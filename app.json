@@ -5,42 +5,44 @@
     "slug": "mcloones-boathouse-connect",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/final_quest_240x240.png",
+    "icon": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg",
     "scheme": "mcloones",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/natively-dark.png",
+      "image": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#E8F1F8"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mcloones.boathouseconnect",
       "infoPlist": {
         "UIBackgroundModes": ["remote-notification"]
-      }
+      },
+      "icon": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/final_quest_240x240.png",
-        "backgroundColor": "#ffffff"
+        "foregroundImage": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg",
+        "backgroundColor": "#E8F1F8"
       },
-      "package": "com.mcloones.boathouseconnect"
+      "package": "com.mcloones.boathouseconnect",
+      "icon": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/final_quest_240x240.png"
+      "favicon": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg"
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#ffffff",
-          "image": "./assets/images/natively-dark.png",
-          "imageWidth": 200
+          "backgroundColor": "#E8F1F8",
+          "image": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg",
+          "imageWidth": 280
         }
       ]
     ],

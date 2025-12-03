@@ -61,17 +61,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
+      // Clean username - remove any leading zeros and whitespace
+      const cleanUsername = username.trim();
+      
+      console.log('Querying database for username:', cleanUsername);
+
       // Query Supabase for user by username
       const { data: userData, error } = await supabase
         .from('users')
         .select('*')
-        .eq('username', username)
+        .eq('username', cleanUsername)
         .single();
 
-      if (error || !userData) {
-        console.log('User not found in database:', error);
+      if (error) {
+        console.log('Database error:', error);
         return false;
       }
+
+      if (!userData) {
+        console.log('User not found in database');
+        return false;
+      }
+
+      console.log('User found:', userData.name);
 
       // Map database user to app user format
       const user: User = {

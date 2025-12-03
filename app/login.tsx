@@ -73,7 +73,7 @@ export default function LoginScreen() {
     }
 
     setIsLoading(true);
-    const success = await login(username, password, rememberMe);
+    const success = await login(username.trim(), password, rememberMe);
     setIsLoading(false);
 
     if (success) {
@@ -105,7 +105,7 @@ export default function LoginScreen() {
           ]}
         >
           <Image
-            source={{ uri: 'https://prod-finalquest-user-projects-storage-bucket-aws.s3.amazonaws.com/user-projects/3d0dba43-d915-4f3b-abce-7a33ab52662a/assets/images/1307410b-fd11-493d-856c-3f8c5cb600a0.jpeg' }}
+            source={require('@/assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg')}
             style={styles.logo}
             resizeMode="contain"
           />
@@ -123,7 +123,6 @@ export default function LoginScreen() {
         >
           <Text style={styles.welcomeText}>Welcome to</Text>
           <Text style={styles.title}>McLoone&apos;s Boathouse Connect</Text>
-          <Text style={styles.subtitle}>Sign in to continue</Text>
 
           {/* Username Input */}
           <View style={styles.inputContainer}>
@@ -136,12 +135,12 @@ export default function LoginScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="Username (3-4 digit number)"
+              placeholder="Username"
               placeholderTextColor={splashColors.textSecondary}
               value={username}
               onChangeText={setUsername}
               autoCapitalize="none"
-              keyboardType="numeric"
+              keyboardType="default"
             />
           </View>
 
@@ -248,12 +247,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: splashColors.primary,
     textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: splashColors.text,
-    textAlign: 'center',
     marginBottom: 32,
   },
   inputContainer: {
@@ -322,8 +315,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: splashColors.textSecondary,
     textAlign: 'center',
-  },
-  textSecondary: {
-    opacity: 0.7,
   },
 });
