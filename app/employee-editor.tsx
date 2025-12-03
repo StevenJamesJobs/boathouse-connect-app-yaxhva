@@ -10,6 +10,8 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { managerColors } from '@/styles/commonStyles';
@@ -213,7 +215,11 @@ export default function EmployeeEditorScreen() {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -252,8 +258,13 @@ export default function EmployeeEditorScreen() {
         />
       </View>
 
-      {/* Filter Buttons */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterContainer}>
+      {/* Filter Buttons - Made more compact */}
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        style={styles.filterContainer}
+        contentContainerStyle={styles.filterContentContainer}
+      >
         {renderFilterButton('all', 'All')}
         {renderFilterButton('a-e', 'A-E')}
         {renderFilterButton('f-i', 'F-I')}
@@ -286,24 +297,24 @@ export default function EmployeeEditorScreen() {
               </View>
               <View style={styles.employeeActions}>
                 <TouchableOpacity
-                  style={styles.actionButton}
+                  style={styles.editButton}
                   onPress={() => handleEditEmployee(employee)}
                 >
                   <IconSymbol
                     ios_icon_name="pencil.circle.fill"
                     android_material_icon_name="edit"
-                    size={24}
+                    size={36}
                     color={managerColors.highlight}
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.actionButton}
+                  style={styles.statusButton}
                   onPress={() => handleToggleActive(employee)}
                 >
                   <IconSymbol
                     ios_icon_name={employee.is_active ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
                     android_material_icon_name={employee.is_active ? 'check_circle' : 'cancel'}
-                    size={24}
+                    size={36}
                     color={employee.is_active ? '#4CAF50' : '#F44336'}
                   />
                 </TouchableOpacity>
@@ -443,7 +454,7 @@ export default function EmployeeEditorScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -499,23 +510,31 @@ const styles = StyleSheet.create({
     color: managerColors.text,
   },
   filterContainer: {
-    marginTop: 16,
+    marginTop: 12,
+    marginBottom: 8,
+    maxHeight: 50,
+  },
+  filterContentContainer: {
     paddingHorizontal: 16,
+    alignItems: 'center',
   },
   filterButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
     backgroundColor: managerColors.card,
-    marginRight: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
+    marginRight: 8,
+    minWidth: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.2)',
+    elevation: 2,
   },
   filterButtonActive: {
     backgroundColor: managerColors.highlight,
   },
   filterButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: managerColors.textSecondary,
   },
@@ -524,7 +543,7 @@ const styles = StyleSheet.create({
   },
   employeeList: {
     flex: 1,
-    marginTop: 16,
+    marginTop: 8,
   },
   employeeListContent: {
     paddingHorizontal: 16,
@@ -576,9 +595,13 @@ const styles = StyleSheet.create({
   employeeActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
-  actionButton: {
-    marginLeft: 12,
+  editButton: {
+    padding: 4,
+  },
+  statusButton: {
+    padding: 4,
   },
   modalOverlay: {
     flex: 1,

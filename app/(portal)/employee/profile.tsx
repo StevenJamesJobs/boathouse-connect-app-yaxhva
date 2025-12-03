@@ -16,6 +16,7 @@ import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 
 export default function EmployeeProfileScreen() {
   const { user } = useAuth();
@@ -28,7 +29,6 @@ export default function EmployeeProfileScreen() {
   
   // Password change state
   const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -116,18 +116,22 @@ export default function EmployeeProfileScreen() {
     try {
       setUploading(true);
 
-      // Convert URI to blob
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      // Read the file as base64
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Convert base64 to array buffer
+      const arrayBuffer = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
 
       // Create file name
-      const fileExt = uri.split('.').pop();
+      const fileExt = uri.split('.').pop() || 'jpg';
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
       // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('profile-pictures')
-        .upload(fileName, blob, {
+        .upload(fileName, arrayBuffer, {
           contentType: 'image/jpeg',
           upsert: true,
         });
@@ -169,6 +173,17 @@ export default function EmployeeProfileScreen() {
     }
 
     try {
+      // Get the current session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        Alert.alert(
+          'Authentication Required',
+          'You need to be logged in with Supabase Auth to change your password. Please contact your manager to reset your password.'
+        );
+        return;
+      }
+
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
@@ -177,7 +192,6 @@ export default function EmployeeProfileScreen() {
 
       Alert.alert('Success', 'Password changed successfully');
       setShowPasswordChange(false);
-      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: any) {
@@ -296,6 +310,9 @@ export default function EmployeeProfileScreen() {
       {/* Password Change */}
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Change Password</Text>
+        <Text style={styles.passwordNote}>
+          Note: Password changes require authentication. If you encounter issues, please contact your manager.
+        </Text>
         {!showPasswordChange ? (
           <TouchableOpacity
             style={styles.passwordButton}
@@ -340,7 +357,6 @@ export default function EmployeeProfileScreen() {
                 style={styles.cancelButton}
                 onPress={() => {
                   setShowPasswordChange(false);
-                  setCurrentPassword('');
                   setNewPassword('');
                   setConfirmPassword('');
                 }}
@@ -442,6 +458,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: employeeColors.text,
     marginBottom: 16,
+  },
+  passwordNote: {
+    fontSize: 12,
+    color: employeeColors.textSecondary,
+    marginBottom: 12,
+    fontStyle: 'italic',
   },
   fieldContainer: {
     marginBottom: 16,
