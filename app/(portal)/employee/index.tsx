@@ -10,9 +10,14 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import CollapsibleSection from '@/components/CollapsibleSection';
+import WeatherWidget from '@/components/WeatherWidget';
 
 export default function EmployeePortalScreen() {
   const { user } = useAuth();
+
+  // Darker header color for sections
+  const headerColor = '#B8D4E0'; // Slightly darker than highlight
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -23,35 +28,32 @@ export default function EmployeePortalScreen() {
         <Text style={styles.tagline}>Let&apos;s see what we have going on today!</Text>
       </View>
 
-      {/* Weather Section */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <IconSymbol
-            ios_icon_name="cloud.sun.fill"
-            android_material_icon_name="wb_sunny"
-            size={24}
-            color={employeeColors.primary}
-          />
-          <Text style={styles.cardTitle}>Weather</Text>
-        </View>
-        <View style={styles.weatherContent}>
-          <Text style={styles.temperature}>72°F</Text>
-          <Text style={styles.weatherDescription}>Partly Cloudy</Text>
-          <Text style={styles.weatherDetail}>Perfect day at the boathouse!</Text>
-        </View>
-      </View>
+      {/* Weather Section - Collapsible */}
+      <CollapsibleSection
+        title="Weather"
+        iconIos="cloud.sun.fill"
+        iconAndroid="wb_sunny"
+        iconColor={employeeColors.primary}
+        headerBackgroundColor={headerColor}
+        headerTextColor={employeeColors.text}
+        defaultExpanded={true}
+      >
+        <WeatherWidget
+          textColor={employeeColors.text}
+          secondaryTextColor={employeeColors.textSecondary}
+        />
+      </CollapsibleSection>
 
-      {/* Announcements Section */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <IconSymbol
-            ios_icon_name="megaphone.fill"
-            android_material_icon_name="campaign"
-            size={24}
-            color={employeeColors.primary}
-          />
-          <Text style={styles.cardTitle}>Announcements</Text>
-        </View>
+      {/* Announcements Section - Collapsible */}
+      <CollapsibleSection
+        title="Announcements"
+        iconIos="megaphone.fill"
+        iconAndroid="campaign"
+        iconColor={employeeColors.primary}
+        headerBackgroundColor={headerColor}
+        headerTextColor={employeeColors.text}
+        defaultExpanded={true}
+      >
         <View style={styles.announcementItem}>
           <Text style={styles.announcementTitle}>Team Meeting Tomorrow</Text>
           <Text style={styles.announcementText}>
@@ -66,7 +68,7 @@ export default function EmployeePortalScreen() {
           </Text>
           <Text style={styles.announcementDate}>Posted yesterday</Text>
         </View>
-      </View>
+      </CollapsibleSection>
 
       {/* Upcoming Events Section */}
       <View style={styles.card}>
@@ -101,17 +103,16 @@ export default function EmployeePortalScreen() {
         </View>
       </View>
 
-      {/* Special Features Section */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <IconSymbol
-            ios_icon_name="star.fill"
-            android_material_icon_name="star"
-            size={24}
-            color={employeeColors.primary}
-          />
-          <Text style={styles.cardTitle}>Special Features</Text>
-        </View>
+      {/* Special Features Section - Collapsible */}
+      <CollapsibleSection
+        title="Special Features"
+        iconIos="star.fill"
+        iconAndroid="star"
+        iconColor={employeeColors.primary}
+        headerBackgroundColor={headerColor}
+        headerTextColor={employeeColors.text}
+        defaultExpanded={true}
+      >
         <View style={styles.featureGrid}>
           <TouchableOpacity style={styles.featureButton}>
             <IconSymbol
@@ -150,19 +151,18 @@ export default function EmployeePortalScreen() {
             <Text style={styles.featureText}>Resources</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </CollapsibleSection>
 
-      {/* Weekly Specials Section */}
-      <View style={[styles.card, styles.lastCard]}>
-        <View style={styles.cardHeader}>
-          <IconSymbol
-            ios_icon_name="fork.knife"
-            android_material_icon_name="restaurant"
-            size={24}
-            color={employeeColors.primary}
-          />
-          <Text style={styles.cardTitle}>Weekly Specials</Text>
-        </View>
+      {/* Weekly Specials Section - Collapsible */}
+      <CollapsibleSection
+        title="Weekly Specials"
+        iconIos="fork.knife"
+        iconAndroid="restaurant"
+        iconColor={employeeColors.primary}
+        headerBackgroundColor={headerColor}
+        headerTextColor={employeeColors.text}
+        defaultExpanded={true}
+      >
         <View style={styles.specialItem}>
           <Text style={styles.specialDay}>Monday</Text>
           <Text style={styles.specialName}>Lobster Roll Special</Text>
@@ -178,7 +178,7 @@ export default function EmployeePortalScreen() {
           <Text style={styles.specialName}>Fresh Catch of the Day</Text>
           <Text style={styles.specialPrice}>Market Price</Text>
         </View>
-      </View>
+      </CollapsibleSection>
     </ScrollView>
   );
 }
@@ -226,9 +226,6 @@ const styles = StyleSheet.create({
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
   },
-  lastCard: {
-    marginBottom: 0,
-  },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -239,25 +236,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: employeeColors.text,
     marginLeft: 12,
-  },
-  weatherContent: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  temperature: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: employeeColors.text,
-  },
-  weatherDescription: {
-    fontSize: 18,
-    color: employeeColors.textSecondary,
-    marginTop: 4,
-  },
-  weatherDetail: {
-    fontSize: 14,
-    color: employeeColors.textSecondary,
-    marginTop: 8,
   },
   announcementItem: {
     paddingVertical: 12,
