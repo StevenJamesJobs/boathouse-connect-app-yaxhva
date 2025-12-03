@@ -1,8 +1,7 @@
-
 {
   "expo": {
-    "name": "McLoone's Boathouse Connect",
-    "slug": "mcloones-boathouse-connect",
+    "name": "Boathouse Connect",
+    "slug": "Boathouse Connect",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg",
@@ -18,7 +17,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.mcloones.boathouseconnect",
       "infoPlist": {
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       },
       "icon": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg"
     },
@@ -49,5 +50,6 @@
     "experiments": {
       "typedRoutes": true
     }
-  }
+  },
+  "scheme": "Boathouse Connect"
 }
