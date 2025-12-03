@@ -45,15 +45,17 @@ export default function EmployeeProfileScreen() {
       setSaving(true);
       if (!user?.id) return;
 
-      const { error } = await supabase
-        .from('users')
-        .update({
-          email: email,
-          phone_number: phoneNumber,
-        })
-        .eq('id', user.id);
+      // Use the new RPC function to update profile info
+      const { error } = await supabase.rpc('update_profile_info', {
+        user_id: user.id,
+        new_email: email,
+        new_phone_number: phoneNumber,
+      });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating profile:', error);
+        throw error;
+      }
 
       // Refresh user data in context
       await refreshUser();
@@ -152,16 +154,18 @@ export default function EmployeeProfileScreen() {
 
       console.log('Public URL:', urlData.publicUrl);
 
-      // Update user record
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ profile_picture_url: urlData.publicUrl })
-        .eq('id', user.id);
+      // Update user record using the new RPC function
+      const { error: updateError } = await supabase.rpc('update_profile_picture', {
+        user_id: user.id,
+        picture_url: urlData.publicUrl,
+      });
 
       if (updateError) {
         console.error('Update error:', updateError);
         throw updateError;
       }
+
+      console.log('Database updated successfully with profile picture URL');
 
       // Refresh user data in context to update profile picture everywhere
       await refreshUser();
