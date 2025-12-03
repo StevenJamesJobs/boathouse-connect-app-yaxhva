@@ -1,47 +1,51 @@
+
 {
   "expo": {
-    "name": "Natively",
-    "slug": "Natively",
+    "name": "McLoone's Boathouse Connect",
+    "slug": "mcloones-boathouse-connect",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/natively-dark.png",
+    "icon": "./assets/images/final_quest_240x240.png",
+    "scheme": "mcloones",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/natively-dark.png",
       "resizeMode": "contain",
-      "backgroundColor": "#000000"
+      "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.Natively",
+      "bundleIdentifier": "com.mcloones.boathouseconnect",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/natively-dark.png",
-        "backgroundColor": "#000000"
+        "foregroundImage": "./assets/images/final_quest_240x240.png",
+        "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.Natively"
+      "package": "com.mcloones.boathouseconnect"
     },
     "web": {
-      "favicon": "./assets/images/final_quest_240x240.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/final_quest_240x240.png"
     },
     "plugins": [
-      "expo-font",
       "expo-router",
-      "expo-web-browser"
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ffffff",
+          "image": "./assets/images/natively-dark.png",
+          "imageWidth": 200
+        }
+      ]
     ],
-    "scheme": "natively",
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "router": {}
     }
   }
 }

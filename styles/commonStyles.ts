@@ -1,14 +1,46 @@
+
 import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
 
+// Employee Portal Colors (Light Blue Theme)
+export const employeeColors = {
+  background: '#E0F2F7',
+  text: '#2E3B4E',
+  textSecondary: '#607B96',
+  primary: '#3498DB',
+  card: '#FFFFFF',
+  highlight: '#A7D9ED',
+  border: '#B8D4E0',
+};
+
+// Manager Portal Colors (Dark Blue Theme)
+export const managerColors = {
+  background: '#2C3E50',
+  text: '#ECF0F1',
+  textSecondary: '#BDC3C7',
+  primary: '#34495E',
+  card: '#34495E',
+  highlight: '#7F8C8D',
+  border: '#4A5F7F',
+};
+
+// Splash Screen Colors
+export const splashColors = {
+  background: '#FFFFFF',
+  primary: '#2C5F8D',
+  secondary: '#A7D9ED',
+  text: '#2E3B4E',
+};
+
+// Legacy colors for backward compatibility
 export const colors = {
-  primary: '#162456',    // Material Blue
-  secondary: '#193cb8',  // Darker Blue
-  accent: '#64B5F6',     // Light Blue
-  background: '#101824',  // Keeping dark background
-  backgroundAlt: '#162133',  // Keeping dark background
-  text: '#e3e3e3',       // Keeping light text
-  grey: '#90CAF9',       // Light Blue Grey
-  card: '#193cb8',       // Keeping dark card background
+  primary: '#162456',
+  secondary: '#193cb8',
+  accent: '#64B5F6',
+  background: '#101824',
+  backgroundAlt: '#162133',
+  text: '#e3e3e3',
+  grey: '#90CAF9',
+  card: '#193cb8',
 };
 
 export const buttonStyles = StyleSheet.create({
