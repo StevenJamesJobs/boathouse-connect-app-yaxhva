@@ -1,15 +1,19 @@
 
 import { StyleSheet, ViewStyle, TextStyle } from 'react-native';
 
-// Employee Portal Colors (Light Blue Theme)
+// Employee Portal Colors (Improved Light Blue Theme with Better Contrast)
 export const employeeColors = {
-  background: '#E0F2F7',
-  text: '#2E3B4E',
-  textSecondary: '#607B96',
-  primary: '#3498DB',
+  background: '#E8F4F8',
+  text: '#1A3A52',
+  textSecondary: '#4A6B7C',
+  primary: '#1976D2',
+  primaryLight: '#42A5F5',
   card: '#FFFFFF',
-  highlight: '#A7D9ED',
-  border: '#B8D4E0',
+  highlight: '#90CAF9',
+  border: '#B0BEC5',
+  tabBarBackground: '#FFFFFF',
+  tabBarActive: '#0D47A1',
+  tabBarInactive: '#546E7A',
 };
 
 // Manager Portal Colors (Improved Dark Blue Theme with better contrast)

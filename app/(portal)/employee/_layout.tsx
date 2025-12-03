@@ -35,7 +35,7 @@ function EmployeeHeader() {
 function FloatingTabBar({ state, descriptors, navigation }: any) {
   return (
     <View style={styles.floatingTabBarContainer}>
-      <BlurView intensity={80} style={styles.blurContainer}>
+      <BlurView intensity={100} style={styles.blurContainer}>
         <View style={styles.tabBarContent}>
           {state.routes.map((route: any, index: number) => {
             const { options } = descriptors[route.key];
@@ -65,13 +65,13 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
                 style={styles.tabButton}
               >
                 {options.tabBarIcon && options.tabBarIcon({
-                  color: isFocused ? employeeColors.primary : employeeColors.textSecondary,
-                  size: 22,
+                  color: isFocused ? employeeColors.tabBarActive : employeeColors.tabBarInactive,
+                  size: 24,
                 })}
                 <Text
                   style={[
                     styles.tabLabel,
-                    { color: isFocused ? employeeColors.primary : employeeColors.textSecondary }
+                    { color: isFocused ? employeeColors.tabBarActive : employeeColors.tabBarInactive }
                   ]}
                   numberOfLines={1}
                 >
@@ -205,22 +205,22 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     borderRadius: 30,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderWidth: 1.5,
+    borderColor: employeeColors.border,
     ...Platform.select({
       ios: {
-        backgroundColor: 'rgba(255, 255, 255, 0.7)',
-      },
-      android: {
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
       },
+      android: {
+        backgroundColor: employeeColors.tabBarBackground,
+      },
       web: {
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        backgroundColor: 'rgba(255, 255, 255, 0.98)',
         backdropFilter: 'blur(20px)',
       },
     }),
-    boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.15)',
-    elevation: 8,
+    boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.2)',
+    elevation: 10,
   },
   tabBarContent: {
     flexDirection: 'row',
@@ -239,7 +239,7 @@ const styles = StyleSheet.create({
   },
   tabLabel: {
     fontSize: 11,
-    fontWeight: '600',
+    fontWeight: '700',
     marginTop: 3,
     textAlign: 'center',
   },
