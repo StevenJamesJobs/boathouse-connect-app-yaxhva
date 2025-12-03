@@ -1,6 +1,7 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabase } from '@/app/integrations/supabase/client';
 import { User, AuthState } from '@/types/user';
 
 interface AuthContextType extends AuthState {
@@ -9,127 +10,6 @@ interface AuthContextType extends AuthState {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// Mock user database - In production, this would be in Supabase
-const MOCK_USERS: User[] = [
-  {
-    id: '1',
-    username: '251',
-    name: 'Steven Eccles',
-    email: 'seccles@mcloones.com',
-    jobTitle: 'Manager',
-    phoneNumber: '732-551-6184',
-    role: 'manager',
-  },
-  {
-    id: '2',
-    username: '1205',
-    name: 'Test Manager',
-    email: 'Stevenjamesjobs@gmail.com',
-    jobTitle: 'Manager',
-    phoneNumber: '555-555-555',
-    role: 'manager',
-  },
-  {
-    id: '3',
-    username: '1206',
-    name: 'Test Employee',
-    email: 'alanawilliams327@gmail.com',
-    jobTitle: 'Server',
-    phoneNumber: '556-556-5566',
-    role: 'employee',
-  },
-  {
-    id: '4',
-    username: '201',
-    name: 'Dylan Cathcart',
-    email: 'Dylancathcart@gmail.com',
-    jobTitle: 'Server/Bartender/Banquets',
-    phoneNumber: '(973) 830-9288',
-    role: 'employee',
-  },
-  {
-    id: '5',
-    username: '9410',
-    name: 'Amanda Martino',
-    email: 'amandamarzouk24@gmail.com',
-    jobTitle: 'Server',
-    phoneNumber: '(856) 533-8232',
-    role: 'employee',
-  },
-  {
-    id: '6',
-    username: '9874',
-    name: 'Hanifah Donaldson',
-    email: 'nifahk12@yahoo.com',
-    jobTitle: 'Server',
-    phoneNumber: '(862) 930-8778',
-    role: 'employee',
-  },
-  {
-    id: '7',
-    username: '1614',
-    name: 'Najii Demsyn',
-    email: 'najiimccain4850@gmail.com',
-    jobTitle: 'Server/Banquets',
-    phoneNumber: '(516) 602-8024',
-    role: 'employee',
-  },
-  {
-    id: '8',
-    username: '6218',
-    name: 'Ernesto Gibson',
-    email: 'EPGibson94@gmail.com',
-    jobTitle: 'Manager',
-    phoneNumber: '(609) 851-7927',
-    role: 'manager',
-  },
-  {
-    id: '9',
-    username: '6858',
-    name: 'Nasio Mathieson',
-    email: 'nmathieson123@gmail.com',
-    jobTitle: 'Runner/Busser',
-    phoneNumber: '(973) 380-9144',
-    role: 'employee',
-  },
-  {
-    id: '10',
-    username: '5665',
-    name: 'Atoy Smith',
-    email: 'atoysmith21@gmail.com',
-    jobTitle: 'Kitchen',
-    phoneNumber: '(201) 463-5707',
-    role: 'employee',
-  },
-  {
-    id: '11',
-    username: '1786',
-    name: 'Alicia Orsino',
-    email: 'aliciaorsino85@gmail.com',
-    jobTitle: 'Bartender',
-    phoneNumber: '(973) 932-2505',
-    role: 'employee',
-  },
-  {
-    id: '12',
-    username: '6807',
-    name: 'John Lachawiec',
-    email: 'babciacakes@gmail.com',
-    jobTitle: 'Server/Bartender/Banquets/Kitchen',
-    phoneNumber: '(732) 759-7304',
-    role: 'employee',
-  },
-  {
-    id: '13',
-    username: '2209',
-    name: 'Leana Santos',
-    email: 'leanasantos0303@gmail.com',
-    jobTitle: 'Banquets',
-    phoneNumber: '(908) 606-7957',
-    role: 'employee',
-  },
-];
 
 const DEFAULT_PASSWORD = 'boathouseconnect';
 const STORAGE_KEY = '@mcloones_auth';
@@ -175,19 +55,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Attempting login with username:', username);
       
-      // Find user by username
-      const user = MOCK_USERS.find(u => u.username === username);
-      
-      if (!user) {
-        console.log('User not found');
-        return false;
-      }
-
-      // Check password
+      // Check password first
       if (password !== DEFAULT_PASSWORD) {
         console.log('Invalid password');
         return false;
       }
+
+      // Query Supabase for user by username
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('username', username)
+        .single();
+
+      if (error || !userData) {
+        console.log('User not found in database:', error);
+        return false;
+      }
+
+      // Map database user to app user format
+      const user: User = {
+        id: userData.id,
+        username: userData.username,
+        name: userData.name,
+        email: userData.email,
+        jobTitle: userData.job_title,
+        phoneNumber: userData.phone_number || '',
+        role: userData.role as 'employee' | 'manager',
+      };
 
       // Store auth state
       if (rememberMe) {
