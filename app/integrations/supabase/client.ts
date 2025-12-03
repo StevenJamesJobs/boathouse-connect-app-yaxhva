@@ -1,5 +1,5 @@
 
-// CRITICAL: Import polyfill first
+// CRITICAL: Import polyfill first - this must be before any other imports
 import 'react-native-url-polyfill/auto';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { Database } from './types';
@@ -17,7 +17,5 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
-    // Disable PKCE flow for React Native
-    flowType: 'implicit',
   },
 })

@@ -6,6 +6,8 @@ import { View, ActivityIndicator, StyleSheet } from 'react-native';
 export default function Index() {
   const { isAuthenticated, isLoading, user } = useAuth();
 
+  console.log('Index screen - Auth state:', { isAuthenticated, isLoading, role: user?.role });
+
   if (isLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -16,6 +18,7 @@ export default function Index() {
 
   if (isAuthenticated && user) {
     // Redirect to appropriate portal based on role
+    console.log('Redirecting to portal for role:', user.role);
     if (user.role === 'manager') {
       return <Redirect href="/(portal)/manager" />;
     } else {
@@ -24,6 +27,7 @@ export default function Index() {
   }
 
   // Not authenticated, redirect to login
+  console.log('Not authenticated, redirecting to login');
   return <Redirect href="/login" />;
 }
 

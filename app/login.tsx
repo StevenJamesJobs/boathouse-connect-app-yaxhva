@@ -25,7 +25,7 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, user } = useAuth();
 
   // Animation values
   const logoScale = new Animated.Value(0);
@@ -77,8 +77,12 @@ export default function LoginScreen() {
     setIsLoading(false);
 
     if (success) {
-      // Navigation will be handled by the root layout based on auth state
-      router.replace('/(portal)');
+      // Wait a moment for auth state to update, then navigate
+      setTimeout(() => {
+        // Navigation will be handled by redirecting to the portal index
+        // which will then redirect to the appropriate portal based on role
+        router.replace('/(portal)');
+      }, 100);
     } else {
       Alert.alert('Login Failed', 'Invalid username or password. Please try again.');
     }

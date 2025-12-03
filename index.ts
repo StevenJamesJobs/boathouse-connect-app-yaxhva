@@ -1,55 +1,77 @@
 
-// CRITICAL: This polyfill MUST be the very first import
-// It must run before any code that might reference window or document
-import 'react-native-url-polyfill/auto';
+// CRITICAL: This polyfill MUST be the very first thing that runs
+// It must execute before ANY other code, including imports
 
-// Comprehensive polyfill for window object in React Native
-// This must be done before any other imports that might use window
+// Polyfill window object IMMEDIATELY
 if (typeof window === 'undefined') {
   (global as any).window = global;
-  (global as any).window.addEventListener = () => {};
-  (global as any).window.removeEventListener = () => {};
-  (global as any).window.dispatchEvent = () => true;
-  (global as any).window.location = {
-    href: '',
-    protocol: 'https:',
-    host: '',
-    hostname: '',
-    port: '',
-    pathname: '/',
-    search: '',
-    hash: '',
-    assign: () => {},
-    reload: () => {},
-    replace: () => {},
-  };
-  (global as any).window.navigator = {
-    userAgent: 'ReactNative',
-    language: 'en-US',
-    languages: ['en-US', 'en'],
-    onLine: true,
-  };
-  (global as any).window.localStorage = {
-    getItem: () => null,
-    setItem: () => {},
-    removeItem: () => {},
-    clear: () => {},
-  };
-  (global as any).window.sessionStorage = {
-    getItem: () => null,
-    setItem: () => {},
-    removeItem: () => {},
-    clear: () => {},
-  };
 }
 
-// Additional polyfills for browser APIs
+// Now add all window properties
+if (typeof window !== 'undefined') {
+  if (!window.addEventListener) {
+    window.addEventListener = () => {};
+  }
+  if (!window.removeEventListener) {
+    window.removeEventListener = () => {};
+  }
+  if (!window.dispatchEvent) {
+    window.dispatchEvent = () => true;
+  }
+  if (!window.location) {
+    (window as any).location = {
+      href: '',
+      protocol: 'https:',
+      host: '',
+      hostname: '',
+      port: '',
+      pathname: '/',
+      search: '',
+      hash: '',
+      assign: () => {},
+      reload: () => {},
+      replace: () => {},
+    };
+  }
+  if (!window.navigator) {
+    (window as any).navigator = {
+      userAgent: 'ReactNative',
+      language: 'en-US',
+      languages: ['en-US', 'en'],
+      onLine: true,
+    };
+  }
+  if (!window.localStorage) {
+    (window as any).localStorage = {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+      clear: () => {},
+      length: 0,
+      key: () => null,
+    };
+  }
+  if (!window.sessionStorage) {
+    (window as any).sessionStorage = {
+      getItem: () => null,
+      setItem: () => {},
+      removeItem: () => {},
+      clear: () => {},
+      length: 0,
+      key: () => null,
+    };
+  }
+}
+
+// Polyfill document object
 if (typeof document === 'undefined') {
   (global as any).document = {
     addEventListener: () => {},
     removeEventListener: () => {},
     createElement: () => ({}),
     getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: () => [],
     documentElement: {
       style: {},
     },
@@ -57,15 +79,29 @@ if (typeof document === 'undefined') {
       style: {},
     },
     cookie: '',
+    readyState: 'complete',
   };
 }
 
-// Polyfill for CustomEvent
+// Polyfill CustomEvent
 if (typeof CustomEvent === 'undefined') {
   (global as any).CustomEvent = class CustomEvent {
-    constructor(public type: string, public detail?: any) {}
+    constructor(public type: string, params?: any) {
+      this.detail = params?.detail;
+    }
+    detail: any;
   };
 }
 
-// Now we can safely import expo-router
+// Polyfill Event
+if (typeof Event === 'undefined') {
+  (global as any).Event = class Event {
+    constructor(public type: string) {}
+  };
+}
+
+// Now import URL polyfill
+import 'react-native-url-polyfill/auto';
+
+// Finally, import expo-router entry
 import 'expo-router/entry';

@@ -2,7 +2,7 @@
 import "react-native-reanimated";
 import React, { useEffect } from "react";
 import { useFonts } from "expo-font";
-import { Stack, router, useSegments } from "expo-router";
+import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { SystemBars } from "react-native-edge-to-edge";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -22,13 +22,14 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
-  initialRouteName: "login",
+  initialRouteName: "index",
 };
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const networkState = useNetworkState();
   const segments = useSegments();
+  const router = useRouter();
   const { isAuthenticated, isLoading, user } = useAuth();
 
   const [loaded] = useFonts({
@@ -59,13 +60,18 @@ function RootLayoutNav() {
 
     const inPortal = segments[0] === '(portal)';
     const onLogin = segments[0] === 'login';
+    const onIndex = segments.length === 0 || segments[0] === 'index';
+
+    console.log('Navigation check:', { isAuthenticated, segments, user: user?.role });
 
     if (!isAuthenticated && inPortal) {
       // Redirect to login if not authenticated and trying to access portal
+      console.log('Redirecting to login - not authenticated');
       router.replace('/login');
-    } else if (isAuthenticated && !inPortal && user) {
-      // Redirect to appropriate portal based on role
-      if (user.role === 'manager') {
+    } else if (isAuthenticated && (onLogin || onIndex)) {
+      // Redirect to appropriate portal based on role when on login or index
+      console.log('Redirecting to portal - authenticated');
+      if (user?.role === 'manager') {
         router.replace('/(portal)/manager');
       } else {
         router.replace('/(portal)/employee');
@@ -111,6 +117,7 @@ function RootLayoutNav() {
         <WidgetProvider>
           <GestureHandlerRootView>
             <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
               <Stack.Screen name="login" />
               <Stack.Screen name="(portal)" />
             </Stack>
