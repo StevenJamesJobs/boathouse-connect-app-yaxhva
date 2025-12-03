@@ -66,13 +66,14 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
               >
                 {options.tabBarIcon && options.tabBarIcon({
                   color: isFocused ? managerColors.highlight : managerColors.textSecondary,
-                  size: 24,
+                  size: 22,
                 })}
                 <Text
                   style={[
                     styles.tabLabel,
                     { color: isFocused ? managerColors.highlight : managerColors.textSecondary }
                   ]}
+                  numberOfLines={1}
                 >
                   {label}
                 </Text>
@@ -181,11 +182,13 @@ const styles = StyleSheet.create({
   floatingTabBarContainer: {
     position: 'absolute',
     bottom: 20,
-    left: 20,
-    right: 20,
+    left: 10,
+    right: 10,
     alignItems: 'center',
   },
   blurContainer: {
+    width: '100%',
+    maxWidth: 500,
     borderRadius: 30,
     overflow: 'hidden',
     borderWidth: 1,
@@ -207,8 +210,8 @@ const styles = StyleSheet.create({
   },
   tabBarContent: {
     flexDirection: 'row',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'space-around',
   },
@@ -216,12 +219,14 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    minWidth: 70,
   },
   tabLabel: {
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '600',
-    marginTop: 4,
+    marginTop: 3,
+    textAlign: 'center',
   },
 });
