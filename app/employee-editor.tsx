@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { managerColors } from '@/styles/commonStyles';
@@ -128,21 +129,16 @@ export default function EmployeeEditorScreen() {
         return;
       }
 
-      // Insert into users table
-      const { data, error } = await supabase
-        .from('users')
-        .insert([
-          {
-            username: newEmployee.username,
-            name: newEmployee.name,
-            email: newEmployee.email,
-            job_title: newEmployee.job_title,
-            phone_number: newEmployee.phone_number,
-            role: newEmployee.role,
-            is_active: true,
-          },
-        ])
-        .select();
+      // Call the database function to create user (bypasses RLS)
+      const { data, error } = await supabase.rpc('create_user', {
+        p_username: newEmployee.username,
+        p_name: newEmployee.name,
+        p_email: newEmployee.email,
+        p_job_title: newEmployee.job_title,
+        p_phone_number: newEmployee.phone_number,
+        p_role: newEmployee.role,
+        p_password: newEmployee.password,
+      });
 
       if (error) throw error;
 
@@ -190,6 +186,19 @@ export default function EmployeeEditorScreen() {
       console.error('Error toggling employee status:', error);
       Alert.alert('Error', 'Failed to update employee status');
     }
+  };
+
+  const getProfilePictureUrl = (url: string | null | undefined) => {
+    if (!url) return null;
+    
+    // If it's already a full URL, return it
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    
+    // Otherwise, construct the Supabase storage URL
+    const { data } = supabase.storage.from('profile-pictures').getPublicUrl(url);
+    return data.publicUrl;
   };
 
   const renderFilterButton = (filter: FilterType, label: string) => (
@@ -278,49 +287,60 @@ export default function EmployeeEditorScreen() {
         {filteredEmployees.length === 0 ? (
           <Text style={styles.emptyText}>No employees found</Text>
         ) : (
-          filteredEmployees.map((employee, index) => (
-            <View key={index} style={styles.employeeCard}>
-              <View style={styles.employeeInfo}>
-                <View style={styles.employeeAvatar}>
-                  <IconSymbol
-                    ios_icon_name="person.circle.fill"
-                    android_material_icon_name="account_circle"
-                    size={50}
-                    color={managerColors.highlight}
-                  />
+          filteredEmployees.map((employee, index) => {
+            const profilePictureUrl = getProfilePictureUrl(employee.profile_picture_url);
+            
+            return (
+              <View key={index} style={styles.employeeCard}>
+                <View style={styles.employeeInfo}>
+                  <View style={styles.employeeAvatar}>
+                    {profilePictureUrl ? (
+                      <Image
+                        source={{ uri: profilePictureUrl }}
+                        style={styles.profileImage}
+                      />
+                    ) : (
+                      <IconSymbol
+                        ios_icon_name="person.circle.fill"
+                        android_material_icon_name="account_circle"
+                        size={50}
+                        color={managerColors.highlight}
+                      />
+                    )}
+                  </View>
+                  <View style={styles.employeeDetails}>
+                    <Text style={styles.employeeName}>{employee.name}</Text>
+                    <Text style={styles.employeeRole}>{employee.job_title}</Text>
+                    <Text style={styles.employeeUsername}>@{employee.username}</Text>
+                  </View>
                 </View>
-                <View style={styles.employeeDetails}>
-                  <Text style={styles.employeeName}>{employee.name}</Text>
-                  <Text style={styles.employeeRole}>{employee.job_title}</Text>
-                  <Text style={styles.employeeUsername}>@{employee.username}</Text>
+                <View style={styles.employeeActions}>
+                  <TouchableOpacity
+                    style={styles.editButton}
+                    onPress={() => handleEditEmployee(employee)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="pencil.circle.fill"
+                      android_material_icon_name="edit"
+                      size={36}
+                      color={managerColors.highlight}
+                    />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.statusButton}
+                    onPress={() => handleToggleActive(employee)}
+                  >
+                    <IconSymbol
+                      ios_icon_name={employee.is_active ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
+                      android_material_icon_name={employee.is_active ? 'check_circle' : 'cancel'}
+                      size={36}
+                      color={employee.is_active ? '#4CAF50' : '#F44336'}
+                    />
+                  </TouchableOpacity>
                 </View>
               </View>
-              <View style={styles.employeeActions}>
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => handleEditEmployee(employee)}
-                >
-                  <IconSymbol
-                    ios_icon_name="pencil.circle.fill"
-                    android_material_icon_name="edit"
-                    size={36}
-                    color={managerColors.highlight}
-                  />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.statusButton}
-                  onPress={() => handleToggleActive(employee)}
-                >
-                  <IconSymbol
-                    ios_icon_name={employee.is_active ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
-                    android_material_icon_name={employee.is_active ? 'check_circle' : 'cancel'}
-                    size={36}
-                    color={employee.is_active ? '#4CAF50' : '#F44336'}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
+            );
+          })
         )}
       </ScrollView>
 
@@ -573,6 +593,15 @@ const styles = StyleSheet.create({
   },
   employeeAvatar: {
     marginRight: 12,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    overflow: 'hidden',
+  },
+  profileImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   employeeDetails: {
     flex: 1,
