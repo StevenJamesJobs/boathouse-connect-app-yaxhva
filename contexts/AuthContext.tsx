@@ -7,6 +7,7 @@ import { User, AuthState } from '@/types/user';
 interface AuthContextType extends AuthState {
   login: (username: string, password: string, rememberMe: boolean) => Promise<boolean>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,19 +26,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loadStoredAuth();
   }, []);
 
+  const fetchUserFromDatabase = async (userId: string): Promise<User | null> => {
+    try {
+      console.log('Fetching user data from database for user:', userId);
+      
+      const { data: userData, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.log('Error fetching user from database:', error);
+        return null;
+      }
+
+      if (!userData) {
+        console.log('User not found in database');
+        return null;
+      }
+
+      // Map database user to app user format
+      const user: User = {
+        id: userData.id,
+        username: userData.username,
+        name: userData.name,
+        email: userData.email,
+        jobTitle: userData.job_title,
+        phoneNumber: userData.phone_number || '',
+        role: userData.role as 'employee' | 'manager',
+        profilePictureUrl: userData.profile_picture_url || undefined,
+      };
+
+      console.log('User data fetched successfully, profile picture URL:', user.profilePictureUrl);
+      return user;
+    } catch (error) {
+      console.log('Error fetching user from database:', error);
+      return null;
+    }
+  };
+
   const loadStoredAuth = async () => {
     try {
       const rememberMe = await AsyncStorage.getItem(REMEMBER_ME_KEY);
       if (rememberMe === 'true') {
         const storedAuth = await AsyncStorage.getItem(STORAGE_KEY);
         if (storedAuth) {
-          const user = JSON.parse(storedAuth);
-          setAuthState({
-            user,
-            isLoading: false,
-            isAuthenticated: true,
-          });
-          return;
+          const storedUser = JSON.parse(storedAuth);
+          console.log('Loaded user from storage:', storedUser.name);
+          
+          // Fetch the latest user data from database to get updated profile picture
+          const freshUser = await fetchUserFromDatabase(storedUser.id);
+          
+          if (freshUser) {
+            // Update storage with fresh data
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
+            
+            setAuthState({
+              user: freshUser,
+              isLoading: false,
+              isAuthenticated: true,
+            });
+            return;
+          }
         }
       }
     } catch (error) {
@@ -48,6 +99,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading: false,
       isAuthenticated: false,
     });
+  };
+
+  const refreshUser = async () => {
+    try {
+      if (!authState.user?.id) return;
+      
+      console.log('Refreshing user data...');
+      const freshUser = await fetchUserFromDatabase(authState.user.id);
+      
+      if (freshUser) {
+        // Update storage
+        const rememberMe = await AsyncStorage.getItem(REMEMBER_ME_KEY);
+        if (rememberMe === 'true') {
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
+        }
+        
+        setAuthState({
+          user: freshUser,
+          isLoading: false,
+          isAuthenticated: true,
+        });
+        console.log('User data refreshed successfully');
+      }
+    } catch (error) {
+      console.log('Error refreshing user:', error);
+    }
   };
 
   const login = async (username: string, password: string, rememberMe: boolean): Promise<boolean> => {
@@ -121,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: true,
       });
 
-      console.log('Login successful for user:', user.name);
+      console.log('Login successful for user:', user.name, 'Profile picture:', user.profilePictureUrl);
       return true;
     } catch (error) {
       console.log('Login error:', error);
@@ -145,7 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ ...authState, login, logout }}>
+    <AuthContext.Provider value={{ ...authState, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

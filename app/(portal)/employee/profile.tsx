@@ -19,10 +19,9 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 
 export default function EmployeeProfileScreen() {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const [email, setEmail] = useState(user?.email || '');
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
-  const [profilePictureUrl, setProfilePictureUrl] = useState(user?.profilePictureUrl || '');
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -33,28 +32,13 @@ export default function EmployeeProfileScreen() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
+  // Update local state when user context changes
   useEffect(() => {
-    fetchUserProfile();
-  }, []);
-
-  const fetchUserProfile = async () => {
-    try {
-      if (!user?.id) return;
-
-      const { data, error } = await supabase
-        .from('users')
-        .select('profile_picture_url')
-        .eq('id', user.id)
-        .single();
-
-      if (error) throw error;
-      if (data?.profile_picture_url) {
-        setProfilePictureUrl(data.profile_picture_url);
-      }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
+    if (user) {
+      setEmail(user.email);
+      setPhoneNumber(user.phoneNumber);
     }
-  };
+  }, [user]);
 
   const handleSave = async () => {
     try {
@@ -70,6 +54,9 @@ export default function EmployeeProfileScreen() {
         .eq('id', user.id);
 
       if (error) throw error;
+
+      // Refresh user data in context
+      await refreshUser();
 
       Alert.alert('Success', 'Profile updated successfully!');
       setIsEditing(false);
@@ -176,7 +163,9 @@ export default function EmployeeProfileScreen() {
         throw updateError;
       }
 
-      setProfilePictureUrl(urlData.publicUrl);
+      // Refresh user data in context to update profile picture everywhere
+      await refreshUser();
+
       Alert.alert('Success', 'Profile picture updated successfully');
     } catch (error: any) {
       console.error('Error uploading image:', error);
@@ -251,8 +240,12 @@ export default function EmployeeProfileScreen() {
         <TouchableOpacity onPress={handlePickImage} style={styles.avatarContainer}>
           {uploading ? (
             <ActivityIndicator size="large" color={employeeColors.primary} />
-          ) : profilePictureUrl ? (
-            <Image source={{ uri: profilePictureUrl }} style={styles.avatar} />
+          ) : user?.profilePictureUrl ? (
+            <Image 
+              source={{ uri: user.profilePictureUrl }} 
+              style={styles.avatar}
+              key={user.profilePictureUrl} // Force re-render when URL changes
+            />
           ) : (
             <IconSymbol
               ios_icon_name="person.circle.fill"
