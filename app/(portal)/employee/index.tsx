@@ -70,17 +70,16 @@ export default function EmployeePortalScreen() {
         </View>
       </CollapsibleSection>
 
-      {/* Upcoming Events Section */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <IconSymbol
-            ios_icon_name="calendar"
-            android_material_icon_name="event"
-            size={24}
-            color={employeeColors.primary}
-          />
-          <Text style={styles.cardTitle}>Upcoming Events</Text>
-        </View>
+      {/* Upcoming Events Section - Collapsible */}
+      <CollapsibleSection
+        title="Upcoming Events"
+        iconIos="calendar"
+        iconAndroid="event"
+        iconColor={employeeColors.primary}
+        headerBackgroundColor={headerColor}
+        headerTextColor={employeeColors.text}
+        defaultExpanded={true}
+      >
         <View style={styles.eventItem}>
           <View style={styles.eventDate}>
             <Text style={styles.eventDay}>15</Text>
@@ -101,7 +100,7 @@ export default function EmployeePortalScreen() {
             <Text style={styles.eventTime}>7:00 PM - 11:00 PM</Text>
           </View>
         </View>
-      </View>
+      </CollapsibleSection>
 
       {/* Special Features Section - Collapsible */}
       <CollapsibleSection
@@ -191,7 +190,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingTop: 20,
     paddingHorizontal: 16,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   welcomeSection: {
     backgroundColor: employeeColors.card,
@@ -217,25 +216,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: employeeColors.textSecondary,
     fontStyle: 'italic',
-  },
-  card: {
-    backgroundColor: employeeColors.card,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: employeeColors.text,
-    marginLeft: 12,
   },
   announcementItem: {
     paddingVertical: 12,

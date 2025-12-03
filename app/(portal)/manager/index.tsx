@@ -17,7 +17,8 @@ export default function ManagerPortalScreen() {
   const { user } = useAuth();
 
   // Darker header color for sections
-  const headerColor = '#5D6D7E'; // Slightly darker than card
+  const headerColor = '#34495E'; // Slightly darker than card
+  const contentColor = managerColors.card; // Use card color for content
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
@@ -33,9 +34,10 @@ export default function ManagerPortalScreen() {
         title="Weather"
         iconIos="cloud.sun.fill"
         iconAndroid="wb_sunny"
-        iconColor={managerColors.highlight}
+        iconColor={managerColors.accent}
         headerBackgroundColor={headerColor}
         headerTextColor={managerColors.text}
+        contentBackgroundColor={contentColor}
         defaultExpanded={true}
       >
         <WeatherWidget
@@ -49,9 +51,10 @@ export default function ManagerPortalScreen() {
         title="Announcements"
         iconIos="megaphone.fill"
         iconAndroid="campaign"
-        iconColor={managerColors.highlight}
+        iconColor={managerColors.accent}
         headerBackgroundColor={headerColor}
         headerTextColor={managerColors.text}
+        contentBackgroundColor={contentColor}
         defaultExpanded={true}
       >
         <View style={styles.announcementItem}>
@@ -79,17 +82,17 @@ export default function ManagerPortalScreen() {
         </TouchableOpacity>
       </CollapsibleSection>
 
-      {/* Upcoming Events Section */}
-      <View style={styles.card}>
-        <View style={styles.cardHeader}>
-          <IconSymbol
-            ios_icon_name="calendar"
-            android_material_icon_name="event"
-            size={24}
-            color={managerColors.highlight}
-          />
-          <Text style={styles.cardTitle}>Upcoming Events</Text>
-        </View>
+      {/* Upcoming Events Section - Collapsible */}
+      <CollapsibleSection
+        title="Upcoming Events"
+        iconIos="calendar"
+        iconAndroid="event"
+        iconColor={managerColors.accent}
+        headerBackgroundColor={headerColor}
+        headerTextColor={managerColors.text}
+        contentBackgroundColor={contentColor}
+        defaultExpanded={true}
+      >
         <View style={styles.eventItem}>
           <View style={styles.eventDate}>
             <Text style={styles.eventDay}>15</Text>
@@ -119,16 +122,17 @@ export default function ManagerPortalScreen() {
           />
           <Text style={styles.editButtonText}>Edit Events</Text>
         </TouchableOpacity>
-      </View>
+      </CollapsibleSection>
 
       {/* Special Features Section - Collapsible */}
       <CollapsibleSection
         title="Special Features"
         iconIos="star.fill"
         iconAndroid="star"
-        iconColor={managerColors.highlight}
+        iconColor={managerColors.accent}
         headerBackgroundColor={headerColor}
         headerTextColor={managerColors.text}
+        contentBackgroundColor={contentColor}
         defaultExpanded={true}
       >
         <View style={styles.featureGrid}>
@@ -176,9 +180,10 @@ export default function ManagerPortalScreen() {
         title="Weekly Specials"
         iconIos="fork.knife"
         iconAndroid="restaurant"
-        iconColor={managerColors.highlight}
+        iconColor={managerColors.accent}
         headerBackgroundColor={headerColor}
         headerTextColor={managerColors.text}
+        contentBackgroundColor={contentColor}
         defaultExpanded={true}
       >
         <View style={styles.specialItem}>
@@ -218,7 +223,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingTop: 20,
     paddingHorizontal: 16,
-    paddingBottom: 100,
+    paddingBottom: 120,
   },
   welcomeSection: {
     backgroundColor: managerColors.card,
@@ -245,29 +250,10 @@ const styles = StyleSheet.create({
     color: managerColors.textSecondary,
     fontStyle: 'italic',
   },
-  card: {
-    backgroundColor: managerColors.card,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  cardTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    marginLeft: 12,
-  },
   announcementItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: managerColors.highlight,
+    borderBottomColor: managerColors.border,
   },
   announcementTitle: {
     fontSize: 16,
@@ -291,7 +277,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: managerColors.highlight,
+    borderBottomColor: managerColors.border,
   },
   eventDate: {
     width: 60,
@@ -310,7 +296,7 @@ const styles = StyleSheet.create({
   eventMonth: {
     fontSize: 12,
     fontWeight: '600',
-    color: managerColors.textSecondary,
+    color: managerColors.background,
   },
   eventDetails: {
     flex: 1,
@@ -348,7 +334,7 @@ const styles = StyleSheet.create({
   specialItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: managerColors.highlight,
+    borderBottomColor: managerColors.border,
   },
   specialDay: {
     fontSize: 14,

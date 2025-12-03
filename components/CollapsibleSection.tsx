@@ -25,6 +25,7 @@ interface CollapsibleSectionProps {
   headerTextColor: string;
   children: React.ReactNode;
   defaultExpanded?: boolean;
+  contentBackgroundColor?: string;
 }
 
 export default function CollapsibleSection({
@@ -36,6 +37,7 @@ export default function CollapsibleSection({
   headerTextColor,
   children,
   defaultExpanded = true,
+  contentBackgroundColor = '#FFFFFF',
 }: CollapsibleSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
@@ -67,7 +69,11 @@ export default function CollapsibleSection({
           color={headerTextColor}
         />
       </TouchableOpacity>
-      {isExpanded && <View style={styles.content}>{children}</View>}
+      {isExpanded && (
+        <View style={[styles.content, { backgroundColor: contentBackgroundColor }]}>
+          {children}
+        </View>
+      )}
     </View>
   );
 }
@@ -97,7 +103,6 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   content: {
-    backgroundColor: '#FFFFFF',
     padding: 20,
   },
 });

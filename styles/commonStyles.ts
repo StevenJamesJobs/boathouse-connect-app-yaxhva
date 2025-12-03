@@ -12,15 +12,16 @@ export const employeeColors = {
   border: '#B8D4E0',
 };
 
-// Manager Portal Colors (Dark Blue Theme)
+// Manager Portal Colors (Improved Dark Blue Theme with better contrast)
 export const managerColors = {
-  background: '#2C3E50',
-  text: '#ECF0F1',
-  textSecondary: '#BDC3C7',
-  primary: '#34495E',
-  card: '#34495E',
-  highlight: '#7F8C8D',
-  border: '#4A5F7F',
+  background: '#1A2332',
+  text: '#FFFFFF',
+  textSecondary: '#A8B8D8',
+  primary: '#4A90E2',
+  card: '#2C3E50',
+  highlight: '#5DADE2',
+  border: '#34495E',
+  accent: '#3498DB',
 };
 
 // Splash Screen Colors

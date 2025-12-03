@@ -6,6 +6,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import { BlurView } from 'expo-blur';
 
 function EmployeeHeader() {
   const router = useRouter();
@@ -31,27 +32,67 @@ function EmployeeHeader() {
   );
 }
 
+function FloatingTabBar({ state, descriptors, navigation }: any) {
+  return (
+    <View style={styles.floatingTabBarContainer}>
+      <BlurView intensity={80} style={styles.blurContainer}>
+        <View style={styles.tabBarContent}>
+          {state.routes.map((route: any, index: number) => {
+            const { options } = descriptors[route.key];
+            const label = options.tabBarLabel ?? options.title ?? route.name;
+            const isFocused = state.index === index;
+
+            const onPress = () => {
+              const event = navigation.emit({
+                type: 'tabPress',
+                target: route.key,
+                canPreventDefault: true,
+              });
+
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name);
+              }
+            };
+
+            return (
+              <TouchableOpacity
+                key={index}
+                accessibilityRole="button"
+                accessibilityState={isFocused ? { selected: true } : {}}
+                accessibilityLabel={options.tabBarAccessibilityLabel}
+                testID={options.tabBarTestID}
+                onPress={onPress}
+                style={styles.tabButton}
+              >
+                {options.tabBarIcon && options.tabBarIcon({
+                  color: isFocused ? employeeColors.primary : employeeColors.textSecondary,
+                  size: 24,
+                })}
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    { color: isFocused ? employeeColors.primary : employeeColors.textSecondary }
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </BlurView>
+    </View>
+  );
+}
+
 export default function EmployeeLayout() {
   return (
     <>
       <EmployeeHeader />
       <Tabs
+        tabBar={(props) => <FloatingTabBar {...props} />}
         screenOptions={{
           headerShown: false,
-          tabBarActiveTintColor: employeeColors.primary,
-          tabBarInactiveTintColor: employeeColors.textSecondary,
-          tabBarStyle: {
-            backgroundColor: employeeColors.card,
-            borderTopColor: employeeColors.border,
-            borderTopWidth: 1,
-            height: 60,
-            paddingBottom: 8,
-            paddingTop: 8,
-          },
-          tabBarLabelStyle: {
-            fontSize: 12,
-            fontWeight: '600',
-          },
         }}
       >
         <Tabs.Screen
@@ -150,5 +191,51 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     padding: 8,
+  },
+  floatingTabBarContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    right: 20,
+    alignItems: 'center',
+  },
+  blurContainer: {
+    borderRadius: 30,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+    ...Platform.select({
+      ios: {
+        backgroundColor: 'rgba(255, 255, 255, 0.7)',
+      },
+      android: {
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      },
+      web: {
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        backdropFilter: 'blur(20px)',
+      },
+    }),
+    boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.15)',
+    elevation: 8,
+  },
+  tabBarContent: {
+    flexDirection: 'row',
+    paddingHorizontal: 8,
+    paddingVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+  },
+  tabLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 4,
   },
 });
