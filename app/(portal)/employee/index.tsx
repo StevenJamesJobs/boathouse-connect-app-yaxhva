@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Platform,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { employeeColors } from '@/styles/commonStyles';
@@ -192,7 +191,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingTop: 20,
     paddingHorizontal: 16,
-    paddingBottom: 40,
+    paddingBottom: 100,
   },
   welcomeSection: {
     backgroundColor: employeeColors.card,

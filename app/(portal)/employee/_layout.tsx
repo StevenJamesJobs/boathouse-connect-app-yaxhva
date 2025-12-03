@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Stack } from 'expo-router';
+import { Tabs } from 'expo-router';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,14 +35,96 @@ export default function EmployeeLayout() {
   return (
     <>
       <EmployeeHeader />
-      <Stack
+      <Tabs
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: employeeColors.background },
+          tabBarActiveTintColor: employeeColors.primary,
+          tabBarInactiveTintColor: employeeColors.textSecondary,
+          tabBarStyle: {
+            backgroundColor: employeeColors.card,
+            borderTopColor: employeeColors.border,
+            borderTopWidth: 1,
+            height: 60,
+            paddingBottom: 8,
+            paddingTop: 8,
+          },
+          tabBarLabelStyle: {
+            fontSize: 12,
+            fontWeight: '600',
+          },
         }}
       >
-        <Stack.Screen name="index" />
-      </Stack>
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: 'Welcome',
+            tabBarIcon: ({ color, size }) => (
+              <IconSymbol
+                ios_icon_name="house.fill"
+                android_material_icon_name="home"
+                size={size}
+                color={color}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="menus"
+          options={{
+            title: 'Menus',
+            tabBarIcon: ({ color, size }) => (
+              <IconSymbol
+                ios_icon_name="fork.knife"
+                android_material_icon_name="restaurant_menu"
+                size={size}
+                color={color}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="tools"
+          options={{
+            title: 'Tools',
+            tabBarIcon: ({ color, size }) => (
+              <IconSymbol
+                ios_icon_name="wrench.and.screwdriver.fill"
+                android_material_icon_name="build"
+                size={size}
+                color={color}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="rewards"
+          options={{
+            title: 'Rewards',
+            tabBarIcon: ({ color, size }) => (
+              <IconSymbol
+                ios_icon_name="star.fill"
+                android_material_icon_name="star"
+                size={size}
+                color={color}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: 'Profile',
+            tabBarIcon: ({ color, size }) => (
+              <IconSymbol
+                ios_icon_name="person.fill"
+                android_material_icon_name="person"
+                size={size}
+                color={color}
+              />
+            ),
+          }}
+        />
+      </Tabs>
     </>
   );
 }
