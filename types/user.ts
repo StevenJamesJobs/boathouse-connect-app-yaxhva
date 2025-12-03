@@ -8,7 +8,6 @@ export interface User {
   phoneNumber: string;
   role: 'employee' | 'manager';
   profilePictureUrl?: string;
-  isActive?: boolean;
 }
 
 export interface AuthState {

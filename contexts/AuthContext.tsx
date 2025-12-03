@@ -11,7 +11,6 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const DEFAULT_PASSWORD = 'boathouseconnect';
 const STORAGE_KEY = '@mcloones_auth';
 const REMEMBER_ME_KEY = '@mcloones_remember_me';
 
@@ -55,12 +54,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       console.log('Attempting login with username:', username);
       
-      // Check password first
-      if (password !== DEFAULT_PASSWORD) {
-        console.log('Invalid password');
-        return false;
-      }
-
       // Clean username - remove any leading zeros and whitespace
       const cleanUsername = username.trim();
       
@@ -85,6 +78,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       console.log('User found:', userData.name);
 
+      // Verify password using the database function
+      const { data: passwordValid, error: verifyError } = await supabase.rpc('verify_password', {
+        user_id: userData.id,
+        password: password,
+      });
+
+      if (verifyError) {
+        console.log('Password verification error:', verifyError);
+        return false;
+      }
+
+      if (!passwordValid) {
+        console.log('Invalid password');
+        return false;
+      }
+
       // Map database user to app user format
       const user: User = {
         id: userData.id,
@@ -94,6 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         jobTitle: userData.job_title,
         phoneNumber: userData.phone_number || '',
         role: userData.role as 'employee' | 'manager',
+        profilePictureUrl: userData.profile_picture_url || undefined,
       };
 
       // Store auth state

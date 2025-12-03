@@ -29,6 +29,7 @@ export default function EmployeeProfileScreen() {
   
   // Password change state
   const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
@@ -115,33 +116,54 @@ export default function EmployeeProfileScreen() {
 
     try {
       setUploading(true);
+      console.log('Starting image upload for user:', user.id);
 
       // Read the file as base64
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Convert base64 to array buffer
-      const arrayBuffer = Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+      // Convert base64 to Uint8Array
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
 
       // Create file name
-      const fileExt = uri.split('.').pop() || 'jpg';
+      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      console.log('Uploading file:', fileName);
+
+      // Determine content type
+      let contentType = 'image/jpeg';
+      if (fileExt === 'png') contentType = 'image/png';
+      else if (fileExt === 'gif') contentType = 'image/gif';
+      else if (fileExt === 'webp') contentType = 'image/webp';
 
       // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('profile-pictures')
-        .upload(fileName, arrayBuffer, {
-          contentType: 'image/jpeg',
+        .upload(fileName, byteArray, {
+          contentType: contentType,
           upsert: true,
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
+
+      console.log('Upload successful:', uploadData);
 
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('profile-pictures')
         .getPublicUrl(fileName);
+
+      console.log('Public URL:', urlData.publicUrl);
 
       // Update user record
       const { error: updateError } = await supabase
@@ -149,19 +171,27 @@ export default function EmployeeProfileScreen() {
         .update({ profile_picture_url: urlData.publicUrl })
         .eq('id', user.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
 
       setProfilePictureUrl(urlData.publicUrl);
       Alert.alert('Success', 'Profile picture updated successfully');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload profile picture');
+      Alert.alert('Error', error.message || 'Failed to upload profile picture');
     } finally {
       setUploading(false);
     }
   };
 
   const handleChangePassword = async () => {
+    if (!currentPassword.trim()) {
+      Alert.alert('Error', 'Please enter your current password');
+      return;
+    }
+
     if (newPassword !== confirmPassword) {
       Alert.alert('Error', 'New passwords do not match');
       return;
@@ -173,25 +203,39 @@ export default function EmployeeProfileScreen() {
     }
 
     try {
-      // Get the current session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !session) {
-        Alert.alert(
-          'Authentication Required',
-          'You need to be logged in with Supabase Auth to change your password. Please contact your manager to reset your password.'
-        );
+      if (!user?.id) return;
+
+      // Verify current password using pgcrypto
+      const { data: verifyData, error: verifyError } = await supabase.rpc('verify_password', {
+        user_id: user.id,
+        password: currentPassword,
+      });
+
+      if (verifyError) {
+        console.error('Password verification error:', verifyError);
+        Alert.alert('Error', 'Failed to verify current password');
         return;
       }
 
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
+      if (!verifyData) {
+        Alert.alert('Error', 'Current password is incorrect');
+        return;
+      }
+
+      // Update password using pgcrypto
+      const { error: updateError } = await supabase.rpc('update_password', {
+        user_id: user.id,
+        new_password: newPassword,
       });
 
-      if (error) throw error;
+      if (updateError) {
+        console.error('Password update error:', updateError);
+        throw updateError;
+      }
 
       Alert.alert('Success', 'Password changed successfully');
       setShowPasswordChange(false);
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     } catch (error: any) {
@@ -311,7 +355,7 @@ export default function EmployeeProfileScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Change Password</Text>
         <Text style={styles.passwordNote}>
-          Note: Password changes require authentication. If you encounter issues, please contact your manager.
+          You can change your password here. Make sure to remember your new password.
         </Text>
         {!showPasswordChange ? (
           <TouchableOpacity
@@ -328,6 +372,18 @@ export default function EmployeeProfileScreen() {
           </TouchableOpacity>
         ) : (
           <>
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Current Password</Text>
+              <TextInput
+                style={styles.input}
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                secureTextEntry
+                placeholder="Enter current password"
+                placeholderTextColor={employeeColors.textSecondary}
+              />
+            </View>
+
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>New Password</Text>
               <TextInput
@@ -357,6 +413,7 @@ export default function EmployeeProfileScreen() {
                 style={styles.cancelButton}
                 onPress={() => {
                   setShowPasswordChange(false);
+                  setCurrentPassword('');
                   setNewPassword('');
                   setConfirmPassword('');
                 }}
