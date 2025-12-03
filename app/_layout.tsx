@@ -29,7 +29,7 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme();
   const networkState = useNetworkState();
   const segments = useSegments();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
@@ -57,16 +57,21 @@ function RootLayoutNav() {
   useEffect(() => {
     if (isLoading || !loaded) return;
 
-    const inAuthGroup = segments[0] === '(portal)';
+    const inPortal = segments[0] === '(portal)';
+    const onLogin = segments[0] === 'login';
 
-    if (!isAuthenticated && inAuthGroup) {
+    if (!isAuthenticated && inPortal) {
       // Redirect to login if not authenticated and trying to access portal
       router.replace('/login');
-    } else if (isAuthenticated && !inAuthGroup && segments[0] !== '(portal)') {
-      // Redirect to portal if authenticated and not in portal
-      router.replace('/(portal)');
+    } else if (isAuthenticated && !inPortal && user) {
+      // Redirect to appropriate portal based on role
+      if (user.role === 'manager') {
+        router.replace('/(portal)/manager');
+      } else {
+        router.replace('/(portal)/employee');
+      }
     }
-  }, [isAuthenticated, isLoading, segments, loaded]);
+  }, [isAuthenticated, isLoading, segments, loaded, user]);
 
   if (!loaded || isLoading) {
     return null;
@@ -108,31 +113,6 @@ function RootLayoutNav() {
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="login" />
               <Stack.Screen name="(portal)" />
-              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-              <Stack.Screen
-                name="modal"
-                options={{
-                  presentation: "modal",
-                  title: "Standard Modal",
-                }}
-              />
-              <Stack.Screen
-                name="formsheet"
-                options={{
-                  presentation: "formSheet",
-                  title: "Form Sheet Modal",
-                  sheetGrabberVisible: true,
-                  sheetAllowedDetents: [0.5, 0.8, 1.0],
-                  sheetCornerRadius: 20,
-                }}
-              />
-              <Stack.Screen
-                name="transparent-modal"
-                options={{
-                  presentation: "transparentModal",
-                  headerShown: false,
-                }}
-              />
             </Stack>
             <SystemBars style={"auto"} />
           </GestureHandlerRootView>

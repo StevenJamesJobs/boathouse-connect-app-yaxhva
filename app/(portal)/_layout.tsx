@@ -1,11 +1,11 @@
 
 import React from 'react';
-import { Redirect, Stack } from 'expo-router';
+import { Stack } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 
 export default function PortalLayout() {
-  const { user, isLoading, isAuthenticated } = useAuth();
+  const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
@@ -15,16 +15,13 @@ export default function PortalLayout() {
     );
   }
 
-  if (!isAuthenticated || !user) {
-    return <Redirect href="/login" />;
-  }
-
-  // Redirect to appropriate portal based on role
-  if (user.role === 'manager') {
-    return <Redirect href="/(portal)/manager" />;
-  } else {
-    return <Redirect href="/(portal)/employee" />;
-  }
+  // The Stack will handle routing to employee or manager based on the URL
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="employee" />
+      <Stack.Screen name="manager" />
+    </Stack>
+  );
 }
 
 const styles = StyleSheet.create({

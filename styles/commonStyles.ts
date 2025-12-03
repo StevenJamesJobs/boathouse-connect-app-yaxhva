@@ -29,6 +29,7 @@ export const splashColors = {
   primary: '#2C5F8D',
   secondary: '#A7D9ED',
   text: '#2E3B4E',
+  textSecondary: '#607B96',
 };
 
 // Legacy colors for backward compatibility
