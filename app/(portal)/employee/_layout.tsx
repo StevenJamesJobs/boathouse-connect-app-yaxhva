@@ -205,22 +205,22 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     borderRadius: 30,
     overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: employeeColors.border,
+    borderWidth: 2,
+    borderColor: 'rgba(13, 71, 161, 0.15)',
     ...Platform.select({
       ios: {
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backgroundColor: 'rgba(255, 255, 255, 0.98)',
       },
       android: {
-        backgroundColor: employeeColors.tabBarBackground,
+        backgroundColor: '#FFFFFF',
       },
       web: {
         backgroundColor: 'rgba(255, 255, 255, 0.98)',
         backdropFilter: 'blur(20px)',
       },
     }),
-    boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.2)',
-    elevation: 10,
+    boxShadow: '0px 12px 32px rgba(13, 71, 161, 0.35)',
+    elevation: 16,
   },
   tabBarContent: {
     flexDirection: 'row',

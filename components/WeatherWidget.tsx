@@ -9,6 +9,7 @@ interface WeatherData {
   lowTemp: number;
   forecastDescription: string;
   conditionText: string;
+  detailedForecast: string;
 }
 
 interface WeatherWidgetProps {
@@ -28,6 +29,54 @@ export default function WeatherWidget({ textColor, secondaryTextColor }: Weather
     fetchWeather();
   }, []);
 
+  const generateDetailedForecast = (data: any): string => {
+    const day = data.forecast.forecastday[0].day;
+    const astro = data.forecast.forecastday[0].astro;
+    const hour = data.forecast.forecastday[0].hour;
+    
+    // Get current hour
+    const currentHour = new Date().getHours();
+    
+    // Find the forecast for the next few hours
+    const upcomingHours = hour.slice(currentHour, currentHour + 6);
+    
+    // Build a detailed description
+    let description = `Today's forecast: ${day.condition.text}. `;
+    description += `High of ${Math.round(day.maxtemp_f)}°F and low of ${Math.round(day.mintemp_f)}°F. `;
+    
+    // Add precipitation info if applicable
+    if (day.daily_chance_of_rain > 30) {
+      description += `${day.daily_chance_of_rain}% chance of rain. `;
+    }
+    
+    if (day.daily_chance_of_snow > 30) {
+      description += `${day.daily_chance_of_snow}% chance of snow. `;
+    }
+    
+    // Add wind information
+    if (day.maxwind_mph > 15) {
+      description += `Winds up to ${Math.round(day.maxwind_mph)} mph. `;
+    }
+    
+    // Add humidity info
+    description += `Humidity around ${day.avghumidity}%. `;
+    
+    // Add UV index warning if high
+    if (day.uv >= 6) {
+      description += `High UV index of ${day.uv} - sun protection recommended. `;
+    }
+    
+    // Add visibility info if poor
+    if (day.avgvis_miles < 5) {
+      description += `Reduced visibility of ${day.avgvis_miles} miles. `;
+    }
+    
+    // Add sunrise/sunset info
+    description += `Sunrise at ${astro.sunrise}, sunset at ${astro.sunset}.`;
+    
+    return description;
+  };
+
   const fetchWeather = async () => {
     try {
       setLoading(true);
@@ -44,6 +93,8 @@ export default function WeatherWidget({ textColor, secondaryTextColor }: Weather
       const data = await response.json();
       console.log('Weather API Response:', data);
 
+      const detailedForecast = generateDetailedForecast(data);
+
       const weatherData: WeatherData = {
         currentTemp: Math.round(data.current.temp_f),
         conditionIcon: `https:${data.current.condition.icon}`,
@@ -51,6 +102,7 @@ export default function WeatherWidget({ textColor, secondaryTextColor }: Weather
         highTemp: Math.round(data.forecast.forecastday[0].day.maxtemp_f),
         lowTemp: Math.round(data.forecast.forecastday[0].day.mintemp_f),
         forecastDescription: data.forecast.forecastday[0].day.condition.text,
+        detailedForecast: detailedForecast,
       };
 
       setWeather(weatherData);
@@ -113,9 +165,14 @@ export default function WeatherWidget({ textColor, secondaryTextColor }: Weather
         </View>
       </View>
 
-      <Text style={[styles.forecastDescription, { color: secondaryTextColor }]}>
-        {weather.forecastDescription}
-      </Text>
+      <View style={styles.forecastContainer}>
+        <Text style={[styles.forecastTitle, { color: textColor }]}>
+          Today&apos;s Forecast
+        </Text>
+        <Text style={[styles.detailedForecast, { color: secondaryTextColor }]}>
+          {weather.detailedForecast}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -166,7 +223,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
     paddingHorizontal: 20,
   },
   tempItem: {
@@ -186,10 +243,22 @@ const styles = StyleSheet.create({
     height: 40,
     backgroundColor: '#E0E0E0',
   },
-  forecastDescription: {
-    fontSize: 16,
-    textAlign: 'center',
-    fontStyle: 'italic',
+  forecastContainer: {
     paddingHorizontal: 20,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+    width: '100%',
+  },
+  forecastTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  detailedForecast: {
+    fontSize: 14,
+    lineHeight: 22,
+    textAlign: 'left',
   },
 });

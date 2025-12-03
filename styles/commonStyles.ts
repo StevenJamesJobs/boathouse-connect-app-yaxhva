@@ -13,7 +13,7 @@ export const employeeColors = {
   border: '#B0BEC5',
   tabBarBackground: '#FFFFFF',
   tabBarActive: '#0D47A1',
-  tabBarInactive: '#546E7A',
+  tabBarInactive: '#1565C0',
 };
 
 // Manager Portal Colors (Improved Dark Blue Theme with better contrast)
