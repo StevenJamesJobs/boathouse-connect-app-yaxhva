@@ -1,4 +1,6 @@
 
+// CRITICAL: This polyfill MUST be the very first import
+// It must run before any code that might reference window or document
 import 'react-native-url-polyfill/auto';
 
 // Comprehensive polyfill for window object in React Native
@@ -17,9 +19,27 @@ if (typeof window === 'undefined') {
     pathname: '/',
     search: '',
     hash: '',
+    assign: () => {},
+    reload: () => {},
+    replace: () => {},
   };
   (global as any).window.navigator = {
     userAgent: 'ReactNative',
+    language: 'en-US',
+    languages: ['en-US', 'en'],
+    onLine: true,
+  };
+  (global as any).window.localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
+  };
+  (global as any).window.sessionStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
   };
 }
 
@@ -30,7 +50,22 @@ if (typeof document === 'undefined') {
     removeEventListener: () => {},
     createElement: () => ({}),
     getElementById: () => null,
+    documentElement: {
+      style: {},
+    },
+    body: {
+      style: {},
+    },
+    cookie: '',
   };
 }
 
+// Polyfill for CustomEvent
+if (typeof CustomEvent === 'undefined') {
+  (global as any).CustomEvent = class CustomEvent {
+    constructor(public type: string, public detail?: any) {}
+  };
+}
+
+// Now we can safely import expo-router
 import 'expo-router/entry';
