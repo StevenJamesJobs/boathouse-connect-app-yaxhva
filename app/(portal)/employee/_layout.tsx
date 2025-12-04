@@ -209,13 +209,13 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.6)',
     ...Platform.select({
       ios: {
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backgroundColor: 'rgba(235, 240, 242, 0.85)',
       },
       android: {
-        backgroundColor: 'rgba(252, 252, 252, 0.98)',
+        backgroundColor: 'rgba(235, 240, 242, 0.90)',
       },
       web: {
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        backgroundColor: 'rgba(235, 240, 242, 0.85)',
         backdropFilter: 'blur(20px)',
       },
     }),

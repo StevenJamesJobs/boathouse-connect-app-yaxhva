@@ -125,9 +125,6 @@ export default function LoginScreen() {
             },
           ]}
         >
-          <Text style={styles.welcomeText}>Welcome to</Text>
-          <Text style={styles.title}>McLoone&apos;s Boathouse Connect</Text>
-
           {/* Username Input */}
           <View style={styles.inputContainer}>
             <IconSymbol
@@ -207,11 +204,6 @@ export default function LoginScreen() {
               {isLoading ? 'Signing In...' : 'Sign In'}
             </Text>
           </TouchableOpacity>
-
-          {/* Help Text */}
-          <Text style={styles.helpText}>
-            Default password: boathouseconnect
-          </Text>
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -225,33 +217,20 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingTop: 60,
+    paddingTop: 80,
     paddingHorizontal: 24,
     paddingBottom: 40,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 60,
   },
   logo: {
-    width: 280,
-    height: 200,
+    width: 340,
+    height: 240,
   },
   formContainer: {
     width: '100%',
-  },
-  welcomeText: {
-    fontSize: 16,
-    color: splashColors.text,
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: splashColors.primary,
-    textAlign: 'center',
-    marginBottom: 32,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -303,7 +282,6 @@ const styles = StyleSheet.create({
     height: 54,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 16,
     boxShadow: '0px 4px 8px rgba(44, 95, 141, 0.2)',
     elevation: 4,
   },
@@ -314,10 +292,5 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
-  },
-  helpText: {
-    fontSize: 14,
-    color: splashColors.textSecondary,
-    textAlign: 'center',
   },
 });
