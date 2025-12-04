@@ -41,11 +41,6 @@ export default function ManagerToolsScreen() {
         {activeTab === 'employee' ? (
           <>
             <Text style={styles.pageTitle}>Employee Tools</Text>
-            <Text style={styles.comingSoon}>Employee tools coming soon...</Text>
-          </>
-        ) : (
-          <>
-            <Text style={styles.pageTitle}>Management Tools</Text>
             
             {/* Employee Management */}
             <View style={styles.card}>
@@ -76,6 +71,40 @@ export default function ManagerToolsScreen() {
                 />
               </TouchableOpacity>
             </View>
+
+            {/* Menu Editor */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <IconSymbol
+                  ios_icon_name="fork.knife"
+                  android_material_icon_name="restaurant_menu"
+                  size={32}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardHeaderText}>
+                  <Text style={styles.cardTitle}>Menu Editor</Text>
+                  <Text style={styles.cardDescription}>
+                    Create, edit, and manage menu items
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.cardButton}
+                onPress={() => router.push('/menu-editor')}
+              >
+                <Text style={styles.cardButtonText}>Open Menu Editor</Text>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron_right"
+                  size={20}
+                  color={managerColors.text}
+                />
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.pageTitle}>Management Tools</Text>
 
             {/* Announcements Editor */}
             <View style={styles.card}>
@@ -264,12 +293,6 @@ const styles = StyleSheet.create({
     color: managerColors.text,
     marginBottom: 20,
     paddingHorizontal: 4,
-  },
-  comingSoon: {
-    fontSize: 16,
-    color: managerColors.textSecondary,
-    textAlign: 'center',
-    marginTop: 40,
   },
   card: {
     backgroundColor: managerColors.card,
