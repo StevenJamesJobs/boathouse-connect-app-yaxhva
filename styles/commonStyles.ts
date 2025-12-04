@@ -11,7 +11,7 @@ export const employeeColors = {
   card: '#FFFFFF',
   highlight: '#90CAF9',
   border: '#B0BEC5',
-  tabBarBackground: '#FFFFFF',
+  tabBarBackground: '#d9ebfa',
   tabBarActive: '#0D47A1',
   tabBarInactive: '#1565C0',
 };

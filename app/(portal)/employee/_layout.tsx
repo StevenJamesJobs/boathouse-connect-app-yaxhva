@@ -35,7 +35,7 @@ function EmployeeHeader() {
 function FloatingTabBar({ state, descriptors, navigation }: any) {
   return (
     <View style={styles.floatingTabBarContainer}>
-      <BlurView intensity={100} style={styles.blurContainer}>
+      <BlurView intensity={80} style={styles.blurContainer}>
         <View style={styles.tabBarContent}>
           {state.routes.map((route: any, index: number) => {
             const { options } = descriptors[route.key];
@@ -205,22 +205,22 @@ const styles = StyleSheet.create({
     maxWidth: 500,
     borderRadius: 30,
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: 'rgba(13, 71, 161, 0.15)',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
     ...Platform.select({
       ios: {
-        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
       },
       android: {
-        backgroundColor: '#FFFFFF',
+        backgroundColor: 'rgba(252, 252, 252, 0.98)',
       },
       web: {
-        backgroundColor: 'rgba(255, 255, 255, 0.98)',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
         backdropFilter: 'blur(20px)',
       },
     }),
-    boxShadow: '0px 12px 32px rgba(13, 71, 161, 0.35)',
-    elevation: 16,
+    boxShadow: '0px 8px 32px rgba(13, 71, 161, 0.25), 0px 4px 16px rgba(0, 0, 0, 0.15)',
+    elevation: 20,
   },
   tabBarContent: {
     flexDirection: 'row',
