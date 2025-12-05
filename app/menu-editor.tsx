@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 
 interface MenuItem {
@@ -48,6 +49,7 @@ const SUBCATEGORIES: { [key: string]: string[] } = {
 
 export default function MenuEditorScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -164,7 +166,10 @@ export default function MenuEditorScreen() {
           upsert: false,
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error uploading image:', error);
+        throw error;
+      }
 
       // Get public URL
       const { data: urlData } = supabase.storage
@@ -187,6 +192,11 @@ export default function MenuEditorScreen() {
       return;
     }
 
+    if (!user?.id) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
     try {
       let thumbnailUrl = editingItem?.thumbnail_url || null;
 
@@ -198,47 +208,62 @@ export default function MenuEditorScreen() {
         }
       }
 
-      const itemData = {
-        name: formData.name,
-        description: formData.description || null,
-        price: formData.price,
-        category: formData.category,
-        subcategory: formData.subcategory || null,
-        available_for_lunch: formData.available_for_lunch,
-        available_for_dinner: formData.available_for_dinner,
-        is_gluten_free: formData.is_gluten_free,
-        is_gluten_free_available: formData.is_gluten_free_available,
-        is_vegetarian: formData.is_vegetarian,
-        is_vegetarian_available: formData.is_vegetarian_available,
-        thumbnail_url: thumbnailUrl,
-        thumbnail_shape: formData.thumbnail_shape,
-        updated_at: new Date().toISOString(),
-      };
-
       if (editingItem) {
-        // Update existing item
-        const { error } = await supabase
-          .from('menu_items')
-          .update(itemData)
-          .eq('id', editingItem.id);
+        // Update existing item using database function
+        const { data, error } = await supabase.rpc('update_menu_item', {
+          p_user_id: user.id,
+          p_menu_item_id: editingItem.id,
+          p_name: formData.name,
+          p_description: formData.description || null,
+          p_price: formData.price,
+          p_category: formData.category,
+          p_subcategory: formData.subcategory || null,
+          p_available_for_lunch: formData.available_for_lunch,
+          p_available_for_dinner: formData.available_for_dinner,
+          p_is_gluten_free: formData.is_gluten_free,
+          p_is_gluten_free_available: formData.is_gluten_free_available,
+          p_is_vegetarian: formData.is_vegetarian,
+          p_is_vegetarian_available: formData.is_vegetarian_available,
+          p_thumbnail_url: thumbnailUrl,
+          p_thumbnail_shape: formData.thumbnail_shape,
+        });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating menu item:', error);
+          throw error;
+        }
         Alert.alert('Success', 'Menu item updated successfully');
       } else {
-        // Create new item
-        const { error } = await supabase
-          .from('menu_items')
-          .insert([itemData]);
+        // Create new item using database function
+        const { data, error } = await supabase.rpc('create_menu_item', {
+          p_user_id: user.id,
+          p_name: formData.name,
+          p_description: formData.description || null,
+          p_price: formData.price,
+          p_category: formData.category,
+          p_subcategory: formData.subcategory || null,
+          p_available_for_lunch: formData.available_for_lunch,
+          p_available_for_dinner: formData.available_for_dinner,
+          p_is_gluten_free: formData.is_gluten_free,
+          p_is_gluten_free_available: formData.is_gluten_free_available,
+          p_is_vegetarian: formData.is_vegetarian,
+          p_is_vegetarian_available: formData.is_vegetarian_available,
+          p_thumbnail_url: thumbnailUrl,
+          p_thumbnail_shape: formData.thumbnail_shape,
+        });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error creating menu item:', error);
+          throw error;
+        }
         Alert.alert('Success', 'Menu item created successfully');
       }
 
       closeModal();
       loadMenuItems();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving menu item:', error);
-      Alert.alert('Error', 'Failed to save menu item');
+      Alert.alert('Error', error.message || 'Failed to save menu item');
     }
   };
 
@@ -253,12 +278,21 @@ export default function MenuEditorScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const { error } = await supabase
-                .from('menu_items')
-                .delete()
-                .eq('id', item.id);
+              if (!user?.id) {
+                Alert.alert('Error', 'User not authenticated');
+                return;
+              }
 
-              if (error) throw error;
+              // Delete using database function
+              const { error } = await supabase.rpc('delete_menu_item', {
+                p_user_id: user.id,
+                p_menu_item_id: item.id,
+              });
+
+              if (error) {
+                console.error('Error deleting menu item:', error);
+                throw error;
+              }
 
               // Delete image if exists
               if (item.thumbnail_url) {
@@ -272,9 +306,9 @@ export default function MenuEditorScreen() {
 
               Alert.alert('Success', 'Menu item deleted successfully');
               loadMenuItems();
-            } catch (error) {
+            } catch (error: any) {
               console.error('Error deleting menu item:', error);
-              Alert.alert('Error', 'Failed to delete menu item');
+              Alert.alert('Error', error.message || 'Failed to delete menu item');
             }
           },
         },
@@ -553,7 +587,7 @@ export default function MenuEditorScreen() {
         </ScrollView>
       )}
 
-      {/* Add/Edit Modal */}
+      {/* Add/Edit Modal - Fixed to slide all the way to top */}
       <Modal
         visible={showAddModal}
         animationType="slide"
@@ -562,7 +596,8 @@ export default function MenuEditorScreen() {
       >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
+          style={styles.modalContainer}
+          keyboardVerticalOffset={0}
         >
           <TouchableOpacity 
             style={styles.modalBackdrop} 
@@ -579,7 +614,7 @@ export default function MenuEditorScreen() {
                   ios_icon_name="xmark.circle.fill"
                   android_material_icon_name="cancel"
                   size={28}
-                  color={managerColors.textSecondary}
+                  color="#666666"
                 />
               </TouchableOpacity>
             </View>
@@ -589,6 +624,7 @@ export default function MenuEditorScreen() {
               contentContainerStyle={styles.modalScrollContent}
               showsVerticalScrollIndicator={true}
               bounces={false}
+              keyboardShouldPersistTaps="handled"
             >
               {/* Image Upload */}
               <View style={styles.formGroup}>
@@ -605,7 +641,7 @@ export default function MenuEditorScreen() {
                         ios_icon_name="photo"
                         android_material_icon_name="add_photo_alternate"
                         size={48}
-                        color={managerColors.textSecondary}
+                        color="#666666"
                       />
                       <Text style={styles.imageUploadText}>Tap to upload image</Text>
                     </View>
@@ -655,7 +691,7 @@ export default function MenuEditorScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="Enter item name"
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor="#999999"
                   value={formData.name}
                   onChangeText={(text) => setFormData({ ...formData, name: text })}
                 />
@@ -667,7 +703,7 @@ export default function MenuEditorScreen() {
                 <TextInput
                   style={[styles.input, styles.textArea]}
                   placeholder="Enter description"
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor="#999999"
                   value={formData.description}
                   onChangeText={(text) => setFormData({ ...formData, description: text })}
                   multiline
@@ -681,7 +717,7 @@ export default function MenuEditorScreen() {
                 <TextInput
                   style={styles.input}
                   placeholder="e.g., $12.99"
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor="#999999"
                   value={formData.price}
                   onChangeText={(text) => setFormData({ ...formData, price: text })}
                 />
@@ -774,7 +810,7 @@ export default function MenuEditorScreen() {
                             ios_icon_name="checkmark"
                             android_material_icon_name="check"
                             size={16}
-                            color={managerColors.text}
+                            color="#1A1A1A"
                           />
                         )}
                       </View>
@@ -800,7 +836,7 @@ export default function MenuEditorScreen() {
                             ios_icon_name="checkmark"
                             android_material_icon_name="check"
                             size={16}
-                            color={managerColors.text}
+                            color="#1A1A1A"
                           />
                         )}
                       </View>
@@ -834,7 +870,7 @@ export default function MenuEditorScreen() {
                           ios_icon_name="checkmark"
                           android_material_icon_name="check"
                           size={16}
-                          color={managerColors.text}
+                          color="#1A1A1A"
                         />
                       )}
                     </View>
@@ -860,7 +896,7 @@ export default function MenuEditorScreen() {
                           ios_icon_name="checkmark"
                           android_material_icon_name="check"
                           size={16}
-                          color={managerColors.text}
+                          color="#1A1A1A"
                         />
                       )}
                     </View>
@@ -886,7 +922,7 @@ export default function MenuEditorScreen() {
                           ios_icon_name="checkmark"
                           android_material_icon_name="check"
                           size={16}
-                          color={managerColors.text}
+                          color="#1A1A1A"
                         />
                       )}
                     </View>
@@ -912,7 +948,7 @@ export default function MenuEditorScreen() {
                           ios_icon_name="checkmark"
                           android_material_icon_name="check"
                           size={16}
-                          color={managerColors.text}
+                          color="#1A1A1A"
                         />
                       )}
                     </View>
@@ -928,7 +964,7 @@ export default function MenuEditorScreen() {
                 disabled={uploadingImage}
               >
                 {uploadingImage ? (
-                  <ActivityIndicator color={managerColors.text} />
+                  <ActivityIndicator color="#1A1A1A" />
                 ) : (
                   <Text style={styles.saveButtonText}>
                     {editingItem ? 'Update Item' : 'Add Item'}
@@ -1187,10 +1223,10 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     color: '#E74C3C',
   },
-  modalOverlay: {
+  // Modal styles - Fixed to slide all the way to top
+  modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
   },
   modalBackdrop: {
     position: 'absolute',
@@ -1198,13 +1234,14 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   modalContent: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: '90%',
-    minHeight: '50%',
+    height: '95%',
+    marginTop: 'auto',
     boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
     elevation: 10,
   },
