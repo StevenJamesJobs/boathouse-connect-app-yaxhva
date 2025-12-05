@@ -12,6 +12,7 @@ import {
   Image,
   ActivityIndicator,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { managerColors } from '@/styles/commonStyles';
@@ -559,23 +560,36 @@ export default function MenuEditorScreen() {
         transparent={true}
         onRequestClose={closeModal}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <TouchableOpacity 
+            style={styles.modalBackdrop} 
+            activeOpacity={1} 
+            onPress={closeModal}
+          />
           <View style={styles.modalContent}>
-            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>
-                  {editingItem ? 'Edit Menu Item' : 'Add Menu Item'}
-                </Text>
-                <TouchableOpacity onPress={closeModal}>
-                  <IconSymbol
-                    ios_icon_name="xmark.circle.fill"
-                    android_material_icon_name="cancel"
-                    size={28}
-                    color={managerColors.textSecondary}
-                  />
-                </TouchableOpacity>
-              </View>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>
+                {editingItem ? 'Edit Menu Item' : 'Add Menu Item'}
+              </Text>
+              <TouchableOpacity onPress={closeModal}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color={managerColors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
 
+            <ScrollView 
+              style={styles.modalScroll} 
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={true}
+              bounces={false}
+            >
               {/* Image Upload */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Thumbnail Image</Text>
@@ -921,9 +935,17 @@ export default function MenuEditorScreen() {
                   </Text>
                 )}
               </TouchableOpacity>
+
+              {/* Cancel Button */}
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={closeModal}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -1167,16 +1189,40 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'flex-end',
   },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   modalContent: {
-    backgroundColor: managerColors.card,
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
+    minHeight: '50%',
     boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
     elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    backgroundColor: '#FFFFFF',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
   },
   modalScroll: {
     flex: 1,
@@ -1185,46 +1231,36 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 40,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
   formGroup: {
     marginBottom: 20,
   },
   formLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.text,
+    color: '#1A1A1A',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: managerColors.background,
+    backgroundColor: '#F5F5F5',
     borderRadius: 12,
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     fontSize: 16,
-    color: managerColors.text,
+    color: '#1A1A1A',
     borderWidth: 1,
-    borderColor: managerColors.border,
+    borderColor: '#E0E0E0',
   },
   textArea: {
     height: 100,
     textAlignVertical: 'top',
+    paddingTop: 14,
   },
   imageUploadButton: {
-    backgroundColor: managerColors.background,
+    backgroundColor: '#F5F5F5',
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 2,
-    borderColor: managerColors.border,
+    borderColor: '#E0E0E0',
     borderStyle: 'dashed',
   },
   imageUploadPlaceholder: {
@@ -1234,7 +1270,7 @@ const styles = StyleSheet.create({
   },
   imageUploadText: {
     fontSize: 14,
-    color: managerColors.textSecondary,
+    color: '#666666',
     marginTop: 8,
   },
   uploadedImage: {
@@ -1251,10 +1287,10 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: managerColors.background,
+    backgroundColor: '#F5F5F5',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: managerColors.border,
+    borderColor: '#E0E0E0',
   },
   shapeOptionActive: {
     backgroundColor: managerColors.highlight,
@@ -1263,10 +1299,10 @@ const styles = StyleSheet.create({
   shapeOptionText: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.textSecondary,
+    color: '#666666',
   },
   shapeOptionTextActive: {
-    color: managerColors.text,
+    color: '#1A1A1A',
   },
   optionsScroll: {
     maxHeight: 50,
@@ -1275,10 +1311,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: managerColors.background,
+    backgroundColor: '#F5F5F5',
     marginRight: 8,
     borderWidth: 1,
-    borderColor: managerColors.border,
+    borderColor: '#E0E0E0',
   },
   optionButtonActive: {
     backgroundColor: managerColors.highlight,
@@ -1287,10 +1323,10 @@ const styles = StyleSheet.create({
   optionButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.textSecondary,
+    color: '#666666',
   },
   optionButtonTextActive: {
-    color: managerColors.text,
+    color: '#1A1A1A',
   },
   checkboxGroup: {
     flexDirection: 'row',
@@ -1307,8 +1343,8 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: managerColors.border,
-    backgroundColor: managerColors.background,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#F5F5F5',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1319,7 +1355,7 @@ const styles = StyleSheet.create({
   checkboxLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.text,
+    color: '#1A1A1A',
   },
   saveButton: {
     backgroundColor: managerColors.highlight,
@@ -1331,6 +1367,20 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: '#1A1A1A',
+  },
+  cancelButton: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666666',
   },
 });
