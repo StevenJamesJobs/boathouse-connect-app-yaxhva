@@ -120,6 +120,13 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     }
   };
 
+  // Helper function to get image URL with cache busting
+  const getImageUrl = (url: string | null) => {
+    if (!url) return null;
+    // Add timestamp to force reload and bypass cache
+    return `${url}?t=${Date.now()}`;
+  };
+
   const styles = createStyles(colors);
 
   return (
@@ -227,8 +234,8 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                 {item.thumbnail_url && (
                   <TouchableOpacity onPress={() => openImageModal(item.thumbnail_url!)}>
                     <Image
-                      key={`${item.id}-${item.thumbnail_url}-${Date.now()}`}
-                      source={{ uri: item.thumbnail_url }}
+                      key={getImageUrl(item.thumbnail_url)}
+                      source={{ uri: getImageUrl(item.thumbnail_url) }}
                       style={[
                         styles.menuItemImage,
                         item.thumbnail_shape === 'banner' && styles.menuItemImageBanner,
@@ -308,9 +315,10 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
             </TouchableOpacity>
             {selectedImage && (
               <Image
-                source={{ uri: selectedImage }}
+                source={{ uri: getImageUrl(selectedImage) }}
                 style={styles.fullImage}
                 resizeMode="contain"
+                key={getImageUrl(selectedImage)}
               />
             )}
             <Text style={styles.swipeHint}>Swipe down to close</Text>

@@ -20,6 +20,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 
 interface MenuItem {
   id: string;
@@ -149,23 +150,38 @@ export default function MenuEditorScreen() {
   const uploadImage = async (uri: string): Promise<string | null> => {
     try {
       setUploadingImage(true);
-      
+      console.log('Starting image upload for menu item');
+
+      // Read the file as base64 (same method as profile pictures)
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      // Convert base64 to Uint8Array
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+
       // Get file extension
-      const ext = uri.split('.').pop() || 'jpg';
+      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${Date.now()}.${ext}`;
-      const filePath = `${fileName}`;
 
-      // Fetch the image
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      console.log('Uploading image:', fileName);
 
-      console.log('Uploading image:', filePath);
+      // Determine content type
+      let contentType = 'image/jpeg';
+      if (ext === 'png') contentType = 'image/png';
+      else if (ext === 'gif') contentType = 'image/gif';
+      else if (ext === 'webp') contentType = 'image/webp';
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('menu-items')
-        .upload(filePath, blob, {
-          contentType: `image/${ext}`,
+        .upload(fileName, byteArray, {
+          contentType: contentType,
           upsert: false,
         });
 
@@ -179,7 +195,7 @@ export default function MenuEditorScreen() {
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('menu-items')
-        .getPublicUrl(filePath);
+        .getPublicUrl(fileName);
 
       console.log('Public URL:', urlData.publicUrl);
 
@@ -377,6 +393,13 @@ export default function MenuEditorScreen() {
     router.replace('/(portal)/manager/tools');
   };
 
+  // Helper function to get image URL with cache busting
+  const getImageUrl = (url: string | null) => {
+    if (!url) return null;
+    // Add timestamp to force reload and bypass cache
+    return `${url}?t=${Date.now()}`;
+  };
+
   return (
     <View style={styles.container}>
       {/* Prominent Back Navigation Tab */}
@@ -527,8 +550,8 @@ export default function MenuEditorScreen() {
               <View key={index} style={styles.menuItemCard}>
                 {item.thumbnail_url && (
                   <Image
-                    key={`${item.id}-${item.thumbnail_url}-${Date.now()}`}
-                    source={{ uri: item.thumbnail_url }}
+                    key={getImageUrl(item.thumbnail_url)}
+                    source={{ uri: getImageUrl(item.thumbnail_url) }}
                     style={[
                       styles.menuItemImage,
                       item.thumbnail_shape === 'banner' && styles.menuItemImageBanner,
@@ -658,9 +681,9 @@ export default function MenuEditorScreen() {
                 <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
                   {selectedImageUri || editingItem?.thumbnail_url ? (
                     <Image
-                      source={{ uri: selectedImageUri || editingItem?.thumbnail_url || '' }}
+                      source={{ uri: selectedImageUri || getImageUrl(editingItem?.thumbnail_url || '') || '' }}
                       style={styles.uploadedImage}
-                      key={selectedImageUri || editingItem?.thumbnail_url}
+                      key={selectedImageUri || getImageUrl(editingItem?.thumbnail_url || '')}
                     />
                   ) : (
                     <View style={styles.imageUploadPlaceholder}>
