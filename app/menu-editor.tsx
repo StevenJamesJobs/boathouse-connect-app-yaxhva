@@ -340,15 +340,19 @@ export default function MenuEditorScreen() {
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Menu Editor</Text>
-        <TouchableOpacity onPress={openAddModal} style={styles.addButton}>
-          <IconSymbol
-            ios_icon_name="plus.circle.fill"
-            android_material_icon_name="add_circle"
-            size={28}
-            color={managerColors.highlight}
-          />
-        </TouchableOpacity>
+        <View style={styles.headerSpacer} />
       </View>
+
+      {/* Add New Item Button - Elongated button above search bar */}
+      <TouchableOpacity style={styles.addNewItemButton} onPress={openAddModal}>
+        <IconSymbol
+          ios_icon_name="plus.circle.fill"
+          android_material_icon_name="add_circle"
+          size={24}
+          color={managerColors.text}
+        />
+        <Text style={styles.addNewItemButtonText}>Add New Item</Text>
+      </TouchableOpacity>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -461,7 +465,7 @@ export default function MenuEditorScreen() {
               />
               <Text style={styles.emptyText}>No menu items found</Text>
               <Text style={styles.emptySubtext}>
-                Tap the + button to add a new item
+                Tap the &quot;Add New Item&quot; button to add a new item
               </Text>
             </View>
           ) : (
@@ -949,15 +953,34 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: managerColors.text,
   },
-  addButton: {
-    padding: 8,
+  headerSpacer: {
+    width: 40,
+  },
+  addNewItemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: managerColors.highlight,
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+    gap: 10,
+  },
+  addNewItemButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: managerColors.text,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: managerColors.card,
     marginHorizontal: 16,
-    marginTop: 16,
+    marginTop: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
@@ -1144,11 +1167,11 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: managerColors.background,
+    backgroundColor: managerColors.card,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
@@ -1181,7 +1204,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   input: {
-    backgroundColor: managerColors.card,
+    backgroundColor: managerColors.background,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -1195,7 +1218,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   imageUploadButton: {
-    backgroundColor: managerColors.card,
+    backgroundColor: managerColors.background,
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 2,
@@ -1226,7 +1249,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: managerColors.card,
+    backgroundColor: managerColors.background,
     alignItems: 'center',
     borderWidth: 2,
     borderColor: managerColors.border,
@@ -1250,7 +1273,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: managerColors.card,
+    backgroundColor: managerColors.background,
     marginRight: 8,
     borderWidth: 1,
     borderColor: managerColors.border,
@@ -1283,7 +1306,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 2,
     borderColor: managerColors.border,
-    backgroundColor: managerColors.card,
+    backgroundColor: managerColors.background,
     justifyContent: 'center',
     alignItems: 'center',
   },

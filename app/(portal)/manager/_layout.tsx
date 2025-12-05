@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { managerColors } from '@/styles/commonStyles';
@@ -19,6 +19,11 @@ function ManagerHeader() {
 
   return (
     <View style={styles.header}>
+      <Image 
+        source={require('@/assets/images/3183c5b9-12b6-4cff-b5af-06e09b108cab.jpeg')}
+        style={styles.cornerIcon}
+        resizeMode="contain"
+      />
       <Text style={styles.headerTitle}>Manager Portal</Text>
       <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
         <IconSymbol
@@ -170,6 +175,10 @@ const styles = StyleSheet.create({
     borderBottomColor: managerColors.border,
     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.2)',
     elevation: 4,
+  },
+  cornerIcon: {
+    width: 40,
+    height: 40,
   },
   headerTitle: {
     fontSize: 20,
