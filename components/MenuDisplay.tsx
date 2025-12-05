@@ -248,62 +248,119 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           <View style={styles.menuItemsContainer}>
             {filteredItems.map((item, index) => (
               <View key={index} style={styles.menuItemCard}>
-                {item.thumbnail_url && (
-                  <TouchableOpacity onPress={() => openImageModal(item.thumbnail_url!)}>
-                    <Image
-                      key={getImageUrl(item.thumbnail_url)}
-                      source={{ uri: getImageUrl(item.thumbnail_url) }}
-                      style={[
-                        styles.menuItemImage,
-                        item.thumbnail_shape === 'banner' && styles.menuItemImageBanner,
-                      ]}
-                      onError={(error) => {
-                        console.error('Image load error for item:', item.name, error.nativeEvent);
-                      }}
-                      onLoad={() => {
-                        console.log('Image loaded successfully for item:', item.name);
-                      }}
-                    />
-                  </TouchableOpacity>
-                )}
-                <View style={styles.menuItemContent}>
-                  <View style={styles.menuItemHeader}>
-                    <Text style={styles.menuItemName}>{item.name}</Text>
-                    <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                {/* Square Layout: Image on left, content on right */}
+                {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
+                  <View style={styles.squareLayout}>
+                    <TouchableOpacity onPress={() => openImageModal(item.thumbnail_url!)}>
+                      <Image
+                        key={getImageUrl(item.thumbnail_url)}
+                        source={{ uri: getImageUrl(item.thumbnail_url) }}
+                        style={styles.squareImage}
+                        onError={(error) => {
+                          console.error('Image load error for item:', item.name, error.nativeEvent);
+                        }}
+                        onLoad={() => {
+                          console.log('Image loaded successfully for item:', item.name);
+                        }}
+                      />
+                    </TouchableOpacity>
+                    <View style={styles.squareContent}>
+                      <View style={styles.squareHeader}>
+                        <Text style={styles.menuItemName}>{item.name}</Text>
+                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                      </View>
+                      {(item.is_gluten_free ||
+                        item.is_gluten_free_available ||
+                        item.is_vegetarian ||
+                        item.is_vegetarian_available) && (
+                        <View style={styles.menuItemTags}>
+                          {item.is_gluten_free && (
+                            <View style={styles.tag}>
+                              <Text style={styles.tagText}>GF</Text>
+                            </View>
+                          )}
+                          {item.is_gluten_free_available && (
+                            <View style={styles.tag}>
+                              <Text style={styles.tagText}>GFA</Text>
+                            </View>
+                          )}
+                          {item.is_vegetarian && (
+                            <View style={styles.tag}>
+                              <Text style={styles.tagText}>V</Text>
+                            </View>
+                          )}
+                          {item.is_vegetarian_available && (
+                            <View style={styles.tag}>
+                              <Text style={styles.tagText}>VA</Text>
+                            </View>
+                          )}
+                        </View>
+                      )}
+                      {item.description && (
+                        <Text style={styles.squareDescription}>
+                          {item.description}
+                        </Text>
+                      )}
+                    </View>
                   </View>
-                  {item.description && (
-                    <Text style={styles.menuItemDescription}>
-                      {item.description}
-                    </Text>
-                  )}
-                  {(item.is_gluten_free ||
-                    item.is_gluten_free_available ||
-                    item.is_vegetarian ||
-                    item.is_vegetarian_available) && (
-                    <View style={styles.menuItemTags}>
-                      {item.is_gluten_free && (
-                        <View style={styles.tag}>
-                          <Text style={styles.tagText}>GF</Text>
-                        </View>
+                ) : (
+                  /* Banner Layout: Image on top, content below */
+                  <>
+                    {item.thumbnail_url && (
+                      <TouchableOpacity onPress={() => openImageModal(item.thumbnail_url!)}>
+                        <Image
+                          key={getImageUrl(item.thumbnail_url)}
+                          source={{ uri: getImageUrl(item.thumbnail_url) }}
+                          style={styles.bannerImage}
+                          onError={(error) => {
+                            console.error('Image load error for item:', item.name, error.nativeEvent);
+                          }}
+                          onLoad={() => {
+                            console.log('Image loaded successfully for item:', item.name);
+                          }}
+                        />
+                      </TouchableOpacity>
+                    )}
+                    <View style={styles.menuItemContent}>
+                      <View style={styles.menuItemHeader}>
+                        <Text style={styles.menuItemName}>{item.name}</Text>
+                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                      </View>
+                      {item.description && (
+                        <Text style={styles.menuItemDescription}>
+                          {item.description}
+                        </Text>
                       )}
-                      {item.is_gluten_free_available && (
-                        <View style={styles.tag}>
-                          <Text style={styles.tagText}>GFA</Text>
-                        </View>
-                      )}
-                      {item.is_vegetarian && (
-                        <View style={styles.tag}>
-                          <Text style={styles.tagText}>V</Text>
-                        </View>
-                      )}
-                      {item.is_vegetarian_available && (
-                        <View style={styles.tag}>
-                          <Text style={styles.tagText}>VA</Text>
+                      {(item.is_gluten_free ||
+                        item.is_gluten_free_available ||
+                        item.is_vegetarian ||
+                        item.is_vegetarian_available) && (
+                        <View style={styles.menuItemTags}>
+                          {item.is_gluten_free && (
+                            <View style={styles.tag}>
+                              <Text style={styles.tagText}>GF</Text>
+                            </View>
+                          )}
+                          {item.is_gluten_free_available && (
+                            <View style={styles.tag}>
+                              <Text style={styles.tagText}>GFA</Text>
+                            </View>
+                          )}
+                          {item.is_vegetarian && (
+                            <View style={styles.tag}>
+                              <Text style={styles.tagText}>V</Text>
+                            </View>
+                          )}
+                          {item.is_vegetarian_available && (
+                            <View style={styles.tag}>
+                              <Text style={styles.tagText}>VA</Text>
+                            </View>
+                          )}
                         </View>
                       )}
                     </View>
-                  )}
-                </View>
+                  </>
+                )}
               </View>
             ))}
           </View>
@@ -452,13 +509,39 @@ const createStyles = (colors: any) =>
       boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
       elevation: 3,
     },
-    menuItemImage: {
-      width: '100%',
-      height: 120,
+    // Square layout styles (image on left, content on right)
+    squareLayout: {
+      flexDirection: 'row',
+      padding: 12,
+      gap: 12,
+    },
+    squareImage: {
+      width: 100,
+      height: 100,
+      borderRadius: 12,
       resizeMode: 'cover',
     },
-    menuItemImageBanner: {
+    squareContent: {
+      flex: 1,
+      justifyContent: 'flex-start',
+    },
+    squareHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 6,
+    },
+    squareDescription: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginTop: 6,
+      lineHeight: 18,
+    },
+    // Banner layout styles (image on top, content below)
+    bannerImage: {
+      width: '100%',
       height: 200,
+      resizeMode: 'cover',
     },
     menuItemContent: {
       padding: 16,
@@ -490,16 +573,17 @@ const createStyles = (colors: any) =>
     menuItemTags: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 8,
+      gap: 6,
+      marginBottom: 6,
     },
     tag: {
       backgroundColor: colors.highlight,
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-      borderRadius: 12,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 10,
     },
     tagText: {
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: '600',
       color: colors.text,
     },
