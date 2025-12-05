@@ -80,6 +80,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         .order('display_order', { ascending: true });
 
       if (error) throw error;
+      console.log('Loaded menu items for display:', data);
       setMenuItems(data || []);
     } catch (error) {
       console.error('Error loading menu items:', error);
@@ -226,11 +227,18 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                 {item.thumbnail_url && (
                   <TouchableOpacity onPress={() => openImageModal(item.thumbnail_url!)}>
                     <Image
+                      key={`${item.id}-${item.thumbnail_url}`}
                       source={{ uri: item.thumbnail_url }}
                       style={[
                         styles.menuItemImage,
                         item.thumbnail_shape === 'banner' && styles.menuItemImageBanner,
                       ]}
+                      onError={(error) => {
+                        console.error('Image load error for item:', item.name, error.nativeEvent);
+                      }}
+                      onLoad={() => {
+                        console.log('Image loaded successfully for item:', item.name);
+                      }}
                     />
                   </TouchableOpacity>
                 )}

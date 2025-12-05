@@ -94,6 +94,7 @@ export default function MenuEditorScreen() {
         .order('display_order', { ascending: true });
 
       if (error) throw error;
+      console.log('Loaded menu items:', data);
       setMenuItems(data || []);
     } catch (error) {
       console.error('Error loading menu items:', error);
@@ -158,6 +159,8 @@ export default function MenuEditorScreen() {
       const response = await fetch(uri);
       const blob = await response.blob();
 
+      console.log('Uploading image:', filePath);
+
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('menu-items')
@@ -171,10 +174,14 @@ export default function MenuEditorScreen() {
         throw error;
       }
 
+      console.log('Upload successful:', data);
+
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('menu-items')
         .getPublicUrl(filePath);
+
+      console.log('Public URL:', urlData.publicUrl);
 
       return urlData.publicUrl;
     } catch (error) {
@@ -205,6 +212,7 @@ export default function MenuEditorScreen() {
         const uploadedUrl = await uploadImage(selectedImageUri);
         if (uploadedUrl) {
           thumbnailUrl = uploadedUrl;
+          console.log('New thumbnail URL:', thumbnailUrl);
         }
       }
 
@@ -232,6 +240,7 @@ export default function MenuEditorScreen() {
           console.error('Error updating menu item:', error);
           throw error;
         }
+        console.log('Menu item updated successfully');
         Alert.alert('Success', 'Menu item updated successfully');
       } else {
         // Create new item using database function
@@ -256,6 +265,7 @@ export default function MenuEditorScreen() {
           console.error('Error creating menu item:', error);
           throw error;
         }
+        console.log('Menu item created successfully');
         Alert.alert('Success', 'Menu item created successfully');
       }
 
@@ -362,11 +372,16 @@ export default function MenuEditorScreen() {
     setSelectedImageUri(null);
   };
 
+  const handleBackPress = () => {
+    // Navigate directly to manager tools instead of using router.back()
+    router.push('/(portal)/manager/tools');
+  };
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow_back"
@@ -508,11 +523,18 @@ export default function MenuEditorScreen() {
               <View key={index} style={styles.menuItemCard}>
                 {item.thumbnail_url && (
                   <Image
+                    key={`${item.id}-${item.thumbnail_url}`}
                     source={{ uri: item.thumbnail_url }}
                     style={[
                       styles.menuItemImage,
                       item.thumbnail_shape === 'banner' && styles.menuItemImageBanner,
                     ]}
+                    onError={(error) => {
+                      console.error('Image load error for item:', item.name, error.nativeEvent);
+                    }}
+                    onLoad={() => {
+                      console.log('Image loaded successfully for item:', item.name);
+                    }}
                   />
                 )}
                 <View style={styles.menuItemContent}>
@@ -634,6 +656,7 @@ export default function MenuEditorScreen() {
                     <Image
                       source={{ uri: selectedImageUri || editingItem?.thumbnail_url || '' }}
                       style={styles.uploadedImage}
+                      key={selectedImageUri || editingItem?.thumbnail_url}
                     />
                   ) : (
                     <View style={styles.imageUploadPlaceholder}>
