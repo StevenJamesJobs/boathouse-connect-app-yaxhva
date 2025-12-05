@@ -25,6 +25,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 interface Announcement {
   id: string;
   title: string;
+  content: string;
   message: string | null;
   thumbnail_url: string | null;
   thumbnail_shape: string;
@@ -65,17 +66,24 @@ export default function AnnouncementEditorScreen() {
   const loadAnnouncements = async () => {
     try {
       setLoading(true);
+      console.log('Loading announcements from database...');
+      
       const { data, error } = await supabase
         .from('announcements')
         .select('*')
         .order('display_order', { ascending: true });
 
-      if (error) throw error;
-      console.log('Loaded announcements:', data);
+      if (error) {
+        console.error('Error loading announcements:', error);
+        throw error;
+      }
+      
+      console.log('Announcements loaded successfully:', data?.length || 0, 'items');
+      console.log('Announcement data:', JSON.stringify(data, null, 2));
       setAnnouncements(data || []);
     } catch (error) {
       console.error('Error loading announcements:', error);
-      Alert.alert('Error', 'Failed to load announcements');
+      Alert.alert('Error', 'Failed to load announcements. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -192,6 +200,7 @@ export default function AnnouncementEditorScreen() {
 
       if (editingAnnouncement) {
         // Update existing announcement
+        console.log('Updating announcement:', editingAnnouncement.id);
         const { error } = await supabase.rpc('update_announcement', {
           p_user_id: user.id,
           p_announcement_id: editingAnnouncement.id,
@@ -212,6 +221,7 @@ export default function AnnouncementEditorScreen() {
         Alert.alert('Success', 'Announcement updated successfully');
       } else {
         // Create new announcement
+        console.log('Creating new announcement');
         const { error } = await supabase.rpc('create_announcement', {
           p_user_id: user.id,
           p_title: formData.title,
@@ -232,7 +242,10 @@ export default function AnnouncementEditorScreen() {
       }
 
       closeModal();
-      loadAnnouncements();
+      // Reload announcements after a short delay to ensure database has updated
+      setTimeout(() => {
+        loadAnnouncements();
+      }, 500);
     } catch (error: any) {
       console.error('Error saving announcement:', error);
       Alert.alert('Error', error.message || 'Failed to save announcement');
@@ -255,6 +268,8 @@ export default function AnnouncementEditorScreen() {
                 return;
               }
 
+              console.log('Deleting announcement:', announcement.id);
+              
               // Delete using database function
               const { error } = await supabase.rpc('delete_announcement', {
                 p_user_id: user.id,
@@ -276,8 +291,13 @@ export default function AnnouncementEditorScreen() {
                 }
               }
 
+              console.log('Announcement deleted successfully');
               Alert.alert('Success', 'Announcement deleted successfully');
-              loadAnnouncements();
+              
+              // Reload announcements after a short delay
+              setTimeout(() => {
+                loadAnnouncements();
+              }, 500);
             } catch (error: any) {
               console.error('Error deleting announcement:', error);
               Alert.alert('Error', error.message || 'Failed to delete announcement');
@@ -306,7 +326,7 @@ export default function AnnouncementEditorScreen() {
     setEditingAnnouncement(announcement);
     setFormData({
       title: announcement.title,
-      message: announcement.message || '',
+      message: announcement.content || announcement.message || '',
       priority: announcement.priority,
       visibility: announcement.visibility,
       thumbnail_shape: announcement.thumbnail_shape,
@@ -401,6 +421,7 @@ export default function AnnouncementEditorScreen() {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={managerColors.highlight} />
+          <Text style={styles.loadingText}>Loading announcements...</Text>
         </View>
       ) : (
         <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
@@ -435,9 +456,9 @@ export default function AnnouncementEditorScreen() {
                           <Text style={styles.priorityText}>{announcement.priority.toUpperCase()}</Text>
                         </View>
                       </View>
-                      {announcement.message && (
+                      {(announcement.content || announcement.message) && (
                         <Text style={styles.squareMessage} numberOfLines={2}>
-                          {announcement.message}
+                          {announcement.content || announcement.message}
                         </Text>
                       )}
                       <View style={styles.announcementMeta}>
@@ -472,9 +493,9 @@ export default function AnnouncementEditorScreen() {
                           <Text style={styles.priorityText}>{announcement.priority.toUpperCase()}</Text>
                         </View>
                       </View>
-                      {announcement.message && (
+                      {(announcement.content || announcement.message) && (
                         <Text style={styles.announcementMessage}>
-                          {announcement.message}
+                          {announcement.content || announcement.message}
                         </Text>
                       )}
                       <View style={styles.announcementMeta}>
@@ -836,6 +857,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginTop: 12,
   },
   itemsList: {
     flex: 1,

@@ -18,6 +18,7 @@ import CollapsibleSection from '@/components/CollapsibleSection';
 import WeatherWidget from '@/components/WeatherWidget';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface MenuItem {
   id: string;
@@ -68,9 +69,20 @@ export default function ManagerPortalScreen() {
     loadAnnouncements();
   }, []);
 
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Manager portal screen focused, refreshing data...');
+      loadWeeklySpecials();
+      loadAnnouncements();
+    }, [])
+  );
+
   const loadWeeklySpecials = async () => {
     try {
       setLoadingSpecials(true);
+      console.log('Loading weekly specials for manager portal...');
+      
       const { data, error } = await supabase
         .from('menu_items')
         .select('*')
@@ -78,8 +90,12 @@ export default function ManagerPortalScreen() {
         .eq('is_active', true)
         .order('display_order', { ascending: true });
 
-      if (error) throw error;
-      console.log('Loaded weekly specials:', data);
+      if (error) {
+        console.error('Error loading weekly specials:', error);
+        throw error;
+      }
+      
+      console.log('Weekly specials loaded:', data?.length || 0, 'items');
       setWeeklySpecials(data || []);
     } catch (error) {
       console.error('Error loading weekly specials:', error);
@@ -91,6 +107,8 @@ export default function ManagerPortalScreen() {
   const loadAnnouncements = async () => {
     try {
       setLoadingAnnouncements(true);
+      console.log('Loading announcements for manager portal...');
+      
       const { data, error } = await supabase
         .from('announcements')
         .select('*')
@@ -99,8 +117,13 @@ export default function ManagerPortalScreen() {
         .order('display_order', { ascending: true })
         .limit(10);
 
-      if (error) throw error;
-      console.log('Loaded announcements:', data);
+      if (error) {
+        console.error('Error loading announcements:', error);
+        throw error;
+      }
+      
+      console.log('Announcements loaded for manager:', data?.length || 0, 'items');
+      console.log('Announcement data:', JSON.stringify(data, null, 2));
       setAnnouncements(data || []);
     } catch (error) {
       console.error('Error loading announcements:', error);
@@ -205,10 +228,12 @@ export default function ManagerPortalScreen() {
           {loadingAnnouncements ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={managerColors.highlight} />
+              <Text style={styles.loadingText}>Loading announcements...</Text>
             </View>
           ) : announcements.length === 0 ? (
             <View style={styles.emptyContainer}>
               <Text style={styles.emptyText}>No announcements available</Text>
+              <Text style={styles.emptySubtext}>Create announcements in the Announcement Editor</Text>
             </View>
           ) : (
             <>
@@ -370,6 +395,7 @@ export default function ManagerPortalScreen() {
           {loadingSpecials ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={managerColors.highlight} />
+              <Text style={styles.loadingText}>Loading specials...</Text>
             </View>
           ) : weeklySpecials.length === 0 ? (
             <View style={styles.emptyContainer}>
@@ -554,6 +580,11 @@ const styles = StyleSheet.create({
   loadingContainer: {
     paddingVertical: 20,
     alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 12,
+    color: managerColors.textSecondary,
+    marginTop: 8,
   },
   emptyContainer: {
     paddingVertical: 20,

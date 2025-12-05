@@ -18,6 +18,7 @@ import CollapsibleSection from '@/components/CollapsibleSection';
 import WeatherWidget from '@/components/WeatherWidget';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface MenuItem {
   id: string;
@@ -67,9 +68,20 @@ export default function EmployeePortalScreen() {
     loadAnnouncements();
   }, []);
 
+  // Refresh data when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Employee portal screen focused, refreshing data...');
+      loadWeeklySpecials();
+      loadAnnouncements();
+    }, [])
+  );
+
   const loadWeeklySpecials = async () => {
     try {
       setLoadingSpecials(true);
+      console.log('Loading weekly specials for employee portal...');
+      
       const { data, error } = await supabase
         .from('menu_items')
         .select('*')
@@ -77,8 +89,12 @@ export default function EmployeePortalScreen() {
         .eq('is_active', true)
         .order('display_order', { ascending: true });
 
-      if (error) throw error;
-      console.log('Loaded weekly specials:', data);
+      if (error) {
+        console.error('Error loading weekly specials:', error);
+        throw error;
+      }
+      
+      console.log('Weekly specials loaded:', data?.length || 0, 'items');
       setWeeklySpecials(data || []);
     } catch (error) {
       console.error('Error loading weekly specials:', error);
@@ -90,6 +106,8 @@ export default function EmployeePortalScreen() {
   const loadAnnouncements = async () => {
     try {
       setLoadingAnnouncements(true);
+      console.log('Loading announcements for employee portal...');
+      
       const { data, error } = await supabase
         .from('announcements')
         .select('*')
@@ -98,8 +116,13 @@ export default function EmployeePortalScreen() {
         .order('display_order', { ascending: true })
         .limit(10);
 
-      if (error) throw error;
-      console.log('Loaded announcements:', data);
+      if (error) {
+        console.error('Error loading announcements:', error);
+        throw error;
+      }
+      
+      console.log('Announcements loaded for employee:', data?.length || 0, 'items');
+      console.log('Announcement data:', JSON.stringify(data, null, 2));
       setAnnouncements(data || []);
     } catch (error) {
       console.error('Error loading announcements:', error);
@@ -202,6 +225,7 @@ export default function EmployeePortalScreen() {
           {loadingAnnouncements ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={employeeColors.primary} />
+              <Text style={styles.loadingText}>Loading announcements...</Text>
             </View>
           ) : announcements.length === 0 ? (
             <View style={styles.emptyContainer}>
@@ -355,6 +379,7 @@ export default function EmployeePortalScreen() {
           {loadingSpecials ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={employeeColors.primary} />
+              <Text style={styles.loadingText}>Loading specials...</Text>
             </View>
           ) : weeklySpecials.length === 0 ? (
             <View style={styles.emptyContainer}>
@@ -538,6 +563,11 @@ const styles = StyleSheet.create({
   loadingContainer: {
     paddingVertical: 20,
     alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 12,
+    color: employeeColors.textSecondary,
+    marginTop: 8,
   },
   emptyContainer: {
     paddingVertical: 20,
