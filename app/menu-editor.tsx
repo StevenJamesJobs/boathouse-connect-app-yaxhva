@@ -41,9 +41,10 @@ interface MenuItem {
   is_active: boolean;
 }
 
-const CATEGORIES = ['Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
+const CATEGORIES = ['Weekly Specials', 'Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
 
 const SUBCATEGORIES: { [key: string]: string[] } = {
+  'Weekly Specials': [],
   Lunch: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Burgers', 'Sandwiches', 'Sides'],
   Dinner: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Entrees', 'Pasta', 'Sides'],
   Libations: ['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV', 'Draft Beer', 'Bottle & Cans'],
@@ -58,7 +59,7 @@ export default function MenuEditorScreen() {
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('Lunch');
+  const [selectedCategory, setSelectedCategory] = useState<string>('Weekly Specials');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
@@ -68,7 +69,7 @@ export default function MenuEditorScreen() {
     name: '',
     description: '',
     price: '',
-    category: 'Lunch',
+    category: 'Weekly Specials',
     subcategory: '',
     available_for_lunch: false,
     available_for_dinner: false,
@@ -112,8 +113,10 @@ export default function MenuEditorScreen() {
   const filterItems = () => {
     let filtered = menuItems;
 
-    // Filter by category - use availability flags for Lunch and Dinner
-    if (selectedCategory === 'Lunch') {
+    // Filter by category
+    if (selectedCategory === 'Weekly Specials') {
+      filtered = filtered.filter(item => item.category === 'Weekly Specials');
+    } else if (selectedCategory === 'Lunch') {
       filtered = filtered.filter(item => item.available_for_lunch);
     } else if (selectedCategory === 'Dinner') {
       filtered = filtered.filter(item => item.available_for_dinner);
@@ -505,7 +508,7 @@ export default function MenuEditorScreen() {
       </ScrollView>
 
       {/* Subcategory Tabs */}
-      {SUBCATEGORIES[selectedCategory] && (
+      {SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -928,7 +931,7 @@ export default function MenuEditorScreen() {
               </View>
 
               {/* Subcategory */}
-              {SUBCATEGORIES[formData.category] && (
+              {SUBCATEGORIES[formData.category] && SUBCATEGORIES[formData.category].length > 0 && (
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel}>Subcategory</Text>
                   <ScrollView
@@ -959,8 +962,8 @@ export default function MenuEditorScreen() {
                 </View>
               )}
 
-              {/* Availability */}
-              {(formData.category === 'Lunch' || formData.category === 'Dinner') && (
+              {/* Availability - Only show for Lunch, Dinner, and Weekly Specials */}
+              {(formData.category === 'Lunch' || formData.category === 'Dinner' || formData.category === 'Weekly Specials') && (
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel}>Available For</Text>
                   <View style={styles.checkboxGroup}>

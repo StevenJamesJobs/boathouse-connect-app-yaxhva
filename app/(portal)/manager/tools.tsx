@@ -13,7 +13,7 @@ import { useRouter } from 'expo-router';
 
 export default function ManagerToolsScreen() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'employee' | 'management'>('employee');
+  const [activeTab, setActiveTab] = useState<'employee' | 'management'>('management');
 
   return (
     <View style={styles.container}>
@@ -42,7 +42,41 @@ export default function ManagerToolsScreen() {
           <>
             <Text style={styles.pageTitle}>Employee Tools</Text>
             
-            {/* Employee Management */}
+            {/* Announcements Editor */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <IconSymbol
+                  ios_icon_name="megaphone.fill"
+                  android_material_icon_name="campaign"
+                  size={32}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardHeaderText}>
+                  <Text style={styles.cardTitle}>Announcements Editor</Text>
+                  <Text style={styles.cardDescription}>
+                    Create and manage announcements for staff
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.cardButton}
+                onPress={() => router.push('/announcement-editor')}
+              >
+                <Text style={styles.cardButtonText}>Open Announcements Editor</Text>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron_right"
+                  size={20}
+                  color={managerColors.text}
+                />
+              </TouchableOpacity>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.pageTitle}>Management Tools</Text>
+
+            {/* Employee Management - MOVED HERE */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <IconSymbol
@@ -72,7 +106,7 @@ export default function ManagerToolsScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Menu Editor */}
+            {/* Menu Editor - MOVED HERE */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <IconSymbol
@@ -101,37 +135,6 @@ export default function ManagerToolsScreen() {
                 />
               </TouchableOpacity>
             </View>
-          </>
-        ) : (
-          <>
-            <Text style={styles.pageTitle}>Management Tools</Text>
-
-            {/* Announcements Editor */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <IconSymbol
-                  ios_icon_name="megaphone.fill"
-                  android_material_icon_name="campaign"
-                  size={32}
-                  color={managerColors.highlight}
-                />
-                <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Announcements</Text>
-                  <Text style={styles.cardDescription}>
-                    Create and manage announcements
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity style={styles.cardButton}>
-                <Text style={styles.cardButtonText}>Manage Announcements</Text>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
-                  size={20}
-                  color={managerColors.text}
-                />
-              </TouchableOpacity>
-            </View>
 
             {/* Events Editor */}
             <View style={styles.card}>
@@ -151,33 +154,6 @@ export default function ManagerToolsScreen() {
               </View>
               <TouchableOpacity style={styles.cardButton}>
                 <Text style={styles.cardButtonText}>Manage Events</Text>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
-                  size={20}
-                  color={managerColors.text}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Weekly Specials Editor */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <IconSymbol
-                  ios_icon_name="fork.knife"
-                  android_material_icon_name="restaurant"
-                  size={32}
-                  color={managerColors.highlight}
-                />
-                <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Weekly Specials</Text>
-                  <Text style={styles.cardDescription}>
-                    Update weekly specials
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity style={styles.cardButton}>
-                <Text style={styles.cardButtonText}>Manage Specials</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron_right"
