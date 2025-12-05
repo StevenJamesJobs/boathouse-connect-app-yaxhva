@@ -373,24 +373,28 @@ export default function MenuEditorScreen() {
   };
 
   const handleBackPress = () => {
-    // Navigate directly to manager tools instead of using router.back()
-    router.push('/(portal)/manager/tools');
+    // Navigate directly to manager tools
+    router.replace('/(portal)/manager/tools');
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+      {/* Prominent Back Navigation Tab */}
+      <View style={styles.backNavigationTab}>
+        <TouchableOpacity onPress={handleBackPress} style={styles.backTabButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow_back"
             size={24}
-            color={managerColors.text}
+            color="#FFFFFF"
           />
+          <Text style={styles.backTabText}>Back to Tools</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* Header */}
+      <View style={styles.header}>
         <Text style={styles.headerTitle}>Menu Editor</Text>
-        <View style={styles.headerSpacer} />
       </View>
 
       {/* Add New Item Button - Elongated button above search bar */}
@@ -523,7 +527,7 @@ export default function MenuEditorScreen() {
               <View key={index} style={styles.menuItemCard}>
                 {item.thumbnail_url && (
                   <Image
-                    key={`${item.id}-${item.thumbnail_url}`}
+                    key={`${item.id}-${item.thumbnail_url}-${Date.now()}`}
                     source={{ uri: item.thumbnail_url }}
                     style={[
                       styles.menuItemImage,
@@ -609,7 +613,7 @@ export default function MenuEditorScreen() {
         </ScrollView>
       )}
 
-      {/* Add/Edit Modal - Fixed to slide all the way to top */}
+      {/* Add/Edit Modal */}
       <Modal
         visible={showAddModal}
         animationType="slide"
@@ -1014,28 +1018,43 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: managerColors.background,
-    paddingTop: Platform.OS === 'android' ? 48 : 0,
+  },
+  backNavigationTab: {
+    backgroundColor: managerColors.primary,
+    paddingTop: Platform.OS === 'android' ? 48 : 60,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.4)',
+    elevation: 8,
+  },
+  backTabButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 12,
+  },
+  backTabText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
     backgroundColor: managerColors.card,
     borderBottomWidth: 1,
     borderBottomColor: managerColors.border,
   },
-  backButton: {
-    padding: 8,
-  },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: managerColors.text,
-  },
-  headerSpacer: {
-    width: 40,
   },
   addNewItemButton: {
     flexDirection: 'row',
@@ -1246,7 +1265,7 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     color: '#E74C3C',
   },
-  // Modal styles - Fixed to slide all the way to top
+  // Modal styles
   modalContainer: {
     flex: 1,
     justifyContent: 'flex-start',

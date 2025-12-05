@@ -227,7 +227,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                 {item.thumbnail_url && (
                   <TouchableOpacity onPress={() => openImageModal(item.thumbnail_url!)}>
                     <Image
-                      key={`${item.id}-${item.thumbnail_url}`}
+                      key={`${item.id}-${item.thumbnail_url}-${Date.now()}`}
                       source={{ uri: item.thumbnail_url }}
                       style={[
                         styles.menuItemImage,
