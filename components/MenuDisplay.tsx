@@ -39,6 +39,9 @@ const CATEGORIES = ['Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
 const SUBCATEGORIES: { [key: string]: string[] } = {
   Lunch: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Burgers', 'Sandwiches', 'Sides'],
   Dinner: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Entrees', 'Pasta', 'Sides'],
+  Libations: ['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV', 'Draft Beer', 'Bottle & Cans'],
+  Wine: ['Sparkling', 'Rose', 'Chardonnay', 'Pinot Grigio', 'Sauvignon Blanc', 'Interesting Whites', 'Cabernet Sauvignon', 'Pinot Noir', 'Merlot', 'Italian Reds', 'Interesting Reds'],
+  'Happy Hour': ['Appetizers', 'Drinks', 'Spirits'],
 };
 
 interface MenuDisplayProps {

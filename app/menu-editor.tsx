@@ -46,6 +46,9 @@ const CATEGORIES = ['Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
 const SUBCATEGORIES: { [key: string]: string[] } = {
   Lunch: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Burgers', 'Sandwiches', 'Sides'],
   Dinner: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Entrees', 'Pasta', 'Sides'],
+  Libations: ['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV', 'Draft Beer', 'Bottle & Cans'],
+  Wine: ['Sparkling', 'Rose', 'Chardonnay', 'Pinot Grigio', 'Sauvignon Blanc', 'Interesting Whites', 'Cabernet Sauvignon', 'Pinot Noir', 'Merlot', 'Italian Reds', 'Interesting Reds'],
+  'Happy Hour': ['Appetizers', 'Drinks', 'Spirits'],
 };
 
 export default function MenuEditorScreen() {
@@ -74,6 +77,7 @@ export default function MenuEditorScreen() {
     is_vegetarian: false,
     is_vegetarian_available: false,
     thumbnail_shape: 'square',
+    display_order: 0,
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -257,6 +261,7 @@ export default function MenuEditorScreen() {
           p_is_vegetarian_available: formData.is_vegetarian_available,
           p_thumbnail_url: thumbnailUrl,
           p_thumbnail_shape: formData.thumbnail_shape,
+          p_display_order: formData.display_order,
         });
 
         if (error) {
@@ -282,6 +287,7 @@ export default function MenuEditorScreen() {
           p_is_vegetarian_available: formData.is_vegetarian_available,
           p_thumbnail_url: thumbnailUrl,
           p_thumbnail_shape: formData.thumbnail_shape,
+          p_display_order: formData.display_order,
         });
 
         if (error) {
@@ -364,6 +370,7 @@ export default function MenuEditorScreen() {
       is_vegetarian: false,
       is_vegetarian_available: false,
       thumbnail_shape: 'square',
+      display_order: 0,
     });
     setSelectedImageUri(null);
     setShowAddModal(true);
@@ -384,6 +391,7 @@ export default function MenuEditorScreen() {
       is_vegetarian: item.is_vegetarian,
       is_vegetarian_available: item.is_vegetarian_available,
       thumbnail_shape: item.thumbnail_shape,
+      display_order: item.display_order,
     });
     setSelectedImageUri(null);
     setShowAddModal(true);
@@ -565,97 +573,167 @@ export default function MenuEditorScreen() {
           ) : (
             filteredItems.map((item, index) => (
               <View key={index} style={styles.menuItemCard}>
-                {item.thumbnail_url && (
-                  <Image
-                    key={getImageUrl(item.thumbnail_url)}
-                    source={{ uri: getImageUrl(item.thumbnail_url) }}
-                    style={[
-                      styles.menuItemImage,
-                      item.thumbnail_shape === 'banner' && styles.menuItemImageBanner,
-                    ]}
-                    onError={(error) => {
-                      console.error('Image load error for item:', item.name, error.nativeEvent);
-                    }}
-                    onLoad={() => {
-                      console.log('Image loaded successfully for item:', item.name);
-                    }}
-                  />
+                {/* Display thumbnail based on shape - Square layout or Banner layout */}
+                {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
+                  <View style={styles.squareLayout}>
+                    <Image
+                      key={getImageUrl(item.thumbnail_url)}
+                      source={{ uri: getImageUrl(item.thumbnail_url) }}
+                      style={styles.squareImage}
+                      onError={(error) => {
+                        console.error('Image load error for item:', item.name, error.nativeEvent);
+                      }}
+                      onLoad={() => {
+                        console.log('Image loaded successfully for item:', item.name);
+                      }}
+                    />
+                    <View style={styles.squareContent}>
+                      <View style={styles.squareHeader}>
+                        <Text style={styles.menuItemName}>{item.name}</Text>
+                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                      </View>
+                      {item.description && (
+                        <Text style={styles.squareDescription} numberOfLines={2}>
+                          {item.description}
+                        </Text>
+                      )}
+                      <View style={styles.menuItemTags}>
+                        {item.subcategory && (
+                          <View style={styles.tag}>
+                            <Text style={styles.tagText}>{item.subcategory}</Text>
+                          </View>
+                        )}
+                        {item.available_for_lunch && (
+                          <View style={[styles.tag, styles.tagAvailability]}>
+                            <Text style={styles.tagText}>Lunch</Text>
+                          </View>
+                        )}
+                        {item.available_for_dinner && (
+                          <View style={[styles.tag, styles.tagAvailability]}>
+                            <Text style={styles.tagText}>Dinner</Text>
+                          </View>
+                        )}
+                        {item.is_gluten_free && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>GF</Text>
+                          </View>
+                        )}
+                        {item.is_gluten_free_available && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>GFA</Text>
+                          </View>
+                        )}
+                        {item.is_vegetarian && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>V</Text>
+                          </View>
+                        )}
+                        {item.is_vegetarian_available && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>VA</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.displayOrderBadge}>
+                        <Text style={styles.displayOrderText}>Order: {item.display_order}</Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    {item.thumbnail_url && (
+                      <Image
+                        key={getImageUrl(item.thumbnail_url)}
+                        source={{ uri: getImageUrl(item.thumbnail_url) }}
+                        style={styles.menuItemImageBanner}
+                        onError={(error) => {
+                          console.error('Image load error for item:', item.name, error.nativeEvent);
+                        }}
+                        onLoad={() => {
+                          console.log('Image loaded successfully for item:', item.name);
+                        }}
+                      />
+                    )}
+                    <View style={styles.menuItemContent}>
+                      <View style={styles.menuItemHeader}>
+                        <Text style={styles.menuItemName}>{item.name}</Text>
+                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                      </View>
+                      {item.description && (
+                        <Text style={styles.menuItemDescription} numberOfLines={2}>
+                          {item.description}
+                        </Text>
+                      )}
+                      <View style={styles.menuItemTags}>
+                        {item.subcategory && (
+                          <View style={styles.tag}>
+                            <Text style={styles.tagText}>{item.subcategory}</Text>
+                          </View>
+                        )}
+                        {item.available_for_lunch && (
+                          <View style={[styles.tag, styles.tagAvailability]}>
+                            <Text style={styles.tagText}>Lunch</Text>
+                          </View>
+                        )}
+                        {item.available_for_dinner && (
+                          <View style={[styles.tag, styles.tagAvailability]}>
+                            <Text style={styles.tagText}>Dinner</Text>
+                          </View>
+                        )}
+                        {item.is_gluten_free && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>GF</Text>
+                          </View>
+                        )}
+                        {item.is_gluten_free_available && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>GFA</Text>
+                          </View>
+                        )}
+                        {item.is_vegetarian && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>V</Text>
+                          </View>
+                        )}
+                        {item.is_vegetarian_available && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>VA</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.displayOrderBadge}>
+                        <Text style={styles.displayOrderText}>Order: {item.display_order}</Text>
+                      </View>
+                    </View>
+                  </>
                 )}
-                <View style={styles.menuItemContent}>
-                  <View style={styles.menuItemHeader}>
-                    <Text style={styles.menuItemName}>{item.name}</Text>
-                    <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
-                  </View>
-                  {item.description && (
-                    <Text style={styles.menuItemDescription} numberOfLines={2}>
-                      {item.description}
+                <View style={styles.menuItemActions}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => openEditModal(item)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="pencil"
+                      android_material_icon_name="edit"
+                      size={20}
+                      color={managerColors.highlight}
+                    />
+                    <Text style={styles.actionButtonText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.deleteButton]}
+                    onPress={() => handleDelete(item)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="trash"
+                      android_material_icon_name="delete"
+                      size={20}
+                      color="#E74C3C"
+                    />
+                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
+                      Delete
                     </Text>
-                  )}
-                  <View style={styles.menuItemTags}>
-                    {item.subcategory && (
-                      <View style={styles.tag}>
-                        <Text style={styles.tagText}>{item.subcategory}</Text>
-                      </View>
-                    )}
-                    {item.available_for_lunch && (
-                      <View style={[styles.tag, styles.tagAvailability]}>
-                        <Text style={styles.tagText}>Lunch</Text>
-                      </View>
-                    )}
-                    {item.available_for_dinner && (
-                      <View style={[styles.tag, styles.tagAvailability]}>
-                        <Text style={styles.tagText}>Dinner</Text>
-                      </View>
-                    )}
-                    {item.is_gluten_free && (
-                      <View style={[styles.tag, styles.tagDietary]}>
-                        <Text style={styles.tagText}>GF</Text>
-                      </View>
-                    )}
-                    {item.is_gluten_free_available && (
-                      <View style={[styles.tag, styles.tagDietary]}>
-                        <Text style={styles.tagText}>GFA</Text>
-                      </View>
-                    )}
-                    {item.is_vegetarian && (
-                      <View style={[styles.tag, styles.tagDietary]}>
-                        <Text style={styles.tagText}>V</Text>
-                      </View>
-                    )}
-                    {item.is_vegetarian_available && (
-                      <View style={[styles.tag, styles.tagDietary]}>
-                        <Text style={styles.tagText}>VA</Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.menuItemActions}>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => openEditModal(item)}
-                    >
-                      <IconSymbol
-                        ios_icon_name="pencil"
-                        android_material_icon_name="edit"
-                        size={20}
-                        color={managerColors.highlight}
-                      />
-                      <Text style={styles.actionButtonText}>Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.deleteButton]}
-                      onPress={() => handleDelete(item)}
-                    >
-                      <IconSymbol
-                        ios_icon_name="trash"
-                        android_material_icon_name="delete"
-                        size={20}
-                        color="#E74C3C"
-                      />
-                      <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                        Delete
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
+                  </TouchableOpacity>
                 </View>
               </View>
             ))
@@ -798,6 +876,25 @@ export default function MenuEditorScreen() {
                   value={formData.price}
                   onChangeText={(text) => setFormData({ ...formData, price: text })}
                 />
+              </View>
+
+              {/* Display Order */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Display Order</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter display order (e.g., 1, 2, 3...)"
+                  placeholderTextColor="#999999"
+                  value={formData.display_order.toString()}
+                  onChangeText={(text) => {
+                    const num = parseInt(text) || 0;
+                    setFormData({ ...formData, display_order: num });
+                  }}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.formHint}>
+                  Lower numbers appear first. Items with the same order are sorted alphabetically.
+                </Text>
               </View>
 
               {/* Category */}
@@ -1234,13 +1331,38 @@ const styles = StyleSheet.create({
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
-  menuItemImage: {
-    width: '100%',
-    height: 120,
+  // Square layout styles (image on left, content on right)
+  squareLayout: {
+    flexDirection: 'row',
+    padding: 12,
+    gap: 12,
+  },
+  squareImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
     resizeMode: 'cover',
   },
+  squareContent: {
+    flex: 1,
+    justifyContent: 'flex-start',
+  },
+  squareHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  squareDescription: {
+    fontSize: 13,
+    color: managerColors.textSecondary,
+    marginTop: 6,
+    lineHeight: 18,
+  },
   menuItemImageBanner: {
+    width: '100%',
     height: 200,
+    resizeMode: 'cover',
   },
   menuItemContent: {
     padding: 16,
@@ -1273,7 +1395,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   tag: {
     backgroundColor: managerColors.background,
@@ -1292,10 +1414,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: managerColors.text,
   },
+  displayOrderBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  displayOrderText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: managerColors.textSecondary,
+  },
   menuItemActions: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: managerColors.border,
   },
   actionButton: {
     flex: 1,
@@ -1371,6 +1508,12 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1A1A1A',
     marginBottom: 8,
+  },
+  formHint: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 6,
+    fontStyle: 'italic',
   },
   input: {
     backgroundColor: '#F5F5F5',
