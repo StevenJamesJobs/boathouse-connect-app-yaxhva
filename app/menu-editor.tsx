@@ -108,8 +108,15 @@ export default function MenuEditorScreen() {
   const filterItems = () => {
     let filtered = menuItems;
 
-    // Filter by category
-    filtered = filtered.filter(item => item.category === selectedCategory);
+    // Filter by category - use availability flags for Lunch and Dinner
+    if (selectedCategory === 'Lunch') {
+      filtered = filtered.filter(item => item.available_for_lunch);
+    } else if (selectedCategory === 'Dinner') {
+      filtered = filtered.filter(item => item.available_for_dinner);
+    } else {
+      // For other categories (Libations, Wine, Happy Hour), use the category field
+      filtered = filtered.filter(item => item.category === selectedCategory);
+    }
 
     // Filter by subcategory if selected
     if (selectedSubcategory) {
@@ -578,6 +585,16 @@ export default function MenuEditorScreen() {
                     {item.subcategory && (
                       <View style={styles.tag}>
                         <Text style={styles.tagText}>{item.subcategory}</Text>
+                      </View>
+                    )}
+                    {item.available_for_lunch && (
+                      <View style={[styles.tag, styles.tagAvailability]}>
+                        <Text style={styles.tagText}>Lunch</Text>
+                      </View>
+                    )}
+                    {item.available_for_dinner && (
+                      <View style={[styles.tag, styles.tagAvailability]}>
+                        <Text style={styles.tagText}>Dinner</Text>
                       </View>
                     )}
                     {item.is_gluten_free && (
@@ -1253,6 +1270,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+  },
+  tagAvailability: {
+    backgroundColor: managerColors.primary,
   },
   tagDietary: {
     backgroundColor: managerColors.highlight,

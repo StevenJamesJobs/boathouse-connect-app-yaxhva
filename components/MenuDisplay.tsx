@@ -92,8 +92,15 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const filterItems = () => {
     let filtered = menuItems;
 
-    // Filter by category
-    filtered = filtered.filter(item => item.category === selectedCategory);
+    // Filter by category - use availability flags for Lunch and Dinner
+    if (selectedCategory === 'Lunch') {
+      filtered = filtered.filter(item => item.available_for_lunch);
+    } else if (selectedCategory === 'Dinner') {
+      filtered = filtered.filter(item => item.available_for_dinner);
+    } else {
+      // For other categories (Libations, Wine, Happy Hour), use the category field
+      filtered = filtered.filter(item => item.category === selectedCategory);
+    }
 
     // Filter by subcategory if selected
     if (selectedSubcategory) {
