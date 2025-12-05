@@ -134,6 +134,16 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     return `${url}?t=${Date.now()}`;
   };
 
+  // Helper function to format price with $ sign
+  const formatPrice = (price: string) => {
+    // If price already has $, return as is
+    if (price.includes('$')) {
+      return price;
+    }
+    // Otherwise add $ at the beginning
+    return `$${price}`;
+  };
+
   const styles = createStyles(colors);
 
   return (
@@ -259,7 +269,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                 <View style={styles.menuItemContent}>
                   <View style={styles.menuItemHeader}>
                     <Text style={styles.menuItemName}>{item.name}</Text>
-                    <Text style={styles.menuItemPrice}>{item.price}</Text>
+                    <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
                   </View>
                   {item.description && (
                     <Text style={styles.menuItemDescription}>
@@ -444,11 +454,11 @@ const createStyles = (colors: any) =>
     },
     menuItemImage: {
       width: '100%',
-      height: 200,
+      height: 120,
       resizeMode: 'cover',
     },
     menuItemImageBanner: {
-      height: 150,
+      height: 200,
     },
     menuItemContent: {
       padding: 16,
