@@ -20,7 +20,7 @@ function ManagerHeader() {
   return (
     <View style={styles.header}>
       <Image 
-        source={require('@/assets/images/3183c5b9-12b6-4cff-b5af-06e09b108cab.jpeg')}
+        source={require('@/assets/images/c9cddae8-fb0d-486c-93f7-d0905925df85.jpeg')}
         style={styles.cornerIcon}
         resizeMode="contain"
       />
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   cornerIcon: {
-    width: 40,
+    width: 120,
     height: 40,
   },
   headerTitle: {

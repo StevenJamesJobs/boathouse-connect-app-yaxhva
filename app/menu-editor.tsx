@@ -1167,7 +1167,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
   modalContent: {
@@ -1175,6 +1175,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
+    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
+    elevation: 10,
   },
   modalScroll: {
     flex: 1,
