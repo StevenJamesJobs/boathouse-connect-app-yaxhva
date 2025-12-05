@@ -21,6 +21,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface Announcement {
   id: string;
@@ -62,6 +63,14 @@ export default function AnnouncementEditorScreen() {
   useEffect(() => {
     loadAnnouncements();
   }, []);
+
+  // Refresh announcements when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Announcement editor screen focused, refreshing data...');
+      loadAnnouncements();
+    }, [])
+  );
 
   const loadAnnouncements = async () => {
     try {
@@ -242,10 +251,8 @@ export default function AnnouncementEditorScreen() {
       }
 
       closeModal();
-      // Reload announcements after a short delay to ensure database has updated
-      setTimeout(() => {
-        loadAnnouncements();
-      }, 500);
+      // Immediately reload announcements
+      await loadAnnouncements();
     } catch (error: any) {
       console.error('Error saving announcement:', error);
       Alert.alert('Error', error.message || 'Failed to save announcement');
@@ -294,10 +301,8 @@ export default function AnnouncementEditorScreen() {
               console.log('Announcement deleted successfully');
               Alert.alert('Success', 'Announcement deleted successfully');
               
-              // Reload announcements after a short delay
-              setTimeout(() => {
-                loadAnnouncements();
-              }, 500);
+              // Immediately reload announcements
+              await loadAnnouncements();
             } catch (error: any) {
               console.error('Error deleting announcement:', error);
               Alert.alert('Error', error.message || 'Failed to delete announcement');
