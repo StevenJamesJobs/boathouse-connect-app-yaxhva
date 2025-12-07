@@ -71,12 +71,72 @@ export default function ManagerToolsScreen() {
                 />
               </TouchableOpacity>
             </View>
+
+            {/* Upcoming Events Editor */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <IconSymbol
+                  ios_icon_name="calendar"
+                  android_material_icon_name="event"
+                  size={32}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardHeaderText}>
+                  <Text style={styles.cardTitle}>Upcoming Events Editor</Text>
+                  <Text style={styles.cardDescription}>
+                    Create and manage upcoming events
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.cardButton}
+                onPress={() => router.push('/upcoming-events-editor')}
+              >
+                <Text style={styles.cardButtonText}>Open Events Editor</Text>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron_right"
+                  size={20}
+                  color={managerColors.text}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Special Features Editor */}
+            <View style={[styles.card, styles.lastCard]}>
+              <View style={styles.cardHeader}>
+                <IconSymbol
+                  ios_icon_name="star.fill"
+                  android_material_icon_name="star"
+                  size={32}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardHeaderText}>
+                  <Text style={styles.cardTitle}>Special Features Editor</Text>
+                  <Text style={styles.cardDescription}>
+                    Create and manage special features
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.cardButton}
+                onPress={() => router.push('/special-features-editor')}
+              >
+                <Text style={styles.cardButtonText}>Open Features Editor</Text>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron_right"
+                  size={20}
+                  color={managerColors.text}
+                />
+              </TouchableOpacity>
+            </View>
           </>
         ) : (
           <>
             <Text style={styles.pageTitle}>Management Tools</Text>
 
-            {/* Employee Management - MOVED HERE */}
+            {/* Employee Management */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <IconSymbol
@@ -106,7 +166,7 @@ export default function ManagerToolsScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Menu Editor - MOVED HERE */}
+            {/* Menu Editor */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <IconSymbol
@@ -137,7 +197,7 @@ export default function ManagerToolsScreen() {
             </View>
 
             {/* Events Editor */}
-            <View style={styles.card}>
+            <View style={[styles.card, styles.lastCard]}>
               <View style={styles.cardHeader}>
                 <IconSymbol
                   ios_icon_name="calendar"
@@ -154,60 +214,6 @@ export default function ManagerToolsScreen() {
               </View>
               <TouchableOpacity style={styles.cardButton}>
                 <Text style={styles.cardButtonText}>Manage Events</Text>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
-                  size={20}
-                  color={managerColors.text}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Reports */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <IconSymbol
-                  ios_icon_name="chart.bar.fill"
-                  android_material_icon_name="bar_chart"
-                  size={32}
-                  color={managerColors.highlight}
-                />
-                <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Reports</Text>
-                  <Text style={styles.cardDescription}>
-                    View analytics and reports
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity style={styles.cardButton}>
-                <Text style={styles.cardButtonText}>View Reports</Text>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
-                  size={20}
-                  color={managerColors.text}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Settings */}
-            <View style={[styles.card, styles.lastCard]}>
-              <View style={styles.cardHeader}>
-                <IconSymbol
-                  ios_icon_name="gearshape.fill"
-                  android_material_icon_name="settings"
-                  size={32}
-                  color={managerColors.highlight}
-                />
-                <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Settings</Text>
-                  <Text style={styles.cardDescription}>
-                    Configure app settings
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity style={styles.cardButton}>
-                <Text style={styles.cardButtonText}>Open Settings</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron_right"

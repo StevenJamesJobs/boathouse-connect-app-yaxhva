@@ -26,6 +26,7 @@ interface CollapsibleSectionProps {
   children: React.ReactNode;
   defaultExpanded?: boolean;
   contentBackgroundColor?: string;
+  onViewAll?: () => void;
 }
 
 export default function CollapsibleSection({
@@ -38,6 +39,7 @@ export default function CollapsibleSection({
   children,
   defaultExpanded = true,
   contentBackgroundColor = '#FFFFFF',
+  onViewAll,
 }: CollapsibleSectionProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
@@ -48,12 +50,12 @@ export default function CollapsibleSection({
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        style={[styles.header, { backgroundColor: headerBackgroundColor }]}
-        onPress={toggleExpanded}
-        activeOpacity={0.7}
-      >
-        <View style={styles.headerLeft}>
+      <View style={[styles.header, { backgroundColor: headerBackgroundColor }]}>
+        <TouchableOpacity
+          style={styles.headerLeft}
+          onPress={toggleExpanded}
+          activeOpacity={0.7}
+        >
           <IconSymbol
             ios_icon_name={iconIos}
             android_material_icon_name={iconAndroid}
@@ -61,14 +63,27 @@ export default function CollapsibleSection({
             color={iconColor}
           />
           <Text style={[styles.headerTitle, { color: headerTextColor }]}>{title}</Text>
+        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          {onViewAll && (
+            <TouchableOpacity
+              style={styles.viewAllButton}
+              onPress={onViewAll}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.viewAllText, { color: headerTextColor }]}>View All</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity onPress={toggleExpanded} activeOpacity={0.7}>
+            <IconSymbol
+              ios_icon_name={isExpanded ? 'chevron.up' : 'chevron.down'}
+              android_material_icon_name={isExpanded ? 'expand_less' : 'expand_more'}
+              size={24}
+              color={headerTextColor}
+            />
+          </TouchableOpacity>
         </View>
-        <IconSymbol
-          ios_icon_name={isExpanded ? 'chevron.up' : 'chevron.down'}
-          android_material_icon_name={isExpanded ? 'expand_less' : 'expand_more'}
-          size={24}
-          color={headerTextColor}
-        />
-      </TouchableOpacity>
+      </View>
       {isExpanded && (
         <View style={[styles.content, { backgroundColor: contentBackgroundColor }]}>
           {children}
@@ -101,6 +116,19 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
     marginLeft: 12,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  viewAllButton: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   content: {
     padding: 20,

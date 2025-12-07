@@ -32,13 +32,6 @@ export default function WeatherWidget({ textColor, secondaryTextColor }: Weather
   const generateDetailedForecast = (data: any): string => {
     const day = data.forecast.forecastday[0].day;
     const astro = data.forecast.forecastday[0].astro;
-    const hour = data.forecast.forecastday[0].hour;
-    
-    // Get current hour
-    const currentHour = new Date().getHours();
-    
-    // Find the forecast for the next few hours
-    const upcomingHours = hour.slice(currentHour, currentHour + 6);
     
     // Build a detailed description
     let description = `Today's forecast: ${day.condition.text}. `;
@@ -137,41 +130,39 @@ export default function WeatherWidget({ textColor, secondaryTextColor }: Weather
 
   return (
     <View style={styles.weatherContainer}>
-      <View style={styles.currentWeather}>
-        <Image
-          source={{ uri: weather.conditionIcon }}
-          style={styles.weatherIcon}
-          resizeMode="contain"
-        />
-        <View style={styles.tempContainer}>
-          <Text style={[styles.temperature, { color: textColor }]}>
-            {weather.currentTemp}°F
-          </Text>
-          <Text style={[styles.conditionText, { color: secondaryTextColor }]}>
-            {weather.conditionText}
-          </Text>
+      {/* Compact Layout: Left side with icon and temps, Right side with forecast */}
+      <View style={styles.compactLayout}>
+        {/* Left Side: Icon, Temps, and Short Description */}
+        <View style={styles.leftSection}>
+          <Image
+            source={{ uri: weather.conditionIcon }}
+            style={styles.weatherIcon}
+            resizeMode="contain"
+          />
+          <View style={styles.tempInfo}>
+            <View style={styles.tempRow}>
+              <Text style={[styles.tempLabel, { color: secondaryTextColor }]}>High:</Text>
+              <Text style={[styles.tempValue, { color: textColor }]}>{weather.highTemp}°F</Text>
+            </View>
+            <View style={styles.tempRow}>
+              <Text style={[styles.tempLabel, { color: secondaryTextColor }]}>Low:</Text>
+              <Text style={[styles.tempValue, { color: textColor }]}>{weather.lowTemp}°F</Text>
+            </View>
+            <Text style={[styles.conditionText, { color: secondaryTextColor }]}>
+              {weather.conditionText}
+            </Text>
+          </View>
         </View>
-      </View>
-      
-      <View style={styles.tempRange}>
-        <View style={styles.tempItem}>
-          <Text style={[styles.tempLabel, { color: secondaryTextColor }]}>High</Text>
-          <Text style={[styles.tempValue, { color: textColor }]}>{weather.highTemp}°F</Text>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.tempItem}>
-          <Text style={[styles.tempLabel, { color: secondaryTextColor }]}>Low</Text>
-          <Text style={[styles.tempValue, { color: textColor }]}>{weather.lowTemp}°F</Text>
-        </View>
-      </View>
 
-      <View style={styles.forecastContainer}>
-        <Text style={[styles.forecastTitle, { color: textColor }]}>
-          Today&apos;s Forecast
-        </Text>
-        <Text style={[styles.detailedForecast, { color: secondaryTextColor }]}>
-          {weather.detailedForecast}
-        </Text>
+        {/* Right Side: Detailed Forecast */}
+        <View style={styles.rightSection}>
+          <Text style={[styles.forecastTitle, { color: textColor }]}>
+            Today&apos;s Forecast
+          </Text>
+          <Text style={[styles.detailedForecast, { color: secondaryTextColor }]}>
+            {weather.detailedForecast}
+          </Text>
+        </View>
       </View>
     </View>
   );
@@ -179,7 +170,7 @@ export default function WeatherWidget({ textColor, secondaryTextColor }: Weather
 
 const styles = StyleSheet.create({
   weatherContainer: {
-    alignItems: 'center',
+    width: '100%',
   },
   loadingContainer: {
     alignItems: 'center',
@@ -197,68 +188,55 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
   },
-  currentWeather: {
+  compactLayout: {
     flexDirection: 'row',
+    gap: 16,
+  },
+  leftSection: {
+    flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
+    minWidth: 120,
   },
   weatherIcon: {
-    width: 80,
-    height: 80,
+    width: 64,
+    height: 64,
+    marginBottom: 8,
   },
-  tempContainer: {
-    marginLeft: 12,
-    alignItems: 'flex-start',
+  tempInfo: {
+    alignItems: 'center',
+    gap: 4,
   },
-  temperature: {
-    fontSize: 48,
-    fontWeight: 'bold',
-  },
-  conditionText: {
-    fontSize: 18,
-    marginTop: 4,
-  },
-  tempRange: {
+  tempRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 20,
-  },
-  tempItem: {
-    alignItems: 'center',
-    paddingHorizontal: 20,
+    gap: 6,
   },
   tempLabel: {
     fontSize: 14,
-    marginBottom: 4,
-  },
-  tempValue: {
-    fontSize: 20,
     fontWeight: '600',
   },
-  divider: {
-    width: 1,
-    height: 40,
-    backgroundColor: '#E0E0E0',
-  },
-  forecastContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-    width: '100%',
-  },
-  forecastTitle: {
+  tempValue: {
     fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 8,
+    fontWeight: 'bold',
+  },
+  conditionText: {
+    fontSize: 13,
+    marginTop: 4,
     textAlign: 'center',
   },
+  rightSection: {
+    flex: 1,
+    paddingLeft: 16,
+    borderLeftWidth: 1,
+    borderLeftColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  forecastTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
   detailedForecast: {
-    fontSize: 14,
-    lineHeight: 22,
-    textAlign: 'left',
+    fontSize: 13,
+    lineHeight: 19,
   },
 });
