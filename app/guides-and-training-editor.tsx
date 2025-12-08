@@ -114,6 +114,7 @@ export default function GuidesAndTrainingEditorScreen() {
 
       if (!result.canceled && result.assets[0]) {
         setSelectedThumbnailUri(result.assets[0].uri);
+        console.log('Thumbnail selected:', result.assets[0].uri);
       }
     } catch (error) {
       console.error('Error picking thumbnail:', error);
@@ -135,6 +136,7 @@ export default function GuidesAndTrainingEditorScreen() {
           name: file.name,
           type: file.mimeType || 'application/octet-stream',
         });
+        console.log('File selected:', file.name);
       }
     } catch (error) {
       console.error('Error picking file:', error);
@@ -145,12 +147,16 @@ export default function GuidesAndTrainingEditorScreen() {
   const uploadThumbnail = async (uri: string): Promise<string | null> => {
     try {
       setUploadingThumbnail(true);
-      console.log('Starting thumbnail upload');
+      console.log('Starting thumbnail upload from URI:', uri);
 
+      // Read file as base64
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
+      console.log('File read as base64, length:', base64.length);
+
+      // Convert base64 to Uint8Array
       const byteCharacters = atob(base64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
@@ -166,6 +172,8 @@ export default function GuidesAndTrainingEditorScreen() {
       else if (ext === 'gif') contentType = 'image/gif';
       else if (ext === 'webp') contentType = 'image/webp';
 
+      console.log('Uploading to storage:', fileName, 'Type:', contentType);
+
       const { data, error } = await supabase.storage
         .from('guides-and-training')
         .upload(`thumbnails/${fileName}`, byteArray, {
@@ -174,18 +182,21 @@ export default function GuidesAndTrainingEditorScreen() {
         });
 
       if (error) {
-        console.error('Error uploading thumbnail:', error);
+        console.error('Storage upload error:', error);
         throw error;
       }
+
+      console.log('Upload successful, getting public URL...');
 
       const { data: urlData } = supabase.storage
         .from('guides-and-training')
         .getPublicUrl(`thumbnails/${fileName}`);
 
+      console.log('Public URL obtained:', urlData.publicUrl);
       return urlData.publicUrl;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading thumbnail:', error);
-      Alert.alert('Error', 'Failed to upload thumbnail');
+      Alert.alert('Error', `Failed to upload thumbnail: ${error.message || 'Unknown error'}`);
       return null;
     } finally {
       setUploadingThumbnail(false);
@@ -195,12 +206,16 @@ export default function GuidesAndTrainingEditorScreen() {
   const uploadFile = async (file: { uri: string; name: string; type: string }): Promise<{ url: string; type: string } | null> => {
     try {
       setUploadingFile(true);
-      console.log('Starting file upload:', file.name);
+      console.log('Starting file upload:', file.name, 'from URI:', file.uri);
 
+      // Read file as base64
       const base64 = await FileSystem.readAsStringAsync(file.uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
+      console.log('File read as base64, length:', base64.length);
+
+      // Convert base64 to Uint8Array
       const byteCharacters = atob(base64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
@@ -210,6 +225,8 @@ export default function GuidesAndTrainingEditorScreen() {
 
       const fileName = `${Date.now()}_${file.name}`;
 
+      console.log('Uploading to storage:', fileName, 'Type:', file.type);
+
       const { data, error } = await supabase.storage
         .from('guides-and-training')
         .upload(`files/${fileName}`, byteArray, {
@@ -218,18 +235,21 @@ export default function GuidesAndTrainingEditorScreen() {
         });
 
       if (error) {
-        console.error('Error uploading file:', error);
+        console.error('Storage upload error:', error);
         throw error;
       }
+
+      console.log('Upload successful, getting public URL...');
 
       const { data: urlData } = supabase.storage
         .from('guides-and-training')
         .getPublicUrl(`files/${fileName}`);
 
+      console.log('Public URL obtained:', urlData.publicUrl);
       return { url: urlData.publicUrl, type: file.type };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading file:', error);
-      Alert.alert('Error', 'Failed to upload file');
+      Alert.alert('Error', `Failed to upload file: ${error.message || 'Unknown error'}`);
       return null;
     } finally {
       setUploadingFile(false);
@@ -260,19 +280,28 @@ export default function GuidesAndTrainingEditorScreen() {
 
       // Upload thumbnail if selected
       if (selectedThumbnailUri) {
+        console.log('Uploading new thumbnail...');
         const uploadedUrl = await uploadThumbnail(selectedThumbnailUri);
         if (uploadedUrl) {
           thumbnailUrl = uploadedUrl;
+          console.log('Thumbnail uploaded successfully');
+        } else {
+          console.log('Thumbnail upload failed, continuing without thumbnail');
         }
       }
 
       // Upload file if selected
       if (selectedFile) {
+        console.log('Uploading new file...');
         const uploadedFile = await uploadFile(selectedFile);
         if (uploadedFile) {
           fileUrl = uploadedFile.url;
           fileType = uploadedFile.type;
           fileName = selectedFile.name;
+          console.log('File uploaded successfully');
+        } else {
+          Alert.alert('Error', 'Failed to upload file');
+          return;
         }
       }
 

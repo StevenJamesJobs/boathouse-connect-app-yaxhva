@@ -88,8 +88,6 @@ export default function ManagerToolsScreen() {
 
         {activeTab === 'newsfeed' ? (
           <>
-            <Text style={styles.pageTitle}>News Feed Editor</Text>
-            
             {/* Announcements Editor */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
@@ -182,8 +180,6 @@ export default function ManagerToolsScreen() {
           </>
         ) : activeTab === 'employee' ? (
           <>
-            <Text style={styles.pageTitle}>Employee Resources</Text>
-
             {/* Guides and Training Editor */}
             <View style={[styles.card, styles.lastCard]}>
               <View style={styles.cardHeader}>
@@ -216,8 +212,6 @@ export default function ManagerToolsScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.pageTitle}>Management Tools</Text>
-
             {/* Employee Management */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
@@ -343,13 +337,6 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: managerColors.text,
-  },
-  pageTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    marginBottom: 16,
-    paddingHorizontal: 4,
   },
   card: {
     backgroundColor: managerColors.card,

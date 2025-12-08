@@ -49,6 +49,7 @@ export default function GuidesAndTrainingScreen() {
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('Employee HandBooks');
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
+  const [viewingFile, setViewingFile] = useState<string | null>(null);
 
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
@@ -113,6 +114,26 @@ export default function GuidesAndTrainingScreen() {
     });
   };
 
+  const handleViewFile = async (guide: GuideItem) => {
+    try {
+      setViewingFile(guide.id);
+      console.log('Opening file:', guide.file_name);
+
+      // Simply open the file URL in the browser/viewer
+      const canOpen = await Linking.canOpenURL(guide.file_url);
+      if (canOpen) {
+        await Linking.openURL(guide.file_url);
+      } else {
+        Alert.alert('Error', 'Cannot open this file type');
+      }
+    } catch (error) {
+      console.error('Error viewing file:', error);
+      Alert.alert('Error', 'Failed to open file');
+    } finally {
+      setViewingFile(null);
+    }
+  };
+
   const handleDownloadFile = async (guide: GuideItem) => {
     try {
       setDownloadingFile(guide.id);
@@ -120,13 +141,23 @@ export default function GuidesAndTrainingScreen() {
 
       // For web, just open the file URL
       if (Platform.OS === 'web') {
-        Linking.openURL(guide.file_url);
+        // Create a temporary link element to trigger download
+        const link = document.createElement('a');
+        link.href = guide.file_url;
+        link.download = guide.file_name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        Alert.alert('Success', 'File download started');
         setDownloadingFile(null);
         return;
       }
 
       // For mobile, download and share
-      const fileUri = FileSystem.documentDirectory + guide.file_name;
+      const fileUri = `${FileSystem.documentDirectory}${guide.file_name}`;
+      
+      console.log('Downloading from:', guide.file_url);
+      console.log('Saving to:', fileUri);
       
       const downloadResult = await FileSystem.downloadAsync(
         guide.file_url,
@@ -138,13 +169,17 @@ export default function GuidesAndTrainingScreen() {
       // Check if sharing is available
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
-        await Sharing.shareAsync(downloadResult.uri);
+        await Sharing.shareAsync(downloadResult.uri, {
+          mimeType: guide.file_type,
+          dialogTitle: `Download ${guide.file_name}`,
+          UTI: guide.file_type,
+        });
       } else {
-        Alert.alert('Success', 'File downloaded successfully');
+        Alert.alert('Success', `File downloaded to: ${downloadResult.uri}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error downloading file:', error);
-      Alert.alert('Error', 'Failed to download file');
+      Alert.alert('Error', `Failed to download file: ${error.message || 'Unknown error'}`);
     } finally {
       setDownloadingFile(null);
     }
@@ -275,27 +310,53 @@ export default function GuidesAndTrainingScreen() {
                     </View>
                   </View>
                 </View>
-                <TouchableOpacity
-                  style={[styles.downloadButton, { backgroundColor: colors.accent || colors.primary }]}
-                  onPress={() => handleDownloadFile(guide)}
-                  disabled={downloadingFile === guide.id}
-                >
-                  {downloadingFile === guide.id ? (
-                    <ActivityIndicator size="small" color={colors.text} />
-                  ) : (
-                    <>
-                      <IconSymbol
-                        ios_icon_name="arrow.down.circle.fill"
-                        android_material_icon_name="download"
-                        size={20}
-                        color={colors.text}
-                      />
-                      <Text style={[styles.downloadButtonText, { color: colors.text }]}>
-                        Download / View
-                      </Text>
-                    </>
-                  )}
-                </TouchableOpacity>
+                
+                {/* Action Buttons */}
+                <View style={styles.actionButtonsContainer}>
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: colors.accent || colors.primary }]}
+                    onPress={() => handleViewFile(guide)}
+                    disabled={viewingFile === guide.id}
+                  >
+                    {viewingFile === guide.id ? (
+                      <ActivityIndicator size="small" color={colors.text} />
+                    ) : (
+                      <>
+                        <IconSymbol
+                          ios_icon_name="eye.fill"
+                          android_material_icon_name="visibility"
+                          size={20}
+                          color={colors.text}
+                        />
+                        <Text style={[styles.actionButtonText, { color: colors.text }]}>
+                          View File
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.downloadButton, { backgroundColor: colors.card, borderColor: colors.accent || colors.primary }]}
+                    onPress={() => handleDownloadFile(guide)}
+                    disabled={downloadingFile === guide.id}
+                  >
+                    {downloadingFile === guide.id ? (
+                      <ActivityIndicator size="small" color={colors.accent || colors.primary} />
+                    ) : (
+                      <>
+                        <IconSymbol
+                          ios_icon_name="arrow.down.circle.fill"
+                          android_material_icon_name="download"
+                          size={20}
+                          color={colors.accent || colors.primary}
+                        />
+                        <Text style={[styles.actionButtonText, { color: colors.accent || colors.primary }]}>
+                          Download
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
             ))
           )}
@@ -467,19 +528,28 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
+    flex: 1,
   },
-  downloadButton: {
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  actionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
     paddingHorizontal: 16,
     gap: 8,
-    marginHorizontal: 16,
-    marginBottom: 16,
     borderRadius: 8,
   },
-  downloadButtonText: {
+  downloadButton: {
+    borderWidth: 2,
+  },
+  actionButtonText: {
     fontSize: 16,
     fontWeight: '600',
   },
