@@ -810,6 +810,7 @@ export default function UpcomingEventsEditorScreen() {
                     value={startDateTime || new Date()}
                     mode="date"
                     display="spinner"
+                    textColor="#000000"
                     onChange={(event, selectedDate) => {
                       if (selectedDate) {
                         const newDate = startDateTime ? new Date(startDateTime) : new Date();
@@ -837,6 +838,7 @@ export default function UpcomingEventsEditorScreen() {
                     value={startDateTime || new Date()}
                     mode="time"
                     display="spinner"
+                    textColor="#000000"
                     onChange={(event, selectedTime) => {
                       if (selectedTime) {
                         const newDate = startDateTime ? new Date(startDateTime) : new Date();
@@ -863,6 +865,7 @@ export default function UpcomingEventsEditorScreen() {
                     value={endDateTime || new Date()}
                     mode="date"
                     display="spinner"
+                    textColor="#000000"
                     onChange={(event, selectedDate) => {
                       if (selectedDate) {
                         const newDate = endDateTime ? new Date(endDateTime) : new Date();
@@ -890,6 +893,7 @@ export default function UpcomingEventsEditorScreen() {
                     value={endDateTime || new Date()}
                     mode="time"
                     display="spinner"
+                    textColor="#000000"
                     onChange={(event, selectedTime) => {
                       if (selectedTime) {
                         const newDate = endDateTime ? new Date(endDateTime) : new Date();
