@@ -167,7 +167,7 @@ export default function ManagerToolsScreen() {
             </View>
 
             {/* Menu Editor */}
-            <View style={styles.card}>
+            <View style={[styles.card, styles.lastCard]}>
               <View style={styles.cardHeader}>
                 <IconSymbol
                   ios_icon_name="fork.knife"
@@ -187,33 +187,6 @@ export default function ManagerToolsScreen() {
                 onPress={() => router.push('/menu-editor')}
               >
                 <Text style={styles.cardButtonText}>Open Menu Editor</Text>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
-                  size={20}
-                  color={managerColors.text}
-                />
-              </TouchableOpacity>
-            </View>
-
-            {/* Events Editor */}
-            <View style={[styles.card, styles.lastCard]}>
-              <View style={styles.cardHeader}>
-                <IconSymbol
-                  ios_icon_name="calendar"
-                  android_material_icon_name="event"
-                  size={32}
-                  color={managerColors.highlight}
-                />
-                <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Events</Text>
-                  <Text style={styles.cardDescription}>
-                    Schedule and manage events
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity style={styles.cardButton}>
-                <Text style={styles.cardButtonText}>Manage Events</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron_right"

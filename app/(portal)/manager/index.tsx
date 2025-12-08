@@ -19,6 +19,7 @@ import WeatherWidget from '@/components/WeatherWidget';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 
 interface MenuItem {
   id: string;
@@ -51,12 +52,45 @@ interface Announcement {
   created_at: string;
 }
 
+interface UpcomingEvent {
+  id: string;
+  title: string;
+  content: string;
+  message: string | null;
+  thumbnail_url: string | null;
+  thumbnail_shape: string;
+  start_date_time: string | null;
+  end_date_time: string | null;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+interface SpecialFeature {
+  id: string;
+  title: string;
+  content: string;
+  message: string | null;
+  thumbnail_url: string | null;
+  thumbnail_shape: string;
+  start_date_time: string | null;
+  end_date_time: string | null;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
 export default function ManagerPortalScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const [weeklySpecials, setWeeklySpecials] = useState<MenuItem[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
+  const [specialFeatures, setSpecialFeatures] = useState<SpecialFeature[]>([]);
   const [loadingSpecials, setLoadingSpecials] = useState(true);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(true);
+  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [loadingFeatures, setLoadingFeatures] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
 
@@ -67,6 +101,8 @@ export default function ManagerPortalScreen() {
   useEffect(() => {
     loadWeeklySpecials();
     loadAnnouncements();
+    loadUpcomingEvents();
+    loadSpecialFeatures();
   }, []);
 
   // Refresh data when screen comes into focus
@@ -75,6 +111,8 @@ export default function ManagerPortalScreen() {
       console.log('Manager portal screen focused, refreshing data...');
       loadWeeklySpecials();
       loadAnnouncements();
+      loadUpcomingEvents();
+      loadSpecialFeatures();
     }, [])
   );
 
@@ -132,6 +170,60 @@ export default function ManagerPortalScreen() {
     }
   };
 
+  const loadUpcomingEvents = async () => {
+    try {
+      setLoadingEvents(true);
+      console.log('Loading upcoming events for manager portal...');
+      
+      const { data, error } = await supabase
+        .from('upcoming_events')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (error) {
+        console.error('Error loading upcoming events:', error);
+        throw error;
+      }
+      
+      console.log('Upcoming events loaded for manager:', data?.length || 0, 'items');
+      setUpcomingEvents(data || []);
+    } catch (error) {
+      console.error('Error loading upcoming events:', error);
+    } finally {
+      setLoadingEvents(false);
+    }
+  };
+
+  const loadSpecialFeatures = async () => {
+    try {
+      setLoadingFeatures(true);
+      console.log('Loading special features for manager portal...');
+      
+      const { data, error } = await supabase
+        .from('special_features')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .order('created_at', { ascending: false })
+        .limit(3);
+
+      if (error) {
+        console.error('Error loading special features:', error);
+        throw error;
+      }
+      
+      console.log('Special features loaded for manager:', data?.length || 0, 'items');
+      setSpecialFeatures(data || []);
+    } catch (error) {
+      console.error('Error loading special features:', error);
+    } finally {
+      setLoadingFeatures(false);
+    }
+  };
+
   const openImageModal = (imageUrl: string) => {
     setSelectedImage(imageUrl);
     setImageModalVisible(true);
@@ -185,6 +277,19 @@ export default function ManagerPortalScreen() {
     if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
     if (diffDays === 1) return 'Yesterday';
     return `${diffDays} days ago`;
+  };
+
+  const formatDateTime = (dateTime: string | null) => {
+    if (!dateTime) return null;
+    const date = new Date(dateTime);
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
   };
 
   return (
@@ -298,36 +403,69 @@ export default function ManagerPortalScreen() {
           headerTextColor={managerColors.text}
           contentBackgroundColor={contentColor}
           defaultExpanded={true}
+          onViewAll={() => router.push('/view-all-upcoming-events')}
         >
-          <View style={styles.eventItem}>
-            <View style={styles.eventDate}>
-              <Text style={styles.eventDay}>15</Text>
-              <Text style={styles.eventMonth}>JUN</Text>
+          {loadingEvents ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={managerColors.highlight} />
+              <Text style={styles.loadingText}>Loading events...</Text>
             </View>
-            <View style={styles.eventDetails}>
-              <Text style={styles.eventTitle}>Summer Kickoff Party</Text>
-              <Text style={styles.eventTime}>6:00 PM - 10:00 PM</Text>
+          ) : upcomingEvents.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No upcoming events</Text>
+              <Text style={styles.emptySubtext}>Create events in the Upcoming Events Editor</Text>
             </View>
-          </View>
-          <View style={styles.eventItem}>
-            <View style={styles.eventDate}>
-              <Text style={styles.eventDay}>22</Text>
-              <Text style={styles.eventMonth}>JUN</Text>
-            </View>
-            <View style={styles.eventDetails}>
-              <Text style={styles.eventTitle}>Live Music Night</Text>
-              <Text style={styles.eventTime}>7:00 PM - 11:00 PM</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.editButton}>
-            <IconSymbol
-              ios_icon_name="pencil"
-              android_material_icon_name="edit"
-              size={16}
-              color={managerColors.text}
-            />
-            <Text style={styles.editButtonText}>Edit Events</Text>
-          </TouchableOpacity>
+          ) : (
+            <>
+              {upcomingEvents.map((event, index) => (
+                <View key={index} style={styles.eventItem}>
+                  {event.thumbnail_shape === 'square' && event.thumbnail_url ? (
+                    <View style={styles.eventSquareLayout}>
+                      <TouchableOpacity onPress={() => openImageModal(event.thumbnail_url!)}>
+                        <Image
+                          source={{ uri: getImageUrl(event.thumbnail_url) }}
+                          style={styles.eventSquareImage}
+                        />
+                      </TouchableOpacity>
+                      <View style={styles.eventSquareContent}>
+                        <Text style={styles.eventTitle}>{event.title}</Text>
+                        {(event.content || event.message) && (
+                          <Text style={styles.eventDescription} numberOfLines={2}>
+                            {event.content || event.message}
+                          </Text>
+                        )}
+                        {event.start_date_time && (
+                          <Text style={styles.eventTime}>{formatDateTime(event.start_date_time)}</Text>
+                        )}
+                      </View>
+                    </View>
+                  ) : (
+                    <>
+                      {event.thumbnail_url && (
+                        <TouchableOpacity onPress={() => openImageModal(event.thumbnail_url!)}>
+                          <Image
+                            source={{ uri: getImageUrl(event.thumbnail_url) }}
+                            style={styles.eventBannerImage}
+                          />
+                        </TouchableOpacity>
+                      )}
+                      <View style={styles.eventContent}>
+                        <Text style={styles.eventTitle}>{event.title}</Text>
+                        {(event.content || event.message) && (
+                          <Text style={styles.eventDescription}>
+                            {event.content || event.message}
+                          </Text>
+                        )}
+                        {event.start_date_time && (
+                          <Text style={styles.eventTime}>{formatDateTime(event.start_date_time)}</Text>
+                        )}
+                      </View>
+                    </>
+                  )}
+                </View>
+              ))}
+            </>
+          )}
         </CollapsibleSection>
 
         {/* Special Features Section - Collapsible */}
@@ -340,45 +478,69 @@ export default function ManagerPortalScreen() {
           headerTextColor={managerColors.text}
           contentBackgroundColor={contentColor}
           defaultExpanded={true}
+          onViewAll={() => router.push('/view-all-special-features')}
         >
-          <View style={styles.featureGrid}>
-            <TouchableOpacity style={styles.featureButton}>
-              <IconSymbol
-                ios_icon_name="person.2.fill"
-                android_material_icon_name="people"
-                size={32}
-                color={managerColors.text}
-              />
-              <Text style={styles.featureText}>Employees</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.featureButton}>
-              <IconSymbol
-                ios_icon_name="calendar.badge.clock"
-                android_material_icon_name="schedule"
-                size={32}
-                color={managerColors.text}
-              />
-              <Text style={styles.featureText}>Scheduling</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.featureButton}>
-              <IconSymbol
-                ios_icon_name="chart.bar.fill"
-                android_material_icon_name="bar_chart"
-                size={32}
-                color={managerColors.text}
-              />
-              <Text style={styles.featureText}>Reports</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.featureButton}>
-              <IconSymbol
-                ios_icon_name="gearshape.fill"
-                android_material_icon_name="settings"
-                size={32}
-                color={managerColors.text}
-              />
-              <Text style={styles.featureText}>Settings</Text>
-            </TouchableOpacity>
-          </View>
+          {loadingFeatures ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={managerColors.highlight} />
+              <Text style={styles.loadingText}>Loading features...</Text>
+            </View>
+          ) : specialFeatures.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No special features</Text>
+              <Text style={styles.emptySubtext}>Create features in the Special Features Editor</Text>
+            </View>
+          ) : (
+            <>
+              {specialFeatures.map((feature, index) => (
+                <View key={index} style={styles.featureItem}>
+                  {feature.thumbnail_shape === 'square' && feature.thumbnail_url ? (
+                    <View style={styles.featureSquareLayout}>
+                      <TouchableOpacity onPress={() => openImageModal(feature.thumbnail_url!)}>
+                        <Image
+                          source={{ uri: getImageUrl(feature.thumbnail_url) }}
+                          style={styles.featureSquareImage}
+                        />
+                      </TouchableOpacity>
+                      <View style={styles.featureSquareContent}>
+                        <Text style={styles.featureTitle}>{feature.title}</Text>
+                        {(feature.content || feature.message) && (
+                          <Text style={styles.featureDescription} numberOfLines={2}>
+                            {feature.content || feature.message}
+                          </Text>
+                        )}
+                        {feature.start_date_time && (
+                          <Text style={styles.featureTime}>{formatDateTime(feature.start_date_time)}</Text>
+                        )}
+                      </View>
+                    </View>
+                  ) : (
+                    <>
+                      {feature.thumbnail_url && (
+                        <TouchableOpacity onPress={() => openImageModal(feature.thumbnail_url!)}>
+                          <Image
+                            source={{ uri: getImageUrl(feature.thumbnail_url) }}
+                            style={styles.featureBannerImage}
+                          />
+                        </TouchableOpacity>
+                      )}
+                      <View style={styles.featureContent}>
+                        <Text style={styles.featureTitle}>{feature.title}</Text>
+                        {(feature.content || feature.message) && (
+                          <Text style={styles.featureDescription}>
+                            {feature.content || feature.message}
+                          </Text>
+                        )}
+                        {feature.start_date_time && (
+                          <Text style={styles.featureTime}>{formatDateTime(feature.start_date_time)}</Text>
+                        )}
+                      </View>
+                    </>
+                  )}
+                </View>
+              ))}
+            </>
+          )}
         </CollapsibleSection>
 
         {/* Weekly Specials Section - Collapsible */}
@@ -662,33 +824,32 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   eventItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: managerColors.border,
   },
-  eventDate: {
-    width: 60,
-    height: 60,
-    backgroundColor: managerColors.highlight,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
+  eventSquareLayout: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  eventDay: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: managerColors.text,
+  eventSquareImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    resizeMode: 'cover',
   },
-  eventMonth: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: managerColors.background,
-  },
-  eventDetails: {
+  eventSquareContent: {
     flex: 1,
+  },
+  eventBannerImage: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    resizeMode: 'cover',
+    marginBottom: 8,
+  },
+  eventContent: {
+    marginTop: 8,
   },
   eventTitle: {
     fontSize: 16,
@@ -696,29 +857,61 @@ const styles = StyleSheet.create({
     color: managerColors.text,
     marginBottom: 4,
   },
-  eventTime: {
+  eventDescription: {
     fontSize: 14,
     color: managerColors.textSecondary,
+    marginBottom: 4,
+    lineHeight: 20,
   },
-  featureGrid: {
+  eventTime: {
+    fontSize: 12,
+    color: managerColors.textSecondary,
+    fontStyle: 'italic',
+  },
+  featureItem: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: managerColors.border,
+  },
+  featureSquareLayout: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+    gap: 12,
   },
-  featureButton: {
-    width: '48%',
-    backgroundColor: managerColors.highlight,
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 12,
+  featureSquareImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    resizeMode: 'cover',
   },
-  featureText: {
-    fontSize: 14,
+  featureSquareContent: {
+    flex: 1,
+  },
+  featureBannerImage: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    resizeMode: 'cover',
+    marginBottom: 8,
+  },
+  featureContent: {
+    marginTop: 8,
+  },
+  featureTitle: {
+    fontSize: 16,
     fontWeight: '600',
     color: managerColors.text,
-    marginTop: 8,
-    textAlign: 'center',
+    marginBottom: 4,
+  },
+  featureDescription: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginBottom: 4,
+    lineHeight: 20,
+  },
+  featureTime: {
+    fontSize: 12,
+    color: managerColors.textSecondary,
+    fontStyle: 'italic',
   },
   specialCard: {
     backgroundColor: managerColors.background,
@@ -790,22 +983,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '600',
     color: managerColors.text,
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: managerColors.highlight,
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginTop: 12,
-  },
-  editButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: managerColors.text,
-    marginLeft: 8,
   },
   imageModalOverlay: {
     flex: 1,
