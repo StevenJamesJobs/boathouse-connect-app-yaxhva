@@ -796,37 +796,119 @@ export default function UpcomingEventsEditorScreen() {
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
             </ScrollView>
+
+            {/* iOS Date/Time Pickers - Rendered inside modal */}
+            {Platform.OS === 'ios' && showStartDatePicker && (
+              <View style={styles.datePickerOverlay}>
+                <View style={styles.datePickerContainer}>
+                  <View style={styles.datePickerHeader}>
+                    <TouchableOpacity onPress={() => setShowStartDatePicker(false)}>
+                      <Text style={styles.datePickerDone}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <DateTimePicker
+                    value={startDateTime || new Date()}
+                    mode="date"
+                    display="spinner"
+                    onChange={(event, selectedDate) => {
+                      if (selectedDate) {
+                        const newDate = startDateTime ? new Date(startDateTime) : new Date();
+                        newDate.setFullYear(selectedDate.getFullYear());
+                        newDate.setMonth(selectedDate.getMonth());
+                        newDate.setDate(selectedDate.getDate());
+                        setStartDateTime(newDate);
+                      }
+                    }}
+                    style={styles.datePicker}
+                  />
+                </View>
+              </View>
+            )}
+
+            {Platform.OS === 'ios' && showStartTimePicker && (
+              <View style={styles.datePickerOverlay}>
+                <View style={styles.datePickerContainer}>
+                  <View style={styles.datePickerHeader}>
+                    <TouchableOpacity onPress={() => setShowStartTimePicker(false)}>
+                      <Text style={styles.datePickerDone}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <DateTimePicker
+                    value={startDateTime || new Date()}
+                    mode="time"
+                    display="spinner"
+                    onChange={(event, selectedTime) => {
+                      if (selectedTime) {
+                        const newDate = startDateTime ? new Date(startDateTime) : new Date();
+                        newDate.setHours(selectedTime.getHours());
+                        newDate.setMinutes(selectedTime.getMinutes());
+                        setStartDateTime(newDate);
+                      }
+                    }}
+                    style={styles.datePicker}
+                  />
+                </View>
+              </View>
+            )}
+
+            {Platform.OS === 'ios' && showEndDatePicker && (
+              <View style={styles.datePickerOverlay}>
+                <View style={styles.datePickerContainer}>
+                  <View style={styles.datePickerHeader}>
+                    <TouchableOpacity onPress={() => setShowEndDatePicker(false)}>
+                      <Text style={styles.datePickerDone}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <DateTimePicker
+                    value={endDateTime || new Date()}
+                    mode="date"
+                    display="spinner"
+                    onChange={(event, selectedDate) => {
+                      if (selectedDate) {
+                        const newDate = endDateTime ? new Date(endDateTime) : new Date();
+                        newDate.setFullYear(selectedDate.getFullYear());
+                        newDate.setMonth(selectedDate.getMonth());
+                        newDate.setDate(selectedDate.getDate());
+                        setEndDateTime(newDate);
+                      }
+                    }}
+                    style={styles.datePicker}
+                  />
+                </View>
+              </View>
+            )}
+
+            {Platform.OS === 'ios' && showEndTimePicker && (
+              <View style={styles.datePickerOverlay}>
+                <View style={styles.datePickerContainer}>
+                  <View style={styles.datePickerHeader}>
+                    <TouchableOpacity onPress={() => setShowEndTimePicker(false)}>
+                      <Text style={styles.datePickerDone}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <DateTimePicker
+                    value={endDateTime || new Date()}
+                    mode="time"
+                    display="spinner"
+                    onChange={(event, selectedTime) => {
+                      if (selectedTime) {
+                        const newDate = endDateTime ? new Date(endDateTime) : new Date();
+                        newDate.setHours(selectedTime.getHours());
+                        newDate.setMinutes(selectedTime.getMinutes());
+                        setEndDateTime(newDate);
+                      }
+                    }}
+                    style={styles.datePicker}
+                  />
+                </View>
+              </View>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Render DateTimePickers outside modal with proper z-index */}
-      {showStartDatePicker && Platform.OS === 'ios' && (
-        <View style={styles.datePickerContainer}>
-          <View style={styles.datePickerHeader}>
-            <TouchableOpacity onPress={() => setShowStartDatePicker(false)}>
-              <Text style={styles.datePickerDone}>Done</Text>
-            </TouchableOpacity>
-          </View>
-          <DateTimePicker
-            value={startDateTime || new Date()}
-            mode="date"
-            display="spinner"
-            onChange={(event, selectedDate) => {
-              if (selectedDate) {
-                const newDate = startDateTime ? new Date(startDateTime) : new Date();
-                newDate.setFullYear(selectedDate.getFullYear());
-                newDate.setMonth(selectedDate.getMonth());
-                newDate.setDate(selectedDate.getDate());
-                setStartDateTime(newDate);
-              }
-            }}
-            style={styles.datePicker}
-          />
-        </View>
-      )}
-
-      {showStartDatePicker && Platform.OS === 'android' && (
+      {/* Android Date/Time Pickers - Rendered as native dialogs */}
+      {Platform.OS === 'android' && showStartDatePicker && (
         <DateTimePicker
           value={startDateTime || new Date()}
           mode="date"
@@ -844,31 +926,7 @@ export default function UpcomingEventsEditorScreen() {
         />
       )}
 
-      {showStartTimePicker && Platform.OS === 'ios' && (
-        <View style={styles.datePickerContainer}>
-          <View style={styles.datePickerHeader}>
-            <TouchableOpacity onPress={() => setShowStartTimePicker(false)}>
-              <Text style={styles.datePickerDone}>Done</Text>
-            </TouchableOpacity>
-          </View>
-          <DateTimePicker
-            value={startDateTime || new Date()}
-            mode="time"
-            display="spinner"
-            onChange={(event, selectedTime) => {
-              if (selectedTime) {
-                const newDate = startDateTime ? new Date(startDateTime) : new Date();
-                newDate.setHours(selectedTime.getHours());
-                newDate.setMinutes(selectedTime.getMinutes());
-                setStartDateTime(newDate);
-              }
-            }}
-            style={styles.datePicker}
-          />
-        </View>
-      )}
-
-      {showStartTimePicker && Platform.OS === 'android' && (
+      {Platform.OS === 'android' && showStartTimePicker && (
         <DateTimePicker
           value={startDateTime || new Date()}
           mode="time"
@@ -885,32 +943,7 @@ export default function UpcomingEventsEditorScreen() {
         />
       )}
 
-      {showEndDatePicker && Platform.OS === 'ios' && (
-        <View style={styles.datePickerContainer}>
-          <View style={styles.datePickerHeader}>
-            <TouchableOpacity onPress={() => setShowEndDatePicker(false)}>
-              <Text style={styles.datePickerDone}>Done</Text>
-            </TouchableOpacity>
-          </View>
-          <DateTimePicker
-            value={endDateTime || new Date()}
-            mode="date"
-            display="spinner"
-            onChange={(event, selectedDate) => {
-              if (selectedDate) {
-                const newDate = endDateTime ? new Date(endDateTime) : new Date();
-                newDate.setFullYear(selectedDate.getFullYear());
-                newDate.setMonth(selectedDate.getMonth());
-                newDate.setDate(selectedDate.getDate());
-                setEndDateTime(newDate);
-              }
-            }}
-            style={styles.datePicker}
-          />
-        </View>
-      )}
-
-      {showEndDatePicker && Platform.OS === 'android' && (
+      {Platform.OS === 'android' && showEndDatePicker && (
         <DateTimePicker
           value={endDateTime || new Date()}
           mode="date"
@@ -928,31 +961,7 @@ export default function UpcomingEventsEditorScreen() {
         />
       )}
 
-      {showEndTimePicker && Platform.OS === 'ios' && (
-        <View style={styles.datePickerContainer}>
-          <View style={styles.datePickerHeader}>
-            <TouchableOpacity onPress={() => setShowEndTimePicker(false)}>
-              <Text style={styles.datePickerDone}>Done</Text>
-            </TouchableOpacity>
-          </View>
-          <DateTimePicker
-            value={endDateTime || new Date()}
-            mode="time"
-            display="spinner"
-            onChange={(event, selectedTime) => {
-              if (selectedTime) {
-                const newDate = endDateTime ? new Date(endDateTime) : new Date();
-                newDate.setHours(selectedTime.getHours());
-                newDate.setMinutes(selectedTime.getMinutes());
-                setEndDateTime(newDate);
-              }
-            }}
-            style={styles.datePicker}
-          />
-        </View>
-      )}
-
-      {showEndTimePicker && Platform.OS === 'android' && (
+      {Platform.OS === 'android' && showEndTimePicker && (
         <DateTimePicker
           value={endDateTime || new Date()}
           mode="time"
@@ -1346,17 +1355,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#666666',
   },
-  datePickerContainer: {
+  datePickerOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  datePickerContainer: {
     backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.3)',
     elevation: 10,
-    zIndex: 9999,
   },
   datePickerHeader: {
     flexDirection: 'row',
