@@ -24,38 +24,71 @@ export default function ManagerToolsScreen() {
         <Text style={styles.nameHeaderText}>{user?.name}&apos;s Tools</Text>
       </View>
 
-      {/* Tab Selector */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'newsfeed' && styles.activeTab]}
-          onPress={() => setActiveTab('newsfeed')}
-        >
-          <Text style={[styles.tabText, activeTab === 'newsfeed' && styles.activeTabText]}>
-            News Feed
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'employee' && styles.activeTab]}
-          onPress={() => setActiveTab('employee')}
-        >
-          <Text style={[styles.tabText, activeTab === 'employee' && styles.activeTabText]}>
-            Employee
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'management' && styles.activeTab]}
-          onPress={() => setActiveTab('management')}
-        >
-          <Text style={[styles.tabText, activeTab === 'management' && styles.activeTabText]}>
-            Management
-          </Text>
-        </TouchableOpacity>
-      </View>
-
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        {/* Guides and Training Section - Always visible at top */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <IconSymbol
+              ios_icon_name="book.fill"
+              android_material_icon_name="menu_book"
+              size={32}
+              color={managerColors.highlight}
+            />
+            <View style={styles.cardHeaderText}>
+              <Text style={styles.cardTitle}>Employee Guides and Training</Text>
+              <Text style={styles.cardDescription}>
+                View training materials and guides
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={styles.cardButton}
+            onPress={() => router.push('/guides-and-training')}
+          >
+            <Text style={styles.cardButtonText}>View Guides</Text>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron_right"
+              size={20}
+              color={managerColors.text}
+            />
+          </TouchableOpacity>
+        </View>
+
+        {/* Management Editors Section Title */}
+        <Text style={styles.sectionTitle}>Management Editors</Text>
+
+        {/* Tab Selector */}
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'newsfeed' && styles.activeTab]}
+            onPress={() => setActiveTab('newsfeed')}
+          >
+            <Text style={[styles.tabText, activeTab === 'newsfeed' && styles.activeTabText]}>
+              News Feed
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'employee' && styles.activeTab]}
+            onPress={() => setActiveTab('employee')}
+          >
+            <Text style={[styles.tabText, activeTab === 'employee' && styles.activeTabText]}>
+              Employee
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'management' && styles.activeTab]}
+            onPress={() => setActiveTab('management')}
+          >
+            <Text style={[styles.tabText, activeTab === 'management' && styles.activeTabText]}>
+              Management
+            </Text>
+          </TouchableOpacity>
+        </View>
+
         {activeTab === 'newsfeed' ? (
           <>
-            <Text style={styles.pageTitle}>Management Editors</Text>
+            <Text style={styles.pageTitle}>News Feed Editor</Text>
             
             {/* Announcements Editor */}
             <View style={styles.card}>
@@ -150,36 +183,6 @@ export default function ManagerToolsScreen() {
         ) : activeTab === 'employee' ? (
           <>
             <Text style={styles.pageTitle}>Employee Resources</Text>
-
-            {/* Guides and Training Section - Viewable */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <IconSymbol
-                  ios_icon_name="book.fill"
-                  android_material_icon_name="menu_book"
-                  size={32}
-                  color={managerColors.highlight}
-                />
-                <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Guides and Training</Text>
-                  <Text style={styles.cardDescription}>
-                    View training materials and guides
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => router.push('/guides-and-training')}
-              >
-                <Text style={styles.cardButtonText}>View Guides</Text>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
-                  size={20}
-                  color={managerColors.text}
-                />
-              </TouchableOpacity>
-            </View>
 
             {/* Guides and Training Editor */}
             <View style={[styles.card, styles.lastCard]}>
@@ -299,13 +302,28 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: managerColors.text,
   },
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 100,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: managerColors.text,
+    marginTop: 24,
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
   tabContainer: {
     flexDirection: 'row',
     backgroundColor: managerColors.card,
-    marginHorizontal: 16,
-    marginTop: 16,
     borderRadius: 12,
     padding: 4,
+    marginBottom: 20,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
@@ -326,19 +344,11 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: managerColors.text,
   },
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingTop: 20,
-    paddingHorizontal: 16,
-    paddingBottom: 100,
-  },
   pageTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: managerColors.text,
-    marginBottom: 20,
+    marginBottom: 16,
     paddingHorizontal: 4,
   },
   card: {
