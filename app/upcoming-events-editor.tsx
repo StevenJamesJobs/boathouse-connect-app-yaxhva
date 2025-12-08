@@ -796,6 +796,7 @@ export default function UpcomingEventsEditorScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
+      {/* Render DateTimePickers outside modal to fix z-index issue */}
       {showStartDatePicker && (
         <DateTimePicker
           value={startDateTime || new Date()}
