@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,6 +24,7 @@ interface MessageThread {
   sender_id: string;
   sender_name: string;
   sender_job_title: string;
+  sender_profile_picture: string | null;
   subject: string | null;
   body: string;
   created_at: string;
@@ -64,7 +66,8 @@ export default function MessageDetailScreen() {
           created_at,
           sender:users!messages_sender_id_fkey (
             name,
-            job_title
+            job_title,
+            profile_picture_url
           )
         `)
         .eq('id', messageId)
@@ -83,7 +86,8 @@ export default function MessageDetailScreen() {
           created_at,
           sender:users!messages_sender_id_fkey (
             name,
-            job_title
+            job_title,
+            profile_picture_url
           )
         `)
         .or(`id.eq.${messageId},thread_id.eq.${threadId}`)
@@ -96,6 +100,7 @@ export default function MessageDetailScreen() {
         sender_id: msg.sender_id,
         sender_name: msg.sender?.name || 'Unknown',
         sender_job_title: msg.sender?.job_title || '',
+        sender_profile_picture: msg.sender?.profile_picture_url || null,
         subject: msg.subject,
         body: msg.body,
         created_at: msg.created_at,
@@ -270,28 +275,53 @@ export default function MessageDetailScreen() {
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         {messages.map((message, index) => (
           <View key={index} style={styles.messageContainer}>
-            <View style={[styles.messageCard, { backgroundColor: colors.card }]}>
+            <View 
+              style={[
+                styles.messageCard, 
+                { 
+                  backgroundColor: message.is_current_user 
+                    ? (user?.role === 'manager' ? '#4A5F7A' : '#A8D5E2')
+                    : colors.card 
+                }
+              ]}
+            >
               <View style={styles.messageHeader}>
+                {/* Profile Picture */}
+                <View style={styles.profilePictureContainer}>
+                  {message.sender_profile_picture ? (
+                    <Image
+                      source={{ uri: message.sender_profile_picture }}
+                      style={styles.profilePicture}
+                    />
+                  ) : (
+                    <View style={[styles.profilePicturePlaceholder, { backgroundColor: colors.highlight }]}>
+                      <Text style={[styles.profilePicturePlaceholderText, { color: colors.text }]}>
+                        {message.sender_name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
                 <View style={styles.senderInfo}>
-                  <Text style={[styles.senderName, { color: colors.text }]}>
+                  <Text style={[styles.senderName, { color: message.is_current_user ? '#FFFFFF' : colors.text }]}>
                     {message.is_current_user ? 'You' : message.sender_name}
                   </Text>
-                  <Text style={[styles.senderJobTitle, { color: colors.textSecondary }]}>
+                  <Text style={[styles.senderJobTitle, { color: message.is_current_user ? 'rgba(255, 255, 255, 0.8)' : colors.textSecondary }]}>
                     {message.sender_job_title}
                   </Text>
                 </View>
-                <Text style={[styles.messageDate, { color: colors.textSecondary }]}>
+                <Text style={[styles.messageDate, { color: message.is_current_user ? 'rgba(255, 255, 255, 0.8)' : colors.textSecondary }]}>
                   {formatDateTime(message.created_at)}
                 </Text>
               </View>
               
               {index === 0 && message.subject && (
-                <Text style={[styles.messageSubject, { color: colors.text }]}>
+                <Text style={[styles.messageSubject, { color: message.is_current_user ? '#FFFFFF' : colors.text }]}>
                   {message.subject}
                 </Text>
               )}
               
-              <Text style={[styles.messageBody, { color: colors.text }]}>
+              <Text style={[styles.messageBody, { color: message.is_current_user ? '#FFFFFF' : colors.text }]}>
                 {message.body}
               </Text>
             </View>
@@ -424,9 +454,29 @@ const styles = StyleSheet.create({
   },
   messageHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: 12,
+    gap: 12,
+  },
+  profilePictureContainer: {
+    width: 40,
+    height: 40,
+  },
+  profilePicture: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  profilePicturePlaceholder: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profilePicturePlaceholderText: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   senderInfo: {
     flex: 1,

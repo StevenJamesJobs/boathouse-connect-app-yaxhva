@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { AppState, AppStateStatus } from 'react-native';
 
 export function useUnreadMessages() {
   const { user } = useAuth();
@@ -45,13 +46,31 @@ export function useUnreadMessages() {
           filter: `recipient_id=eq.${user?.id}`,
         },
         () => {
+          console.log('Message update detected, refreshing unread count...');
           loadUnreadCount();
         }
       )
       .subscribe();
 
+    // Refresh when app comes to foreground
+    const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
+      if (nextAppState === 'active') {
+        console.log('App became active, refreshing unread count...');
+        loadUnreadCount();
+      }
+    });
+
+    // Refresh every 30 seconds when app is active
+    const interval = setInterval(() => {
+      if (AppState.currentState === 'active') {
+        loadUnreadCount();
+      }
+    }, 30000);
+
     return () => {
       supabase.removeChannel(channel);
+      subscription.remove();
+      clearInterval(interval);
     };
   }, [user?.id]);
 

@@ -9,8 +9,9 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  Image,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -26,8 +27,10 @@ interface Message {
   created_at: string;
   sender_name: string;
   sender_job_title: string;
+  sender_profile_picture: string | null;
   is_read: boolean;
   recipient_count: number;
+  recipient_id?: string;
 }
 
 export default function MessagesScreen() {
@@ -42,6 +45,15 @@ export default function MessagesScreen() {
   const [inboxCount, setInboxCount] = useState(0);
 
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
+
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadMessages();
+      loadUnreadCount();
+      loadInboxCount();
+    }, [activeTab])
+  );
 
   useEffect(() => {
     loadMessages();
@@ -77,6 +89,7 @@ export default function MessagesScreen() {
         id,
         is_read,
         created_at,
+        recipient_id,
         message:messages (
           id,
           sender_id,
@@ -87,7 +100,8 @@ export default function MessagesScreen() {
           created_at,
           sender:users!messages_sender_id_fkey (
             name,
-            job_title
+            job_title,
+            profile_picture_url
           )
         )
       `)
@@ -112,8 +126,10 @@ export default function MessagesScreen() {
         created_at: item.message.created_at,
         sender_name: item.message.sender?.name || 'Unknown',
         sender_job_title: item.message.sender?.job_title || '',
+        sender_profile_picture: item.message.sender?.profile_picture_url || null,
         is_read: item.is_read,
         recipient_count: 1,
+        recipient_id: item.recipient_id,
       }));
 
     setInboxMessages(messages);
@@ -133,6 +149,7 @@ export default function MessagesScreen() {
         thread_id,
         created_at,
         recipients:message_recipients (
+          id,
           recipient:users (
             name,
             job_title
@@ -157,6 +174,7 @@ export default function MessagesScreen() {
       created_at: msg.created_at,
       sender_name: user.name,
       sender_job_title: user.jobTitle,
+      sender_profile_picture: user.profilePictureUrl || null,
       is_read: true,
       recipient_count: msg.recipients?.length || 0,
     }));
@@ -203,6 +221,74 @@ export default function MessagesScreen() {
       pathname: '/message-detail',
       params: { messageId: message.id, threadId: message.thread_id || message.id },
     });
+  };
+
+  const handleMarkAsRead = async (message: Message) => {
+    if (!user?.id || activeTab !== 'inbox') return;
+
+    try {
+      await supabase
+        .from('message_recipients')
+        .update({ is_read: true, read_at: new Date().toISOString() })
+        .eq('recipient_id', user.id)
+        .eq('message_id', message.id);
+
+      await loadMessages();
+      await loadUnreadCount();
+      Alert.alert('Success', 'Message marked as read');
+    } catch (error) {
+      console.error('Error marking as read:', error);
+      Alert.alert('Error', 'Failed to mark message as read');
+    }
+  };
+
+  const handleDeleteMessage = async (message: Message) => {
+    Alert.alert(
+      'Delete Message',
+      activeTab === 'inbox' 
+        ? 'Are you sure you want to delete this message from your inbox?'
+        : 'Are you sure you want to delete this sent message?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (activeTab === 'inbox') {
+                // Delete from inbox (soft delete)
+                await supabase
+                  .from('message_recipients')
+                  .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+                  .eq('recipient_id', user?.id)
+                  .eq('message_id', message.id);
+              } else {
+                // Delete sent message (hard delete)
+                // First delete all recipients
+                await supabase
+                  .from('message_recipients')
+                  .delete()
+                  .eq('message_id', message.id);
+                
+                // Then delete the message
+                await supabase
+                  .from('messages')
+                  .delete()
+                  .eq('id', message.id);
+              }
+
+              await loadMessages();
+              await loadUnreadCount();
+              await loadInboxCount();
+              Alert.alert('Success', 'Message deleted');
+            } catch (error) {
+              console.error('Error deleting message:', error);
+              Alert.alert('Error', 'Failed to delete message');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const formatDate = (dateString: string) => {
@@ -362,37 +448,87 @@ export default function MessagesScreen() {
         ) : (
           <>
             {messages.map((message, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.messageItem,
-                  { backgroundColor: colors.card },
-                  !message.is_read && activeTab === 'inbox' && styles.unreadMessage,
-                ]}
-                onPress={() => handleMessagePress(message)}
-              >
-                <View style={styles.messageHeader}>
-                  <View style={styles.messageHeaderLeft}>
-                    {!message.is_read && activeTab === 'inbox' && (
-                      <View style={styles.unreadDot} />
+              <View key={index} style={styles.messageItemWrapper}>
+                <TouchableOpacity
+                  style={[
+                    styles.messageItem,
+                    { backgroundColor: colors.card },
+                    !message.is_read && activeTab === 'inbox' && styles.unreadMessage,
+                  ]}
+                  onPress={() => handleMessagePress(message)}
+                >
+                  {/* Profile Picture */}
+                  <View style={styles.profilePictureContainer}>
+                    {message.sender_profile_picture ? (
+                      <Image
+                        source={{ uri: message.sender_profile_picture }}
+                        style={styles.profilePicture}
+                      />
+                    ) : (
+                      <View style={[styles.profilePicturePlaceholder, { backgroundColor: colors.highlight }]}>
+                        <Text style={[styles.profilePicturePlaceholderText, { color: colors.text }]}>
+                          {message.sender_name.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
                     )}
-                    <Text style={[styles.messageSender, { color: colors.text }]} numberOfLines={1}>
-                      {activeTab === 'inbox' ? message.sender_name : `To: ${message.recipient_count} recipient${message.recipient_count > 1 ? 's' : ''}`}
+                  </View>
+
+                  {/* Message Content */}
+                  <View style={styles.messageContent}>
+                    <View style={styles.messageHeader}>
+                      <View style={styles.messageHeaderLeft}>
+                        {!message.is_read && activeTab === 'inbox' && (
+                          <View style={styles.unreadDot} />
+                        )}
+                        <Text style={[styles.messageSender, { color: colors.text }]} numberOfLines={1}>
+                          {activeTab === 'inbox' ? message.sender_name : `To: ${message.recipient_count} recipient${message.recipient_count > 1 ? 's' : ''}`}
+                        </Text>
+                      </View>
+                      <Text style={[styles.messageDate, { color: colors.textSecondary }]}>
+                        {formatDate(message.created_at)}
+                      </Text>
+                    </View>
+                    {message.subject && (
+                      <Text style={[styles.messageSubject, { color: colors.text }]} numberOfLines={1}>
+                        {message.subject}
+                      </Text>
+                    )}
+                    <Text style={[styles.messageBody, { color: colors.textSecondary }]} numberOfLines={2}>
+                      {message.body}
                     </Text>
                   </View>
-                  <Text style={[styles.messageDate, { color: colors.textSecondary }]}>
-                    {formatDate(message.created_at)}
-                  </Text>
+                </TouchableOpacity>
+
+                {/* Action Buttons */}
+                <View style={styles.actionButtons}>
+                  {activeTab === 'inbox' && !message.is_read && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: '#3498DB' }]}
+                      onPress={() => handleMarkAsRead(message)}
+                    >
+                      <IconSymbol
+                        ios_icon_name="checkmark.circle"
+                        android_material_icon_name="check_circle"
+                        size={16}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.actionButtonText}>Mark as Read</Text>
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: '#E74C3C' }]}
+                    onPress={() => handleDeleteMessage(message)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="trash"
+                      android_material_icon_name="delete"
+                      size={16}
+                      color="#FFFFFF"
+                    />
+                    <Text style={styles.actionButtonText}>Delete</Text>
+                  </TouchableOpacity>
                 </View>
-                {message.subject && (
-                  <Text style={[styles.messageSubject, { color: colors.text }]} numberOfLines={1}>
-                    {message.subject}
-                  </Text>
-                )}
-                <Text style={[styles.messageBody, { color: colors.textSecondary }]} numberOfLines={2}>
-                  {message.body}
-                </Text>
-              </TouchableOpacity>
+              </View>
             ))}
           </>
         )}
@@ -506,16 +642,43 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
-  messageItem: {
-    padding: 16,
-    borderRadius: 12,
+  messageItemWrapper: {
     marginBottom: 12,
+  },
+  messageItem: {
+    flexDirection: 'row',
+    padding: 12,
+    borderRadius: 12,
     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
     elevation: 2,
+    gap: 12,
   },
   unreadMessage: {
     borderLeftWidth: 4,
     borderLeftColor: '#3498DB',
+  },
+  profilePictureContainer: {
+    width: 50,
+    height: 50,
+  },
+  profilePicture: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  profilePicturePlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  profilePicturePlaceholderText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  messageContent: {
+    flex: 1,
   },
   messageHeader: {
     flexDirection: 'row',
@@ -551,5 +714,23 @@ const styles = StyleSheet.create({
   messageBody: {
     fontSize: 14,
     lineHeight: 20,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    gap: 6,
+  },
+  actionButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });

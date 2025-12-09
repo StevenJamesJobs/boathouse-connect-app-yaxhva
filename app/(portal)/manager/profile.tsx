@@ -30,6 +30,7 @@ export default function ManagerProfileScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [profileInfoExpanded, setProfileInfoExpanded] = useState(false);
   
   // Password change state
   const [showPasswordChange, setShowPasswordChange] = useState(false);
@@ -244,42 +245,6 @@ export default function ManagerProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Messages Section */}
-      <TouchableOpacity
-        style={styles.messagesCard}
-        onPress={() => router.push('/messages')}
-      >
-        <View style={styles.messagesHeader}>
-          <View style={styles.messagesIconContainer}>
-            <IconSymbol
-              ios_icon_name="envelope.fill"
-              android_material_icon_name="mail"
-              size={24}
-              color={managerColors.highlight}
-            />
-            {unreadCount > 0 && (
-              <View style={styles.badgePosition}>
-                <MessageBadge count={unreadCount} size="small" />
-              </View>
-            )}
-          </View>
-          <View style={styles.messagesContent}>
-            <Text style={styles.messagesTitle}>Messages</Text>
-            <Text style={styles.messagesSubtitle}>
-              {unreadCount > 0
-                ? `${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`
-                : 'No new messages'}
-            </Text>
-          </View>
-          <IconSymbol
-            ios_icon_name="chevron.right"
-            android_material_icon_name="chevron_right"
-            size={24}
-            color={managerColors.textSecondary}
-          />
-        </View>
-      </TouchableOpacity>
-
       {/* Profile Header */}
       <View style={styles.profileHeader}>
         <TouchableOpacity onPress={handlePickImage} style={styles.avatarContainer}>
@@ -322,79 +287,130 @@ export default function ManagerProfileScreen() {
         </View>
       </View>
 
-      {/* Profile Information */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Profile Information</Text>
-
-        {/* Username (Read-only) */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Username</Text>
-          <View style={[styles.input, styles.inputDisabled]}>
-            <Text style={styles.inputTextDisabled}>{user?.username}</Text>
-          </View>
-          <Text style={styles.fieldNote}>Username cannot be changed</Text>
-        </View>
-
-        {/* Full Name (Read-only) */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Full Name</Text>
-          <View style={[styles.input, styles.inputDisabled]}>
-            <Text style={styles.inputTextDisabled}>{user?.name}</Text>
-          </View>
-          <Text style={styles.fieldNote}>Name cannot be changed</Text>
-        </View>
-
-        {/* Email (Editable) */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Email</Text>
-          <TextInput
-            style={[styles.input, !isEditing && styles.inputDisabled]}
-            value={email}
-            onChangeText={setEmail}
-            editable={isEditing}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            placeholderTextColor={managerColors.textSecondary}
-          />
-        </View>
-
-        {/* Phone Number (Editable) */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Phone Number</Text>
-          <TextInput
-            style={[styles.input, !isEditing && styles.inputDisabled]}
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-            editable={isEditing}
-            keyboardType="phone-pad"
-            placeholderTextColor={managerColors.textSecondary}
-          />
-        </View>
-
-        {/* Action Buttons */}
-        {!isEditing ? (
-          <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
+      {/* Messages Section */}
+      <TouchableOpacity
+        style={styles.messagesCard}
+        onPress={() => router.push('/messages')}
+      >
+        <View style={styles.messagesHeader}>
+          <View style={styles.messagesIconContainer}>
             <IconSymbol
-              ios_icon_name="pencil"
-              android_material_icon_name="edit"
-              size={20}
-              color={managerColors.text}
+              ios_icon_name="envelope.fill"
+              android_material_icon_name="mail"
+              size={24}
+              color={managerColors.highlight}
             />
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
-              {saving ? (
-                <ActivityIndicator color={managerColors.text} />
-              ) : (
-                <Text style={styles.saveButtonText}>Save Changes</Text>
-              )}
-            </TouchableOpacity>
+            {unreadCount > 0 && (
+              <View style={styles.badgePosition}>
+                <MessageBadge count={unreadCount} size="small" />
+              </View>
+            )}
           </View>
+          <View style={styles.messagesContent}>
+            <Text style={styles.messagesTitle}>Messages</Text>
+            <Text style={styles.messagesSubtitle}>
+              {unreadCount > 0
+                ? `${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`
+                : 'No new messages'}
+            </Text>
+          </View>
+          <IconSymbol
+            ios_icon_name="chevron.right"
+            android_material_icon_name="chevron_right"
+            size={24}
+            color={managerColors.textSecondary}
+          />
+        </View>
+      </TouchableOpacity>
+
+      {/* Profile Information - Collapsible */}
+      <View style={styles.card}>
+        <TouchableOpacity 
+          style={styles.collapsibleHeader}
+          onPress={() => setProfileInfoExpanded(!profileInfoExpanded)}
+        >
+          <Text style={styles.sectionTitle}>Profile Information</Text>
+          <IconSymbol
+            ios_icon_name={profileInfoExpanded ? "chevron.up" : "chevron.down"}
+            android_material_icon_name={profileInfoExpanded ? "expand_less" : "expand_more"}
+            size={24}
+            color={managerColors.text}
+          />
+        </TouchableOpacity>
+
+        {profileInfoExpanded && (
+          <>
+            {/* Username (Read-only) */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Username</Text>
+              <View style={[styles.input, styles.inputDisabled]}>
+                <Text style={styles.inputTextDisabled}>{user?.username}</Text>
+              </View>
+              <Text style={styles.fieldNote}>Username cannot be changed</Text>
+            </View>
+
+            {/* Full Name (Read-only) */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Full Name</Text>
+              <View style={[styles.input, styles.inputDisabled]}>
+                <Text style={styles.inputTextDisabled}>{user?.name}</Text>
+              </View>
+              <Text style={styles.fieldNote}>Name cannot be changed</Text>
+            </View>
+
+            {/* Email (Editable) */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Email</Text>
+              <TextInput
+                style={[styles.input, !isEditing && styles.inputDisabled]}
+                value={email}
+                onChangeText={setEmail}
+                editable={isEditing}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor={managerColors.textSecondary}
+              />
+            </View>
+
+            {/* Phone Number (Editable) */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Phone Number</Text>
+              <TextInput
+                style={[styles.input, !isEditing && styles.inputDisabled]}
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                editable={isEditing}
+                keyboardType="phone-pad"
+                placeholderTextColor={managerColors.textSecondary}
+              />
+            </View>
+
+            {/* Action Buttons */}
+            {!isEditing ? (
+              <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
+                <IconSymbol
+                  ios_icon_name="pencil"
+                  android_material_icon_name="edit"
+                  size={20}
+                  color={managerColors.text}
+                />
+                <Text style={styles.editButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.buttonRow}>
+                <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
+                  {saving ? (
+                    <ActivityIndicator color={managerColors.text} />
+                  ) : (
+                    <Text style={styles.saveButtonText}>Save Changes</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
         )}
       </View>
 
@@ -474,23 +490,6 @@ export default function ManagerProfileScreen() {
           </>
         )}
       </View>
-
-      {/* Additional Information */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Account Details</Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Role:</Text>
-          <Text style={styles.infoValue}>Manager</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Employee ID:</Text>
-          <Text style={styles.infoValue}>{user?.id}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Access Level:</Text>
-          <Text style={styles.infoValue}>Full Access</Text>
-        </View>
-      </View>
     </ScrollView>
   );
 }
@@ -504,40 +503,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingHorizontal: 16,
     paddingBottom: 100,
-  },
-  messagesCard: {
-    backgroundColor: managerColors.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  messagesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  messagesIconContainer: {
-    position: 'relative',
-  },
-  badgePosition: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-  },
-  messagesContent: {
-    flex: 1,
-  },
-  messagesTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: managerColors.text,
-    marginBottom: 2,
-  },
-  messagesSubtitle: {
-    fontSize: 14,
-    color: managerColors.textSecondary,
   },
   profileHeader: {
     alignItems: 'center',
@@ -602,6 +567,40 @@ const styles = StyleSheet.create({
     color: managerColors.text,
     marginLeft: 6,
   },
+  messagesCard: {
+    backgroundColor: managerColors.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  messagesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  messagesIconContainer: {
+    position: 'relative',
+  },
+  badgePosition: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+  },
+  messagesContent: {
+    flex: 1,
+  },
+  messagesTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: managerColors.text,
+    marginBottom: 2,
+  },
+  messagesSubtitle: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+  },
   card: {
     backgroundColor: managerColors.card,
     borderRadius: 16,
@@ -610,11 +609,16 @@ const styles = StyleSheet.create({
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
+  collapsibleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: managerColors.text,
-    marginBottom: 16,
   },
   passwordNote: {
     fontSize: 12,
@@ -717,21 +721,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: managerColors.text,
     marginLeft: 8,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: managerColors.highlight,
-  },
-  infoLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: managerColors.text,
-  },
-  infoValue: {
-    fontSize: 16,
-    color: managerColors.textSecondary,
   },
 });

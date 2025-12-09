@@ -30,6 +30,7 @@ export default function EmployeeProfileScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [profileInfoExpanded, setProfileInfoExpanded] = useState(false);
   
   // Password change state
   const [showPasswordChange, setShowPasswordChange] = useState(false);
@@ -244,6 +245,39 @@ export default function EmployeeProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      {/* Profile Header */}
+      <View style={styles.profileHeader}>
+        <TouchableOpacity onPress={handlePickImage} style={styles.avatarContainer}>
+          {uploading ? (
+            <ActivityIndicator size="large" color={employeeColors.primary} />
+          ) : user?.profilePictureUrl ? (
+            <Image 
+              source={{ uri: user.profilePictureUrl }} 
+              style={styles.avatar}
+              key={user.profilePictureUrl} // Force re-render when URL changes
+            />
+          ) : (
+            <IconSymbol
+              ios_icon_name="person.circle.fill"
+              android_material_icon_name="account_circle"
+              size={100}
+              color={employeeColors.primary}
+            />
+          )}
+          <View style={styles.cameraIcon}>
+            <IconSymbol
+              ios_icon_name="camera.fill"
+              android_material_icon_name="camera_alt"
+              size={16}
+              color="#FFFFFF"
+            />
+          </View>
+        </TouchableOpacity>
+        <Text style={styles.uploadHint}>Tap to change photo</Text>
+        <Text style={styles.userName}>{user?.name}</Text>
+        <Text style={styles.userRole}>{user?.jobTitle}</Text>
+      </View>
+
       {/* Messages Section */}
       <TouchableOpacity
         style={styles.messagesCard}
@@ -280,112 +314,94 @@ export default function EmployeeProfileScreen() {
         </View>
       </TouchableOpacity>
 
-      {/* Profile Header */}
-      <View style={styles.profileHeader}>
-        <TouchableOpacity onPress={handlePickImage} style={styles.avatarContainer}>
-          {uploading ? (
-            <ActivityIndicator size="large" color={employeeColors.primary} />
-          ) : user?.profilePictureUrl ? (
-            <Image 
-              source={{ uri: user.profilePictureUrl }} 
-              style={styles.avatar}
-              key={user.profilePictureUrl} // Force re-render when URL changes
-            />
-          ) : (
-            <IconSymbol
-              ios_icon_name="person.circle.fill"
-              android_material_icon_name="account_circle"
-              size={100}
-              color={employeeColors.primary}
-            />
-          )}
-          <View style={styles.cameraIcon}>
-            <IconSymbol
-              ios_icon_name="camera.fill"
-              android_material_icon_name="camera_alt"
-              size={16}
-              color="#FFFFFF"
-            />
-          </View>
-        </TouchableOpacity>
-        <Text style={styles.uploadHint}>Tap to change photo</Text>
-        <Text style={styles.userName}>{user?.name}</Text>
-        <Text style={styles.userRole}>{user?.jobTitle}</Text>
-      </View>
-
-      {/* Profile Information */}
+      {/* Profile Information - Collapsible */}
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Profile Information</Text>
-
-        {/* Username (Read-only) */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Username</Text>
-          <View style={[styles.input, styles.inputDisabled]}>
-            <Text style={styles.inputTextDisabled}>{user?.username}</Text>
-          </View>
-          <Text style={styles.fieldNote}>Username cannot be changed</Text>
-        </View>
-
-        {/* Full Name (Read-only) */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Full Name</Text>
-          <View style={[styles.input, styles.inputDisabled]}>
-            <Text style={styles.inputTextDisabled}>{user?.name}</Text>
-          </View>
-          <Text style={styles.fieldNote}>Name cannot be changed</Text>
-        </View>
-
-        {/* Email (Editable) */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Email</Text>
-          <TextInput
-            style={[styles.input, !isEditing && styles.inputDisabled]}
-            value={email}
-            onChangeText={setEmail}
-            editable={isEditing}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            placeholderTextColor={employeeColors.textSecondary}
+        <TouchableOpacity 
+          style={styles.collapsibleHeader}
+          onPress={() => setProfileInfoExpanded(!profileInfoExpanded)}
+        >
+          <Text style={styles.sectionTitle}>Profile Information</Text>
+          <IconSymbol
+            ios_icon_name={profileInfoExpanded ? "chevron.up" : "chevron.down"}
+            android_material_icon_name={profileInfoExpanded ? "expand_less" : "expand_more"}
+            size={24}
+            color={employeeColors.text}
           />
-        </View>
+        </TouchableOpacity>
 
-        {/* Phone Number (Editable) */}
-        <View style={styles.fieldContainer}>
-          <Text style={styles.fieldLabel}>Phone Number</Text>
-          <TextInput
-            style={[styles.input, !isEditing && styles.inputDisabled]}
-            value={phoneNumber}
-            onChangeText={setPhoneNumber}
-            editable={isEditing}
-            keyboardType="phone-pad"
-            placeholderTextColor={employeeColors.textSecondary}
-          />
-        </View>
+        {profileInfoExpanded && (
+          <>
+            {/* Username (Read-only) */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Username</Text>
+              <View style={[styles.input, styles.inputDisabled]}>
+                <Text style={styles.inputTextDisabled}>{user?.username}</Text>
+              </View>
+              <Text style={styles.fieldNote}>Username cannot be changed</Text>
+            </View>
 
-        {/* Action Buttons */}
-        {!isEditing ? (
-          <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
-            <IconSymbol
-              ios_icon_name="pencil"
-              android_material_icon_name="edit"
-              size={20}
-              color="#FFFFFF"
-            />
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.buttonRow}>
-            <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
-              {saving ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.saveButtonText}>Save Changes</Text>
-              )}
-            </TouchableOpacity>
-          </View>
+            {/* Full Name (Read-only) */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Full Name</Text>
+              <View style={[styles.input, styles.inputDisabled]}>
+                <Text style={styles.inputTextDisabled}>{user?.name}</Text>
+              </View>
+              <Text style={styles.fieldNote}>Name cannot be changed</Text>
+            </View>
+
+            {/* Email (Editable) */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Email</Text>
+              <TextInput
+                style={[styles.input, !isEditing && styles.inputDisabled]}
+                value={email}
+                onChangeText={setEmail}
+                editable={isEditing}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                placeholderTextColor={employeeColors.textSecondary}
+              />
+            </View>
+
+            {/* Phone Number (Editable) */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Phone Number</Text>
+              <TextInput
+                style={[styles.input, !isEditing && styles.inputDisabled]}
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                editable={isEditing}
+                keyboardType="phone-pad"
+                placeholderTextColor={employeeColors.textSecondary}
+              />
+            </View>
+
+            {/* Action Buttons */}
+            {!isEditing ? (
+              <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
+                <IconSymbol
+                  ios_icon_name="pencil"
+                  android_material_icon_name="edit"
+                  size={20}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.editButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.buttonRow}>
+                <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
+                  {saving ? (
+                    <ActivityIndicator color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>Save Changes</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
+          </>
         )}
       </View>
 
@@ -465,19 +481,6 @@ export default function EmployeeProfileScreen() {
           </>
         )}
       </View>
-
-      {/* Additional Information */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Account Details</Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Role:</Text>
-          <Text style={styles.infoValue}>{user?.role === 'manager' ? 'Manager' : 'Employee'}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>Employee ID:</Text>
-          <Text style={styles.infoValue}>{user?.id}</Text>
-        </View>
-      </View>
     </ScrollView>
   );
 }
@@ -491,40 +494,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingHorizontal: 16,
     paddingBottom: 100,
-  },
-  messagesCard: {
-    backgroundColor: employeeColors.card,
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 20,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  messagesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  messagesIconContainer: {
-    position: 'relative',
-  },
-  badgePosition: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-  },
-  messagesContent: {
-    flex: 1,
-  },
-  messagesTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: employeeColors.text,
-    marginBottom: 2,
-  },
-  messagesSubtitle: {
-    fontSize: 14,
-    color: employeeColors.textSecondary,
   },
   profileHeader: {
     alignItems: 'center',
@@ -574,6 +543,40 @@ const styles = StyleSheet.create({
     color: employeeColors.primary,
     fontWeight: '600',
   },
+  messagesCard: {
+    backgroundColor: employeeColors.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  messagesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  messagesIconContainer: {
+    position: 'relative',
+  },
+  badgePosition: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+  },
+  messagesContent: {
+    flex: 1,
+  },
+  messagesTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: employeeColors.text,
+    marginBottom: 2,
+  },
+  messagesSubtitle: {
+    fontSize: 14,
+    color: employeeColors.textSecondary,
+  },
   card: {
     backgroundColor: employeeColors.card,
     borderRadius: 16,
@@ -582,11 +585,16 @@ const styles = StyleSheet.create({
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
   },
+  collapsibleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: employeeColors.text,
-    marginBottom: 16,
   },
   passwordNote: {
     fontSize: 12,
@@ -689,21 +697,5 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
     marginLeft: 8,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: employeeColors.highlight,
-  },
-  infoLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: employeeColors.text,
-  },
-  infoValue: {
-    fontSize: 16,
-    color: employeeColors.textSecondary,
   },
 });
