@@ -11,7 +11,6 @@ import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import CheckOutCalculator from '@/components/CheckOutCalculator';
 
 export default function EmployeeToolsScreen() {
   const router = useRouter();
@@ -26,8 +25,33 @@ export default function EmployeeToolsScreen() {
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {/* Check Out Calculator Section */}
-        <View style={styles.section}>
-          <CheckOutCalculator colors={employeeColors} />
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <IconSymbol
+              ios_icon_name="calculator.fill"
+              android_material_icon_name="calculate"
+              size={32}
+              color={employeeColors.primary}
+            />
+            <View style={styles.cardHeaderText}>
+              <Text style={styles.cardTitle}>Check Out Calculator</Text>
+              <Text style={styles.cardDescription}>
+                Calculate your shift check out totals and tip outs
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={styles.cardButton}
+            onPress={() => router.push('/check-out-calculator')}
+          >
+            <Text style={styles.cardButtonText}>Open Calculator</Text>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron_right"
+              size={20}
+              color={employeeColors.text}
+            />
+          </TouchableOpacity>
         </View>
 
         {/* Guides and Training Section */}
@@ -89,9 +113,6 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingHorizontal: 16,
     paddingBottom: 100,
-  },
-  section: {
-    marginBottom: 24,
   },
   card: {
     backgroundColor: employeeColors.card,
