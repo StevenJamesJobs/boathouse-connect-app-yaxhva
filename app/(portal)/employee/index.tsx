@@ -299,21 +299,25 @@ export default function EmployeePortalScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
-          <View style={styles.welcomeHeader}>
-            <View style={styles.welcomeTextContainer}>
-              <Text style={styles.welcomeTitle}>Welcome, {user?.name}!</Text>
-              <Text style={styles.jobTitle}>{user?.jobTitle}</Text>
-            </View>
-            <TouchableOpacity
-              style={styles.messageButton}
-              onPress={() => router.push('/messages')}
-            >
-              <View style={styles.messageIconContainer}>
+          <View style={styles.welcomeTextContainer}>
+            <Text style={styles.welcomeTitle}>Welcome, {user?.name}!</Text>
+            <Text style={styles.jobTitle}>{user?.jobTitle}</Text>
+            <Text style={styles.tagline}>Let&apos;s see what we have going on today!</Text>
+          </View>
+          
+          {/* Messages Button - Redesigned to match Manager Portal */}
+          <TouchableOpacity
+            style={styles.messageButton}
+            onPress={() => router.push('/messages')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.messageButtonContent}>
+              <View style={styles.messageIconWrapper}>
                 <IconSymbol
                   ios_icon_name="envelope.fill"
                   android_material_icon_name="mail"
-                  size={28}
-                  color={employeeColors.primary}
+                  size={24}
+                  color="#FFFFFF"
                 />
                 {unreadCount > 0 && (
                   <View style={styles.messageBadgePosition}>
@@ -321,12 +325,14 @@ export default function EmployeePortalScreen() {
                   </View>
                 )}
               </View>
-              <Text style={styles.messageButtonText}>
-                {unreadCount > 0 ? `${unreadCount} New` : 'No New Messages'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.tagline}>Let&apos;s see what we have going on today!</Text>
+              <View style={styles.messageTextContainer}>
+                <Text style={styles.messageButtonLabel}>Messages</Text>
+                <Text style={styles.messageButtonCount}>
+                  {unreadCount > 0 ? `${unreadCount} unread` : 'No new messages'}
+                </Text>
+              </View>
+            </View>
+          </TouchableOpacity>
         </View>
 
         {/* Weather Section - Collapsible */}
@@ -740,14 +746,8 @@ const styles = StyleSheet.create({
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
   },
-  welcomeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
   welcomeTextContainer: {
-    flex: 1,
+    marginBottom: 16,
   },
   welcomeTitle: {
     fontSize: 28,
@@ -759,34 +759,56 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: employeeColors.primary,
     fontWeight: '600',
-  },
-  messageButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: employeeColors.highlight,
-    borderRadius: 12,
-    padding: 12,
-    minWidth: 100,
-  },
-  messageIconContainer: {
-    position: 'relative',
-    marginBottom: 4,
-  },
-  messageBadgePosition: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-  },
-  messageButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: employeeColors.text,
-    textAlign: 'center',
+    marginBottom: 8,
   },
   tagline: {
     fontSize: 16,
     color: employeeColors.textSecondary,
     fontStyle: 'italic',
+  },
+  messageButton: {
+    backgroundColor: 'rgba(52, 152, 219, 0.15)',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#3498DB',
+    overflow: 'hidden',
+  },
+  messageButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    gap: 14,
+  },
+  messageIconWrapper: {
+    position: 'relative',
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#3498DB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0px 2px 6px rgba(52, 152, 219, 0.4)',
+    elevation: 3,
+  },
+  messageBadgePosition: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+  },
+  messageTextContainer: {
+    flex: 1,
+  },
+  messageButtonLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: employeeColors.text,
+    marginBottom: 2,
+  },
+  messageButtonCount: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: employeeColors.textSecondary,
   },
   loadingContainer: {
     paddingVertical: 20,
