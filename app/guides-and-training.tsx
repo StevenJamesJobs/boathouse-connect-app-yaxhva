@@ -154,16 +154,16 @@ export default function GuidesAndTrainingScreen() {
         return;
       }
 
-      // For mobile, use the new Expo 54 FileSystem API
+      // For mobile, use the new Expo 54 FileSystem API with improved error handling
       console.log('Downloading from URL:', guide.file_url);
       
       // Step 1: Create a downloads directory in cache
       const downloadsDir = new Directory(Paths.cache, 'downloads');
       console.log('Downloads directory path:', downloadsDir.uri);
       
-      // Step 2: Check if directory exists, if not create it with intermediates option
+      // Step 2: Ensure directory exists, create if needed
       if (!downloadsDir.exists) {
-        console.log('Downloads directory does not exist, creating...');
+        console.log('Creating downloads directory...');
         try {
           downloadsDir.create({ intermediates: true });
           console.log('Downloads directory created successfully');
@@ -171,78 +171,113 @@ export default function GuidesAndTrainingScreen() {
           console.error('Error creating downloads directory:', createError);
           throw new Error(`Failed to create downloads directory: ${createError.message}`);
         }
-      } else {
-        console.log('Downloads directory already exists');
       }
 
-      // Step 3: Verify the directory was created successfully
-      if (!downloadsDir.exists) {
-        throw new Error('Downloads directory could not be created or verified');
-      }
-
-      // Step 4: Generate a unique filename by appending timestamp
-      // This ensures each download is unique and avoids conflicts
-      const fileExtension = guide.file_name.substring(guide.file_name.lastIndexOf('.'));
-      const fileNameWithoutExt = guide.file_name.substring(0, guide.file_name.lastIndexOf('.'));
-      const timestamp = Date.now();
-      const uniqueFileName = `${fileNameWithoutExt}_${timestamp}${fileExtension}`;
+      // Step 3: Generate a unique filename with timestamp and random string
+      // This ensures each download is completely unique and avoids any conflicts
+      const fileExtension = guide.file_name.includes('.') 
+        ? guide.file_name.substring(guide.file_name.lastIndexOf('.'))
+        : '';
+      const fileNameWithoutExt = guide.file_name.includes('.')
+        ? guide.file_name.substring(0, guide.file_name.lastIndexOf('.'))
+        : guide.file_name;
       
-      console.log('Unique filename:', uniqueFileName);
+      // Add both timestamp and random string for maximum uniqueness
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 8);
+      const uniqueFileName = `${fileNameWithoutExt}_${timestamp}_${randomString}${fileExtension}`;
+      
+      console.log('Generated unique filename:', uniqueFileName);
 
-      // Step 5: Create the destination file path
+      // Step 4: Create the destination file with the unique name
       const destinationFile = new File(downloadsDir, uniqueFileName);
       console.log('Destination file path:', destinationFile.uri);
 
-      // Step 6: Download the file
+      // Step 5: If file somehow exists (very unlikely with timestamp+random), delete it
+      if (destinationFile.exists) {
+        console.log('Destination file already exists, deleting...');
+        try {
+          destinationFile.delete();
+          console.log('Existing file deleted successfully');
+        } catch (deleteError: any) {
+          console.error('Error deleting existing file:', deleteError);
+          // Continue anyway, the download might overwrite it
+        }
+      }
+
+      // Step 6: Download the file directly to the specific file path
       console.log('Starting file download...');
       let downloadedFile: File;
       try {
+        // Download directly to the specific file we created
         downloadedFile = await File.downloadFileAsync(
           guide.file_url,
-          downloadsDir
+          destinationFile
         );
-        console.log('File downloaded successfully');
+        console.log('File downloaded successfully to:', downloadedFile.uri);
       } catch (downloadError: any) {
-        console.error('Error during download:', downloadError);
+        console.error('Download error:', downloadError);
         console.error('Download error code:', downloadError.code);
         console.error('Download error message:', downloadError.message);
-        throw new Error(`Download failed: ${downloadError.message}`);
+        
+        // Provide specific error messages based on error type
+        if (downloadError.message?.includes('already exists')) {
+          throw new Error('File already exists. Please try again.');
+        } else if (downloadError.message?.includes('network')) {
+          throw new Error('Network error. Please check your connection and try again.');
+        } else if (downloadError.message?.includes('permission')) {
+          throw new Error('Permission denied. Please check app permissions.');
+        } else {
+          throw new Error(`Download failed: ${downloadError.message || 'Unknown error'}`);
+        }
       }
 
-      // Step 7: Verify the downloaded file exists
-      console.log('Downloaded file URI:', downloadedFile.uri);
-      console.log('Downloaded file exists:', downloadedFile.exists);
-      
+      // Step 7: Verify the downloaded file exists and has content
+      console.log('Verifying downloaded file...');
       if (!downloadedFile.exists) {
         throw new Error('Downloaded file does not exist after download');
       }
 
-      console.log('Downloaded file size:', downloadedFile.size, 'bytes');
+      const fileSize = downloadedFile.size;
+      console.log('Downloaded file size:', fileSize, 'bytes');
+      
+      if (fileSize === 0) {
+        throw new Error('Downloaded file is empty');
+      }
 
-      // Step 8: Share the file so user can save it
+      // Step 8: Share the file so user can save it to their preferred location
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
-        console.log('Sharing file...');
+        console.log('Opening share dialog...');
         await Sharing.shareAsync(downloadedFile.uri, {
-          mimeType: guide.file_type,
+          mimeType: guide.file_type || 'application/octet-stream',
           dialogTitle: `Save ${guide.file_name}`,
-          UTI: guide.file_type,
+          UTI: guide.file_type || 'public.data',
         });
-        Alert.alert('Success', 'File ready to save. Choose where to save it from the share menu.');
+        Alert.alert(
+          'Success', 
+          `File "${guide.file_name}" is ready to save. Choose where to save it from the share menu.`
+        );
       } else {
-        Alert.alert('Success', `File downloaded successfully to ${downloadedFile.uri}`);
+        Alert.alert(
+          'Success', 
+          `File downloaded successfully to:\n${downloadedFile.uri}\n\nFile size: ${(fileSize / 1024).toFixed(2)} KB`
+        );
       }
     } catch (error: any) {
       console.error('ERROR Failed to download file:', error);
-      console.error('Error code:', error.code);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack,
+      });
       
-      // Provide more specific error messages
-      let errorMessage = 'Failed to download file';
+      // Provide user-friendly error messages
+      let errorMessage = 'Failed to download file. Please try again.';
       if (error.message) {
         errorMessage = error.message;
       }
+      
       Alert.alert('Download Error', errorMessage);
     } finally {
       setDownloadingFile(null);
