@@ -154,7 +154,7 @@ export default function GuidesAndTrainingScreen() {
         return;
       }
 
-      // For mobile, use the new Expo 54 FileSystem API
+      // For mobile, use the new Expo 54 FileSystem API with unique filenames
       console.log('Downloading from:', guide.file_url);
       
       // Create a downloads directory in cache
@@ -168,34 +168,20 @@ export default function GuidesAndTrainingScreen() {
 
       console.log('Downloads directory:', downloadsDir.uri);
       
-      // Check if file already exists and delete it if it does
-      const targetFile = new File(downloadsDir, guide.file_name);
-      console.log('Target file path:', targetFile.uri);
-      console.log('File exists before download:', targetFile.exists);
+      // Generate a unique filename by appending timestamp
+      // This ensures each download is unique and avoids "already exists" errors
+      const fileExtension = guide.file_name.substring(guide.file_name.lastIndexOf('.'));
+      const fileNameWithoutExt = guide.file_name.substring(0, guide.file_name.lastIndexOf('.'));
+      const timestamp = Date.now();
+      const uniqueFileName = `${fileNameWithoutExt}_${timestamp}${fileExtension}`;
       
-      if (targetFile.exists) {
-        console.log('File already exists, deleting old version...');
-        try {
-          targetFile.delete();
-          console.log('Old file deleted successfully');
-          
-          // Verify deletion
-          const stillExists = new File(downloadsDir, guide.file_name).exists;
-          console.log('File still exists after deletion:', stillExists);
-        } catch (deleteError) {
-          console.error('Error deleting old file:', deleteError);
-          // If deletion fails, try to continue anyway
-        }
-      }
+      console.log('Unique filename:', uniqueFileName);
 
-      // Small delay to ensure file system operations complete
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      // Download the file using the new API
+      // Download the file using the new API with unique filename
       console.log('Starting download...');
       const downloadedFile = await File.downloadFileAsync(
         guide.file_url,
-        downloadsDir
+        new Directory(downloadsDir, uniqueFileName)
       );
 
       console.log('File downloaded successfully to:', downloadedFile.uri);
@@ -208,12 +194,12 @@ export default function GuidesAndTrainingScreen() {
         console.log('Sharing file...');
         await Sharing.shareAsync(downloadedFile.uri, {
           mimeType: guide.file_type,
-          dialogTitle: `Download ${guide.file_name}`,
+          dialogTitle: `Save ${guide.file_name}`,
           UTI: guide.file_type,
         });
-        Alert.alert('Success', 'File ready to save');
+        Alert.alert('Success', 'File ready to save. Choose where to save it from the share menu.');
       } else {
-        Alert.alert('Success', `File downloaded to: ${downloadedFile.uri}`);
+        Alert.alert('Success', `File downloaded successfully!`);
       }
     } catch (error: any) {
       console.error('Error downloading file:', error);
@@ -223,27 +209,10 @@ export default function GuidesAndTrainingScreen() {
       
       // Provide more specific error messages
       let errorMessage = 'Failed to download file';
-      if (error.code === 'ERR_DESTINATION_ALREADY_EXISTS') {
-        errorMessage = 'File already exists. Trying to clean up and retry...';
-        Alert.alert('Error', errorMessage);
-        
-        // Try to clean up and suggest retry
-        try {
-          const downloadsDir = new Directory(Paths.cache, 'downloads');
-          const targetFile = new File(downloadsDir, guide.file_name);
-          if (targetFile.exists) {
-            targetFile.delete();
-            console.log('Cleaned up existing file');
-          }
-        } catch (cleanupError) {
-          console.error('Error during cleanup:', cleanupError);
-        }
-      } else if (error.message) {
+      if (error.message) {
         errorMessage = `Failed to download file: ${error.message}`;
-        Alert.alert('Error', errorMessage);
-      } else {
-        Alert.alert('Error', errorMessage);
       }
+      Alert.alert('Error', errorMessage);
     } finally {
       setDownloadingFile(null);
     }
