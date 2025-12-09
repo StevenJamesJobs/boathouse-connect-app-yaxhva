@@ -168,6 +168,19 @@ export default function GuidesAndTrainingScreen() {
 
       console.log('Downloading to directory:', downloadsDir.uri);
       
+      // Check if file already exists and delete it if it does
+      const targetFile = new File(downloadsDir, guide.file_name);
+      if (targetFile.exists) {
+        console.log('File already exists, deleting old version...');
+        try {
+          await targetFile.delete();
+          console.log('Old file deleted successfully');
+        } catch (deleteError) {
+          console.error('Error deleting old file:', deleteError);
+          // Continue anyway, the download might still work
+        }
+      }
+
       // Download the file using the new API
       const downloadedFile = await File.downloadFileAsync(
         guide.file_url,
@@ -193,7 +206,16 @@ export default function GuidesAndTrainingScreen() {
     } catch (error: any) {
       console.error('Error downloading file:', error);
       console.error('Error details:', JSON.stringify(error, null, 2));
-      Alert.alert('Error', `Failed to download file: ${error.message || 'Unknown error'}`);
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to download file';
+      if (error.code === 'ERR_DESTINATION_ALREADY_EXISTS') {
+        errorMessage = 'File already exists. Please try again.';
+      } else if (error.message) {
+        errorMessage = `Failed to download file: ${error.message}`;
+      }
+      
+      Alert.alert('Error', errorMessage);
     } finally {
       setDownloadingFile(null);
     }
