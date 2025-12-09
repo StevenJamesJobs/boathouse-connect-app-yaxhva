@@ -22,7 +22,7 @@ function ManagerHeader() {
   return (
     <View style={styles.header}>
       <Image 
-        source={require('@/assets/images/d54a0580-09c7-484b-a833-f82e463aed69.jpeg')}
+        source={require('@/assets/images/421d6130-e7c0-49c4-acac-8398f8d292b4.jpeg')}
         style={styles.cornerIcon}
         resizeMode="contain"
       />
