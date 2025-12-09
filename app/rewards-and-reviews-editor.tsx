@@ -250,7 +250,7 @@ export default function RewardsAndReviewsEditorScreen() {
   const handleDeleteTransaction = async (transaction: RewardTransaction) => {
     Alert.alert(
       'Delete Transaction',
-      `Are you sure you want to delete this transaction? This will deduct $${transaction.amount} from ${transaction.user_name}'s total.`,
+      `Are you sure you want to delete this transaction? This will remove it from the history but will NOT affect ${transaction.user_name}'s total balance.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -260,25 +260,7 @@ export default function RewardsAndReviewsEditorScreen() {
             try {
               setLoading(true);
 
-              // First, deduct the amount from the user's total
-              const { data: userData, error: userFetchError } = await supabase
-                .from('users')
-                .select('mcloones_bucks')
-                .eq('id', transaction.user_id)
-                .single();
-
-              if (userFetchError) throw userFetchError;
-
-              const newTotal = (userData.mcloones_bucks || 0) - transaction.amount;
-
-              const { error: updateError } = await supabase
-                .from('users')
-                .update({ mcloones_bucks: newTotal })
-                .eq('id', transaction.user_id);
-
-              if (updateError) throw updateError;
-
-              // Then delete the transaction
+              // Delete the transaction (balance is NOT affected)
               const { error: deleteError } = await supabase
                 .from('rewards_transactions')
                 .delete()
@@ -307,7 +289,7 @@ export default function RewardsAndReviewsEditorScreen() {
     
     Alert.alert(
       `${newVisibility ? 'Show' : 'Hide'} Transaction`,
-      `Are you sure you want to ${actionText} this transaction? ${!newVisibility ? `This will deduct $${transaction.amount} from ${transaction.user_name}'s total.` : `This will add $${transaction.amount} back to ${transaction.user_name}'s total.`}`,
+      `Are you sure you want to ${actionText} this transaction? This will ${newVisibility ? 'show it to' : 'hide it from'} ${transaction.user_name} but will NOT affect their total balance.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -316,27 +298,7 @@ export default function RewardsAndReviewsEditorScreen() {
             try {
               setLoading(true);
 
-              // If hiding, deduct the amount from the user's total
-              // If showing, add the amount back to the user's total
-              const { data: userData, error: userFetchError } = await supabase
-                .from('users')
-                .select('mcloones_bucks')
-                .eq('id', transaction.user_id)
-                .single();
-
-              if (userFetchError) throw userFetchError;
-
-              const adjustment = newVisibility ? transaction.amount : -transaction.amount;
-              const newTotal = (userData.mcloones_bucks || 0) + adjustment;
-
-              const { error: updateError } = await supabase
-                .from('users')
-                .update({ mcloones_bucks: newTotal })
-                .eq('id', transaction.user_id);
-
-              if (updateError) throw updateError;
-
-              // Update the transaction visibility
+              // Update the transaction visibility (balance is NOT affected)
               const { error: visibilityError } = await supabase
                 .from('rewards_transactions')
                 .update({ is_visible: newVisibility })
@@ -800,8 +762,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.formNote}>
-                  If hidden, the bucks will still be added/deducted but won&apos;t show in their
-                  transaction history
+                  If hidden, the transaction won&apos;t show in the employee&apos;s transaction history, but the bucks will still be added/deducted from their total
                 </Text>
               </View>
 
