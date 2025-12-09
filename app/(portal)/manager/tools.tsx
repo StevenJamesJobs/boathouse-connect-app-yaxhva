@@ -11,6 +11,7 @@ import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import CheckOutCalculator from '@/components/CheckOutCalculator';
 
 export default function ManagerToolsScreen() {
   const router = useRouter();
@@ -24,6 +25,11 @@ export default function ManagerToolsScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        {/* Check Out Calculator Section */}
+        <View style={styles.section}>
+          <CheckOutCalculator colors={managerColors} />
+        </View>
+
         {/* Guides and Training Section */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
@@ -83,6 +89,9 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingHorizontal: 16,
     paddingBottom: 100,
+  },
+  section: {
+    marginBottom: 24,
   },
   card: {
     backgroundColor: managerColors.card,
