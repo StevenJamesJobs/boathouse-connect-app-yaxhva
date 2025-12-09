@@ -1,10 +1,11 @@
+
 {
   "expo": {
     "name": "Boathouse Connect",
     "slug": "Boathouse Connect",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg",
+    "icon": "./assets/images/ea95b469-b132-462c-80f5-f05a9e8d2ab5.jpeg",
     "scheme": "mcloones",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -21,20 +22,20 @@
           "remote-notification"
         ]
       },
-      "icon": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg"
+      "icon": "./assets/images/ea95b469-b132-462c-80f5-f05a9e8d2ab5.jpeg"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg",
+        "foregroundImage": "./assets/images/ea95b469-b132-462c-80f5-f05a9e8d2ab5.jpeg",
         "backgroundColor": "#E8F1F8"
       },
       "package": "com.mcloones.boathouseconnect",
-      "icon": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg"
+      "icon": "./assets/images/ea95b469-b132-462c-80f5-f05a9e8d2ab5.jpeg"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg"
+      "favicon": "./assets/images/ea95b469-b132-462c-80f5-f05a9e8d2ab5.jpeg"
     },
     "plugins": [
       "expo-router",
