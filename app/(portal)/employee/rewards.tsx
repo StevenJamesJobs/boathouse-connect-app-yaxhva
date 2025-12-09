@@ -1,17 +1,148 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import { supabase } from '@/app/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+
+interface Employee {
+  id: string;
+  name: string;
+  job_title: string;
+  mcloones_bucks: number;
+}
+
+interface RewardTransaction {
+  id: string;
+  amount: number;
+  description: string;
+  created_at: string;
+}
+
+interface GuestReview {
+  id: string;
+  guest_name: string;
+  rating: number;
+  review_text: string;
+  review_date: string;
+}
 
 export default function EmployeeRewardsScreen() {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'rewards' | 'reviews'>('rewards');
+  const [loading, setLoading] = useState(true);
+  
+  // Rewards state
+  const [myBucks, setMyBucks] = useState(0);
+  const [topEmployees, setTopEmployees] = useState<Employee[]>([]);
+  const [recentTransactions, setRecentTransactions] = useState<RewardTransaction[]>([]);
+  
+  // Reviews state
+  const [reviews, setReviews] = useState<GuestReview[]>([]);
+
+  useEffect(() => {
+    fetchRewardsData();
+    fetchReviews();
+  }, []);
+
+  const fetchRewardsData = async () => {
+    try {
+      setLoading(true);
+      
+      // Fetch current user's bucks
+      if (user?.id) {
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('mcloones_bucks')
+          .eq('id', user.id)
+          .single();
+
+        if (!userError && userData) {
+          setMyBucks(userData.mcloones_bucks || 0);
+        }
+      }
+
+      // Fetch top 5 employees
+      const { data: topData, error: topError } = await supabase
+        .from('users')
+        .select('id, name, job_title, mcloones_bucks')
+        .eq('is_active', true)
+        .order('mcloones_bucks', { ascending: false })
+        .limit(5);
+
+      if (!topError && topData) {
+        setTopEmployees(topData);
+      }
+
+      // Fetch recent visible transactions for current user
+      if (user?.id) {
+        const { data: transData, error: transError } = await supabase
+          .from('rewards_transactions')
+          .select('id, amount, description, created_at')
+          .eq('user_id', user.id)
+          .eq('is_visible', true)
+          .order('created_at', { ascending: false })
+          .limit(5);
+
+        if (!transError && transData) {
+          setRecentTransactions(transData);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching rewards data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchReviews = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('guest_reviews')
+        .select('id, guest_name, rating, review_text, review_date')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .order('review_date', { ascending: false });
+
+      if (!error && data) {
+        setReviews(data);
+      }
+    } catch (error) {
+      console.error('Error fetching reviews:', error);
+    }
+  };
+
+  const renderStars = (rating: number) => {
+    return (
+      <View style={styles.starsContainer}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <IconSymbol
+            key={star}
+            ios_icon_name={star <= rating ? 'star.fill' : 'star'}
+            android_material_icon_name={star <= rating ? 'star' : 'star_border'}
+            size={20}
+            color={star <= rating ? '#FFD700' : employeeColors.textSecondary}
+          />
+        ))}
+      </View>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={employeeColors.primary} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -38,37 +169,95 @@ export default function EmployeeRewardsScreen() {
       {/* Content */}
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {activeTab === 'rewards' ? (
-          <View style={styles.placeholderContainer}>
-            <IconSymbol
-              ios_icon_name="gift.fill"
-              android_material_icon_name="card_giftcard"
-              size={64}
-              color={employeeColors.primary}
-            />
-            <Text style={styles.placeholderTitle}>Rewards</Text>
-            <Text style={styles.placeholderText}>
-              Your rewards and achievements will be displayed here.
-            </Text>
-            <Text style={styles.placeholderSubtext}>
-              Earn rewards for your hard work and dedication!
-            </Text>
-          </View>
+          <>
+            {/* My McLoone's Bucks */}
+            <View style={styles.bucksCard}>
+              <Text style={styles.bucksLabel}>My McLoone&apos;s Bucks</Text>
+              <Text style={styles.bucksAmount}>${myBucks}</Text>
+            </View>
+
+            {/* Top 5 Leaderboard */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Top 5 Leaderboard</Text>
+              {topEmployees.length === 0 ? (
+                <Text style={styles.emptyText}>No leaderboard data yet</Text>
+              ) : (
+                topEmployees.map((emp, index) => (
+                  <View key={index} style={styles.leaderboardItem}>
+                    <View style={styles.leaderboardRank}>
+                      <Text style={styles.leaderboardRankText}>#{index + 1}</Text>
+                    </View>
+                    <View style={styles.leaderboardInfo}>
+                      <Text style={styles.leaderboardName}>{emp.name}</Text>
+                      <Text style={styles.leaderboardJob}>{emp.job_title}</Text>
+                    </View>
+                    <Text style={styles.leaderboardBucks}>${emp.mcloones_bucks || 0}</Text>
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* Recent Transactions */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>My Recent Transactions</Text>
+              {recentTransactions.length === 0 ? (
+                <Text style={styles.emptyText}>No transactions yet</Text>
+              ) : (
+                recentTransactions.map((trans, index) => (
+                  <View key={index} style={styles.transactionItem}>
+                    <View style={styles.transactionInfo}>
+                      <Text style={styles.transactionDescription}>{trans.description}</Text>
+                      <Text style={styles.transactionDate}>
+                        {new Date(trans.created_at).toLocaleDateString()}
+                      </Text>
+                    </View>
+                    <Text
+                      style={[
+                        styles.transactionAmount,
+                        trans.amount > 0 ? styles.positiveAmount : styles.negativeAmount,
+                      ]}
+                    >
+                      {trans.amount > 0 ? '+' : ''}${trans.amount}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+          </>
         ) : (
-          <View style={styles.placeholderContainer}>
-            <IconSymbol
-              ios_icon_name="star.fill"
-              android_material_icon_name="rate_review"
-              size={64}
-              color={employeeColors.primary}
-            />
-            <Text style={styles.placeholderTitle}>Reviews</Text>
-            <Text style={styles.placeholderText}>
-              Your performance reviews will be displayed here.
-            </Text>
-            <Text style={styles.placeholderSubtext}>
-              Track your progress and feedback from management.
-            </Text>
-          </View>
+          <>
+            {/* Guest Reviews */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Guest Reviews</Text>
+              {reviews.length === 0 ? (
+                <View style={styles.placeholderContainer}>
+                  <IconSymbol
+                    ios_icon_name="star.fill"
+                    android_material_icon_name="rate_review"
+                    size={64}
+                    color={employeeColors.primary}
+                  />
+                  <Text style={styles.placeholderTitle}>No Reviews Yet</Text>
+                  <Text style={styles.placeholderText}>
+                    Guest reviews will appear here once they are added by management.
+                  </Text>
+                </View>
+              ) : (
+                reviews.map((review, index) => (
+                  <View key={index} style={styles.reviewCard}>
+                    <View style={styles.reviewHeader}>
+                      <Text style={styles.reviewGuestName}>{review.guest_name}</Text>
+                      {renderStars(review.rating)}
+                    </View>
+                    <Text style={styles.reviewText}>{review.review_text}</Text>
+                    <Text style={styles.reviewDate}>
+                      {new Date(review.review_date).toLocaleDateString()}
+                    </Text>
+                  </View>
+                ))
+              )}
+            </View>
+          </>
         )}
       </ScrollView>
     </View>
@@ -78,6 +267,12 @@ export default function EmployeeRewardsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: employeeColors.background,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: employeeColors.background,
   },
   tabContainer: {
@@ -115,12 +310,153 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 100,
   },
+  bucksCard: {
+    backgroundColor: employeeColors.card,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    marginBottom: 20,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  bucksLabel: {
+    fontSize: 16,
+    color: employeeColors.textSecondary,
+    marginBottom: 8,
+  },
+  bucksAmount: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    color: employeeColors.primary,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: employeeColors.text,
+    marginBottom: 12,
+  },
+  leaderboardItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: employeeColors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  leaderboardRank: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: employeeColors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  leaderboardRankText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  leaderboardInfo: {
+    flex: 1,
+  },
+  leaderboardName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: employeeColors.text,
+    marginBottom: 4,
+  },
+  leaderboardJob: {
+    fontSize: 14,
+    color: employeeColors.textSecondary,
+  },
+  leaderboardBucks: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: employeeColors.primary,
+  },
+  transactionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: employeeColors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  transactionInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  transactionDescription: {
+    fontSize: 16,
+    color: employeeColors.text,
+    marginBottom: 4,
+  },
+  transactionDate: {
+    fontSize: 12,
+    color: employeeColors.textSecondary,
+  },
+  transactionAmount: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  positiveAmount: {
+    color: '#4CAF50',
+  },
+  negativeAmount: {
+    color: '#F44336',
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: employeeColors.textSecondary,
+    marginTop: 20,
+  },
+  reviewCard: {
+    backgroundColor: employeeColors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  reviewHeader: {
+    marginBottom: 12,
+  },
+  reviewGuestName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: employeeColors.text,
+    marginBottom: 8,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  reviewText: {
+    fontSize: 14,
+    color: employeeColors.text,
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  reviewDate: {
+    fontSize: 12,
+    color: employeeColors.textSecondary,
+  },
   placeholderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 32,
-    minHeight: 400,
+    minHeight: 300,
   },
   placeholderTitle: {
     fontSize: 28,
@@ -134,11 +470,5 @@ const styles = StyleSheet.create({
     color: employeeColors.textSecondary,
     textAlign: 'center',
     marginBottom: 8,
-  },
-  placeholderSubtext: {
-    fontSize: 14,
-    color: employeeColors.textSecondary,
-    textAlign: 'center',
-    fontStyle: 'italic',
   },
 });

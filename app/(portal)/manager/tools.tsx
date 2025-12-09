@@ -181,7 +181,7 @@ export default function ManagerToolsScreen() {
         ) : activeTab === 'employee' ? (
           <>
             {/* Guides and Training Editor */}
-            <View style={[styles.card, styles.lastCard]}>
+            <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <IconSymbol
                   ios_icon_name="square.and.pencil"
@@ -201,6 +201,36 @@ export default function ManagerToolsScreen() {
                 onPress={() => router.push('/guides-and-training-editor')}
               >
                 <Text style={styles.cardButtonText}>Open Guides Editor</Text>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron_right"
+                  size={20}
+                  color={managerColors.text}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Rewards and Reviews Editor */}
+            <View style={[styles.card, styles.lastCard]}>
+              <View style={styles.cardHeader}>
+                <IconSymbol
+                  ios_icon_name="gift.fill"
+                  android_material_icon_name="card_giftcard"
+                  size={32}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardHeaderText}>
+                  <Text style={styles.cardTitle}>Rewards and Reviews Editor</Text>
+                  <Text style={styles.cardDescription}>
+                    Manage employee rewards and guest reviews
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.cardButton}
+                onPress={() => router.push('/rewards-and-reviews-editor')}
+              >
+                <Text style={styles.cardButtonText}>Open Rewards & Reviews</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron_right"
