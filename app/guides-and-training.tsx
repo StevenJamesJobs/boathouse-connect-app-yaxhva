@@ -166,29 +166,41 @@ export default function GuidesAndTrainingScreen() {
         downloadsDir.create({ intermediates: true });
       }
 
-      console.log('Downloading to directory:', downloadsDir.uri);
+      console.log('Downloads directory:', downloadsDir.uri);
       
       // Check if file already exists and delete it if it does
       const targetFile = new File(downloadsDir, guide.file_name);
+      console.log('Target file path:', targetFile.uri);
+      console.log('File exists before download:', targetFile.exists);
+      
       if (targetFile.exists) {
         console.log('File already exists, deleting old version...');
         try {
-          await targetFile.delete();
+          targetFile.delete();
           console.log('Old file deleted successfully');
+          
+          // Verify deletion
+          const stillExists = new File(downloadsDir, guide.file_name).exists;
+          console.log('File still exists after deletion:', stillExists);
         } catch (deleteError) {
           console.error('Error deleting old file:', deleteError);
-          // Continue anyway, the download might still work
+          // If deletion fails, try to continue anyway
         }
       }
 
+      // Small delay to ensure file system operations complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Download the file using the new API
+      console.log('Starting download...');
       const downloadedFile = await File.downloadFileAsync(
         guide.file_url,
         downloadsDir
       );
 
       console.log('File downloaded successfully to:', downloadedFile.uri);
-      console.log('File exists:', downloadedFile.exists);
+      console.log('Downloaded file exists:', downloadedFile.exists);
+      console.log('Downloaded file size:', downloadedFile.size);
 
       // Check if sharing is available
       const isAvailable = await Sharing.isAvailableAsync();
@@ -205,17 +217,33 @@ export default function GuidesAndTrainingScreen() {
       }
     } catch (error: any) {
       console.error('Error downloading file:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
       console.error('Error details:', JSON.stringify(error, null, 2));
       
       // Provide more specific error messages
       let errorMessage = 'Failed to download file';
       if (error.code === 'ERR_DESTINATION_ALREADY_EXISTS') {
-        errorMessage = 'File already exists. Please try again.';
+        errorMessage = 'File already exists. Trying to clean up and retry...';
+        Alert.alert('Error', errorMessage);
+        
+        // Try to clean up and suggest retry
+        try {
+          const downloadsDir = new Directory(Paths.cache, 'downloads');
+          const targetFile = new File(downloadsDir, guide.file_name);
+          if (targetFile.exists) {
+            targetFile.delete();
+            console.log('Cleaned up existing file');
+          }
+        } catch (cleanupError) {
+          console.error('Error during cleanup:', cleanupError);
+        }
       } else if (error.message) {
         errorMessage = `Failed to download file: ${error.message}`;
+        Alert.alert('Error', errorMessage);
+      } else {
+        Alert.alert('Error', errorMessage);
       }
-      
-      Alert.alert('Error', errorMessage);
     } finally {
       setDownloadingFile(null);
     }
