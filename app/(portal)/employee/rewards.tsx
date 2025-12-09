@@ -25,6 +25,7 @@ interface RewardTransaction {
   user_id: string;
   amount: number;
   description: string;
+  is_visible: boolean;
   created_at: string;
   user_name?: string;
 }
@@ -84,14 +85,13 @@ export default function EmployeeRewardsScreen() {
         setTopEmployees(topData);
       }
 
-      // Fetch last 5 visible transactions with user names
-      // First get transactions
+      // Fetch last 5 transactions with user names
+      // First get ALL transactions (the RLS policy now allows this)
       const { data: transData, error: transError } = await supabase
         .from('rewards_transactions')
-        .select('id, user_id, amount, description, created_at')
-        .eq('is_visible', true)
+        .select('id, user_id, amount, description, is_visible, created_at')
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(10); // Fetch more to account for hidden ones
 
       if (transError) {
         console.error('Error fetching transactions:', transError);
@@ -99,33 +99,40 @@ export default function EmployeeRewardsScreen() {
       }
 
       if (transData && transData.length > 0) {
-        // Get unique user IDs
-        const userIds = [...new Set(transData.map(t => t.user_id))];
+        // Filter to only visible transactions on the client side
+        const visibleTransactions = transData.filter(t => t.is_visible === true).slice(0, 5);
         
-        // Fetch user names separately
-        const { data: usersData, error: usersError } = await supabase
-          .from('users')
-          .select('id, name')
-          .in('id', userIds);
+        if (visibleTransactions.length > 0) {
+          // Get unique user IDs
+          const userIds = [...new Set(visibleTransactions.map(t => t.user_id))];
+          
+          // Fetch user names separately
+          const { data: usersData, error: usersError } = await supabase
+            .from('users')
+            .select('id, name')
+            .in('id', userIds);
 
-        if (!usersError && usersData) {
-          // Create a map of user IDs to names
-          const userMap = new Map(usersData.map(u => [u.id, u.name]));
-          
-          // Combine transaction data with user names
-          const transactionsWithNames = transData.map(trans => ({
-            ...trans,
-            user_name: userMap.get(trans.user_id) || 'Unknown Employee'
-          }));
-          
-          console.log('Fetched transactions with names:', transactionsWithNames);
-          setRecentTransactions(transactionsWithNames);
+          if (!usersError && usersData) {
+            // Create a map of user IDs to names
+            const userMap = new Map(usersData.map(u => [u.id, u.name]));
+            
+            // Combine transaction data with user names
+            const transactionsWithNames = visibleTransactions.map(trans => ({
+              ...trans,
+              user_name: userMap.get(trans.user_id) || 'Unknown Employee'
+            }));
+            
+            console.log('Fetched visible transactions with names:', transactionsWithNames);
+            setRecentTransactions(transactionsWithNames);
+          } else {
+            console.error('Error fetching user names:', usersError);
+            setRecentTransactions(visibleTransactions.map(trans => ({
+              ...trans,
+              user_name: 'Unknown Employee'
+            })));
+          }
         } else {
-          console.error('Error fetching user names:', usersError);
-          setRecentTransactions(transData.map(trans => ({
-            ...trans,
-            user_name: 'Unknown Employee'
-          })));
+          setRecentTransactions([]);
         }
       } else {
         setRecentTransactions([]);
@@ -233,7 +240,7 @@ export default function EmployeeRewardsScreen() {
 
             {/* Recent Transactions */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>My Recent Transactions</Text>
+              <Text style={styles.sectionTitle}>Recent Transactions</Text>
               {recentTransactions.length === 0 ? (
                 <Text style={styles.emptyText}>No transactions yet</Text>
               ) : (

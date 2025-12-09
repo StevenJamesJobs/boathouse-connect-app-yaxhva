@@ -141,7 +141,7 @@ export default function RewardsAndReviewsEditorScreen() {
       }
 
       // Fetch last 5 transactions with user names
-      // First get transactions
+      // Managers can see ALL transactions (including hidden ones)
       const { data: transData, error: transError } = await supabase
         .from('rewards_transactions')
         .select('id, user_id, amount, description, is_visible, created_at')
@@ -289,7 +289,7 @@ export default function RewardsAndReviewsEditorScreen() {
     
     Alert.alert(
       `${newVisibility ? 'Show' : 'Hide'} Transaction`,
-      `Are you sure you want to ${actionText} this transaction? This will ${newVisibility ? 'show it to' : 'hide it from'} ${transaction.user_name} but will NOT affect their total balance.`,
+      `Are you sure you want to ${actionText} this transaction? This will ${newVisibility ? 'show it to' : 'hide it from'} all employees in their recent transaction list but will NOT affect their total balance. Managers will still be able to see all transactions.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -547,7 +547,7 @@ export default function RewardsAndReviewsEditorScreen() {
                         {new Date(trans.created_at).toLocaleDateString()}
                       </Text>
                       {!trans.is_visible && (
-                        <Text style={styles.hiddenBadge}>Hidden from employee</Text>
+                        <Text style={styles.hiddenBadge}>Hidden from all employees</Text>
                       )}
                     </View>
                     <View style={styles.transactionRight}>
@@ -748,7 +748,7 @@ export default function RewardsAndReviewsEditorScreen() {
               {/* Visibility Toggle */}
               <View style={styles.formField}>
                 <View style={styles.visibilityToggle}>
-                  <Text style={styles.formLabel}>Visible to Employee</Text>
+                  <Text style={styles.formLabel}>Visible to Employees</Text>
                   <TouchableOpacity
                     style={[styles.toggleButton, isVisible && styles.toggleButtonActive]}
                     onPress={() => setIsVisible(!isVisible)}
@@ -762,7 +762,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.formNote}>
-                  If hidden, the transaction won&apos;t show in the employee&apos;s transaction history, but the bucks will still be added/deducted from their total
+                  If hidden, the transaction won&apos;t show in any employee&apos;s transaction history, but the bucks will still be added/deducted from their total. Managers will still be able to see all transactions.
                 </Text>
               </View>
 
