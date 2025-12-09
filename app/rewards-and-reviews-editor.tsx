@@ -247,6 +247,118 @@ export default function RewardsAndReviewsEditorScreen() {
     }
   };
 
+  const handleDeleteTransaction = async (transaction: RewardTransaction) => {
+    Alert.alert(
+      'Delete Transaction',
+      `Are you sure you want to delete this transaction? This will deduct $${transaction.amount} from ${transaction.user_name}'s total.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+
+              // First, deduct the amount from the user's total
+              const { data: userData, error: userFetchError } = await supabase
+                .from('users')
+                .select('mcloones_bucks')
+                .eq('id', transaction.user_id)
+                .single();
+
+              if (userFetchError) throw userFetchError;
+
+              const newTotal = (userData.mcloones_bucks || 0) - transaction.amount;
+
+              const { error: updateError } = await supabase
+                .from('users')
+                .update({ mcloones_bucks: newTotal })
+                .eq('id', transaction.user_id);
+
+              if (updateError) throw updateError;
+
+              // Then delete the transaction
+              const { error: deleteError } = await supabase
+                .from('rewards_transactions')
+                .delete()
+                .eq('id', transaction.id);
+
+              if (deleteError) throw deleteError;
+
+              Alert.alert('Success', 'Transaction deleted successfully');
+              fetchEmployees();
+              fetchRewardsData();
+            } catch (error: any) {
+              console.error('Error deleting transaction:', error);
+              Alert.alert('Error', error.message || 'Failed to delete transaction');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleHideTransaction = async (transaction: RewardTransaction) => {
+    const newVisibility = !transaction.is_visible;
+    const actionText = newVisibility ? 'show' : 'hide';
+    
+    Alert.alert(
+      `${newVisibility ? 'Show' : 'Hide'} Transaction`,
+      `Are you sure you want to ${actionText} this transaction? ${!newVisibility ? `This will deduct $${transaction.amount} from ${transaction.user_name}'s total.` : `This will add $${transaction.amount} back to ${transaction.user_name}'s total.`}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: newVisibility ? 'Show' : 'Hide',
+          onPress: async () => {
+            try {
+              setLoading(true);
+
+              // If hiding, deduct the amount from the user's total
+              // If showing, add the amount back to the user's total
+              const { data: userData, error: userFetchError } = await supabase
+                .from('users')
+                .select('mcloones_bucks')
+                .eq('id', transaction.user_id)
+                .single();
+
+              if (userFetchError) throw userFetchError;
+
+              const adjustment = newVisibility ? transaction.amount : -transaction.amount;
+              const newTotal = (userData.mcloones_bucks || 0) + adjustment;
+
+              const { error: updateError } = await supabase
+                .from('users')
+                .update({ mcloones_bucks: newTotal })
+                .eq('id', transaction.user_id);
+
+              if (updateError) throw updateError;
+
+              // Update the transaction visibility
+              const { error: visibilityError } = await supabase
+                .from('rewards_transactions')
+                .update({ is_visible: newVisibility })
+                .eq('id', transaction.id);
+
+              if (visibilityError) throw visibilityError;
+
+              Alert.alert('Success', `Transaction ${actionText === 'hide' ? 'hidden' : 'shown'} successfully`);
+              fetchEmployees();
+              fetchRewardsData();
+            } catch (error: any) {
+              console.error(`Error ${actionText}ing transaction:`, error);
+              Alert.alert('Error', error.message || `Failed to ${actionText} transaction`);
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const resetRewardForm = () => {
     setSelectedEmployee(null);
     setRewardAmount('');
@@ -458,7 +570,7 @@ export default function RewardsAndReviewsEditorScreen() {
 
             {/* Recent Transactions */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>My Recent Transactions</Text>
+              <Text style={styles.sectionTitle}>Recent Transactions</Text>
               {recentTransactions.length === 0 ? (
                 <Text style={styles.emptyText}>No transactions yet</Text>
               ) : (
@@ -476,14 +588,40 @@ export default function RewardsAndReviewsEditorScreen() {
                         <Text style={styles.hiddenBadge}>Hidden from employee</Text>
                       )}
                     </View>
-                    <Text
-                      style={[
-                        styles.transactionAmount,
-                        trans.amount > 0 ? styles.positiveAmount : styles.negativeAmount,
-                      ]}
-                    >
-                      {trans.amount > 0 ? '+' : ''}${trans.amount}
-                    </Text>
+                    <View style={styles.transactionRight}>
+                      <Text
+                        style={[
+                          styles.transactionAmount,
+                          trans.amount > 0 ? styles.positiveAmount : styles.negativeAmount,
+                        ]}
+                      >
+                        {trans.amount > 0 ? '+' : ''}${trans.amount}
+                      </Text>
+                      <View style={styles.transactionActions}>
+                        <TouchableOpacity
+                          onPress={() => handleHideTransaction(trans)}
+                          style={styles.actionButton}
+                        >
+                          <IconSymbol
+                            ios_icon_name={trans.is_visible ? 'eye.slash.fill' : 'eye.fill'}
+                            android_material_icon_name={trans.is_visible ? 'visibility_off' : 'visibility'}
+                            size={24}
+                            color={trans.is_visible ? '#FF9800' : '#4CAF50'}
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteTransaction(trans)}
+                          style={styles.actionButton}
+                        >
+                          <IconSymbol
+                            ios_icon_name="trash.fill"
+                            android_material_icon_name="delete"
+                            size={24}
+                            color="#F44336"
+                          />
+                        </TouchableOpacity>
+                      </View>
+                    </View>
                   </View>
                 ))
               )}
@@ -551,6 +689,13 @@ export default function RewardsAndReviewsEditorScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* Loading Overlay */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={managerColors.highlight} />
+        </View>
+      )}
 
       {/* Reward Modal */}
       <Modal visible={showRewardModal} animationType="slide" transparent>
@@ -984,6 +1129,10 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     marginTop: 4,
   },
+  transactionRight: {
+    alignItems: 'flex-end',
+    gap: 8,
+  },
   transactionAmount: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -993,6 +1142,13 @@ const styles = StyleSheet.create({
   },
   negativeAmount: {
     color: '#F44336',
+  },
+  transactionActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  actionButton: {
+    padding: 4,
   },
   emptyText: {
     textAlign: 'center',
@@ -1040,6 +1196,16 @@ const styles = StyleSheet.create({
   reviewDate: {
     fontSize: 12,
     color: managerColors.textSecondary,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalOverlay: {
     flex: 1,
