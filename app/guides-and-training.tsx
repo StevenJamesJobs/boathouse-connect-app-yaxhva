@@ -137,7 +137,7 @@ export default function GuidesAndTrainingScreen() {
   const handleDownloadFile = async (guide: GuideItem) => {
     try {
       setDownloadingFile(guide.id);
-      console.log('Downloading file:', guide.file_name);
+      console.log('Starting download for:', guide.file_name);
 
       // For web, just open the file URL in a new tab to trigger download
       if (Platform.OS === 'web') {
@@ -154,22 +154,34 @@ export default function GuidesAndTrainingScreen() {
         return;
       }
 
-      // For mobile, use the new Expo 54 FileSystem API with unique filenames
-      console.log('Downloading from:', guide.file_url);
+      // For mobile, use the new Expo 54 FileSystem API
+      console.log('Downloading from URL:', guide.file_url);
       
-      // Create a downloads directory in cache
+      // Step 1: Create a downloads directory in cache
       const downloadsDir = new Directory(Paths.cache, 'downloads');
+      console.log('Downloads directory path:', downloadsDir.uri);
       
-      // Create the directory if it doesn't exist
+      // Step 2: Check if directory exists, if not create it with intermediates option
       if (!downloadsDir.exists) {
-        console.log('Creating downloads directory...');
-        downloadsDir.create({ intermediates: true });
+        console.log('Downloads directory does not exist, creating...');
+        try {
+          downloadsDir.create({ intermediates: true });
+          console.log('Downloads directory created successfully');
+        } catch (createError: any) {
+          console.error('Error creating downloads directory:', createError);
+          throw new Error(`Failed to create downloads directory: ${createError.message}`);
+        }
+      } else {
+        console.log('Downloads directory already exists');
       }
 
-      console.log('Downloads directory:', downloadsDir.uri);
-      
-      // Generate a unique filename by appending timestamp
-      // This ensures each download is unique and avoids "already exists" errors
+      // Step 3: Verify the directory was created successfully
+      if (!downloadsDir.exists) {
+        throw new Error('Downloads directory could not be created or verified');
+      }
+
+      // Step 4: Generate a unique filename by appending timestamp
+      // This ensures each download is unique and avoids conflicts
       const fileExtension = guide.file_name.substring(guide.file_name.lastIndexOf('.'));
       const fileNameWithoutExt = guide.file_name.substring(0, guide.file_name.lastIndexOf('.'));
       const timestamp = Date.now();
@@ -177,18 +189,37 @@ export default function GuidesAndTrainingScreen() {
       
       console.log('Unique filename:', uniqueFileName);
 
-      // Download the file using the new API with unique filename
-      console.log('Starting download...');
-      const downloadedFile = await File.downloadFileAsync(
-        guide.file_url,
-        new Directory(downloadsDir, uniqueFileName)
-      );
+      // Step 5: Create the destination file path
+      const destinationFile = new File(downloadsDir, uniqueFileName);
+      console.log('Destination file path:', destinationFile.uri);
 
-      console.log('File downloaded successfully to:', downloadedFile.uri);
+      // Step 6: Download the file
+      console.log('Starting file download...');
+      let downloadedFile: File;
+      try {
+        downloadedFile = await File.downloadFileAsync(
+          guide.file_url,
+          downloadsDir
+        );
+        console.log('File downloaded successfully');
+      } catch (downloadError: any) {
+        console.error('Error during download:', downloadError);
+        console.error('Download error code:', downloadError.code);
+        console.error('Download error message:', downloadError.message);
+        throw new Error(`Download failed: ${downloadError.message}`);
+      }
+
+      // Step 7: Verify the downloaded file exists
+      console.log('Downloaded file URI:', downloadedFile.uri);
       console.log('Downloaded file exists:', downloadedFile.exists);
-      console.log('Downloaded file size:', downloadedFile.size);
+      
+      if (!downloadedFile.exists) {
+        throw new Error('Downloaded file does not exist after download');
+      }
 
-      // Check if sharing is available
+      console.log('Downloaded file size:', downloadedFile.size, 'bytes');
+
+      // Step 8: Share the file so user can save it
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
         console.log('Sharing file...');
@@ -199,20 +230,20 @@ export default function GuidesAndTrainingScreen() {
         });
         Alert.alert('Success', 'File ready to save. Choose where to save it from the share menu.');
       } else {
-        Alert.alert('Success', `File downloaded successfully!`);
+        Alert.alert('Success', `File downloaded successfully to ${downloadedFile.uri}`);
       }
     } catch (error: any) {
-      console.error('Error downloading file:', error);
+      console.error('ERROR Failed to download file:', error);
       console.error('Error code:', error.code);
       console.error('Error message:', error.message);
-      console.error('Error details:', JSON.stringify(error, null, 2));
+      console.error('Error stack:', error.stack);
       
       // Provide more specific error messages
       let errorMessage = 'Failed to download file';
       if (error.message) {
-        errorMessage = `Failed to download file: ${error.message}`;
+        errorMessage = error.message;
       }
-      Alert.alert('Error', errorMessage);
+      Alert.alert('Download Error', errorMessage);
     } finally {
       setDownloadingFile(null);
     }
