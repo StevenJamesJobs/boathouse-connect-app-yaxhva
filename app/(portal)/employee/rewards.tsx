@@ -22,9 +22,13 @@ interface Employee {
 
 interface RewardTransaction {
   id: string;
+  user_id: string;
   amount: number;
   description: string;
   created_at: string;
+  users?: {
+    name: string;
+  };
 }
 
 interface GuestReview {
@@ -82,19 +86,28 @@ export default function EmployeeRewardsScreen() {
         setTopEmployees(topData);
       }
 
-      // Fetch recent visible transactions for current user
-      if (user?.id) {
-        const { data: transData, error: transError } = await supabase
-          .from('rewards_transactions')
-          .select('id, amount, description, created_at')
-          .eq('user_id', user.id)
-          .eq('is_visible', true)
-          .order('created_at', { ascending: false })
-          .limit(5);
+      // Fetch last 5 visible transactions (all employees, not just current user)
+      const { data: transData, error: transError } = await supabase
+        .from('rewards_transactions')
+        .select(`
+          id,
+          user_id,
+          amount,
+          description,
+          created_at,
+          users (
+            name
+          )
+        `)
+        .eq('is_visible', true)
+        .order('created_at', { ascending: false })
+        .limit(5);
 
-        if (!transError && transData) {
-          setRecentTransactions(transData);
-        }
+      if (!transError && transData) {
+        console.log('Fetched transactions:', transData);
+        setRecentTransactions(transData);
+      } else {
+        console.error('Error fetching transactions:', transError);
       }
     } catch (error) {
       console.error('Error fetching rewards data:', error);
@@ -206,6 +219,9 @@ export default function EmployeeRewardsScreen() {
                 recentTransactions.map((trans, index) => (
                   <View key={index} style={styles.transactionItem}>
                     <View style={styles.transactionInfo}>
+                      <Text style={styles.transactionEmployee}>
+                        {trans.users?.name || 'Unknown Employee'}
+                      </Text>
                       <Text style={styles.transactionDescription}>{trans.description}</Text>
                       <Text style={styles.transactionDate}>
                         {new Date(trans.created_at).toLocaleDateString()}
@@ -395,8 +411,14 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
+  transactionEmployee: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: employeeColors.text,
+    marginBottom: 4,
+  },
   transactionDescription: {
-    fontSize: 16,
+    fontSize: 15,
     color: employeeColors.text,
     marginBottom: 4,
   },

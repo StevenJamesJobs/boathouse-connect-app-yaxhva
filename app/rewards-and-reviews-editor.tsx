@@ -142,18 +142,28 @@ export default function RewardsAndReviewsEditorScreen() {
         setTopEmployees(topData);
       }
 
-      // Fetch recent transactions for current user
-      if (user?.id) {
-        const { data: transData, error: transError } = await supabase
-          .from('rewards_transactions')
-          .select('*, users(name)')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
-          .limit(5);
+      // Fetch last 5 transactions (all employees, not just current user)
+      const { data: transData, error: transError } = await supabase
+        .from('rewards_transactions')
+        .select(`
+          id,
+          user_id,
+          amount,
+          description,
+          is_visible,
+          created_at,
+          users (
+            name
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(5);
 
-        if (!transError && transData) {
-          setRecentTransactions(transData);
-        }
+      if (!transError && transData) {
+        console.log('Fetched transactions:', transData);
+        setRecentTransactions(transData);
+      } else {
+        console.error('Error fetching transactions:', transError);
       }
     } catch (error) {
       console.error('Error fetching rewards data:', error);
@@ -435,10 +445,16 @@ export default function RewardsAndReviewsEditorScreen() {
                 recentTransactions.map((trans, index) => (
                   <View key={index} style={styles.transactionItem}>
                     <View style={styles.transactionInfo}>
+                      <Text style={styles.transactionEmployee}>
+                        {trans.users?.name || 'Unknown Employee'}
+                      </Text>
                       <Text style={styles.transactionDescription}>{trans.description}</Text>
                       <Text style={styles.transactionDate}>
                         {new Date(trans.created_at).toLocaleDateString()}
                       </Text>
+                      {!trans.is_visible && (
+                        <Text style={styles.hiddenBadge}>Hidden from employee</Text>
+                      )}
                     </View>
                     <Text
                       style={[
@@ -927,14 +943,26 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 12,
   },
+  transactionEmployee: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    color: managerColors.text,
+    marginBottom: 4,
+  },
   transactionDescription: {
-    fontSize: 16,
+    fontSize: 15,
     color: managerColors.text,
     marginBottom: 4,
   },
   transactionDate: {
     fontSize: 12,
     color: managerColors.textSecondary,
+  },
+  hiddenBadge: {
+    fontSize: 11,
+    color: '#FF9800',
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   transactionAmount: {
     fontSize: 18,
