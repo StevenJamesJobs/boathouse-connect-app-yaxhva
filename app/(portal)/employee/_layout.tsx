@@ -22,7 +22,7 @@ function EmployeeHeader() {
   return (
     <View style={styles.header}>
       <Image 
-        source={require('@/assets/images/c9cddae8-fb0d-486c-93f7-d0905925df85.jpeg')}
+        source={require('@/assets/images/6b42d5c0-d10c-4de7-bf00-803733393db9.jpeg')}
         style={styles.cornerIcon}
         resizeMode="contain"
       />
