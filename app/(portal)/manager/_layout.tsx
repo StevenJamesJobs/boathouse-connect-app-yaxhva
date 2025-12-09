@@ -144,6 +144,20 @@ export default function ManagerLayout() {
           }}
         />
         <Tabs.Screen
+          name="manage"
+          options={{
+            title: 'Manage',
+            tabBarIcon: ({ color, size }) => (
+              <IconSymbol
+                ios_icon_name="slider.horizontal.3"
+                android_material_icon_name="tune"
+                size={size}
+                color={color}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
           name="profile"
           options={{
             title: 'Profile',
