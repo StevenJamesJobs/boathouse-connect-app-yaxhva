@@ -11,15 +11,20 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { useUnreadMessages } from '@/hooks/useUnreadMessages';
+import { MessageBadge } from '@/components/MessageBadge';
 
 export default function EmployeeProfileScreen() {
   const { user, refreshUser } = useAuth();
+  const router = useRouter();
+  const { unreadCount } = useUnreadMessages();
   const [email, setEmail] = useState(user?.email || '');
   const [phoneNumber, setPhoneNumber] = useState(user?.phoneNumber || '');
   const [isEditing, setIsEditing] = useState(false);
@@ -239,6 +244,42 @@ export default function EmployeeProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      {/* Messages Section */}
+      <TouchableOpacity
+        style={styles.messagesCard}
+        onPress={() => router.push('/messages')}
+      >
+        <View style={styles.messagesHeader}>
+          <View style={styles.messagesIconContainer}>
+            <IconSymbol
+              ios_icon_name="envelope.fill"
+              android_material_icon_name="mail"
+              size={24}
+              color={employeeColors.primary}
+            />
+            {unreadCount > 0 && (
+              <View style={styles.badgePosition}>
+                <MessageBadge count={unreadCount} size="small" />
+              </View>
+            )}
+          </View>
+          <View style={styles.messagesContent}>
+            <Text style={styles.messagesTitle}>Messages</Text>
+            <Text style={styles.messagesSubtitle}>
+              {unreadCount > 0
+                ? `${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`
+                : 'No new messages'}
+            </Text>
+          </View>
+          <IconSymbol
+            ios_icon_name="chevron.right"
+            android_material_icon_name="chevron_right"
+            size={24}
+            color={employeeColors.textSecondary}
+          />
+        </View>
+      </TouchableOpacity>
+
       {/* Profile Header */}
       <View style={styles.profileHeader}>
         <TouchableOpacity onPress={handlePickImage} style={styles.avatarContainer}>
@@ -450,6 +491,40 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingHorizontal: 16,
     paddingBottom: 100,
+  },
+  messagesCard: {
+    backgroundColor: employeeColors.card,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  messagesHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  messagesIconContainer: {
+    position: 'relative',
+  },
+  badgePosition: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+  },
+  messagesContent: {
+    flex: 1,
+  },
+  messagesTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: employeeColors.text,
+    marginBottom: 2,
+  },
+  messagesSubtitle: {
+    fontSize: 14,
+    color: employeeColors.textSecondary,
   },
   profileHeader: {
     alignItems: 'center',

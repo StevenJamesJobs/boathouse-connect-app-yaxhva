@@ -20,6 +20,8 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
+import { useUnreadMessages } from '@/hooks/useUnreadMessages';
+import { MessageBadge } from '@/components/MessageBadge';
 
 interface MenuItem {
   id: string;
@@ -83,6 +85,7 @@ interface SpecialFeature {
 export default function ManagerPortalScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { unreadCount } = useUnreadMessages();
   const [weeklySpecials, setWeeklySpecials] = useState<MenuItem[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
@@ -297,8 +300,33 @@ export default function ManagerPortalScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {/* Welcome Section */}
         <View style={styles.welcomeSection}>
-          <Text style={styles.welcomeTitle}>Welcome, {user?.name}!</Text>
-          <Text style={styles.jobTitle}>{user?.jobTitle}</Text>
+          <View style={styles.welcomeHeader}>
+            <View style={styles.welcomeTextContainer}>
+              <Text style={styles.welcomeTitle}>Welcome, {user?.name}!</Text>
+              <Text style={styles.jobTitle}>{user?.jobTitle}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.messageButton}
+              onPress={() => router.push('/messages')}
+            >
+              <View style={styles.messageIconContainer}>
+                <IconSymbol
+                  ios_icon_name="envelope.fill"
+                  android_material_icon_name="mail"
+                  size={28}
+                  color={managerColors.highlight}
+                />
+                {unreadCount > 0 && (
+                  <View style={styles.messageBadgePosition}>
+                    <MessageBadge count={unreadCount} size="small" />
+                  </View>
+                )}
+              </View>
+              <Text style={styles.messageButtonText}>
+                {unreadCount > 0 ? `${unreadCount} New` : 'No New Messages'}
+              </Text>
+            </TouchableOpacity>
+          </View>
           <Text style={styles.tagline}>Let&apos;s see what we have going on today!</Text>
         </View>
 
@@ -722,6 +750,15 @@ const styles = StyleSheet.create({
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
+  welcomeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  welcomeTextContainer: {
+    flex: 1,
+  },
   welcomeTitle: {
     fontSize: 28,
     fontWeight: 'bold',
@@ -732,7 +769,29 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: managerColors.highlight,
     fontWeight: '600',
-    marginBottom: 12,
+  },
+  messageButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: managerColors.highlight,
+    borderRadius: 12,
+    padding: 12,
+    minWidth: 100,
+  },
+  messageIconContainer: {
+    position: 'relative',
+    marginBottom: 4,
+  },
+  messageBadgePosition: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+  },
+  messageButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: managerColors.text,
+    textAlign: 'center',
   },
   tagline: {
     fontSize: 16,

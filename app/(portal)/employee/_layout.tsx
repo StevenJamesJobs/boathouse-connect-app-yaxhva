@@ -7,6 +7,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { BlurView } from 'expo-blur';
+import { useUnreadMessages } from '@/hooks/useUnreadMessages';
+import { MessageBadge } from '@/components/MessageBadge';
 
 function EmployeeHeader() {
   const router = useRouter();
@@ -38,6 +40,8 @@ function EmployeeHeader() {
 }
 
 function FloatingTabBar({ state, descriptors, navigation }: any) {
+  const { unreadCount } = useUnreadMessages();
+  
   return (
     <View style={styles.floatingTabBarContainer}>
       <BlurView intensity={80} style={styles.blurContainer}>
@@ -46,6 +50,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
             const { options } = descriptors[route.key];
             const label = options.tabBarLabel ?? options.title ?? route.name;
             const isFocused = state.index === index;
+            const isProfileTab = route.name === 'profile';
 
             const onPress = () => {
               const event = navigation.emit({
@@ -69,10 +74,17 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
                 onPress={onPress}
                 style={styles.tabButton}
               >
-                {options.tabBarIcon && options.tabBarIcon({
-                  color: isFocused ? employeeColors.tabBarActive : employeeColors.tabBarInactive,
-                  size: 24,
-                })}
+                <View style={styles.iconContainer}>
+                  {options.tabBarIcon && options.tabBarIcon({
+                    color: isFocused ? employeeColors.tabBarActive : employeeColors.tabBarInactive,
+                    size: 24,
+                  })}
+                  {isProfileTab && unreadCount > 0 && (
+                    <View style={styles.tabBadgePosition}>
+                      <MessageBadge count={unreadCount} size="small" />
+                    </View>
+                  )}
+                </View>
                 <Text
                   style={[
                     styles.tabLabel,
@@ -245,6 +257,14 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 6,
     minWidth: 60,
+  },
+  iconContainer: {
+    position: 'relative',
+  },
+  tabBadgePosition: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
   },
   tabLabel: {
     fontSize: 11,
