@@ -21,6 +21,7 @@ export default function CheckOutCalculatorScreen() {
 
   const [totalShiftSales, setTotalShiftSales] = useState('');
   const [cashInOutTotal, setCashInOutTotal] = useState('');
+  const [isNegative, setIsNegative] = useState(false);
   const [busserRunnerPercent, setBusserRunnerPercent] = useState(0.035);
   const [bartenderPercent, setBartenderPercent] = useState(0.02);
   const [declarePercent, setDeclarePercent] = useState(0.08);
@@ -46,7 +47,8 @@ export default function CheckOutCalculatorScreen() {
   // Live calculation
   const calculateResults = () => {
     const sales = parseFloat(totalShiftSales) || 0;
-    const cashInOut = parseFloat(cashInOutTotal) || 0;
+    const cashInOutValue = parseFloat(cashInOutTotal) || 0;
+    const cashInOut = isNegative ? -Math.abs(cashInOutValue) : Math.abs(cashInOutValue);
     
     const busserAmount = sales * busserRunnerPercent;
     const bartenderAmount = sales * bartenderPercent;
@@ -67,6 +69,10 @@ export default function CheckOutCalculatorScreen() {
 
   const formatCurrency = (value: number) => {
     return `$${Math.abs(value).toFixed(2)}`;
+  };
+
+  const toggleNegative = () => {
+    setIsNegative(!isNegative);
   };
 
   return (
@@ -188,19 +194,49 @@ export default function CheckOutCalculatorScreen() {
               Cashed Out/In Total *
             </Text>
             <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-              (Enter negative number with - sign if applicable)
+              (Use +/- button to toggle between positive and negative)
             </Text>
-            <View style={[styles.inputWrapper, { borderColor: colors.border }]}>
-              <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                value={cashInOutTotal}
-                onChangeText={setCashInOutTotal}
-                keyboardType="numeric"
-                placeholder="0.00 or -0.00"
-                placeholderTextColor={colors.textSecondary}
-              />
+            <View style={styles.cashInputContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  {
+                    backgroundColor: isNegative ? '#D32F2F' : '#388E3C',
+                  },
+                ]}
+                onPress={toggleNegative}
+              >
+                <Text style={styles.toggleButtonText}>
+                  {isNegative ? '-' : '+'}
+                </Text>
+              </TouchableOpacity>
+              <View style={[styles.inputWrapper, styles.cashInputWrapper, { borderColor: colors.border }]}>
+                <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  value={cashInOutTotal}
+                  onChangeText={(text) => {
+                    // Remove any non-numeric characters except decimal point
+                    const cleaned = text.replace(/[^0-9.]/g, '');
+                    setCashInOutTotal(cleaned);
+                  }}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
             </View>
+            {/* Show current value with sign */}
+            {cashInOutTotal !== '' && (
+              <View style={styles.currentValueContainer}>
+                <Text style={[styles.currentValueLabel, { color: colors.textSecondary }]}>
+                  Current value:
+                </Text>
+                <Text style={[styles.currentValue, { color: isNegative ? '#D32F2F' : '#388E3C' }]}>
+                  {isNegative ? '-' : '+'}${cashInOutTotal || '0.00'}
+                </Text>
+              </View>
+            )}
           </View>
 
           {/* Busser/Runner Percentage */}
@@ -340,11 +376,11 @@ export default function CheckOutCalculatorScreen() {
                 style={[
                   styles.resultValue,
                   {
-                    color: colors.text,
+                    color: results.cashInOut >= 0 ? '#388E3C' : '#D32F2F',
                   },
                 ]}
               >
-                {results.cashInOut >= 0 ? '' : '-'}
+                {results.cashInOut >= 0 ? '+' : '-'}
                 {formatCurrency(results.cashInOut)}
               </Text>
             </View>
@@ -465,6 +501,26 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     fontStyle: 'italic',
   },
+  cashInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  toggleButton: {
+    width: 50,
+    height: 48,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleButtonText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  cashInputWrapper: {
+    flex: 1,
+  },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -482,6 +538,23 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     height: 48,
+  },
+  currentValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  currentValueLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  currentValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   buttonGroup: {
     flexDirection: 'row',
