@@ -26,9 +26,7 @@ interface RewardTransaction {
   amount: number;
   description: string;
   created_at: string;
-  users?: {
-    name: string;
-  };
+  user_name?: string;
 }
 
 interface GuestReview {
@@ -86,28 +84,51 @@ export default function EmployeeRewardsScreen() {
         setTopEmployees(topData);
       }
 
-      // Fetch last 5 visible transactions (all employees, not just current user)
+      // Fetch last 5 visible transactions with user names
+      // First get transactions
       const { data: transData, error: transError } = await supabase
         .from('rewards_transactions')
-        .select(`
-          id,
-          user_id,
-          amount,
-          description,
-          created_at,
-          users (
-            name
-          )
-        `)
+        .select('id, user_id, amount, description, created_at')
         .eq('is_visible', true)
         .order('created_at', { ascending: false })
         .limit(5);
 
-      if (!transError && transData) {
-        console.log('Fetched transactions:', transData);
-        setRecentTransactions(transData);
-      } else {
+      if (transError) {
         console.error('Error fetching transactions:', transError);
+        return;
+      }
+
+      if (transData && transData.length > 0) {
+        // Get unique user IDs
+        const userIds = [...new Set(transData.map(t => t.user_id))];
+        
+        // Fetch user names separately
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select('id, name')
+          .in('id', userIds);
+
+        if (!usersError && usersData) {
+          // Create a map of user IDs to names
+          const userMap = new Map(usersData.map(u => [u.id, u.name]));
+          
+          // Combine transaction data with user names
+          const transactionsWithNames = transData.map(trans => ({
+            ...trans,
+            user_name: userMap.get(trans.user_id) || 'Unknown Employee'
+          }));
+          
+          console.log('Fetched transactions with names:', transactionsWithNames);
+          setRecentTransactions(transactionsWithNames);
+        } else {
+          console.error('Error fetching user names:', usersError);
+          setRecentTransactions(transData.map(trans => ({
+            ...trans,
+            user_name: 'Unknown Employee'
+          })));
+        }
+      } else {
+        setRecentTransactions([]);
       }
     } catch (error) {
       console.error('Error fetching rewards data:', error);
@@ -220,7 +241,7 @@ export default function EmployeeRewardsScreen() {
                   <View key={index} style={styles.transactionItem}>
                     <View style={styles.transactionInfo}>
                       <Text style={styles.transactionEmployee}>
-                        {trans.users?.name || 'Unknown Employee'}
+                        {trans.user_name || 'Unknown Employee'}
                       </Text>
                       <Text style={styles.transactionDescription}>{trans.description}</Text>
                       <Text style={styles.transactionDate}>
