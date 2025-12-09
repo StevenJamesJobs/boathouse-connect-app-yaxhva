@@ -20,7 +20,7 @@ import { managerColors, employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import * as FileSystem from 'expo-file-system/legacy';
+import { File, Directory, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 
 interface GuideItem {
@@ -139,12 +139,13 @@ export default function GuidesAndTrainingScreen() {
       setDownloadingFile(guide.id);
       console.log('Downloading file:', guide.file_name);
 
-      // For web, just open the file URL
+      // For web, just open the file URL in a new tab to trigger download
       if (Platform.OS === 'web') {
         // Create a temporary link element to trigger download
         const link = document.createElement('a');
         link.href = guide.file_url;
         link.download = guide.file_name;
+        link.target = '_blank';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -153,32 +154,45 @@ export default function GuidesAndTrainingScreen() {
         return;
       }
 
-      // For mobile, download and share
-      const fileUri = `${FileSystem.documentDirectory}${guide.file_name}`;
-      
+      // For mobile, use the new Expo 54 FileSystem API
       console.log('Downloading from:', guide.file_url);
-      console.log('Saving to:', fileUri);
       
-      const downloadResult = await FileSystem.downloadAsync(
+      // Create a downloads directory in cache
+      const downloadsDir = new Directory(Paths.cache, 'downloads');
+      
+      // Create the directory if it doesn't exist
+      if (!downloadsDir.exists) {
+        console.log('Creating downloads directory...');
+        downloadsDir.create({ intermediates: true });
+      }
+
+      console.log('Downloading to directory:', downloadsDir.uri);
+      
+      // Download the file using the new API
+      const downloadedFile = await File.downloadFileAsync(
         guide.file_url,
-        fileUri
+        downloadsDir
       );
 
-      console.log('File downloaded to:', downloadResult.uri);
+      console.log('File downloaded successfully to:', downloadedFile.uri);
+      console.log('File exists:', downloadedFile.exists);
 
       // Check if sharing is available
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
-        await Sharing.shareAsync(downloadResult.uri, {
+        console.log('Sharing file...');
+        await Sharing.shareAsync(downloadedFile.uri, {
           mimeType: guide.file_type,
           dialogTitle: `Download ${guide.file_name}`,
           UTI: guide.file_type,
         });
+        Alert.alert('Success', 'File ready to save');
       } else {
-        Alert.alert('Success', `File downloaded to: ${downloadResult.uri}`);
+        Alert.alert('Success', `File downloaded to: ${downloadedFile.uri}`);
       }
     } catch (error: any) {
       console.error('Error downloading file:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       Alert.alert('Error', `Failed to download file: ${error.message || 'Unknown error'}`);
     } finally {
       setDownloadingFile(null);
