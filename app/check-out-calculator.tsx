@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,12 @@ export default function CheckOutCalculatorScreen() {
   const [isNegative, setIsNegative] = useState(false);
   const [busserRunnerPercent, setBusserRunnerPercent] = useState(0.035);
   const [bartenderPercent, setBartenderPercent] = useState(0.02);
-  const [declarePercent, setDeclarePercent] = useState(0.08);
+  const [declarePercent, setDeclarePercent] = useState(0.12); // Default to 12%
+  
+  // Shared party state
+  const [sharedParty, setSharedParty] = useState(false);
+  const [partySubtotal, setPartySubtotal] = useState('');
+  const [checkUnderMyName, setCheckUnderMyName] = useState<boolean | null>(null);
 
   const busserRunnerOptions = [
     { label: '3.5%', value: 0.035 },
@@ -40,9 +45,29 @@ export default function CheckOutCalculatorScreen() {
   ];
 
   const declareOptions = [
-    { label: '8%', value: 0.08 },
     { label: '12%', value: 0.12 },
+    { label: '8%', value: 0.08 },
   ];
+
+  // Calculate adjusted sales for declare amount
+  const adjustedSales = useMemo(() => {
+    const sales = parseFloat(totalShiftSales) || 0;
+    const party = parseFloat(partySubtotal) || 0;
+    
+    if (!sharedParty || checkUnderMyName === null) {
+      return sales;
+    }
+    
+    const halfParty = party / 2;
+    
+    if (checkUnderMyName) {
+      // Check is under my name, subtract half
+      return sales - halfParty;
+    } else {
+      // Check is NOT under my name, add half
+      return sales + halfParty;
+    }
+  }, [totalShiftSales, sharedParty, partySubtotal, checkUnderMyName]);
 
   // Live calculation
   const calculateResults = () => {
@@ -50,9 +75,13 @@ export default function CheckOutCalculatorScreen() {
     const cashInOutValue = parseFloat(cashInOutTotal) || 0;
     const cashInOut = isNegative ? -Math.abs(cashInOutValue) : Math.abs(cashInOutValue);
     
+    // Busser/Runner and Bartender amounts are based on ORIGINAL Total Sales
     const busserAmount = sales * busserRunnerPercent;
     const bartenderAmount = sales * bartenderPercent;
-    const declareAmount = sales * declarePercent;
+    
+    // Declare amount is based on ADJUSTED sales
+    const declareAmount = adjustedSales * declarePercent;
+    
     const finalTally = cashInOut + busserAmount + bartenderAmount;
 
     return {
@@ -61,6 +90,7 @@ export default function CheckOutCalculatorScreen() {
       cashInOut,
       finalTally,
       declareAmount,
+      adjustedSales,
     };
   };
 
@@ -136,7 +166,112 @@ export default function CheckOutCalculatorScreen() {
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
+            
+            {/* Shared Party Section */}
+            <Text style={[styles.smallText, { color: colors.textSecondary, marginTop: 12 }]}>
+              Did you share a party?
+            </Text>
+            <TouchableOpacity
+              style={styles.checkboxContainer}
+              onPress={() => {
+                setSharedParty(!sharedParty);
+                if (sharedParty) {
+                  // Reset party-related fields when unchecking
+                  setPartySubtotal('');
+                  setCheckUnderMyName(null);
+                }
+              }}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  {
+                    borderColor: colors.border,
+                    backgroundColor: sharedParty ? colors.primary : 'transparent',
+                  },
+                ]}
+              >
+                {sharedParty && (
+                  <IconSymbol
+                    ios_icon_name="checkmark"
+                    android_material_icon_name="check"
+                    size={16}
+                    color="#FFFFFF"
+                  />
+                )}
+              </View>
+              <Text style={[styles.checkboxLabel, { color: colors.text }]}>Yes</Text>
+            </TouchableOpacity>
           </View>
+
+          {/* Party Subtotal - Only show if shared party is checked */}
+          {sharedParty && (
+            <View style={styles.inputGroup}>
+              <Text style={[styles.label, { color: colors.text }]}>
+                Party Subtotal
+              </Text>
+              <View style={[styles.inputWrapper, { borderColor: colors.border }]}>
+                <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  value={partySubtotal}
+                  onChangeText={setPartySubtotal}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+              
+              {/* Is the check under my name? */}
+              <Text style={[styles.smallText, { color: colors.textSecondary, marginTop: 12 }]}>
+                Is the check under my name?
+              </Text>
+              <View style={styles.yesNoContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.yesNoButton,
+                    {
+                      backgroundColor: checkUnderMyName === true ? colors.primary : colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => setCheckUnderMyName(true)}
+                >
+                  <Text
+                    style={[
+                      styles.yesNoButtonText,
+                      {
+                        color: checkUnderMyName === true ? '#FFFFFF' : colors.text,
+                      },
+                    ]}
+                  >
+                    Yes
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.yesNoButton,
+                    {
+                      backgroundColor: checkUnderMyName === false ? colors.primary : colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                  onPress={() => setCheckUnderMyName(false)}
+                >
+                  <Text
+                    style={[
+                      styles.yesNoButtonText,
+                      {
+                        color: checkUnderMyName === false ? '#FFFFFF' : colors.text,
+                      },
+                    ]}
+                  >
+                    No
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
 
           {/* Declare Percentage */}
           <View style={styles.inputGroup}>
@@ -183,6 +318,17 @@ export default function CheckOutCalculatorScreen() {
                 </Text>
                 <Text style={[styles.liveCalcValue, { color: colors.primary }]}>
                   {formatCurrency(results.declareAmount)}
+                </Text>
+              </View>
+            )}
+            {/* Show adjusted sales if different from original */}
+            {sharedParty && checkUnderMyName !== null && totalShiftSales !== '' && (
+              <View style={styles.liveCalculation}>
+                <Text style={[styles.liveCalcLabel, { color: colors.textSecondary }]}>
+                  Adjusted Sales for Declare:
+                </Text>
+                <Text style={[styles.liveCalcValue, { color: colors.highlight }]}>
+                  {formatCurrency(results.adjustedSales)}
                 </Text>
               </View>
             )}
@@ -347,6 +493,39 @@ export default function CheckOutCalculatorScreen() {
               Final Tally
             </Text>
 
+            {/* Show adjusted sales if different from original */}
+            {sharedParty && checkUnderMyName !== null && (
+              <View style={styles.resultRow}>
+                <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
+                  Original Total Sales:
+                </Text>
+                <Text style={[styles.resultValue, { color: colors.text }]}>
+                  {formatCurrency(parseFloat(totalShiftSales) || 0)}
+                </Text>
+              </View>
+            )}
+
+            {sharedParty && checkUnderMyName !== null && (
+              <View style={styles.resultRow}>
+                <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
+                  Adjusted Sales for Declare:
+                </Text>
+                <Text style={[styles.resultValue, { color: colors.highlight }]}>
+                  {formatCurrency(results.adjustedSales)}
+                </Text>
+              </View>
+            )}
+
+            {/* Declare Amount */}
+            <View style={styles.resultRow}>
+              <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
+                Declare Amount ({declarePercent === 0.12 ? '12%' : '8%'}):
+              </Text>
+              <Text style={[styles.resultValue, { color: colors.primary }]}>
+                {formatCurrency(results.declareAmount)}
+              </Text>
+            </View>
+
             {/* Busser/Runner Amount */}
             <View style={styles.resultRow}>
               <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
@@ -409,17 +588,6 @@ export default function CheckOutCalculatorScreen() {
                 ]}
               >
                 {formatCurrency(results.finalTally)}
-              </Text>
-            </View>
-
-            {/* Declare Amount */}
-            <View style={[styles.divider, { backgroundColor: colors.border, marginTop: 16 }]} />
-            <View style={styles.declareContainer}>
-              <Text style={[styles.declareLabel, { color: colors.textSecondary }]}>
-                You will declare
-              </Text>
-              <Text style={[styles.declareValue, { color: colors.primary }]}>
-                {formatCurrency(results.declareAmount)}
               </Text>
             </View>
           </View>
@@ -500,6 +668,45 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginBottom: 8,
     fontStyle: 'italic',
+  },
+  smallText: {
+    fontSize: 13,
+    marginBottom: 8,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  yesNoContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  yesNoButton: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  yesNoButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   cashInputContainer: {
     flexDirection: 'row',
@@ -610,6 +817,7 @@ const styles = StyleSheet.create({
   },
   resultLabel: {
     fontSize: 14,
+    flex: 1,
   },
   resultValue: {
     fontSize: 16,
@@ -630,19 +838,6 @@ const styles = StyleSheet.create({
   },
   finalTallyValue: {
     fontSize: 36,
-    fontWeight: 'bold',
-  },
-  declareContainer: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  declareLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  declareValue: {
-    fontSize: 28,
     fontWeight: 'bold',
   },
 });
