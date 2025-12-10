@@ -15,6 +15,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 
 interface Employee {
@@ -32,6 +33,7 @@ interface Employee {
 export default function EmployeeDetailScreen() {
   const router = useRouter();
   const { employeeId } = useLocalSearchParams();
+  const { user } = useAuth();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -68,11 +70,17 @@ export default function EmployeeDetailScreen() {
   const handleSave = async () => {
     if (!employee) return;
 
+    if (!user?.id) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
     try {
       setSaving(true);
       
       console.log('Attempting to save employee data:', {
-        id: employee.id,
+        manager_id: user.id,
+        employee_id: employee.id,
         name: employee.name,
         email: employee.email,
         job_title: employee.job_title,
@@ -80,24 +88,23 @@ export default function EmployeeDetailScreen() {
         role: employee.role,
       });
 
-      const { data, error } = await supabase
-        .from('users')
-        .update({
-          name: employee.name,
-          email: employee.email,
-          job_title: employee.job_title,
-          phone_number: employee.phone_number,
-          role: employee.role,
-        })
-        .eq('id', employee.id)
-        .select();
+      // Use the database function to update employee info
+      const { data, error } = await supabase.rpc('update_employee_info', {
+        p_manager_id: user.id,
+        p_employee_id: employee.id,
+        p_name: employee.name,
+        p_email: employee.email,
+        p_job_title: employee.job_title,
+        p_phone_number: employee.phone_number || '',
+        p_role: employee.role,
+      });
 
       if (error) {
         console.error('Supabase update error:', error);
         throw error;
       }
 
-      console.log('Update successful, returned data:', data);
+      console.log('Update successful, result:', data);
       Alert.alert('Success', 'Employee updated successfully');
       
       // Refresh the employee data to confirm the update

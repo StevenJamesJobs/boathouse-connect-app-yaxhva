@@ -281,22 +281,39 @@ export default function RewardsAndReviewsEditorScreen() {
         return;
       }
 
+      if (!user?.id) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+
       setLoading(true);
 
       // Calculate the final amount based on Reward/Deduct toggle
       const finalAmount = editIsReward ? parseInt(editAmount) : -parseInt(editAmount);
 
-      const { error } = await supabase
-        .from('rewards_transactions')
-        .update({
-          amount: finalAmount,
-          description: editDescription,
-        })
-        .eq('id', editingTransaction.id);
+      console.log('Updating transaction:', {
+        manager_id: user.id,
+        transaction_id: editingTransaction.id,
+        new_amount: finalAmount,
+        new_description: editDescription,
+      });
 
-      if (error) throw error;
+      // Use the database function to update transaction and recalculate balance
+      const { data, error } = await supabase.rpc('update_transaction_and_balance', {
+        p_manager_id: user.id,
+        p_transaction_id: editingTransaction.id,
+        p_new_amount: finalAmount,
+        p_new_description: editDescription,
+      });
 
-      Alert.alert('Success', 'Transaction updated successfully');
+      if (error) {
+        console.error('Error from database function:', error);
+        throw error;
+      }
+
+      console.log('Transaction updated successfully, result:', data);
+
+      Alert.alert('Success', 'Transaction updated successfully and user balance recalculated');
       setShowEditTransactionModal(false);
       setEditingTransaction(null);
       fetchEmployees();
