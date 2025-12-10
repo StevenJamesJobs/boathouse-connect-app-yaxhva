@@ -36,6 +36,7 @@ interface UpcomingEvent {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  link: string | null;
 }
 
 export default function UpcomingEventsEditorScreen() {
@@ -52,6 +53,7 @@ export default function UpcomingEventsEditorScreen() {
     message: '',
     thumbnail_shape: 'square',
     display_order: 0,
+    link: '',
   });
   const [startDateTime, setStartDateTime] = useState<Date | null>(null);
   const [endDateTime, setEndDateTime] = useState<Date | null>(null);
@@ -214,6 +216,8 @@ export default function UpcomingEventsEditorScreen() {
         }
       }
 
+      const linkValue = formData.link.trim() || null;
+
       if (editingEvent) {
         console.log('Updating upcoming event:', editingEvent.id);
         const { error } = await supabase.rpc('update_upcoming_event', {
@@ -226,6 +230,7 @@ export default function UpcomingEventsEditorScreen() {
           p_start_date_time: startDateTime?.toISOString() || null,
           p_end_date_time: endDateTime?.toISOString() || null,
           p_display_order: formData.display_order,
+          p_link: linkValue,
         });
 
         if (error) {
@@ -245,6 +250,7 @@ export default function UpcomingEventsEditorScreen() {
           p_start_date_time: startDateTime?.toISOString() || null,
           p_end_date_time: endDateTime?.toISOString() || null,
           p_display_order: formData.display_order,
+          p_link: linkValue,
         });
 
         if (error) {
@@ -321,6 +327,7 @@ export default function UpcomingEventsEditorScreen() {
       message: '',
       thumbnail_shape: 'square',
       display_order: events.length,
+      link: '',
     });
     setStartDateTime(null);
     setEndDateTime(null);
@@ -335,6 +342,7 @@ export default function UpcomingEventsEditorScreen() {
       message: event.content || event.message || '',
       thumbnail_shape: event.thumbnail_shape,
       display_order: event.display_order,
+      link: event.link || '',
     });
     setStartDateTime(event.start_date_time ? new Date(event.start_date_time) : null);
     setEndDateTime(event.end_date_time ? new Date(event.end_date_time) : null);
@@ -675,6 +683,22 @@ export default function UpcomingEventsEditorScreen() {
                   multiline
                   numberOfLines={4}
                 />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Link (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter link URL (e.g., https://example.com)"
+                  placeholderTextColor="#999999"
+                  value={formData.link}
+                  onChangeText={(text) => setFormData({ ...formData, link: text })}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+                <Text style={styles.formHint}>
+                  This link will be displayed in the full event view and &quot;View All&quot; page
+                </Text>
               </View>
 
               <View style={styles.formGroup}>

@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
-  Dimensions,
   Linking,
   Alert,
 } from 'react-native';
@@ -197,19 +196,24 @@ export default function ContentDetailModal({
 
                 {/* Link Button */}
                 {link && (
-                  <TouchableOpacity style={styles.linkButton} onPress={handleLinkPress}>
+                  <TouchableOpacity 
+                    style={[styles.linkButton, { borderColor: colors.primary }]} 
+                    onPress={handleLinkPress}
+                  >
                     <IconSymbol
                       ios_icon_name="link"
                       android_material_icon_name="link"
                       size={20}
-                      color="#3498DB"
+                      color={colors.primary}
                     />
-                    <Text style={styles.linkButtonText}>View More Information</Text>
+                    <Text style={[styles.linkButtonText, { color: colors.primary }]}>
+                      View More Information
+                    </Text>
                     <IconSymbol
                       ios_icon_name="arrow.up.right"
                       android_material_icon_name="open_in_new"
                       size={16}
-                      color="#3498DB"
+                      color={colors.primary}
                     />
                   </TouchableOpacity>
                 )}
@@ -235,7 +239,7 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'center',
+    justifyContent: 'flex-end',
     alignItems: 'center',
   },
   backdrop: {
@@ -247,10 +251,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   modalContent: {
-    width: '92%',
-    maxHeight: '90%',
-    borderRadius: 24,
-    boxShadow: '0px 4px 30px rgba(0, 0, 0, 0.5)',
+    width: '100%',
+    height: '85%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    boxShadow: '0px -4px 30px rgba(0, 0, 0, 0.5)',
     elevation: 10,
     overflow: 'hidden',
   },
@@ -278,7 +283,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 24,
     paddingTop: 56,
-    paddingBottom: 20,
+    paddingBottom: 80,
   },
   squareImage: {
     width: '100%',
@@ -340,7 +345,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(52, 152, 219, 0.1)',
     borderWidth: 2,
-    borderColor: '#3498DB',
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 20,
@@ -350,7 +354,6 @@ const styles = StyleSheet.create({
   linkButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#3498DB',
   },
   swipeHintContainer: {
     paddingVertical: 12,
