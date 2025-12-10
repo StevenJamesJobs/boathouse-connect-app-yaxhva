@@ -16,6 +16,7 @@ import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import WeatherWidget from '@/components/WeatherWidget';
+import ContentDetailModal from '@/components/ContentDetailModal';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
@@ -52,6 +53,7 @@ interface Announcement {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  link: string | null;
 }
 
 interface UpcomingEvent {
@@ -66,6 +68,7 @@ interface UpcomingEvent {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  link: string | null;
 }
 
 interface SpecialFeature {
@@ -80,6 +83,7 @@ interface SpecialFeature {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  link: string | null;
 }
 
 export default function ManagerPortalScreen() {
@@ -96,6 +100,19 @@ export default function ManagerPortalScreen() {
   const [loadingFeatures, setLoadingFeatures] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
+  
+  // Detail modal state
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<{
+    title: string;
+    content: string;
+    thumbnailUrl?: string | null;
+    thumbnailShape?: string;
+    startDateTime?: string | null;
+    endDateTime?: string | null;
+    priority?: string;
+    link?: string | null;
+  } | null>(null);
 
   // Darker header color for sections
   const headerColor = '#34495E'; // Slightly darker than card
@@ -244,6 +261,25 @@ export default function ManagerPortalScreen() {
     }
   };
 
+  const openDetailModal = (item: {
+    title: string;
+    content: string;
+    thumbnailUrl?: string | null;
+    thumbnailShape?: string;
+    startDateTime?: string | null;
+    endDateTime?: string | null;
+    priority?: string;
+    link?: string | null;
+  }) => {
+    setSelectedItem(item);
+    setDetailModalVisible(true);
+  };
+
+  const closeDetailModal = () => {
+    setDetailModalVisible(false);
+    setSelectedItem(null);
+  };
+
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
     return `${url}?t=${Date.now()}`;
@@ -377,15 +413,25 @@ export default function ManagerPortalScreen() {
           ) : (
             <>
               {announcements.map((announcement, index) => (
-                <View key={index} style={styles.announcementItem}>
+                <TouchableOpacity
+                  key={index}
+                  style={styles.announcementItem}
+                  onPress={() => openDetailModal({
+                    title: announcement.title,
+                    content: announcement.content || announcement.message || '',
+                    thumbnailUrl: announcement.thumbnail_url,
+                    thumbnailShape: announcement.thumbnail_shape,
+                    priority: announcement.priority,
+                    link: announcement.link,
+                  })}
+                  activeOpacity={0.7}
+                >
                   {announcement.thumbnail_shape === 'square' && announcement.thumbnail_url ? (
                     <View style={styles.announcementSquareLayout}>
-                      <TouchableOpacity onPress={() => openImageModal(announcement.thumbnail_url!)}>
-                        <Image
-                          source={{ uri: getImageUrl(announcement.thumbnail_url) }}
-                          style={styles.announcementSquareImage}
-                        />
-                      </TouchableOpacity>
+                      <Image
+                        source={{ uri: getImageUrl(announcement.thumbnail_url) }}
+                        style={styles.announcementSquareImage}
+                      />
                       <View style={styles.announcementSquareContent}>
                         <View style={styles.announcementHeader}>
                           <Text style={styles.announcementTitle}>{announcement.title}</Text>
@@ -402,12 +448,10 @@ export default function ManagerPortalScreen() {
                   ) : (
                     <>
                       {announcement.thumbnail_url && (
-                        <TouchableOpacity onPress={() => openImageModal(announcement.thumbnail_url!)}>
-                          <Image
-                            source={{ uri: getImageUrl(announcement.thumbnail_url) }}
-                            style={styles.announcementBannerImage}
-                          />
-                        </TouchableOpacity>
+                        <Image
+                          source={{ uri: getImageUrl(announcement.thumbnail_url) }}
+                          style={styles.announcementBannerImage}
+                        />
                       )}
                       <View style={styles.announcementHeader}>
                         <Text style={styles.announcementTitle}>{announcement.title}</Text>
@@ -421,7 +465,7 @@ export default function ManagerPortalScreen() {
                       <Text style={styles.announcementDate}>{getTimeAgo(announcement.created_at)}</Text>
                     </>
                   )}
-                </View>
+                </TouchableOpacity>
               ))}
             </>
           )}
@@ -452,15 +496,26 @@ export default function ManagerPortalScreen() {
           ) : (
             <>
               {upcomingEvents.map((event, index) => (
-                <View key={index} style={styles.eventItem}>
+                <TouchableOpacity
+                  key={index}
+                  style={styles.eventItem}
+                  onPress={() => openDetailModal({
+                    title: event.title,
+                    content: event.content || event.message || '',
+                    thumbnailUrl: event.thumbnail_url,
+                    thumbnailShape: event.thumbnail_shape,
+                    startDateTime: event.start_date_time,
+                    endDateTime: event.end_date_time,
+                    link: event.link,
+                  })}
+                  activeOpacity={0.7}
+                >
                   {event.thumbnail_shape === 'square' && event.thumbnail_url ? (
                     <View style={styles.eventSquareLayout}>
-                      <TouchableOpacity onPress={() => openImageModal(event.thumbnail_url!)}>
-                        <Image
-                          source={{ uri: getImageUrl(event.thumbnail_url) }}
-                          style={styles.eventSquareImage}
-                        />
-                      </TouchableOpacity>
+                      <Image
+                        source={{ uri: getImageUrl(event.thumbnail_url) }}
+                        style={styles.eventSquareImage}
+                      />
                       <View style={styles.eventSquareContent}>
                         <Text style={styles.eventTitle}>{event.title}</Text>
                         {(event.content || event.message) && (
@@ -476,12 +531,10 @@ export default function ManagerPortalScreen() {
                   ) : (
                     <>
                       {event.thumbnail_url && (
-                        <TouchableOpacity onPress={() => openImageModal(event.thumbnail_url!)}>
-                          <Image
-                            source={{ uri: getImageUrl(event.thumbnail_url) }}
-                            style={styles.eventBannerImage}
-                          />
-                        </TouchableOpacity>
+                        <Image
+                          source={{ uri: getImageUrl(event.thumbnail_url) }}
+                          style={styles.eventBannerImage}
+                        />
                       )}
                       <View style={styles.eventContent}>
                         <Text style={styles.eventTitle}>{event.title}</Text>
@@ -496,7 +549,7 @@ export default function ManagerPortalScreen() {
                       </View>
                     </>
                   )}
-                </View>
+                </TouchableOpacity>
               ))}
             </>
           )}
@@ -527,15 +580,26 @@ export default function ManagerPortalScreen() {
           ) : (
             <>
               {specialFeatures.map((feature, index) => (
-                <View key={index} style={styles.featureItem}>
+                <TouchableOpacity
+                  key={index}
+                  style={styles.featureItem}
+                  onPress={() => openDetailModal({
+                    title: feature.title,
+                    content: feature.content || feature.message || '',
+                    thumbnailUrl: feature.thumbnail_url,
+                    thumbnailShape: feature.thumbnail_shape,
+                    startDateTime: feature.start_date_time,
+                    endDateTime: feature.end_date_time,
+                    link: feature.link,
+                  })}
+                  activeOpacity={0.7}
+                >
                   {feature.thumbnail_shape === 'square' && feature.thumbnail_url ? (
                     <View style={styles.featureSquareLayout}>
-                      <TouchableOpacity onPress={() => openImageModal(feature.thumbnail_url!)}>
-                        <Image
-                          source={{ uri: getImageUrl(feature.thumbnail_url) }}
-                          style={styles.featureSquareImage}
-                        />
-                      </TouchableOpacity>
+                      <Image
+                        source={{ uri: getImageUrl(feature.thumbnail_url) }}
+                        style={styles.featureSquareImage}
+                      />
                       <View style={styles.featureSquareContent}>
                         <Text style={styles.featureTitle}>{feature.title}</Text>
                         {(feature.content || feature.message) && (
@@ -551,12 +615,10 @@ export default function ManagerPortalScreen() {
                   ) : (
                     <>
                       {feature.thumbnail_url && (
-                        <TouchableOpacity onPress={() => openImageModal(feature.thumbnail_url!)}>
-                          <Image
-                            source={{ uri: getImageUrl(feature.thumbnail_url) }}
-                            style={styles.featureBannerImage}
-                          />
-                        </TouchableOpacity>
+                        <Image
+                          source={{ uri: getImageUrl(feature.thumbnail_url) }}
+                          style={styles.featureBannerImage}
+                        />
                       )}
                       <View style={styles.featureContent}>
                         <Text style={styles.featureTitle}>{feature.title}</Text>
@@ -571,7 +633,7 @@ export default function ManagerPortalScreen() {
                       </View>
                     </>
                   )}
-                </View>
+                </TouchableOpacity>
               ))}
             </>
           )}
@@ -731,6 +793,28 @@ export default function ManagerPortalScreen() {
           </View>
         </PanGestureHandler>
       </Modal>
+
+      {/* Content Detail Modal */}
+      {selectedItem && (
+        <ContentDetailModal
+          visible={detailModalVisible}
+          onClose={closeDetailModal}
+          title={selectedItem.title}
+          content={selectedItem.content}
+          thumbnailUrl={selectedItem.thumbnailUrl}
+          thumbnailShape={selectedItem.thumbnailShape}
+          startDateTime={selectedItem.startDateTime}
+          endDateTime={selectedItem.endDateTime}
+          priority={selectedItem.priority}
+          link={selectedItem.link}
+          colors={{
+            text: managerColors.text,
+            textSecondary: managerColors.textSecondary,
+            card: managerColors.card,
+            primary: managerColors.primary,
+          }}
+        />
+      )}
     </GestureHandlerRootView>
   );
 }

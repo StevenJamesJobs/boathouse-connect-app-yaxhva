@@ -35,6 +35,7 @@ interface Announcement {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  link: string | null;
 }
 
 const PRIORITY_LEVELS = ['high', 'medium', 'low'];
@@ -56,6 +57,7 @@ export default function AnnouncementEditorScreen() {
     visibility: 'everyone',
     thumbnail_shape: 'square',
     display_order: 0,
+    link: '',
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -207,6 +209,8 @@ export default function AnnouncementEditorScreen() {
         }
       }
 
+      const linkValue = formData.link.trim() || null;
+
       if (editingAnnouncement) {
         // Update existing announcement
         console.log('Updating announcement:', editingAnnouncement.id);
@@ -220,6 +224,7 @@ export default function AnnouncementEditorScreen() {
           p_priority: formData.priority,
           p_visibility: formData.visibility,
           p_display_order: formData.display_order,
+          p_link: linkValue,
         });
 
         if (error) {
@@ -240,6 +245,7 @@ export default function AnnouncementEditorScreen() {
           p_priority: formData.priority,
           p_visibility: formData.visibility,
           p_display_order: formData.display_order,
+          p_link: linkValue,
         });
 
         if (error) {
@@ -322,6 +328,7 @@ export default function AnnouncementEditorScreen() {
       visibility: 'everyone',
       thumbnail_shape: 'square',
       display_order: announcements.length,
+      link: '',
     });
     setSelectedImageUri(null);
     setShowAddModal(true);
@@ -336,6 +343,7 @@ export default function AnnouncementEditorScreen() {
       visibility: announcement.visibility,
       thumbnail_shape: announcement.thumbnail_shape,
       display_order: announcement.display_order,
+      link: announcement.link || '',
     });
     setSelectedImageUri(null);
     setShowAddModal(true);
@@ -677,6 +685,23 @@ export default function AnnouncementEditorScreen() {
                   multiline
                   numberOfLines={4}
                 />
+              </View>
+
+              {/* Link */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Link (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter link URL (e.g., https://example.com)"
+                  placeholderTextColor="#999999"
+                  value={formData.link}
+                  onChangeText={(text) => setFormData({ ...formData, link: text })}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+                <Text style={styles.formHint}>
+                  This link will be displayed in the full announcement view and &quot;View All&quot; page
+                </Text>
               </View>
 
               {/* Priority Level */}

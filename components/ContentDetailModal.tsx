@@ -105,7 +105,7 @@ export default function ContentDetailModal({
     <Modal
       visible={visible}
       transparent={true}
-      animationType="fade"
+      animationType="slide"
       onRequestClose={onClose}
     >
       <GestureHandlerRootView style={styles.container}>
@@ -117,6 +117,9 @@ export default function ContentDetailModal({
               onPress={onClose}
             />
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+              {/* Drag Handle */}
+              <View style={styles.dragHandle} />
+
               {/* Close Button */}
               <TouchableOpacity style={styles.closeButton} onPress={onClose}>
                 <IconSymbol
@@ -213,9 +216,11 @@ export default function ContentDetailModal({
               </ScrollView>
 
               {/* Swipe Hint */}
-              <Text style={[styles.swipeHint, { color: colors.textSecondary }]}>
-                Swipe down to close
-              </Text>
+              <View style={styles.swipeHintContainer}>
+                <Text style={[styles.swipeHint, { color: colors.textSecondary }]}>
+                  Swipe down to close
+                </Text>
+              </View>
             </View>
           </View>
         </PanGestureHandler>
@@ -230,7 +235,8 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   backdrop: {
     position: 'absolute',
@@ -241,11 +247,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   modalContent: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: Dimensions.get('window').height * 0.85,
-    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
+    width: '92%',
+    maxHeight: '90%',
+    borderRadius: 24,
+    boxShadow: '0px 4px 30px rgba(0, 0, 0, 0.5)',
     elevation: 10,
+    overflow: 'hidden',
+  },
+  dragHandle: {
+    width: 40,
+    height: 5,
+    backgroundColor: 'rgba(128, 128, 128, 0.3)',
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginTop: 12,
+    marginBottom: 8,
   },
   closeButton: {
     position: 'absolute',
@@ -253,6 +269,8 @@ const styles = StyleSheet.create({
     right: 16,
     zIndex: 10,
     padding: 8,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 20,
   },
   scrollView: {
     flex: 1,
@@ -260,7 +278,7 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: 24,
     paddingTop: 56,
-    paddingBottom: 40,
+    paddingBottom: 20,
   },
   squareImage: {
     width: '100%',
@@ -334,10 +352,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#3498DB',
   },
+  swipeHintContainer: {
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(128, 128, 128, 0.2)',
+  },
   swipeHint: {
     textAlign: 'center',
     fontSize: 12,
-    paddingVertical: 12,
     opacity: 0.7,
   },
 });
