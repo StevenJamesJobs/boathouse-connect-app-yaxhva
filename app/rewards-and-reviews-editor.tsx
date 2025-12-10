@@ -66,6 +66,14 @@ export default function RewardsAndReviewsEditorScreen() {
   const [myBucks, setMyBucks] = useState(0);
   const [topEmployees, setTopEmployees] = useState<Employee[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<RewardTransaction[]>([]);
+  const [isReward, setIsReward] = useState(true); // true = Reward (positive), false = Deduct (negative)
+
+  // Edit transaction state
+  const [showEditTransactionModal, setShowEditTransactionModal] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<RewardTransaction | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editIsReward, setEditIsReward] = useState(true);
 
   // Reviews state
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -224,9 +232,12 @@ export default function RewardsAndReviewsEditorScreen() {
 
       setLoading(true);
 
+      // Calculate the final amount based on Reward/Deduct toggle
+      const finalAmount = isReward ? parseInt(rewardAmount) : -parseInt(rewardAmount);
+
       const { error } = await supabase.from('rewards_transactions').insert({
         user_id: selectedEmployee.id,
-        amount: parseInt(rewardAmount),
+        amount: finalAmount,
         description: rewardDescription,
         is_visible: isVisible,
         created_by: user?.id,
@@ -234,7 +245,7 @@ export default function RewardsAndReviewsEditorScreen() {
 
       if (error) throw error;
 
-      Alert.alert('Success', 'Reward added successfully');
+      Alert.alert('Success', `${isReward ? 'Reward' : 'Deduction'} added successfully`);
       setShowRewardModal(false);
       resetRewardForm();
       fetchEmployees();
@@ -242,6 +253,57 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error: any) {
       console.error('Error adding reward:', error);
       Alert.alert('Error', error.message || 'Failed to add reward');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditTransaction = (transaction: RewardTransaction) => {
+    setEditingTransaction(transaction);
+    const absAmount = Math.abs(transaction.amount);
+    setEditAmount(absAmount.toString());
+    setEditDescription(transaction.description);
+    setEditIsReward(transaction.amount >= 0);
+    setShowEditTransactionModal(true);
+  };
+
+  const handleSaveEditTransaction = async () => {
+    try {
+      if (!editingTransaction) return;
+
+      if (!editAmount || isNaN(parseInt(editAmount))) {
+        Alert.alert('Error', 'Please enter a valid amount');
+        return;
+      }
+
+      if (!editDescription.trim()) {
+        Alert.alert('Error', 'Please enter a description');
+        return;
+      }
+
+      setLoading(true);
+
+      // Calculate the final amount based on Reward/Deduct toggle
+      const finalAmount = editIsReward ? parseInt(editAmount) : -parseInt(editAmount);
+
+      const { error } = await supabase
+        .from('rewards_transactions')
+        .update({
+          amount: finalAmount,
+          description: editDescription,
+        })
+        .eq('id', editingTransaction.id);
+
+      if (error) throw error;
+
+      Alert.alert('Success', 'Transaction updated successfully');
+      setShowEditTransactionModal(false);
+      setEditingTransaction(null);
+      fetchEmployees();
+      fetchRewardsData();
+    } catch (error: any) {
+      console.error('Error updating transaction:', error);
+      Alert.alert('Error', error.message || 'Failed to update transaction');
     } finally {
       setLoading(false);
     }
@@ -327,6 +389,7 @@ export default function RewardsAndReviewsEditorScreen() {
     setRewardDescription('');
     setIsVisible(true);
     setSearchQuery('');
+    setIsReward(true);
   };
 
   const handleSaveReview = async () => {
@@ -561,6 +624,17 @@ export default function RewardsAndReviewsEditorScreen() {
                       </Text>
                       <View style={styles.transactionActions}>
                         <TouchableOpacity
+                          onPress={() => handleEditTransaction(trans)}
+                          style={styles.actionButton}
+                        >
+                          <IconSymbol
+                            ios_icon_name="pencil.circle.fill"
+                            android_material_icon_name="edit"
+                            size={24}
+                            color={managerColors.highlight}
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
                           onPress={() => handleHideTransaction(trans)}
                           style={styles.actionButton}
                         >
@@ -718,17 +792,79 @@ export default function RewardsAndReviewsEditorScreen() {
                 )}
               </View>
 
+              {/* Reward/Deduct Toggle */}
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Action Type *</Text>
+                <View style={styles.toggleContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleOptionButton,
+                      isReward && styles.toggleOptionButtonActive,
+                      isReward && styles.toggleOptionButtonReward,
+                    ]}
+                    onPress={() => setIsReward(true)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="plus.circle.fill"
+                      android_material_icon_name="add_circle"
+                      size={24}
+                      color={isReward ? '#FFFFFF' : managerColors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.toggleOptionText,
+                        isReward && styles.toggleOptionTextActive,
+                      ]}
+                    >
+                      Reward
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleOptionButton,
+                      !isReward && styles.toggleOptionButtonActive,
+                      !isReward && styles.toggleOptionButtonDeduct,
+                    ]}
+                    onPress={() => setIsReward(false)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="minus.circle.fill"
+                      android_material_icon_name="remove_circle"
+                      size={24}
+                      color={!isReward ? '#FFFFFF' : managerColors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.toggleOptionText,
+                        !isReward && styles.toggleOptionTextActive,
+                      ]}
+                    >
+                      Deduct
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
               {/* Amount */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Amount (use negative for deduction) *</Text>
+                <Text style={styles.formLabel}>Amount *</Text>
                 <TextInput
                   style={styles.formInput}
                   value={rewardAmount}
                   onChangeText={setRewardAmount}
-                  placeholder="Enter amount (e.g., 50 or -25)"
+                  placeholder="Enter amount (e.g., 50)"
                   placeholderTextColor={managerColors.textSecondary}
                   keyboardType="numeric"
                 />
+                {rewardAmount && (
+                  <Text style={styles.amountPreview}>
+                    This will {isReward ? 'add' : 'deduct'}{' '}
+                    <Text style={{ color: isReward ? '#4CAF50' : '#F44336', fontWeight: 'bold' }}>
+                      {isReward ? '+' : '-'}${rewardAmount}
+                    </Text>
+                    {' '}McLoone&apos;s Bucks
+                  </Text>
+                )}
               </View>
 
               {/* Description */}
@@ -738,7 +874,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   style={[styles.formInput, styles.textArea]}
                   value={rewardDescription}
                   onChangeText={setRewardDescription}
-                  placeholder="Why are they receiving/losing bucks?"
+                  placeholder={`Why are they ${isReward ? 'receiving' : 'losing'} bucks?`}
                   placeholderTextColor={managerColors.textSecondary}
                   multiline
                   numberOfLines={4}
@@ -774,7 +910,146 @@ export default function RewardsAndReviewsEditorScreen() {
                 {loading ? (
                   <ActivityIndicator color={managerColors.text} />
                 ) : (
-                  <Text style={styles.submitButtonText}>Submit Reward</Text>
+                  <Text style={styles.submitButtonText}>
+                    Submit {isReward ? 'Reward' : 'Deduction'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Edit Transaction Modal */}
+      <Modal visible={showEditTransactionModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Edit Transaction</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowEditTransactionModal(false);
+                  setEditingTransaction(null);
+                }}
+              >
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color={managerColors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalForm}>
+              {/* Employee Info (Read-only) */}
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Employee</Text>
+                <View style={[styles.formInput, styles.formInputDisabled]}>
+                  <Text style={styles.formInputTextDisabled}>
+                    {editingTransaction?.user_name || 'Unknown Employee'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Reward/Deduct Toggle */}
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Action Type *</Text>
+                <View style={styles.toggleContainer}>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleOptionButton,
+                      editIsReward && styles.toggleOptionButtonActive,
+                      editIsReward && styles.toggleOptionButtonReward,
+                    ]}
+                    onPress={() => setEditIsReward(true)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="plus.circle.fill"
+                      android_material_icon_name="add_circle"
+                      size={24}
+                      color={editIsReward ? '#FFFFFF' : managerColors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.toggleOptionText,
+                        editIsReward && styles.toggleOptionTextActive,
+                      ]}
+                    >
+                      Reward
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.toggleOptionButton,
+                      !editIsReward && styles.toggleOptionButtonActive,
+                      !editIsReward && styles.toggleOptionButtonDeduct,
+                    ]}
+                    onPress={() => setEditIsReward(false)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="minus.circle.fill"
+                      android_material_icon_name="remove_circle"
+                      size={24}
+                      color={!editIsReward ? '#FFFFFF' : managerColors.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.toggleOptionText,
+                        !editIsReward && styles.toggleOptionTextActive,
+                      ]}
+                    >
+                      Deduct
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Amount */}
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Amount *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={editAmount}
+                  onChangeText={setEditAmount}
+                  placeholder="Enter amount (e.g., 50)"
+                  placeholderTextColor={managerColors.textSecondary}
+                  keyboardType="numeric"
+                />
+                {editAmount && (
+                  <Text style={styles.amountPreview}>
+                    This will {editIsReward ? 'add' : 'deduct'}{' '}
+                    <Text style={{ color: editIsReward ? '#4CAF50' : '#F44336', fontWeight: 'bold' }}>
+                      {editIsReward ? '+' : '-'}${editAmount}
+                    </Text>
+                    {' '}McLoone&apos;s Bucks
+                  </Text>
+                )}
+              </View>
+
+              {/* Description */}
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Description *</Text>
+                <TextInput
+                  style={[styles.formInput, styles.textArea]}
+                  value={editDescription}
+                  onChangeText={setEditDescription}
+                  placeholder={`Why are they ${editIsReward ? 'receiving' : 'losing'} bucks?`}
+                  placeholderTextColor={managerColors.textSecondary}
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.submitButton}
+                onPress={handleSaveEditTransaction}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color={managerColors.text} />
+                ) : (
+                  <Text style={styles.submitButtonText}>Save Changes</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -1217,6 +1492,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: managerColors.border,
   },
+  formInputDisabled: {
+    opacity: 0.6,
+  },
+  formInputTextDisabled: {
+    fontSize: 16,
+    color: managerColors.textSecondary,
+  },
   textArea: {
     minHeight: 100,
     textAlignVertical: 'top',
@@ -1260,6 +1542,48 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: managerColors.text,
+  },
+  toggleContainer: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  toggleOptionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: managerColors.card,
+    borderWidth: 2,
+    borderColor: managerColors.border,
+    gap: 8,
+  },
+  toggleOptionButtonActive: {
+    borderWidth: 2,
+  },
+  toggleOptionButtonReward: {
+    backgroundColor: '#4CAF50',
+    borderColor: '#4CAF50',
+  },
+  toggleOptionButtonDeduct: {
+    backgroundColor: '#F44336',
+    borderColor: '#F44336',
+  },
+  toggleOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: managerColors.textSecondary,
+  },
+  toggleOptionTextActive: {
+    color: '#FFFFFF',
+  },
+  amountPreview: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginTop: 8,
+    fontStyle: 'italic',
   },
   visibilityToggle: {
     flexDirection: 'row',

@@ -54,6 +54,7 @@ export default function EmployeeDetailScreen() {
         .single();
 
       if (error) throw error;
+      console.log('Fetched employee data:', data);
       setEmployee(data);
     } catch (error) {
       console.error('Error fetching employee:', error);
@@ -69,7 +70,17 @@ export default function EmployeeDetailScreen() {
 
     try {
       setSaving(true);
-      const { error } = await supabase
+      
+      console.log('Attempting to save employee data:', {
+        id: employee.id,
+        name: employee.name,
+        email: employee.email,
+        job_title: employee.job_title,
+        phone_number: employee.phone_number,
+        role: employee.role,
+      });
+
+      const { data, error } = await supabase
         .from('users')
         .update({
           name: employee.name,
@@ -78,14 +89,22 @@ export default function EmployeeDetailScreen() {
           phone_number: employee.phone_number,
           role: employee.role,
         })
-        .eq('id', employee.id);
+        .eq('id', employee.id)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase update error:', error);
+        throw error;
+      }
 
+      console.log('Update successful, returned data:', data);
       Alert.alert('Success', 'Employee updated successfully');
-    } catch (error) {
+      
+      // Refresh the employee data to confirm the update
+      await fetchEmployee();
+    } catch (error: any) {
       console.error('Error updating employee:', error);
-      Alert.alert('Error', 'Failed to update employee');
+      Alert.alert('Error', error.message || 'Failed to update employee');
     } finally {
       setSaving(false);
     }
@@ -296,7 +315,7 @@ export default function EmployeeDetailScreen() {
           </View>
 
           <View style={styles.formField}>
-            <Text style={styles.formLabel}>Full Name</Text>
+            <Text style={styles.formLabel}>Full Name *</Text>
             <TextInput
               style={styles.formInput}
               value={employee.name}
@@ -306,7 +325,7 @@ export default function EmployeeDetailScreen() {
           </View>
 
           <View style={styles.formField}>
-            <Text style={styles.formLabel}>Email</Text>
+            <Text style={styles.formLabel}>Email *</Text>
             <TextInput
               style={styles.formInput}
               value={employee.email}

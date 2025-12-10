@@ -36,13 +36,14 @@ interface MenuItem {
 
 const CATEGORIES = ['Weekly Specials', 'Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
 
+// Updated subcategories with "All" moved to the end
 const SUBCATEGORIES: { [key: string]: string[] } = {
   'Weekly Specials': [],
-  Lunch: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Burgers', 'Sandwiches', 'Sides'],
-  Dinner: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Entrees', 'Pasta', 'Sides'],
-  Libations: ['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV', 'Draft Beer', 'Bottle & Cans'],
-  Wine: ['Sparkling', 'Rose', 'Chardonnay', 'Pinot Grigio', 'Sauvignon Blanc', 'Interesting Whites', 'Cabernet Sauvignon', 'Pinot Noir', 'Merlot', 'Italian Reds', 'Interesting Reds'],
-  'Happy Hour': ['Appetizers', 'Drinks', 'Spirits'],
+  Lunch: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Burgers', 'Sandwiches', 'Sides', 'All'],
+  Dinner: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Entrees', 'Pasta', 'Sides', 'All'],
+  Libations: ['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV', 'Draft Beer', 'Bottle & Cans', 'All'],
+  Wine: ['Sparkling', 'Rose', 'Chardonnay', 'Pinot Grigio', 'Sauvignon Blanc', 'Interesting Whites', 'Cabernet Sauvignon', 'Pinot Noir', 'Merlot', 'Italian Reds', 'Interesting Reds', 'All'],
+  'Happy Hour': ['Appetizers', 'Drinks', 'Spirits', 'All'],
 };
 
 interface MenuDisplayProps {
@@ -73,6 +74,16 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   useEffect(() => {
     filterItems();
   }, [menuItems, selectedCategory, selectedSubcategory]);
+
+  // Set the default subcategory when category changes
+  useEffect(() => {
+    if (SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0) {
+      // Set to the first subcategory (which is now the proper starting one, not "All")
+      setSelectedSubcategory(SUBCATEGORIES[selectedCategory][0]);
+    } else {
+      setSelectedSubcategory(null);
+    }
+  }, [selectedCategory]);
 
   const loadMenuItems = async () => {
     try {
@@ -108,8 +119,8 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
       filtered = filtered.filter(item => item.category === selectedCategory);
     }
 
-    // Filter by subcategory if selected
-    if (selectedSubcategory) {
+    // Filter by subcategory if selected and not "All"
+    if (selectedSubcategory && selectedSubcategory !== 'All') {
       filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
     }
 
@@ -171,7 +182,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
               ]}
               onPress={() => {
                 setSelectedCategory(category);
-                setSelectedSubcategory(null);
+                // selectedSubcategory will be set by the useEffect
               }}
             >
               <Text
@@ -194,22 +205,6 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
             style={styles.subcategoryScroll}
             contentContainerStyle={styles.subcategoryScrollContent}
           >
-            <TouchableOpacity
-              style={[
-                styles.subcategoryTab,
-                selectedSubcategory === null && styles.subcategoryTabActive,
-              ]}
-              onPress={() => setSelectedSubcategory(null)}
-            >
-              <Text
-                style={[
-                  styles.subcategoryTabText,
-                  selectedSubcategory === null && styles.subcategoryTabTextActive,
-                ]}
-              >
-                All
-              </Text>
-            </TouchableOpacity>
             {SUBCATEGORIES[selectedCategory].map((subcategory, index) => (
               <TouchableOpacity
                 key={index}
