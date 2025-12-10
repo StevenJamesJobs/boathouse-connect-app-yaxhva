@@ -119,7 +119,6 @@ export default function GuidesAndTrainingScreen() {
       setViewingFile(guide.id);
       console.log('Opening file:', guide.file_name);
 
-      // Simply open the file URL in the browser/viewer
       const canOpen = await Linking.canOpenURL(guide.file_url);
       if (canOpen) {
         await Linking.openURL(guide.file_url);
@@ -139,9 +138,7 @@ export default function GuidesAndTrainingScreen() {
       setDownloadingFile(guide.id);
       console.log('Starting download for:', guide.file_name);
 
-      // For web, just open the file URL in a new tab to trigger download
       if (Platform.OS === 'web') {
-        // Create a temporary link element to trigger download
         const link = document.createElement('a');
         link.href = guide.file_url;
         link.download = guide.file_name;
@@ -154,14 +151,11 @@ export default function GuidesAndTrainingScreen() {
         return;
       }
 
-      // For mobile, use the new Expo 54 FileSystem API with improved error handling
       console.log('Downloading from URL:', guide.file_url);
       
-      // Step 1: Create a downloads directory in cache
       const downloadsDir = new Directory(Paths.cache, 'downloads');
       console.log('Downloads directory path:', downloadsDir.uri);
       
-      // Step 2: Ensure directory exists, create if needed
       if (!downloadsDir.exists) {
         console.log('Creating downloads directory...');
         try {
@@ -173,8 +167,6 @@ export default function GuidesAndTrainingScreen() {
         }
       }
 
-      // Step 3: Generate a unique filename with timestamp and random string
-      // This ensures each download is completely unique and avoids any conflicts
       const fileExtension = guide.file_name.includes('.') 
         ? guide.file_name.substring(guide.file_name.lastIndexOf('.'))
         : '';
@@ -182,18 +174,15 @@ export default function GuidesAndTrainingScreen() {
         ? guide.file_name.substring(0, guide.file_name.lastIndexOf('.'))
         : guide.file_name;
       
-      // Add both timestamp and random string for maximum uniqueness
       const timestamp = Date.now();
       const randomString = Math.random().toString(36).substring(2, 8);
       const uniqueFileName = `${fileNameWithoutExt}_${timestamp}_${randomString}${fileExtension}`;
       
       console.log('Generated unique filename:', uniqueFileName);
 
-      // Step 4: Create the destination file with the unique name
       const destinationFile = new File(downloadsDir, uniqueFileName);
       console.log('Destination file path:', destinationFile.uri);
 
-      // Step 5: If file somehow exists (very unlikely with timestamp+random), delete it
       if (destinationFile.exists) {
         console.log('Destination file already exists, deleting...');
         try {
@@ -201,15 +190,12 @@ export default function GuidesAndTrainingScreen() {
           console.log('Existing file deleted successfully');
         } catch (deleteError: any) {
           console.error('Error deleting existing file:', deleteError);
-          // Continue anyway, the download might overwrite it
         }
       }
 
-      // Step 6: Download the file directly to the specific file path
       console.log('Starting file download...');
       let downloadedFile: File;
       try {
-        // Download directly to the specific file we created
         downloadedFile = await File.downloadFileAsync(
           guide.file_url,
           destinationFile
@@ -220,7 +206,6 @@ export default function GuidesAndTrainingScreen() {
         console.error('Download error code:', downloadError.code);
         console.error('Download error message:', downloadError.message);
         
-        // Provide specific error messages based on error type
         if (downloadError.message?.includes('already exists')) {
           throw new Error('File already exists. Please try again.');
         } else if (downloadError.message?.includes('network')) {
@@ -232,7 +217,6 @@ export default function GuidesAndTrainingScreen() {
         }
       }
 
-      // Step 7: Verify the downloaded file exists and has content
       console.log('Verifying downloaded file...');
       if (!downloadedFile.exists) {
         throw new Error('Downloaded file does not exist after download');
@@ -245,7 +229,6 @@ export default function GuidesAndTrainingScreen() {
         throw new Error('Downloaded file is empty');
       }
 
-      // Step 8: Share the file so user can save it to their preferred location
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
         console.log('Opening share dialog...');
@@ -272,7 +255,6 @@ export default function GuidesAndTrainingScreen() {
         stack: error.stack,
       });
       
-      // Provide user-friendly error messages
       let errorMessage = 'Failed to download file. Please try again.';
       if (error.message) {
         errorMessage = error.message;
@@ -314,7 +296,6 @@ export default function GuidesAndTrainingScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>Guides and Training</Text>
       </View>
 
-      {/* Category Tabs */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -386,17 +367,6 @@ export default function GuidesAndTrainingScreen() {
                     <View style={styles.guideMeta}>
                       <View style={styles.metaItem}>
                         <IconSymbol
-                          ios_icon_name="doc.fill"
-                          android_material_icon_name="description"
-                          size={14}
-                          color={colors.textSecondary}
-                        />
-                        <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                          {guide.file_name}
-                        </Text>
-                      </View>
-                      <View style={styles.metaItem}>
-                        <IconSymbol
                           ios_icon_name="clock"
                           android_material_icon_name="schedule"
                           size={14}
@@ -410,7 +380,6 @@ export default function GuidesAndTrainingScreen() {
                   </View>
                 </View>
                 
-                {/* Action Buttons */}
                 <View style={styles.actionButtonsContainer}>
                   <TouchableOpacity
                     style={[styles.actionButton, { backgroundColor: colors.accent || colors.primary }]}
@@ -424,11 +393,11 @@ export default function GuidesAndTrainingScreen() {
                         <IconSymbol
                           ios_icon_name="eye.fill"
                           android_material_icon_name="visibility"
-                          size={20}
+                          size={18}
                           color={colors.text}
                         />
                         <Text style={[styles.actionButtonText, { color: colors.text }]}>
-                          View File
+                          View
                         </Text>
                       </>
                     )}
@@ -446,7 +415,7 @@ export default function GuidesAndTrainingScreen() {
                         <IconSymbol
                           ios_icon_name="arrow.down.circle.fill"
                           android_material_icon_name="download"
-                          size={20}
+                          size={18}
                           color={colors.accent || colors.primary}
                         />
                         <Text style={[styles.actionButtonText, { color: colors.accent || colors.primary }]}>
@@ -462,7 +431,6 @@ export default function GuidesAndTrainingScreen() {
         </ScrollView>
       )}
 
-      {/* Image Modal */}
       <Modal
         visible={imageModalVisible}
         transparent={true}
@@ -587,69 +555,69 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   guideCard: {
-    borderRadius: 16,
-    marginBottom: 16,
+    borderRadius: 12,
+    marginBottom: 12,
     overflow: 'hidden',
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.2)',
     elevation: 3,
   },
   guideLayout: {
     flexDirection: 'row',
-    padding: 16,
-    gap: 16,
+    padding: 12,
+    gap: 12,
   },
   guideThumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
+    width: 70,
+    height: 70,
+    borderRadius: 10,
     resizeMode: 'cover',
   },
   guideContent: {
     flex: 1,
   },
   guideTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   guideDescription: {
-    fontSize: 14,
-    marginBottom: 8,
-    lineHeight: 20,
+    fontSize: 13,
+    marginBottom: 6,
+    lineHeight: 18,
   },
   guideMeta: {
-    gap: 6,
+    gap: 4,
   },
   metaItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
   metaText: {
-    fontSize: 12,
+    fontSize: 11,
     flex: 1,
   },
   actionButtonsContainer: {
     flexDirection: 'row',
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 12,
   },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    gap: 6,
     borderRadius: 8,
   },
   downloadButton: {
     borderWidth: 2,
   },
   actionButtonText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
   imageModalOverlay: {
