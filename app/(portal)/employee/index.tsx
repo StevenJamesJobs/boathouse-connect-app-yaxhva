@@ -41,6 +41,14 @@ interface MenuItem {
   is_active: boolean;
 }
 
+interface GuideFile {
+  id: string;
+  title: string;
+  file_url: string;
+  file_name: string;
+  file_type: string;
+}
+
 interface Announcement {
   id: string;
   title: string;
@@ -54,6 +62,8 @@ interface Announcement {
   is_active: boolean;
   created_at: string;
   link: string | null;
+  guide_file_id: string | null;
+  guide_file?: GuideFile | null;
 }
 
 interface UpcomingEvent {
@@ -69,6 +79,8 @@ interface UpcomingEvent {
   is_active: boolean;
   created_at: string;
   link: string | null;
+  guide_file_id: string | null;
+  guide_file?: GuideFile | null;
 }
 
 interface SpecialFeature {
@@ -84,6 +96,8 @@ interface SpecialFeature {
   is_active: boolean;
   created_at: string;
   link: string | null;
+  guide_file_id: string | null;
+  guide_file?: GuideFile | null;
 }
 
 export default function EmployeePortalScreen() {
@@ -112,6 +126,7 @@ export default function EmployeePortalScreen() {
     endDateTime?: string | null;
     priority?: string;
     link?: string | null;
+    guideFile?: GuideFile | null;
   } | null>(null);
 
   const headerColor = '#B8D4E0';
@@ -166,7 +181,16 @@ export default function EmployeePortalScreen() {
       
       const { data, error } = await supabase
         .from('announcements')
-        .select('*')
+        .select(`
+          *,
+          guide_file:guides_and_training!announcements_guide_file_id_fkey(
+            id,
+            title,
+            file_url,
+            file_name,
+            file_type
+          )
+        `)
         .eq('is_active', true)
         .in('visibility', ['everyone', 'employees'])
         .order('display_order', { ascending: true })
@@ -193,7 +217,16 @@ export default function EmployeePortalScreen() {
       
       const { data, error } = await supabase
         .from('upcoming_events')
-        .select('*')
+        .select(`
+          *,
+          guide_file:guides_and_training!upcoming_events_guide_file_id_fkey(
+            id,
+            title,
+            file_url,
+            file_name,
+            file_type
+          )
+        `)
         .eq('is_active', true)
         .order('display_order', { ascending: true })
         .order('created_at', { ascending: false })
@@ -220,7 +253,16 @@ export default function EmployeePortalScreen() {
       
       const { data, error } = await supabase
         .from('special_features')
-        .select('*')
+        .select(`
+          *,
+          guide_file:guides_and_training!special_features_guide_file_id_fkey(
+            id,
+            title,
+            file_url,
+            file_name,
+            file_type
+          )
+        `)
         .eq('is_active', true)
         .order('display_order', { ascending: true })
         .order('created_at', { ascending: false })
@@ -266,6 +308,7 @@ export default function EmployeePortalScreen() {
     endDateTime?: string | null;
     priority?: string;
     link?: string | null;
+    guideFile?: GuideFile | null;
   }) => {
     setSelectedItem(item);
     setDetailModalVisible(true);
@@ -412,6 +455,7 @@ export default function EmployeePortalScreen() {
                     thumbnailShape: announcement.thumbnail_shape,
                     priority: announcement.priority,
                     link: announcement.link,
+                    guideFile: announcement.guide_file || null,
                   })}
                   activeOpacity={0.7}
                 >
@@ -493,6 +537,7 @@ export default function EmployeePortalScreen() {
                     startDateTime: event.start_date_time,
                     endDateTime: event.end_date_time,
                     link: event.link,
+                    guideFile: event.guide_file || null,
                   })}
                   activeOpacity={0.7}
                 >
@@ -574,6 +619,7 @@ export default function EmployeePortalScreen() {
                     startDateTime: feature.start_date_time,
                     endDateTime: feature.end_date_time,
                     link: feature.link,
+                    guideFile: feature.guide_file || null,
                   })}
                   activeOpacity={0.7}
                 >
@@ -785,6 +831,7 @@ export default function EmployeePortalScreen() {
           endDateTime={selectedItem.endDateTime}
           priority={selectedItem.priority}
           link={selectedItem.link}
+          guideFile={selectedItem.guideFile}
           colors={{
             text: employeeColors.text,
             textSecondary: employeeColors.textSecondary,

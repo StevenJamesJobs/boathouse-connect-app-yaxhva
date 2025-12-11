@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -10,9 +10,13 @@ import {
   ScrollView,
   Linking,
   Alert,
+  ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
+import { File, Directory, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 interface ContentDetailModalProps {
   visible: boolean;
@@ -25,6 +29,13 @@ interface ContentDetailModalProps {
   endDateTime?: string | null;
   priority?: string;
   link?: string | null;
+  guideFile?: {
+    id: string;
+    title: string;
+    file_url: string;
+    file_name: string;
+    file_type: string;
+  } | null;
   colors: {
     text: string;
     textSecondary: string;
@@ -44,8 +55,12 @@ export default function ContentDetailModal({
   endDateTime,
   priority,
   link,
+  guideFile,
   colors,
 }: ContentDetailModalProps) {
+  const [downloadingFile, setDownloadingFile] = useState(false);
+  const [viewingFile, setViewingFile] = useState(false);
+
   const handleSwipeGesture = (event: any) => {
     const { translationY } = event.nativeEvent;
     if (translationY > 100) {
@@ -97,6 +112,162 @@ export default function ContentDetailModal({
     } catch (error) {
       console.error('Error opening link:', error);
       Alert.alert('Error', 'Failed to open link');
+    }
+  };
+
+  const handleViewFile = async () => {
+    if (!guideFile) return;
+
+    try {
+      setViewingFile(true);
+      console.log('Opening file:', guideFile.file_name);
+
+      const canOpen = await Linking.canOpenURL(guideFile.file_url);
+      if (canOpen) {
+        await Linking.openURL(guideFile.file_url);
+      } else {
+        Alert.alert('Error', 'Cannot open this file type');
+      }
+    } catch (error) {
+      console.error('Error viewing file:', error);
+      Alert.alert('Error', 'Failed to open file');
+    } finally {
+      setViewingFile(false);
+    }
+  };
+
+  const handleDownloadFile = async () => {
+    if (!guideFile) return;
+
+    try {
+      setDownloadingFile(true);
+      console.log('Starting download for:', guideFile.file_name);
+
+      if (Platform.OS === 'web') {
+        const link = document.createElement('a');
+        link.href = guideFile.file_url;
+        link.download = guideFile.file_name;
+        link.target = '_blank';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        Alert.alert('Success', 'File download started');
+        setDownloadingFile(false);
+        return;
+      }
+
+      console.log('Downloading from URL:', guideFile.file_url);
+      
+      const downloadsDir = new Directory(Paths.cache, 'downloads');
+      console.log('Downloads directory path:', downloadsDir.uri);
+      
+      if (!downloadsDir.exists) {
+        console.log('Creating downloads directory...');
+        try {
+          downloadsDir.create({ intermediates: true });
+          console.log('Downloads directory created successfully');
+        } catch (createError: any) {
+          console.error('Error creating downloads directory:', createError);
+          throw new Error(`Failed to create downloads directory: ${createError.message}`);
+        }
+      }
+
+      const fileExtension = guideFile.file_name.includes('.') 
+        ? guideFile.file_name.substring(guideFile.file_name.lastIndexOf('.'))
+        : '';
+      const fileNameWithoutExt = guideFile.file_name.includes('.')
+        ? guideFile.file_name.substring(0, guideFile.file_name.lastIndexOf('.'))
+        : guideFile.file_name;
+      
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 8);
+      const uniqueFileName = `${fileNameWithoutExt}_${timestamp}_${randomString}${fileExtension}`;
+      
+      console.log('Generated unique filename:', uniqueFileName);
+
+      const destinationFile = new File(downloadsDir, uniqueFileName);
+      console.log('Destination file path:', destinationFile.uri);
+
+      if (destinationFile.exists) {
+        console.log('Destination file already exists, deleting...');
+        try {
+          destinationFile.delete();
+          console.log('Existing file deleted successfully');
+        } catch (deleteError: any) {
+          console.error('Error deleting existing file:', deleteError);
+        }
+      }
+
+      console.log('Starting file download...');
+      let downloadedFile: File;
+      try {
+        downloadedFile = await File.downloadFileAsync(
+          guideFile.file_url,
+          destinationFile
+        );
+        console.log('File downloaded successfully to:', downloadedFile.uri);
+      } catch (downloadError: any) {
+        console.error('Download error:', downloadError);
+        console.error('Download error code:', downloadError.code);
+        console.error('Download error message:', downloadError.message);
+        
+        if (downloadError.message?.includes('already exists')) {
+          throw new Error('File already exists. Please try again.');
+        } else if (downloadError.message?.includes('network')) {
+          throw new Error('Network error. Please check your connection and try again.');
+        } else if (downloadError.message?.includes('permission')) {
+          throw new Error('Permission denied. Please check app permissions.');
+        } else {
+          throw new Error(`Download failed: ${downloadError.message || 'Unknown error'}`);
+        }
+      }
+
+      console.log('Verifying downloaded file...');
+      if (!downloadedFile.exists) {
+        throw new Error('Downloaded file does not exist after download');
+      }
+
+      const fileSize = downloadedFile.size;
+      console.log('Downloaded file size:', fileSize, 'bytes');
+      
+      if (fileSize === 0) {
+        throw new Error('Downloaded file is empty');
+      }
+
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        console.log('Opening share dialog...');
+        await Sharing.shareAsync(downloadedFile.uri, {
+          mimeType: guideFile.file_type || 'application/octet-stream',
+          dialogTitle: `Save ${guideFile.file_name}`,
+          UTI: guideFile.file_type || 'public.data',
+        });
+        Alert.alert(
+          'Success', 
+          `File "${guideFile.file_name}" is ready to save. Choose where to save it from the share menu.`
+        );
+      } else {
+        Alert.alert(
+          'Success', 
+          `File downloaded successfully to:\n${downloadedFile.uri}\n\nFile size: ${(fileSize / 1024).toFixed(2)} KB`
+        );
+      }
+    } catch (error: any) {
+      console.error('ERROR Failed to download file:', error);
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack,
+      });
+      
+      let errorMessage = 'Failed to download file. Please try again.';
+      if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Download Error', errorMessage);
+    } finally {
+      setDownloadingFile(false);
     }
   };
 
@@ -216,6 +387,78 @@ export default function ContentDetailModal({
                       color={colors.primary}
                     />
                   </TouchableOpacity>
+                )}
+
+                {/* Attached File Buttons */}
+                {guideFile && (
+                  <View style={styles.fileActionsContainer}>
+                    <View style={styles.fileInfoContainer}>
+                      <IconSymbol
+                        ios_icon_name="doc.fill"
+                        android_material_icon_name="description"
+                        size={24}
+                        color={colors.primary}
+                      />
+                      <View style={styles.fileInfoText}>
+                        <Text style={[styles.fileInfoTitle, { color: colors.text }]}>
+                          Attached File
+                        </Text>
+                        <Text style={[styles.fileInfoName, { color: colors.textSecondary }]}>
+                          {guideFile.title}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.fileButtonsContainer}>
+                      <TouchableOpacity
+                        style={[styles.fileActionButton, { backgroundColor: colors.primary }]}
+                        onPress={handleViewFile}
+                        disabled={viewingFile}
+                      >
+                        {viewingFile ? (
+                          <ActivityIndicator size="small" color={colors.text} />
+                        ) : (
+                          <>
+                            <IconSymbol
+                              ios_icon_name="eye.fill"
+                              android_material_icon_name="visibility"
+                              size={18}
+                              color={colors.text}
+                            />
+                            <Text style={[styles.fileActionButtonText, { color: colors.text }]}>
+                              View
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[
+                          styles.fileActionButton,
+                          styles.downloadButton,
+                          { backgroundColor: colors.card, borderColor: colors.primary }
+                        ]}
+                        onPress={handleDownloadFile}
+                        disabled={downloadingFile}
+                      >
+                        {downloadingFile ? (
+                          <ActivityIndicator size="small" color={colors.primary} />
+                        ) : (
+                          <>
+                            <IconSymbol
+                              ios_icon_name="arrow.down.circle.fill"
+                              android_material_icon_name="download"
+                              size={18}
+                              color={colors.primary}
+                            />
+                            <Text style={[styles.fileActionButtonText, { color: colors.primary }]}>
+                              Download
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
                 )}
               </ScrollView>
 
@@ -350,9 +593,56 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     gap: 8,
     marginTop: 8,
+    marginBottom: 16,
   },
   linkButtonText: {
     fontSize: 16,
+    fontWeight: '600',
+  },
+  fileActionsContainer: {
+    backgroundColor: 'rgba(52, 152, 219, 0.05)',
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(52, 152, 219, 0.2)',
+  },
+  fileInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+  },
+  fileInfoText: {
+    flex: 1,
+  },
+  fileInfoTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 2,
+  },
+  fileInfoName: {
+    fontSize: 13,
+  },
+  fileButtonsContainer: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  fileActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    gap: 8,
+    borderRadius: 10,
+  },
+  downloadButton: {
+    borderWidth: 2,
+  },
+  fileActionButtonText: {
+    fontSize: 15,
     fontWeight: '600',
   },
   swipeHintContainer: {
