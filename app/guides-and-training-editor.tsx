@@ -437,7 +437,7 @@ export default function GuidesAndTrainingEditorScreen() {
   };
 
   const handleBackPress = () => {
-    router.replace('/(portal)/manager/tools');
+    router.replace('/(portal)/manager/manage');
   };
 
   const getImageUrl = (url: string | null) => {
@@ -458,20 +458,17 @@ export default function GuidesAndTrainingEditorScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.backNavigationTab}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backTabButton}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow_back"
             size={24}
-            color="#FFFFFF"
+            color={managerColors.text}
           />
-          <Text style={styles.backTabText}>Back to Tools</Text>
         </TouchableOpacity>
-      </View>
-
-      <View style={styles.header}>
         <Text style={styles.headerTitle}>Guides and Training Editor</Text>
+        <View style={styles.backButton} />
       </View>
 
       {/* Category Tabs */}
@@ -795,34 +792,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: managerColors.background,
   },
-  backNavigationTab: {
-    backgroundColor: managerColors.primary,
-    paddingTop: Platform.OS === 'android' ? 48 : 60,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.4)',
-    elevation: 8,
-  },
-  backTabButton: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-  },
-  backTabText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingTop: Platform.OS === 'android' ? 48 : 60,
+    paddingBottom: 12,
     backgroundColor: managerColors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  backButton: {
+    padding: 8,
+    width: 40,
   },
   headerTitle: {
     fontSize: 20,
