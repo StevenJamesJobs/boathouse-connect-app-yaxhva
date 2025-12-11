@@ -37,15 +37,29 @@ interface UpcomingEvent {
   is_active: boolean;
   created_at: string;
   link: string | null;
+  guide_file_id: string | null;
 }
+
+interface GuideFile {
+  id: string;
+  title: string;
+  category: string;
+  file_name: string;
+}
+
+const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
 
 export default function UpcomingEventsEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
+  const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showFilePickerModal, setShowFilePickerModal] = useState(false);
   const [editingEvent, setEditingEvent] = useState<UpcomingEvent | null>(null);
+  const [selectedGuideFile, setSelectedGuideFile] = useState<GuideFile | null>(null);
+  const [fileSearchQuery, setFileSearchQuery] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -66,6 +80,7 @@ export default function UpcomingEventsEditorScreen() {
 
   useEffect(() => {
     loadEvents();
+    loadGuideFiles();
     cleanupExpiredEvents();
   }, []);
 
@@ -73,9 +88,34 @@ export default function UpcomingEventsEditorScreen() {
     React.useCallback(() => {
       console.log('Upcoming events editor screen focused, refreshing data...');
       loadEvents();
+      loadGuideFiles();
       cleanupExpiredEvents();
     }, [])
   );
+
+  const loadGuideFiles = async () => {
+    try {
+      console.log('Loading guide files from database...');
+      
+      const { data, error } = await supabase
+        .from('guides_and_training')
+        .select('id, title, category, file_name')
+        .in('category', GUIDE_CATEGORIES)
+        .eq('is_active', true)
+        .order('category', { ascending: true })
+        .order('title', { ascending: true });
+
+      if (error) {
+        console.error('Error loading guide files:', error);
+        throw error;
+      }
+      
+      console.log('Guide files loaded successfully:', data?.length || 0, 'items');
+      setGuideFiles(data || []);
+    } catch (error) {
+      console.error('Error loading guide files:', error);
+    }
+  };
 
   const cleanupExpiredEvents = async () => {
     try {
@@ -217,6 +257,7 @@ export default function UpcomingEventsEditorScreen() {
       }
 
       const linkValue = formData.link.trim() || null;
+      const guideFileId = selectedGuideFile?.id || null;
 
       if (editingEvent) {
         console.log('Updating upcoming event:', editingEvent.id);
@@ -231,6 +272,7 @@ export default function UpcomingEventsEditorScreen() {
           p_end_date_time: endDateTime?.toISOString() || null,
           p_display_order: formData.display_order,
           p_link: linkValue,
+          p_guide_file_id: guideFileId,
         });
 
         if (error) {
@@ -251,6 +293,7 @@ export default function UpcomingEventsEditorScreen() {
           p_end_date_time: endDateTime?.toISOString() || null,
           p_display_order: formData.display_order,
           p_link: linkValue,
+          p_guide_file_id: guideFileId,
         });
 
         if (error) {
@@ -332,10 +375,11 @@ export default function UpcomingEventsEditorScreen() {
     setStartDateTime(null);
     setEndDateTime(null);
     setSelectedImageUri(null);
+    setSelectedGuideFile(null);
     setShowAddModal(true);
   };
 
-  const openEditModal = (event: UpcomingEvent) => {
+  const openEditModal = async (event: UpcomingEvent) => {
     setEditingEvent(event);
     setFormData({
       title: event.title,
@@ -347,6 +391,15 @@ export default function UpcomingEventsEditorScreen() {
     setStartDateTime(event.start_date_time ? new Date(event.start_date_time) : null);
     setEndDateTime(event.end_date_time ? new Date(event.end_date_time) : null);
     setSelectedImageUri(null);
+    
+    // Load the attached guide file if exists
+    if (event.guide_file_id) {
+      const guideFile = guideFiles.find(g => g.id === event.guide_file_id);
+      setSelectedGuideFile(guideFile || null);
+    } else {
+      setSelectedGuideFile(null);
+    }
+    
     setShowAddModal(true);
   };
 
@@ -354,12 +407,32 @@ export default function UpcomingEventsEditorScreen() {
     setShowAddModal(false);
     setEditingEvent(null);
     setSelectedImageUri(null);
+    setSelectedGuideFile(null);
     setStartDateTime(null);
     setEndDateTime(null);
     setShowStartDatePicker(false);
     setShowStartTimePicker(false);
     setShowEndDatePicker(false);
     setShowEndTimePicker(false);
+  };
+
+  const openFilePicker = () => {
+    setFileSearchQuery('');
+    setShowFilePickerModal(true);
+  };
+
+  const closeFilePicker = () => {
+    setShowFilePickerModal(false);
+    setFileSearchQuery('');
+  };
+
+  const selectGuideFile = (file: GuideFile) => {
+    setSelectedGuideFile(file);
+    closeFilePicker();
+  };
+
+  const clearGuideFile = () => {
+    setSelectedGuideFile(null);
   };
 
   const handleBackPress = () => {
@@ -383,6 +456,17 @@ export default function UpcomingEventsEditorScreen() {
       hour12: true,
     });
   };
+
+  const filteredGuideFiles = guideFiles.filter(file =>
+    file.title.toLowerCase().includes(fileSearchQuery.toLowerCase()) ||
+    file.category.toLowerCase().includes(fileSearchQuery.toLowerCase()) ||
+    file.file_name.toLowerCase().includes(fileSearchQuery.toLowerCase())
+  );
+
+  const groupedGuideFiles = GUIDE_CATEGORIES.reduce((acc, category) => {
+    acc[category] = filteredGuideFiles.filter(f => f.category === category);
+    return acc;
+  }, {} as Record<string, GuideFile[]>);
 
   return (
     <View style={styles.container}>
@@ -565,6 +649,7 @@ export default function UpcomingEventsEditorScreen() {
         </ScrollView>
       )}
 
+      {/* Add/Edit Modal */}
       <Modal
         visible={showAddModal}
         animationType="slide"
@@ -698,6 +783,47 @@ export default function UpcomingEventsEditorScreen() {
                 />
                 <Text style={styles.formHint}>
                   This link will be displayed in the full event view and &quot;View All&quot; page
+                </Text>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Attach File from Guides & Training (Optional)</Text>
+                {selectedGuideFile ? (
+                  <View style={styles.selectedFileContainer}>
+                    <View style={styles.selectedFileInfo}>
+                      <IconSymbol
+                        ios_icon_name="doc.fill"
+                        android_material_icon_name="description"
+                        size={24}
+                        color={managerColors.highlight}
+                      />
+                      <View style={styles.selectedFileText}>
+                        <Text style={styles.selectedFileTitle}>{selectedGuideFile.title}</Text>
+                        <Text style={styles.selectedFileCategory}>{selectedGuideFile.category}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity onPress={clearGuideFile} style={styles.clearFileButton}>
+                      <IconSymbol
+                        ios_icon_name="xmark.circle.fill"
+                        android_material_icon_name="cancel"
+                        size={24}
+                        color="#E74C3C"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity style={styles.filePickerButton} onPress={openFilePicker}>
+                    <IconSymbol
+                      ios_icon_name="doc.badge.plus"
+                      android_material_icon_name="note_add"
+                      size={24}
+                      color={managerColors.highlight}
+                    />
+                    <Text style={styles.filePickerButtonText}>Select File</Text>
+                  </TouchableOpacity>
+                )}
+                <Text style={styles.formHint}>
+                  Attach a file from Guides & Training to display View and Download buttons
                 </Text>
               </View>
 
@@ -933,6 +1059,100 @@ export default function UpcomingEventsEditorScreen() {
             )}
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* File Picker Modal */}
+      <Modal
+        visible={showFilePickerModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeFilePicker}
+      >
+        <View style={styles.filePickerModalContainer}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop} 
+            activeOpacity={1} 
+            onPress={closeFilePicker}
+          />
+          <View style={styles.filePickerModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select File</Text>
+              <TouchableOpacity onPress={closeFilePicker}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color="#666666"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchContainer}>
+              <IconSymbol
+                ios_icon_name="magnifyingglass"
+                android_material_icon_name="search"
+                size={20}
+                color="#666666"
+              />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search files..."
+                placeholderTextColor="#999999"
+                value={fileSearchQuery}
+                onChangeText={setFileSearchQuery}
+              />
+            </View>
+
+            <ScrollView style={styles.fileList} contentContainerStyle={styles.fileListContent}>
+              {GUIDE_CATEGORIES.map((category, catIndex) => {
+                const categoryFiles = groupedGuideFiles[category];
+                if (categoryFiles.length === 0) return null;
+
+                return (
+                  <View key={catIndex} style={styles.fileCategorySection}>
+                    <Text style={styles.fileCategoryTitle}>{category}</Text>
+                    {categoryFiles.map((file, fileIndex) => (
+                      <TouchableOpacity
+                        key={fileIndex}
+                        style={styles.fileItem}
+                        onPress={() => selectGuideFile(file)}
+                      >
+                        <IconSymbol
+                          ios_icon_name="doc.fill"
+                          android_material_icon_name="description"
+                          size={24}
+                          color={managerColors.highlight}
+                        />
+                        <View style={styles.fileItemText}>
+                          <Text style={styles.fileItemTitle}>{file.title}</Text>
+                          <Text style={styles.fileItemName}>{file.file_name}</Text>
+                        </View>
+                        <IconSymbol
+                          ios_icon_name="chevron.right"
+                          android_material_icon_name="chevron_right"
+                          size={20}
+                          color="#666666"
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                );
+              })}
+
+              {filteredGuideFiles.length === 0 && (
+                <View style={styles.emptyFileList}>
+                  <IconSymbol
+                    ios_icon_name="doc"
+                    android_material_icon_name="description"
+                    size={48}
+                    color="#999999"
+                  />
+                  <Text style={styles.emptyFileListText}>No files found</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
 
       {/* Android Date/Time Pickers - Rendered as native dialogs */}
@@ -1328,6 +1548,56 @@ const styles = StyleSheet.create({
   shapeOptionTextActive: {
     color: '#1A1A1A',
   },
+  selectedFileContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: managerColors.highlight,
+  },
+  selectedFileInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  selectedFileText: {
+    flex: 1,
+  },
+  selectedFileTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  selectedFileCategory: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 2,
+  },
+  clearFileButton: {
+    padding: 4,
+  },
+  filePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+    gap: 8,
+  },
+  filePickerButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: managerColors.highlight,
+  },
   dateTimeButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1382,6 +1652,84 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#666666',
+  },
+  filePickerModalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  filePickerModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '80%',
+    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
+    elevation: 10,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1A1A1A',
+  },
+  fileList: {
+    flex: 1,
+  },
+  fileListContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  fileCategorySection: {
+    marginBottom: 24,
+  },
+  fileCategoryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginBottom: 12,
+  },
+  fileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    gap: 12,
+  },
+  fileItemText: {
+    flex: 1,
+  },
+  fileItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  fileItemName: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 2,
+  },
+  emptyFileList: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyFileListText: {
+    fontSize: 16,
+    color: '#999999',
+    marginTop: 12,
   },
   datePickerOverlay: {
     position: 'absolute',
