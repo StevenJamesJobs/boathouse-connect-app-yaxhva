@@ -407,8 +407,7 @@ export default function MenuEditorScreen() {
   };
 
   const handleBackPress = () => {
-    // Navigate directly to manager tools
-    router.replace('/(portal)/manager/tools');
+    router.replace('/(portal)/manager/manage');
   };
 
   // Helper function to get image URL with cache busting
@@ -430,22 +429,18 @@ export default function MenuEditorScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Prominent Back Navigation Tab */}
-      <View style={styles.backNavigationTab}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backTabButton}>
+      {/* Header with Back Button */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow_back"
             size={24}
-            color="#FFFFFF"
+            color={managerColors.text}
           />
-          <Text style={styles.backTabText}>Back to Tools</Text>
         </TouchableOpacity>
-      </View>
-
-      {/* Header */}
-      <View style={styles.header}>
         <Text style={styles.headerTitle}>Menu Editor</Text>
+        <View style={styles.backButton} />
       </View>
 
       {/* Add New Item Button - Elongated button above search bar */}
@@ -1169,37 +1164,20 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: managerColors.background,
   },
-  backNavigationTab: {
-    backgroundColor: managerColors.primary,
-    paddingTop: Platform.OS === 'android' ? 48 : 60,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.4)',
-    elevation: 8,
-  },
-  backTabButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-  },
-  backTabText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingTop: Platform.OS === 'android' ? 48 : 60,
+    paddingBottom: 12,
     backgroundColor: managerColors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  backButton: {
+    padding: 8,
+    width: 40,
   },
   headerTitle: {
     fontSize: 20,
