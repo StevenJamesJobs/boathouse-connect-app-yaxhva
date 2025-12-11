@@ -36,6 +36,7 @@ interface SpecialFeature {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  link: string | null;
 }
 
 export default function SpecialFeaturesEditorScreen() {
@@ -52,6 +53,7 @@ export default function SpecialFeaturesEditorScreen() {
     message: '',
     thumbnail_shape: 'square',
     display_order: 0,
+    link: '',
   });
   const [startDateTime, setStartDateTime] = useState<Date | null>(null);
   const [endDateTime, setEndDateTime] = useState<Date | null>(null);
@@ -214,6 +216,8 @@ export default function SpecialFeaturesEditorScreen() {
         }
       }
 
+      const linkValue = formData.link.trim() || null;
+
       if (editingFeature) {
         console.log('Updating special feature:', editingFeature.id);
         const { error } = await supabase.rpc('update_special_feature', {
@@ -226,6 +230,7 @@ export default function SpecialFeaturesEditorScreen() {
           p_start_date_time: startDateTime?.toISOString() || null,
           p_end_date_time: endDateTime?.toISOString() || null,
           p_display_order: formData.display_order,
+          p_link: linkValue,
         });
 
         if (error) {
@@ -245,6 +250,7 @@ export default function SpecialFeaturesEditorScreen() {
           p_start_date_time: startDateTime?.toISOString() || null,
           p_end_date_time: endDateTime?.toISOString() || null,
           p_display_order: formData.display_order,
+          p_link: linkValue,
         });
 
         if (error) {
@@ -321,6 +327,7 @@ export default function SpecialFeaturesEditorScreen() {
       message: '',
       thumbnail_shape: 'square',
       display_order: features.length,
+      link: '',
     });
     setStartDateTime(null);
     setEndDateTime(null);
@@ -335,6 +342,7 @@ export default function SpecialFeaturesEditorScreen() {
       message: feature.content || feature.message || '',
       thumbnail_shape: feature.thumbnail_shape,
       display_order: feature.display_order,
+      link: feature.link || '',
     });
     setStartDateTime(feature.start_date_time ? new Date(feature.start_date_time) : null);
     setEndDateTime(feature.end_date_time ? new Date(feature.end_date_time) : null);
@@ -679,6 +687,22 @@ export default function SpecialFeaturesEditorScreen() {
                   multiline
                   numberOfLines={4}
                 />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Link (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter link URL (e.g., https://example.com)"
+                  placeholderTextColor="#999999"
+                  value={formData.link}
+                  onChangeText={(text) => setFormData({ ...formData, link: text })}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+                <Text style={styles.formHint}>
+                  This link will be displayed in the full feature view and &quot;View All&quot; page
+                </Text>
               </View>
 
               <View style={styles.formGroup}>
