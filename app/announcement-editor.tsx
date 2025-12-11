@@ -36,18 +36,31 @@ interface Announcement {
   is_active: boolean;
   created_at: string;
   link: string | null;
+  guide_file_id: string | null;
+}
+
+interface GuideFile {
+  id: string;
+  title: string;
+  category: string;
+  file_name: string;
 }
 
 const PRIORITY_LEVELS = ['high', 'medium', 'low'];
 const VISIBILITY_OPTIONS = ['everyone', 'employees', 'managers'];
+const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
 
 export default function AnnouncementEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showFilePickerModal, setShowFilePickerModal] = useState(false);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  const [selectedGuideFile, setSelectedGuideFile] = useState<GuideFile | null>(null);
+  const [fileSearchQuery, setFileSearchQuery] = useState('');
 
   // Form state
   const [formData, setFormData] = useState({
@@ -64,15 +77,40 @@ export default function AnnouncementEditorScreen() {
 
   useEffect(() => {
     loadAnnouncements();
+    loadGuideFiles();
   }, []);
 
-  // Refresh announcements when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       console.log('Announcement editor screen focused, refreshing data...');
       loadAnnouncements();
+      loadGuideFiles();
     }, [])
   );
+
+  const loadGuideFiles = async () => {
+    try {
+      console.log('Loading guide files from database...');
+      
+      const { data, error } = await supabase
+        .from('guides_and_training')
+        .select('id, title, category, file_name')
+        .in('category', GUIDE_CATEGORIES)
+        .eq('is_active', true)
+        .order('category', { ascending: true })
+        .order('title', { ascending: true });
+
+      if (error) {
+        console.error('Error loading guide files:', error);
+        throw error;
+      }
+      
+      console.log('Guide files loaded successfully:', data?.length || 0, 'items');
+      setGuideFiles(data || []);
+    } catch (error) {
+      console.error('Error loading guide files:', error);
+    }
+  };
 
   const loadAnnouncements = async () => {
     try {
@@ -123,12 +161,10 @@ export default function AnnouncementEditorScreen() {
       setUploadingImage(true);
       console.log('Starting image upload for announcement');
 
-      // Read the file as base64
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Convert base64 to Uint8Array
       const byteCharacters = atob(base64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
@@ -136,19 +172,16 @@ export default function AnnouncementEditorScreen() {
       }
       const byteArray = new Uint8Array(byteNumbers);
 
-      // Get file extension
       const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${Date.now()}.${ext}`;
 
       console.log('Uploading image:', fileName);
 
-      // Determine content type
       let contentType = 'image/jpeg';
       if (ext === 'png') contentType = 'image/png';
       else if (ext === 'gif') contentType = 'image/gif';
       else if (ext === 'webp') contentType = 'image/webp';
 
-      // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('announcements')
         .upload(fileName, byteArray, {
@@ -163,7 +196,6 @@ export default function AnnouncementEditorScreen() {
 
       console.log('Upload successful:', data);
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('announcements')
         .getPublicUrl(fileName);
@@ -191,7 +223,6 @@ export default function AnnouncementEditorScreen() {
       return;
     }
 
-    // Check if we're at the limit of 10 announcements
     if (!editingAnnouncement && announcements.length >= 10) {
       Alert.alert('Limit Reached', 'You can only have up to 10 announcements. Please delete an existing announcement before adding a new one.');
       return;
@@ -200,7 +231,6 @@ export default function AnnouncementEditorScreen() {
     try {
       let thumbnailUrl = editingAnnouncement?.thumbnail_url || null;
 
-      // Upload image if selected
       if (selectedImageUri) {
         const uploadedUrl = await uploadImage(selectedImageUri);
         if (uploadedUrl) {
@@ -210,9 +240,9 @@ export default function AnnouncementEditorScreen() {
       }
 
       const linkValue = formData.link.trim() || null;
+      const guideFileId = selectedGuideFile?.id || null;
 
       if (editingAnnouncement) {
-        // Update existing announcement
         console.log('Updating announcement:', editingAnnouncement.id);
         const { error } = await supabase.rpc('update_announcement', {
           p_user_id: user.id,
@@ -225,6 +255,7 @@ export default function AnnouncementEditorScreen() {
           p_visibility: formData.visibility,
           p_display_order: formData.display_order,
           p_link: linkValue,
+          p_guide_file_id: guideFileId,
         });
 
         if (error) {
@@ -234,7 +265,6 @@ export default function AnnouncementEditorScreen() {
         console.log('Announcement updated successfully');
         Alert.alert('Success', 'Announcement updated successfully');
       } else {
-        // Create new announcement
         console.log('Creating new announcement');
         const { error } = await supabase.rpc('create_announcement', {
           p_user_id: user.id,
@@ -246,6 +276,7 @@ export default function AnnouncementEditorScreen() {
           p_visibility: formData.visibility,
           p_display_order: formData.display_order,
           p_link: linkValue,
+          p_guide_file_id: guideFileId,
         });
 
         if (error) {
@@ -257,7 +288,6 @@ export default function AnnouncementEditorScreen() {
       }
 
       closeModal();
-      // Immediately reload announcements
       await loadAnnouncements();
     } catch (error: any) {
       console.error('Error saving announcement:', error);
@@ -283,7 +313,6 @@ export default function AnnouncementEditorScreen() {
 
               console.log('Deleting announcement:', announcement.id);
               
-              // Delete using database function
               const { error } = await supabase.rpc('delete_announcement', {
                 p_user_id: user.id,
                 p_announcement_id: announcement.id,
@@ -294,7 +323,6 @@ export default function AnnouncementEditorScreen() {
                 throw error;
               }
 
-              // Delete image if exists
               if (announcement.thumbnail_url) {
                 const fileName = announcement.thumbnail_url.split('/').pop();
                 if (fileName) {
@@ -307,7 +335,6 @@ export default function AnnouncementEditorScreen() {
               console.log('Announcement deleted successfully');
               Alert.alert('Success', 'Announcement deleted successfully');
               
-              // Immediately reload announcements
               await loadAnnouncements();
             } catch (error: any) {
               console.error('Error deleting announcement:', error);
@@ -331,10 +358,11 @@ export default function AnnouncementEditorScreen() {
       link: '',
     });
     setSelectedImageUri(null);
+    setSelectedGuideFile(null);
     setShowAddModal(true);
   };
 
-  const openEditModal = (announcement: Announcement) => {
+  const openEditModal = async (announcement: Announcement) => {
     setEditingAnnouncement(announcement);
     setFormData({
       title: announcement.title,
@@ -346,6 +374,15 @@ export default function AnnouncementEditorScreen() {
       link: announcement.link || '',
     });
     setSelectedImageUri(null);
+    
+    // Load the attached guide file if exists
+    if (announcement.guide_file_id) {
+      const guideFile = guideFiles.find(g => g.id === announcement.guide_file_id);
+      setSelectedGuideFile(guideFile || null);
+    } else {
+      setSelectedGuideFile(null);
+    }
+    
     setShowAddModal(true);
   };
 
@@ -353,6 +390,26 @@ export default function AnnouncementEditorScreen() {
     setShowAddModal(false);
     setEditingAnnouncement(null);
     setSelectedImageUri(null);
+    setSelectedGuideFile(null);
+  };
+
+  const openFilePicker = () => {
+    setFileSearchQuery('');
+    setShowFilePickerModal(true);
+  };
+
+  const closeFilePicker = () => {
+    setShowFilePickerModal(false);
+    setFileSearchQuery('');
+  };
+
+  const selectGuideFile = (file: GuideFile) => {
+    setSelectedGuideFile(file);
+    closeFilePicker();
+  };
+
+  const clearGuideFile = () => {
+    setSelectedGuideFile(null);
   };
 
   const handleBackPress = () => {
@@ -390,9 +447,19 @@ export default function AnnouncementEditorScreen() {
     }
   };
 
+  const filteredGuideFiles = guideFiles.filter(file =>
+    file.title.toLowerCase().includes(fileSearchQuery.toLowerCase()) ||
+    file.category.toLowerCase().includes(fileSearchQuery.toLowerCase()) ||
+    file.file_name.toLowerCase().includes(fileSearchQuery.toLowerCase())
+  );
+
+  const groupedGuideFiles = GUIDE_CATEGORIES.reduce((acc, category) => {
+    acc[category] = filteredGuideFiles.filter(f => f.category === category);
+    return acc;
+  }, {} as Record<string, GuideFile[]>);
+
   return (
     <View style={styles.container}>
-      {/* Prominent Back Navigation Tab */}
       <View style={styles.backNavigationTab}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backTabButton}>
           <IconSymbol
@@ -405,7 +472,6 @@ export default function AnnouncementEditorScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Announcements Editor</Text>
         <Text style={styles.headerSubtitle}>
@@ -413,7 +479,6 @@ export default function AnnouncementEditorScreen() {
         </Text>
       </View>
 
-      {/* Add New Announcement Button */}
       <TouchableOpacity 
         style={[styles.addNewItemButton, announcements.length >= 10 && styles.addNewItemButtonDisabled]} 
         onPress={openAddModal}
@@ -430,7 +495,6 @@ export default function AnnouncementEditorScreen() {
         </Text>
       </TouchableOpacity>
 
-      {/* Announcements List */}
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={managerColors.highlight} />
@@ -454,7 +518,6 @@ export default function AnnouncementEditorScreen() {
           ) : (
             announcements.map((announcement, index) => (
               <View key={index} style={styles.announcementCard}>
-                {/* Display thumbnail based on shape */}
                 {announcement.thumbnail_shape === 'square' && announcement.thumbnail_url ? (
                   <View style={styles.squareLayout}>
                     <Image
@@ -601,7 +664,6 @@ export default function AnnouncementEditorScreen() {
               bounces={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* Image Upload */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Thumbnail Image (Optional)</Text>
                 <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
@@ -624,7 +686,6 @@ export default function AnnouncementEditorScreen() {
                   )}
                 </TouchableOpacity>
                 
-                {/* Thumbnail Shape */}
                 <View style={styles.shapeSelector}>
                   <TouchableOpacity
                     style={[
@@ -661,7 +722,6 @@ export default function AnnouncementEditorScreen() {
                 </View>
               </View>
 
-              {/* Title */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Announcement Title *</Text>
                 <TextInput
@@ -673,7 +733,6 @@ export default function AnnouncementEditorScreen() {
                 />
               </View>
 
-              {/* Message */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Message *</Text>
                 <TextInput
@@ -687,7 +746,6 @@ export default function AnnouncementEditorScreen() {
                 />
               </View>
 
-              {/* Link */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Link (Optional)</Text>
                 <TextInput
@@ -704,7 +762,47 @@ export default function AnnouncementEditorScreen() {
                 </Text>
               </View>
 
-              {/* Priority Level */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Attach File from Guides & Training (Optional)</Text>
+                {selectedGuideFile ? (
+                  <View style={styles.selectedFileContainer}>
+                    <View style={styles.selectedFileInfo}>
+                      <IconSymbol
+                        ios_icon_name="doc.fill"
+                        android_material_icon_name="description"
+                        size={24}
+                        color={managerColors.highlight}
+                      />
+                      <View style={styles.selectedFileText}>
+                        <Text style={styles.selectedFileTitle}>{selectedGuideFile.title}</Text>
+                        <Text style={styles.selectedFileCategory}>{selectedGuideFile.category}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity onPress={clearGuideFile} style={styles.clearFileButton}>
+                      <IconSymbol
+                        ios_icon_name="xmark.circle.fill"
+                        android_material_icon_name="cancel"
+                        size={24}
+                        color="#E74C3C"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity style={styles.filePickerButton} onPress={openFilePicker}>
+                    <IconSymbol
+                      ios_icon_name="doc.badge.plus"
+                      android_material_icon_name="note_add"
+                      size={24}
+                      color={managerColors.highlight}
+                    />
+                    <Text style={styles.filePickerButtonText}>Select File</Text>
+                  </TouchableOpacity>
+                )}
+                <Text style={styles.formHint}>
+                  Attach a file from Guides & Training to display View and Download buttons
+                </Text>
+              </View>
+
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Priority Level</Text>
                 <ScrollView
@@ -734,7 +832,6 @@ export default function AnnouncementEditorScreen() {
                 </ScrollView>
               </View>
 
-              {/* Visibility */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Visible To</Text>
                 <ScrollView
@@ -764,7 +861,6 @@ export default function AnnouncementEditorScreen() {
                 </ScrollView>
               </View>
 
-              {/* Display Order */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Display Order</Text>
                 <TextInput
@@ -783,7 +879,6 @@ export default function AnnouncementEditorScreen() {
                 </Text>
               </View>
 
-              {/* Save Button */}
               <TouchableOpacity
                 style={styles.saveButton}
                 onPress={handleSave}
@@ -798,7 +893,6 @@ export default function AnnouncementEditorScreen() {
                 )}
               </TouchableOpacity>
 
-              {/* Cancel Button */}
               <TouchableOpacity
                 style={styles.cancelButton}
                 onPress={closeModal}
@@ -808,6 +902,100 @@ export default function AnnouncementEditorScreen() {
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* File Picker Modal */}
+      <Modal
+        visible={showFilePickerModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeFilePicker}
+      >
+        <View style={styles.filePickerModalContainer}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop} 
+            activeOpacity={1} 
+            onPress={closeFilePicker}
+          />
+          <View style={styles.filePickerModalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Select File</Text>
+              <TouchableOpacity onPress={closeFilePicker}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color="#666666"
+                />
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.searchContainer}>
+              <IconSymbol
+                ios_icon_name="magnifyingglass"
+                android_material_icon_name="search"
+                size={20}
+                color="#666666"
+              />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Search files..."
+                placeholderTextColor="#999999"
+                value={fileSearchQuery}
+                onChangeText={setFileSearchQuery}
+              />
+            </View>
+
+            <ScrollView style={styles.fileList} contentContainerStyle={styles.fileListContent}>
+              {GUIDE_CATEGORIES.map((category, catIndex) => {
+                const categoryFiles = groupedGuideFiles[category];
+                if (categoryFiles.length === 0) return null;
+
+                return (
+                  <View key={catIndex} style={styles.fileCategorySection}>
+                    <Text style={styles.fileCategoryTitle}>{category}</Text>
+                    {categoryFiles.map((file, fileIndex) => (
+                      <TouchableOpacity
+                        key={fileIndex}
+                        style={styles.fileItem}
+                        onPress={() => selectGuideFile(file)}
+                      >
+                        <IconSymbol
+                          ios_icon_name="doc.fill"
+                          android_material_icon_name="description"
+                          size={24}
+                          color={managerColors.highlight}
+                        />
+                        <View style={styles.fileItemText}>
+                          <Text style={styles.fileItemTitle}>{file.title}</Text>
+                          <Text style={styles.fileItemName}>{file.file_name}</Text>
+                        </View>
+                        <IconSymbol
+                          ios_icon_name="chevron.right"
+                          android_material_icon_name="chevron_right"
+                          size={20}
+                          color="#666666"
+                        />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                );
+              })}
+
+              {filteredGuideFiles.length === 0 && (
+                <View style={styles.emptyFileList}>
+                  <IconSymbol
+                    ios_icon_name="doc"
+                    android_material_icon_name="description"
+                    size={48}
+                    color="#999999"
+                  />
+                  <Text style={styles.emptyFileListText}>No files found</Text>
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -1174,6 +1362,56 @@ const styles = StyleSheet.create({
   optionButtonTextActive: {
     color: '#1A1A1A',
   },
+  selectedFileContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: managerColors.highlight,
+  },
+  selectedFileInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  selectedFileText: {
+    flex: 1,
+  },
+  selectedFileTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  selectedFileCategory: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 2,
+  },
+  clearFileButton: {
+    padding: 4,
+  },
+  filePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+    gap: 8,
+  },
+  filePickerButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: managerColors.highlight,
+  },
   saveButton: {
     backgroundColor: managerColors.highlight,
     borderRadius: 12,
@@ -1199,5 +1437,83 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#666666',
+  },
+  filePickerModalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  filePickerModalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '80%',
+    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
+    elevation: 10,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: '#1A1A1A',
+  },
+  fileList: {
+    flex: 1,
+  },
+  fileListContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  fileCategorySection: {
+    marginBottom: 24,
+  },
+  fileCategoryTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginBottom: 12,
+  },
+  fileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    gap: 12,
+  },
+  fileItemText: {
+    flex: 1,
+  },
+  fileItemTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  fileItemName: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 2,
+  },
+  emptyFileList: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyFileListText: {
+    fontSize: 16,
+    color: '#999999',
+    marginTop: 12,
   },
 });
