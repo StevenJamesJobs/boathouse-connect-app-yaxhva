@@ -274,26 +274,17 @@ export default function GuidesAndTrainingScreen() {
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.backNavigationTab, { backgroundColor: colors.primary }]}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backTabButton}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow_back"
             size={24}
-            color="#FFFFFF"
+            color={colors.text}
           />
-          <Text style={styles.backTabText}>Back to Tools</Text>
         </TouchableOpacity>
-      </View>
-
-      <View style={[styles.header, { backgroundColor: colors.card }]}>
-        <IconSymbol
-          ios_icon_name="book.fill"
-          android_material_icon_name="menu_book"
-          size={32}
-          color={colors.accent || colors.primary}
-        />
         <Text style={[styles.headerTitle, { color: colors.text }]}>Guides and Training</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView
@@ -469,39 +460,27 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  backNavigationTab: {
-    paddingTop: Platform.OS === 'android' ? 48 : 60,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.4)',
-    elevation: 8,
-  },
-  backTabButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: 12,
-  },
-  backTabText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    gap: 12,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 48 : 60,
+    paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  backButton: {
+    padding: 8,
+    marginLeft: -8,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
+    textAlign: 'center',
+  },
+  headerSpacer: {
+    width: 40,
   },
   categoryScroll: {
     marginTop: 16,
