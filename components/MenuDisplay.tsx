@@ -612,7 +612,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         )}
       </ScrollView>
 
-      {/* Filter Modal */}
+      {/* Filter Modal - REDESIGNED WITH LARGER SIZE AND NO CHECKBOXES */}
       <Modal
         visible={showFilterModal}
         transparent={true}
@@ -634,8 +634,8 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
               </TouchableOpacity>
             </View>
 
-            {/* Filter Options Grid */}
-            <ScrollView style={styles.filterModalScroll}>
+            {/* Filter Options Grid - NO CHECKBOXES, JUST COLOR HIGHLIGHTING */}
+            <ScrollView style={styles.filterModalScroll} showsVerticalScrollIndicator={false}>
               <View style={styles.filterOptionsGrid}>
                 {FILTER_OPTIONS.map((option, index) => {
                   const isSelected = selectedFilters.includes(option.value);
@@ -652,32 +652,14 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                       onPress={() => toggleFilter(option.value)}
                       activeOpacity={0.7}
                     >
-                      <View style={styles.filterOptionContent}>
-                        <View style={[
-                          styles.checkbox,
-                          { 
-                            backgroundColor: isSelected ? colors.primary : 'transparent',
-                            borderColor: isSelected ? colors.primary : colors.border,
-                          }
-                        ]}>
-                          {isSelected && (
-                            <IconSymbol
-                              ios_icon_name="checkmark"
-                              android_material_icon_name="check"
-                              size={16}
-                              color="#FFFFFF"
-                            />
-                          )}
-                        </View>
-                        <Text
-                          style={[
-                            styles.filterOptionBoxText,
-                            { color: isSelected ? '#FFFFFF' : colors.text },
-                          ]}
-                        >
-                          {option.label}
-                        </Text>
-                      </View>
+                      <Text
+                        style={[
+                          styles.filterOptionBoxText,
+                          { color: isSelected ? '#FFFFFF' : colors.text },
+                        ]}
+                      >
+                        {option.label}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -1026,85 +1008,75 @@ const createStyles = (colors: any) =>
       fontWeight: '600',
       color: colors.text,
     },
-    // Filter Modal Styles
+    // Filter Modal Styles - REDESIGNED FOR LARGER SIZE
     filterModalOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      backgroundColor: 'rgba(0, 0, 0, 0.6)',
       justifyContent: 'center',
       alignItems: 'center',
       paddingHorizontal: 20,
     },
     filterModalContent: {
-      width: '100%',
-      maxWidth: 400,
-      maxHeight: '70%',
-      borderRadius: 20,
+      width: '95%',
+      maxWidth: 500,
+      maxHeight: '80%',
+      borderRadius: 24,
       overflow: 'hidden',
-      boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.3)',
-      elevation: 10,
+      boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.4)',
+      elevation: 15,
     },
     filterModalHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: 20,
-      paddingVertical: 16,
+      paddingHorizontal: 24,
+      paddingVertical: 20,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
     filterModalTitle: {
-      fontSize: 20,
+      fontSize: 22,
       fontWeight: 'bold',
     },
     filterModalScroll: {
       flex: 1,
-      paddingHorizontal: 20,
-      paddingVertical: 16,
+      paddingHorizontal: 24,
+      paddingVertical: 20,
     },
     filterOptionsGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 12,
+      gap: 14,
+      paddingBottom: 10,
     },
     filterOptionBox: {
       width: '47%',
-      paddingVertical: 14,
-      paddingHorizontal: 12,
-      borderRadius: 12,
+      paddingVertical: 18,
+      paddingHorizontal: 16,
+      borderRadius: 14,
       borderWidth: 2,
-      boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
-      elevation: 2,
-    },
-    filterOptionContent: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-    },
-    checkbox: {
-      width: 22,
-      height: 22,
-      borderRadius: 6,
-      borderWidth: 2,
+      boxShadow: '0px 3px 8px rgba(0, 0, 0, 0.12)',
+      elevation: 3,
       justifyContent: 'center',
       alignItems: 'center',
     },
     filterOptionBoxText: {
-      fontSize: 15,
+      fontSize: 16,
       fontWeight: '600',
-      flex: 1,
+      textAlign: 'center',
     },
     filterModalFooter: {
       flexDirection: 'row',
       gap: 12,
-      paddingHorizontal: 20,
-      paddingVertical: 16,
+      paddingHorizontal: 24,
+      paddingVertical: 20,
       borderTopWidth: 1,
       borderTopColor: colors.border,
     },
     clearFiltersButton: {
       flex: 1,
-      paddingVertical: 14,
-      borderRadius: 12,
+      paddingVertical: 16,
+      borderRadius: 14,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -1114,8 +1086,8 @@ const createStyles = (colors: any) =>
     },
     applyFiltersButton: {
       flex: 1,
-      paddingVertical: 14,
-      borderRadius: 12,
+      paddingVertical: 16,
+      borderRadius: 14,
       justifyContent: 'center',
       alignItems: 'center',
     },
