@@ -74,6 +74,103 @@ interface MenuDisplayProps {
   };
 }
 
+// Component for handling image loading with retry logic
+interface MenuItemImageProps {
+  uri: string | null;
+  style: any;
+  itemName: string;
+  onPress?: () => void;
+}
+
+const MenuItemImage: React.FC<MenuItemImageProps> = ({ uri, style, itemName, onPress }) => {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const [imageKey, setImageKey] = useState(0);
+  const MAX_RETRIES = 3;
+
+  useEffect(() => {
+    // Reset states when URI changes
+    setLoading(true);
+    setError(false);
+    setRetryCount(0);
+    setImageKey(prev => prev + 1);
+  }, [uri]);
+
+  const handleError = (e: any) => {
+    console.error('Image load error for item:', itemName, e.nativeEvent);
+    setLoading(false);
+    
+    if (retryCount < MAX_RETRIES) {
+      // Retry after a delay
+      const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff
+      console.log(`Retrying image load for ${itemName} in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+      
+      setTimeout(() => {
+        setRetryCount(prev => prev + 1);
+        setLoading(true);
+        setError(false);
+        setImageKey(prev => prev + 1); // Force re-render with new key
+      }, delay);
+    } else {
+      setError(true);
+    }
+  };
+
+  const handleLoad = () => {
+    console.log('Image loaded successfully for item:', itemName);
+    setLoading(false);
+    setError(false);
+  };
+
+  const handleLoadStart = () => {
+    setLoading(true);
+  };
+
+  if (!uri) {
+    return (
+      <View style={[style, styles.imagePlaceholder]}>
+        <IconSymbol
+          ios_icon_name="photo"
+          android_material_icon_name="image"
+          size={40}
+          color="#999"
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={style}>
+      <Image
+        key={`${uri}-${imageKey}`}
+        source={{ uri }}
+        style={style}
+        onError={handleError}
+        onLoad={handleLoad}
+        onLoadStart={handleLoadStart}
+        resizeMode="cover"
+      />
+      {loading && !error && (
+        <View style={[style, styles.imageLoadingOverlay]}>
+          <ActivityIndicator size="small" color="#3498db" />
+        </View>
+      )}
+      {error && (
+        <View style={[style, styles.imageErrorOverlay]}>
+          <IconSymbol
+            ios_icon_name="exclamationmark.triangle"
+            android_material_icon_name="error"
+            size={32}
+            color="#e74c3c"
+          />
+          <Text style={styles.imageErrorText}>Failed to load</Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
 export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
@@ -262,13 +359,6 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     if (translationY > 100) {
       closeImageModal();
     }
-  };
-
-  // Helper function to get image URL with cache busting
-  const getImageUrl = (url: string | null) => {
-    if (!url) return null;
-    // Add timestamp to force reload and bypass cache
-    return `${url}?t=${Date.now()}`;
   };
 
   // Helper function to format price with $ sign
@@ -510,16 +600,10 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                 {/* Square Layout: Image on left, content on right */}
                 {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
                   <View style={styles.squareLayout}>
-                    <Image
-                      key={getImageUrl(item.thumbnail_url)}
-                      source={{ uri: getImageUrl(item.thumbnail_url) }}
+                    <MenuItemImage
+                      uri={item.thumbnail_url}
                       style={styles.squareImage}
-                      onError={(error) => {
-                        console.error('Image load error for item:', item.name, error.nativeEvent);
-                      }}
-                      onLoad={() => {
-                        console.log('Image loaded successfully for item:', item.name);
-                      }}
+                      itemName={item.name}
                     />
                     <View style={styles.squareContent}>
                       <View style={styles.squareHeader}>
@@ -564,16 +648,10 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                   /* Banner Layout: Image on top, content below */
                   <>
                     {item.thumbnail_url && (
-                      <Image
-                        key={getImageUrl(item.thumbnail_url)}
-                        source={{ uri: getImageUrl(item.thumbnail_url) }}
+                      <MenuItemImage
+                        uri={item.thumbnail_url}
                         style={styles.bannerImage}
-                        onError={(error) => {
-                          console.error('Image load error for item:', item.name, error.nativeEvent);
-                        }}
-                        onLoad={() => {
-                          console.log('Image loaded successfully for item:', item.name);
-                        }}
+                        itemName={item.name}
                       />
                     )}
                     <View style={styles.menuItemContent}>
@@ -725,10 +803,9 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
             </TouchableOpacity>
             {selectedImage && (
               <Image
-                source={{ uri: getImageUrl(selectedImage) }}
+                source={{ uri: selectedImage }}
                 style={styles.fullImage}
                 resizeMode="contain"
-                key={getImageUrl(selectedImage)}
               />
             )}
             <Text style={styles.swipeHint}>Swipe down to close</Text>
@@ -954,7 +1031,6 @@ const createStyles = (colors: any) =>
       width: 100,
       height: 100,
       borderRadius: 12,
-      resizeMode: 'cover',
     },
     squareContent: {
       flex: 1,
@@ -976,7 +1052,6 @@ const createStyles = (colors: any) =>
     bannerImage: {
       width: '100%',
       height: 200,
-      resizeMode: 'cover',
     },
     menuItemContent: {
       padding: 16,
@@ -1021,6 +1096,38 @@ const createStyles = (colors: any) =>
       fontSize: 11,
       fontWeight: '600',
       color: colors.text,
+    },
+    // Image loading and error states
+    imagePlaceholder: {
+      backgroundColor: '#f0f0f0',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    imageLoadingOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(240, 240, 240, 0.8)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    imageErrorOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: '#f8f8f8',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    imageErrorText: {
+      fontSize: 11,
+      color: '#e74c3c',
+      marginTop: 4,
+      fontWeight: '600',
     },
     // Filter Modal Styles - FIXED WITH LARGER SIZE
     filterModalOverlay: {
