@@ -10,6 +10,7 @@ import {
   Modal,
   ActivityIndicator,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -47,6 +48,21 @@ const SUBCATEGORIES: { [key: string]: string[] } = {
   'Happy Hour': ['Appetizers', 'Drinks', 'Spirits', 'All'],
 };
 
+// Filter options for the search
+const FILTER_OPTIONS = [
+  { label: 'All', value: 'all' },
+  { label: 'Lunch', value: 'lunch' },
+  { label: 'Dinner', value: 'dinner' },
+  { label: 'GF', value: 'gf' },
+  { label: 'GFA', value: 'gfa' },
+  { label: 'V', value: 'v' },
+  { label: 'VA', value: 'va' },
+  { label: 'Wine', value: 'wine' },
+  { label: 'Libations', value: 'libations' },
+  { label: 'Happy Hour', value: 'happy_hour' },
+  { label: 'Weekly Specials', value: 'weekly_specials' },
+];
+
 interface MenuDisplayProps {
   colors: {
     background: string;
@@ -69,6 +85,9 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFilter, setSelectedFilter] = useState('all');
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
 
   useEffect(() => {
     loadMenuItems();
@@ -76,7 +95,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
 
   useEffect(() => {
     filterItems();
-  }, [menuItems, selectedCategory, selectedSubcategory]);
+  }, [menuItems, selectedCategory, selectedSubcategory, searchQuery, selectedFilter]);
 
   // Set the default subcategory when category changes
   useEffect(() => {
@@ -110,24 +129,85 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const filterItems = () => {
     let filtered = menuItems;
 
-    // Filter by category
-    if (selectedCategory === 'Weekly Specials') {
-      filtered = filtered.filter(item => item.category === 'Weekly Specials');
-    } else if (selectedCategory === 'Lunch') {
-      filtered = filtered.filter(item => item.available_for_lunch);
-    } else if (selectedCategory === 'Dinner') {
-      filtered = filtered.filter(item => item.available_for_dinner);
-    } else {
-      // For other categories (Libations, Wine, Happy Hour), use the category field
-      filtered = filtered.filter(item => item.category === selectedCategory);
-    }
+    // If searching, apply search and filter logic
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim();
+      
+      filtered = filtered.filter(item => {
+        // Search by name
+        const nameMatch = item.name.toLowerCase().includes(query);
+        
+        // Search by description
+        const descriptionMatch = item.description?.toLowerCase().includes(query) || false;
+        
+        // Search by category
+        const categoryMatch = item.category.toLowerCase().includes(query);
+        
+        // Search by subcategory
+        const subcategoryMatch = item.subcategory?.toLowerCase().includes(query) || false;
+        
+        // Search by dietary tags
+        const dietaryMatch = 
+          (query.includes('gf') && (item.is_gluten_free || item.is_gluten_free_available)) ||
+          (query.includes('gluten') && (item.is_gluten_free || item.is_gluten_free_available)) ||
+          (query.includes('v') && (item.is_vegetarian || item.is_vegetarian_available)) ||
+          (query.includes('veg') && (item.is_vegetarian || item.is_vegetarian_available));
+        
+        return nameMatch || descriptionMatch || categoryMatch || subcategoryMatch || dietaryMatch;
+      });
 
-    // Filter by subcategory if selected and not "All"
-    if (selectedSubcategory && selectedSubcategory !== 'All') {
-      filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
+      // Apply selected filter
+      if (selectedFilter !== 'all') {
+        filtered = applyFilter(filtered, selectedFilter);
+      }
+    } else {
+      // Normal category/subcategory filtering when not searching
+      // Filter by category
+      if (selectedCategory === 'Weekly Specials') {
+        filtered = filtered.filter(item => item.category === 'Weekly Specials');
+      } else if (selectedCategory === 'Lunch') {
+        filtered = filtered.filter(item => item.available_for_lunch);
+      } else if (selectedCategory === 'Dinner') {
+        filtered = filtered.filter(item => item.available_for_dinner);
+      } else {
+        // For other categories (Libations, Wine, Happy Hour), use the category field
+        filtered = filtered.filter(item => item.category === selectedCategory);
+      }
+
+      // Filter by subcategory if selected and not "All"
+      if (selectedSubcategory && selectedSubcategory !== 'All') {
+        filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
+      }
     }
 
     setFilteredItems(filtered);
+  };
+
+  const applyFilter = (items: MenuItem[], filter: string) => {
+    switch (filter) {
+      case 'lunch':
+        return items.filter(item => item.available_for_lunch);
+      case 'dinner':
+        return items.filter(item => item.available_for_dinner);
+      case 'gf':
+        return items.filter(item => item.is_gluten_free);
+      case 'gfa':
+        return items.filter(item => item.is_gluten_free_available);
+      case 'v':
+        return items.filter(item => item.is_vegetarian);
+      case 'va':
+        return items.filter(item => item.is_vegetarian_available);
+      case 'wine':
+        return items.filter(item => item.category === 'Wine');
+      case 'libations':
+        return items.filter(item => item.category === 'Libations');
+      case 'happy_hour':
+        return items.filter(item => item.category === 'Happy Hour');
+      case 'weekly_specials':
+        return items.filter(item => item.category === 'Weekly Specials');
+      default:
+        return items;
+    }
   };
 
   const openImageModal = (imageUrl: string) => {
@@ -214,39 +294,161 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   return (
     <GestureHandlerRootView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Category Tabs */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
-          contentContainerStyle={styles.categoryScrollContent}
-        >
-          {CATEGORIES.map((category, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.categoryTab,
-                selectedCategory === category && styles.categoryTabActive,
-              ]}
-              onPress={() => {
-                setSelectedCategory(category);
-                // selectedSubcategory will be set by the useEffect
-              }}
+        {/* Search Box with Filter */}
+        <View style={styles.searchSection}>
+          <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
+            <IconSymbol
+              ios_icon_name="magnifyingglass"
+              android_material_icon_name="search"
+              size={20}
+              color={colors.textSecondary}
+            />
+            <TextInput
+              style={[styles.searchInput, { color: colors.text }]}
+              placeholder="Search menu items..."
+              placeholderTextColor={colors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              onFocus={() => setShowFilterMenu(true)}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity 
+              style={styles.filterButton}
+              onPress={() => setShowFilterMenu(!showFilterMenu)}
             >
-              <Text
-                style={[
-                  styles.categoryTabText,
-                  selectedCategory === category && styles.categoryTabTextActive,
-                ]}
-              >
-                {category}
-              </Text>
+              <IconSymbol
+                ios_icon_name="line.3.horizontal.decrease.circle"
+                android_material_icon_name="filter_list"
+                size={24}
+                color={selectedFilter !== 'all' ? colors.primary : colors.textSecondary}
+              />
             </TouchableOpacity>
-          ))}
-        </ScrollView>
+          </View>
 
-        {/* Subcategory Tabs */}
-        {SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
+          {/* Filter Menu */}
+          {showFilterMenu && (
+            <View style={[styles.filterMenu, { backgroundColor: colors.card }]}>
+              <View style={styles.filterHeader}>
+                <Text style={[styles.filterHeaderText, { color: colors.text }]}>Filter By</Text>
+                <TouchableOpacity onPress={() => setShowFilterMenu(false)}>
+                  <IconSymbol
+                    ios_icon_name="xmark"
+                    android_material_icon_name="close"
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.filterOptionsContainer}
+              >
+                {FILTER_OPTIONS.map((option, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.filterOption,
+                      { 
+                        backgroundColor: selectedFilter === option.value 
+                          ? colors.primary 
+                          : colors.highlight 
+                      },
+                    ]}
+                    onPress={() => {
+                      setSelectedFilter(option.value);
+                      if (option.value !== 'all') {
+                        setShowFilterMenu(false);
+                      }
+                    }}
+                  >
+                    <Text
+                      style={[
+                        styles.filterOptionText,
+                        { 
+                          color: selectedFilter === option.value 
+                            ? '#FFFFFF' 
+                            : colors.text 
+                        },
+                      ]}
+                    >
+                      {option.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* Search Results Header */}
+          {searchQuery.trim() && (
+            <View style={styles.searchResultsHeader}>
+              <Text style={[styles.searchResultsText, { color: colors.text }]}>
+                Search Results ({filteredItems.length})
+              </Text>
+              {selectedFilter !== 'all' && (
+                <View style={[styles.activeFilterBadge, { backgroundColor: colors.primary }]}>
+                  <Text style={styles.activeFilterText}>
+                    {FILTER_OPTIONS.find(f => f.value === selectedFilter)?.label}
+                  </Text>
+                  <TouchableOpacity onPress={() => setSelectedFilter('all')}>
+                    <IconSymbol
+                      ios_icon_name="xmark.circle.fill"
+                      android_material_icon_name="cancel"
+                      size={16}
+                      color="#FFFFFF"
+                    />
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          )}
+        </View>
+
+        {/* Category Tabs - Only show when not searching */}
+        {!searchQuery.trim() && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoryScroll}
+            contentContainerStyle={styles.categoryScrollContent}
+          >
+            {CATEGORIES.map((category, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.categoryTab,
+                  selectedCategory === category && styles.categoryTabActive,
+                ]}
+                onPress={() => {
+                  setSelectedCategory(category);
+                  // selectedSubcategory will be set by the useEffect
+                }}
+              >
+                <Text
+                  style={[
+                    styles.categoryTabText,
+                    selectedCategory === category && styles.categoryTabTextActive,
+                  ]}
+                >
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* Subcategory Tabs - Only show when not searching */}
+        {!searchQuery.trim() && SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -283,14 +485,16 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         ) : filteredItems.length === 0 ? (
           <View style={styles.emptyContainer}>
             <IconSymbol
-              ios_icon_name="fork.knife"
-              android_material_icon_name="restaurant_menu"
+              ios_icon_name={searchQuery.trim() ? "magnifyingglass" : "fork.knife"}
+              android_material_icon_name={searchQuery.trim() ? "search" : "restaurant_menu"}
               size={64}
               color={colors.textSecondary}
             />
-            <Text style={styles.emptyText}>No menu items available</Text>
+            <Text style={styles.emptyText}>
+              {searchQuery.trim() ? 'No results found' : 'No menu items available'}
+            </Text>
             <Text style={styles.emptySubtext}>
-              Check back later for updates
+              {searchQuery.trim() ? 'Try different keywords or filters' : 'Check back later for updates'}
             </Text>
           </View>
         ) : (
@@ -478,6 +682,86 @@ const createStyles = (colors: any) =>
     contentContainer: {
       paddingTop: 20,
       paddingBottom: 100,
+    },
+    searchSection: {
+      paddingHorizontal: 16,
+      marginBottom: 12,
+    },
+    searchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderRadius: 16,
+      gap: 10,
+      boxShadow: '0px 3px 10px rgba(0, 0, 0, 0.15)',
+      elevation: 4,
+      borderWidth: 2,
+      borderColor: 'rgba(52, 152, 219, 0.2)',
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 16,
+      padding: 0,
+    },
+    filterButton: {
+      padding: 4,
+    },
+    filterMenu: {
+      marginTop: 12,
+      borderRadius: 12,
+      padding: 12,
+      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+      elevation: 3,
+    },
+    filterHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+      paddingHorizontal: 4,
+    },
+    filterHeaderText: {
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    filterOptionsContainer: {
+      gap: 8,
+      paddingHorizontal: 4,
+    },
+    filterOption: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 20,
+      marginRight: 8,
+    },
+    filterOptionText: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    searchResultsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 12,
+      paddingHorizontal: 4,
+    },
+    searchResultsText: {
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    activeFilterBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+    },
+    activeFilterText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: '#FFFFFF',
     },
     categoryScroll: {
       maxHeight: 50,
