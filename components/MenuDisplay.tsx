@@ -14,6 +14,7 @@ import {
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
+import ContentDetailModal from '@/components/ContentDetailModal';
 
 interface MenuItem {
   id: string;
@@ -66,6 +67,8 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
 
   useEffect(() => {
     loadMenuItems();
@@ -137,6 +140,16 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     setSelectedImage(null);
   };
 
+  const openDetailModal = (item: MenuItem) => {
+    setSelectedMenuItem(item);
+    setDetailModalVisible(true);
+  };
+
+  const closeDetailModal = () => {
+    setDetailModalVisible(false);
+    setSelectedMenuItem(null);
+  };
+
   const handleSwipeGesture = (event: any) => {
     const { translationY } = event.nativeEvent;
     if (translationY > 100) {
@@ -159,6 +172,41 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     }
     // Otherwise add $ at the beginning
     return `$${price}`;
+  };
+
+  // Helper function to build detailed description for modal
+  const buildDetailedDescription = (item: MenuItem) => {
+    let description = item.description || '';
+    
+    // Add dietary information
+    const dietaryInfo = [];
+    if (item.is_gluten_free) dietaryInfo.push('Gluten Free');
+    if (item.is_gluten_free_available) dietaryInfo.push('Gluten Free Available');
+    if (item.is_vegetarian) dietaryInfo.push('Vegetarian');
+    if (item.is_vegetarian_available) dietaryInfo.push('Vegetarian Available');
+    
+    if (dietaryInfo.length > 0) {
+      description += `\n\nDietary Options: ${dietaryInfo.join(', ')}`;
+    }
+    
+    // Add availability information
+    const availability = [];
+    if (item.available_for_lunch) availability.push('Lunch');
+    if (item.available_for_dinner) availability.push('Dinner');
+    
+    if (availability.length > 0) {
+      description += `\n\nAvailable for: ${availability.join(', ')}`;
+    }
+    
+    // Add category and subcategory
+    if (item.category) {
+      description += `\n\nCategory: ${item.category}`;
+    }
+    if (item.subcategory) {
+      description += `\nSubcategory: ${item.subcategory}`;
+    }
+    
+    return description;
   };
 
   const styles = createStyles(colors);
@@ -248,23 +296,26 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         ) : (
           <View style={styles.menuItemsContainer}>
             {filteredItems.map((item, index) => (
-              <View key={index} style={styles.menuItemCard}>
+              <TouchableOpacity
+                key={index}
+                style={styles.menuItemCard}
+                onPress={() => openDetailModal(item)}
+                activeOpacity={0.7}
+              >
                 {/* Square Layout: Image on left, content on right */}
                 {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
                   <View style={styles.squareLayout}>
-                    <TouchableOpacity onPress={() => openImageModal(item.thumbnail_url!)}>
-                      <Image
-                        key={getImageUrl(item.thumbnail_url)}
-                        source={{ uri: getImageUrl(item.thumbnail_url) }}
-                        style={styles.squareImage}
-                        onError={(error) => {
-                          console.error('Image load error for item:', item.name, error.nativeEvent);
-                        }}
-                        onLoad={() => {
-                          console.log('Image loaded successfully for item:', item.name);
-                        }}
-                      />
-                    </TouchableOpacity>
+                    <Image
+                      key={getImageUrl(item.thumbnail_url)}
+                      source={{ uri: getImageUrl(item.thumbnail_url) }}
+                      style={styles.squareImage}
+                      onError={(error) => {
+                        console.error('Image load error for item:', item.name, error.nativeEvent);
+                      }}
+                      onLoad={() => {
+                        console.log('Image loaded successfully for item:', item.name);
+                      }}
+                    />
                     <View style={styles.squareContent}>
                       <View style={styles.squareHeader}>
                         <Text style={styles.menuItemName}>{item.name}</Text>
@@ -298,7 +349,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                         </View>
                       )}
                       {item.description && (
-                        <Text style={styles.squareDescription}>
+                        <Text style={styles.squareDescription} numberOfLines={2}>
                           {item.description}
                         </Text>
                       )}
@@ -308,19 +359,17 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                   /* Banner Layout: Image on top, content below */
                   <>
                     {item.thumbnail_url && (
-                      <TouchableOpacity onPress={() => openImageModal(item.thumbnail_url!)}>
-                        <Image
-                          key={getImageUrl(item.thumbnail_url)}
-                          source={{ uri: getImageUrl(item.thumbnail_url) }}
-                          style={styles.bannerImage}
-                          onError={(error) => {
-                            console.error('Image load error for item:', item.name, error.nativeEvent);
-                          }}
-                          onLoad={() => {
-                            console.log('Image loaded successfully for item:', item.name);
-                          }}
-                        />
-                      </TouchableOpacity>
+                      <Image
+                        key={getImageUrl(item.thumbnail_url)}
+                        source={{ uri: getImageUrl(item.thumbnail_url) }}
+                        style={styles.bannerImage}
+                        onError={(error) => {
+                          console.error('Image load error for item:', item.name, error.nativeEvent);
+                        }}
+                        onLoad={() => {
+                          console.log('Image loaded successfully for item:', item.name);
+                        }}
+                      />
                     )}
                     <View style={styles.menuItemContent}>
                       <View style={styles.menuItemHeader}>
@@ -328,7 +377,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                         <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
                       </View>
                       {item.description && (
-                        <Text style={styles.menuItemDescription}>
+                        <Text style={styles.menuItemDescription} numberOfLines={2}>
                           {item.description}
                         </Text>
                       )}
@@ -362,13 +411,13 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                     </View>
                   </>
                 )}
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         )}
       </ScrollView>
 
-      {/* Image Modal */}
+      {/* Image Modal (kept for backward compatibility if needed) */}
       <Modal
         visible={imageModalVisible}
         transparent={true}
@@ -400,6 +449,19 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           </View>
         </PanGestureHandler>
       </Modal>
+
+      {/* Content Detail Modal for Menu Items */}
+      {selectedMenuItem && (
+        <ContentDetailModal
+          visible={detailModalVisible}
+          onClose={closeDetailModal}
+          title={`${selectedMenuItem.name} - ${formatPrice(selectedMenuItem.price)}`}
+          content={buildDetailedDescription(selectedMenuItem)}
+          thumbnailUrl={selectedMenuItem.thumbnail_url}
+          thumbnailShape={selectedMenuItem.thumbnail_shape}
+          colors={colors}
+        />
+      )}
     </GestureHandlerRootView>
   );
 }
