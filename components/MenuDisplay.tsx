@@ -622,7 +622,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         )}
       </ScrollView>
 
-      {/* Filter Modal - REDESIGNED WITH BUTTONS MOVED UP */}
+      {/* Filter Modal - FIXED WITH LARGER SIZE AND PROPER VISIBILITY */}
       <Modal
         visible={showFilterModal}
         transparent={true}
@@ -644,8 +644,12 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
               </TouchableOpacity>
             </View>
 
-            {/* Filter Options Grid - NO CHECKBOXES, JUST COLOR HIGHLIGHTING */}
-            <ScrollView style={styles.filterModalScroll} showsVerticalScrollIndicator={false}>
+            {/* Filter Options Grid - Scrollable with all options visible */}
+            <ScrollView 
+              style={styles.filterModalScroll} 
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.filterModalScrollContent}
+            >
               <View style={styles.filterOptionsGrid}>
                 {FILTER_OPTIONS.map((option, index) => {
                   const isSelected = selectedFilters.includes(option.value);
@@ -674,27 +678,27 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                   );
                 })}
               </View>
-
-              {/* Modal Footer - MOVED INSIDE SCROLLVIEW TO BE JUST BELOW FILTER OPTIONS */}
-              <View style={styles.filterModalFooter}>
-                <TouchableOpacity
-                  style={[styles.clearFiltersButton, { backgroundColor: colors.highlight }]}
-                  onPress={clearAllFilters}
-                >
-                  <Text style={[styles.clearFiltersButtonText, { color: colors.text }]}>
-                    Clear All
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.applyFiltersButton, { backgroundColor: colors.primary }]}
-                  onPress={() => setShowFilterModal(false)}
-                >
-                  <Text style={styles.applyFiltersButtonText}>
-                    Apply {selectedFilters.length > 0 ? `(${selectedFilters.length})` : ''}
-                  </Text>
-                </TouchableOpacity>
-              </View>
             </ScrollView>
+
+            {/* Modal Footer - Fixed at bottom */}
+            <View style={styles.filterModalFooter}>
+              <TouchableOpacity
+                style={[styles.clearFiltersButton, { backgroundColor: colors.highlight }]}
+                onPress={clearAllFilters}
+              >
+                <Text style={[styles.clearFiltersButtonText, { color: colors.text }]}>
+                  Clear All
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.applyFiltersButton, { backgroundColor: colors.primary }]}
+                onPress={() => setShowFilterModal(false)}
+              >
+                <Text style={styles.applyFiltersButtonText}>
+                  Apply {selectedFilters.length > 0 ? `(${selectedFilters.length})` : ''}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -1018,7 +1022,7 @@ const createStyles = (colors: any) =>
       fontWeight: '600',
       color: colors.text,
     },
-    // Filter Modal Styles - REDESIGNED WITH BUTTONS MOVED UP
+    // Filter Modal Styles - FIXED WITH LARGER SIZE
     filterModalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -1029,7 +1033,7 @@ const createStyles = (colors: any) =>
     filterModalContent: {
       width: '95%',
       maxWidth: 500,
-      maxHeight: '70%',
+      height: 550,
       borderRadius: 24,
       overflow: 'hidden',
       boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.4)',
@@ -1050,18 +1054,20 @@ const createStyles = (colors: any) =>
     },
     filterModalScroll: {
       flex: 1,
+    },
+    filterModalScrollContent: {
       paddingHorizontal: 20,
-      paddingVertical: 16,
+      paddingVertical: 20,
+      paddingBottom: 10,
     },
     filterOptionsGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 12,
-      paddingBottom: 10,
+      gap: 14,
     },
     filterOptionBox: {
       width: '47%',
-      paddingVertical: 14,
+      paddingVertical: 18,
       paddingHorizontal: 12,
       borderRadius: 12,
       borderWidth: 2,
@@ -1069,6 +1075,7 @@ const createStyles = (colors: any) =>
       elevation: 2,
       justifyContent: 'center',
       alignItems: 'center',
+      minHeight: 56,
     },
     filterOptionBoxText: {
       fontSize: 15,
@@ -1078,8 +1085,11 @@ const createStyles = (colors: any) =>
     filterModalFooter: {
       flexDirection: 'row',
       gap: 12,
-      paddingTop: 16,
-      paddingBottom: 10,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      backgroundColor: colors.card,
     },
     clearFiltersButton: {
       flex: 1,
