@@ -50,7 +50,6 @@ const SUBCATEGORIES: { [key: string]: string[] } = {
 
 // Filter options for the search
 const FILTER_OPTIONS = [
-  { label: 'All', value: 'all' },
   { label: 'Lunch', value: 'lunch' },
   { label: 'Dinner', value: 'dinner' },
   { label: 'GF', value: 'gf' },
@@ -86,8 +85,8 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('all');
-  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+  const [showFilterModal, setShowFilterModal] = useState(false);
 
   useEffect(() => {
     loadMenuItems();
@@ -95,7 +94,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
 
   useEffect(() => {
     filterItems();
-  }, [menuItems, selectedCategory, selectedSubcategory, searchQuery, selectedFilter]);
+  }, [menuItems, selectedCategory, selectedSubcategory, searchQuery, selectedFilters]);
 
   // Set the default subcategory when category changes
   useEffect(() => {
@@ -156,9 +155,9 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         return nameMatch || descriptionMatch || categoryMatch || subcategoryMatch || dietaryMatch;
       });
 
-      // Apply selected filter
-      if (selectedFilter !== 'all') {
-        filtered = applyFilter(filtered, selectedFilter);
+      // Apply selected filters (multiple filters)
+      if (selectedFilters.length > 0) {
+        filtered = applyMultipleFilters(filtered, selectedFilters);
       }
     } else {
       // Normal category/subcategory filtering when not searching
@@ -183,31 +182,52 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     setFilteredItems(filtered);
   };
 
-  const applyFilter = (items: MenuItem[], filter: string) => {
-    switch (filter) {
-      case 'lunch':
-        return items.filter(item => item.available_for_lunch);
-      case 'dinner':
-        return items.filter(item => item.available_for_dinner);
-      case 'gf':
-        return items.filter(item => item.is_gluten_free);
-      case 'gfa':
-        return items.filter(item => item.is_gluten_free_available);
-      case 'v':
-        return items.filter(item => item.is_vegetarian);
-      case 'va':
-        return items.filter(item => item.is_vegetarian_available);
-      case 'wine':
-        return items.filter(item => item.category === 'Wine');
-      case 'libations':
-        return items.filter(item => item.category === 'Libations');
-      case 'happy_hour':
-        return items.filter(item => item.category === 'Happy Hour');
-      case 'weekly_specials':
-        return items.filter(item => item.category === 'Weekly Specials');
-      default:
-        return items;
-    }
+  const applyMultipleFilters = (items: MenuItem[], filters: string[]) => {
+    // Apply all filters - item must match ALL selected filters
+    return items.filter(item => {
+      return filters.every(filter => {
+        switch (filter) {
+          case 'lunch':
+            return item.available_for_lunch;
+          case 'dinner':
+            return item.available_for_dinner;
+          case 'gf':
+            return item.is_gluten_free;
+          case 'gfa':
+            return item.is_gluten_free_available;
+          case 'v':
+            return item.is_vegetarian;
+          case 'va':
+            return item.is_vegetarian_available;
+          case 'wine':
+            return item.category === 'Wine';
+          case 'libations':
+            return item.category === 'Libations';
+          case 'happy_hour':
+            return item.category === 'Happy Hour';
+          case 'weekly_specials':
+            return item.category === 'Weekly Specials';
+          default:
+            return true;
+        }
+      });
+    });
+  };
+
+  const toggleFilter = (filterValue: string) => {
+    setSelectedFilters(prev => {
+      if (prev.includes(filterValue)) {
+        // Remove filter if already selected
+        return prev.filter(f => f !== filterValue);
+      } else {
+        // Add filter if not selected
+        return [...prev, filterValue];
+      }
+    });
+  };
+
+  const clearAllFilters = () => {
+    setSelectedFilters([]);
   };
 
   const openImageModal = (imageUrl: string) => {
@@ -294,7 +314,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   return (
     <GestureHandlerRootView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Search Box with Filter */}
+        {/* Search Box with Filter Button */}
         <View style={styles.searchSection}>
           <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
             <IconSymbol
@@ -309,7 +329,6 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
               placeholderTextColor={colors.textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}
-              onFocus={() => setShowFilterMenu(true)}
             />
             {searchQuery.length > 0 && (
               <TouchableOpacity onPress={() => setSearchQuery('')}>
@@ -322,69 +341,56 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
               </TouchableOpacity>
             )}
             <TouchableOpacity 
-              style={styles.filterButton}
-              onPress={() => setShowFilterMenu(!showFilterMenu)}
+              style={[styles.filterButton, { backgroundColor: selectedFilters.length > 0 ? colors.primary : colors.highlight }]}
+              onPress={() => setShowFilterModal(true)}
             >
               <IconSymbol
                 ios_icon_name="line.3.horizontal.decrease.circle"
                 android_material_icon_name="filter_list"
-                size={24}
-                color={selectedFilter !== 'all' ? colors.primary : colors.textSecondary}
+                size={20}
+                color={selectedFilters.length > 0 ? '#FFFFFF' : colors.text}
               />
+              <Text style={[styles.filterButtonText, { color: selectedFilters.length > 0 ? '#FFFFFF' : colors.text }]}>
+                Filter
+              </Text>
+              {selectedFilters.length > 0 && (
+                <View style={styles.filterBadge}>
+                  <Text style={styles.filterBadgeText}>{selectedFilters.length}</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
 
-          {/* Filter Menu */}
-          {showFilterMenu && (
-            <View style={[styles.filterMenu, { backgroundColor: colors.card }]}>
-              <View style={styles.filterHeader}>
-                <Text style={[styles.filterHeaderText, { color: colors.text }]}>Filter By</Text>
-                <TouchableOpacity onPress={() => setShowFilterMenu(false)}>
-                  <IconSymbol
-                    ios_icon_name="xmark"
-                    android_material_icon_name="close"
-                    size={20}
-                    color={colors.textSecondary}
-                  />
-                </TouchableOpacity>
-              </View>
+          {/* Active Filters Display */}
+          {selectedFilters.length > 0 && (
+            <View style={styles.activeFiltersContainer}>
               <ScrollView 
                 horizontal 
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.filterOptionsContainer}
+                contentContainerStyle={styles.activeFiltersScroll}
               >
-                {FILTER_OPTIONS.map((option, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.filterOption,
-                      { 
-                        backgroundColor: selectedFilter === option.value 
-                          ? colors.primary 
-                          : colors.highlight 
-                      },
-                    ]}
-                    onPress={() => {
-                      setSelectedFilter(option.value);
-                      if (option.value !== 'all') {
-                        setShowFilterMenu(false);
-                      }
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.filterOptionText,
-                        { 
-                          color: selectedFilter === option.value 
-                            ? '#FFFFFF' 
-                            : colors.text 
-                        },
-                      ]}
-                    >
-                      {option.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {selectedFilters.map((filterValue, index) => {
+                  const filterOption = FILTER_OPTIONS.find(f => f.value === filterValue);
+                  return (
+                    <View key={index} style={[styles.activeFilterChip, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.activeFilterChipText}>{filterOption?.label}</Text>
+                      <TouchableOpacity onPress={() => toggleFilter(filterValue)}>
+                        <IconSymbol
+                          ios_icon_name="xmark.circle.fill"
+                          android_material_icon_name="cancel"
+                          size={16}
+                          color="#FFFFFF"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+                <TouchableOpacity 
+                  style={[styles.clearAllButton, { backgroundColor: colors.highlight }]}
+                  onPress={clearAllFilters}
+                >
+                  <Text style={[styles.clearAllButtonText, { color: colors.text }]}>Clear All</Text>
+                </TouchableOpacity>
               </ScrollView>
             </View>
           )}
@@ -395,21 +401,6 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
               <Text style={[styles.searchResultsText, { color: colors.text }]}>
                 Search Results ({filteredItems.length})
               </Text>
-              {selectedFilter !== 'all' && (
-                <View style={[styles.activeFilterBadge, { backgroundColor: colors.primary }]}>
-                  <Text style={styles.activeFilterText}>
-                    {FILTER_OPTIONS.find(f => f.value === selectedFilter)?.label}
-                  </Text>
-                  <TouchableOpacity onPress={() => setSelectedFilter('all')}>
-                    <IconSymbol
-                      ios_icon_name="xmark.circle.fill"
-                      android_material_icon_name="cancel"
-                      size={16}
-                      color="#FFFFFF"
-                    />
-                  </TouchableOpacity>
-                </View>
-              )}
             </View>
           )}
         </View>
@@ -621,6 +612,101 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         )}
       </ScrollView>
 
+      {/* Filter Modal */}
+      <Modal
+        visible={showFilterModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowFilterModal(false)}
+      >
+        <View style={styles.filterModalOverlay}>
+          <View style={[styles.filterModalContent, { backgroundColor: colors.card }]}>
+            {/* Modal Header */}
+            <View style={styles.filterModalHeader}>
+              <Text style={[styles.filterModalTitle, { color: colors.text }]}>Filter Options</Text>
+              <TouchableOpacity onPress={() => setShowFilterModal(false)}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Filter Options Grid */}
+            <ScrollView style={styles.filterModalScroll}>
+              <View style={styles.filterOptionsGrid}>
+                {FILTER_OPTIONS.map((option, index) => {
+                  const isSelected = selectedFilters.includes(option.value);
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.filterOptionBox,
+                        { 
+                          backgroundColor: isSelected ? colors.primary : colors.highlight,
+                          borderColor: isSelected ? colors.primary : colors.border,
+                        },
+                      ]}
+                      onPress={() => toggleFilter(option.value)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={styles.filterOptionContent}>
+                        <View style={[
+                          styles.checkbox,
+                          { 
+                            backgroundColor: isSelected ? colors.primary : 'transparent',
+                            borderColor: isSelected ? colors.primary : colors.border,
+                          }
+                        ]}>
+                          {isSelected && (
+                            <IconSymbol
+                              ios_icon_name="checkmark"
+                              android_material_icon_name="check"
+                              size={16}
+                              color="#FFFFFF"
+                            />
+                          )}
+                        </View>
+                        <Text
+                          style={[
+                            styles.filterOptionBoxText,
+                            { color: isSelected ? '#FFFFFF' : colors.text },
+                          ]}
+                        >
+                          {option.label}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </ScrollView>
+
+            {/* Modal Footer */}
+            <View style={styles.filterModalFooter}>
+              <TouchableOpacity
+                style={[styles.clearFiltersButton, { backgroundColor: colors.highlight }]}
+                onPress={clearAllFilters}
+              >
+                <Text style={[styles.clearFiltersButtonText, { color: colors.text }]}>
+                  Clear All
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.applyFiltersButton, { backgroundColor: colors.primary }]}
+                onPress={() => setShowFilterModal(false)}
+              >
+                <Text style={styles.applyFiltersButtonText}>
+                  Apply {selectedFilters.length > 0 ? `(${selectedFilters.length})` : ''}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* Image Modal (kept for backward compatibility if needed) */}
       <Modal
         visible={imageModalVisible}
@@ -705,63 +791,69 @@ const createStyles = (colors: any) =>
       padding: 0,
     },
     filterButton: {
-      padding: 4,
-    },
-    filterMenu: {
-      marginTop: 12,
-      borderRadius: 12,
-      padding: 12,
-      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-      elevation: 3,
-    },
-    filterHeader: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: 12,
-      paddingHorizontal: 4,
-    },
-    filterHeaderText: {
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    filterOptionsContainer: {
-      gap: 8,
-      paddingHorizontal: 4,
-    },
-    filterOption: {
-      paddingHorizontal: 16,
+      paddingHorizontal: 12,
       paddingVertical: 8,
       borderRadius: 20,
-      marginRight: 8,
+      gap: 6,
     },
-    filterOptionText: {
+    filterButtonText: {
       fontSize: 14,
       fontWeight: '600',
     },
-    searchResultsHeader: {
-      flexDirection: 'row',
+    filterBadge: {
+      backgroundColor: 'rgba(255, 255, 255, 0.3)',
+      borderRadius: 10,
+      width: 20,
+      height: 20,
+      justifyContent: 'center',
       alignItems: 'center',
-      justifyContent: 'space-between',
+    },
+    filterBadgeText: {
+      color: '#FFFFFF',
+      fontSize: 11,
+      fontWeight: 'bold',
+    },
+    activeFiltersContainer: {
       marginTop: 12,
+    },
+    activeFiltersScroll: {
+      gap: 8,
       paddingHorizontal: 4,
     },
-    searchResultsText: {
-      fontSize: 16,
-      fontWeight: '600',
-    },
-    activeFilterBadge: {
+    activeFilterChip: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 16,
+      marginRight: 8,
     },
-    activeFilterText: {
-      fontSize: 12,
+    activeFilterChipText: {
+      fontSize: 13,
       fontWeight: '600',
       color: '#FFFFFF',
+    },
+    clearAllButton: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    clearAllButtonText: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    searchResultsHeader: {
+      marginTop: 12,
+      paddingHorizontal: 4,
+    },
+    searchResultsText: {
+      fontSize: 16,
+      fontWeight: '600',
     },
     categoryScroll: {
       maxHeight: 50,
@@ -933,6 +1025,104 @@ const createStyles = (colors: any) =>
       fontSize: 11,
       fontWeight: '600',
       color: colors.text,
+    },
+    // Filter Modal Styles
+    filterModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+    },
+    filterModalContent: {
+      width: '100%',
+      maxWidth: 400,
+      maxHeight: '70%',
+      borderRadius: 20,
+      overflow: 'hidden',
+      boxShadow: '0px 4px 20px rgba(0, 0, 0, 0.3)',
+      elevation: 10,
+    },
+    filterModalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    filterModalTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+    },
+    filterModalScroll: {
+      flex: 1,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+    },
+    filterOptionsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+    },
+    filterOptionBox: {
+      width: '47%',
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      borderRadius: 12,
+      borderWidth: 2,
+      boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+      elevation: 2,
+    },
+    filterOptionContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 6,
+      borderWidth: 2,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    filterOptionBoxText: {
+      fontSize: 15,
+      fontWeight: '600',
+      flex: 1,
+    },
+    filterModalFooter: {
+      flexDirection: 'row',
+      gap: 12,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    clearFiltersButton: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    clearFiltersButtonText: {
+      fontSize: 16,
+      fontWeight: '600',
+    },
+    applyFiltersButton: {
+      flex: 1,
+      paddingVertical: 14,
+      borderRadius: 12,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    applyFiltersButtonText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#FFFFFF',
     },
     imageModalOverlay: {
       flex: 1,
