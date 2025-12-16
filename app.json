@@ -1,3 +1,4 @@
+
 {
   "expo": {
     "name": "Boathouse Connect",
@@ -19,7 +20,8 @@
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
-        ]
+        ],
+        "NSPhotoLibraryUsageDescription": "Boathouse Connect needs access to your photos so you can upload a profile picture to personalize your account."
       },
       "icon": "./assets/images/ea95b469-b132-462c-80f5-f05a9e8d2ab5.jpeg"
     },
