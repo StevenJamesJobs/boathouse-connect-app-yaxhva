@@ -128,24 +128,36 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const filterItems = () => {
     let filtered = menuItems;
 
-    // If searching, apply search and filter logic
-    if (searchQuery.trim()) {
+    // If filters are selected, apply filter logic (even without search text)
+    if (selectedFilters.length > 0) {
+      filtered = applyMultipleFilters(filtered, selectedFilters);
+      
+      // If also searching, apply search on top of filters
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        filtered = filtered.filter(item => {
+          const nameMatch = item.name.toLowerCase().includes(query);
+          const descriptionMatch = item.description?.toLowerCase().includes(query) || false;
+          const categoryMatch = item.category.toLowerCase().includes(query);
+          const subcategoryMatch = item.subcategory?.toLowerCase().includes(query) || false;
+          const dietaryMatch = 
+            (query.includes('gf') && (item.is_gluten_free || item.is_gluten_free_available)) ||
+            (query.includes('gluten') && (item.is_gluten_free || item.is_gluten_free_available)) ||
+            (query.includes('v') && (item.is_vegetarian || item.is_vegetarian_available)) ||
+            (query.includes('veg') && (item.is_vegetarian || item.is_vegetarian_available));
+          
+          return nameMatch || descriptionMatch || categoryMatch || subcategoryMatch || dietaryMatch;
+        });
+      }
+    } else if (searchQuery.trim()) {
+      // If searching without filters, apply search logic
       const query = searchQuery.toLowerCase().trim();
       
       filtered = filtered.filter(item => {
-        // Search by name
         const nameMatch = item.name.toLowerCase().includes(query);
-        
-        // Search by description
         const descriptionMatch = item.description?.toLowerCase().includes(query) || false;
-        
-        // Search by category
         const categoryMatch = item.category.toLowerCase().includes(query);
-        
-        // Search by subcategory
         const subcategoryMatch = item.subcategory?.toLowerCase().includes(query) || false;
-        
-        // Search by dietary tags
         const dietaryMatch = 
           (query.includes('gf') && (item.is_gluten_free || item.is_gluten_free_available)) ||
           (query.includes('gluten') && (item.is_gluten_free || item.is_gluten_free_available)) ||
@@ -154,13 +166,8 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         
         return nameMatch || descriptionMatch || categoryMatch || subcategoryMatch || dietaryMatch;
       });
-
-      // Apply selected filters (multiple filters)
-      if (selectedFilters.length > 0) {
-        filtered = applyMultipleFilters(filtered, selectedFilters);
-      }
     } else {
-      // Normal category/subcategory filtering when not searching
+      // Normal category/subcategory filtering when not searching and no filters
       // Filter by category
       if (selectedCategory === 'Weekly Specials') {
         filtered = filtered.filter(item => item.category === 'Weekly Specials');
@@ -311,6 +318,9 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
 
   const styles = createStyles(colors);
 
+  // Determine if we should show category tabs (only when no filters and no search)
+  const shouldShowCategoryTabs = selectedFilters.length === 0 && !searchQuery.trim();
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
@@ -395,18 +405,18 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
             </View>
           )}
 
-          {/* Search Results Header */}
-          {searchQuery.trim() && (
+          {/* Search/Filter Results Header */}
+          {(searchQuery.trim() || selectedFilters.length > 0) && (
             <View style={styles.searchResultsHeader}>
               <Text style={[styles.searchResultsText, { color: colors.text }]}>
-                Search Results ({filteredItems.length})
+                {searchQuery.trim() ? 'Search Results' : 'Filtered Results'} ({filteredItems.length})
               </Text>
             </View>
           )}
         </View>
 
-        {/* Category Tabs - Only show when not searching */}
-        {!searchQuery.trim() && (
+        {/* Category Tabs - Only show when no filters and no search */}
+        {shouldShowCategoryTabs && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -438,8 +448,8 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           </ScrollView>
         )}
 
-        {/* Subcategory Tabs - Only show when not searching */}
-        {!searchQuery.trim() && SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
+        {/* Subcategory Tabs - Only show when no filters and no search */}
+        {shouldShowCategoryTabs && SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -476,16 +486,16 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         ) : filteredItems.length === 0 ? (
           <View style={styles.emptyContainer}>
             <IconSymbol
-              ios_icon_name={searchQuery.trim() ? "magnifyingglass" : "fork.knife"}
-              android_material_icon_name={searchQuery.trim() ? "search" : "restaurant_menu"}
+              ios_icon_name={searchQuery.trim() || selectedFilters.length > 0 ? "magnifyingglass" : "fork.knife"}
+              android_material_icon_name={searchQuery.trim() || selectedFilters.length > 0 ? "search" : "restaurant_menu"}
               size={64}
               color={colors.textSecondary}
             />
             <Text style={styles.emptyText}>
-              {searchQuery.trim() ? 'No results found' : 'No menu items available'}
+              {searchQuery.trim() || selectedFilters.length > 0 ? 'No results found' : 'No menu items available'}
             </Text>
             <Text style={styles.emptySubtext}>
-              {searchQuery.trim() ? 'Try different keywords or filters' : 'Check back later for updates'}
+              {searchQuery.trim() || selectedFilters.length > 0 ? 'Try different keywords or filters' : 'Check back later for updates'}
             </Text>
           </View>
         ) : (
@@ -612,7 +622,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         )}
       </ScrollView>
 
-      {/* Filter Modal - REDESIGNED WITH LARGER SIZE AND SMALLER FILTER OPTIONS */}
+      {/* Filter Modal - REDESIGNED WITH BUTTONS MOVED UP */}
       <Modal
         visible={showFilterModal}
         transparent={true}
@@ -664,27 +674,27 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                   );
                 })}
               </View>
-            </ScrollView>
 
-            {/* Modal Footer */}
-            <View style={styles.filterModalFooter}>
-              <TouchableOpacity
-                style={[styles.clearFiltersButton, { backgroundColor: colors.highlight }]}
-                onPress={clearAllFilters}
-              >
-                <Text style={[styles.clearFiltersButtonText, { color: colors.text }]}>
-                  Clear All
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.applyFiltersButton, { backgroundColor: colors.primary }]}
-                onPress={() => setShowFilterModal(false)}
-              >
-                <Text style={styles.applyFiltersButtonText}>
-                  Apply {selectedFilters.length > 0 ? `(${selectedFilters.length})` : ''}
-                </Text>
-              </TouchableOpacity>
-            </View>
+              {/* Modal Footer - MOVED INSIDE SCROLLVIEW TO BE JUST BELOW FILTER OPTIONS */}
+              <View style={styles.filterModalFooter}>
+                <TouchableOpacity
+                  style={[styles.clearFiltersButton, { backgroundColor: colors.highlight }]}
+                  onPress={clearAllFilters}
+                >
+                  <Text style={[styles.clearFiltersButtonText, { color: colors.text }]}>
+                    Clear All
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.applyFiltersButton, { backgroundColor: colors.primary }]}
+                  onPress={() => setShowFilterModal(false)}
+                >
+                  <Text style={styles.applyFiltersButtonText}>
+                    Apply {selectedFilters.length > 0 ? `(${selectedFilters.length})` : ''}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1008,7 +1018,7 @@ const createStyles = (colors: any) =>
       fontWeight: '600',
       color: colors.text,
     },
-    // Filter Modal Styles - REDESIGNED WITH LARGER SIZE AND SMALLER FILTER OPTIONS
+    // Filter Modal Styles - REDESIGNED WITH BUTTONS MOVED UP
     filterModalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -1019,7 +1029,7 @@ const createStyles = (colors: any) =>
     filterModalContent: {
       width: '95%',
       maxWidth: 500,
-      height: '70%',
+      maxHeight: '70%',
       borderRadius: 24,
       overflow: 'hidden',
       boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.4)',
@@ -1068,10 +1078,8 @@ const createStyles = (colors: any) =>
     filterModalFooter: {
       flexDirection: 'row',
       gap: 12,
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
+      paddingTop: 16,
+      paddingBottom: 10,
     },
     clearFiltersButton: {
       flex: 1,
