@@ -13,6 +13,7 @@ import {
   Platform,
   Linking,
   Alert,
+  TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -22,6 +23,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import { File, Directory, Paths } from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
+import ContentDetailModal from '@/components/ContentDetailModal';
 
 interface GuideItem {
   id: string;
@@ -50,6 +52,9 @@ export default function GuidesAndTrainingScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string>('Employee HandBooks');
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
   const [viewingFile, setViewingFile] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedGuide, setSelectedGuide] = useState<GuideItem | null>(null);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
 
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
@@ -270,7 +275,42 @@ export default function GuidesAndTrainingScreen() {
     router.back();
   };
 
-  const filteredGuides = guides.filter(g => g.category === selectedCategory);
+  const handleGuidePress = (guide: GuideItem) => {
+    setSelectedGuide(guide);
+    setDetailModalVisible(true);
+  };
+
+  const closeDetailModal = () => {
+    setDetailModalVisible(false);
+    setSelectedGuide(null);
+  };
+
+  // Filter guides based on search query
+  const filterGuides = (guidesToFilter: GuideItem[]) => {
+    if (!searchQuery.trim()) {
+      return guidesToFilter;
+    }
+
+    const query = searchQuery.toLowerCase().trim();
+    
+    return guidesToFilter.filter(guide => {
+      // Search by title (name)
+      const titleMatch = guide.title.toLowerCase().includes(query);
+      
+      // Search by description (keywords)
+      const descriptionMatch = guide.description?.toLowerCase().includes(query) || false;
+      
+      // Search by date
+      const createdDate = formatDate(guide.created_at).toLowerCase();
+      const updatedDate = formatDate(guide.updated_at).toLowerCase();
+      const dateMatch = createdDate.includes(query) || updatedDate.includes(query);
+      
+      return titleMatch || descriptionMatch || dateMatch;
+    });
+  };
+
+  const filteredGuides = filterGuides(guides.filter(g => g.category === selectedCategory));
+  const searchResults = searchQuery.trim() ? filterGuides(guides) : [];
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -287,68 +327,72 @@ export default function GuidesAndTrainingScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoryScroll}
-        contentContainerStyle={styles.categoryScrollContent}
-      >
-        {CATEGORIES.map((category, index) => (
-          <TouchableOpacity
-            key={index}
-            style={[
-              styles.categoryTab,
-              { backgroundColor: colors.card },
-              selectedCategory === category && { backgroundColor: colors.accent || colors.primary },
-            ]}
-            onPress={() => setSelectedCategory(category)}
-          >
-            <Text
-              style={[
-                styles.categoryTabText,
-                { color: colors.textSecondary },
-                selectedCategory === category && { color: colors.text },
-              ]}
-            >
-              {category}
-            </Text>
+      {/* Search Box */}
+      <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
+        <IconSymbol
+          ios_icon_name="magnifyingglass"
+          android_material_icon_name="search"
+          size={20}
+          color={colors.textSecondary}
+        />
+        <TextInput
+          style={[styles.searchInput, { color: colors.text }]}
+          placeholder="Search by name, keywords, or date..."
+          placeholderTextColor={colors.textSecondary}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <IconSymbol
+              ios_icon_name="xmark.circle.fill"
+              android_material_icon_name="cancel"
+              size={20}
+              color={colors.textSecondary}
+            />
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+        )}
+      </View>
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading guides...</Text>
-        </View>
-      ) : (
+      {/* Show search results if searching, otherwise show category tabs */}
+      {searchQuery.trim() ? (
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-          {filteredGuides.length === 0 ? (
+          <Text style={[styles.searchResultsHeader, { color: colors.text }]}>
+            Search Results ({searchResults.length})
+          </Text>
+          {searchResults.length === 0 ? (
             <View style={styles.emptyContainer}>
               <IconSymbol
-                ios_icon_name="book.fill"
-                android_material_icon_name="menu_book"
+                ios_icon_name="magnifyingglass"
+                android_material_icon_name="search"
                 size={64}
                 color={colors.textSecondary}
               />
-              <Text style={[styles.emptyText, { color: colors.text }]}>No guides in this category</Text>
+              <Text style={[styles.emptyText, { color: colors.text }]}>No results found</Text>
               <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                Check back later for new materials
+                Try different keywords
               </Text>
             </View>
           ) : (
-            filteredGuides.map((guide, index) => (
-              <View key={index} style={[styles.guideCard, { backgroundColor: colors.card }]}>
+            searchResults.map((guide, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[styles.guideCard, { backgroundColor: colors.card }]}
+                onPress={() => handleGuidePress(guide)}
+              >
                 <View style={styles.guideLayout}>
                   {guide.thumbnail_url && (
-                    <TouchableOpacity onPress={() => openImageModal(guide.thumbnail_url!)}>
-                      <Image
-                        source={{ uri: getImageUrl(guide.thumbnail_url) }}
-                        style={styles.guideThumbnail}
-                      />
-                    </TouchableOpacity>
+                    <Image
+                      source={{ uri: getImageUrl(guide.thumbnail_url) }}
+                      style={styles.guideThumbnail}
+                    />
                   )}
                   <View style={styles.guideContent}>
+                    <View style={styles.categoryBadge}>
+                      <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>
+                        {guide.category}
+                      </Text>
+                    </View>
                     <Text style={[styles.guideTitle, { color: colors.text }]}>{guide.title}</Text>
                     {guide.description && (
                       <Text style={[styles.guideDescription, { color: colors.textSecondary }]}>
@@ -370,58 +414,152 @@ export default function GuidesAndTrainingScreen() {
                     </View>
                   </View>
                 </View>
-                
-                <View style={styles.actionButtonsContainer}>
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: colors.accent || colors.primary }]}
-                    onPress={() => handleViewFile(guide)}
-                    disabled={viewingFile === guide.id}
-                  >
-                    {viewingFile === guide.id ? (
-                      <ActivityIndicator size="small" color={colors.text} />
-                    ) : (
-                      <>
-                        <IconSymbol
-                          ios_icon_name="eye.fill"
-                          android_material_icon_name="visibility"
-                          size={18}
-                          color={colors.text}
-                        />
-                        <Text style={[styles.actionButtonText, { color: colors.text }]}>
-                          View
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.downloadButton, { backgroundColor: colors.card, borderColor: colors.accent || colors.primary }]}
-                    onPress={() => handleDownloadFile(guide)}
-                    disabled={downloadingFile === guide.id}
-                  >
-                    {downloadingFile === guide.id ? (
-                      <ActivityIndicator size="small" color={colors.accent || colors.primary} />
-                    ) : (
-                      <>
-                        <IconSymbol
-                          ios_icon_name="arrow.down.circle.fill"
-                          android_material_icon_name="download"
-                          size={18}
-                          color={colors.accent || colors.primary}
-                        />
-                        <Text style={[styles.actionButtonText, { color: colors.accent || colors.primary }]}>
-                          Download
-                        </Text>
-                      </>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              </View>
+              </TouchableOpacity>
             ))
           )}
         </ScrollView>
+      ) : (
+        <>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoryScroll}
+            contentContainerStyle={styles.categoryScrollContent}
+          >
+            {CATEGORIES.map((category, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.categoryTab,
+                  { backgroundColor: colors.card },
+                  selectedCategory === category && { backgroundColor: colors.accent || colors.primary },
+                ]}
+                onPress={() => setSelectedCategory(category)}
+              >
+                <Text
+                  style={[
+                    styles.categoryTabText,
+                    { color: colors.textSecondary },
+                    selectedCategory === category && { color: colors.text },
+                  ]}
+                >
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading guides...</Text>
+            </View>
+          ) : (
+            <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+              {filteredGuides.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <IconSymbol
+                    ios_icon_name="book.fill"
+                    android_material_icon_name="menu_book"
+                    size={64}
+                    color={colors.textSecondary}
+                  />
+                  <Text style={[styles.emptyText, { color: colors.text }]}>No guides in this category</Text>
+                  <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                    Check back later for new materials
+                  </Text>
+                </View>
+              ) : (
+                filteredGuides.map((guide, index) => (
+                  <View key={index} style={[styles.guideCard, { backgroundColor: colors.card }]}>
+                    <TouchableOpacity onPress={() => handleGuidePress(guide)}>
+                      <View style={styles.guideLayout}>
+                        {guide.thumbnail_url && (
+                          <TouchableOpacity onPress={() => openImageModal(guide.thumbnail_url!)}>
+                            <Image
+                              source={{ uri: getImageUrl(guide.thumbnail_url) }}
+                              style={styles.guideThumbnail}
+                            />
+                          </TouchableOpacity>
+                        )}
+                        <View style={styles.guideContent}>
+                          <Text style={[styles.guideTitle, { color: colors.text }]}>{guide.title}</Text>
+                          {guide.description && (
+                            <Text style={[styles.guideDescription, { color: colors.textSecondary }]}>
+                              {guide.description}
+                            </Text>
+                          )}
+                          <View style={styles.guideMeta}>
+                            <View style={styles.metaItem}>
+                              <IconSymbol
+                                ios_icon_name="clock"
+                                android_material_icon_name="schedule"
+                                size={14}
+                                color={colors.textSecondary}
+                              />
+                              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                                Updated: {formatDate(guide.updated_at)}
+                              </Text>
+                            </View>
+                          </View>
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                    
+                    <View style={styles.actionButtonsContainer}>
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: colors.accent || colors.primary }]}
+                        onPress={() => handleViewFile(guide)}
+                        disabled={viewingFile === guide.id}
+                      >
+                        {viewingFile === guide.id ? (
+                          <ActivityIndicator size="small" color={colors.text} />
+                        ) : (
+                          <>
+                            <IconSymbol
+                              ios_icon_name="eye.fill"
+                              android_material_icon_name="visibility"
+                              size={18}
+                              color={colors.text}
+                            />
+                            <Text style={[styles.actionButtonText, { color: colors.text }]}>
+                              View
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.downloadButton, { backgroundColor: colors.card, borderColor: colors.accent || colors.primary }]}
+                        onPress={() => handleDownloadFile(guide)}
+                        disabled={downloadingFile === guide.id}
+                      >
+                        {downloadingFile === guide.id ? (
+                          <ActivityIndicator size="small" color={colors.accent || colors.primary} />
+                        ) : (
+                          <>
+                            <IconSymbol
+                              ios_icon_name="arrow.down.circle.fill"
+                              android_material_icon_name="download"
+                              size={18}
+                              color={colors.accent || colors.primary}
+                            />
+                            <Text style={[styles.actionButtonText, { color: colors.accent || colors.primary }]}>
+                              Download
+                            </Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ))
+              )}
+            </ScrollView>
+          )}
+        </>
       )}
 
+      {/* Image Modal */}
       <Modal
         visible={imageModalVisible}
         transparent={true}
@@ -452,6 +590,25 @@ export default function GuidesAndTrainingScreen() {
           </View>
         </PanGestureHandler>
       </Modal>
+
+      {/* Detail Modal */}
+      {selectedGuide && (
+        <ContentDetailModal
+          visible={detailModalVisible}
+          onClose={closeDetailModal}
+          title={selectedGuide.title}
+          content={selectedGuide.description || 'No description available'}
+          thumbnailUrl={selectedGuide.thumbnail_url}
+          guideFile={{
+            id: selectedGuide.id,
+            title: selectedGuide.title,
+            file_url: selectedGuide.file_url,
+            file_name: selectedGuide.file_name,
+            file_type: selectedGuide.file_type,
+          }}
+          colors={colors}
+        />
+      )}
     </GestureHandlerRootView>
   );
 }
@@ -481,6 +638,28 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 10,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 2,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    padding: 0,
+  },
+  searchResultsHeader: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
   },
   categoryScroll: {
     marginTop: 16,
@@ -553,6 +732,18 @@ const styles = StyleSheet.create({
   },
   guideContent: {
     flex: 1,
+  },
+  categoryBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+    marginBottom: 6,
+  },
+  categoryBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   guideTitle: {
     fontSize: 16,
