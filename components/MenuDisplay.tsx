@@ -612,7 +612,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         )}
       </ScrollView>
 
-      {/* Filter Modal - REDESIGNED WITH LARGER SIZE AND NO CHECKBOXES */}
+      {/* Filter Modal - REDESIGNED WITH LARGER SIZE AND SMALLER FILTER OPTIONS */}
       <Modal
         visible={showFilterModal}
         transparent={true}
@@ -1008,7 +1008,7 @@ const createStyles = (colors: any) =>
       fontWeight: '600',
       color: colors.text,
     },
-    // Filter Modal Styles - REDESIGNED FOR LARGER SIZE
+    // Filter Modal Styles - REDESIGNED WITH LARGER SIZE AND SMALLER FILTER OPTIONS
     filterModalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0, 0, 0, 0.6)',
@@ -1019,7 +1019,7 @@ const createStyles = (colors: any) =>
     filterModalContent: {
       width: '95%',
       maxWidth: 500,
-      maxHeight: '80%',
+      height: '70%',
       borderRadius: 24,
       overflow: 'hidden',
       boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.4)',
@@ -1030,7 +1030,7 @@ const createStyles = (colors: any) =>
       justifyContent: 'space-between',
       alignItems: 'center',
       paddingHorizontal: 24,
-      paddingVertical: 20,
+      paddingVertical: 18,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
@@ -1040,59 +1040,59 @@ const createStyles = (colors: any) =>
     },
     filterModalScroll: {
       flex: 1,
-      paddingHorizontal: 24,
-      paddingVertical: 20,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
     },
     filterOptionsGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: 14,
+      gap: 12,
       paddingBottom: 10,
     },
     filterOptionBox: {
       width: '47%',
-      paddingVertical: 18,
-      paddingHorizontal: 16,
-      borderRadius: 14,
+      paddingVertical: 14,
+      paddingHorizontal: 12,
+      borderRadius: 12,
       borderWidth: 2,
-      boxShadow: '0px 3px 8px rgba(0, 0, 0, 0.12)',
-      elevation: 3,
+      boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.1)',
+      elevation: 2,
       justifyContent: 'center',
       alignItems: 'center',
     },
     filterOptionBoxText: {
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: '600',
       textAlign: 'center',
     },
     filterModalFooter: {
       flexDirection: 'row',
       gap: 12,
-      paddingHorizontal: 24,
-      paddingVertical: 20,
+      paddingHorizontal: 20,
+      paddingVertical: 16,
       borderTopWidth: 1,
       borderTopColor: colors.border,
     },
     clearFiltersButton: {
       flex: 1,
-      paddingVertical: 16,
-      borderRadius: 14,
+      paddingVertical: 14,
+      borderRadius: 12,
       justifyContent: 'center',
       alignItems: 'center',
     },
     clearFiltersButtonText: {
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: '600',
     },
     applyFiltersButton: {
       flex: 1,
-      paddingVertical: 16,
-      borderRadius: 14,
+      paddingVertical: 14,
+      borderRadius: 12,
       justifyContent: 'center',
       alignItems: 'center',
     },
     applyFiltersButtonText: {
-      fontSize: 16,
+      fontSize: 15,
       fontWeight: '600',
       color: '#FFFFFF',
     },
