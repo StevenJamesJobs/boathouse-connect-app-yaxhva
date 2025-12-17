@@ -129,7 +129,7 @@ const MenuItemImage: React.FC<MenuItemImageProps> = ({ uri, style, itemName, onP
 
   if (!uri) {
     return (
-      <View style={[style, styles.imagePlaceholder]}>
+      <View style={[style, imageStyles.imagePlaceholder]}>
         <IconSymbol
           ios_icon_name="photo"
           android_material_icon_name="image"
@@ -152,24 +152,59 @@ const MenuItemImage: React.FC<MenuItemImageProps> = ({ uri, style, itemName, onP
         resizeMode="cover"
       />
       {loading && !error && (
-        <View style={[style, styles.imageLoadingOverlay]}>
+        <View style={[style, imageStyles.imageLoadingOverlay]}>
           <ActivityIndicator size="small" color="#3498db" />
         </View>
       )}
       {error && (
-        <View style={[style, styles.imageErrorOverlay]}>
+        <View style={[style, imageStyles.imageErrorOverlay]}>
           <IconSymbol
             ios_icon_name="exclamationmark.triangle"
             android_material_icon_name="error"
             size={32}
             color="#e74c3c"
           />
-          <Text style={styles.imageErrorText}>Failed to load</Text>
+          <Text style={imageStyles.imageErrorText}>Failed to load</Text>
         </View>
       )}
     </View>
   );
 };
+
+// Styles for the MenuItemImage component
+const imageStyles = StyleSheet.create({
+  imagePlaceholder: {
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageLoadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(240, 240, 240, 0.8)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageErrorOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#f8f8f8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageErrorText: {
+    fontSize: 11,
+    color: '#e74c3c',
+    marginTop: 4,
+    fontWeight: '600',
+  },
+});
 
 export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -1096,38 +1131,6 @@ const createStyles = (colors: any) =>
       fontSize: 11,
       fontWeight: '600',
       color: colors.text,
-    },
-    // Image loading and error states
-    imagePlaceholder: {
-      backgroundColor: '#f0f0f0',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    imageLoadingOverlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(240, 240, 240, 0.8)',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    imageErrorOverlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: '#f8f8f8',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    imageErrorText: {
-      fontSize: 11,
-      color: '#e74c3c',
-      marginTop: 4,
-      fontWeight: '600',
     },
     // Filter Modal Styles - FIXED WITH LARGER SIZE
     filterModalOverlay: {
