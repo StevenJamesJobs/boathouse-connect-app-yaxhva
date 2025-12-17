@@ -6,12 +6,12 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Image,
   Modal,
   ActivityIndicator,
   Dimensions,
   TextInput,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
@@ -74,7 +74,7 @@ interface MenuDisplayProps {
   };
 }
 
-// Component for handling image loading with retry logic
+// Component for handling image loading with expo-image
 interface MenuItemImageProps {
   uri: string | null;
   style: any;
@@ -85,47 +85,6 @@ interface MenuItemImageProps {
 const MenuItemImage: React.FC<MenuItemImageProps> = ({ uri, style, itemName, onPress }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
-  const [imageKey, setImageKey] = useState(0);
-  const MAX_RETRIES = 3;
-
-  useEffect(() => {
-    // Reset states when URI changes
-    setLoading(true);
-    setError(false);
-    setRetryCount(0);
-    setImageKey(prev => prev + 1);
-  }, [uri]);
-
-  const handleError = (e: any) => {
-    console.error('Image load error for item:', itemName, e.nativeEvent);
-    setLoading(false);
-    
-    if (retryCount < MAX_RETRIES) {
-      // Retry after a delay
-      const delay = Math.min(1000 * Math.pow(2, retryCount), 5000); // Exponential backoff
-      console.log(`Retrying image load for ${itemName} in ${delay}ms (attempt ${retryCount + 1}/${MAX_RETRIES})`);
-      
-      setTimeout(() => {
-        setRetryCount(prev => prev + 1);
-        setLoading(true);
-        setError(false);
-        setImageKey(prev => prev + 1); // Force re-render with new key
-      }, delay);
-    } else {
-      setError(true);
-    }
-  };
-
-  const handleLoad = () => {
-    console.log('Image loaded successfully for item:', itemName);
-    setLoading(false);
-    setError(false);
-  };
-
-  const handleLoadStart = () => {
-    setLoading(true);
-  };
 
   if (!uri) {
     return (
@@ -143,21 +102,37 @@ const MenuItemImage: React.FC<MenuItemImageProps> = ({ uri, style, itemName, onP
   return (
     <View style={style}>
       <Image
-        key={`${uri}-${imageKey}`}
         source={{ uri }}
         style={style}
-        onError={handleError}
-        onLoad={handleLoad}
-        onLoadStart={handleLoadStart}
-        resizeMode="cover"
+        contentFit="cover"
+        transition={200}
+        cachePolicy="memory-disk"
+        priority="normal"
+        onLoadStart={() => {
+          console.log('Image loading started for:', itemName);
+          setLoading(true);
+          setError(false);
+        }}
+        onLoad={() => {
+          console.log('Image loaded successfully for:', itemName);
+          setLoading(false);
+          setError(false);
+        }}
+        onError={(e) => {
+          console.error('Image load error for:', itemName, e);
+          setLoading(false);
+          setError(true);
+        }}
+        placeholder={require('@/assets/images/natively-dark.png')}
+        placeholderContentFit="cover"
       />
       {loading && !error && (
-        <View style={[style, imageStyles.imageLoadingOverlay]}>
+        <View style={[imageStyles.imageLoadingOverlay, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }]}>
           <ActivityIndicator size="small" color="#3498db" />
         </View>
       )}
       {error && (
-        <View style={[style, imageStyles.imageErrorOverlay]}>
+        <View style={[imageStyles.imageErrorOverlay, { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }]}>
           <IconSymbol
             ios_icon_name="exclamationmark.triangle"
             android_material_icon_name="error"
@@ -179,21 +154,11 @@ const imageStyles = StyleSheet.create({
     alignItems: 'center',
   },
   imageLoadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: 'rgba(240, 240, 240, 0.8)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   imageErrorOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: '#f8f8f8',
     justifyContent: 'center',
     alignItems: 'center',
@@ -238,6 +203,29 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     }
   }, [selectedCategory]);
 
+  // Prefetch images when filtered items change
+  useEffect(() => {
+    const prefetchImages = async () => {
+      const imageUrls = filteredItems
+        .map(item => item.thumbnail_url)
+        .filter((url): url is string => url !== null && url !== undefined);
+      
+      if (imageUrls.length > 0) {
+        console.log('Prefetching', imageUrls.length, 'images...');
+        try {
+          await Image.prefetch(imageUrls, { cachePolicy: 'memory-disk' });
+          console.log('Images prefetched successfully');
+        } catch (error) {
+          console.error('Error prefetching images:', error);
+        }
+      }
+    };
+
+    // Prefetch after a short delay to avoid blocking the UI
+    const timeoutId = setTimeout(prefetchImages, 100);
+    return () => clearTimeout(timeoutId);
+  }, [filteredItems]);
+
   const loadMenuItems = async () => {
     try {
       setLoading(true);
@@ -248,7 +236,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         .order('display_order', { ascending: true });
 
       if (error) throw error;
-      console.log('Loaded menu items for display:', data);
+      console.log('Loaded menu items for display:', data?.length || 0, 'items');
       setMenuItems(data || []);
     } catch (error) {
       console.error('Error loading menu items:', error);
@@ -318,6 +306,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
       }
     }
 
+    console.log('Filtered items:', filtered.length);
     setFilteredItems(filtered);
   };
 
@@ -681,7 +670,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                   </View>
                 ) : (
                   /* Banner Layout: Image on top, content below */
-                  <>
+                  <React.Fragment>
                     {item.thumbnail_url && (
                       <MenuItemImage
                         uri={item.thumbnail_url}
@@ -727,7 +716,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                         </View>
                       )}
                     </View>
-                  </>
+                  </React.Fragment>
                 )}
               </TouchableOpacity>
             ))}
@@ -840,7 +829,8 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
               <Image
                 source={{ uri: selectedImage }}
                 style={styles.fullImage}
-                resizeMode="contain"
+                contentFit="contain"
+                cachePolicy="memory-disk"
               />
             )}
             <Text style={styles.swipeHint}>Swipe down to close</Text>
