@@ -689,15 +689,23 @@ export default function EmployeePortalScreen() {
           ) : (
             <>
               {weeklySpecials.map((item, index) => (
-                <View key={index} style={styles.specialCard}>
+                <TouchableOpacity
+                  key={index}
+                  style={styles.specialCard}
+                  onPress={() => openDetailModal({
+                    title: item.name,
+                    content: `${item.description || ''}\n\nPrice: ${formatPrice(item.price)}${item.is_gluten_free ? '\n• Gluten Free' : ''}${item.is_gluten_free_available ? '\n• Gluten Free Available' : ''}${item.is_vegetarian ? '\n• Vegetarian' : ''}${item.is_vegetarian_available ? '\n• Vegetarian Available' : ''}`,
+                    thumbnailUrl: item.thumbnail_url,
+                    thumbnailShape: item.thumbnail_shape,
+                  })}
+                  activeOpacity={0.7}
+                >
                   {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
                     <View style={styles.specialSquareLayout}>
-                      <TouchableOpacity onPress={() => openImageModal(item.thumbnail_url!)}>
-                        <Image
-                          source={{ uri: getImageUrl(item.thumbnail_url) }}
-                          style={styles.specialSquareImage}
-                        />
-                      </TouchableOpacity>
+                      <Image
+                        source={{ uri: getImageUrl(item.thumbnail_url) }}
+                        style={styles.specialSquareImage}
+                      />
                       <View style={styles.specialSquareContent}>
                         <View style={styles.specialHeader}>
                           <Text style={styles.specialName}>{item.name}</Text>
@@ -737,12 +745,10 @@ export default function EmployeePortalScreen() {
                   ) : (
                     <>
                       {item.thumbnail_url && (
-                        <TouchableOpacity onPress={() => openImageModal(item.thumbnail_url!)}>
-                          <Image
-                            source={{ uri: getImageUrl(item.thumbnail_url) }}
-                            style={styles.specialBannerImage}
-                          />
-                        </TouchableOpacity>
+                        <Image
+                          source={{ uri: getImageUrl(item.thumbnail_url) }}
+                          style={styles.specialBannerImage}
+                        />
                       )}
                       <View style={styles.specialContent}>
                         <View style={styles.specialHeader}>
@@ -781,7 +787,7 @@ export default function EmployeePortalScreen() {
                       </View>
                     </>
                   )}
-                </View>
+                </TouchableOpacity>
               ))}
             </>
           )}
