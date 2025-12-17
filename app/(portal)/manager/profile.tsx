@@ -245,7 +245,7 @@ export default function ManagerProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Profile Header */}
+      {/* Compact Profile Header - Image Left, Details Right */}
       <View style={styles.profileHeader}>
         <TouchableOpacity onPress={handlePickImage} style={styles.avatarContainer}>
           {uploading ? (
@@ -254,13 +254,13 @@ export default function ManagerProfileScreen() {
             <Image 
               source={{ uri: user.profilePictureUrl }} 
               style={styles.avatar}
-              key={user.profilePictureUrl} // Force re-render when URL changes
+              key={user.profilePictureUrl}
             />
           ) : (
             <IconSymbol
               ios_icon_name="person.circle.fill"
               android_material_icon_name="account_circle"
-              size={100}
+              size={70}
               color={managerColors.highlight}
             />
           )}
@@ -268,22 +268,24 @@ export default function ManagerProfileScreen() {
             <IconSymbol
               ios_icon_name="camera.fill"
               android_material_icon_name="camera_alt"
-              size={16}
+              size={14}
               color="#FFFFFF"
             />
           </View>
         </TouchableOpacity>
-        <Text style={styles.uploadHint}>Tap to change photo</Text>
-        <Text style={styles.userName}>{user?.name}</Text>
-        <Text style={styles.userRole}>{user?.jobTitle}</Text>
-        <View style={styles.managerBadge}>
-          <IconSymbol
-            ios_icon_name="star.fill"
-            android_material_icon_name="star"
-            size={16}
-            color={managerColors.text}
-          />
-          <Text style={styles.managerBadgeText}>Manager</Text>
+        
+        <View style={styles.profileDetails}>
+          <Text style={styles.userName}>{user?.name}</Text>
+          <Text style={styles.userRole}>{user?.jobTitle}</Text>
+          <View style={styles.managerBadge}>
+            <IconSymbol
+              ios_icon_name="star.fill"
+              android_material_icon_name="star"
+              size={12}
+              color={managerColors.text}
+            />
+            <Text style={styles.managerBadgeText}>Manager</Text>
+          </View>
         </View>
       </View>
 
@@ -505,67 +507,66 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   profileHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: managerColors.card,
     borderRadius: 16,
-    padding: 24,
+    padding: 16,
     marginBottom: 20,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 8,
+    marginRight: 16,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
   },
   cameraIcon: {
     position: 'absolute',
     bottom: 0,
     right: 0,
     backgroundColor: managerColors.highlight,
-    borderRadius: 16,
-    width: 32,
-    height: 32,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: managerColors.card,
   },
-  uploadHint: {
-    fontSize: 12,
-    color: managerColors.textSecondary,
-    fontStyle: 'italic',
-    marginBottom: 12,
+  profileDetails: {
+    flex: 1,
+    justifyContent: 'center',
   },
   userName: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: managerColors.text,
     marginBottom: 4,
   },
   userRole: {
-    fontSize: 16,
+    fontSize: 14,
     color: managerColors.textSecondary,
-    fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   managerBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: managerColors.highlight,
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
   },
   managerBadgeText: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: managerColors.text,
-    marginLeft: 6,
+    marginLeft: 4,
   },
   messagesCard: {
     backgroundColor: managerColors.card,

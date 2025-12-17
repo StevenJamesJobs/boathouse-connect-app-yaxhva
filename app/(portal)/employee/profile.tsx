@@ -245,7 +245,7 @@ export default function EmployeeProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Profile Header */}
+      {/* Compact Profile Header - Image Left, Details Right */}
       <View style={styles.profileHeader}>
         <TouchableOpacity onPress={handlePickImage} style={styles.avatarContainer}>
           {uploading ? (
@@ -254,13 +254,13 @@ export default function EmployeeProfileScreen() {
             <Image 
               source={{ uri: user.profilePictureUrl }} 
               style={styles.avatar}
-              key={user.profilePictureUrl} // Force re-render when URL changes
+              key={user.profilePictureUrl}
             />
           ) : (
             <IconSymbol
               ios_icon_name="person.circle.fill"
               android_material_icon_name="account_circle"
-              size={100}
+              size={70}
               color={employeeColors.primary}
             />
           )}
@@ -268,14 +268,25 @@ export default function EmployeeProfileScreen() {
             <IconSymbol
               ios_icon_name="camera.fill"
               android_material_icon_name="camera_alt"
-              size={16}
+              size={14}
               color="#FFFFFF"
             />
           </View>
         </TouchableOpacity>
-        <Text style={styles.uploadHint}>Tap to change photo</Text>
-        <Text style={styles.userName}>{user?.name}</Text>
-        <Text style={styles.userRole}>{user?.jobTitle}</Text>
+        
+        <View style={styles.profileDetails}>
+          <Text style={styles.userName}>{user?.name}</Text>
+          <Text style={styles.userRole}>{user?.jobTitle}</Text>
+          <View style={styles.roleBadge}>
+            <IconSymbol
+              ios_icon_name="person.fill"
+              android_material_icon_name="person"
+              size={12}
+              color="#FFFFFF"
+            />
+            <Text style={styles.roleBadgeText}>Employee</Text>
+          </View>
+        </View>
       </View>
 
       {/* Messages Section */}
@@ -496,52 +507,66 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   profileHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: employeeColors.card,
     borderRadius: 16,
-    padding: 24,
+    padding: 16,
     marginBottom: 20,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
   },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 8,
+    marginRight: 16,
   },
   avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
   },
   cameraIcon: {
     position: 'absolute',
     bottom: 0,
     right: 0,
     backgroundColor: employeeColors.primary,
-    borderRadius: 16,
-    width: 32,
-    height: 32,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: employeeColors.card,
   },
-  uploadHint: {
-    fontSize: 12,
-    color: employeeColors.textSecondary,
-    fontStyle: 'italic',
-    marginBottom: 12,
+  profileDetails: {
+    flex: 1,
+    justifyContent: 'center',
   },
   userName: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
     color: employeeColors.text,
     marginBottom: 4,
   },
   userRole: {
-    fontSize: 16,
-    color: employeeColors.primary,
+    fontSize: 14,
+    color: employeeColors.textSecondary,
+    marginBottom: 8,
+  },
+  roleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: employeeColors.primary,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    alignSelf: 'flex-start',
+  },
+  roleBadgeText: {
+    fontSize: 12,
     fontWeight: '600',
+    color: '#FFFFFF',
+    marginLeft: 4,
   },
   messagesCard: {
     backgroundColor: employeeColors.card,
