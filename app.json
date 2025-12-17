@@ -1,10 +1,11 @@
+
 {
   "expo": {
     "name": "Boathouse Connect",
     "slug": "Boathouse Connect",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/ea95b469-b132-462c-80f5-f05a9e8d2ab5.jpeg",
+    "icon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png",
     "scheme": "mcloones",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -22,20 +23,20 @@
         ],
         "NSPhotoLibraryUsageDescription": "Boathouse Connect needs access to your photos so you can upload a profile picture to personalize your account."
       },
-      "icon": "./assets/images/ea95b469-b132-462c-80f5-f05a9e8d2ab5.jpeg"
+      "icon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/ea95b469-b132-462c-80f5-f05a9e8d2ab5.jpeg",
+        "foregroundImage": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png",
         "backgroundColor": "#E8F1F8"
       },
       "package": "com.mcloones.boathouseconnect",
-      "icon": "./assets/images/ea95b469-b132-462c-80f5-f05a9e8d2ab5.jpeg"
+      "icon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/ea95b469-b132-462c-80f5-f05a9e8d2ab5.jpeg"
+      "favicon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png"
     },
     "plugins": [
       "expo-router",
