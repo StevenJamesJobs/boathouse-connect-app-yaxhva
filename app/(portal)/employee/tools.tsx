@@ -10,6 +10,8 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -155,14 +157,17 @@ export default function EmployeeToolsScreen() {
         </View>
       </ScrollView>
 
-      {/* Feedback Modal */}
+      {/* Feedback Modal - Fixed positioning */}
       <Modal
         visible={showFeedbackModal}
         animationType="slide"
         transparent={true}
         onRequestClose={() => setShowFeedbackModal(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Feedback and Suggestions</Text>
@@ -183,7 +188,11 @@ export default function EmployeeToolsScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalScrollContent}>
+            <ScrollView 
+              style={styles.modalScroll} 
+              contentContainerStyle={styles.modalScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
               <Text style={styles.feedbackInstructions}>
                 Have any feedback or suggestions that can help the team? Let us know below and submit your idea! 
                 Your feedback is not anonymous, but will only be seen as a private message between only you and management.
@@ -236,7 +245,7 @@ export default function EmployeeToolsScreen() {
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -329,20 +338,23 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   modalContent: {
     backgroundColor: employeeColors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-    paddingTop: 20,
+    borderRadius: 24,
+    width: '100%',
+    maxHeight: '85%',
+    overflow: 'hidden',
   },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: employeeColors.border,
@@ -351,6 +363,7 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     color: employeeColors.text,
+    flex: 1,
   },
   closeButton: {
     padding: 4,
@@ -407,6 +420,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     gap: 8,
     marginTop: 8,
+    marginBottom: 20,
   },
   submitButtonDisabled: {
     opacity: 0.6,

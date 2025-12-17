@@ -245,7 +245,7 @@ export default function EmployeeProfileScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      {/* Compact Profile Header - Image Left, Details Right */}
+      {/* Compact Profile Header - Image Left, Details Right - LARGER SIZE */}
       <View style={styles.profileHeader}>
         <TouchableOpacity onPress={handlePickImage} style={styles.avatarContainer}>
           {uploading ? (
@@ -260,7 +260,7 @@ export default function EmployeeProfileScreen() {
             <IconSymbol
               ios_icon_name="person.circle.fill"
               android_material_icon_name="account_circle"
-              size={70}
+              size={90}
               color={employeeColors.primary}
             />
           )}
@@ -268,7 +268,7 @@ export default function EmployeeProfileScreen() {
             <IconSymbol
               ios_icon_name="camera.fill"
               android_material_icon_name="camera_alt"
-              size={14}
+              size={16}
               color="#FFFFFF"
             />
           </View>
@@ -281,7 +281,7 @@ export default function EmployeeProfileScreen() {
             <IconSymbol
               ios_icon_name="person.fill"
               android_material_icon_name="person"
-              size={12}
+              size={14}
               color="#FFFFFF"
             />
             <Text style={styles.roleBadgeText}>Employee</Text>
@@ -511,28 +511,28 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: employeeColors.card,
     borderRadius: 16,
-    padding: 16,
+    padding: 20,
     marginBottom: 20,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
   },
   avatarContainer: {
     position: 'relative',
-    marginRight: 16,
+    marginRight: 20,
   },
   avatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
   },
   cameraIcon: {
     position: 'absolute',
     bottom: 0,
     right: 0,
     backgroundColor: employeeColors.primary,
-    borderRadius: 12,
-    width: 24,
-    height: 24,
+    borderRadius: 14,
+    width: 28,
+    height: 28,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
@@ -543,30 +543,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   userName: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: employeeColors.text,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   userRole: {
-    fontSize: 14,
+    fontSize: 16,
     color: employeeColors.textSecondary,
-    marginBottom: 8,
+    marginBottom: 10,
   },
   roleBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: employeeColors.primary,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     alignSelf: 'flex-start',
   },
   roleBadgeText: {
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '600',
     color: '#FFFFFF',
-    marginLeft: 4,
+    marginLeft: 6,
   },
   messagesCard: {
     backgroundColor: employeeColors.card,
