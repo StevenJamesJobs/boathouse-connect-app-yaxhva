@@ -207,40 +207,50 @@ export default function MessagesScreen() {
   const loadFeedback = async () => {
     if (!user?.id || !isManager) return;
 
-    const { data, error } = await supabase
+    console.log('Loading feedback...');
+
+    // First, let's try a simpler query to see if we can get the data
+    const { data: feedbackData, error: feedbackError } = await supabase
       .from('feedback')
-      .select(`
-        id,
-        sender_id,
-        title,
-        description,
-        created_at,
-        sender:users!feedback_sender_id_fkey (
-          name,
-          job_title,
-          profile_picture_url
-        )
-      `)
+      .select('*')
       .eq('is_deleted', false)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error loading feedback:', error);
-      throw error;
+    if (feedbackError) {
+      console.error('Error loading feedback:', feedbackError);
+      throw feedbackError;
     }
 
-    const feedback: Feedback[] = (data || []).map((item: any) => ({
-      id: item.id,
-      sender_id: item.sender_id,
-      title: item.title,
-      description: item.description,
-      created_at: item.created_at,
-      sender_name: item.sender?.name || 'Unknown',
-      sender_job_title: item.sender?.job_title || '',
-      sender_profile_picture: item.sender?.profile_picture_url || null,
-    }));
+    console.log('Feedback data:', feedbackData);
 
-    setFeedbackList(feedback);
+    // Now get user data separately for each feedback
+    const feedbackWithUsers: Feedback[] = [];
+    
+    for (const item of feedbackData || []) {
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('name, job_title, profile_picture_url')
+        .eq('id', item.sender_id)
+        .single();
+
+      if (userError) {
+        console.error('Error loading user for feedback:', userError);
+      }
+
+      feedbackWithUsers.push({
+        id: item.id,
+        sender_id: item.sender_id,
+        title: item.title,
+        description: item.description,
+        created_at: item.created_at,
+        sender_name: userData?.name || 'Unknown',
+        sender_job_title: userData?.job_title || '',
+        sender_profile_picture: userData?.profile_picture_url || null,
+      });
+    }
+
+    console.log('Feedback with users:', feedbackWithUsers);
+    setFeedbackList(feedbackWithUsers);
   };
 
   const loadUnreadCount = async () => {
@@ -577,6 +587,9 @@ export default function MessagesScreen() {
               <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
                 No feedback submissions yet
               </Text>
+              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                Employees can submit feedback from their Tools page
+              </Text>
             </View>
           ) : (
             <>
@@ -611,6 +624,9 @@ export default function MessagesScreen() {
                           {formatDate(feedback.created_at)}
                         </Text>
                       </View>
+                      <Text style={[styles.messageJobTitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {feedback.sender_job_title}
+                      </Text>
                       <Text style={[styles.messageSubject, { color: colors.text }]} numberOfLines={1}>
                         {feedback.title}
                       </Text>
@@ -851,6 +867,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: 'center',
   },
+  emptySubtext: {
+    marginTop: 8,
+    fontSize: 14,
+    textAlign: 'center',
+  },
   messageItemWrapper: {
     marginBottom: 12,
   },
@@ -914,6 +935,10 @@ const styles = StyleSheet.create({
   },
   messageDate: {
     fontSize: 12,
+  },
+  messageJobTitle: {
+    fontSize: 12,
+    marginBottom: 4,
   },
   messageSubject: {
     fontSize: 14,

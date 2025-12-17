@@ -157,7 +157,7 @@ export default function EmployeeToolsScreen() {
         </View>
       </ScrollView>
 
-      {/* Feedback Modal - Fixed positioning */}
+      {/* Feedback Modal - Fixed with proper height */}
       <Modal
         visible={showFeedbackModal}
         animationType="slide"
@@ -168,6 +168,15 @@ export default function EmployeeToolsScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
+          <TouchableOpacity 
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => {
+              setShowFeedbackModal(false);
+              setFeedbackTitle('');
+              setFeedbackDescription('');
+            }}
+          />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Feedback and Suggestions</Text>
@@ -337,16 +346,23 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
     backgroundColor: employeeColors.card,
     borderRadius: 24,
-    width: '100%',
-    maxHeight: '85%',
+    width: '90%',
+    maxWidth: 500,
+    height: 600,
     overflow: 'hidden',
   },
   modalHeader: {
