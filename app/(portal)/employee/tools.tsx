@@ -28,6 +28,11 @@ export default function EmployeeToolsScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmitFeedback = async () => {
+    console.log('=== FEEDBACK SUBMISSION STARTED ===');
+    console.log('User ID:', user?.id);
+    console.log('Title:', feedbackTitle);
+    console.log('Description length:', feedbackDescription.length);
+
     if (!feedbackTitle.trim()) {
       Alert.alert('Error', 'Please enter a title for your feedback');
       return;
@@ -38,22 +43,52 @@ export default function EmployeeToolsScreen() {
       return;
     }
 
+    if (!user?.id) {
+      Alert.alert('Error', 'User not authenticated. Please log in again.');
+      return;
+    }
+
     try {
       setSubmitting(true);
 
-      const { error } = await supabase
+      console.log('Attempting to insert feedback...');
+      const { data, error } = await supabase
         .from('feedback')
         .insert({
-          sender_id: user?.id,
+          sender_id: user.id,
           title: feedbackTitle.trim(),
           description: feedbackDescription.trim(),
-        });
+        })
+        .select();
+
+      console.log('Insert response data:', data);
+      console.log('Insert response error:', error);
 
       if (error) {
         console.error('Error submitting feedback:', error);
-        throw error;
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        
+        // Provide more specific error messages
+        if (error.code === '42501') {
+          Alert.alert(
+            'Permission Error',
+            'You do not have permission to submit feedback. Please contact your manager.'
+          );
+        } else if (error.code === '23503') {
+          Alert.alert(
+            'Database Error',
+            'There was an issue with your user account. Please log out and log back in.'
+          );
+        } else {
+          Alert.alert(
+            'Error',
+            `Failed to submit feedback: ${error.message || 'Unknown error'}`
+          );
+        }
+        return;
       }
 
+      console.log('Feedback submitted successfully!');
       Alert.alert(
         'Success',
         'Your feedback has been submitted successfully! Management will review it.',
@@ -68,11 +103,13 @@ export default function EmployeeToolsScreen() {
           },
         ]
       );
-    } catch (error) {
-      console.error('Error submitting feedback:', error);
-      Alert.alert('Error', 'Failed to submit feedback. Please try again.');
+    } catch (error: any) {
+      console.error('Unexpected error submitting feedback:', error);
+      console.error('Error stack:', error.stack);
+      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
     } finally {
       setSubmitting(false);
+      console.log('=== FEEDBACK SUBMISSION ENDED ===');
     }
   };
 
