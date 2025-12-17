@@ -47,6 +47,8 @@ export default function ContentDetailModal({
     }
   };
 
+  const screenHeight = Dimensions.get('window').height;
+
   return (
     <Modal
       visible={visible}
@@ -55,8 +57,13 @@ export default function ContentDetailModal({
       onRequestClose={onClose}
     >
       <GestureHandlerRootView style={styles.modalOverlay}>
+        <TouchableOpacity 
+          style={styles.modalBackdrop} 
+          activeOpacity={1} 
+          onPress={onClose}
+        />
         <PanGestureHandler onGestureEvent={handleSwipeGesture}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, height: screenHeight * 0.85 }]}>
             {/* Swipe Indicator */}
             <View style={styles.swipeIndicatorContainer}>
               <View style={[styles.swipeIndicator, { backgroundColor: colors.border }]} />
@@ -118,10 +125,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
   },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: Dimensions.get('window').height * 0.85,
     paddingBottom: 20,
     boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.3)',
     elevation: 10,
