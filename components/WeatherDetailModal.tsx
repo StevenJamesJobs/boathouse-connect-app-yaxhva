@@ -81,9 +81,9 @@ export default function WeatherDetailModal({
       setLoading(true);
       setError(null);
 
-      // Request 4 days to get today + next 3 days
+      // Request 5 days to ensure we get today + next 3 days (with buffer)
       const response = await fetch(
-        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=4&aqi=no&alerts=no`
+        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=5&aqi=no&alerts=no`
       );
 
       if (!response.ok) {
@@ -92,6 +92,7 @@ export default function WeatherDetailModal({
 
       const data = await response.json();
       console.log('Detailed Weather API Response:', data);
+      console.log('Total forecast days received:', data.forecast.forecastday.length);
 
       // Generate detailed forecast for today
       const today = data.forecast.forecastday[0];
@@ -125,10 +126,31 @@ export default function WeatherDetailModal({
 
       detailedForecast += `Sunrise at ${todayAstro.sunrise}, sunset at ${todayAstro.sunset}.`;
 
-      // Process next 3 days (skip today at index 0, get days 1, 2, 3)
-      const next3Days: DayForecast[] = data.forecast.forecastday.slice(1, 4).map((day: any) => {
+      // Get today's date to compare
+      const todayDate = new Date();
+      todayDate.setHours(0, 0, 0, 0);
+      
+      console.log('Today\'s date:', todayDate.toISOString());
+
+      // Filter to get only future days (not today) and take exactly 3
+      const futureDays = data.forecast.forecastday.filter((day: any, index: number) => {
+        const dayDate = new Date(day.date);
+        dayDate.setHours(0, 0, 0, 0);
+        
+        console.log(`Day ${index} date:`, dayDate.toISOString(), 'Is future:', dayDate > todayDate);
+        
+        // Only include days that are after today
+        return dayDate > todayDate;
+      });
+
+      console.log('Future days found:', futureDays.length);
+
+      // Take exactly 3 future days
+      const next3Days: DayForecast[] = futureDays.slice(0, 3).map((day: any, index: number) => {
         const date = new Date(day.date);
         const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+        
+        console.log(`Processing future day ${index + 1}:`, dayOfWeek, day.date);
         
         let summary = `${day.day.condition.text}. `;
         
@@ -160,6 +182,11 @@ export default function WeatherDetailModal({
           windSpeed: Math.round(day.day.maxwind_mph),
           uvIndex: day.day.uv,
         };
+      });
+
+      console.log('Next 3 days processed:', next3Days.length, 'days');
+      next3Days.forEach((day, i) => {
+        console.log(`Day ${i + 1}:`, day.dayOfWeek, day.date);
       });
 
       const weatherDetail: WeatherDetailData = {
@@ -365,62 +392,68 @@ export default function WeatherDetailModal({
                   <View style={styles.forecastSection}>
                     <Text style={[styles.forecastTitle, { color: colors.text }]}>Next 3 Day Forecast</Text>
 
-                    {weatherData.next3Days.map((day, index) => (
-                      <View
-                        key={index}
-                        style={[
-                          styles.forecastDayCard,
-                          { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }
-                        ]}
-                      >
-                        <View style={styles.forecastDayHeader}>
-                          <View style={styles.forecastDayInfo}>
-                            <Text style={[styles.forecastDayName, { color: colors.text }]}>
-                              {day.dayOfWeek}
-                            </Text>
-                            <Text style={[styles.forecastDate, { color: colors.textSecondary }]}>
-                              {day.date}
-                            </Text>
-                          </View>
-                          <Image
-                            source={{ uri: day.conditionIcon }}
-                            style={styles.forecastIcon}
-                            resizeMode="contain"
-                          />
-                        </View>
-
-                        <View style={styles.forecastTemps}>
-                          <View style={styles.tempItem}>
-                            <IconSymbol
-                              ios_icon_name="arrow.up"
-                              android_material_icon_name="arrow_upward"
-                              size={16}
-                              color="#E74C3C"
+                    {weatherData.next3Days.length === 0 ? (
+                      <Text style={[styles.noDataText, { color: colors.textSecondary }]}>
+                        No forecast data available for the next 3 days.
+                      </Text>
+                    ) : (
+                      weatherData.next3Days.map((day, index) => (
+                        <View
+                          key={index}
+                          style={[
+                            styles.forecastDayCard,
+                            { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }
+                          ]}
+                        >
+                          <View style={styles.forecastDayHeader}>
+                            <View style={styles.forecastDayInfo}>
+                              <Text style={[styles.forecastDayName, { color: colors.text }]}>
+                                {day.dayOfWeek}
+                              </Text>
+                              <Text style={[styles.forecastDate, { color: colors.textSecondary }]}>
+                                {day.date}
+                              </Text>
+                            </View>
+                            <Image
+                              source={{ uri: day.conditionIcon }}
+                              style={styles.forecastIcon}
+                              resizeMode="contain"
                             />
-                            <Text style={[styles.tempLabel, { color: colors.textSecondary }]}>High:</Text>
-                            <Text style={[styles.tempValue, { color: colors.text }]}>{day.highTemp}°F</Text>
                           </View>
-                          <View style={styles.tempItem}>
-                            <IconSymbol
-                              ios_icon_name="arrow.down"
-                              android_material_icon_name="arrow_downward"
-                              size={16}
-                              color="#3498DB"
-                            />
-                            <Text style={[styles.tempLabel, { color: colors.textSecondary }]}>Low:</Text>
-                            <Text style={[styles.tempValue, { color: colors.text }]}>{day.lowTemp}°F</Text>
+
+                          <View style={styles.forecastTemps}>
+                            <View style={styles.tempItem}>
+                              <IconSymbol
+                                ios_icon_name="arrow.up"
+                                android_material_icon_name="arrow_upward"
+                                size={16}
+                                color="#E74C3C"
+                              />
+                              <Text style={[styles.tempLabel, { color: colors.textSecondary }]}>High:</Text>
+                              <Text style={[styles.tempValue, { color: colors.text }]}>{day.highTemp}°F</Text>
+                            </View>
+                            <View style={styles.tempItem}>
+                              <IconSymbol
+                                ios_icon_name="arrow.down"
+                                android_material_icon_name="arrow_downward"
+                                size={16}
+                                color="#3498DB"
+                              />
+                              <Text style={[styles.tempLabel, { color: colors.textSecondary }]}>Low:</Text>
+                              <Text style={[styles.tempValue, { color: colors.text }]}>{day.lowTemp}°F</Text>
+                            </View>
                           </View>
+
+                          <Text style={[styles.forecastCondition, { color: colors.text }]}>
+                            {day.conditionText}
+                          </Text>
+
+                          <Text style={[styles.forecastSummary, { color: colors.textSecondary }]}>
+                            {day.summary}
+                          </Text>
                         </View>
-
-                        <Text style={[styles.forecastCondition, { color: colors.text }]}>
-                          {day.conditionText}
-                        </Text>
-
-                        <Text style={[styles.forecastSummary, { color: colors.textSecondary }]}>
-                          {day.summary}
-                        </Text>
-                      </View>
-                    ))}
+                      ))
+                    )}
                   </View>
                 </>
               )}
@@ -574,6 +607,11 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: 'bold',
     marginBottom: 16,
+  },
+  noDataText: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 20,
   },
   forecastDayCard: {
     borderRadius: 12,
