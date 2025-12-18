@@ -1,3 +1,4 @@
+
 # Ignore generated files
 _expo/
 dist/
@@ -9,3 +10,6 @@ node_modules/
 # Ignore build artifacts
 *.bundle.js
 *.bundle.js.map
+
+# Ignore Supabase Edge Functions (they use Deno imports)
+supabase/functions/
