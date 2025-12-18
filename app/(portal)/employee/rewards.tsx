@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -51,12 +51,7 @@ export default function EmployeeRewardsScreen() {
   // Reviews state
   const [reviews, setReviews] = useState<GuestReview[]>([]);
 
-  useEffect(() => {
-    fetchRewardsData();
-    fetchReviews();
-  }, []);
-
-  const fetchRewardsData = async () => {
+  const fetchRewardsData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -142,9 +137,9 @@ export default function EmployeeRewardsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('guest_reviews')
@@ -159,7 +154,12 @@ export default function EmployeeRewardsScreen() {
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchRewardsData();
+    fetchReviews();
+  }, [fetchRewardsData, fetchReviews]);
 
   const renderStars = (rating: number) => {
     return (

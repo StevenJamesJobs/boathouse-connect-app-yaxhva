@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -46,17 +46,7 @@ export default function ComposeMessageScreen() {
 
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
-  useEffect(() => {
-    loadUsers();
-  }, []);
-
-  useEffect(() => {
-    if (allUsers.length > 0) {
-      generateRecipientGroups();
-    }
-  }, [allUsers]);
-
-  const loadUsers = async () => {
+  const loadUsers = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('users')
@@ -71,9 +61,9 @@ export default function ComposeMessageScreen() {
       console.error('Error loading users:', error);
       Alert.alert('Error', 'Failed to load users');
     }
-  };
+  }, [user?.id]);
 
-  const generateRecipientGroups = () => {
+  const generateRecipientGroups = useCallback(() => {
     const groups: RecipientGroup[] = [];
 
     // Default group for employees: All Managers
@@ -114,7 +104,17 @@ export default function ComposeMessageScreen() {
     });
 
     setRecipientGroups(groups);
-  };
+  }, [allUsers, user?.role]);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers]);
+
+  useEffect(() => {
+    if (allUsers.length > 0) {
+      generateRecipientGroups();
+    }
+  }, [allUsers, generateRecipientGroups]);
 
   const handleSelectGroup = (group: RecipientGroup) => {
     const groupUsers = allUsers.filter(u => group.userIds.includes(u.id));
