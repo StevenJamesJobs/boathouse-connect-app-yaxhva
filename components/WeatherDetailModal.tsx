@@ -21,12 +21,6 @@ interface DayForecast {
   conditionText: string;
   highTemp: number;
   lowTemp: number;
-  summary: string;
-  chanceOfRain: number;
-  chanceOfSnow: number;
-  humidity: number;
-  windSpeed: number;
-  uvIndex: number;
 }
 
 interface WeatherDetailData {
@@ -126,18 +120,19 @@ export default function WeatherDetailModal({
 
       detailedForecast += `Sunrise at ${todayAstro.sunrise}, sunset at ${todayAstro.sunset}.`;
 
-      // Get today's date to compare
+      // Get today's date at midnight for accurate comparison
       const todayDate = new Date();
       todayDate.setHours(0, 0, 0, 0);
       
-      console.log('Today\'s date:', todayDate.toISOString());
+      console.log('Today\'s date (midnight):', todayDate.toISOString());
+      console.log('Today\'s date (local):', todayDate.toLocaleDateString());
 
       // Filter to get only future days (not today) and take exactly 3
       const futureDays = data.forecast.forecastday.filter((day: any, index: number) => {
-        const dayDate = new Date(day.date);
-        dayDate.setHours(0, 0, 0, 0);
+        const dayDate = new Date(day.date + 'T00:00:00'); // Parse as local date
         
-        console.log(`Day ${index} date:`, dayDate.toISOString(), 'Is future:', dayDate > todayDate);
+        console.log(`Day ${index}: ${day.date} -> ${dayDate.toLocaleDateString()} (${dayDate.toISOString()})`);
+        console.log(`  Is after today? ${dayDate > todayDate}`);
         
         // Only include days that are after today
         return dayDate > todayDate;
@@ -145,28 +140,12 @@ export default function WeatherDetailModal({
 
       console.log('Future days found:', futureDays.length);
 
-      // Take exactly 3 future days
+      // Take exactly 3 future days - FIXED: was slice(2, 3) which only gave 1 day!
       const next3Days: DayForecast[] = futureDays.slice(0, 3).map((day: any, index: number) => {
-        const date = new Date(day.date);
-        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+        const date = new Date(day.date + 'T00:00:00');
+        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
         
-        console.log(`Processing future day ${index + 1}:`, dayOfWeek, day.date);
-        
-        let summary = `${day.day.condition.text}. `;
-        
-        if (day.day.daily_chance_of_rain > 30) {
-          summary += `${day.day.daily_chance_of_rain}% chance of rain. `;
-        }
-        
-        if (day.day.daily_chance_of_snow > 30) {
-          summary += `${day.day.daily_chance_of_snow}% chance of snow. `;
-        }
-        
-        if (day.day.maxwind_mph > 15) {
-          summary += `Windy, up to ${Math.round(day.day.maxwind_mph)} mph. `;
-        }
-        
-        summary += `Humidity ${day.day.avghumidity}%.`;
+        console.log(`Processing future day ${index + 1}: ${dayOfWeek} ${day.date}`);
 
         return {
           date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
@@ -175,18 +154,12 @@ export default function WeatherDetailModal({
           conditionText: day.day.condition.text,
           highTemp: Math.round(day.day.maxtemp_f),
           lowTemp: Math.round(day.day.mintemp_f),
-          summary,
-          chanceOfRain: day.day.daily_chance_of_rain,
-          chanceOfSnow: day.day.daily_chance_of_snow,
-          humidity: day.day.avghumidity,
-          windSpeed: Math.round(day.day.maxwind_mph),
-          uvIndex: day.day.uv,
         };
       });
 
       console.log('Next 3 days processed:', next3Days.length, 'days');
       next3Days.forEach((day, i) => {
-        console.log(`Day ${i + 1}:`, day.dayOfWeek, day.date);
+        console.log(`  Day ${i + 1}: ${day.dayOfWeek} ${day.date} - High: ${day.highTemp}°F, Low: ${day.lowTemp}°F`);
       });
 
       const weatherDetail: WeatherDetailData = {
@@ -388,7 +361,7 @@ export default function WeatherDetailModal({
                     </View>
                   </View>
 
-                  {/* Next 3 Days Forecast */}
+                  {/* Next 3 Days Forecast - SIMPLIFIED HORIZONTAL LAYOUT */}
                   <View style={styles.forecastSection}>
                     <Text style={[styles.forecastTitle, { color: colors.text }]}>Next 3 Day Forecast</Text>
 
@@ -397,62 +370,55 @@ export default function WeatherDetailModal({
                         No forecast data available for the next 3 days.
                       </Text>
                     ) : (
-                      weatherData.next3Days.map((day, index) => (
-                        <View
-                          key={index}
-                          style={[
-                            styles.forecastDayCard,
-                            { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }
-                          ]}
-                        >
-                          <View style={styles.forecastDayHeader}>
-                            <View style={styles.forecastDayInfo}>
-                              <Text style={[styles.forecastDayName, { color: colors.text }]}>
-                                {day.dayOfWeek}
-                              </Text>
-                              <Text style={[styles.forecastDate, { color: colors.textSecondary }]}>
-                                {day.date}
-                              </Text>
-                            </View>
+                      <View style={styles.horizontalForecastContainer}>
+                        {weatherData.next3Days.map((day, index) => (
+                          <View
+                            key={index}
+                            style={[
+                              styles.horizontalDayCard,
+                              { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }
+                            ]}
+                          >
+                            {/* Day Name */}
+                            <Text style={[styles.horizontalDayName, { color: colors.text }]}>
+                              {day.dayOfWeek}
+                            </Text>
+
+                            {/* Weather Icon */}
                             <Image
                               source={{ uri: day.conditionIcon }}
-                              style={styles.forecastIcon}
+                              style={styles.horizontalIcon}
                               resizeMode="contain"
                             />
-                          </View>
 
-                          <View style={styles.forecastTemps}>
-                            <View style={styles.tempItem}>
+                            {/* High Temperature */}
+                            <View style={styles.horizontalTempRow}>
                               <IconSymbol
                                 ios_icon_name="arrow.up"
                                 android_material_icon_name="arrow_upward"
-                                size={16}
+                                size={14}
                                 color="#E74C3C"
                               />
-                              <Text style={[styles.tempLabel, { color: colors.textSecondary }]}>High:</Text>
-                              <Text style={[styles.tempValue, { color: colors.text }]}>{day.highTemp}°F</Text>
+                              <Text style={[styles.horizontalTempText, { color: colors.text }]}>
+                                {day.highTemp}°
+                              </Text>
                             </View>
-                            <View style={styles.tempItem}>
+
+                            {/* Low Temperature */}
+                            <View style={styles.horizontalTempRow}>
                               <IconSymbol
                                 ios_icon_name="arrow.down"
                                 android_material_icon_name="arrow_downward"
-                                size={16}
+                                size={14}
                                 color="#3498DB"
                               />
-                              <Text style={[styles.tempLabel, { color: colors.textSecondary }]}>Low:</Text>
-                              <Text style={[styles.tempValue, { color: colors.text }]}>{day.lowTemp}°F</Text>
+                              <Text style={[styles.horizontalTempText, { color: colors.textSecondary }]}>
+                                {day.lowTemp}°
+                              </Text>
                             </View>
                           </View>
-
-                          <Text style={[styles.forecastCondition, { color: colors.text }]}>
-                            {day.conditionText}
-                          </Text>
-
-                          <Text style={[styles.forecastSummary, { color: colors.textSecondary }]}>
-                            {day.summary}
-                          </Text>
-                        </View>
-                      ))
+                        ))}
+                      </View>
                     )}
                   </View>
                 </>
@@ -613,58 +579,37 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 20,
   },
-  forecastDayCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-  },
-  forecastDayHeader: {
+  // NEW HORIZONTAL LAYOUT STYLES
+  horizontalForecastContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
+    gap: 12,
   },
-  forecastDayInfo: {
+  horizontalDayCard: {
     flex: 1,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    gap: 8,
   },
-  forecastDayName: {
-    fontSize: 18,
+  horizontalDayName: {
+    fontSize: 16,
     fontWeight: '700',
+    textAlign: 'center',
   },
-  forecastDate: {
-    fontSize: 14,
-    marginTop: 2,
+  horizontalIcon: {
+    width: 56,
+    height: 56,
+    marginVertical: 4,
   },
-  forecastIcon: {
-    width: 60,
-    height: 60,
-  },
-  forecastTemps: {
-    flexDirection: 'row',
-    gap: 16,
-    marginBottom: 12,
-  },
-  tempItem: {
+  horizontalTempRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 4,
   },
-  tempLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  tempValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  forecastCondition: {
+  horizontalTempText: {
     fontSize: 16,
     fontWeight: '600',
-    marginBottom: 8,
-  },
-  forecastSummary: {
-    fontSize: 14,
-    lineHeight: 20,
   },
 });
