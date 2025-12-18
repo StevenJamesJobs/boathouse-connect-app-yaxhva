@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, Image } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
 
 interface WeatherData {
   currentTemp: number;
@@ -15,12 +15,13 @@ interface WeatherData {
 interface WeatherWidgetProps {
   textColor: string;
   secondaryTextColor: string;
+  onPress?: () => void;
 }
 
 const WEATHER_API_KEY = '6e3db8832cf34a5bbc5182329251711';
 const LOCATION = 'Perth Amboy, NJ'; // McLoone's Boathouse location
 
-export default function WeatherWidget({ textColor, secondaryTextColor }: WeatherWidgetProps) {
+export default function WeatherWidget({ textColor, secondaryTextColor, onPress }: WeatherWidgetProps) {
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +129,7 @@ export default function WeatherWidget({ textColor, secondaryTextColor }: Weather
     );
   }
 
-  return (
+  const content = (
     <View style={styles.weatherContainer}>
       {/* Compact Layout: Left side with icon and temps, Right side with forecast */}
       <View style={styles.compactLayout}>
@@ -159,13 +160,29 @@ export default function WeatherWidget({ textColor, secondaryTextColor }: Weather
           <Text style={[styles.forecastTitle, { color: textColor }]}>
             Today&apos;s Forecast
           </Text>
-          <Text style={[styles.detailedForecast, { color: secondaryTextColor }]}>
+          <Text style={[styles.detailedForecast, { color: secondaryTextColor }]} numberOfLines={6}>
             {weather.detailedForecast}
           </Text>
+          {onPress && (
+            <Text style={[styles.tapHint, { color: secondaryTextColor }]}>
+              Tap for detailed forecast
+            </Text>
+          )}
         </View>
       </View>
     </View>
   );
+
+  // If onPress is provided, wrap in TouchableOpacity
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return content;
 }
 
 const styles = StyleSheet.create({
@@ -238,5 +255,11 @@ const styles = StyleSheet.create({
   detailedForecast: {
     fontSize: 13,
     lineHeight: 19,
+  },
+  tapHint: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    marginTop: 8,
+    opacity: 0.7,
   },
 });

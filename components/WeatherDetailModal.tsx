@@ -1,0 +1,621 @@
+
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  Modal,
+  TouchableOpacity,
+  ScrollView,
+  StyleSheet,
+  Dimensions,
+  ActivityIndicator,
+  Image,
+} from 'react-native';
+import { IconSymbol } from '@/components/IconSymbol';
+import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
+
+interface DayForecast {
+  date: string;
+  dayOfWeek: string;
+  conditionIcon: string;
+  conditionText: string;
+  highTemp: number;
+  lowTemp: number;
+  summary: string;
+  chanceOfRain: number;
+  chanceOfSnow: number;
+  humidity: number;
+  windSpeed: number;
+  uvIndex: number;
+}
+
+interface WeatherDetailData {
+  currentTemp: number;
+  conditionIcon: string;
+  conditionText: string;
+  feelsLike: number;
+  humidity: number;
+  windSpeed: number;
+  windDirection: string;
+  pressure: number;
+  visibility: number;
+  uvIndex: number;
+  detailedForecast: string;
+  sunrise: string;
+  sunset: string;
+  next3Days: DayForecast[];
+}
+
+interface WeatherDetailModalProps {
+  visible: boolean;
+  onClose: () => void;
+  colors: {
+    text: string;
+    textSecondary: string;
+    primary: string;
+    card: string;
+    border?: string;
+  };
+}
+
+const WEATHER_API_KEY = '6e3db8832cf34a5bbc5182329251711';
+const LOCATION = 'Perth Amboy, NJ';
+
+export default function WeatherDetailModal({
+  visible,
+  onClose,
+  colors,
+}: WeatherDetailModalProps) {
+  const [weatherData, setWeatherData] = useState<WeatherDetailData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (visible) {
+      fetchDetailedWeather();
+    }
+  }, [visible]);
+
+  const fetchDetailedWeather = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await fetch(
+        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=4&aqi=no&alerts=no`
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch weather data');
+      }
+
+      const data = await response.json();
+      console.log('Detailed Weather API Response:', data);
+
+      // Generate detailed forecast for today
+      const today = data.forecast.forecastday[0];
+      const todayDay = today.day;
+      const todayAstro = today.astro;
+
+      let detailedForecast = `Today's forecast: ${todayDay.condition.text}. `;
+      detailedForecast += `High of ${Math.round(todayDay.maxtemp_f)}°F and low of ${Math.round(todayDay.mintemp_f)}°F. `;
+
+      if (todayDay.daily_chance_of_rain > 30) {
+        detailedForecast += `${todayDay.daily_chance_of_rain}% chance of rain. `;
+      }
+
+      if (todayDay.daily_chance_of_snow > 30) {
+        detailedForecast += `${todayDay.daily_chance_of_snow}% chance of snow. `;
+      }
+
+      if (todayDay.maxwind_mph > 15) {
+        detailedForecast += `Winds up to ${Math.round(todayDay.maxwind_mph)} mph. `;
+      }
+
+      detailedForecast += `Humidity around ${todayDay.avghumidity}%. `;
+
+      if (todayDay.uv >= 6) {
+        detailedForecast += `High UV index of ${todayDay.uv} - sun protection recommended. `;
+      }
+
+      if (todayDay.avgvis_miles < 5) {
+        detailedForecast += `Reduced visibility of ${todayDay.avgvis_miles} miles. `;
+      }
+
+      detailedForecast += `Sunrise at ${todayAstro.sunrise}, sunset at ${todayAstro.sunset}.`;
+
+      // Process next 3 days (skip today, get days 1, 2, 3)
+      const next3Days: DayForecast[] = data.forecast.forecastday.slice(1, 4).map((day: any) => {
+        const date = new Date(day.date);
+        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
+        
+        let summary = `${day.day.condition.text}. `;
+        
+        if (day.day.daily_chance_of_rain > 30) {
+          summary += `${day.day.daily_chance_of_rain}% chance of rain. `;
+        }
+        
+        if (day.day.daily_chance_of_snow > 30) {
+          summary += `${day.day.daily_chance_of_snow}% chance of snow. `;
+        }
+        
+        if (day.day.maxwind_mph > 15) {
+          summary += `Windy, up to ${Math.round(day.day.maxwind_mph)} mph. `;
+        }
+        
+        summary += `Humidity ${day.day.avghumidity}%.`;
+
+        return {
+          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          dayOfWeek,
+          conditionIcon: `https:${day.day.condition.icon}`,
+          conditionText: day.day.condition.text,
+          highTemp: Math.round(day.day.maxtemp_f),
+          lowTemp: Math.round(day.day.mintemp_f),
+          summary,
+          chanceOfRain: day.day.daily_chance_of_rain,
+          chanceOfSnow: day.day.daily_chance_of_snow,
+          humidity: day.day.avghumidity,
+          windSpeed: Math.round(day.day.maxwind_mph),
+          uvIndex: day.day.uv,
+        };
+      });
+
+      const weatherDetail: WeatherDetailData = {
+        currentTemp: Math.round(data.current.temp_f),
+        conditionIcon: `https:${data.current.condition.icon}`,
+        conditionText: data.current.condition.text,
+        feelsLike: Math.round(data.current.feelslike_f),
+        humidity: data.current.humidity,
+        windSpeed: Math.round(data.current.wind_mph),
+        windDirection: data.current.wind_dir,
+        pressure: Math.round(data.current.pressure_mb),
+        visibility: Math.round(data.current.vis_miles),
+        uvIndex: data.current.uv,
+        detailedForecast,
+        sunrise: todayAstro.sunrise,
+        sunset: todayAstro.sunset,
+        next3Days,
+      };
+
+      setWeatherData(weatherDetail);
+    } catch (err) {
+      console.error('Error fetching detailed weather:', err);
+      setError('Unable to load weather data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSwipeGesture = (event: any) => {
+    const { translationY } = event.nativeEvent;
+    if (translationY > 100) {
+      onClose();
+    }
+  };
+
+  const screenHeight = Dimensions.get('window').height;
+
+  return (
+    <Modal
+      visible={visible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={onClose}
+    >
+      <GestureHandlerRootView style={styles.modalOverlay}>
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+        <PanGestureHandler onGestureEvent={handleSwipeGesture}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, height: screenHeight * 0.85 }]}>
+            {/* Swipe Indicator */}
+            <View style={styles.swipeIndicatorContainer}>
+              <View style={[styles.swipeIndicator, { backgroundColor: colors.border || colors.textSecondary }]} />
+            </View>
+
+            {/* Close Button */}
+            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+              <IconSymbol
+                ios_icon_name="xmark.circle.fill"
+                android_material_icon_name="cancel"
+                size={32}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {/* Content */}
+            <ScrollView
+              style={styles.scrollView}
+              contentContainerStyle={styles.scrollContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+                    Loading detailed weather...
+                  </Text>
+                </View>
+              ) : error || !weatherData ? (
+                <View style={styles.errorContainer}>
+                  <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+                    {error || 'Weather data unavailable'}
+                  </Text>
+                </View>
+              ) : (
+                <>
+                  {/* Title */}
+                  <Text style={[styles.title, { color: colors.text }]}>Weather Details</Text>
+                  <Text style={[styles.location, { color: colors.textSecondary }]}>Perth Amboy, NJ</Text>
+
+                  {/* Current Weather Section */}
+                  <View style={[styles.currentWeatherSection, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}>
+                    <View style={styles.currentWeatherHeader}>
+                      <Image
+                        source={{ uri: weatherData.conditionIcon }}
+                        style={styles.currentWeatherIcon}
+                        resizeMode="contain"
+                      />
+                      <View style={styles.currentWeatherInfo}>
+                        <Text style={[styles.currentTemp, { color: colors.text }]}>
+                          {weatherData.currentTemp}°F
+                        </Text>
+                        <Text style={[styles.currentCondition, { color: colors.textSecondary }]}>
+                          {weatherData.conditionText}
+                        </Text>
+                        <Text style={[styles.feelsLike, { color: colors.textSecondary }]}>
+                          Feels like {weatherData.feelsLike}°F
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Weather Details Grid */}
+                    <View style={styles.detailsGrid}>
+                      <View style={styles.detailItem}>
+                        <IconSymbol
+                          ios_icon_name="drop.fill"
+                          android_material_icon_name="water_drop"
+                          size={20}
+                          color={colors.primary}
+                        />
+                        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Humidity</Text>
+                        <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.humidity}%</Text>
+                      </View>
+
+                      <View style={styles.detailItem}>
+                        <IconSymbol
+                          ios_icon_name="wind"
+                          android_material_icon_name="air"
+                          size={20}
+                          color={colors.primary}
+                        />
+                        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Wind</Text>
+                        <Text style={[styles.detailValue, { color: colors.text }]}>
+                          {weatherData.windSpeed} mph {weatherData.windDirection}
+                        </Text>
+                      </View>
+
+                      <View style={styles.detailItem}>
+                        <IconSymbol
+                          ios_icon_name="eye.fill"
+                          android_material_icon_name="visibility"
+                          size={20}
+                          color={colors.primary}
+                        />
+                        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Visibility</Text>
+                        <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.visibility} mi</Text>
+                      </View>
+
+                      <View style={styles.detailItem}>
+                        <IconSymbol
+                          ios_icon_name="sun.max.fill"
+                          android_material_icon_name="wb_sunny"
+                          size={20}
+                          color={colors.primary}
+                        />
+                        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>UV Index</Text>
+                        <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.uvIndex}</Text>
+                      </View>
+
+                      <View style={styles.detailItem}>
+                        <IconSymbol
+                          ios_icon_name="sunrise.fill"
+                          android_material_icon_name="wb_twilight"
+                          size={20}
+                          color={colors.primary}
+                        />
+                        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Sunrise</Text>
+                        <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.sunrise}</Text>
+                      </View>
+
+                      <View style={styles.detailItem}>
+                        <IconSymbol
+                          ios_icon_name="sunset.fill"
+                          android_material_icon_name="wb_twilight"
+                          size={20}
+                          color={colors.primary}
+                        />
+                        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Sunset</Text>
+                        <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.sunset}</Text>
+                      </View>
+                    </View>
+
+                    {/* Detailed Forecast */}
+                    <View style={styles.detailedForecastContainer}>
+                      <Text style={[styles.detailedForecastTitle, { color: colors.text }]}>
+                        Today&apos;s Detailed Forecast
+                      </Text>
+                      <Text style={[styles.detailedForecastText, { color: colors.textSecondary }]}>
+                        {weatherData.detailedForecast}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* Next 3 Days Forecast */}
+                  <View style={styles.forecastSection}>
+                    <Text style={[styles.forecastTitle, { color: colors.text }]}>Next 3 Day Forecast</Text>
+
+                    {weatherData.next3Days.map((day, index) => (
+                      <View
+                        key={index}
+                        style={[
+                          styles.forecastDayCard,
+                          { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }
+                        ]}
+                      >
+                        <View style={styles.forecastDayHeader}>
+                          <View style={styles.forecastDayInfo}>
+                            <Text style={[styles.forecastDayName, { color: colors.text }]}>
+                              {day.dayOfWeek}
+                            </Text>
+                            <Text style={[styles.forecastDate, { color: colors.textSecondary }]}>
+                              {day.date}
+                            </Text>
+                          </View>
+                          <Image
+                            source={{ uri: day.conditionIcon }}
+                            style={styles.forecastIcon}
+                            resizeMode="contain"
+                          />
+                        </View>
+
+                        <View style={styles.forecastTemps}>
+                          <View style={styles.tempItem}>
+                            <IconSymbol
+                              ios_icon_name="arrow.up"
+                              android_material_icon_name="arrow_upward"
+                              size={16}
+                              color="#E74C3C"
+                            />
+                            <Text style={[styles.tempLabel, { color: colors.textSecondary }]}>High:</Text>
+                            <Text style={[styles.tempValue, { color: colors.text }]}>{day.highTemp}°F</Text>
+                          </View>
+                          <View style={styles.tempItem}>
+                            <IconSymbol
+                              ios_icon_name="arrow.down"
+                              android_material_icon_name="arrow_downward"
+                              size={16}
+                              color="#3498DB"
+                            />
+                            <Text style={[styles.tempLabel, { color: colors.textSecondary }]}>Low:</Text>
+                            <Text style={[styles.tempValue, { color: colors.text }]}>{day.lowTemp}°F</Text>
+                          </View>
+                        </View>
+
+                        <Text style={[styles.forecastCondition, { color: colors.text }]}>
+                          {day.conditionText}
+                        </Text>
+
+                        <Text style={[styles.forecastSummary, { color: colors.textSecondary }]}>
+                          {day.summary}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              )}
+            </ScrollView>
+          </View>
+        </PanGestureHandler>
+      </GestureHandlerRootView>
+    </Modal>
+  );
+}
+
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  modalContent: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 20,
+    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.3)',
+    elevation: 10,
+  },
+  swipeIndicatorContainer: {
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  swipeIndicator: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    zIndex: 10,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 14,
+  },
+  errorContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  errorText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  location: {
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  currentWeatherSection: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+  },
+  currentWeatherHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    gap: 16,
+  },
+  currentWeatherIcon: {
+    width: 80,
+    height: 80,
+  },
+  currentWeatherInfo: {
+    flex: 1,
+  },
+  currentTemp: {
+    fontSize: 48,
+    fontWeight: 'bold',
+    lineHeight: 56,
+  },
+  currentCondition: {
+    fontSize: 18,
+    marginTop: 4,
+  },
+  feelsLike: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  detailsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 20,
+  },
+  detailItem: {
+    width: '48%',
+    alignItems: 'center',
+    padding: 12,
+    gap: 4,
+  },
+  detailLabel: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  detailValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  detailedForecastContainer: {
+    marginTop: 8,
+  },
+  detailedForecastTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  detailedForecastText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  forecastSection: {
+    marginTop: 8,
+  },
+  forecastTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  forecastDayCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  forecastDayHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  forecastDayInfo: {
+    flex: 1,
+  },
+  forecastDayName: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  forecastDate: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  forecastIcon: {
+    width: 60,
+    height: 60,
+  },
+  forecastTemps: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 12,
+  },
+  tempItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  tempLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  tempValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  forecastCondition: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  forecastSummary: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+});

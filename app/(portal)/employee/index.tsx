@@ -16,6 +16,7 @@ import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import WeatherWidget from '@/components/WeatherWidget';
+import WeatherDetailModal from '@/components/WeatherDetailModal';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
@@ -114,6 +115,9 @@ export default function EmployeePortalScreen() {
   const [loadingFeatures, setLoadingFeatures] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
+  
+  // Weather detail modal state
+  const [weatherDetailVisible, setWeatherDetailVisible] = useState(false);
   
   // Detail modal state
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -319,6 +323,14 @@ export default function EmployeePortalScreen() {
     setSelectedItem(null);
   };
 
+  const openWeatherDetail = () => {
+    setWeatherDetailVisible(true);
+  };
+
+  const closeWeatherDetail = () => {
+    setWeatherDetailVisible(false);
+  };
+
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
     return `${url}?t=${Date.now()}`;
@@ -421,6 +433,7 @@ export default function EmployeePortalScreen() {
           <WeatherWidget
             textColor={employeeColors.text}
             secondaryTextColor={employeeColors.textSecondary}
+            onPress={openWeatherDetail}
           />
         </CollapsibleSection>
 
@@ -846,6 +859,18 @@ export default function EmployeePortalScreen() {
           }}
         />
       )}
+
+      <WeatherDetailModal
+        visible={weatherDetailVisible}
+        onClose={closeWeatherDetail}
+        colors={{
+          text: employeeColors.text,
+          textSecondary: employeeColors.textSecondary,
+          card: employeeColors.card,
+          primary: employeeColors.primary,
+          border: employeeColors.highlight,
+        }}
+      />
     </GestureHandlerRootView>
   );
 }

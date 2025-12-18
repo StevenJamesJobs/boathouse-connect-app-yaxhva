@@ -16,6 +16,7 @@ import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import WeatherWidget from '@/components/WeatherWidget';
+import WeatherDetailModal from '@/components/WeatherDetailModal';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
@@ -114,6 +115,9 @@ export default function ManagerPortalScreen() {
   const [loadingFeatures, setLoadingFeatures] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
+  
+  // Weather detail modal state
+  const [weatherDetailVisible, setWeatherDetailVisible] = useState(false);
   
   // Detail modal state
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -326,6 +330,14 @@ export default function ManagerPortalScreen() {
     setSelectedItem(null);
   };
 
+  const openWeatherDetail = () => {
+    setWeatherDetailVisible(true);
+  };
+
+  const closeWeatherDetail = () => {
+    setWeatherDetailVisible(false);
+  };
+
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
     return `${url}?t=${Date.now()}`;
@@ -432,6 +444,7 @@ export default function ManagerPortalScreen() {
           <WeatherWidget
             textColor={managerColors.text}
             secondaryTextColor={managerColors.textSecondary}
+            onPress={openWeatherDetail}
           />
         </CollapsibleSection>
 
@@ -871,6 +884,18 @@ export default function ManagerPortalScreen() {
           }}
         />
       )}
+
+      <WeatherDetailModal
+        visible={weatherDetailVisible}
+        onClose={closeWeatherDetail}
+        colors={{
+          text: managerColors.text,
+          textSecondary: managerColors.textSecondary,
+          card: managerColors.card,
+          primary: managerColors.primary,
+          border: managerColors.border,
+        }}
+      />
     </GestureHandlerRootView>
   );
 }
