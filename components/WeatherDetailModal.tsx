@@ -59,7 +59,7 @@ interface WeatherDetailModalProps {
 }
 
 const WEATHER_API_KEY = '6e3db8832cf34a5bbc5182329251711';
-const LOCATION = 'Perth Amboy, NJ';
+const LOCATION = 'West Orange, NJ'; // Zip code 07003
 
 export default function WeatherDetailModal({
   visible,
@@ -81,6 +81,7 @@ export default function WeatherDetailModal({
       setLoading(true);
       setError(null);
 
+      // Request 4 days to get today + next 3 days
       const response = await fetch(
         `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=4&aqi=no&alerts=no`
       );
@@ -124,7 +125,7 @@ export default function WeatherDetailModal({
 
       detailedForecast += `Sunrise at ${todayAstro.sunrise}, sunset at ${todayAstro.sunset}.`;
 
-      // Process next 3 days (skip today, get days 1, 2, 3)
+      // Process next 3 days (skip today at index 0, get days 1, 2, 3)
       const next3Days: DayForecast[] = data.forecast.forecastday.slice(1, 4).map((day: any) => {
         const date = new Date(day.date);
         const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'long' });
@@ -249,7 +250,7 @@ export default function WeatherDetailModal({
                 <>
                   {/* Title */}
                   <Text style={[styles.title, { color: colors.text }]}>Weather Details</Text>
-                  <Text style={[styles.location, { color: colors.textSecondary }]}>Perth Amboy, NJ</Text>
+                  <Text style={[styles.location, { color: colors.textSecondary }]}>West Orange, NJ</Text>
 
                   {/* Current Weather Section */}
                   <View style={[styles.currentWeatherSection, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}>
@@ -272,74 +273,80 @@ export default function WeatherDetailModal({
                       </View>
                     </View>
 
-                    {/* Weather Details Grid */}
+                    {/* Weather Details Grid - 2 rows of 3 items */}
                     <View style={styles.detailsGrid}>
-                      <View style={styles.detailItem}>
-                        <IconSymbol
-                          ios_icon_name="drop.fill"
-                          android_material_icon_name="water_drop"
-                          size={20}
-                          color={colors.primary}
-                        />
-                        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Humidity</Text>
-                        <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.humidity}%</Text>
+                      {/* Row 1: Humidity, Wind, Visibility */}
+                      <View style={styles.detailRow}>
+                        <View style={styles.detailItem}>
+                          <IconSymbol
+                            ios_icon_name="drop.fill"
+                            android_material_icon_name="water_drop"
+                            size={18}
+                            color={colors.primary}
+                          />
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Humidity</Text>
+                          <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.humidity}%</Text>
+                        </View>
+
+                        <View style={styles.detailItem}>
+                          <IconSymbol
+                            ios_icon_name="wind"
+                            android_material_icon_name="air"
+                            size={18}
+                            color={colors.primary}
+                          />
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Wind</Text>
+                          <Text style={[styles.detailValue, { color: colors.text }]}>
+                            {weatherData.windSpeed} mph
+                          </Text>
+                        </View>
+
+                        <View style={styles.detailItem}>
+                          <IconSymbol
+                            ios_icon_name="eye.fill"
+                            android_material_icon_name="visibility"
+                            size={18}
+                            color={colors.primary}
+                          />
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Visibility</Text>
+                          <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.visibility} mi</Text>
+                        </View>
                       </View>
 
-                      <View style={styles.detailItem}>
-                        <IconSymbol
-                          ios_icon_name="wind"
-                          android_material_icon_name="air"
-                          size={20}
-                          color={colors.primary}
-                        />
-                        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Wind</Text>
-                        <Text style={[styles.detailValue, { color: colors.text }]}>
-                          {weatherData.windSpeed} mph {weatherData.windDirection}
-                        </Text>
-                      </View>
+                      {/* Row 2: UV Index, Sunrise, Sunset */}
+                      <View style={styles.detailRow}>
+                        <View style={styles.detailItem}>
+                          <IconSymbol
+                            ios_icon_name="sun.max.fill"
+                            android_material_icon_name="wb_sunny"
+                            size={18}
+                            color={colors.primary}
+                          />
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>UV Index</Text>
+                          <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.uvIndex}</Text>
+                        </View>
 
-                      <View style={styles.detailItem}>
-                        <IconSymbol
-                          ios_icon_name="eye.fill"
-                          android_material_icon_name="visibility"
-                          size={20}
-                          color={colors.primary}
-                        />
-                        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Visibility</Text>
-                        <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.visibility} mi</Text>
-                      </View>
+                        <View style={styles.detailItem}>
+                          <IconSymbol
+                            ios_icon_name="sunrise.fill"
+                            android_material_icon_name="wb_twilight"
+                            size={18}
+                            color={colors.primary}
+                          />
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Sunrise</Text>
+                          <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.sunrise}</Text>
+                        </View>
 
-                      <View style={styles.detailItem}>
-                        <IconSymbol
-                          ios_icon_name="sun.max.fill"
-                          android_material_icon_name="wb_sunny"
-                          size={20}
-                          color={colors.primary}
-                        />
-                        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>UV Index</Text>
-                        <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.uvIndex}</Text>
-                      </View>
-
-                      <View style={styles.detailItem}>
-                        <IconSymbol
-                          ios_icon_name="sunrise.fill"
-                          android_material_icon_name="wb_twilight"
-                          size={20}
-                          color={colors.primary}
-                        />
-                        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Sunrise</Text>
-                        <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.sunrise}</Text>
-                      </View>
-
-                      <View style={styles.detailItem}>
-                        <IconSymbol
-                          ios_icon_name="sunset.fill"
-                          android_material_icon_name="wb_twilight"
-                          size={20}
-                          color={colors.primary}
-                        />
-                        <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Sunset</Text>
-                        <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.sunset}</Text>
+                        <View style={styles.detailItem}>
+                          <IconSymbol
+                            ios_icon_name="sunset.fill"
+                            android_material_icon_name="wb_twilight"
+                            size={18}
+                            color={colors.primary}
+                          />
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Sunset</Text>
+                          <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.sunset}</Text>
+                        </View>
                       </View>
                     </View>
 
@@ -525,24 +532,28 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   detailsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
     marginBottom: 20,
+    gap: 12,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
   },
   detailItem: {
-    width: '48%',
+    flex: 1,
     alignItems: 'center',
-    padding: 12,
+    padding: 10,
     gap: 4,
   },
   detailLabel: {
-    fontSize: 12,
+    fontSize: 11,
     marginTop: 4,
   },
   detailValue: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
+    textAlign: 'center',
   },
   detailedForecastContainer: {
     marginTop: 8,

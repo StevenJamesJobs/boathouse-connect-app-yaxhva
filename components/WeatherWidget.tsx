@@ -19,7 +19,7 @@ interface WeatherWidgetProps {
 }
 
 const WEATHER_API_KEY = '6e3db8832cf34a5bbc5182329251711';
-const LOCATION = 'Perth Amboy, NJ'; // McLoone's Boathouse location
+const LOCATION = 'West Orange, NJ'; // McLoone's Boathouse location - zip code 07003
 
 export default function WeatherWidget({ textColor, secondaryTextColor, onPress }: WeatherWidgetProps) {
   const [weather, setWeather] = useState<WeatherData | null>(null);
