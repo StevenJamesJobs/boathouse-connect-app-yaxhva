@@ -14,11 +14,16 @@ serve(async (req) => {
   }
 
   try {
+    console.log('=== EDGE FUNCTION: submit-feedback STARTED ===');
+    
     // Get the authorization header
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
+      console.error('No authorization header provided');
       throw new Error('No authorization header');
     }
+
+    console.log('Authorization header present');
 
     // Create Supabase client with service role key to bypass RLS
     const supabaseAdmin = createClient(
@@ -54,7 +59,7 @@ serve(async (req) => {
     } = await supabaseClient.auth.getUser();
 
     if (userError || !user) {
-      console.error('User error:', userError);
+      console.error('User authentication error:', userError);
       throw new Error('User not authenticated');
     }
 
@@ -65,14 +70,18 @@ serve(async (req) => {
 
     // Validate input
     if (!title || !title.trim()) {
+      console.error('Title is missing or empty');
       throw new Error('Title is required');
     }
 
     if (!description || !description.trim()) {
+      console.error('Description is missing or empty');
       throw new Error('Description is required');
     }
 
     console.log('Inserting feedback for user:', user.id);
+    console.log('Title:', title);
+    console.log('Description length:', description.length);
 
     // Use the admin client to insert feedback (bypasses RLS)
     const { data, error } = await supabaseAdmin
@@ -92,7 +101,8 @@ serve(async (req) => {
       throw error;
     }
 
-    console.log('Feedback inserted successfully:', data);
+    console.log('Feedback inserted successfully:', data?.id);
+    console.log('=== EDGE FUNCTION: submit-feedback COMPLETED ===');
 
     return new Response(
       JSON.stringify({

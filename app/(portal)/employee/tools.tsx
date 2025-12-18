@@ -51,23 +51,32 @@ export default function EmployeeToolsScreen() {
     try {
       setSubmitting(true);
 
-      console.log('Submitting feedback directly to database...');
+      console.log('Getting auth session...');
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        console.error('Session error:', sessionError);
+        throw new Error('Authentication session not found. Please log in again.');
+      }
 
-      // Insert feedback directly into the database
-      const { data, error } = await supabase
-        .from('feedback')
-        .insert({
-          sender_id: user.id,
+      console.log('Calling Edge Function to submit feedback...');
+      
+      // Call the Edge Function to submit feedback
+      const { data, error } = await supabase.functions.invoke('submit-feedback', {
+        body: {
           title: feedbackTitle.trim(),
           description: feedbackDescription.trim(),
-          is_deleted: false,
-        })
-        .select()
-        .single();
+        },
+      });
 
       if (error) {
-        console.error('Database error:', error);
+        console.error('Edge Function error:', error);
         throw new Error(error.message || 'Failed to submit feedback');
+      }
+
+      if (!data?.success) {
+        console.error('Edge Function returned error:', data);
+        throw new Error(data?.error || 'Failed to submit feedback');
       }
 
       console.log('Feedback submitted successfully!', data);
@@ -96,6 +105,8 @@ export default function EmployeeToolsScreen() {
           errorMessage = 'Your session has expired. Please log out and log back in.';
         } else if (error.message.includes('permission') || error.message.includes('policy')) {
           errorMessage = 'Permission error. Please contact your manager if this persists.';
+        } else if (error.message.includes('FunctionsRelayError') || error.message.includes('FunctionsFetchError')) {
+          errorMessage = 'Unable to connect to the feedback service. Please check your internet connection and try again.';
         } else {
           errorMessage = error.message;
         }
