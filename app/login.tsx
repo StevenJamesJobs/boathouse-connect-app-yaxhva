@@ -64,7 +64,7 @@ export default function LoginScreen() {
         }),
       ]).start();
     }, 400);
-  }, []);
+  }, []); // Empty dependency array is correct - only run once on mount
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {

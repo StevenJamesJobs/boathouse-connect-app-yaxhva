@@ -77,7 +77,7 @@ function RootLayoutNav() {
         router.replace('/(portal)/employee');
       }
     }
-  }, [isAuthenticated, isLoading, segments, loaded, user, router]);
+  }, [isAuthenticated, isLoading, segments, loaded, user?.role, router]);
 
   if (!loaded || isLoading) {
     return null;

@@ -2,6 +2,12 @@
 // CRITICAL: This polyfill MUST be the very first thing that runs
 // It must execute before ANY other code, including imports
 
+// Import URL polyfill first
+import 'react-native-url-polyfill/auto';
+
+// Import expo-router entry
+import 'expo-router/entry';
+
 // Polyfill window object IMMEDIATELY
 if (typeof window === 'undefined') {
   (global as any).window = global;
@@ -99,9 +105,3 @@ if (typeof Event === 'undefined') {
     constructor(public type: string) {}
   };
 }
-
-// Now import URL polyfill
-import 'react-native-url-polyfill/auto';
-
-// Finally, import expo-router entry
-import 'expo-router/entry';
