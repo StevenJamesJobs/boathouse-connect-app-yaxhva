@@ -51,47 +51,44 @@ export default function EmployeeToolsScreen() {
     try {
       setSubmitting(true);
 
-      console.log('Attempting to insert feedback...');
-      const { data, error } = await supabase
-        .from('feedback')
-        .insert({
-          sender_id: user.id,
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('No active session. Please log out and log back in.');
+      }
+
+      console.log('Session found, submitting via Edge Function...');
+
+      // Call the Edge Function with proper authorization
+      const { data, error } = await supabase.functions.invoke('submit-feedback', {
+        body: {
           title: feedbackTitle.trim(),
           description: feedbackDescription.trim(),
-        })
-        .select();
+        },
+      });
 
-      console.log('Insert response data:', data);
-      console.log('Insert response error:', error);
+      console.log('Edge Function response:', { data, error });
 
       if (error) {
-        console.error('Error submitting feedback:', error);
-        console.error('Error details:', JSON.stringify(error, null, 2));
-        
-        // Provide more specific error messages
-        if (error.code === '42501') {
-          Alert.alert(
-            'Permission Error',
-            'You do not have permission to submit feedback. Please contact your manager.'
-          );
-        } else if (error.code === '23503') {
-          Alert.alert(
-            'Database Error',
-            'There was an issue with your user account. Please log out and log back in.'
-          );
-        } else {
-          Alert.alert(
-            'Error',
-            `Failed to submit feedback: ${error.message || 'Unknown error'}`
-          );
-        }
-        return;
+        console.error('Edge Function error:', error);
+        throw new Error(error.message || 'Failed to submit feedback');
+      }
+
+      if (data?.error) {
+        console.error('Error in response:', data.error);
+        throw new Error(data.error);
+      }
+
+      if (!data?.success) {
+        throw new Error('Feedback submission failed');
       }
 
       console.log('Feedback submitted successfully!');
+      
       Alert.alert(
-        'Success',
-        'Your feedback has been submitted successfully! Management will review it.',
+        'Success! 🎉',
+        'Your feedback has been submitted successfully! Management will review it shortly.',
         [
           {
             text: 'OK',
@@ -104,9 +101,23 @@ export default function EmployeeToolsScreen() {
         ]
       );
     } catch (error: any) {
-      console.error('Unexpected error submitting feedback:', error);
-      console.error('Error stack:', error.stack);
-      Alert.alert('Error', 'An unexpected error occurred. Please try again.');
+      console.error('Error submitting feedback:', error);
+      
+      let errorMessage = 'An unexpected error occurred. Please try again.';
+      
+      if (error.message) {
+        if (error.message.includes('not authenticated') || error.message.includes('session')) {
+          errorMessage = 'Your session has expired. Please log out and log back in.';
+        } else if (error.message.includes('required')) {
+          errorMessage = error.message;
+        } else if (error.message.includes('Edge Function')) {
+          errorMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
+      Alert.alert('Submission Failed', errorMessage);
     } finally {
       setSubmitting(false);
       console.log('=== FEEDBACK SUBMISSION ENDED ===');
@@ -253,6 +264,7 @@ export default function EmployeeToolsScreen() {
                   placeholder="Enter a brief title"
                   placeholderTextColor={employeeColors.textSecondary}
                   maxLength={100}
+                  editable={!submitting}
                 />
               </View>
 
@@ -267,6 +279,7 @@ export default function EmployeeToolsScreen() {
                   multiline
                   numberOfLines={8}
                   textAlignVertical="top"
+                  editable={!submitting}
                 />
               </View>
 
@@ -276,7 +289,10 @@ export default function EmployeeToolsScreen() {
                 disabled={submitting}
               >
                 {submitting ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <>
+                    <ActivityIndicator color="#FFFFFF" />
+                    <Text style={styles.submitButtonText}>Submitting...</Text>
+                  </>
                 ) : (
                   <>
                     <IconSymbol
