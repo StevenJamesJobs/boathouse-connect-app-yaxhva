@@ -51,35 +51,66 @@ export default function EmployeeToolsScreen() {
     try {
       setSubmitting(true);
 
-      console.log('Getting auth session...');
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Get all managers to send feedback to
+      console.log('Fetching all managers...');
+      const { data: managers, error: managersError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('role', 'manager')
+        .eq('is_active', true);
+
+      if (managersError) {
+        console.error('Error fetching managers:', managersError);
+        throw new Error('Failed to fetch managers');
+      }
+
+      if (!managers || managers.length === 0) {
+        throw new Error('No managers found to send feedback to');
+      }
+
+      console.log(`Found ${managers.length} manager(s)`);
+
+      // Create the feedback message with a special subject prefix
+      // This prefix will be used to identify feedback messages in the manager's view
+      const feedbackSubject = `[FEEDBACK] ${feedbackTitle.trim()}`;
       
-      if (sessionError || !session) {
-        console.error('Session error:', sessionError);
-        throw new Error('Authentication session not found. Please log in again.');
+      console.log('Creating feedback message...');
+      const { data: messageData, error: messageError } = await supabase
+        .from('messages')
+        .insert({
+          sender_id: user.id,
+          subject: feedbackSubject,
+          body: feedbackDescription.trim(),
+          thread_id: null,
+          parent_message_id: null,
+        })
+        .select()
+        .single();
+
+      if (messageError) {
+        console.error('Error creating message:', messageError);
+        throw new Error('Failed to create feedback message');
       }
 
-      console.log('Calling Edge Function to submit feedback...');
-      
-      // Call the Edge Function to submit feedback
-      const { data, error } = await supabase.functions.invoke('submit-feedback', {
-        body: {
-          title: feedbackTitle.trim(),
-          description: feedbackDescription.trim(),
-        },
-      });
+      console.log('Message created:', messageData.id);
 
-      if (error) {
-        console.error('Edge Function error:', error);
-        throw new Error(error.message || 'Failed to submit feedback');
+      // Create message recipients for all managers
+      console.log('Creating message recipients...');
+      const recipients = managers.map(manager => ({
+        message_id: messageData.id,
+        recipient_id: manager.id,
+      }));
+
+      const { error: recipientsError } = await supabase
+        .from('message_recipients')
+        .insert(recipients);
+
+      if (recipientsError) {
+        console.error('Error creating recipients:', recipientsError);
+        throw new Error('Failed to send feedback to managers');
       }
 
-      if (!data?.success) {
-        console.error('Edge Function returned error:', data);
-        throw new Error(data?.error || 'Failed to submit feedback');
-      }
-
-      console.log('Feedback submitted successfully!', data);
+      console.log('Feedback submitted successfully!');
       
       Alert.alert(
         'Success! 🎉',
@@ -101,15 +132,7 @@ export default function EmployeeToolsScreen() {
       let errorMessage = 'An unexpected error occurred. Please try again.';
       
       if (error.message) {
-        if (error.message.includes('not authenticated') || error.message.includes('session')) {
-          errorMessage = 'Your session has expired. Please log out and log back in.';
-        } else if (error.message.includes('permission') || error.message.includes('policy')) {
-          errorMessage = 'Permission error. Please contact your manager if this persists.';
-        } else if (error.message.includes('FunctionsRelayError') || error.message.includes('FunctionsFetchError')) {
-          errorMessage = 'Unable to connect to the feedback service. Please check your internet connection and try again.';
-        } else {
-          errorMessage = error.message;
-        }
+        errorMessage = error.message;
       }
       
       Alert.alert('Submission Failed', errorMessage);

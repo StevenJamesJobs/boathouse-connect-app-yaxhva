@@ -33,24 +33,13 @@ interface Message {
   recipient_id?: string;
 }
 
-interface Feedback {
-  id: string;
-  sender_id: string;
-  title: string;
-  description: string;
-  created_at: string;
-  sender_name: string;
-  sender_job_title: string;
-  sender_profile_picture: string | null;
-}
-
 export default function MessagesScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'feedback'>('inbox');
   const [inboxMessages, setInboxMessages] = useState<Message[]>([]);
   const [sentMessages, setSentMessages] = useState<Message[]>([]);
-  const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
+  const [feedbackMessages, setFeedbackMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -92,7 +81,7 @@ export default function MessagesScreen() {
       } else if (activeTab === 'sent') {
         await loadSentMessages();
       } else if (activeTab === 'feedback' && isManager) {
-        await loadFeedback();
+        await loadFeedbackMessages();
       }
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -136,8 +125,10 @@ export default function MessagesScreen() {
       throw error;
     }
 
+    // Filter out feedback messages (those with [FEEDBACK] prefix)
     const messages: Message[] = (data || [])
       .filter((item: any) => item.message)
+      .filter((item: any) => !item.message.subject?.startsWith('[FEEDBACK]'))
       .map((item: any) => ({
         id: item.message.id,
         sender_id: item.message.sender_id,
@@ -186,71 +177,86 @@ export default function MessagesScreen() {
       throw error;
     }
 
-    const messages: Message[] = (data || []).map((msg: any) => ({
-      id: msg.id,
-      sender_id: msg.sender_id,
-      subject: msg.subject,
-      body: msg.body,
-      parent_message_id: msg.parent_message_id,
-      thread_id: msg.thread_id,
-      created_at: msg.created_at,
-      sender_name: user.name,
-      sender_job_title: user.jobTitle,
-      sender_profile_picture: user.profilePictureUrl || null,
-      is_read: true,
-      recipient_count: msg.recipients?.length || 0,
-    }));
+    // Filter out feedback messages (those with [FEEDBACK] prefix)
+    const messages: Message[] = (data || [])
+      .filter((msg: any) => !msg.subject?.startsWith('[FEEDBACK]'))
+      .map((msg: any) => ({
+        id: msg.id,
+        sender_id: msg.sender_id,
+        subject: msg.subject,
+        body: msg.body,
+        parent_message_id: msg.parent_message_id,
+        thread_id: msg.thread_id,
+        created_at: msg.created_at,
+        sender_name: user.name,
+        sender_job_title: user.jobTitle,
+        sender_profile_picture: user.profilePictureUrl || null,
+        is_read: true,
+        recipient_count: msg.recipients?.length || 0,
+      }));
 
     setSentMessages(messages);
   };
 
-  const loadFeedback = async () => {
+  const loadFeedbackMessages = async () => {
     if (!user?.id || !isManager) return;
 
-    console.log('Loading feedback...');
+    console.log('Loading feedback messages...');
 
-    // First, let's try a simpler query to see if we can get the data
-    const { data: feedbackData, error: feedbackError } = await supabase
-      .from('feedback')
-      .select('*')
+    // Load all messages with [FEEDBACK] prefix that are sent to this manager
+    const { data, error } = await supabase
+      .from('message_recipients')
+      .select(`
+        id,
+        is_read,
+        created_at,
+        recipient_id,
+        message:messages (
+          id,
+          sender_id,
+          subject,
+          body,
+          parent_message_id,
+          thread_id,
+          created_at,
+          sender:users!messages_sender_id_fkey (
+            name,
+            job_title,
+            profile_picture_url
+          )
+        )
+      `)
+      .eq('recipient_id', user.id)
       .eq('is_deleted', false)
       .order('created_at', { ascending: false });
 
-    if (feedbackError) {
-      console.error('Error loading feedback:', feedbackError);
-      throw feedbackError;
+    if (error) {
+      console.error('Error loading feedback:', error);
+      throw error;
     }
 
-    console.log('Feedback data:', feedbackData);
+    // Filter only feedback messages (those with [FEEDBACK] prefix)
+    const feedbackMsgs: Message[] = (data || [])
+      .filter((item: any) => item.message)
+      .filter((item: any) => item.message.subject?.startsWith('[FEEDBACK]'))
+      .map((item: any) => ({
+        id: item.message.id,
+        sender_id: item.message.sender_id,
+        subject: item.message.subject?.replace('[FEEDBACK] ', ''), // Remove the prefix for display
+        body: item.message.body,
+        parent_message_id: item.message.parent_message_id,
+        thread_id: item.message.thread_id,
+        created_at: item.message.created_at,
+        sender_name: item.message.sender?.name || 'Unknown',
+        sender_job_title: item.message.sender?.job_title || '',
+        sender_profile_picture: item.message.sender?.profile_picture_url || null,
+        is_read: item.is_read,
+        recipient_count: 1,
+        recipient_id: item.recipient_id,
+      }));
 
-    // Now get user data separately for each feedback
-    const feedbackWithUsers: Feedback[] = [];
-    
-    for (const item of feedbackData || []) {
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('name, job_title, profile_picture_url')
-        .eq('id', item.sender_id)
-        .single();
-
-      if (userError) {
-        console.error('Error loading user for feedback:', userError);
-      }
-
-      feedbackWithUsers.push({
-        id: item.id,
-        sender_id: item.sender_id,
-        title: item.title,
-        description: item.description,
-        created_at: item.created_at,
-        sender_name: userData?.name || 'Unknown',
-        sender_job_title: userData?.job_title || '',
-        sender_profile_picture: userData?.profile_picture_url || null,
-      });
-    }
-
-    console.log('Feedback with users:', feedbackWithUsers);
-    setFeedbackList(feedbackWithUsers);
+    console.log('Feedback messages loaded:', feedbackMsgs.length);
+    setFeedbackMessages(feedbackMsgs);
   };
 
   const loadUnreadCount = async () => {
@@ -282,13 +288,22 @@ export default function MessagesScreen() {
   const loadFeedbackCount = async () => {
     if (!user?.id || !isManager) return;
 
-    const { count, error } = await supabase
-      .from('feedback')
-      .select('*', { count: 'exact', head: true })
+    // Count messages with [FEEDBACK] prefix sent to this manager
+    const { data, error } = await supabase
+      .from('message_recipients')
+      .select(`
+        message:messages (
+          subject
+        )
+      `)
+      .eq('recipient_id', user.id)
       .eq('is_deleted', false);
 
-    if (!error && count !== null) {
-      setFeedbackCount(count);
+    if (!error && data) {
+      const feedbackCount = data.filter(
+        (item: any) => item.message?.subject?.startsWith('[FEEDBACK]')
+      ).length;
+      setFeedbackCount(feedbackCount);
     }
   };
 
@@ -311,7 +326,7 @@ export default function MessagesScreen() {
   };
 
   const handleMarkAsRead = async (message: Message) => {
-    if (!user?.id || activeTab !== 'inbox') return;
+    if (!user?.id) return;
 
     try {
       await supabase
@@ -330,10 +345,12 @@ export default function MessagesScreen() {
   };
 
   const handleDeleteMessage = async (message: Message) => {
+    const messageType = activeTab === 'feedback' ? 'feedback' : 'message';
+    
     Alert.alert(
-      'Delete Message',
-      activeTab === 'inbox' 
-        ? 'Are you sure you want to delete this message from your inbox?'
+      `Delete ${messageType === 'feedback' ? 'Feedback' : 'Message'}`,
+      activeTab === 'inbox' || activeTab === 'feedback'
+        ? `Are you sure you want to delete this ${messageType} from your inbox?`
         : 'Are you sure you want to delete this sent message?',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -342,7 +359,7 @@ export default function MessagesScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (activeTab === 'inbox') {
+              if (activeTab === 'inbox' || activeTab === 'feedback') {
                 // Delete from inbox (soft delete)
                 await supabase
                   .from('message_recipients')
@@ -367,39 +384,13 @@ export default function MessagesScreen() {
               await loadMessages();
               await loadUnreadCount();
               await loadInboxCount();
-              Alert.alert('Success', 'Message deleted');
+              if (isManager) {
+                await loadFeedbackCount();
+              }
+              Alert.alert('Success', `${messageType === 'feedback' ? 'Feedback' : 'Message'} deleted`);
             } catch (error) {
               console.error('Error deleting message:', error);
-              Alert.alert('Error', 'Failed to delete message');
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleDeleteFeedback = async (feedbackId: string) => {
-    Alert.alert(
-      'Delete Feedback',
-      'Are you sure you want to delete this feedback?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await supabase
-                .from('feedback')
-                .update({ is_deleted: true, deleted_at: new Date().toISOString() })
-                .eq('id', feedbackId);
-
-              await loadFeedback();
-              await loadFeedbackCount();
-              Alert.alert('Success', 'Feedback deleted');
-            } catch (error) {
-              console.error('Error deleting feedback:', error);
-              Alert.alert('Error', 'Failed to delete feedback');
+              Alert.alert('Error', `Failed to delete ${messageType}`);
             }
           },
         },
@@ -456,7 +447,7 @@ export default function MessagesScreen() {
     return null;
   };
 
-  const messages = activeTab === 'inbox' ? inboxMessages : sentMessages;
+  const messages = activeTab === 'inbox' ? inboxMessages : activeTab === 'sent' ? sentMessages : feedbackMessages;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -574,188 +565,120 @@ export default function MessagesScreen() {
               Loading {activeTab === 'feedback' ? 'feedback' : 'messages'}...
             </Text>
           </View>
-        ) : activeTab === 'feedback' ? (
-          // Feedback List
-          feedbackList.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <IconSymbol
-                ios_icon_name="bubble.left.and.bubble.right"
-                android_material_icon_name="feedback"
-                size={64}
-                color={colors.textSecondary}
-              />
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                No feedback submissions yet
-              </Text>
+        ) : messages.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <IconSymbol
+              ios_icon_name={activeTab === 'feedback' ? 'bubble.left.and.bubble.right' : activeTab === 'inbox' ? 'tray' : 'paperplane'}
+              android_material_icon_name={activeTab === 'feedback' ? 'feedback' : activeTab === 'inbox' ? 'inbox' : 'send'}
+              size={64}
+              color={colors.textSecondary}
+            />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              {activeTab === 'feedback' 
+                ? 'No feedback submissions yet'
+                : activeTab === 'inbox' 
+                ? 'No messages in your inbox' 
+                : 'No sent messages'}
+            </Text>
+            {activeTab === 'feedback' && (
               <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
                 Employees can submit feedback from their Tools page
               </Text>
-            </View>
-          ) : (
-            <>
-              {feedbackList.map((feedback, index) => (
-                <View key={index} style={styles.messageItemWrapper}>
-                  <View style={[styles.messageItem, { backgroundColor: colors.card }]}>
-                    {/* Profile Picture */}
-                    <View style={styles.profilePictureContainer}>
-                      {feedback.sender_profile_picture ? (
-                        <Image
-                          source={{ uri: feedback.sender_profile_picture }}
-                          style={styles.profilePicture}
-                        />
-                      ) : (
-                        <View style={[styles.profilePicturePlaceholder, { backgroundColor: colors.highlight }]}>
-                          <Text style={[styles.profilePicturePlaceholderText, { color: colors.text }]}>
-                            {feedback.sender_name.charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Feedback Content */}
-                    <View style={styles.messageContent}>
-                      <View style={styles.messageHeader}>
-                        <View style={styles.messageHeaderLeft}>
-                          <Text style={[styles.messageSender, { color: colors.text }]} numberOfLines={1}>
-                            {feedback.sender_name}
-                          </Text>
-                        </View>
-                        <Text style={[styles.messageDate, { color: colors.textSecondary }]}>
-                          {formatDate(feedback.created_at)}
-                        </Text>
-                      </View>
-                      <Text style={[styles.messageJobTitle, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {feedback.sender_job_title}
-                      </Text>
-                      <Text style={[styles.messageSubject, { color: colors.text }]} numberOfLines={1}>
-                        {feedback.title}
-                      </Text>
-                      <Text style={[styles.messageBody, { color: colors.textSecondary }]} numberOfLines={2}>
-                        {feedback.description}
-                      </Text>
-                    </View>
-                  </View>
-
-                  {/* Action Button */}
-                  <View style={styles.actionButtons}>
-                    <TouchableOpacity
-                      style={[styles.actionButton, { backgroundColor: '#E74C3C' }]}
-                      onPress={() => handleDeleteFeedback(feedback.id)}
-                    >
-                      <IconSymbol
-                        ios_icon_name="trash"
-                        android_material_icon_name="delete"
-                        size={16}
-                        color="#FFFFFF"
-                      />
-                      <Text style={styles.actionButtonText}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
-            </>
-          )
+            )}
+          </View>
         ) : (
-          // Messages List
-          messages.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <IconSymbol
-                ios_icon_name={activeTab === 'inbox' ? 'tray' : 'paperplane'}
-                android_material_icon_name={activeTab === 'inbox' ? 'inbox' : 'send'}
-                size={64}
-                color={colors.textSecondary}
-              />
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                {activeTab === 'inbox' ? 'No messages in your inbox' : 'No sent messages'}
-              </Text>
-            </View>
-          ) : (
-            <>
-              {messages.map((message, index) => (
-                <View key={index} style={styles.messageItemWrapper}>
-                  <TouchableOpacity
-                    style={[
-                      styles.messageItem,
-                      { backgroundColor: colors.card },
-                      !message.is_read && activeTab === 'inbox' && styles.unreadMessage,
-                    ]}
-                    onPress={() => handleMessagePress(message)}
-                  >
-                    {/* Profile Picture */}
-                    <View style={styles.profilePictureContainer}>
-                      {message.sender_profile_picture ? (
-                        <Image
-                          source={{ uri: message.sender_profile_picture }}
-                          style={styles.profilePicture}
-                        />
-                      ) : (
-                        <View style={[styles.profilePicturePlaceholder, { backgroundColor: colors.highlight }]}>
-                          <Text style={[styles.profilePicturePlaceholderText, { color: colors.text }]}>
-                            {message.sender_name.charAt(0).toUpperCase()}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-
-                    {/* Message Content */}
-                    <View style={styles.messageContent}>
-                      <View style={styles.messageHeader}>
-                        <View style={styles.messageHeaderLeft}>
-                          {!message.is_read && activeTab === 'inbox' && (
-                            <View style={styles.unreadDot} />
-                          )}
-                          <Text style={[styles.messageSender, { color: colors.text }]} numberOfLines={1}>
-                            {activeTab === 'inbox' ? message.sender_name : `To: ${message.recipient_count} recipient${message.recipient_count > 1 ? 's' : ''}`}
-                          </Text>
-                        </View>
-                        <Text style={[styles.messageDate, { color: colors.textSecondary }]}>
-                          {formatDate(message.created_at)}
+          <>
+            {messages.map((message, index) => (
+              <View key={index} style={styles.messageItemWrapper}>
+                <TouchableOpacity
+                  style={[
+                    styles.messageItem,
+                    { backgroundColor: colors.card },
+                    !message.is_read && (activeTab === 'inbox' || activeTab === 'feedback') && styles.unreadMessage,
+                  ]}
+                  onPress={() => handleMessagePress(message)}
+                >
+                  {/* Profile Picture */}
+                  <View style={styles.profilePictureContainer}>
+                    {message.sender_profile_picture ? (
+                      <Image
+                        source={{ uri: message.sender_profile_picture }}
+                        style={styles.profilePicture}
+                      />
+                    ) : (
+                      <View style={[styles.profilePicturePlaceholder, { backgroundColor: colors.highlight }]}>
+                        <Text style={[styles.profilePicturePlaceholderText, { color: colors.text }]}>
+                          {message.sender_name.charAt(0).toUpperCase()}
                         </Text>
                       </View>
-                      {message.subject && (
-                        <Text style={[styles.messageSubject, { color: colors.text }]} numberOfLines={1}>
-                          {message.subject}
+                    )}
+                  </View>
+
+                  {/* Message Content */}
+                  <View style={styles.messageContent}>
+                    <View style={styles.messageHeader}>
+                      <View style={styles.messageHeaderLeft}>
+                        {!message.is_read && (activeTab === 'inbox' || activeTab === 'feedback') && (
+                          <View style={styles.unreadDot} />
+                        )}
+                        <Text style={[styles.messageSender, { color: colors.text }]} numberOfLines={1}>
+                          {activeTab === 'sent' 
+                            ? `To: ${message.recipient_count} recipient${message.recipient_count > 1 ? 's' : ''}`
+                            : message.sender_name}
                         </Text>
-                      )}
-                      <Text style={[styles.messageBody, { color: colors.textSecondary }]} numberOfLines={2}>
-                        {message.body}
+                      </View>
+                      <Text style={[styles.messageDate, { color: colors.textSecondary }]}>
+                        {formatDate(message.created_at)}
                       </Text>
                     </View>
-                  </TouchableOpacity>
-
-                  {/* Action Buttons */}
-                  <View style={styles.actionButtons}>
-                    {activeTab === 'inbox' && !message.is_read && (
-                      <TouchableOpacity
-                        style={[styles.actionButton, { backgroundColor: '#3498DB' }]}
-                        onPress={() => handleMarkAsRead(message)}
-                      >
-                        <IconSymbol
-                          ios_icon_name="checkmark.circle"
-                          android_material_icon_name="check_circle"
-                          size={16}
-                          color="#FFFFFF"
-                        />
-                        <Text style={styles.actionButtonText}>Mark as Read</Text>
-                      </TouchableOpacity>
+                    {activeTab !== 'sent' && (
+                      <Text style={[styles.messageJobTitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                        {message.sender_job_title}
+                      </Text>
                     )}
+                    {message.subject && (
+                      <Text style={[styles.messageSubject, { color: colors.text }]} numberOfLines={1}>
+                        {message.subject}
+                      </Text>
+                    )}
+                    <Text style={[styles.messageBody, { color: colors.textSecondary }]} numberOfLines={2}>
+                      {message.body}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Action Buttons */}
+                <View style={styles.actionButtons}>
+                  {(activeTab === 'inbox' || activeTab === 'feedback') && !message.is_read && (
                     <TouchableOpacity
-                      style={[styles.actionButton, { backgroundColor: '#E74C3C' }]}
-                      onPress={() => handleDeleteMessage(message)}
+                      style={[styles.actionButton, { backgroundColor: '#3498DB' }]}
+                      onPress={() => handleMarkAsRead(message)}
                     >
                       <IconSymbol
-                        ios_icon_name="trash"
-                        android_material_icon_name="delete"
+                        ios_icon_name="checkmark.circle"
+                        android_material_icon_name="check_circle"
                         size={16}
                         color="#FFFFFF"
                       />
-                      <Text style={styles.actionButtonText}>Delete</Text>
+                      <Text style={styles.actionButtonText}>Mark as Read</Text>
                     </TouchableOpacity>
-                  </View>
+                  )}
+                  <TouchableOpacity
+                    style={[styles.actionButton, { backgroundColor: '#E74C3C' }]}
+                    onPress={() => handleDeleteMessage(message)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="trash"
+                      android_material_icon_name="delete"
+                      size={16}
+                      color="#FFFFFF"
+                    />
+                    <Text style={styles.actionButtonText}>Delete</Text>
+                  </TouchableOpacity>
                 </View>
-              ))}
-            </>
-          )
+              </View>
+            ))}
+          </>
         )}
       </ScrollView>
     </View>
