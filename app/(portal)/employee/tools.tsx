@@ -51,40 +51,26 @@ export default function EmployeeToolsScreen() {
     try {
       setSubmitting(true);
 
-      // Get the current session
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        throw new Error('No active session. Please log out and log back in.');
-      }
+      console.log('Submitting feedback directly to database...');
 
-      console.log('Session found, submitting via Edge Function...');
-
-      // Call the Edge Function with proper authorization
-      const { data, error } = await supabase.functions.invoke('submit-feedback', {
-        body: {
+      // Insert feedback directly into the database
+      const { data, error } = await supabase
+        .from('feedback')
+        .insert({
+          sender_id: user.id,
           title: feedbackTitle.trim(),
           description: feedbackDescription.trim(),
-        },
-      });
-
-      console.log('Edge Function response:', { data, error });
+          is_deleted: false,
+        })
+        .select()
+        .single();
 
       if (error) {
-        console.error('Edge Function error:', error);
+        console.error('Database error:', error);
         throw new Error(error.message || 'Failed to submit feedback');
       }
 
-      if (data?.error) {
-        console.error('Error in response:', data.error);
-        throw new Error(data.error);
-      }
-
-      if (!data?.success) {
-        throw new Error('Feedback submission failed');
-      }
-
-      console.log('Feedback submitted successfully!');
+      console.log('Feedback submitted successfully!', data);
       
       Alert.alert(
         'Success! 🎉',
@@ -108,10 +94,8 @@ export default function EmployeeToolsScreen() {
       if (error.message) {
         if (error.message.includes('not authenticated') || error.message.includes('session')) {
           errorMessage = 'Your session has expired. Please log out and log back in.';
-        } else if (error.message.includes('required')) {
-          errorMessage = error.message;
-        } else if (error.message.includes('Edge Function')) {
-          errorMessage = 'Unable to connect to the server. Please check your internet connection and try again.';
+        } else if (error.message.includes('permission') || error.message.includes('policy')) {
+          errorMessage = 'Permission error. Please contact your manager if this persists.';
         } else {
           errorMessage = error.message;
         }
