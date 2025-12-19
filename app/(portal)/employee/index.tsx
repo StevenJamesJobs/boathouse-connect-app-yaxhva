@@ -382,6 +382,22 @@ export default function EmployeePortalScreen() {
     });
   };
 
+  // Helper function to truncate text to 100-125 characters
+  const truncateText = (text: string | null, maxLength: number = 125): string => {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    
+    // Find the last space before maxLength to avoid cutting words
+    const truncated = text.substring(0, maxLength);
+    const lastSpace = truncated.lastIndexOf(' ');
+    
+    if (lastSpace > 100) {
+      return truncated.substring(0, lastSpace) + '...';
+    }
+    
+    return truncated + '...';
+  };
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
@@ -506,7 +522,7 @@ export default function EmployeePortalScreen() {
                         </View>
                       </View>
                       <Text style={styles.announcementText}>
-                        {announcement.content || announcement.message}
+                        {truncateText(announcement.content || announcement.message, 125)}
                       </Text>
                       <Text style={styles.announcementDate}>{getTimeAgo(announcement.created_at)}</Text>
                     </>
@@ -584,7 +600,7 @@ export default function EmployeePortalScreen() {
                         <Text style={styles.eventTitle}>{event.title}</Text>
                         {(event.content || event.message) && (
                           <Text style={styles.eventDescription}>
-                            {event.content || event.message}
+                            {truncateText(event.content || event.message, 125)}
                           </Text>
                         )}
                         {event.start_date_time && (
@@ -666,7 +682,7 @@ export default function EmployeePortalScreen() {
                         <Text style={styles.featureTitle}>{feature.title}</Text>
                         {(feature.content || feature.message) && (
                           <Text style={styles.featureDescription}>
-                            {feature.content || feature.message}
+                            {truncateText(feature.content || feature.message, 125)}
                           </Text>
                         )}
                         {feature.start_date_time && (

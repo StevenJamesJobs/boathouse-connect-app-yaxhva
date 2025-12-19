@@ -56,6 +56,7 @@ export default function RewardsAndReviewsEditorScreen() {
 
   // Rewards state
   const [showRewardModal, setShowRewardModal] = useState(false);
+  const [showResetBucksModal, setShowResetBucksModal] = useState(false);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
@@ -67,6 +68,11 @@ export default function RewardsAndReviewsEditorScreen() {
   const [topEmployees, setTopEmployees] = useState<Employee[]>([]);
   const [recentTransactions, setRecentTransactions] = useState<RewardTransaction[]>([]);
   const [isReward, setIsReward] = useState(true); // true = Reward (positive), false = Deduct (negative)
+
+  // Reset Bucks state
+  const [resetSearchQuery, setResetSearchQuery] = useState('');
+  const [resetFilteredEmployees, setResetFilteredEmployees] = useState<Employee[]>([]);
+  const [resetSelectedEmployee, setResetSelectedEmployee] = useState<Employee | null>(null);
 
   // Edit transaction state
   const [showEditTransactionModal, setShowEditTransactionModal] = useState(false);
@@ -105,6 +111,19 @@ export default function RewardsAndReviewsEditorScreen() {
       setFilteredEmployees([]);
     }
   }, [searchQuery, employees]);
+
+  useEffect(() => {
+    if (resetSearchQuery) {
+      const filtered = employees.filter(
+        (emp) =>
+          emp.name.toLowerCase().includes(resetSearchQuery.toLowerCase()) ||
+          emp.username.toLowerCase().includes(resetSearchQuery.toLowerCase())
+      );
+      setResetFilteredEmployees(filtered);
+    } else {
+      setResetFilteredEmployees([]);
+    }
+  }, [resetSearchQuery, employees]);
 
   const fetchEmployees = async () => {
     try {
@@ -256,6 +275,105 @@ export default function RewardsAndReviewsEditorScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResetSingleUser = async () => {
+    if (!resetSelectedEmployee) {
+      Alert.alert('Error', 'Please select an employee');
+      return;
+    }
+
+    Alert.alert(
+      'Reset User Bucks',
+      `Are you sure you want to reset ${resetSelectedEmployee.name}'s McLoone's Bucks to $0? This will also delete all their transaction history. This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+
+              // Delete all transactions for this user
+              const { error: deleteError } = await supabase
+                .from('rewards_transactions')
+                .delete()
+                .eq('user_id', resetSelectedEmployee.id);
+
+              if (deleteError) throw deleteError;
+
+              // Reset user's bucks to 0
+              const { error: updateError } = await supabase
+                .from('users')
+                .update({ mcloones_bucks: 0 })
+                .eq('id', resetSelectedEmployee.id);
+
+              if (updateError) throw updateError;
+
+              Alert.alert('Success', `${resetSelectedEmployee.name}'s McLoone's Bucks have been reset to $0 and all transactions deleted`);
+              setShowResetBucksModal(false);
+              setResetSelectedEmployee(null);
+              setResetSearchQuery('');
+              fetchEmployees();
+              fetchRewardsData();
+            } catch (error: any) {
+              console.error('Error resetting user bucks:', error);
+              Alert.alert('Error', error.message || 'Failed to reset user bucks');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleResetAllUsers = async () => {
+    Alert.alert(
+      'Reset All Users Bucks',
+      'Are you sure you want to reset ALL employees\' McLoone\'s Bucks to $0? This will also delete ALL transaction history for everyone. This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset All',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setLoading(true);
+
+              // Delete all transactions
+              const { error: deleteError } = await supabase
+                .from('rewards_transactions')
+                .delete()
+                .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+
+              if (deleteError) throw deleteError;
+
+              // Reset all users' bucks to 0
+              const { error: updateError } = await supabase
+                .from('users')
+                .update({ mcloones_bucks: 0 })
+                .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all rows
+
+              if (updateError) throw updateError;
+
+              Alert.alert('Success', 'All employees\' McLoone\'s Bucks have been reset to $0 and all transactions deleted');
+              setShowResetBucksModal(false);
+              setResetSelectedEmployee(null);
+              setResetSearchQuery('');
+              fetchEmployees();
+              fetchRewardsData();
+            } catch (error: any) {
+              console.error('Error resetting all users bucks:', error);
+              Alert.alert('Error', error.message || 'Failed to reset all users bucks');
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const handleEditTransaction = (transaction: RewardTransaction) => {
@@ -573,19 +691,34 @@ export default function RewardsAndReviewsEditorScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {activeTab === 'rewards' ? (
           <>
-            {/* Reward Bucks Button */}
-            <TouchableOpacity
-              style={styles.rewardButton}
-              onPress={() => setShowRewardModal(true)}
-            >
-              <IconSymbol
-                ios_icon_name="gift.fill"
-                android_material_icon_name="card_giftcard"
-                size={24}
-                color={managerColors.text}
-              />
-              <Text style={styles.rewardButtonText}>Reward Bucks</Text>
-            </TouchableOpacity>
+            {/* Action Buttons Row */}
+            <View style={styles.actionButtonsRow}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.rewardButton]}
+                onPress={() => setShowRewardModal(true)}
+              >
+                <IconSymbol
+                  ios_icon_name="gift.fill"
+                  android_material_icon_name="card_giftcard"
+                  size={24}
+                  color={managerColors.text}
+                />
+                <Text style={styles.actionButtonText}>Reward Bucks</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.actionButton, styles.resetButton]}
+                onPress={() => setShowResetBucksModal(true)}
+              >
+                <IconSymbol
+                  ios_icon_name="arrow.counterclockwise.circle.fill"
+                  android_material_icon_name="refresh"
+                  size={24}
+                  color={managerColors.text}
+                />
+                <Text style={styles.actionButtonText}>Reset Bucks</Text>
+              </TouchableOpacity>
+            </View>
 
             {/* My McLoone's Bucks */}
             <View style={styles.bucksCard}>
@@ -642,7 +775,7 @@ export default function RewardsAndReviewsEditorScreen() {
                       <View style={styles.transactionActions}>
                         <TouchableOpacity
                           onPress={() => handleEditTransaction(trans)}
-                          style={styles.actionButton}
+                          style={styles.actionIconButton}
                         >
                           <IconSymbol
                             ios_icon_name="pencil.circle.fill"
@@ -653,7 +786,7 @@ export default function RewardsAndReviewsEditorScreen() {
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => handleHideTransaction(trans)}
-                          style={styles.actionButton}
+                          style={styles.actionIconButton}
                         >
                           <IconSymbol
                             ios_icon_name={trans.is_visible ? 'eye.slash.fill' : 'eye.fill'}
@@ -664,7 +797,7 @@ export default function RewardsAndReviewsEditorScreen() {
                         </TouchableOpacity>
                         <TouchableOpacity
                           onPress={() => handleDeleteTransaction(trans)}
-                          style={styles.actionButton}
+                          style={styles.actionIconButton}
                         >
                           <IconSymbol
                             ios_icon_name="trash.fill"
@@ -932,6 +1065,117 @@ export default function RewardsAndReviewsEditorScreen() {
                   </Text>
                 )}
               </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Reset Bucks Modal */}
+      <Modal visible={showResetBucksModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Reset McLoone&apos;s Bucks</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowResetBucksModal(false);
+                  setResetSelectedEmployee(null);
+                  setResetSearchQuery('');
+                }}
+              >
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color={managerColors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalForm}>
+              <Text style={styles.resetWarning}>
+                ⚠️ Warning: Resetting bucks will set the balance to $0 and delete all transaction history. This action cannot be undone.
+              </Text>
+
+              {/* Reset Single User */}
+              <View style={styles.resetSection}>
+                <Text style={styles.resetSectionTitle}>Reset Single User</Text>
+                <View style={styles.formField}>
+                  <Text style={styles.formLabel}>Search Employee</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={resetSearchQuery}
+                    onChangeText={setResetSearchQuery}
+                    placeholder="Type employee name..."
+                    placeholderTextColor={managerColors.textSecondary}
+                  />
+                  {resetFilteredEmployees.length > 0 && (
+                    <View style={styles.searchResults}>
+                      {resetFilteredEmployees.map((emp, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.searchResultItem}
+                          onPress={() => {
+                            setResetSelectedEmployee(emp);
+                            setResetSearchQuery(emp.name);
+                            setResetFilteredEmployees([]);
+                          }}
+                        >
+                          <Text style={styles.searchResultName}>{emp.name}</Text>
+                          <Text style={styles.searchResultJob}>
+                            {emp.job_title} - Current: ${emp.mcloones_bucks || 0}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
+                  {resetSelectedEmployee && (
+                    <View style={styles.selectedEmployee}>
+                      <Text style={styles.selectedEmployeeText}>
+                        Selected: {resetSelectedEmployee.name}
+                      </Text>
+                      <Text style={styles.selectedEmployeeBalance}>
+                        Current Balance: ${resetSelectedEmployee.mcloones_bucks || 0}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.submitButton, styles.resetSingleButton]}
+                  onPress={handleResetSingleUser}
+                  disabled={loading || !resetSelectedEmployee}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={managerColors.text} />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Reset Selected User</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* Divider */}
+              <View style={styles.divider} />
+
+              {/* Reset All Users */}
+              <View style={styles.resetSection}>
+                <Text style={styles.resetSectionTitle}>Reset All Users</Text>
+                <Text style={styles.resetAllWarning}>
+                  This will reset ALL employees&apos; McLoone&apos;s Bucks to $0 and delete ALL transaction history for everyone.
+                </Text>
+
+                <TouchableOpacity
+                  style={[styles.submitButton, styles.resetAllButton]}
+                  onPress={handleResetAllUsers}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={managerColors.text} />
+                  ) : (
+                    <Text style={styles.submitButtonText}>Reset All Users</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </View>
@@ -1259,17 +1503,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 100,
   },
-  rewardButton: {
+  actionButtonsRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  actionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: managerColors.highlight,
     borderRadius: 12,
     paddingVertical: 16,
-    marginBottom: 20,
-    gap: 12,
+    gap: 8,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
+  },
+  rewardButton: {
+    backgroundColor: managerColors.highlight,
+  },
+  resetButton: {
+    backgroundColor: '#FF9800',
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: managerColors.text,
   },
   rewardButtonText: {
     fontSize: 18,
@@ -1400,7 +1659,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  actionButton: {
+  actionIconButton: {
     padding: 4,
   },
   emptyText: {
@@ -1560,6 +1819,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: managerColors.text,
   },
+  selectedEmployeeBalance: {
+    fontSize: 13,
+    color: managerColors.text,
+    marginTop: 4,
+  },
   toggleContainer: {
     flexDirection: 'row',
     gap: 12,
@@ -1643,5 +1907,40 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: managerColors.text,
+  },
+  resetWarning: {
+    backgroundColor: '#FFF3CD',
+    borderRadius: 8,
+    padding: 16,
+    marginBottom: 24,
+    fontSize: 14,
+    color: '#856404',
+    lineHeight: 20,
+  },
+  resetSection: {
+    marginBottom: 24,
+  },
+  resetSectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: managerColors.text,
+    marginBottom: 16,
+  },
+  resetSingleButton: {
+    backgroundColor: '#FF9800',
+  },
+  resetAllButton: {
+    backgroundColor: '#F44336',
+  },
+  resetAllWarning: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginBottom: 16,
+    lineHeight: 20,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: managerColors.border,
+    marginVertical: 24,
   },
 });
