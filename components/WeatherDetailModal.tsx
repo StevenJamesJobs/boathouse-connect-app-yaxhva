@@ -12,7 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
-import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 
 interface DayForecast {
   date: string;
@@ -197,16 +197,20 @@ export default function WeatherDetailModal({
   };
 
   const handleSwipeGesture = (event: any) => {
-    const { translationY } = event.nativeEvent;
-    if (translationY > 100) {
-      onClose();
+    if (event.nativeEvent.state === State.END) {
+      const { translationY } = event.nativeEvent;
+      if (translationY > 100) {
+        onClose();
+      }
     }
   };
 
   const handleRadarSwipeGesture = (event: any) => {
-    const { translationY } = event.nativeEvent;
-    if (translationY > 100) {
-      setRadarExpanded(false);
+    if (event.nativeEvent.state === State.END) {
+      const { translationY } = event.nativeEvent;
+      if (translationY > 100) {
+        setRadarExpanded(false);
+      }
     }
   };
 
@@ -237,7 +241,7 @@ export default function WeatherDetailModal({
             activeOpacity={1}
             onPress={onClose}
           />
-          <PanGestureHandler onGestureEvent={handleSwipeGesture}>
+          <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
             <View style={[styles.modalContent, { backgroundColor: colors.card, height: screenHeight * 0.85 }]}>
               {/* Swipe Indicator */}
               <View style={styles.swipeIndicatorContainer}>
@@ -487,49 +491,51 @@ export default function WeatherDetailModal({
       </Modal>
 
       {/* Expanded Radar Modal */}
-      <Modal
-        visible={radarExpanded}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={closeRadarExpanded}
-      >
-        <GestureHandlerRootView style={styles.expandedRadarOverlay}>
-          <TouchableOpacity
-            style={styles.expandedRadarBackdrop}
-            activeOpacity={1}
-            onPress={closeRadarExpanded}
-          />
-          <PanGestureHandler onGestureEvent={handleRadarSwipeGesture}>
-            <View style={styles.expandedRadarContainer}>
-              {/* Close Button */}
-              <TouchableOpacity style={styles.expandedRadarCloseButton} onPress={closeRadarExpanded}>
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={36}
-                  color="#FFFFFF"
-                />
-              </TouchableOpacity>
+      {radarExpanded && weatherData && (
+        <Modal
+          visible={radarExpanded}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={closeRadarExpanded}
+        >
+          <View style={styles.expandedRadarOverlay}>
+            <TouchableOpacity
+              style={styles.expandedRadarBackdrop}
+              activeOpacity={1}
+              onPress={closeRadarExpanded}
+            />
+            <GestureHandlerRootView style={styles.expandedRadarGestureContainer}>
+              <PanGestureHandler onHandlerStateChange={handleRadarSwipeGesture}>
+                <View style={styles.expandedRadarContainer}>
+                  {/* Close Button */}
+                  <TouchableOpacity style={styles.expandedRadarCloseButton} onPress={closeRadarExpanded}>
+                    <IconSymbol
+                      ios_icon_name="xmark.circle.fill"
+                      android_material_icon_name="cancel"
+                      size={36}
+                      color="#FFFFFF"
+                    />
+                  </TouchableOpacity>
 
-              {/* Radar Image */}
-              {weatherData && (
-                <View style={styles.expandedRadarContent}>
-                  <Text style={styles.expandedRadarTitle}>Northeast Regional Radar</Text>
-                  <Text style={styles.expandedRadarSubtitle}>Tri-State Area (NY, NJ, CT)</Text>
-                  <Image
-                    source={{ uri: weatherData.radarImageUrl }}
-                    style={styles.expandedRadarImage}
-                    resizeMode="contain"
-                  />
+                  {/* Radar Image */}
+                  <View style={styles.expandedRadarContent}>
+                    <Text style={styles.expandedRadarTitle}>Northeast Regional Radar</Text>
+                    <Text style={styles.expandedRadarSubtitle}>Tri-State Area (NY, NJ, CT)</Text>
+                    <Image
+                      source={{ uri: weatherData.radarImageUrl }}
+                      style={styles.expandedRadarImage}
+                      resizeMode="contain"
+                    />
+                  </View>
+
+                  {/* Swipe Hint */}
+                  <Text style={styles.expandedRadarSwipeHint}>Swipe down or tap X to close</Text>
                 </View>
-              )}
-
-              {/* Swipe Hint */}
-              <Text style={styles.expandedRadarSwipeHint}>Swipe down or tap X to close</Text>
-            </View>
-          </PanGestureHandler>
-        </GestureHandlerRootView>
-      </Modal>
+              </PanGestureHandler>
+            </GestureHandlerRootView>
+          </View>
+        </Modal>
+      )}
     </>
   );
 }
@@ -766,7 +772,13 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
+  expandedRadarGestureContainer: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
   expandedRadarContainer: {
+    flex: 1,
     width: '100%',
     height: '100%',
     justifyContent: 'center',
