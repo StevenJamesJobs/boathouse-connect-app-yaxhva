@@ -294,22 +294,45 @@ export default function RewardsAndReviewsEditorScreen() {
           onPress: async () => {
             try {
               setLoading(true);
+              console.log('Starting reset for user:', resetSelectedEmployee.id);
 
-              // Delete all transactions for this user
+              // Step 1: Delete all transactions for this user
               const { error: deleteError } = await supabase
                 .from('rewards_transactions')
                 .delete()
                 .eq('user_id', resetSelectedEmployee.id);
 
-              if (deleteError) throw deleteError;
+              if (deleteError) {
+                console.error('Error deleting transactions:', deleteError);
+                throw deleteError;
+              }
+              console.log('Transactions deleted successfully');
 
-              // Reset user's bucks to 0
-              const { error: updateError } = await supabase
+              // Step 2: Reset user's bucks to 0 - using a direct update
+              const { data: updateData, error: updateError } = await supabase
                 .from('users')
                 .update({ mcloones_bucks: 0 })
-                .eq('id', resetSelectedEmployee.id);
+                .eq('id', resetSelectedEmployee.id)
+                .select();
 
-              if (updateError) throw updateError;
+              if (updateError) {
+                console.error('Error updating user bucks:', updateError);
+                throw updateError;
+              }
+              console.log('User bucks updated successfully:', updateData);
+
+              // Step 3: Verify the update
+              const { data: verifyData, error: verifyError } = await supabase
+                .from('users')
+                .select('mcloones_bucks')
+                .eq('id', resetSelectedEmployee.id)
+                .single();
+
+              if (verifyError) {
+                console.error('Error verifying update:', verifyError);
+              } else {
+                console.log('Verified user bucks after reset:', verifyData);
+              }
 
               Alert.alert('Success', `${resetSelectedEmployee.name}'s McLoone's Bucks have been reset to $0 and all transactions deleted`);
               setShowResetBucksModal(false);
@@ -341,22 +364,60 @@ export default function RewardsAndReviewsEditorScreen() {
           onPress: async () => {
             try {
               setLoading(true);
+              console.log('Starting reset for all users');
 
-              // Delete all transactions
+              // Step 1: Delete all transactions
               const { error: deleteError } = await supabase
                 .from('rewards_transactions')
                 .delete()
                 .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
 
-              if (deleteError) throw deleteError;
+              if (deleteError) {
+                console.error('Error deleting all transactions:', deleteError);
+                throw deleteError;
+              }
+              console.log('All transactions deleted successfully');
 
-              // Reset all users' bucks to 0
-              const { error: updateError } = await supabase
+              // Step 2: Get all active users
+              const { data: allUsers, error: fetchError } = await supabase
+                .from('users')
+                .select('id')
+                .eq('is_active', true);
+
+              if (fetchError) {
+                console.error('Error fetching users:', fetchError);
+                throw fetchError;
+              }
+              console.log('Found users to reset:', allUsers?.length);
+
+              // Step 3: Reset all users' bucks to 0 - using a direct update
+              const { data: updateData, error: updateError } = await supabase
                 .from('users')
                 .update({ mcloones_bucks: 0 })
-                .neq('id', '00000000-0000-0000-0000-000000000000'); // Update all rows
+                .eq('is_active', true)
+                .select();
 
-              if (updateError) throw updateError;
+              if (updateError) {
+                console.error('Error updating all users bucks:', updateError);
+                throw updateError;
+              }
+              console.log('All users bucks updated successfully:', updateData?.length, 'users updated');
+
+              // Step 4: Verify the update
+              const { data: verifyData, error: verifyError } = await supabase
+                .from('users')
+                .select('id, name, mcloones_bucks')
+                .eq('is_active', true);
+
+              if (verifyError) {
+                console.error('Error verifying update:', verifyError);
+              } else {
+                console.log('Verified users after reset:', verifyData);
+                const nonZeroUsers = verifyData?.filter(u => u.mcloones_bucks !== 0);
+                if (nonZeroUsers && nonZeroUsers.length > 0) {
+                  console.warn('Warning: Some users still have non-zero bucks:', nonZeroUsers);
+                }
+              }
 
               Alert.alert('Success', 'All employees\' McLoone\'s Bucks have been reset to $0 and all transactions deleted');
               setShowResetBucksModal(false);
