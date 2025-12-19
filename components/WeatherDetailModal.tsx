@@ -37,7 +37,8 @@ interface WeatherDetailData {
   detailedForecast: string;
   sunrise: string;
   sunset: string;
-  next3Days: DayForecast[];
+  next4Days: DayForecast[];
+  radarImageUrl: string;
 }
 
 interface WeatherDetailModalProps {
@@ -75,9 +76,9 @@ export default function WeatherDetailModal({
       setLoading(true);
       setError(null);
 
-      // Request 5 days to ensure we get today + next 3 days (with buffer)
+      // Request 6 days to ensure we get today + next 4 days (with buffer)
       const response = await fetch(
-        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=5&aqi=no&alerts=no`
+        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=6&aqi=no&alerts=no`
       );
 
       if (!response.ok) {
@@ -127,7 +128,7 @@ export default function WeatherDetailModal({
       console.log('Today\'s date (midnight):', todayDate.toISOString());
       console.log('Today\'s date (local):', todayDate.toLocaleDateString());
 
-      // Filter to get only future days (not today) and take exactly 3
+      // Filter to get only future days (not today) and take exactly 4
       const futureDays = data.forecast.forecastday.filter((day: any, index: number) => {
         const dayDate = new Date(day.date + 'T00:00:00'); // Parse as local date
         
@@ -140,8 +141,8 @@ export default function WeatherDetailModal({
 
       console.log('Future days found:', futureDays.length);
 
-      // Take exactly 3 future days - FIXED: was slice(2, 3) which only gave 1 day!
-      const next3Days: DayForecast[] = futureDays.slice(0, 3).map((day: any, index: number) => {
+      // Take exactly 4 future days
+      const next4Days: DayForecast[] = futureDays.slice(0, 4).map((day: any, index: number) => {
         const date = new Date(day.date + 'T00:00:00');
         const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
         
@@ -157,10 +158,14 @@ export default function WeatherDetailModal({
         };
       });
 
-      console.log('Next 3 days processed:', next3Days.length, 'days');
-      next3Days.forEach((day, i) => {
+      console.log('Next 4 days processed:', next4Days.length, 'days');
+      next4Days.forEach((day, i) => {
         console.log(`  Day ${i + 1}: ${day.dayOfWeek} ${day.date} - High: ${day.highTemp}°F, Low: ${day.lowTemp}°F`);
       });
+
+      // Generate radar image URL for West Orange, NJ area
+      // Using Weather API's radar/satellite imagery
+      const radarImageUrl = `https://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&aqi=no`;
 
       const weatherDetail: WeatherDetailData = {
         currentTemp: Math.round(data.current.temp_f),
@@ -176,7 +181,8 @@ export default function WeatherDetailModal({
         detailedForecast,
         sunrise: todayAstro.sunrise,
         sunset: todayAstro.sunset,
-        next3Days,
+        next4Days,
+        radarImageUrl: 'https://radar.weather.gov/ridge/standard/CONUS_loop.gif',
       };
 
       setWeatherData(weatherDetail);
@@ -273,6 +279,30 @@ export default function WeatherDetailModal({
                       </View>
                     </View>
 
+                    {/* Today's Detailed Forecast - MOVED UP */}
+                    <View style={styles.detailedForecastContainer}>
+                      <Text style={[styles.detailedForecastTitle, { color: colors.text }]}>
+                        Today&apos;s Detailed Forecast
+                      </Text>
+                      <Text style={[styles.detailedForecastText, { color: colors.textSecondary }]}>
+                        {weatherData.detailedForecast}
+                      </Text>
+                    </View>
+
+                    {/* Radar Image - NEW */}
+                    <View style={styles.radarContainer}>
+                      <Text style={[styles.radarTitle, { color: colors.text }]}>
+                        Regional Radar
+                      </Text>
+                      <View style={[styles.radarImageWrapper, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}>
+                        <Image
+                          source={{ uri: weatherData.radarImageUrl }}
+                          style={styles.radarImage}
+                          resizeMode="cover"
+                        />
+                      </View>
+                    </View>
+
                     {/* Weather Details Grid - 2 rows of 3 items */}
                     <View style={styles.detailsGrid}>
                       {/* Row 1: Humidity, Wind, Visibility */}
@@ -349,29 +379,19 @@ export default function WeatherDetailModal({
                         </View>
                       </View>
                     </View>
-
-                    {/* Detailed Forecast */}
-                    <View style={styles.detailedForecastContainer}>
-                      <Text style={[styles.detailedForecastTitle, { color: colors.text }]}>
-                        Today&apos;s Detailed Forecast
-                      </Text>
-                      <Text style={[styles.detailedForecastText, { color: colors.textSecondary }]}>
-                        {weatherData.detailedForecast}
-                      </Text>
-                    </View>
                   </View>
 
-                  {/* Next 3 Days Forecast - SIMPLIFIED HORIZONTAL LAYOUT */}
+                  {/* Extended Forecast - RENAMED AND UPDATED TO 4 DAYS */}
                   <View style={styles.forecastSection}>
-                    <Text style={[styles.forecastTitle, { color: colors.text }]}>Next 3 Day Forecast</Text>
+                    <Text style={[styles.forecastTitle, { color: colors.text }]}>Extended Forecast</Text>
 
-                    {weatherData.next3Days.length === 0 ? (
+                    {weatherData.next4Days.length === 0 ? (
                       <Text style={[styles.noDataText, { color: colors.textSecondary }]}>
-                        No forecast data available for the next 3 days.
+                        No forecast data available for the extended forecast.
                       </Text>
                     ) : (
                       <View style={styles.horizontalForecastContainer}>
-                        {weatherData.next3Days.map((day, index) => (
+                        {weatherData.next4Days.map((day, index) => (
                           <View
                             key={index}
                             style={[
@@ -530,8 +550,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 2,
   },
-  detailsGrid: {
+  detailedForecastContainer: {
     marginBottom: 20,
+  },
+  detailedForecastTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  detailedForecastText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  radarContainer: {
+    marginBottom: 20,
+  },
+  radarTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  radarImageWrapper: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    height: 200,
+  },
+  radarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  detailsGrid: {
     gap: 12,
   },
   detailRow: {
@@ -554,18 +603,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  detailedForecastContainer: {
-    marginTop: 8,
-  },
-  detailedForecastTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  detailedForecastText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
   forecastSection: {
     marginTop: 8,
   },
@@ -579,37 +616,36 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingVertical: 20,
   },
-  // NEW HORIZONTAL LAYOUT STYLES
   horizontalForecastContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 12,
+    gap: 8,
   },
   horizontalDayCard: {
     flex: 1,
     borderRadius: 16,
-    padding: 16,
+    padding: 12,
     alignItems: 'center',
     borderWidth: 1,
-    gap: 8,
+    gap: 6,
   },
   horizontalDayName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     textAlign: 'center',
   },
   horizontalIcon: {
-    width: 56,
-    height: 56,
-    marginVertical: 4,
+    width: 48,
+    height: 48,
+    marginVertical: 2,
   },
   horizontalTempRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 3,
   },
   horizontalTempText: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
 });
