@@ -1,8 +1,9 @@
+
 {
   "expo": {
     "name": "Boathouse Connect",
     "slug": "Boathouse Connect",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png",
     "scheme": "mcloones",
@@ -16,6 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mcloones.boathouseconnect",
+      "buildNumber": "1.1",
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
@@ -30,6 +32,7 @@
         "backgroundColor": "#E8F1F8"
       },
       "package": "com.mcloones.boathouseconnect",
+      "versionCode": 2,
       "icon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png"
     },
     "web": {
