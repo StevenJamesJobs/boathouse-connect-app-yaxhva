@@ -76,9 +76,9 @@ export default function WeatherDetailModal({
       setLoading(true);
       setError(null);
 
-      // Request 6 days to ensure we get today + next 4 days (with buffer)
+      // Request 5 days to ensure we get today + next 4 days
       const response = await fetch(
-        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=6&aqi=no&alerts=no`
+        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=5&aqi=no&alerts=no`
       );
 
       if (!response.ok) {
@@ -121,51 +121,34 @@ export default function WeatherDetailModal({
 
       detailedForecast += `Sunrise at ${todayAstro.sunrise}, sunset at ${todayAstro.sunset}.`;
 
-      // Get today's date at midnight for accurate comparison
-      const todayDate = new Date();
-      todayDate.setHours(0, 0, 0, 0);
-      
-      console.log('Today\'s date (midnight):', todayDate.toISOString());
-      console.log('Today\'s date (local):', todayDate.toLocaleDateString());
+      // Get the next 4 days (excluding today which is index 0)
+      // Simply slice from index 1 to get the next 4 days
+      const next4Days: DayForecast[] = data.forecast.forecastday
+        .slice(1, 5) // Get indices 1, 2, 3, 4 (the next 4 days after today)
+        .map((day: any, index: number) => {
+          const date = new Date(day.date + 'T00:00:00');
+          const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
+          
+          console.log(`Processing future day ${index + 1}: ${dayOfWeek} ${day.date} - High: ${Math.round(day.day.maxtemp_f)}°F, Low: ${Math.round(day.day.mintemp_f)}°F`);
 
-      // Filter to get only future days (not today) and take exactly 4
-      const futureDays = data.forecast.forecastday.filter((day: any, index: number) => {
-        const dayDate = new Date(day.date + 'T00:00:00'); // Parse as local date
-        
-        console.log(`Day ${index}: ${day.date} -> ${dayDate.toLocaleDateString()} (${dayDate.toISOString()})`);
-        console.log(`  Is after today? ${dayDate > todayDate}`);
-        
-        // Only include days that are after today
-        return dayDate > todayDate;
-      });
-
-      console.log('Future days found:', futureDays.length);
-
-      // Take exactly 4 future days
-      const next4Days: DayForecast[] = futureDays.slice(0, 4).map((day: any, index: number) => {
-        const date = new Date(day.date + 'T00:00:00');
-        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
-        
-        console.log(`Processing future day ${index + 1}: ${dayOfWeek} ${day.date}`);
-
-        return {
-          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          dayOfWeek,
-          conditionIcon: `https:${day.day.condition.icon}`,
-          conditionText: day.day.condition.text,
-          highTemp: Math.round(day.day.maxtemp_f),
-          lowTemp: Math.round(day.day.mintemp_f),
-        };
-      });
+          return {
+            date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            dayOfWeek,
+            conditionIcon: `https:${day.day.condition.icon}`,
+            conditionText: day.day.condition.text,
+            highTemp: Math.round(day.day.maxtemp_f),
+            lowTemp: Math.round(day.day.mintemp_f),
+          };
+        });
 
       console.log('Next 4 days processed:', next4Days.length, 'days');
       next4Days.forEach((day, i) => {
         console.log(`  Day ${i + 1}: ${day.dayOfWeek} ${day.date} - High: ${day.highTemp}°F, Low: ${day.lowTemp}°F`);
       });
 
-      // Generate radar image URL for West Orange, NJ area
-      // Using Weather API's radar/satellite imagery
-      const radarImageUrl = `https://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&aqi=no`;
+      // Use Northeast regional radar from NOAA
+      // This covers the tri-state area (NY, NJ, CT) including West Orange, NJ
+      const radarImageUrl = 'https://radar.weather.gov/ridge/standard/NORTHEAST_loop.gif';
 
       const weatherDetail: WeatherDetailData = {
         currentTemp: Math.round(data.current.temp_f),
@@ -182,7 +165,7 @@ export default function WeatherDetailModal({
         sunrise: todayAstro.sunrise,
         sunset: todayAstro.sunset,
         next4Days,
-        radarImageUrl: 'https://radar.weather.gov/ridge/standard/CONUS_loop.gif',
+        radarImageUrl,
       };
 
       setWeatherData(weatherDetail);
@@ -279,7 +262,7 @@ export default function WeatherDetailModal({
                       </View>
                     </View>
 
-                    {/* Today's Detailed Forecast - MOVED UP */}
+                    {/* Today's Detailed Forecast */}
                     <View style={styles.detailedForecastContainer}>
                       <Text style={[styles.detailedForecastTitle, { color: colors.text }]}>
                         Today&apos;s Detailed Forecast
@@ -289,10 +272,13 @@ export default function WeatherDetailModal({
                       </Text>
                     </View>
 
-                    {/* Radar Image - NEW */}
+                    {/* Radar Image - Northeast Region */}
                     <View style={styles.radarContainer}>
                       <Text style={[styles.radarTitle, { color: colors.text }]}>
-                        Regional Radar
+                        Northeast Regional Radar
+                      </Text>
+                      <Text style={[styles.radarSubtitle, { color: colors.textSecondary }]}>
+                        Tri-State Area (NY, NJ, CT)
                       </Text>
                       <View style={[styles.radarImageWrapper, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}>
                         <Image
@@ -381,7 +367,7 @@ export default function WeatherDetailModal({
                     </View>
                   </View>
 
-                  {/* Extended Forecast - RENAMED AND UPDATED TO 4 DAYS */}
+                  {/* Extended Forecast - 4 Days */}
                   <View style={styles.forecastSection}>
                     <Text style={[styles.forecastTitle, { color: colors.text }]}>Extended Forecast</Text>
 
@@ -568,6 +554,10 @@ const styles = StyleSheet.create({
   radarTitle: {
     fontSize: 16,
     fontWeight: '700',
+    marginBottom: 4,
+  },
+  radarSubtitle: {
+    fontSize: 12,
     marginBottom: 8,
   },
   radarImageWrapper: {
