@@ -209,6 +209,7 @@ export default function WeatherDetailModal({
     if (event.nativeEvent.state === State.END) {
       const { translationY } = event.nativeEvent;
       if (translationY > 100) {
+        console.log('Swipe down detected, closing expanded radar');
         setRadarExpanded(false);
       }
     }
@@ -491,51 +492,49 @@ export default function WeatherDetailModal({
       </Modal>
 
       {/* Expanded Radar Modal */}
-      {radarExpanded && weatherData && (
-        <Modal
-          visible={radarExpanded}
-          transparent={true}
-          animationType="fade"
-          onRequestClose={closeRadarExpanded}
-        >
-          <View style={styles.expandedRadarOverlay}>
-            <TouchableOpacity
-              style={styles.expandedRadarBackdrop}
-              activeOpacity={1}
-              onPress={closeRadarExpanded}
-            />
-            <GestureHandlerRootView style={styles.expandedRadarGestureContainer}>
-              <PanGestureHandler onHandlerStateChange={handleRadarSwipeGesture}>
-                <View style={styles.expandedRadarContainer}>
-                  {/* Close Button */}
-                  <TouchableOpacity style={styles.expandedRadarCloseButton} onPress={closeRadarExpanded}>
-                    <IconSymbol
-                      ios_icon_name="xmark.circle.fill"
-                      android_material_icon_name="cancel"
-                      size={36}
-                      color="#FFFFFF"
-                    />
-                  </TouchableOpacity>
+      <Modal
+        visible={radarExpanded}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeRadarExpanded}
+      >
+        <GestureHandlerRootView style={styles.expandedRadarOverlay}>
+          <TouchableOpacity
+            style={styles.expandedRadarBackdrop}
+            activeOpacity={1}
+            onPress={closeRadarExpanded}
+          />
+          <PanGestureHandler onHandlerStateChange={handleRadarSwipeGesture}>
+            <View style={styles.expandedRadarContainer}>
+              {/* Close Button */}
+              <TouchableOpacity style={styles.expandedRadarCloseButton} onPress={closeRadarExpanded}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={36}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
 
-                  {/* Radar Image */}
-                  <View style={styles.expandedRadarContent}>
-                    <Text style={styles.expandedRadarTitle}>Northeast Regional Radar</Text>
-                    <Text style={styles.expandedRadarSubtitle}>Tri-State Area (NY, NJ, CT)</Text>
-                    <Image
-                      source={{ uri: weatherData.radarImageUrl }}
-                      style={styles.expandedRadarImage}
-                      resizeMode="contain"
-                    />
-                  </View>
+              {/* Radar Image */}
+              <View style={styles.expandedRadarContent}>
+                <Text style={styles.expandedRadarTitle}>Northeast Regional Radar</Text>
+                <Text style={styles.expandedRadarSubtitle}>Tri-State Area (NY, NJ, CT)</Text>
+                {weatherData && (
+                  <Image
+                    source={{ uri: weatherData.radarImageUrl }}
+                    style={styles.expandedRadarImage}
+                    resizeMode="contain"
+                  />
+                )}
+              </View>
 
-                  {/* Swipe Hint */}
-                  <Text style={styles.expandedRadarSwipeHint}>Swipe down or tap X to close</Text>
-                </View>
-              </PanGestureHandler>
-            </GestureHandlerRootView>
-          </View>
-        </Modal>
-      )}
+              {/* Swipe Hint */}
+              <Text style={styles.expandedRadarSwipeHint}>Swipe down or tap X to close</Text>
+            </View>
+          </PanGestureHandler>
+        </GestureHandlerRootView>
+      </Modal>
     </>
   );
 }
@@ -772,15 +771,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
   },
-  expandedRadarGestureContainer: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
   expandedRadarContainer: {
     flex: 1,
     width: '100%',
-    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
