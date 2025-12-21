@@ -31,10 +31,11 @@
         "foregroundImage": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png",
         "backgroundColor": "#E8F1F8"
       },
-      "package": "com.mcloones.boathouseconnect",
+      "package": "com.mcloonesboathouse.newboathouseconnectapp",
       "versionCode": 2,
       "icon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png",
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "pan",
+      "windowSoftInputMode": "adjustPan"
     },
     "web": {
       "bundler": "metro",
