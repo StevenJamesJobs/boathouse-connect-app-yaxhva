@@ -154,8 +154,24 @@ export default function ComposeMessageScreen() {
       }
     });
 
-    // Sort job titles alphabetically
-    const jobTitles = Array.from(jobTitlesSet).sort();
+    // Define the standard job titles in the desired order
+    const standardJobTitles = ['Banquets', 'Bartender', 'Busser', 'Chef', 'Host', 'Kitchen', 'Manager', 'Runner', 'Server'];
+    
+    // Sort job titles: standard ones first in order, then any others alphabetically
+    const jobTitles = Array.from(jobTitlesSet).sort((a, b) => {
+      const aIndex = standardJobTitles.indexOf(a);
+      const bIndex = standardJobTitles.indexOf(b);
+      
+      if (aIndex !== -1 && bIndex !== -1) {
+        return aIndex - bIndex;
+      } else if (aIndex !== -1) {
+        return -1;
+      } else if (bIndex !== -1) {
+        return 1;
+      } else {
+        return a.localeCompare(b);
+      }
+    });
     
     jobTitles.forEach(jobTitle => {
       const usersWithTitle = allUsers.filter(u => 

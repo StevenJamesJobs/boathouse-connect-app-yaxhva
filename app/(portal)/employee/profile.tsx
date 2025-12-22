@@ -37,6 +37,9 @@ export default function EmployeeProfileScreen() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Update local state when user context changes
   useEffect(() => {
@@ -439,38 +442,77 @@ export default function EmployeeProfileScreen() {
           <>
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>Current Password</Text>
-              <TextInput
-                style={styles.input}
-                value={currentPassword}
-                onChangeText={setCurrentPassword}
-                secureTextEntry
-                placeholder="Enter current password"
-                placeholderTextColor={employeeColors.textSecondary}
-              />
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  secureTextEntry={!showCurrentPassword}
+                  placeholder="Enter current password"
+                  placeholderTextColor={employeeColors.textSecondary}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                  style={styles.eyeIconButton}
+                >
+                  <IconSymbol
+                    ios_icon_name={showCurrentPassword ? 'eye.slash.fill' : 'eye.fill'}
+                    android_material_icon_name={showCurrentPassword ? 'visibility_off' : 'visibility'}
+                    size={20}
+                    color={employeeColors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>New Password</Text>
-              <TextInput
-                style={styles.input}
-                value={newPassword}
-                onChangeText={setNewPassword}
-                secureTextEntry
-                placeholder="Enter new password"
-                placeholderTextColor={employeeColors.textSecondary}
-              />
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry={!showNewPassword}
+                  placeholder="Enter new password"
+                  placeholderTextColor={employeeColors.textSecondary}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowNewPassword(!showNewPassword)}
+                  style={styles.eyeIconButton}
+                >
+                  <IconSymbol
+                    ios_icon_name={showNewPassword ? 'eye.slash.fill' : 'eye.fill'}
+                    android_material_icon_name={showNewPassword ? 'visibility_off' : 'visibility'}
+                    size={20}
+                    color={employeeColors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>Confirm New Password</Text>
-              <TextInput
-                style={styles.input}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                placeholder="Confirm new password"
-                placeholderTextColor={employeeColors.textSecondary}
-              />
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  placeholder="Confirm new password"
+                  placeholderTextColor={employeeColors.textSecondary}
+                />
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  style={styles.eyeIconButton}
+                >
+                  <IconSymbol
+                    ios_icon_name={showConfirmPassword ? 'eye.slash.fill' : 'eye.fill'}
+                    android_material_icon_name={showConfirmPassword ? 'visibility_off' : 'visibility'}
+                    size={20}
+                    color={employeeColors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.buttonRow}>
@@ -722,5 +764,23 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
     marginLeft: 8,
+  },
+  passwordInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: employeeColors.border,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: employeeColors.text,
+  },
+  eyeIconButton: {
+    padding: 12,
   },
 });
