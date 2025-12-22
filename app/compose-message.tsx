@@ -12,7 +12,7 @@ import {
   Modal,
   FlatList,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -36,6 +36,15 @@ interface RecipientGroup {
 export default function ComposeMessageScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const params = useLocalSearchParams();
+  
+  // Reply/Reply All parameters
+  const replyToMessageId = params.replyToMessageId as string;
+  const replyToSenderId = params.replyToSenderId as string;
+  const replyAllRecipientIds = params.replyAllRecipientIds as string;
+  const replySubject = params.replySubject as string;
+  const isReplyAll = params.isReplyAll === 'true';
+  
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [selectedRecipients, setSelectedRecipients] = useState<User[]>([]);
@@ -46,6 +55,51 @@ export default function ComposeMessageScreen() {
   const [recipientGroups, setRecipientGroups] = useState<RecipientGroup[]>([]);
 
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
+
+  // Initialize reply/reply all
+  useEffect(() => {
+    if (replyToMessageId && replyToSenderId) {
+      // Set subject with "Re: " prefix
+      if (replySubject) {
+        const subjectText = replySubject.startsWith('Re: ') ? replySubject : `Re: ${replySubject}`;
+        setSubject(subjectText);
+      }
+      
+      // Load reply recipients
+      loadReplyRecipients();
+    }
+  }, [replyToMessageId, replyToSenderId, replyAllRecipientIds]);
+
+  const loadReplyRecipients = async () => {
+    try {
+      if (isReplyAll && replyAllRecipientIds) {
+        // Reply All: Load all original recipients + sender
+        const recipientIds = replyAllRecipientIds.split(',').filter(id => id !== user?.id);
+        
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, name, job_title, job_titles, role')
+          .in('id', recipientIds);
+
+        if (error) throw error;
+        setSelectedRecipients(data || []);
+      } else if (replyToSenderId) {
+        // Reply: Load only the sender
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, name, job_title, job_titles, role')
+          .eq('id', replyToSenderId)
+          .single();
+
+        if (error) throw error;
+        if (data) {
+          setSelectedRecipients([data]);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading reply recipients:', error);
+    }
+  };
 
   const loadUsers = useCallback(async () => {
     try {
@@ -82,7 +136,6 @@ export default function ComposeMessageScreen() {
 
     // Default group for managers: All Employees
     if (user?.role === 'manager') {
-      const employees = allUsers.filter(u => u.role === 'employee');
       const allCount = allUsers.length;
       
       groups.push({
@@ -101,6 +154,7 @@ export default function ComposeMessageScreen() {
       }
     });
 
+    // Sort job titles alphabetically
     const jobTitles = Array.from(jobTitlesSet).sort();
     
     jobTitles.forEach(jobTitle => {
@@ -111,7 +165,7 @@ export default function ComposeMessageScreen() {
       if (usersWithTitle.length > 0) {
         groups.push({
           id: `job-${jobTitle}`,
-          label: jobTitle,
+          label: `All ${jobTitle}s`,
           description: `Send to all ${usersWithTitle.length} ${jobTitle}${usersWithTitle.length > 1 ? 's' : ''}`,
           userIds: usersWithTitle.map(u => u.id),
         });
@@ -172,6 +226,27 @@ export default function ComposeMessageScreen() {
     try {
       setSending(true);
 
+      // Determine thread_id and parent_message_id for replies
+      let threadId = null;
+      let parentMessageId = null;
+      
+      if (replyToMessageId) {
+        // This is a reply
+        parentMessageId = replyToMessageId;
+        
+        // Get the thread_id from the original message
+        const { data: originalMessage, error: originalError } = await supabase
+          .from('messages')
+          .select('thread_id, id')
+          .eq('id', replyToMessageId)
+          .single();
+        
+        if (originalError) throw originalError;
+        
+        // If original message has a thread_id, use it; otherwise use the original message id
+        threadId = originalMessage.thread_id || originalMessage.id;
+      }
+
       // Create the message
       const { data: messageData, error: messageError } = await supabase
         .from('messages')
@@ -179,8 +254,8 @@ export default function ComposeMessageScreen() {
           sender_id: user?.id,
           subject: subject.trim() || null,
           body: body.trim(),
-          thread_id: null,
-          parent_message_id: null,
+          thread_id: threadId,
+          parent_message_id: parentMessageId,
         })
         .select()
         .single();
@@ -238,7 +313,9 @@ export default function ComposeMessageScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>New Message</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          {replyToMessageId ? (isReplyAll ? 'Reply All' : 'Reply') : 'New Message'}
+        </Text>
         <View style={styles.headerRight} />
       </View>
 

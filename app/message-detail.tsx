@@ -43,6 +43,7 @@ export default function MessageDetailScreen() {
   const [replyText, setReplyText] = useState('');
   const [sending, setSending] = useState(false);
   const [showReply, setShowReply] = useState(false);
+  const [allRecipientIds, setAllRecipientIds] = useState<string[]>([]);
 
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
@@ -74,6 +75,19 @@ export default function MessageDetailScreen() {
         .single();
 
       if (mainError) throw mainError;
+
+      // Load all recipients of the original message for Reply All
+      const { data: recipients, error: recipientsError } = await supabase
+        .from('message_recipients')
+        .select('recipient_id')
+        .eq('message_id', messageId);
+
+      if (recipientsError) throw recipientsError;
+
+      // Store all recipient IDs including the sender for Reply All
+      const recipientIds = recipients?.map(r => r.recipient_id) || [];
+      const allIds = [mainMessage.sender_id, ...recipientIds].filter(id => id !== user?.id);
+      setAllRecipientIds(allIds);
 
       // Load all messages in the thread
       const { data: threadMessages, error: threadError } = await supabase
@@ -130,54 +144,31 @@ export default function MessageDetailScreen() {
     }
   };
 
-  const handleReply = async () => {
-    if (!replyText.trim()) {
-      Alert.alert('Error', 'Please enter a reply');
-      return;
-    }
+  const handleReply = () => {
+    const originalMessage = messages[0];
+    router.push({
+      pathname: '/compose-message',
+      params: {
+        replyToMessageId: messageId,
+        replyToSenderId: originalMessage.sender_id,
+        replySubject: originalMessage.subject || '',
+        isReplyAll: 'false',
+      },
+    });
+  };
 
-    try {
-      setSending(true);
-
-      // Get the original sender to reply to
-      const originalMessage = messages[0];
-      
-      // Create reply message
-      const { data: replyMessage, error: messageError } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: user?.id,
-          subject: originalMessage.subject,
-          body: replyText.trim(),
-          thread_id: threadId,
-          parent_message_id: messageId,
-        })
-        .select()
-        .single();
-
-      if (messageError) throw messageError;
-
-      // Send to original sender
-      const { error: recipientError } = await supabase
-        .from('message_recipients')
-        .insert({
-          message_id: replyMessage.id,
-          recipient_id: originalMessage.sender_id,
-        });
-
-      if (recipientError) throw recipientError;
-
-      setReplyText('');
-      setShowReply(false);
-      await loadThread();
-      
-      Alert.alert('Success', 'Reply sent successfully!');
-    } catch (error) {
-      console.error('Error sending reply:', error);
-      Alert.alert('Error', 'Failed to send reply');
-    } finally {
-      setSending(false);
-    }
+  const handleReplyAll = () => {
+    const originalMessage = messages[0];
+    router.push({
+      pathname: '/compose-message',
+      params: {
+        replyToMessageId: messageId,
+        replyToSenderId: originalMessage.sender_id,
+        replyAllRecipientIds: allRecipientIds.join(','),
+        replySubject: originalMessage.subject || '',
+        isReplyAll: 'true',
+      },
+    });
   };
 
   const handleDelete = () => {
@@ -336,11 +327,11 @@ export default function MessageDetailScreen() {
       </ScrollView>
 
       {/* Reply Section */}
-      {!showReply ? (
-        <View style={[styles.replyButtonContainer, { backgroundColor: colors.card }]}>
+      <View style={[styles.replyButtonContainer, { backgroundColor: colors.card }]}>
+        <View style={styles.replyButtonRow}>
           <TouchableOpacity
             style={[styles.replyButton, { backgroundColor: colors.primary || colors.highlight }]}
-            onPress={() => setShowReply(true)}
+            onPress={handleReply}
           >
             <IconSymbol
               ios_icon_name="arrowshape.turn.up.left.fill"
@@ -352,54 +343,25 @@ export default function MessageDetailScreen() {
               Reply
             </Text>
           </TouchableOpacity>
-        </View>
-      ) : (
-        <View style={[styles.replyInputContainer, { backgroundColor: colors.card }]}>
-          <TextInput
-            style={[styles.replyInput, { color: colors.text }]}
-            value={replyText}
-            onChangeText={setReplyText}
-            placeholder="Type your reply..."
-            placeholderTextColor={colors.textSecondary}
-            multiline
-            maxLength={1000}
-          />
-          <View style={styles.replyActions}>
+          
+          {allRecipientIds.length > 1 && (
             <TouchableOpacity
-              style={[styles.cancelReplyButton, { backgroundColor: colors.textSecondary }]}
-              onPress={() => {
-                setShowReply(false);
-                setReplyText('');
-              }}
+              style={[styles.replyAllButton, { backgroundColor: colors.highlight, opacity: 0.9 }]}
+              onPress={handleReplyAll}
             >
-              <Text style={[styles.cancelReplyText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
-                Cancel
+              <IconSymbol
+                ios_icon_name="arrowshape.turn.up.left.2.fill"
+                android_material_icon_name="reply_all"
+                size={20}
+                color={user?.role === 'manager' ? colors.text : '#FFFFFF'}
+              />
+              <Text style={[styles.replyButtonText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
+                Reply All
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.sendReplyButton, { backgroundColor: colors.primary || colors.highlight }]}
-              onPress={handleReply}
-              disabled={sending}
-            >
-              {sending ? (
-                <ActivityIndicator color={user?.role === 'manager' ? colors.text : '#FFFFFF'} />
-              ) : (
-                <>
-                  <IconSymbol
-                    ios_icon_name="paperplane.fill"
-                    android_material_icon_name="send"
-                    size={18}
-                    color={user?.role === 'manager' ? colors.text : '#FFFFFF'}
-                  />
-                  <Text style={[styles.sendReplyText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
-                    Send
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </View>
+          )}
         </View>
-      )}
+      </View>
     </KeyboardAvoidingView>
   );
 }
@@ -514,7 +476,21 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.1)',
   },
+  replyButtonRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
   replyButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  replyAllButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
