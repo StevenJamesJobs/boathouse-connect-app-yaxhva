@@ -19,6 +19,9 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
 
+// Specific managers who should receive feedback
+const FEEDBACK_RECIPIENTS = ['1636', '6956', '251'];
+
 export default function EmployeeToolsScreen() {
   const router = useRouter();
   const { user } = useAuth();
@@ -51,24 +54,24 @@ export default function EmployeeToolsScreen() {
     try {
       setSubmitting(true);
 
-      // Get all managers to send feedback to
-      console.log('Fetching all managers...');
+      // Get specific managers to send feedback to (by username)
+      console.log('Fetching specific feedback recipients:', FEEDBACK_RECIPIENTS);
       const { data: managers, error: managersError } = await supabase
         .from('users')
-        .select('id')
-        .eq('role', 'manager')
+        .select('id, username, name')
+        .in('username', FEEDBACK_RECIPIENTS)
         .eq('is_active', true);
 
       if (managersError) {
         console.error('Error fetching managers:', managersError);
-        throw new Error('Failed to fetch managers');
+        throw new Error('Failed to fetch feedback recipients');
       }
 
       if (!managers || managers.length === 0) {
-        throw new Error('No managers found to send feedback to');
+        throw new Error('No feedback recipients found. Please contact an administrator.');
       }
 
-      console.log(`Found ${managers.length} manager(s)`);
+      console.log(`Found ${managers.length} feedback recipient(s):`, managers.map(m => m.name).join(', '));
 
       // Create the feedback message with a special subject prefix
       // This prefix will be used to identify feedback messages in the manager's view
@@ -94,7 +97,7 @@ export default function EmployeeToolsScreen() {
 
       console.log('Message created:', messageData.id);
 
-      // Create message recipients for all managers
+      // Create message recipients for specific managers only
       console.log('Creating message recipients...');
       const recipients = managers.map(manager => ({
         message_id: messageData.id,

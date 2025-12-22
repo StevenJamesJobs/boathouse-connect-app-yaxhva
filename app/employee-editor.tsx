@@ -25,6 +25,7 @@ interface Employee {
   name: string;
   email: string;
   job_title: string;
+  job_titles: string[];
   phone_number: string;
   role: string;
   is_active: boolean;
@@ -32,6 +33,18 @@ interface Employee {
 }
 
 type FilterType = 'all' | 'a-e' | 'f-i' | 'j-r' | 's-z' | 'inactive';
+
+const JOB_TITLE_OPTIONS = [
+  'Banquets',
+  'Bartender',
+  'Busser',
+  'Chef',
+  'Host',
+  'Kitchen',
+  'Manager',
+  'Runner',
+  'Server',
+];
 
 export default function EmployeeEditorScreen() {
   const router = useRouter();
@@ -48,7 +61,7 @@ export default function EmployeeEditorScreen() {
     username: '',
     name: '',
     email: '',
-    job_title: '',
+    job_titles: [] as string[],
     phone_number: '',
     role: 'employee',
     password: 'boathouseconnect',
@@ -129,12 +142,17 @@ export default function EmployeeEditorScreen() {
         return;
       }
 
+      if (newEmployee.job_titles.length === 0) {
+        Alert.alert('Error', 'Please select at least one job title');
+        return;
+      }
+
       // Call the database function to create user (bypasses RLS)
       const { data, error } = await supabase.rpc('create_user', {
         p_username: newEmployee.username,
         p_name: newEmployee.name,
         p_email: newEmployee.email,
-        p_job_title: newEmployee.job_title,
+        p_job_title: newEmployee.job_titles.join(', '), // For backward compatibility
         p_phone_number: newEmployee.phone_number,
         p_role: newEmployee.role,
         p_password: newEmployee.password,
@@ -142,13 +160,21 @@ export default function EmployeeEditorScreen() {
 
       if (error) throw error;
 
+      // Update the job_titles array for the new user
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ job_titles: newEmployee.job_titles })
+        .eq('username', newEmployee.username);
+
+      if (updateError) throw updateError;
+
       Alert.alert('Success', 'Employee added successfully');
       setShowAddModal(false);
       setNewEmployee({
         username: '',
         name: '',
         email: '',
-        job_title: '',
+        job_titles: [],
         phone_number: '',
         role: 'employee',
         password: 'boathouseconnect',
@@ -199,6 +225,26 @@ export default function EmployeeEditorScreen() {
     // Otherwise, construct the Supabase storage URL
     const { data } = supabase.storage.from('profile-pictures').getPublicUrl(url);
     return data.publicUrl;
+  };
+
+  const toggleJobTitle = (title: string) => {
+    const currentTitles = [...newEmployee.job_titles];
+    const index = currentTitles.indexOf(title);
+    
+    if (index > -1) {
+      currentTitles.splice(index, 1);
+    } else {
+      currentTitles.push(title);
+    }
+    
+    setNewEmployee({ ...newEmployee, job_titles: currentTitles });
+  };
+
+  const getJobTitlesDisplay = (employee: Employee) => {
+    if (employee.job_titles && employee.job_titles.length > 0) {
+      return employee.job_titles.join(', ');
+    }
+    return employee.job_title || 'No job title';
   };
 
   const renderFilterButton = (filter: FilterType, label: string) => (
@@ -310,7 +356,7 @@ export default function EmployeeEditorScreen() {
                   </View>
                   <View style={styles.employeeDetails}>
                     <Text style={styles.employeeName}>{employee.name}</Text>
-                    <Text style={styles.employeeRole}>{employee.job_title}</Text>
+                    <Text style={styles.employeeRole}>{getJobTitlesDisplay(employee)}</Text>
                     <Text style={styles.employeeUsername}>@{employee.username}</Text>
                   </View>
                 </View>
@@ -397,14 +443,28 @@ export default function EmployeeEditorScreen() {
               </View>
 
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Job Title</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={newEmployee.job_title}
-                  onChangeText={(text) => setNewEmployee({ ...newEmployee, job_title: text })}
-                  placeholder="Enter job title"
-                  placeholderTextColor={managerColors.textSecondary}
-                />
+                <Text style={styles.formLabel}>Job Titles * (Select one or more)</Text>
+                <View style={styles.jobTitlesContainer}>
+                  {JOB_TITLE_OPTIONS.map((title, idx) => (
+                    <TouchableOpacity
+                      key={idx}
+                      style={styles.checkboxRow}
+                      onPress={() => toggleJobTitle(title)}
+                    >
+                      <View style={styles.checkbox}>
+                        {newEmployee.job_titles.includes(title) && (
+                          <IconSymbol
+                            ios_icon_name="checkmark"
+                            android_material_icon_name="check"
+                            size={18}
+                            color={managerColors.highlight}
+                          />
+                        )}
+                      </View>
+                      <Text style={styles.checkboxLabel}>{title}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
               </View>
 
               <View style={styles.formField}>
@@ -693,6 +753,32 @@ const styles = StyleSheet.create({
     color: managerColors.textSecondary,
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  jobTitlesContainer: {
+    backgroundColor: managerColors.card,
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: managerColors.highlight,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkboxLabel: {
+    fontSize: 16,
+    color: managerColors.text,
   },
   roleSelector: {
     flexDirection: 'row',

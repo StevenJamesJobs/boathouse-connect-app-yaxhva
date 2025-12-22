@@ -46,19 +46,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return null;
       }
 
+      // Get job title display - prefer job_titles array, fallback to job_title
+      let jobTitleDisplay = '';
+      if (userData.job_titles && Array.isArray(userData.job_titles) && userData.job_titles.length > 0) {
+        jobTitleDisplay = userData.job_titles.join(', ');
+      } else if (userData.job_title) {
+        jobTitleDisplay = userData.job_title;
+      }
+
       // Map database user to app user format
       const user: User = {
         id: userData.id,
         username: userData.username,
         name: userData.name,
         email: userData.email,
-        jobTitle: userData.job_title,
+        jobTitle: jobTitleDisplay,
         phoneNumber: userData.phone_number || '',
         role: userData.role as 'employee' | 'manager',
         profilePictureUrl: userData.profile_picture_url || undefined,
       };
 
-      console.log('User data fetched successfully, profile picture URL:', user.profilePictureUrl);
+      console.log('User data fetched successfully, job title:', user.jobTitle, 'profile picture URL:', user.profilePictureUrl);
       return user;
     } catch (error) {
       console.log('Error fetching user from database:', error);
@@ -75,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const storedUser = JSON.parse(storedAuth);
           console.log('Loaded user from storage:', storedUser.name);
           
-          // Fetch the latest user data from database to get updated profile picture
+          // Fetch the latest user data from database to get updated profile picture and job titles
           const freshUser = await fetchUserFromDatabase(storedUser.id);
           
           if (freshUser) {
@@ -171,13 +179,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
+      // Get job title display - prefer job_titles array, fallback to job_title
+      let jobTitleDisplay = '';
+      if (userData.job_titles && Array.isArray(userData.job_titles) && userData.job_titles.length > 0) {
+        jobTitleDisplay = userData.job_titles.join(', ');
+      } else if (userData.job_title) {
+        jobTitleDisplay = userData.job_title;
+      }
+
       // Map database user to app user format
       const user: User = {
         id: userData.id,
         username: userData.username,
         name: userData.name,
         email: userData.email,
-        jobTitle: userData.job_title,
+        jobTitle: jobTitleDisplay,
         phoneNumber: userData.phone_number || '',
         role: userData.role as 'employee' | 'manager',
         profilePictureUrl: userData.profile_picture_url || undefined,
@@ -198,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: true,
       });
 
-      console.log('Login successful for user:', user.name, 'Profile picture:', user.profilePictureUrl);
+      console.log('Login successful for user:', user.name, 'Job title:', user.jobTitle, 'Profile picture:', user.profilePictureUrl);
       return true;
     } catch (error) {
       console.log('Login error:', error);

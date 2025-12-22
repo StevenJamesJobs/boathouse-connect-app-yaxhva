@@ -22,6 +22,7 @@ interface User {
   id: string;
   name: string;
   job_title: string;
+  job_titles: string[];
   role: string;
 }
 
@@ -50,7 +51,7 @@ export default function ComposeMessageScreen() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('id, name, job_title, role')
+        .select('id, name, job_title, job_titles, role')
         .eq('is_active', true)
         .neq('id', user?.id || '')
         .order('name');
@@ -79,20 +80,34 @@ export default function ComposeMessageScreen() {
       }
     }
 
-    // Default group for managers: Everyone
+    // Default group for managers: All Employees
     if (user?.role === 'manager') {
+      const employees = allUsers.filter(u => u.role === 'employee');
+      const allCount = allUsers.length;
+      
       groups.push({
-        id: 'everyone',
-        label: 'Everyone',
-        description: `Send to all ${allUsers.length} employee${allUsers.length > 1 ? 's' : ''} and managers`,
+        id: 'all-employees',
+        label: 'All Employees',
+        description: `Send to all ${allCount} employee${allCount > 1 ? 's' : ''} and managers`,
         userIds: allUsers.map(u => u.id),
       });
     }
 
-    // Group by job title
-    const jobTitles = [...new Set(allUsers.map(u => u.job_title))];
+    // Group by job titles (using the new job_titles array)
+    const jobTitlesSet = new Set<string>();
+    allUsers.forEach(u => {
+      if (u.job_titles && Array.isArray(u.job_titles)) {
+        u.job_titles.forEach(title => jobTitlesSet.add(title));
+      }
+    });
+
+    const jobTitles = Array.from(jobTitlesSet).sort();
+    
     jobTitles.forEach(jobTitle => {
-      const usersWithTitle = allUsers.filter(u => u.job_title === jobTitle);
+      const usersWithTitle = allUsers.filter(u => 
+        u.job_titles && Array.isArray(u.job_titles) && u.job_titles.includes(jobTitle)
+      );
+      
       if (usersWithTitle.length > 0) {
         groups.push({
           id: `job-${jobTitle}`,
@@ -195,10 +210,21 @@ export default function ComposeMessageScreen() {
     }
   };
 
-  const filteredUsers = allUsers.filter(u =>
-    u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.job_title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const getJobTitlesDisplay = (u: User) => {
+    if (u.job_titles && Array.isArray(u.job_titles) && u.job_titles.length > 0) {
+      return u.job_titles.join(', ');
+    }
+    return u.job_title || 'No job title';
+  };
+
+  const filteredUsers = allUsers.filter(u => {
+    const nameMatch = u.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const jobTitlesMatch = u.job_titles && Array.isArray(u.job_titles) && 
+      u.job_titles.some(title => title.toLowerCase().includes(searchQuery.toLowerCase()));
+    const oldJobTitleMatch = u.job_title && u.job_title.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return nameMatch || jobTitlesMatch || oldJobTitleMatch;
+  });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -403,7 +429,7 @@ export default function ComposeMessageScreen() {
                       <View style={styles.userInfo}>
                         <Text style={[styles.userName, { color: colors.text }]}>{item.name}</Text>
                         <Text style={[styles.userJobTitle, { color: colors.textSecondary }]}>
-                          {item.job_title}
+                          {getJobTitlesDisplay(item)}
                         </Text>
                       </View>
                       {isSelected && (

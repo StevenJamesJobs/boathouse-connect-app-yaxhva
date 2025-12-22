@@ -24,11 +24,24 @@ interface Employee {
   name: string;
   email: string;
   job_title: string;
+  job_titles: string[];
   phone_number: string;
   role: string;
   is_active: boolean;
   profile_picture_url?: string;
 }
+
+const JOB_TITLE_OPTIONS = [
+  'Banquets',
+  'Bartender',
+  'Busser',
+  'Chef',
+  'Host',
+  'Kitchen',
+  'Manager',
+  'Runner',
+  'Server',
+];
 
 export default function EmployeeDetailScreen() {
   const router = useRouter();
@@ -57,6 +70,12 @@ export default function EmployeeDetailScreen() {
 
       if (error) throw error;
       console.log('Fetched employee data:', data);
+      
+      // Ensure job_titles is an array
+      if (!data.job_titles || !Array.isArray(data.job_titles)) {
+        data.job_titles = [];
+      }
+      
       setEmployee(data);
     } catch (error) {
       console.error('Error fetching employee:', error);
@@ -67,11 +86,31 @@ export default function EmployeeDetailScreen() {
     }
   };
 
+  const toggleJobTitle = (title: string) => {
+    if (!employee) return;
+    
+    const currentTitles = [...(employee.job_titles || [])];
+    const index = currentTitles.indexOf(title);
+    
+    if (index > -1) {
+      currentTitles.splice(index, 1);
+    } else {
+      currentTitles.push(title);
+    }
+    
+    setEmployee({ ...employee, job_titles: currentTitles });
+  };
+
   const handleSave = async () => {
     if (!employee) return;
 
     if (!user?.id) {
       Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    if (!employee.job_titles || employee.job_titles.length === 0) {
+      Alert.alert('Error', 'Please select at least one job title');
       return;
     }
 
@@ -83,7 +122,7 @@ export default function EmployeeDetailScreen() {
         employee_id: employee.id,
         name: employee.name,
         email: employee.email,
-        job_title: employee.job_title,
+        job_titles: employee.job_titles,
         phone_number: employee.phone_number,
         role: employee.role,
       });
@@ -94,7 +133,7 @@ export default function EmployeeDetailScreen() {
         p_employee_id: employee.id,
         p_name: employee.name,
         p_email: employee.email,
-        p_job_title: employee.job_title,
+        p_job_title: employee.job_titles.join(', '), // For backward compatibility
         p_phone_number: employee.phone_number || '',
         p_role: employee.role,
       });
@@ -102,6 +141,17 @@ export default function EmployeeDetailScreen() {
       if (error) {
         console.error('Supabase update error:', error);
         throw error;
+      }
+
+      // Update the job_titles array
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ job_titles: employee.job_titles })
+        .eq('id', employee.id);
+
+      if (updateError) {
+        console.error('Job titles update error:', updateError);
+        throw updateError;
       }
 
       console.log('Update successful, result:', data);
@@ -344,13 +394,28 @@ export default function EmployeeDetailScreen() {
           </View>
 
           <View style={styles.formField}>
-            <Text style={styles.formLabel}>Job Title</Text>
-            <TextInput
-              style={styles.formInput}
-              value={employee.job_title}
-              onChangeText={(text) => setEmployee({ ...employee, job_title: text })}
-              placeholderTextColor={managerColors.textSecondary}
-            />
+            <Text style={styles.formLabel}>Job Titles * (Select one or more)</Text>
+            <View style={styles.jobTitlesContainer}>
+              {JOB_TITLE_OPTIONS.map((title, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={styles.checkboxRow}
+                  onPress={() => toggleJobTitle(title)}
+                >
+                  <View style={styles.checkbox}>
+                    {employee.job_titles && employee.job_titles.includes(title) && (
+                      <IconSymbol
+                        ios_icon_name="checkmark"
+                        android_material_icon_name="check"
+                        size={18}
+                        color={managerColors.highlight}
+                      />
+                    )}
+                  </View>
+                  <Text style={styles.checkboxLabel}>{title}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
 
           <View style={styles.formField}>
@@ -570,6 +635,33 @@ const styles = StyleSheet.create({
     color: managerColors.textSecondary,
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  jobTitlesContainer: {
+    backgroundColor: managerColors.highlight,
+    borderRadius: 8,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: managerColors.text,
+    marginRight: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: managerColors.card,
+  },
+  checkboxLabel: {
+    fontSize: 16,
+    color: managerColors.text,
   },
   roleSelector: {
     flexDirection: 'row',
