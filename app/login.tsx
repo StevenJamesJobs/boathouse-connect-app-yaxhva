@@ -64,7 +64,7 @@ export default function LoginScreen() {
         }),
       ]).start();
     }, 400);
-  }, []); // Empty dependency array is correct - we only want to run animations once on mount
+  }, [logoScale, logoOpacity, formTranslateY, formOpacity]);
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
