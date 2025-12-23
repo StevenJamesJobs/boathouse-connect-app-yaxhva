@@ -111,6 +111,10 @@ export default function ComposeMessageScreen() {
         .order('name');
 
       if (error) throw error;
+      
+      console.log('Loaded users:', data?.length);
+      console.log('Sample user job_titles:', data?.[0]?.job_titles);
+      
       setAllUsers(data || []);
     } catch (error) {
       console.error('Error loading users:', error);
@@ -120,6 +124,9 @@ export default function ComposeMessageScreen() {
 
   const generateRecipientGroups = useCallback(() => {
     const groups: RecipientGroup[] = [];
+
+    console.log('Generating recipient groups for role:', user?.role);
+    console.log('Total users:', allUsers.length);
 
     // Default group for employees: All Managers
     if (user?.role === 'employee') {
@@ -132,6 +139,7 @@ export default function ComposeMessageScreen() {
           userIds: managers.map(m => m.id),
         });
       }
+      console.log('Added All Managers group:', managers.length, 'managers');
     }
 
     // Default group for managers: All Employees
@@ -144,50 +152,63 @@ export default function ComposeMessageScreen() {
         description: `Send to all ${allCount} employee${allCount > 1 ? 's' : ''} and managers`,
         userIds: allUsers.map(u => u.id),
       });
+      console.log('Added All Employees group:', allCount, 'users');
     }
 
     // Group by job titles (using the new job_titles array)
-    const jobTitlesSet = new Set<string>();
+    const jobTitlesMap = new Map<string, string[]>();
+    
     allUsers.forEach(u => {
-      if (u.job_titles && Array.isArray(u.job_titles)) {
-        u.job_titles.forEach(title => jobTitlesSet.add(title));
-      }
-    });
-
-    // Define the standard job titles in the desired order
-    const standardJobTitles = ['Banquets', 'Bartender', 'Busser', 'Chef', 'Host', 'Kitchen', 'Manager', 'Runner', 'Server'];
-    
-    // Sort job titles: standard ones first in order, then any others alphabetically
-    const jobTitles = Array.from(jobTitlesSet).sort((a, b) => {
-      const aIndex = standardJobTitles.indexOf(a);
-      const bIndex = standardJobTitles.indexOf(b);
-      
-      if (aIndex !== -1 && bIndex !== -1) {
-        return aIndex - bIndex;
-      } else if (aIndex !== -1) {
-        return -1;
-      } else if (bIndex !== -1) {
-        return 1;
-      } else {
-        return a.localeCompare(b);
-      }
-    });
-    
-    jobTitles.forEach(jobTitle => {
-      const usersWithTitle = allUsers.filter(u => 
-        u.job_titles && Array.isArray(u.job_titles) && u.job_titles.includes(jobTitle)
-      );
-      
-      if (usersWithTitle.length > 0) {
-        groups.push({
-          id: `job-${jobTitle}`,
-          label: `All ${jobTitle}s`,
-          description: `Send to all ${usersWithTitle.length} ${jobTitle}${usersWithTitle.length > 1 ? 's' : ''}`,
-          userIds: usersWithTitle.map(u => u.id),
+      if (u.job_titles && Array.isArray(u.job_titles) && u.job_titles.length > 0) {
+        u.job_titles.forEach(title => {
+          if (!jobTitlesMap.has(title)) {
+            jobTitlesMap.set(title, []);
+          }
+          jobTitlesMap.get(title)!.push(u.id);
         });
       }
     });
 
+    console.log('Job titles found:', Array.from(jobTitlesMap.keys()));
+
+    // Define the standard job titles in the desired order
+    const standardJobTitles = ['Banquets', 'Bartender', 'Busser', 'Chef', 'Host', 'Kitchen', 'Manager', 'Runner', 'Server'];
+    
+    // Add job title groups in order
+    standardJobTitles.forEach(jobTitle => {
+      const userIds = jobTitlesMap.get(jobTitle);
+      if (userIds && userIds.length > 0) {
+        const pluralLabel = jobTitle === 'Chef' ? 'Chefs' : 
+                           jobTitle === 'Manager' ? 'Managers' :
+                           jobTitle + 's';
+        groups.push({
+          id: `job-${jobTitle}`,
+          label: `All ${pluralLabel}`,
+          description: `Send to all ${userIds.length} ${jobTitle}${userIds.length > 1 ? 's' : ''}`,
+          userIds: userIds,
+        });
+        console.log(`Added ${jobTitle} group:`, userIds.length, 'users');
+      }
+    });
+
+    // Add any non-standard job titles
+    Array.from(jobTitlesMap.keys())
+      .filter(title => !standardJobTitles.includes(title))
+      .sort()
+      .forEach(jobTitle => {
+        const userIds = jobTitlesMap.get(jobTitle);
+        if (userIds && userIds.length > 0) {
+          groups.push({
+            id: `job-${jobTitle}`,
+            label: `All ${jobTitle}s`,
+            description: `Send to all ${userIds.length} ${jobTitle}${userIds.length > 1 ? 's' : ''}`,
+            userIds: userIds,
+          });
+          console.log(`Added ${jobTitle} group (non-standard):`, userIds.length, 'users');
+        }
+      });
+
+    console.log('Total groups generated:', groups.length);
     setRecipientGroups(groups);
   }, [allUsers, user?.role]);
 

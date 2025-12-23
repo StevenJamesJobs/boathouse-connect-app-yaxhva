@@ -163,10 +163,11 @@ export default function WeatherDetailModal({
         console.log(`  Day ${i + 1}: ${day.dayOfWeek} ${day.date} - High: ${day.highTemp}°F, Low: ${day.lowTemp}°F`);
       });
 
-      // Use Northeast regional radar from NOAA with timestamp to force refresh
+      // Use North Jersey/Manhattan focused radar from NOAA with timestamp to force refresh
+      // Using the New York City radar (KOKX) which covers North Jersey and Manhattan area
       const timestamp = Date.now();
-      const radarImageUrl = `https://radar.weather.gov/ridge/standard/NORTHEAST_loop.gif?t=${timestamp}`;
-      console.log('Radar URL with timestamp:', radarImageUrl);
+      const radarImageUrl = `https://radar.weather.gov/ridge/standard/KOKX_loop.gif?t=${timestamp}`;
+      console.log('Radar URL with timestamp (NYC/North Jersey focus):', radarImageUrl);
 
       const weatherDetail: WeatherDetailData = {
         currentTemp: Math.round(data.current.temp_f),
@@ -292,13 +293,13 @@ export default function WeatherDetailModal({
                       </Text>
                     </View>
 
-                    {/* Radar Image - Northeast Region - Non-clickable */}
+                    {/* Radar Image - North Jersey/Manhattan Area */}
                     <View style={styles.radarContainer}>
                       <Text style={[styles.radarTitle, { color: colors.text }]}>
-                        Northeast Regional Radar
+                        Local Radar
                       </Text>
                       <Text style={[styles.radarSubtitle, { color: colors.textSecondary }]}>
-                        Tri-State Area (NY, NJ, CT)
+                        North Jersey / Manhattan Area
                       </Text>
                       <View style={[styles.radarImageWrapper, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}>
                         <Image
