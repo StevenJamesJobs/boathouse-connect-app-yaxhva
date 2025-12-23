@@ -77,7 +77,7 @@ export default function CollapsibleSection({
           <TouchableOpacity onPress={toggleExpanded} activeOpacity={0.7}>
             <IconSymbol
               ios_icon_name={isExpanded ? 'chevron.up' : 'chevron.down'}
-              android_material_icon_name={isExpanded ? 'expand_less' : 'expand_more'}
+              android_material_icon_name={isExpanded ? 'expand-less' : 'expand-more'}
               size={24}
               color={headerTextColor}
             />
