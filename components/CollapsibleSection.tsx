@@ -58,7 +58,7 @@ export default function CollapsibleSection({
         >
           <IconSymbol
             ios_icon_name={iconIos}
-            android_material_icon_name={iconAndroid}
+            android_material_icon_name={iconAndroid as any}
             size={24}
             color={iconColor}
           />

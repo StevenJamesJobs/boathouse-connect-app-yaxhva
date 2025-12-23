@@ -10,6 +10,7 @@ import {
   Dimensions,
   Alert,
   Linking,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -162,7 +163,7 @@ export default function ContentDetailModal({
           onPress={onClose}
         />
         <PanGestureHandler onGestureEvent={handleSwipeGesture}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card, height: screenHeight * 0.85 }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, maxHeight: screenHeight * 0.9 }]}>
             {/* Swipe Indicator */}
             <View style={styles.swipeIndicatorContainer}>
               <View style={[styles.swipeIndicator, { backgroundColor: colors.border || colors.textSecondary }]} />
@@ -178,11 +179,13 @@ export default function ContentDetailModal({
               />
             </TouchableOpacity>
 
-            {/* Content */}
+            {/* Scrollable Content */}
             <ScrollView
               style={styles.scrollView}
               contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
+              showsVerticalScrollIndicator={true}
+              bounces={true}
+              nestedScrollEnabled={true}
             >
               {/* Thumbnail Image */}
               {thumbnailUrl && (
@@ -309,6 +312,9 @@ export default function ContentDetailModal({
                   )}
                 </View>
               )}
+
+              {/* Extra padding at bottom to ensure content is fully scrollable */}
+              <View style={{ height: 40 }} />
             </ScrollView>
           </View>
         </PanGestureHandler>
@@ -333,7 +339,7 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingBottom: 20,
+    paddingBottom: Platform.OS === 'android' ? 20 : 0,
     boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.3)',
     elevation: 10,
   },
@@ -353,11 +359,11 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   scrollView: {
-    flex: 1,
+    maxHeight: Dimensions.get('window').height * 0.8,
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 40,
   },
   imageContainer: {
     marginBottom: 20,
