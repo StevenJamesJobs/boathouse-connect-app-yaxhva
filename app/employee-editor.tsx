@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -71,29 +71,7 @@ export default function EmployeeEditorScreen() {
     fetchEmployees();
   }, []);
 
-  useEffect(() => {
-    filterEmployees();
-  }, [employees, searchQuery, activeFilter]);
-
-  const fetchEmployees = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      setEmployees(data || []);
-    } catch (error) {
-      console.error('Error fetching employees:', error);
-      Alert.alert('Error', 'Failed to fetch employees');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterEmployees = () => {
+  const filterEmployees = useCallback(() => {
     let filtered = [...employees];
 
     // Apply search filter
@@ -133,6 +111,28 @@ export default function EmployeeEditorScreen() {
     }
 
     setFilteredEmployees(filtered);
+  }, [employees, searchQuery, activeFilter]);
+
+  useEffect(() => {
+    filterEmployees();
+  }, [filterEmployees]);
+
+  const fetchEmployees = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      setEmployees(data || []);
+    } catch (error) {
+      console.error('Error fetching employees:', error);
+      Alert.alert('Error', 'Failed to fetch employees');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddEmployee = async () => {
