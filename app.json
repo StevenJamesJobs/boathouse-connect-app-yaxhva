@@ -32,7 +32,7 @@
         "backgroundColor": "#E8F1F8"
       },
       "package": "com.mcloonesboathouse.newboathouseconnectapp",
-      "versionCode": 2,
+      "versionCode": 3,
       "icon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png",
       "softwareKeyboardLayoutMode": "pan",
       "windowSoftInputMode": "adjustPan"
@@ -50,6 +50,14 @@
           "backgroundColor": "#E8F1F8",
           "image": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg",
           "imageWidth": 280
+        }
+      ],
+      [
+        "react-native-edge-to-edge",
+        {
+          "android": {
+            "enforceNavigationBarContrast": false
+          }
         }
       ]
     ],

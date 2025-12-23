@@ -110,7 +110,7 @@ function RootLayoutNav() {
 
   return (
     <>
-      <StatusBar style="auto" animated />
+      <StatusBar style="auto" />
       <ThemeProvider
         value={colorScheme === "dark" ? CustomDarkTheme : CustomDefaultTheme}
       >
@@ -121,7 +121,7 @@ function RootLayoutNav() {
               <Stack.Screen name="login" />
               <Stack.Screen name="(portal)" />
             </Stack>
-            <SystemBars style={"auto"} />
+            <SystemBars style="auto" />
           </GestureHandlerRootView>
         </WidgetProvider>
       </ThemeProvider>

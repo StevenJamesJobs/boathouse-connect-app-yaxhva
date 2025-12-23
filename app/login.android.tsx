@@ -8,7 +8,6 @@ import {
   StyleSheet,
   Image,
   Alert,
-  StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -45,8 +44,6 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={splashColors.background} />
-      
       {/* Logo Section */}
       <View style={styles.logoContainer}>
         <Image
