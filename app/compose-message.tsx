@@ -329,14 +329,18 @@ export default function ComposeMessageScreen() {
     return u.job_title || 'No job title';
   };
 
-  const filteredUsers = allUsers.filter(u => {
-    const nameMatch = u.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const jobTitlesMatch = u.job_titles && Array.isArray(u.job_titles) && 
-      u.job_titles.some(title => title.toLowerCase().includes(searchQuery.toLowerCase()));
-    const oldJobTitleMatch = u.job_title && u.job_title.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    return nameMatch || jobTitlesMatch || oldJobTitleMatch;
-  });
+  // Filter users based on search query
+  // If no search query, show all users (for the "All Users" section)
+  const filteredUsers = searchQuery
+    ? allUsers.filter(u => {
+        const nameMatch = u.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const jobTitlesMatch = u.job_titles && Array.isArray(u.job_titles) && 
+          u.job_titles.some(title => title.toLowerCase().includes(searchQuery.toLowerCase()));
+        const oldJobTitleMatch = u.job_title && u.job_title.toLowerCase().includes(searchQuery.toLowerCase());
+        
+        return nameMatch || jobTitlesMatch || oldJobTitleMatch;
+      })
+    : allUsers; // Show all users when no search query
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -498,7 +502,7 @@ export default function ComposeMessageScreen() {
               />
             </View>
 
-            {/* Recipient Groups - Always show when no search query */}
+            {/* Recipient Groups - Only show when no search query */}
             {searchQuery === '' && recipientGroups.length > 0 && (
               <View style={styles.groupsSection}>
                 <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Quick Select</Text>
@@ -525,7 +529,7 @@ export default function ComposeMessageScreen() {
               </View>
             )}
 
-            {/* Individual Users */}
+            {/* Individual Users - Always show, either filtered or all users */}
             <View style={styles.usersSection}>
               <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
                 {searchQuery === '' ? 'All Users' : 'Search Results'}

@@ -308,10 +308,25 @@ export default function RewardsAndReviewsEditorScreen() {
               }
               console.log('Transactions deleted successfully');
 
-              // Step 2: Reset user's bucks to 0 - using a direct update
+              // Step 2: Recalculate the balance from remaining transactions (should be 0)
+              const { data: sumData, error: sumError } = await supabase
+                .from('rewards_transactions')
+                .select('amount')
+                .eq('user_id', resetSelectedEmployee.id);
+
+              if (sumError) {
+                console.error('Error calculating sum:', sumError);
+                throw sumError;
+              }
+
+              // Calculate total from remaining transactions
+              const totalBucks = sumData?.reduce((sum, trans) => sum + trans.amount, 0) || 0;
+              console.log('Calculated total bucks from remaining transactions:', totalBucks);
+
+              // Step 3: Update user's bucks to the calculated total (should be 0)
               const { data: updateData, error: updateError } = await supabase
                 .from('users')
-                .update({ mcloones_bucks: 0 })
+                .update({ mcloones_bucks: totalBucks })
                 .eq('id', resetSelectedEmployee.id)
                 .select();
 
@@ -321,7 +336,7 @@ export default function RewardsAndReviewsEditorScreen() {
               }
               console.log('User bucks updated successfully:', updateData);
 
-              // Step 3: Verify the update
+              // Step 4: Verify the update
               const { data: verifyData, error: verifyError } = await supabase
                 .from('users')
                 .select('mcloones_bucks')
@@ -390,18 +405,36 @@ export default function RewardsAndReviewsEditorScreen() {
               }
               console.log('Found users to reset:', allUsers?.length);
 
-              // Step 3: Reset all users' bucks to 0 - using a direct update
-              const { data: updateData, error: updateError } = await supabase
-                .from('users')
-                .update({ mcloones_bucks: 0 })
-                .eq('is_active', true)
-                .select();
+              // Step 3: For each user, recalculate their balance from remaining transactions (should be 0)
+              if (allUsers && allUsers.length > 0) {
+                for (const userRecord of allUsers) {
+                  // Calculate sum of remaining transactions for this user
+                  const { data: sumData, error: sumError } = await supabase
+                    .from('rewards_transactions')
+                    .select('amount')
+                    .eq('user_id', userRecord.id);
 
-              if (updateError) {
-                console.error('Error updating all users bucks:', updateError);
-                throw updateError;
+                  if (sumError) {
+                    console.error(`Error calculating sum for user ${userRecord.id}:`, sumError);
+                    continue;
+                  }
+
+                  // Calculate total from remaining transactions
+                  const totalBucks = sumData?.reduce((sum, trans) => sum + trans.amount, 0) || 0;
+
+                  // Update user's bucks to the calculated total (should be 0)
+                  const { error: updateError } = await supabase
+                    .from('users')
+                    .update({ mcloones_bucks: totalBucks })
+                    .eq('id', userRecord.id);
+
+                  if (updateError) {
+                    console.error(`Error updating user ${userRecord.id}:`, updateError);
+                  }
+                }
               }
-              console.log('All users bucks updated successfully:', updateData?.length, 'users updated');
+
+              console.log('All users bucks updated successfully');
 
               // Step 4: Verify the update
               const { data: verifyData, error: verifyError } = await supabase
