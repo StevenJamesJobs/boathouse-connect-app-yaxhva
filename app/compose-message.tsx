@@ -56,21 +56,7 @@ export default function ComposeMessageScreen() {
 
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
-  // Initialize reply/reply all
-  useEffect(() => {
-    if (replyToMessageId && replyToSenderId) {
-      // Set subject with "Re: " prefix
-      if (replySubject) {
-        const subjectText = replySubject.startsWith('Re: ') ? replySubject : `Re: ${replySubject}`;
-        setSubject(subjectText);
-      }
-      
-      // Load reply recipients
-      loadReplyRecipients();
-    }
-  }, [replyToMessageId, replyToSenderId, replyAllRecipientIds]);
-
-  const loadReplyRecipients = async () => {
+  const loadReplyRecipients = useCallback(async () => {
     try {
       if (isReplyAll && replyAllRecipientIds) {
         // Reply All: Load all original recipients + sender
@@ -99,7 +85,21 @@ export default function ComposeMessageScreen() {
     } catch (error) {
       console.error('Error loading reply recipients:', error);
     }
-  };
+  }, [isReplyAll, replyAllRecipientIds, replyToSenderId, user?.id]);
+
+  // Initialize reply/reply all
+  useEffect(() => {
+    if (replyToMessageId && replyToSenderId) {
+      // Set subject with "Re: " prefix
+      if (replySubject) {
+        const subjectText = replySubject.startsWith('Re: ') ? replySubject : `Re: ${replySubject}`;
+        setSubject(subjectText);
+      }
+      
+      // Load reply recipients
+      loadReplyRecipients();
+    }
+  }, [replyToMessageId, replyToSenderId, replySubject, loadReplyRecipients]);
 
   const loadUsers = useCallback(async () => {
     try {
