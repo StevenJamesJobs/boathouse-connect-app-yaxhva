@@ -23,6 +23,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { sendSpecialFeatureNotification } from '@/utils/notificationHelpers';
 
 interface SpecialFeature {
   id: string;
@@ -301,7 +302,19 @@ export default function SpecialFeaturesEditorScreen() {
           throw error;
         }
         console.log('Special feature created successfully');
-        Alert.alert('Success', 'Special feature created successfully');
+
+        // 🔔 SEND PUSH NOTIFICATION TO ALL STAFF
+        try {
+          await sendSpecialFeatureNotification(
+            formData.title,  // Feature title
+            'new'            // Feature ID (we don't get it back from RPC)
+          );
+        } catch (notificationError) {
+          console.error('Failed to send notification:', notificationError);
+          // Don't show error to user - notification is secondary to main action
+        }
+
+        Alert.alert('Success', 'Special feature created and staff notified!');
       }
 
       closeModal();

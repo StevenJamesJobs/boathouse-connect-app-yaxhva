@@ -1,8 +1,8 @@
 
-import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform, Alert } from 'react-native';
+import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from './AuthContext';
@@ -52,37 +52,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const notificationListener = useRef<Notifications.Subscription>();
   const responseListener = useRef<Notifications.Subscription>();
 
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      registerForPushNotificationsAsync();
-      loadPreferences();
-    }
-
-    // Set up notification listeners
-    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
-      console.log('Notification received:', notification);
-      setNotification(notification);
-    });
-
-    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
-      console.log('Notification response:', response);
-      // Handle notification tap here - navigate to relevant screen
-      const data = response.notification.request.content.data;
-      console.log('Notification data:', data);
-      // TODO: Add navigation logic based on notification type
-    });
-
-    return () => {
-      if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
-      }
-      if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
-      }
-    };
-  }, [isAuthenticated, user]);
-
-  const registerForPushNotificationsAsync = async () => {
+  const registerForPushNotificationsAsync = useCallback(async () => {
     try {
       if (!Device.isDevice) {
         console.log('Must use physical device for Push Notifications');
@@ -152,9 +122,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     } catch (error) {
       console.error('Error registering for push notifications:', error);
     }
-  };
+  }, [user?.id]);
 
-  const loadPreferences = async () => {
+  const loadPreferences = useCallback(async () => {
     try {
       if (!user?.id) return;
 
@@ -203,7 +173,37 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     } catch (error) {
       console.error('Error loading preferences:', error);
     }
-  };
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      registerForPushNotificationsAsync();
+      loadPreferences();
+    }
+
+    // Set up notification listeners
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log('Notification received:', notification);
+      setNotification(notification);
+    });
+
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      console.log('Notification response:', response);
+      // Handle notification tap here - navigate to relevant screen
+      const data = response.notification.request.content.data;
+      console.log('Notification data:', data);
+      // TODO: Add navigation logic based on notification type
+    });
+
+    return () => {
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(notificationListener.current);
+      }
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
+    };
+  }, [isAuthenticated, user, registerForPushNotificationsAsync, loadPreferences]);
 
   const updatePreferences = async (prefs: Partial<NotificationPreferences>) => {
     try {

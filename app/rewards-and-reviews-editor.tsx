@@ -18,6 +18,7 @@ import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { sendRewardNotification } from '@/utils/notificationHelpers';
 
 interface Employee {
   id: string;
@@ -263,6 +264,20 @@ export default function RewardsAndReviewsEditorScreen() {
       });
 
       if (error) throw error;
+
+      // 🔔 SEND PUSH NOTIFICATION (only for rewards, not deductions)
+      if (isReward) {
+        try {
+          await sendRewardNotification(
+            selectedEmployee.id,     // User who received the reward
+            parseInt(rewardAmount),  // Amount of McLoone's Bucks
+            rewardDescription        // Description of why they earned it
+          );
+        } catch (notificationError) {
+          console.error('Failed to send notification:', notificationError);
+          // Don't show error to user - notification is secondary to main action
+        }
+      }
 
       Alert.alert('Success', `${isReward ? 'Reward' : 'Deduction'} added successfully`);
       setShowRewardModal(false);

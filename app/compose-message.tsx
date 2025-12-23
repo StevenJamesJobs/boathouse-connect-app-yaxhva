@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { sendMessageNotification } from '@/utils/notificationHelpers';
 
 interface User {
   id: string;
@@ -310,6 +311,20 @@ export default function ComposeMessageScreen() {
         .insert(recipients);
 
       if (recipientsError) throw recipientsError;
+
+      // 🔔 SEND PUSH NOTIFICATION
+      try {
+        await sendMessageNotification(
+          selectedRecipients.map(r => r.id),  // Array of recipient user IDs
+          user?.name || 'Someone',            // Sender's name
+          body.trim(),                        // Message body
+          messageData.id,                     // Message ID
+          threadId || undefined               // Thread ID (if replying)
+        );
+      } catch (notificationError) {
+        console.error('Failed to send notification:', notificationError);
+        // Don't show error to user - notification is secondary to main action
+      }
 
       Alert.alert('Success', 'Message sent successfully!', [
         { text: 'OK', onPress: () => router.back() },

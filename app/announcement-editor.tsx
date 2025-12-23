@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
+import { sendAnnouncementNotification } from '@/utils/notificationHelpers';
 
 interface Announcement {
   id: string;
@@ -284,7 +285,19 @@ export default function AnnouncementEditorScreen() {
           throw error;
         }
         console.log('Announcement created successfully');
-        Alert.alert('Success', 'Announcement created successfully');
+
+        // 🔔 SEND PUSH NOTIFICATION TO ALL STAFF
+        try {
+          await sendAnnouncementNotification(
+            formData.title,  // Announcement title
+            'new'            // Announcement ID (we don't get it back from RPC)
+          );
+        } catch (notificationError) {
+          console.error('Failed to send notification:', notificationError);
+          // Don't show error to user - notification is secondary to main action
+        }
+
+        Alert.alert('Success', 'Announcement created and staff notified!');
       }
 
       closeModal();
