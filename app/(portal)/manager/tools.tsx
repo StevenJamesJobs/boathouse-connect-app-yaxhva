@@ -54,6 +54,36 @@ export default function ManagerToolsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Notification Center Section */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <IconSymbol
+              ios_icon_name="bell.badge.fill"
+              android_material_icon_name="notifications_active"
+              size={32}
+              color={managerColors.highlight}
+            />
+            <View style={styles.cardHeaderText}>
+              <Text style={styles.cardTitle}>Notification Center</Text>
+              <Text style={styles.cardDescription}>
+                Send custom notifications to all staff members
+              </Text>
+            </View>
+          </View>
+          <TouchableOpacity 
+            style={styles.cardButton}
+            onPress={() => router.push('/notification-center')}
+          >
+            <Text style={styles.cardButtonText}>Send Notification</Text>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron_right"
+              size={20}
+              color={managerColors.text}
+            />
+          </TouchableOpacity>
+        </View>
+
         {/* Guides and Training Section */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
