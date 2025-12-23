@@ -477,7 +477,7 @@ export default function ComposeMessageScreen() {
               />
             </View>
 
-            {/* Recipient Groups */}
+            {/* Recipient Groups - Always show when no search query */}
             {searchQuery === '' && recipientGroups.length > 0 && (
               <View style={styles.groupsSection}>
                 <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Quick Select</Text>

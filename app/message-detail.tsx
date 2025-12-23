@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -29,6 +28,7 @@ interface MessageThread {
   body: string;
   created_at: string;
   is_current_user: boolean;
+  recipient_names?: string[];
 }
 
 export default function MessageDetailScreen() {
@@ -40,9 +40,6 @@ export default function MessageDetailScreen() {
   
   const [messages, setMessages] = useState<MessageThread[]>([]);
   const [loading, setLoading] = useState(true);
-  const [replyText, setReplyText] = useState('');
-  const [sending, setSending] = useState(false);
-  const [showReply, setShowReply] = useState(false);
   const [allRecipientIds, setAllRecipientIds] = useState<string[]>([]);
 
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
@@ -76,16 +73,22 @@ export default function MessageDetailScreen() {
 
       if (mainError) throw mainError;
 
-      // Load all recipients of the original message for Reply All
+      // Load all recipients of the original message
       const { data: recipients, error: recipientsError } = await supabase
         .from('message_recipients')
-        .select('recipient_id')
+        .select(`
+          recipient_id,
+          recipient:users (
+            name
+          )
+        `)
         .eq('message_id', messageId);
 
       if (recipientsError) throw recipientsError;
 
-      // Store all recipient IDs including the sender for Reply All
+      // Store all recipient IDs and names
       const recipientIds = recipients?.map(r => r.recipient_id) || [];
+      const recipientNames = recipients?.map(r => r.recipient?.name).filter(Boolean) || [];
       const allIds = [mainMessage.sender_id, ...recipientIds].filter(id => id !== user?.id);
       setAllRecipientIds(allIds);
 
@@ -119,6 +122,7 @@ export default function MessageDetailScreen() {
         body: msg.body,
         created_at: msg.created_at,
         is_current_user: msg.sender_id === user?.id,
+        recipient_names: msg.id === messageId ? recipientNames : undefined,
       }));
 
       setMessages(formattedMessages);
@@ -306,6 +310,15 @@ export default function MessageDetailScreen() {
                 </Text>
               </View>
               
+              {/* Show recipients for the first message if multiple recipients */}
+              {index === 0 && message.recipient_names && message.recipient_names.length > 0 && (
+                <View style={styles.recipientsSection}>
+                  <Text style={[styles.recipientsLabel, { color: message.is_current_user ? 'rgba(255, 255, 255, 0.9)' : colors.textSecondary }]}>
+                    To: {message.recipient_names.join(', ')}
+                  </Text>
+                </View>
+              )}
+              
               {index === 0 && message.subject && (
                 <Text style={[styles.messageSubject, { color: message.is_current_user ? '#FFFFFF' : colors.text }]}>
                   {message.subject}
@@ -454,6 +467,16 @@ const styles = StyleSheet.create({
   messageDate: {
     fontSize: 12,
   },
+  recipientsSection: {
+    marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  recipientsLabel: {
+    fontSize: 13,
+    fontStyle: 'italic',
+  },
   messageSubject: {
     fontSize: 16,
     fontWeight: '600',
@@ -500,45 +523,6 @@ const styles = StyleSheet.create({
   },
   replyButtonText: {
     fontSize: 16,
-    fontWeight: '600',
-  },
-  replyInputContainer: {
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  replyInput: {
-    fontSize: 15,
-    minHeight: 80,
-    maxHeight: 120,
-    marginBottom: 12,
-    textAlignVertical: 'top',
-  },
-  replyActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  cancelReplyButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 12,
-    alignItems: 'center',
-  },
-  cancelReplyText: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  sendReplyButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 12,
-    borderRadius: 12,
-    gap: 6,
-  },
-  sendReplyText: {
-    fontSize: 15,
     fontWeight: '600',
   },
 });
