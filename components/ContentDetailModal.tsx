@@ -313,8 +313,8 @@ export default function ContentDetailModal({
                 </View>
               )}
 
-              {/* Extra padding at bottom to ensure content is fully scrollable */}
-              <View style={{ height: 40 }} />
+              {/* Extra padding at bottom to ensure content is fully scrollable on Android */}
+              <View style={{ height: Platform.OS === 'android' ? 80 : 60 }} />
             </ScrollView>
           </View>
         </PanGestureHandler>
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingBottom: Platform.OS === 'android' ? 80 : 60,
   },
   imageContainer: {
     marginBottom: 20,
