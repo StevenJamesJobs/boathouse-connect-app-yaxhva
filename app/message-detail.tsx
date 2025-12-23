@@ -46,7 +46,7 @@ export default function MessageDetailScreen() {
 
   useEffect(() => {
     loadThread();
-    markAsRead();
+    markThreadAsRead();
   }, []);
 
   const loadThread = async () => {
@@ -134,17 +134,44 @@ export default function MessageDetailScreen() {
     }
   };
 
-  const markAsRead = async () => {
+  const markThreadAsRead = async () => {
     if (!user?.id) return;
 
     try {
-      await supabase
+      console.log('Marking entire thread as read for user:', user.id, 'thread:', threadId);
+      
+      // Get all message IDs in this thread
+      const { data: threadMessages, error: threadError } = await supabase
+        .from('messages')
+        .select('id')
+        .or(`id.eq.${messageId},thread_id.eq.${threadId}`);
+
+      if (threadError) {
+        console.error('Error fetching thread messages:', threadError);
+        throw threadError;
+      }
+
+      const messageIds = threadMessages?.map(m => m.id) || [messageId];
+      console.log('Message IDs to mark as read:', messageIds);
+
+      // Mark all messages in the thread as read for this user
+      const { error: updateError } = await supabase
         .from('message_recipients')
-        .update({ is_read: true, read_at: new Date().toISOString() })
+        .update({ 
+          is_read: true, 
+          read_at: new Date().toISOString() 
+        })
         .eq('recipient_id', user.id)
-        .eq('message_id', messageId);
+        .in('message_id', messageIds);
+
+      if (updateError) {
+        console.error('Error marking thread as read:', updateError);
+        throw updateError;
+      }
+
+      console.log('Successfully marked thread as read');
     } catch (error) {
-      console.error('Error marking as read:', error);
+      console.error('Error in markThreadAsRead:', error);
     }
   };
 

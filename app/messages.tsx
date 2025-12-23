@@ -56,6 +56,7 @@ export default function MessagesScreen() {
   // Refresh when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
+      console.log('Messages screen focused, refreshing data...');
       loadMessages();
       loadUnreadCount();
       loadInboxCount();
@@ -161,6 +162,15 @@ export default function MessagesScreen() {
           .eq('thread_id', threadId)
           .neq('id', threadId);
 
+        // Check if ANY message in this thread is unread for this user
+        const { data: threadRecipients } = await supabase
+          .from('message_recipients')
+          .select('is_read, message:messages!inner(id, thread_id)')
+          .eq('recipient_id', user.id)
+          .or(`message_id.eq.${threadId},message.thread_id.eq.${threadId}`);
+
+        const hasUnreadInThread = threadRecipients?.some((tr: any) => !tr.is_read) || false;
+
         threadMap.set(threadId, {
           id: msg.id,
           sender_id: msg.sender_id,
@@ -172,21 +182,21 @@ export default function MessagesScreen() {
           sender_name: msg.sender?.name || 'Unknown',
           sender_job_title: msg.sender?.job_title || '',
           sender_profile_picture: msg.sender?.profile_picture_url || null,
-          is_read: item.is_read,
+          is_read: !hasUnreadInThread,
           recipient_count: recipientNames.length,
           recipient_id: item.recipient_id,
           recipient_names: recipientNames,
           reply_count: replyCount || 0,
         });
       } else {
-        // Update is_read status if any message in thread is unread
-        const existing = threadMap.get(threadId);
-        if (!item.is_read) {
-          existing.is_read = false;
-        }
         // Update to latest message time
+        const existing = threadMap.get(threadId);
         if (new Date(msg.created_at) > new Date(existing.created_at)) {
           existing.created_at = msg.created_at;
+        }
+        // Check if this specific message is unread
+        if (!item.is_read) {
+          existing.is_read = false;
         }
       }
     }
@@ -195,6 +205,7 @@ export default function MessagesScreen() {
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
+    console.log('Loaded inbox messages:', messages.length);
     setInboxMessages(messages);
   };
 
@@ -346,6 +357,7 @@ export default function MessagesScreen() {
     });
 
     if (!error && data !== null) {
+      console.log('Unread count:', data);
       setUnreadCount(data);
     }
   };
@@ -431,11 +443,29 @@ export default function MessagesScreen() {
 
     try {
       const messageIds = Array.from(selectedMessages);
-      await supabase
-        .from('message_recipients')
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq('recipient_id', user.id)
-        .in('message_id', messageIds);
+      
+      // For each selected message, mark the entire thread as read
+      for (const messageId of messageIds) {
+        const message = inboxMessages.find(m => m.id === messageId) || feedbackMessages.find(m => m.id === messageId);
+        if (!message) continue;
+        
+        const threadId = message.thread_id || message.id;
+        
+        // Get all message IDs in this thread
+        const { data: threadMessages } = await supabase
+          .from('messages')
+          .select('id')
+          .or(`id.eq.${messageId},thread_id.eq.${threadId}`);
+
+        const threadMessageIds = threadMessages?.map(m => m.id) || [messageId];
+        
+        // Mark all messages in thread as read
+        await supabase
+          .from('message_recipients')
+          .update({ is_read: true, read_at: new Date().toISOString() })
+          .eq('recipient_id', user.id)
+          .in('message_id', threadMessageIds);
+      }
 
       await loadMessages();
       await loadUnreadCount();
@@ -510,11 +540,22 @@ export default function MessagesScreen() {
     if (!user?.id) return;
 
     try {
+      const threadId = message.thread_id || message.id;
+      
+      // Get all message IDs in this thread
+      const { data: threadMessages } = await supabase
+        .from('messages')
+        .select('id')
+        .or(`id.eq.${message.id},thread_id.eq.${threadId}`);
+
+      const threadMessageIds = threadMessages?.map(m => m.id) || [message.id];
+      
+      // Mark all messages in thread as read
       await supabase
         .from('message_recipients')
         .update({ is_read: true, read_at: new Date().toISOString() })
         .eq('recipient_id', user.id)
-        .eq('message_id', message.id);
+        .in('message_id', threadMessageIds);
 
       await loadMessages();
       await loadUnreadCount();

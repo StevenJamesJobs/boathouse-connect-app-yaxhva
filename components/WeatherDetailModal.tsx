@@ -163,11 +163,12 @@ export default function WeatherDetailModal({
         console.log(`  Day ${i + 1}: ${day.dayOfWeek} ${day.date} - High: ${day.highTemp}°F, Low: ${day.lowTemp}°F`);
       });
 
-      // Use North Jersey/Manhattan focused radar from NOAA with timestamp to force refresh
-      // Using the New York City radar (KOKX) which covers North Jersey and Manhattan area
+      // Use North Jersey focused radar from NOAA with timestamp to force refresh
+      // Using coordinates centered on North Jersey (40.8, -74.3) for better focus
+      // NOAA radar station KDIX (Philadelphia/Mt Holly) provides good North Jersey coverage
       const timestamp = Date.now();
-      const radarImageUrl = `https://radar.weather.gov/ridge/standard/KOKX_loop.gif?t=${timestamp}`;
-      console.log('Radar URL with timestamp (NYC/North Jersey focus):', radarImageUrl);
+      const radarImageUrl = `https://radar.weather.gov/ridge/standard/KDIX_loop.gif?t=${timestamp}`;
+      console.log('Radar URL with timestamp (North Jersey focus - KDIX):', radarImageUrl);
 
       const weatherDetail: WeatherDetailData = {
         currentTemp: Math.round(data.current.temp_f),
@@ -293,13 +294,13 @@ export default function WeatherDetailModal({
                       </Text>
                     </View>
 
-                    {/* Radar Image - North Jersey/Manhattan Area */}
+                    {/* Radar Image - North Jersey Area */}
                     <View style={styles.radarContainer}>
                       <Text style={[styles.radarTitle, { color: colors.text }]}>
                         Local Radar
                       </Text>
                       <Text style={[styles.radarSubtitle, { color: colors.textSecondary }]}>
-                        North Jersey / Manhattan Area
+                        North Jersey Area
                       </Text>
                       <View style={[styles.radarImageWrapper, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}>
                         <Image
