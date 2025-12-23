@@ -82,12 +82,31 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         return;
       }
 
-      // Get Expo push token
-      const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+      // Get Expo push token - try multiple ways to get project ID
+      let projectId = Constants?.expoConfig?.extra?.eas?.projectId;
       
       if (!projectId) {
-        console.error('Project ID not found. Please add it to app.json under extra.eas.projectId');
-        return;
+        projectId = Constants?.easConfig?.projectId;
+      }
+      
+      if (!projectId) {
+        // Try to extract from manifest
+        projectId = Constants?.expoConfig?.slug;
+      }
+      
+      if (!projectId) {
+        console.warn('Project ID not found. Push notifications will work in development but may need configuration for production.');
+        // In Expo Go, we can still try to get a token without explicit project ID
+        try {
+          const tokenData = await Notifications.getExpoPushTokenAsync();
+          const token = tokenData.data;
+          console.log('Expo Push Token (development):', token);
+          setExpoPushToken(token);
+          return;
+        } catch (error) {
+          console.error('Error getting push token:', error);
+          return;
+        }
       }
 
       const tokenData = await Notifications.getExpoPushTokenAsync({
@@ -121,6 +140,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }
     } catch (error) {
       console.error('Error registering for push notifications:', error);
+      // Don't throw - allow app to continue without push notifications
     }
   }, [user?.id]);
 
@@ -176,12 +196,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   }, [user?.id]);
 
   useEffect(() => {
-    if (isAuthenticated && user) {
-      registerForPushNotificationsAsync();
-      loadPreferences();
-    }
-
-    // Set up notification listeners
+    // Set up notification listeners first (these work even without push token)
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       console.log('Notification received:', notification);
       setNotification(notification);
@@ -194,6 +209,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       console.log('Notification data:', data);
       // TODO: Add navigation logic based on notification type
     });
+
+    // Only register for push notifications if authenticated
+    if (isAuthenticated && user) {
+      registerForPushNotificationsAsync();
+      loadPreferences();
+    }
 
     return () => {
       if (notificationListener.current) {
