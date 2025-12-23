@@ -15,15 +15,17 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 // Map of common icon names to ensure they work on Android
 const ICON_MAP: Record<string, keyof typeof MaterialIcons.glyphMap> = {
-  // Weather icons
+  // Weather icons - FIXED
   'cloud.sun': 'wb-cloudy',
   'cloud.sun.fill': 'wb-cloudy',
   'cloud.rain': 'cloud',
   'cloud.rain.fill': 'cloud',
   'sun.max': 'wb-sunny',
   'sun.max.fill': 'wb-sunny',
+  'cloud': 'cloud',
+  'cloud.fill': 'cloud',
   
-  // Chevrons and arrows
+  // Chevrons and arrows - FIXED
   'chevron.up': 'expand-less',
   'chevron.down': 'expand-more',
   'chevron.left': 'chevron-left',
@@ -32,22 +34,27 @@ const ICON_MAP: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   'arrow.right': 'arrow-forward',
   'arrow.up': 'arrow-upward',
   'arrow.down': 'arrow-downward',
+  'arrow.back': 'arrow-back',
   
-  // Menu and navigation
-  'line.3.horizontal': 'menu',
-  'line.horizontal.3': 'menu',
+  // Menu and navigation - FIXED
+  'line.3.horizontal': 'restaurant',
+  'line.horizontal.3': 'restaurant',
   'list.bullet': 'list',
+  'fork.knife': 'restaurant',
+  'fork.knife.circle': 'restaurant-menu',
   
   // Filter
   'line.3.horizontal.decrease.circle': 'filter-list',
   'slider.horizontal.3': 'tune',
   
-  // Plus and add
+  // Plus and add - FIXED
   'plus': 'add',
   'plus.circle': 'add-circle',
   'plus.circle.fill': 'add-circle',
+  'add': 'add',
+  'add.circle': 'add-circle',
   
-  // Key and security
+  // Key and security - FIXED
   'key': 'vpn-key',
   'key.fill': 'vpn-key',
   'lock': 'lock',
@@ -110,12 +117,51 @@ const ICON_MAP: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   'feedback': 'feedback',
   
   // Restaurant and food
-  'fork.knife': 'restaurant',
-  'fork.knife.circle': 'restaurant-menu',
+  'restaurant': 'restaurant',
+  'restaurant-menu': 'restaurant-menu',
   
   // Tray and inbox
   'tray': 'inbox',
   'tray.fill': 'inbox',
+  
+  // Calendar and time
+  'calendar': 'event',
+  'clock': 'schedule',
+  
+  // Star
+  'star': 'star',
+  'star.fill': 'star',
+  
+  // Person
+  'person': 'person',
+  'person.fill': 'person',
+  'person.circle': 'account-circle',
+  'person.circle.fill': 'account-circle',
+  
+  // Home
+  'house': 'home',
+  'house.fill': 'home',
+  
+  // Tools
+  'wrench.and.screwdriver': 'build',
+  'wrench.and.screwdriver.fill': 'build',
+  
+  // Eye visibility
+  'eye': 'visibility',
+  'eye.fill': 'visibility',
+  'eye.slash': 'visibility-off',
+  'eye.slash.fill': 'visibility-off',
+  
+  // Edit
+  'pencil': 'edit',
+  'pencil.circle': 'edit',
+  
+  // Logout
+  'rectangle.portrait.and.arrow.right': 'logout',
+  
+  // Download
+  'arrow.down.circle': 'download',
+  'arrow.down.circle.fill': 'download',
 };
 
 /**
@@ -146,11 +192,16 @@ export function IconSymbol({
     iconName = ICON_MAP[iconName];
   }
   
+  // Also check if the icon name itself needs mapping (even without dots)
+  if (typeof iconName === 'string' && ICON_MAP[iconName]) {
+    iconName = ICON_MAP[iconName];
+  }
+  
   // Check if the icon exists in MaterialIcons
   const iconExists = iconName in MaterialIcons.glyphMap;
   
   if (!iconExists) {
-    console.warn(`Icon "${iconName}" not found in MaterialIcons. Using fallback.`);
+    console.warn(`Icon "${iconName}" not found in MaterialIcons. Using fallback. Original: "${android_material_icon_name}"`);
     // Use a generic icon as fallback
     iconName = 'help-outline';
   }
