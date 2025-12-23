@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -189,7 +189,63 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     loadMenuItems();
   }, []);
 
-  const filterItems = useCallback(() => {
+  useEffect(() => {
+    filterItems();
+  }, [menuItems, selectedCategory, selectedSubcategory, searchQuery, selectedFilters]);
+
+  // Set the default subcategory when category changes
+  useEffect(() => {
+    if (SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0) {
+      // Set to the first subcategory (which is now the proper starting one, not "All")
+      setSelectedSubcategory(SUBCATEGORIES[selectedCategory][0]);
+    } else {
+      setSelectedSubcategory(null);
+    }
+  }, [selectedCategory]);
+
+  // Prefetch images when filtered items change
+  useEffect(() => {
+    const prefetchImages = async () => {
+      const imageUrls = filteredItems
+        .map(item => item.thumbnail_url)
+        .filter((url): url is string => url !== null && url !== undefined);
+      
+      if (imageUrls.length > 0) {
+        console.log('Prefetching', imageUrls.length, 'images...');
+        try {
+          await Image.prefetch(imageUrls, { cachePolicy: 'memory-disk' });
+          console.log('Images prefetched successfully');
+        } catch (error) {
+          console.error('Error prefetching images:', error);
+        }
+      }
+    };
+
+    // Prefetch after a short delay to avoid blocking the UI
+    const timeoutId = setTimeout(prefetchImages, 100);
+    return () => clearTimeout(timeoutId);
+  }, [filteredItems]);
+
+  const loadMenuItems = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      console.log('Loaded menu items for display:', data?.length || 0, 'items');
+      setMenuItems(data || []);
+    } catch (error) {
+      console.error('Error loading menu items:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filterItems = () => {
     let filtered = menuItems;
 
     // If filters are selected, apply filter logic (even without search text)
@@ -252,62 +308,6 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
 
     console.log('Filtered items:', filtered.length);
     setFilteredItems(filtered);
-  }, [menuItems, selectedCategory, selectedSubcategory, searchQuery, selectedFilters]);
-
-  useEffect(() => {
-    filterItems();
-  }, [filterItems]);
-
-  // Set the default subcategory when category changes
-  useEffect(() => {
-    if (SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0) {
-      // Set to the first subcategory (which is now the proper starting one, not "All")
-      setSelectedSubcategory(SUBCATEGORIES[selectedCategory][0]);
-    } else {
-      setSelectedSubcategory(null);
-    }
-  }, [selectedCategory]);
-
-  // Prefetch images when filtered items change
-  useEffect(() => {
-    const prefetchImages = async () => {
-      const imageUrls = filteredItems
-        .map(item => item.thumbnail_url)
-        .filter((url): url is string => url !== null && url !== undefined);
-      
-      if (imageUrls.length > 0) {
-        console.log('Prefetching', imageUrls.length, 'images...');
-        try {
-          await Image.prefetch(imageUrls, { cachePolicy: 'memory-disk' });
-          console.log('Images prefetched successfully');
-        } catch (error) {
-          console.error('Error prefetching images:', error);
-        }
-      }
-    };
-
-    // Prefetch after a short delay to avoid blocking the UI
-    const timeoutId = setTimeout(prefetchImages, 100);
-    return () => clearTimeout(timeoutId);
-  }, [filteredItems]);
-
-  const loadMenuItems = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('menu_items')
-        .select('*')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
-
-      if (error) throw error;
-      console.log('Loaded menu items for display:', data?.length || 0, 'items');
-      setMenuItems(data || []);
-    } catch (error) {
-      console.error('Error loading menu items:', error);
-    } finally {
-      setLoading(false);
-    }
   };
 
   const applyMultipleFilters = (items: MenuItem[], filters: string[]) => {

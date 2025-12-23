@@ -20,7 +20,6 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { MessageBadge } from '@/components/MessageBadge';
-import NotificationPreferences from '@/components/NotificationPreferences';
 
 export default function EmployeeProfileScreen() {
   const { user, refreshUser } = useAuth();
@@ -535,9 +534,6 @@ export default function EmployeeProfileScreen() {
           </>
         )}
       </View>
-
-      {/* Notification Preferences */}
-      <NotificationPreferences />
     </ScrollView>
   );
 }

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -44,7 +44,12 @@ export default function MessageDetailScreen() {
 
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
-  const loadThread = useCallback(async () => {
+  useEffect(() => {
+    loadThread();
+    markThreadAsRead();
+  }, []);
+
+  const loadThread = async () => {
     try {
       setLoading(true);
 
@@ -127,9 +132,9 @@ export default function MessageDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [messageId, threadId, user?.id]);
+  };
 
-  const markThreadAsRead = useCallback(async () => {
+  const markThreadAsRead = async () => {
     if (!user?.id) return;
 
     try {
@@ -168,12 +173,7 @@ export default function MessageDetailScreen() {
     } catch (error) {
       console.error('Error in markThreadAsRead:', error);
     }
-  }, [user?.id, messageId, threadId]);
-
-  useEffect(() => {
-    loadThread();
-    markThreadAsRead();
-  }, [loadThread, markThreadAsRead]);
+  };
 
   const handleReply = () => {
     const originalMessage = messages[0];

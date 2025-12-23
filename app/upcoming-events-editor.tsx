@@ -23,7 +23,6 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { sendEventNotification } from '@/utils/notificationHelpers';
 
 interface UpcomingEvent {
   id: string;
@@ -302,20 +301,7 @@ export default function UpcomingEventsEditorScreen() {
           throw error;
         }
         console.log('Upcoming event created successfully');
-
-        // 🔔 SEND PUSH NOTIFICATION TO ALL STAFF
-        try {
-          await sendEventNotification(
-            formData.title,                      // Event title
-            'new',                               // Event ID (we don't get it back from RPC)
-            startDateTime?.toISOString()         // Event date (optional)
-          );
-        } catch (notificationError) {
-          console.error('Failed to send notification:', notificationError);
-          // Don't show error to user - notification is secondary to main action
-        }
-
-        Alert.alert('Success', 'Event created and staff notified!');
+        Alert.alert('Success', 'Upcoming event created successfully');
       }
 
       closeModal();

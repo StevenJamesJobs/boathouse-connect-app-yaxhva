@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
 
 interface WeatherData {
@@ -25,6 +25,10 @@ export default function WeatherWidget({ textColor, secondaryTextColor, onPress }
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchWeather();
+  }, []);
 
   const generateDetailedForecast = (data: any): string => {
     const day = data.forecast.forecastday[0].day;
@@ -67,7 +71,7 @@ export default function WeatherWidget({ textColor, secondaryTextColor, onPress }
     return description;
   };
 
-  const fetchWeather = useCallback(async () => {
+  const fetchWeather = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -102,11 +106,7 @@ export default function WeatherWidget({ textColor, secondaryTextColor, onPress }
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    fetchWeather();
-  }, [fetchWeather]);
+  };
 
   if (loading) {
     return (

@@ -17,7 +17,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
-import { sendMessageNotification } from '@/utils/notificationHelpers';
 
 interface User {
   id: string;
@@ -57,7 +56,21 @@ export default function ComposeMessageScreen() {
 
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
-  const loadReplyRecipients = useCallback(async () => {
+  // Initialize reply/reply all
+  useEffect(() => {
+    if (replyToMessageId && replyToSenderId) {
+      // Set subject with "Re: " prefix
+      if (replySubject) {
+        const subjectText = replySubject.startsWith('Re: ') ? replySubject : `Re: ${replySubject}`;
+        setSubject(subjectText);
+      }
+      
+      // Load reply recipients
+      loadReplyRecipients();
+    }
+  }, [replyToMessageId, replyToSenderId, replyAllRecipientIds]);
+
+  const loadReplyRecipients = async () => {
     try {
       if (isReplyAll && replyAllRecipientIds) {
         // Reply All: Load all original recipients + sender
@@ -86,21 +99,7 @@ export default function ComposeMessageScreen() {
     } catch (error) {
       console.error('Error loading reply recipients:', error);
     }
-  }, [isReplyAll, replyAllRecipientIds, replyToSenderId, user?.id]);
-
-  // Initialize reply/reply all
-  useEffect(() => {
-    if (replyToMessageId && replyToSenderId) {
-      // Set subject with "Re: " prefix
-      if (replySubject) {
-        const subjectText = replySubject.startsWith('Re: ') ? replySubject : `Re: ${replySubject}`;
-        setSubject(subjectText);
-      }
-      
-      // Load reply recipients
-      loadReplyRecipients();
-    }
-  }, [replyToMessageId, replyToSenderId, replySubject, loadReplyRecipients]);
+  };
 
   const loadUsers = useCallback(async () => {
     try {
@@ -311,20 +310,6 @@ export default function ComposeMessageScreen() {
         .insert(recipients);
 
       if (recipientsError) throw recipientsError;
-
-      // 🔔 SEND PUSH NOTIFICATION
-      try {
-        await sendMessageNotification(
-          selectedRecipients.map(r => r.id),  // Array of recipient user IDs
-          user?.name || 'Someone',            // Sender's name
-          body.trim(),                        // Message body
-          messageData.id,                     // Message ID
-          threadId || undefined               // Thread ID (if replying)
-        );
-      } catch (notificationError) {
-        console.error('Failed to send notification:', notificationError);
-        // Don't show error to user - notification is secondary to main action
-      }
 
       Alert.alert('Success', 'Message sent successfully!', [
         { text: 'OK', onPress: () => router.back() },

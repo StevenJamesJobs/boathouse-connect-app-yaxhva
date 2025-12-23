@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -53,7 +53,13 @@ export default function EmployeeDetailScreen() {
   const [uploading, setUploading] = useState(false);
   const [newPassword, setNewPassword] = useState('');
 
-  const fetchEmployee = useCallback(async () => {
+  useEffect(() => {
+    if (employeeId) {
+      fetchEmployee();
+    }
+  }, [employeeId]);
+
+  const fetchEmployee = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -78,13 +84,7 @@ export default function EmployeeDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [employeeId, router]);
-
-  useEffect(() => {
-    if (employeeId) {
-      fetchEmployee();
-    }
-  }, [employeeId, fetchEmployee]);
+  };
 
   const toggleJobTitle = (title: string) => {
     if (!employee) return;

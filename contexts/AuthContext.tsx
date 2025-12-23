@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { User, AuthState } from '@/types/user';
@@ -21,6 +21,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading: true,
     isAuthenticated: false,
   });
+
+  useEffect(() => {
+    loadStoredAuth();
+  }, []);
 
   const fetchUserFromDatabase = async (userId: string): Promise<User | null> => {
     try {
@@ -70,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const loadStoredAuth = useCallback(async () => {
+  const loadStoredAuth = async () => {
     try {
       const rememberMe = await AsyncStorage.getItem(REMEMBER_ME_KEY);
       if (rememberMe === 'true') {
@@ -103,11 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isLoading: false,
       isAuthenticated: false,
     });
-  }, []);
-
-  useEffect(() => {
-    loadStoredAuth();
-  }, [loadStoredAuth]);
+  };
 
   const refreshUser = async () => {
     try {
