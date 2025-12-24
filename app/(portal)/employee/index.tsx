@@ -440,7 +440,7 @@ export default function EmployeePortalScreen() {
         <CollapsibleSection
           title="Weather"
           iconIos="cloud.sun.fill"
-          iconAndroid="wb_sunny"
+          iconAndroid="wb-cloudy"
           iconColor={employeeColors.primary}
           headerBackgroundColor={headerColor}
           headerTextColor={employeeColors.text}

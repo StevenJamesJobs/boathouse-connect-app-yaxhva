@@ -450,7 +450,7 @@ export default function ManagerPortalScreen() {
         <CollapsibleSection
           title="Weather"
           iconIos="cloud.sun.fill"
-          iconAndroid="wb_sunny"
+          iconAndroid="wb-cloudy"
           iconColor={managerColors.accent}
           headerBackgroundColor={headerColor}
           headerTextColor={managerColors.text}
