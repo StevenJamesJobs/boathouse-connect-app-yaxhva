@@ -16,6 +16,12 @@ export default function ManagerToolsScreen() {
   const router = useRouter();
   const { user } = useAuth();
 
+  // Check if user is a Manager or Bartender based on job titles
+  const isBartenderOrManager = user?.jobTitle && (
+    user.jobTitle.toLowerCase().includes('bartender') || 
+    user.jobTitle.toLowerCase().includes('manager')
+  );
+
   return (
     <View style={styles.container}>
       {/* User's Name Header */}
@@ -83,6 +89,38 @@ export default function ManagerToolsScreen() {
             />
           </TouchableOpacity>
         </View>
+
+        {/* Bartender Assistant Section - Only visible to Managers and Bartenders */}
+        {isBartenderOrManager && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <IconSymbol
+                ios_icon_name="wineglass.fill"
+                android_material_icon_name="local-bar"
+                size={32}
+                color={managerColors.highlight}
+              />
+              <View style={styles.cardHeaderText}>
+                <Text style={styles.cardTitle}>Bartender Assistant</Text>
+                <Text style={styles.cardDescription}>
+                  Access cocktail recipes, knowledge base, and bar exams
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              style={styles.cardButton}
+              onPress={() => router.push('/bartender-assistant')}
+            >
+              <Text style={styles.cardButtonText}>Open Bartender Assistant</Text>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={20}
+                color={managerColors.text}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
     </View>
   );

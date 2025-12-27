@@ -30,9 +30,11 @@ export default function EmployeeToolsScreen() {
   const [feedbackDescription, setFeedbackDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Check if user is a Manager or Bartender
-  const isBartenderOrManager = user?.role === 'manager' || 
-    user?.jobTitle?.toLowerCase().includes('bartender');
+  // Check if user is a Manager or Bartender based on job titles
+  const isBartenderOrManager = user?.jobTitle && (
+    user.jobTitle.toLowerCase().includes('bartender') || 
+    user.jobTitle.toLowerCase().includes('manager')
+  );
 
   const handleSubmitFeedback = async () => {
     console.log('=== FEEDBACK SUBMISSION STARTED ===');
