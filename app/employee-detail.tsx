@@ -315,7 +315,7 @@ export default function EmployeeDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
+            android_material_icon_name="arrow-back"
             size={24}
             color={managerColors.text}
           />
@@ -342,7 +342,7 @@ export default function EmployeeDetailScreen() {
             ) : (
               <IconSymbol
                 ios_icon_name="person.circle.fill"
-                android_material_icon_name="account_circle"
+                android_material_icon_name="account-circle"
                 size={120}
                 color={managerColors.highlight}
               />
@@ -350,7 +350,7 @@ export default function EmployeeDetailScreen() {
             <View style={styles.cameraIcon}>
               <IconSymbol
                 ios_icon_name="camera.fill"
-                android_material_icon_name="camera_alt"
+                android_material_icon_name="camera-alt"
                 size={20}
                 color="#FFFFFF"
               />
@@ -483,7 +483,7 @@ export default function EmployeeDetailScreen() {
           <TouchableOpacity style={styles.resetButton} onPress={handleResetPassword}>
             <IconSymbol
               ios_icon_name="key.fill"
-              android_material_icon_name="vpn_key"
+              android_material_icon_name="vpn-key"
               size={20}
               color={managerColors.text}
             />

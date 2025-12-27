@@ -251,7 +251,7 @@ export default function MessageDetailScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <IconSymbol
               ios_icon_name="chevron.left"
-              android_material_icon_name="arrow_back"
+              android_material_icon_name="chevron-left"
               size={24}
               color={colors.text}
             />
@@ -277,7 +277,7 @@ export default function MessageDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
+            android_material_icon_name="chevron-left"
             size={24}
             color={colors.text}
           />
@@ -391,7 +391,7 @@ export default function MessageDetailScreen() {
             >
               <IconSymbol
                 ios_icon_name="arrowshape.turn.up.left.2.fill"
-                android_material_icon_name="reply_all"
+                android_material_icon_name="reply-all"
                 size={20}
                 color={user?.role === 'manager' ? colors.text : '#FFFFFF'}
               />

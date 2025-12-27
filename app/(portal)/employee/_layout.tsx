@@ -134,7 +134,7 @@ export default function EmployeeLayout() {
             tabBarIcon: ({ color, size }) => (
               <IconSymbol
                 ios_icon_name="fork.knife"
-                android_material_icon_name="restaurant_menu"
+                android_material_icon_name="restaurant"
                 size={size}
                 color={color}
               />

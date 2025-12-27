@@ -321,7 +321,7 @@ export default function EmployeeProfileScreen() {
           </View>
           <IconSymbol
             ios_icon_name="chevron.right"
-            android_material_icon_name="chevron_right"
+            android_material_icon_name="chevron-right"
             size={24}
             color={employeeColors.textSecondary}
           />
@@ -337,7 +337,7 @@ export default function EmployeeProfileScreen() {
           <Text style={styles.sectionTitle}>Profile Information</Text>
           <IconSymbol
             ios_icon_name={profileInfoExpanded ? "chevron.up" : "chevron.down"}
-            android_material_icon_name={profileInfoExpanded ? "expand_less" : "expand_more"}
+            android_material_icon_name={profileInfoExpanded ? "expand-less" : "expand-more"}
             size={24}
             color={employeeColors.text}
           />
@@ -432,7 +432,7 @@ export default function EmployeeProfileScreen() {
           >
             <IconSymbol
               ios_icon_name="key.fill"
-              android_material_icon_name="vpn_key"
+              android_material_icon_name="vpn-key"
               size={20}
               color="#FFFFFF"
             />

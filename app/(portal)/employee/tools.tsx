@@ -30,6 +30,10 @@ export default function EmployeeToolsScreen() {
   const [feedbackDescription, setFeedbackDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Check if user is a Manager or Bartender
+  const isBartenderOrManager = user?.role === 'manager' || 
+    user?.jobTitle?.toLowerCase().includes('bartender');
+
   const handleSubmitFeedback = async () => {
     console.log('=== FEEDBACK SUBMISSION STARTED ===');
     console.log('User ID:', user?.id);
@@ -188,7 +192,7 @@ export default function EmployeeToolsScreen() {
             <Text style={styles.cardButtonText}>Open Calculator</Text>
             <IconSymbol
               ios_icon_name="chevron.right"
-              android_material_icon_name="chevron_right"
+              android_material_icon_name="chevron-right"
               size={20}
               color={employeeColors.text}
             />
@@ -200,7 +204,7 @@ export default function EmployeeToolsScreen() {
           <View style={styles.cardHeader}>
             <IconSymbol
               ios_icon_name="book.fill"
-              android_material_icon_name="menu_book"
+              android_material_icon_name="book"
               size={32}
               color={employeeColors.primary}
             />
@@ -218,12 +222,44 @@ export default function EmployeeToolsScreen() {
             <Text style={styles.cardButtonText}>View Guides</Text>
             <IconSymbol
               ios_icon_name="chevron.right"
-              android_material_icon_name="chevron_right"
+              android_material_icon_name="chevron-right"
               size={20}
               color={employeeColors.text}
             />
           </TouchableOpacity>
         </View>
+
+        {/* Bartender Assistant Section - Only visible to Managers and Bartenders */}
+        {isBartenderOrManager && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <IconSymbol
+                ios_icon_name="wineglass.fill"
+                android_material_icon_name="local-bar"
+                size={32}
+                color={employeeColors.primary}
+              />
+              <View style={styles.cardHeaderText}>
+                <Text style={styles.cardTitle}>Bartender Assistant</Text>
+                <Text style={styles.cardDescription}>
+                  Access cocktail recipes, knowledge base, and bar exams
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              style={styles.cardButton}
+              onPress={() => router.push('/bartender-assistant')}
+            >
+              <Text style={styles.cardButtonText}>Open Bartender Assistant</Text>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={20}
+                color={employeeColors.text}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
       </ScrollView>
 
       {/* Feedback Modal - Fixed with proper height */}

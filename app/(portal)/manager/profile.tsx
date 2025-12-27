@@ -262,7 +262,7 @@ export default function ManagerProfileScreen() {
           ) : (
             <IconSymbol
               ios_icon_name="person.circle.fill"
-              android_material_icon_name="account_circle"
+              android_material_icon_name="account-circle"
               size={90}
               color={managerColors.highlight}
             />
@@ -270,7 +270,7 @@ export default function ManagerProfileScreen() {
           <View style={styles.cameraIcon}>
             <IconSymbol
               ios_icon_name="camera.fill"
-              android_material_icon_name="camera_alt"
+              android_material_icon_name="camera-alt"
               size={16}
               color="#FFFFFF"
             />
@@ -321,7 +321,7 @@ export default function ManagerProfileScreen() {
           </View>
           <IconSymbol
             ios_icon_name="chevron.right"
-            android_material_icon_name="chevron_right"
+            android_material_icon_name="chevron-right"
             size={24}
             color={managerColors.textSecondary}
           />
@@ -337,7 +337,7 @@ export default function ManagerProfileScreen() {
           <Text style={styles.sectionTitle}>Profile Information</Text>
           <IconSymbol
             ios_icon_name={profileInfoExpanded ? "chevron.up" : "chevron.down"}
-            android_material_icon_name={profileInfoExpanded ? "expand_less" : "expand_more"}
+            android_material_icon_name={profileInfoExpanded ? "expand-less" : "expand-more"}
             size={24}
             color={managerColors.text}
           />
@@ -432,7 +432,7 @@ export default function ManagerProfileScreen() {
           >
             <IconSymbol
               ios_icon_name="key.fill"
-              android_material_icon_name="vpn_key"
+              android_material_icon_name="vpn-key"
               size={20}
               color={managerColors.text}
             />

@@ -462,7 +462,7 @@ export default function GuidesAndTrainingEditorScreen() {
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
+            android_material_icon_name="arrow-back"
             size={24}
             color={managerColors.text}
           />
@@ -502,7 +502,7 @@ export default function GuidesAndTrainingEditorScreen() {
       <TouchableOpacity style={styles.addNewItemButton} onPress={openAddModal}>
         <IconSymbol
           ios_icon_name="plus.circle.fill"
-          android_material_icon_name="add_circle"
+          android_material_icon_name="add-circle"
           size={24}
           color={managerColors.text}
         />
@@ -520,7 +520,7 @@ export default function GuidesAndTrainingEditorScreen() {
             <View style={styles.emptyContainer}>
               <IconSymbol
                 ios_icon_name="book.fill"
-                android_material_icon_name="menu_book"
+                android_material_icon_name="restaurant"
                 size={64}
                 color={managerColors.textSecondary}
               />
@@ -656,7 +656,7 @@ export default function GuidesAndTrainingEditorScreen() {
                     <View style={styles.imageUploadPlaceholder}>
                       <IconSymbol
                         ios_icon_name="photo"
-                        android_material_icon_name="add_photo_alternate"
+                        android_material_icon_name="add-photo-alternate"
                         size={48}
                         color="#666666"
                       />

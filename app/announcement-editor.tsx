@@ -460,7 +460,7 @@ export default function AnnouncementEditorScreen() {
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
+            android_material_icon_name="arrow-back"
             size={24}
             color={managerColors.text}
           />
@@ -482,7 +482,7 @@ export default function AnnouncementEditorScreen() {
       >
         <IconSymbol
           ios_icon_name="plus.circle.fill"
-          android_material_icon_name="add_circle"
+          android_material_icon_name="add-circle"
           size={24}
           color={announcements.length >= 10 ? managerColors.textSecondary : managerColors.text}
         />
@@ -791,7 +791,7 @@ export default function AnnouncementEditorScreen() {
                   >
                     <IconSymbol
                       ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
-                      android_material_icon_name={showFileSection ? "expand_less" : "expand_more"}
+                      android_material_icon_name={showFileSection ? "expand-less" : "expand-more"}
                       size={24}
                       color={managerColors.highlight}
                     />
@@ -855,7 +855,7 @@ export default function AnnouncementEditorScreen() {
                                 </View>
                                 <IconSymbol
                                   ios_icon_name="chevron.right"
-                                  android_material_icon_name="chevron_right"
+                                  android_material_icon_name="chevron-right"
                                   size={20}
                                   color="#666666"
                                 />

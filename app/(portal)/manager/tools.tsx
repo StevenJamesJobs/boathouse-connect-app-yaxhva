@@ -47,7 +47,7 @@ export default function ManagerToolsScreen() {
             <Text style={styles.cardButtonText}>Open Calculator</Text>
             <IconSymbol
               ios_icon_name="chevron.right"
-              android_material_icon_name="chevron_right"
+              android_material_icon_name="chevron-right"
               size={20}
               color={managerColors.text}
             />
@@ -59,7 +59,7 @@ export default function ManagerToolsScreen() {
           <View style={styles.cardHeader}>
             <IconSymbol
               ios_icon_name="book.fill"
-              android_material_icon_name="menu_book"
+              android_material_icon_name="book"
               size={32}
               color={managerColors.highlight}
             />
@@ -77,7 +77,7 @@ export default function ManagerToolsScreen() {
             <Text style={styles.cardButtonText}>View Guides</Text>
             <IconSymbol
               ios_icon_name="chevron.right"
-              android_material_icon_name="chevron_right"
+              android_material_icon_name="chevron-right"
               size={20}
               color={managerColors.text}
             />

@@ -349,7 +349,7 @@ export default function ComposeMessageScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
+            android_material_icon_name="chevron-left"
             size={24}
             color={colors.text}
           />
@@ -370,7 +370,7 @@ export default function ComposeMessageScreen() {
           >
             <IconSymbol
               ios_icon_name="person.badge.plus"
-              android_material_icon_name="person_add"
+              android_material_icon_name="person-add"
               size={20}
               color={colors.primary || colors.highlight}
             />
@@ -520,7 +520,7 @@ export default function ComposeMessageScreen() {
                     </View>
                     <IconSymbol
                       ios_icon_name="chevron.right"
-                      android_material_icon_name="chevron_right"
+                      android_material_icon_name="chevron-right"
                       size={20}
                       color={colors.textSecondary}
                     />

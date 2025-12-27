@@ -732,7 +732,7 @@ export default function RewardsAndReviewsEditorScreen() {
           <IconSymbol
             key={star}
             ios_icon_name={star <= rating ? 'star.fill' : 'star'}
-            android_material_icon_name={star <= rating ? 'star' : 'star_border'}
+            android_material_icon_name={star <= rating ? 'star' : 'star-border'}
             size={20}
             color={star <= rating ? '#FFD700' : managerColors.textSecondary}
           />
@@ -752,7 +752,7 @@ export default function RewardsAndReviewsEditorScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
+            android_material_icon_name="arrow-back"
             size={24}
             color={managerColors.text}
           />
@@ -793,7 +793,7 @@ export default function RewardsAndReviewsEditorScreen() {
               >
                 <IconSymbol
                   ios_icon_name="gift.fill"
-                  android_material_icon_name="card_giftcard"
+                  android_material_icon_name="card-giftcard"
                   size={24}
                   color={managerColors.text}
                 />
@@ -919,7 +919,7 @@ export default function RewardsAndReviewsEditorScreen() {
             >
               <IconSymbol
                 ios_icon_name="plus.circle.fill"
-                android_material_icon_name="add_circle"
+                android_material_icon_name="add-circle"
                 size={24}
                 color={managerColors.text}
               />
@@ -1050,7 +1050,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   >
                     <IconSymbol
                       ios_icon_name="plus.circle.fill"
-                      android_material_icon_name="add_circle"
+                      android_material_icon_name="add-circle"
                       size={24}
                       color={isReward ? '#FFFFFF' : managerColors.textSecondary}
                     />
@@ -1073,7 +1073,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   >
                     <IconSymbol
                       ios_icon_name="minus.circle.fill"
-                      android_material_icon_name="remove_circle"
+                      android_material_icon_name="remove-circle"
                       size={24}
                       color={!isReward ? '#FFFFFF' : managerColors.textSecondary}
                     />
@@ -1321,7 +1321,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   >
                     <IconSymbol
                       ios_icon_name="plus.circle.fill"
-                      android_material_icon_name="add_circle"
+                      android_material_icon_name="add-circle"
                       size={24}
                       color={editIsReward ? '#FFFFFF' : managerColors.textSecondary}
                     />
@@ -1344,7 +1344,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   >
                     <IconSymbol
                       ios_icon_name="minus.circle.fill"
-                      android_material_icon_name="remove_circle"
+                      android_material_icon_name="remove-circle"
                       size={24}
                       color={!editIsReward ? '#FFFFFF' : managerColors.textSecondary}
                     />
@@ -1462,7 +1462,7 @@ export default function RewardsAndReviewsEditorScreen() {
                       <IconSymbol
                         ios_icon_name={star <= reviewForm.rating ? 'star.fill' : 'star'}
                         android_material_icon_name={
-                          star <= reviewForm.rating ? 'star' : 'star_border'
+                          star <= reviewForm.rating ? 'star' : 'star-border'
                         }
                         size={40}
                         color={star <= reviewForm.rating ? '#FFD700' : managerColors.textSecondary}

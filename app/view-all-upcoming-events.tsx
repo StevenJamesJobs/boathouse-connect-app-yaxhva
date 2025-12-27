@@ -150,7 +150,7 @@ export default function ViewAllUpcomingEventsScreen() {
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
+            android_material_icon_name="chevron-left"
             size={24}
             color={colors.text}
           />
@@ -232,7 +232,7 @@ export default function ViewAllUpcomingEventsScreen() {
                         <View style={styles.actionIndicator}>
                           <IconSymbol
                             ios_icon_name="chevron.right"
-                            android_material_icon_name="chevron_right"
+                            android_material_icon_name="chevron-right"
                             size={16}
                             color={colors.primary}
                           />
@@ -290,7 +290,7 @@ export default function ViewAllUpcomingEventsScreen() {
                         <View style={styles.actionIndicator}>
                           <IconSymbol
                             ios_icon_name="chevron.right"
-                            android_material_icon_name="chevron_right"
+                            android_material_icon_name="chevron-right"
                             size={16}
                             color={colors.primary}
                           />

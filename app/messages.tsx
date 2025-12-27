@@ -695,7 +695,7 @@ export default function MessagesScreen() {
             <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
               <IconSymbol
                 ios_icon_name="chevron.left"
-                android_material_icon_name="arrow_back"
+                android_material_icon_name="chevron-left"
                 size={24}
                 color={colors.text}
               />
@@ -716,7 +716,7 @@ export default function MessagesScreen() {
             >
               <IconSymbol
                 ios_icon_name="checkmark.circle"
-                android_material_icon_name="check_circle"
+                android_material_icon_name="check-circle"
                 size={20}
                 color="#FFFFFF"
               />
@@ -813,7 +813,7 @@ export default function MessagesScreen() {
         >
           <IconSymbol
             ios_icon_name="plus.circle.fill"
-            android_material_icon_name="add_circle"
+            android_material_icon_name="add-circle"
             size={24}
             color={user?.role === 'manager' ? colors.text : '#FFFFFF'}
           />
@@ -1032,7 +1032,7 @@ function MessageCard({
               >
                 <IconSymbol
                   ios_icon_name="checkmark.circle"
-                  android_material_icon_name="check_circle"
+                  android_material_icon_name="check-circle"
                   size={14}
                   color="#FFFFFF"
                 />

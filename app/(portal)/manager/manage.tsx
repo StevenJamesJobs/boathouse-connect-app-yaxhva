@@ -78,7 +78,7 @@ export default function ManagerManageScreen() {
                 <Text style={styles.cardButtonText}>Open Announcements Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
+                  android_material_icon_name="chevron-right"
                   size={20}
                   color={managerColors.text}
                 />
@@ -108,7 +108,7 @@ export default function ManagerManageScreen() {
                 <Text style={styles.cardButtonText}>Open Events Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
+                  android_material_icon_name="chevron-right"
                   size={20}
                   color={managerColors.text}
                 />
@@ -138,7 +138,7 @@ export default function ManagerManageScreen() {
                 <Text style={styles.cardButtonText}>Open Features Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
+                  android_material_icon_name="chevron-right"
                   size={20}
                   color={managerColors.text}
                 />
@@ -152,7 +152,7 @@ export default function ManagerManageScreen() {
               <View style={styles.cardHeader}>
                 <IconSymbol
                   ios_icon_name="square.and.pencil"
-                  android_material_icon_name="edit_note"
+                  android_material_icon_name="book"
                   size={32}
                   color={managerColors.highlight}
                 />
@@ -170,7 +170,7 @@ export default function ManagerManageScreen() {
                 <Text style={styles.cardButtonText}>Open Guides Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
+                  android_material_icon_name="chevron-right"
                   size={20}
                   color={managerColors.text}
                 />
@@ -178,11 +178,11 @@ export default function ManagerManageScreen() {
             </View>
 
             {/* Rewards and Reviews Editor */}
-            <View style={[styles.card, styles.lastCard]}>
+            <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <IconSymbol
                   ios_icon_name="gift.fill"
-                  android_material_icon_name="card_giftcard"
+                  android_material_icon_name="star"
                   size={32}
                   color={managerColors.highlight}
                 />
@@ -200,7 +200,37 @@ export default function ManagerManageScreen() {
                 <Text style={styles.cardButtonText}>Open Rewards & Reviews</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={managerColors.text}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Bartender Assistant Editor */}
+            <View style={[styles.card, styles.lastCard]}>
+              <View style={styles.cardHeader}>
+                <IconSymbol
+                  ios_icon_name="wineglass.fill"
+                  android_material_icon_name="local-bar"
+                  size={32}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardHeaderText}>
+                  <Text style={styles.cardTitle}>Bartender Assistant Editor</Text>
+                  <Text style={styles.cardDescription}>
+                    Manage cocktail recipes, knowledge base, and bar exams
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.cardButton}
+                onPress={() => router.push('/bartender-assistant-editor')}
+              >
+                <Text style={styles.cardButtonText}>Open Bartender Editor</Text>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
                   size={20}
                   color={managerColors.text}
                 />
@@ -232,7 +262,7 @@ export default function ManagerManageScreen() {
                 <Text style={styles.cardButtonText}>Open Employee Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
+                  android_material_icon_name="chevron-right"
                   size={20}
                   color={managerColors.text}
                 />
@@ -244,7 +274,7 @@ export default function ManagerManageScreen() {
               <View style={styles.cardHeader}>
                 <IconSymbol
                   ios_icon_name="fork.knife"
-                  android_material_icon_name="restaurant_menu"
+                  android_material_icon_name="restaurant"
                   size={32}
                   color={managerColors.highlight}
                 />
@@ -262,7 +292,7 @@ export default function ManagerManageScreen() {
                 <Text style={styles.cardButtonText}>Open Menu Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron_right"
+                  android_material_icon_name="chevron-right"
                   size={20}
                   color={managerColors.text}
                 />

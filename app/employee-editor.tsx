@@ -280,7 +280,7 @@ export default function EmployeeEditorScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
+            android_material_icon_name="arrow-back"
             size={24}
             color={managerColors.text}
           />
@@ -289,7 +289,7 @@ export default function EmployeeEditorScreen() {
         <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.addButton}>
           <IconSymbol
             ios_icon_name="plus.circle.fill"
-            android_material_icon_name="add_circle"
+            android_material_icon_name="add-circle"
             size={28}
             color={managerColors.highlight}
           />
@@ -348,7 +348,7 @@ export default function EmployeeEditorScreen() {
                     ) : (
                       <IconSymbol
                         ios_icon_name="person.circle.fill"
-                        android_material_icon_name="account_circle"
+                        android_material_icon_name="account-circle"
                         size={50}
                         color={managerColors.highlight}
                       />
@@ -378,7 +378,7 @@ export default function EmployeeEditorScreen() {
                   >
                     <IconSymbol
                       ios_icon_name={employee.is_active ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
-                      android_material_icon_name={employee.is_active ? 'check_circle' : 'cancel'}
+                      android_material_icon_name={employee.is_active ? 'check-circle' : 'cancel'}
                       size={36}
                       color={employee.is_active ? '#4CAF50' : '#F44336'}
                     />
