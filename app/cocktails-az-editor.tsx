@@ -120,6 +120,7 @@ export default function CocktailsAZEditorScreen() {
 
       if (!result.canceled && result.assets[0]) {
         setSelectedImageUri(result.assets[0].uri);
+        console.log('Image selected:', result.assets[0].uri);
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -130,12 +131,14 @@ export default function CocktailsAZEditorScreen() {
   const uploadImage = async (uri: string): Promise<string | null> => {
     try {
       setUploadingImage(true);
-      console.log('Starting image upload for cocktail');
+      console.log('Starting image upload for cocktail, URI:', uri);
 
       // Read the file as base64
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
+
+      console.log('File read as base64, length:', base64.length);
 
       // Convert base64 to Uint8Array
       const byteCharacters = atob(base64);
@@ -145,17 +148,21 @@ export default function CocktailsAZEditorScreen() {
       }
       const byteArray = new Uint8Array(byteNumbers);
 
+      console.log('Converted to byte array, size:', byteArray.length);
+
       // Get file extension
       const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${Date.now()}.${ext}`;
 
-      console.log('Uploading image:', fileName);
+      console.log('Uploading image with filename:', fileName);
 
       // Determine content type
       let contentType = 'image/jpeg';
       if (ext === 'png') contentType = 'image/png';
       else if (ext === 'gif') contentType = 'image/gif';
       else if (ext === 'webp') contentType = 'image/webp';
+
+      console.log('Content type:', contentType);
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
@@ -166,23 +173,24 @@ export default function CocktailsAZEditorScreen() {
         });
 
       if (error) {
-        console.error('Error uploading image:', error);
+        console.error('Error uploading image to storage:', error);
+        Alert.alert('Upload Error', `Failed to upload image: ${error.message}`);
         throw error;
       }
 
-      console.log('Upload successful:', data);
+      console.log('Upload successful, data:', data);
 
       // Get public URL
       const { data: urlData } = supabase.storage
         .from('cocktail-images')
         .getPublicUrl(fileName);
 
-      console.log('Public URL:', urlData.publicUrl);
+      console.log('Public URL generated:', urlData.publicUrl);
 
       return urlData.publicUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload image');
+    } catch (error: any) {
+      console.error('Error in uploadImage function:', error);
+      Alert.alert('Error', `Failed to upload image: ${error.message || 'Unknown error'}`);
       return null;
     } finally {
       setUploadingImage(false);
@@ -203,17 +211,28 @@ export default function CocktailsAZEditorScreen() {
     try {
       let thumbnailUrl = editingCocktail?.thumbnail_url || null;
 
+      console.log('Starting save process...');
+      console.log('Current thumbnail URL:', thumbnailUrl);
+      console.log('Selected image URI:', selectedImageUri);
+
       // Upload image if selected
       if (selectedImageUri) {
+        console.log('Uploading new image...');
         const uploadedUrl = await uploadImage(selectedImageUri);
         if (uploadedUrl) {
           thumbnailUrl = uploadedUrl;
-          console.log('New thumbnail URL:', thumbnailUrl);
+          console.log('New thumbnail URL set:', thumbnailUrl);
+        } else {
+          console.error('Image upload returned null');
+          Alert.alert('Warning', 'Image upload failed. Saving cocktail without image.');
         }
       }
 
+      console.log('Final thumbnail URL to save:', thumbnailUrl);
+
       if (editingCocktail) {
         // Update existing cocktail
+        console.log('Updating cocktail with ID:', editingCocktail.id);
         const { error } = await supabase.rpc('update_cocktail', {
           p_user_id: user.id,
           p_cocktail_id: editingCocktail.id,
@@ -229,10 +248,11 @@ export default function CocktailsAZEditorScreen() {
           console.error('Error updating cocktail:', error);
           throw error;
         }
-        console.log('Cocktail updated successfully');
+        console.log('Cocktail updated successfully with thumbnail URL:', thumbnailUrl);
         Alert.alert('Success', 'Cocktail updated successfully');
       } else {
         // Create new cocktail
+        console.log('Creating new cocktail...');
         const { error } = await supabase.rpc('create_cocktail', {
           p_user_id: user.id,
           p_name: formData.name,
@@ -247,7 +267,7 @@ export default function CocktailsAZEditorScreen() {
           console.error('Error creating cocktail:', error);
           throw error;
         }
-        console.log('Cocktail created successfully');
+        console.log('Cocktail created successfully with thumbnail URL:', thumbnailUrl);
         Alert.alert('Success', 'Cocktail created successfully');
       }
 
@@ -431,6 +451,17 @@ export default function CocktailsAZEditorScreen() {
                   <View style={styles.cocktailInfo}>
                     <Text style={styles.cocktailName}>{cocktail.name}</Text>
                     <Text style={styles.cocktailAlcoholType}>{cocktail.alcohol_type}</Text>
+                    {cocktail.thumbnail_url && (
+                      <View style={styles.thumbnailIndicator}>
+                        <IconSymbol
+                          ios_icon_name="photo"
+                          android_material_icon_name="image"
+                          size={16}
+                          color={managerColors.highlight}
+                        />
+                        <Text style={styles.thumbnailIndicatorText}>Has thumbnail</Text>
+                      </View>
+                    )}
                     <View style={styles.displayOrderBadge}>
                       <Text style={styles.displayOrderText}>Order: {cocktail.display_order}</Text>
                     </View>
@@ -575,6 +606,14 @@ export default function CocktailsAZEditorScreen() {
                     </View>
                   )}
                 </TouchableOpacity>
+                {selectedImageUri && (
+                  <TouchableOpacity 
+                    style={styles.removeImageButton}
+                    onPress={() => setSelectedImageUri(null)}
+                  >
+                    <Text style={styles.removeImageButtonText}>Remove Selected Image</Text>
+                  </TouchableOpacity>
+                )}
               </View>
 
               {/* Name */}
@@ -819,6 +858,17 @@ const styles = StyleSheet.create({
     color: managerColors.textSecondary,
     marginBottom: 8,
   },
+  thumbnailIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+  },
+  thumbnailIndicatorText: {
+    fontSize: 12,
+    color: managerColors.highlight,
+    fontWeight: '600',
+  },
   displayOrderBadge: {
     alignSelf: 'flex-start',
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
@@ -987,6 +1037,19 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 200,
     resizeMode: 'cover',
+  },
+  removeImageButton: {
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#FFE5E5',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  removeImageButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#E74C3C',
   },
   optionsScroll: {
     maxHeight: 50,
