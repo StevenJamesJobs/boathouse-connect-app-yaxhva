@@ -72,9 +72,9 @@ export default function BartenderAssistantEditorScreen() {
               </View>
               <TouchableOpacity 
                 style={styles.cardButton}
-                onPress={() => console.log('Cocktails A-Z Editor - Coming Soon')}
+                onPress={() => router.push('/cocktails-az-editor')}
               >
-                <Text style={styles.cardButtonText}>Coming Soon</Text>
+                <Text style={styles.cardButtonText}>Manage Cocktails</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
