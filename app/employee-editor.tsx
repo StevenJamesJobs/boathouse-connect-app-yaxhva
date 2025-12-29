@@ -32,8 +32,6 @@ interface Employee {
   profile_picture_url?: string;
 }
 
-type FilterType = 'all' | 'a-e' | 'f-i' | 'j-r' | 's-z' | 'inactive';
-
 const JOB_TITLE_OPTIONS = [
   'Banquets',
   'Bartender',
@@ -46,12 +44,15 @@ const JOB_TITLE_OPTIONS = [
   'Server',
 ];
 
+const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
 export default function EmployeeEditorScreen() {
   const router = useRouter();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -73,7 +74,7 @@ export default function EmployeeEditorScreen() {
 
   useEffect(() => {
     filterEmployees();
-  }, [employees, searchQuery, activeFilter]);
+  }, [employees, searchQuery, selectedLetter, showInactive]);
 
   const fetchEmployees = async () => {
     try {
@@ -96,6 +97,13 @@ export default function EmployeeEditorScreen() {
   const filterEmployees = () => {
     let filtered = [...employees];
 
+    // Apply active/inactive filter
+    if (showInactive) {
+      filtered = filtered.filter((emp) => !emp.is_active);
+    } else {
+      filtered = filtered.filter((emp) => emp.is_active);
+    }
+
     // Apply search filter
     if (searchQuery) {
       filtered = filtered.filter(
@@ -106,30 +114,11 @@ export default function EmployeeEditorScreen() {
       );
     }
 
-    // Apply alphabetical filter
-    if (activeFilter !== 'all' && activeFilter !== 'inactive') {
-      filtered = filtered.filter((emp) => {
-        const firstLetter = emp.name.charAt(0).toLowerCase();
-        switch (activeFilter) {
-          case 'a-e':
-            return firstLetter >= 'a' && firstLetter <= 'e';
-          case 'f-i':
-            return firstLetter >= 'f' && firstLetter <= 'i';
-          case 'j-r':
-            return firstLetter >= 'j' && firstLetter <= 'r';
-          case 's-z':
-            return firstLetter >= 's' && firstLetter <= 'z';
-          default:
-            return true;
-        }
-      });
-    }
-
-    // Apply inactive filter
-    if (activeFilter === 'inactive') {
-      filtered = filtered.filter((emp) => !emp.is_active);
-    } else {
-      filtered = filtered.filter((emp) => emp.is_active);
+    // Apply alphabetical filter by selected letter
+    if (selectedLetter) {
+      filtered = filtered.filter((emp) =>
+        emp.name.toUpperCase().startsWith(selectedLetter)
+      );
     }
 
     setFilteredEmployees(filtered);
@@ -247,20 +236,6 @@ export default function EmployeeEditorScreen() {
     return employee.job_title || 'No job title';
   };
 
-  const renderFilterButton = (filter: FilterType, label: string) => (
-    <TouchableOpacity
-      key={filter}
-      style={[styles.filterButton, activeFilter === filter && styles.filterButtonActive]}
-      onPress={() => setActiveFilter(filter)}
-    >
-      <Text
-        style={[styles.filterButtonText, activeFilter === filter && styles.filterButtonTextActive]}
-      >
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -311,84 +286,146 @@ export default function EmployeeEditorScreen() {
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <IconSymbol
+              ios_icon_name="xmark.circle.fill"
+              android_material_icon_name="cancel"
+              size={20}
+              color={managerColors.textSecondary}
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Filter Buttons - Made more compact */}
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false} 
-        style={styles.filterContainer}
-        contentContainerStyle={styles.filterContentContainer}
-      >
-        {renderFilterButton('all', 'All')}
-        {renderFilterButton('a-e', 'A-E')}
-        {renderFilterButton('f-i', 'F-I')}
-        {renderFilterButton('j-r', 'J-R')}
-        {renderFilterButton('s-z', 'S-Z')}
-        {renderFilterButton('inactive', 'Inactive')}
-      </ScrollView>
+      {/* Show Inactive Toggle */}
+      <View style={styles.toggleContainer}>
+        <TouchableOpacity
+          style={styles.toggleButton}
+          onPress={() => setShowInactive(!showInactive)}
+        >
+          <View style={[styles.toggleCheckbox, showInactive && styles.toggleCheckboxActive]}>
+            {showInactive && (
+              <IconSymbol
+                ios_icon_name="checkmark"
+                android_material_icon_name="check"
+                size={16}
+                color={managerColors.text}
+              />
+            )}
+          </View>
+          <Text style={styles.toggleLabel}>Show Inactive Employees</Text>
+        </TouchableOpacity>
+      </View>
 
-      {/* Employee List */}
-      <ScrollView style={styles.employeeList} contentContainerStyle={styles.employeeListContent}>
-        {filteredEmployees.length === 0 ? (
-          <Text style={styles.emptyText}>No employees found</Text>
-        ) : (
-          filteredEmployees.map((employee, index) => {
-            const profilePictureUrl = getProfilePictureUrl(employee.profile_picture_url);
-            
-            return (
-              <View key={index} style={styles.employeeCard}>
-                <View style={styles.employeeInfo}>
-                  <View style={styles.employeeAvatar}>
-                    {profilePictureUrl ? (
-                      <Image
-                        source={{ uri: profilePictureUrl }}
-                        style={styles.profileImage}
-                      />
-                    ) : (
+      {/* Content Container with List and Alphabet Nav */}
+      <View style={styles.contentContainer}>
+        {/* Employee List */}
+        <ScrollView style={styles.employeeList} contentContainerStyle={styles.employeeListContent}>
+          {filteredEmployees.length === 0 ? (
+            <Text style={styles.emptyText}>No employees found</Text>
+          ) : (
+            filteredEmployees.map((employee, index) => {
+              const profilePictureUrl = getProfilePictureUrl(employee.profile_picture_url);
+              
+              return (
+                <View key={index} style={styles.employeeCard}>
+                  <View style={styles.employeeInfo}>
+                    <View style={styles.employeeAvatar}>
+                      {profilePictureUrl ? (
+                        <Image
+                          source={{ uri: profilePictureUrl }}
+                          style={styles.profileImage}
+                        />
+                      ) : (
+                        <IconSymbol
+                          ios_icon_name="person.circle.fill"
+                          android_material_icon_name="account-circle"
+                          size={50}
+                          color={managerColors.highlight}
+                        />
+                      )}
+                    </View>
+                    <View style={styles.employeeDetails}>
+                      <Text style={styles.employeeName}>{employee.name}</Text>
+                      <Text style={styles.employeeRole}>{getJobTitlesDisplay(employee)}</Text>
+                      <Text style={styles.employeeUsername}>@{employee.username}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.employeeActions}>
+                    <TouchableOpacity
+                      style={styles.editButton}
+                      onPress={() => handleEditEmployee(employee)}
+                    >
                       <IconSymbol
-                        ios_icon_name="person.circle.fill"
-                        android_material_icon_name="account-circle"
-                        size={50}
+                        ios_icon_name="pencil.circle.fill"
+                        android_material_icon_name="edit"
+                        size={36}
                         color={managerColors.highlight}
                       />
-                    )}
-                  </View>
-                  <View style={styles.employeeDetails}>
-                    <Text style={styles.employeeName}>{employee.name}</Text>
-                    <Text style={styles.employeeRole}>{getJobTitlesDisplay(employee)}</Text>
-                    <Text style={styles.employeeUsername}>@{employee.username}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.statusButton}
+                      onPress={() => handleToggleActive(employee)}
+                    >
+                      <IconSymbol
+                        ios_icon_name={employee.is_active ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
+                        android_material_icon_name={employee.is_active ? 'check-circle' : 'cancel'}
+                        size={36}
+                        color={employee.is_active ? '#4CAF50' : '#F44336'}
+                      />
+                    </TouchableOpacity>
                   </View>
                 </View>
-                <View style={styles.employeeActions}>
-                  <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={() => handleEditEmployee(employee)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="pencil.circle.fill"
-                      android_material_icon_name="edit"
-                      size={36}
-                      color={managerColors.highlight}
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.statusButton}
-                    onPress={() => handleToggleActive(employee)}
-                  >
-                    <IconSymbol
-                      ios_icon_name={employee.is_active ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
-                      android_material_icon_name={employee.is_active ? 'check-circle' : 'cancel'}
-                      size={36}
-                      color={employee.is_active ? '#4CAF50' : '#F44336'}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            );
-          })
-        )}
-      </ScrollView>
+              );
+            })
+          )}
+        </ScrollView>
+
+        {/* Alphabetical Navigation Bar */}
+        <View style={styles.alphabetNav}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.alphabetNavContent}
+          >
+            <TouchableOpacity
+              style={[
+                styles.alphabetButton,
+                selectedLetter === null && styles.alphabetButtonActive,
+              ]}
+              onPress={() => setSelectedLetter(null)}
+            >
+              <Text
+                style={[
+                  styles.alphabetButtonText,
+                  selectedLetter === null && styles.alphabetButtonTextActive,
+                ]}
+              >
+                All
+              </Text>
+            </TouchableOpacity>
+            {ALPHABET.map((letter, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.alphabetButton,
+                  selectedLetter === letter && styles.alphabetButtonActive,
+                ]}
+                onPress={() => setSelectedLetter(letter)}
+              >
+                <Text
+                  style={[
+                    styles.alphabetButtonText,
+                    selectedLetter === letter && styles.alphabetButtonTextActive,
+                  ]}
+                >
+                  {letter}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
 
       {/* Add Employee Modal */}
       <Modal visible={showAddModal} animationType="slide" transparent>
@@ -589,44 +626,45 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: managerColors.text,
   },
-  filterContainer: {
-    marginTop: 12,
-    marginBottom: 8,
-    maxHeight: 50,
-  },
-  filterContentContainer: {
+  toggleContainer: {
     paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  toggleButton: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: managerColors.card,
-    marginRight: 8,
-    minWidth: 50,
+  toggleCheckbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: managerColors.highlight,
+    marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.2)',
-    elevation: 2,
+    backgroundColor: managerColors.card,
   },
-  filterButtonActive: {
+  toggleCheckboxActive: {
     backgroundColor: managerColors.highlight,
   },
-  filterButtonText: {
-    fontSize: 13,
+  toggleLabel: {
+    fontSize: 14,
     fontWeight: '600',
-    color: managerColors.textSecondary,
-  },
-  filterButtonTextActive: {
     color: managerColors.text,
+  },
+  contentContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    marginTop: 8,
   },
   employeeList: {
     flex: 1,
-    marginTop: 8,
+    paddingLeft: 16,
   },
   employeeListContent: {
-    paddingHorizontal: 16,
+    paddingRight: 8,
     paddingBottom: 100,
   },
   emptyText: {
@@ -691,6 +729,38 @@ const styles = StyleSheet.create({
   },
   statusButton: {
     padding: 4,
+  },
+  alphabetNav: {
+    width: 40,
+    backgroundColor: managerColors.card,
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+    marginRight: 16,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  alphabetNavContent: {
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  alphabetButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 2,
+    borderRadius: 16,
+  },
+  alphabetButtonActive: {
+    backgroundColor: managerColors.highlight,
+  },
+  alphabetButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: managerColors.textSecondary,
+  },
+  alphabetButtonTextActive: {
+    color: managerColors.text,
   },
   modalOverlay: {
     flex: 1,
