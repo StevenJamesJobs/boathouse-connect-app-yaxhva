@@ -1,13 +1,44 @@
 
 # Signature Recipes Setup Guide
 
-This guide explains how to set up the Signature Recipes feature for the McLoone's Boathouse Connect app.
+⚠️ **IMPORTANT: This file has been superseded by newer migration files!**
 
-## Database Migration
+Please use one of the following files instead:
 
-Run the following SQL in your Supabase SQL Editor to create the necessary tables, storage bucket, and functions:
+## Recommended Files:
+
+1. **SIGNATURE_RECIPES_FIX_GUIDE.md** - Start here! Complete guide to fixing all issues
+2. **SIGNATURE_RECIPES_MIGRATION.sql** - Complete migration script (run all at once)
+3. **SIGNATURE_RECIPES_STEP_BY_STEP.sql** - Step-by-step migration (for troubleshooting)
+4. **SIGNATURE_RECIPES_VS_MENU_ITEMS.md** - Explains the difference between the two tables
+
+## What's Fixed:
+
+✅ **Navigation buttons now work** - "Coming Soon" replaced with working links
+✅ **SQL policy error fixed** - Policies are dropped before being recreated
+✅ **Data migration included** - Template for copying Libations data
+✅ **Better documentation** - Step-by-step guides and troubleshooting
+
+## Quick Start:
+
+1. Read `SIGNATURE_RECIPES_FIX_GUIDE.md` first
+2. Run `SIGNATURE_RECIPES_MIGRATION.sql` in Supabase SQL Editor
+3. Verify the migration worked
+4. Add missing data (glassware, ingredients, procedures) through the app
+
+---
+
+## Original Setup Instructions (Deprecated)
+
+The original SQL below may cause errors if policies already exist. Use the new migration files instead.
+
+<details>
+<summary>Click to view original SQL (not recommended)</summary>
 
 ```sql
+-- This SQL is deprecated. Use SIGNATURE_RECIPES_MIGRATION.sql instead.
+-- Keeping this here for reference only.
+
 -- Create signature_recipes table
 CREATE TABLE IF NOT EXISTS signature_recipes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -29,6 +60,7 @@ CREATE TABLE IF NOT EXISTS signature_recipes (
 ALTER TABLE signature_recipes ENABLE ROW LEVEL SECURITY;
 
 -- Create RLS policies for signature_recipes
+-- WARNING: These will fail if policies already exist!
 CREATE POLICY "Anyone can view active signature recipes"
   ON signature_recipes FOR SELECT
   USING (is_active = true);
@@ -63,183 +95,18 @@ CREATE POLICY "Managers can delete signature recipes"
     )
   );
 
--- Create storage bucket for signature recipe images
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('signature-recipe-images', 'signature-recipe-images', true)
-ON CONFLICT (id) DO NOTHING;
-
--- Create RLS policies for signature-recipe-images bucket
-CREATE POLICY "Anyone can view signature recipe images"
-  ON storage.objects FOR SELECT
-  USING (bucket_id = 'signature-recipe-images');
-
-CREATE POLICY "Managers can upload signature recipe images"
-  ON storage.objects FOR INSERT
-  WITH CHECK (
-    bucket_id = 'signature-recipe-images'
-    AND EXISTS (
-      SELECT 1 FROM users
-      WHERE users.id = auth.uid()
-      AND users.role = 'manager'
-    )
-  );
-
-CREATE POLICY "Managers can update signature recipe images"
-  ON storage.objects FOR UPDATE
-  USING (
-    bucket_id = 'signature-recipe-images'
-    AND EXISTS (
-      SELECT 1 FROM users
-      WHERE users.id = auth.uid()
-      AND users.role = 'manager'
-    )
-  );
-
-CREATE POLICY "Managers can delete signature recipe images"
-  ON storage.objects FOR DELETE
-  USING (
-    bucket_id = 'signature-recipe-images'
-    AND EXISTS (
-      SELECT 1 FROM users
-      WHERE users.id = auth.uid()
-      AND users.role = 'manager'
-    )
-  );
-
--- Create database functions for CRUD operations
-CREATE OR REPLACE FUNCTION create_signature_recipe(
-  p_user_id UUID,
-  p_name TEXT,
-  p_price TEXT,
-  p_subcategory TEXT,
-  p_glassware TEXT,
-  p_ingredients JSONB,
-  p_procedure TEXT,
-  p_thumbnail_url TEXT,
-  p_display_order INTEGER
-)
-RETURNS UUID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_recipe_id UUID;
-  v_is_manager BOOLEAN;
-BEGIN
-  -- Check if user is a manager
-  SELECT role = 'manager' INTO v_is_manager
-  FROM users
-  WHERE id = p_user_id;
-
-  IF NOT v_is_manager THEN
-    RAISE EXCEPTION 'Only managers can create signature recipes';
-  END IF;
-
-  -- Insert the signature recipe
-  INSERT INTO signature_recipes (
-    name,
-    price,
-    subcategory,
-    glassware,
-    ingredients,
-    procedure,
-    thumbnail_url,
-    display_order,
-    created_by
-  )
-  VALUES (
-    p_name,
-    p_price,
-    p_subcategory,
-    p_glassware,
-    p_ingredients,
-    p_procedure,
-    p_thumbnail_url,
-    p_display_order,
-    p_user_id
-  )
-  RETURNING id INTO v_recipe_id;
-
-  RETURN v_recipe_id;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION update_signature_recipe(
-  p_user_id UUID,
-  p_recipe_id UUID,
-  p_name TEXT,
-  p_price TEXT,
-  p_subcategory TEXT,
-  p_glassware TEXT,
-  p_ingredients JSONB,
-  p_procedure TEXT,
-  p_thumbnail_url TEXT,
-  p_display_order INTEGER
-)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_is_manager BOOLEAN;
-BEGIN
-  -- Check if user is a manager
-  SELECT role = 'manager' INTO v_is_manager
-  FROM users
-  WHERE id = p_user_id;
-
-  IF NOT v_is_manager THEN
-    RAISE EXCEPTION 'Only managers can update signature recipes';
-  END IF;
-
-  -- Update the signature recipe
-  UPDATE signature_recipes
-  SET
-    name = p_name,
-    price = p_price,
-    subcategory = p_subcategory,
-    glassware = p_glassware,
-    ingredients = p_ingredients,
-    procedure = p_procedure,
-    thumbnail_url = p_thumbnail_url,
-    display_order = p_display_order,
-    updated_at = NOW()
-  WHERE id = p_recipe_id;
-END;
-$$;
-
-CREATE OR REPLACE FUNCTION delete_signature_recipe(
-  p_user_id UUID,
-  p_recipe_id UUID
-)
-RETURNS VOID
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_is_manager BOOLEAN;
-BEGIN
-  -- Check if user is a manager
-  SELECT role = 'manager' INTO v_is_manager
-  FROM users
-  WHERE id = p_user_id;
-
-  IF NOT v_is_manager THEN
-    RAISE EXCEPTION 'Only managers can delete signature recipes';
-  END IF;
-
-  -- Delete the signature recipe
-  DELETE FROM signature_recipes
-  WHERE id = p_recipe_id;
-END;
-$$;
+-- ... (rest of original SQL omitted for brevity)
 ```
+
+</details>
+
+---
 
 ## Features Implemented
 
 ### Signature Recipes Page (Employee & Manager View)
 
-- **2-Column Tile View**: Displays cocktails in a 2-column grid layout similar to the reference image
+- **2-Column Tile View**: Displays cocktails in a 2-column grid layout
 - **Category Grouping**: Recipes are grouped by category with headers (Signature Cocktails, Martinis, Sangria, Low ABV, Zero ABV)
 - **Thumbnail Display**: Shows cocktail thumbnail with name and price overlaid on the image
 - **Placeholder Image**: Uses a default cocktail image from Unsplash if no thumbnail is uploaded

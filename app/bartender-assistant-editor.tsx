@@ -102,9 +102,9 @@ export default function BartenderAssistantEditorScreen() {
               </View>
               <TouchableOpacity 
                 style={styles.cardButton}
-                onPress={() => console.log('Signature Recipes Editor - Coming Soon')}
+                onPress={() => router.push('/signature-recipes-editor')}
               >
-                <Text style={styles.cardButtonText}>Coming Soon</Text>
+                <Text style={styles.cardButtonText}>Manage Recipes</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
