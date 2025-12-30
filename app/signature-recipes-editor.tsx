@@ -299,31 +299,21 @@ export default function SignatureRecipesEditorScreen() {
       console.log('Final thumbnail URL to save:', thumbnailUrl);
       console.log('Valid ingredients:', validIngredients);
 
-      // Prepare the data object
-      const recipeData = {
-        name: formData.name,
-        price: formData.price,
-        subcategory: formData.subcategory,
-        glassware: formData.glassware || null,
-        ingredients: validIngredients, // Send as array, Supabase will convert to JSONB
-        procedure: formData.procedure || '',
-        thumbnail_url: thumbnailUrl,
-        display_order: formData.display_order,
-        is_active: true,
-      };
-
-      console.log('Recipe data to save:', recipeData);
-
       if (editingRecipe) {
-        // Update existing recipe
+        // Update existing recipe using RPC function
         console.log('Updating recipe with ID:', editingRecipe.id);
-        const { error } = await supabase
-          .from('signature_recipes')
-          .update({
-            ...recipeData,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', editingRecipe.id);
+        const { data, error } = await supabase.rpc('update_signature_recipe', {
+          p_user_id: user.id,
+          p_recipe_id: editingRecipe.id,
+          p_name: formData.name,
+          p_price: formData.price,
+          p_subcategory: formData.subcategory,
+          p_glassware: formData.glassware || null,
+          p_ingredients: validIngredients,
+          p_procedure: formData.procedure || '',
+          p_thumbnail_url: thumbnailUrl,
+          p_display_order: formData.display_order,
+        });
 
         if (error) {
           console.error('Error updating recipe:', error);
@@ -332,14 +322,19 @@ export default function SignatureRecipesEditorScreen() {
         console.log('Recipe updated successfully');
         Alert.alert('Success', 'Recipe updated successfully');
       } else {
-        // Create new recipe
+        // Create new recipe using RPC function
         console.log('Creating new recipe...');
-        const { error } = await supabase
-          .from('signature_recipes')
-          .insert({
-            ...recipeData,
-            created_by: user.id,
-          });
+        const { data, error } = await supabase.rpc('create_signature_recipe', {
+          p_user_id: user.id,
+          p_name: formData.name,
+          p_price: formData.price,
+          p_subcategory: formData.subcategory,
+          p_glassware: formData.glassware || null,
+          p_ingredients: validIngredients,
+          p_procedure: formData.procedure || '',
+          p_thumbnail_url: thumbnailUrl,
+          p_display_order: formData.display_order,
+        });
 
         if (error) {
           console.error('Error creating recipe:', error);
@@ -373,11 +368,11 @@ export default function SignatureRecipesEditorScreen() {
                 return;
               }
 
-              // Delete the recipe
-              const { error } = await supabase
-                .from('signature_recipes')
-                .delete()
-                .eq('id', recipe.id);
+              // Delete the recipe using RPC function
+              const { error } = await supabase.rpc('delete_signature_recipe', {
+                p_user_id: user.id,
+                p_recipe_id: recipe.id,
+              });
 
               if (error) {
                 console.error('Error deleting recipe:', error);
