@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   ActivityIndicator,
   Modal,
   Image,
@@ -17,13 +16,18 @@ import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 
+interface Ingredient {
+  ingredient: string;
+  amount: string;
+}
+
 interface SignatureRecipe {
   id: string;
   name: string;
-  description: string | null;
   price: string;
   subcategory: string | null;
-  ingredients: string;
+  glassware: string | null;
+  ingredients: Ingredient[];
   procedure: string;
   thumbnail_url: string | null;
   display_order: number;
@@ -31,24 +35,18 @@ interface SignatureRecipe {
 }
 
 const SUBCATEGORIES = ['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV'];
+const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=400&h=400&fit=crop';
 
 export default function SignatureRecipesScreen() {
   const router = useRouter();
   const [recipes, setRecipes] = useState<SignatureRecipe[]>([]);
-  const [filteredRecipes, setFilteredRecipes] = useState<SignatureRecipe[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [selectedRecipe, setSelectedRecipe] = useState<SignatureRecipe | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
   useEffect(() => {
     loadRecipes();
   }, []);
-
-  useEffect(() => {
-    filterRecipes();
-  }, [recipes, searchQuery, selectedSubcategory]);
 
   const loadRecipes = async () => {
     try {
@@ -57,7 +55,8 @@ export default function SignatureRecipesScreen() {
         .from('signature_recipes')
         .select('*')
         .eq('is_active', true)
-        .order('display_order', { ascending: true });
+        .order('display_order', { ascending: true })
+        .order('name', { ascending: true });
 
       if (error) throw error;
       console.log('Loaded signature recipes:', data);
@@ -67,28 +66,6 @@ export default function SignatureRecipesScreen() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const filterRecipes = () => {
-    let filtered = recipes;
-
-    // Filter by subcategory
-    if (selectedSubcategory) {
-      filtered = filtered.filter(recipe => recipe.subcategory === selectedSubcategory);
-    }
-
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        recipe =>
-          recipe.name.toLowerCase().includes(query) ||
-          (recipe.description && recipe.description.toLowerCase().includes(query)) ||
-          recipe.ingredients.toLowerCase().includes(query)
-      );
-    }
-
-    setFilteredRecipes(filtered);
   };
 
   const openDetailModal = (recipe: SignatureRecipe) => {
@@ -107,7 +84,7 @@ export default function SignatureRecipesScreen() {
 
   // Helper function to get image URL with cache busting
   const getImageUrl = (url: string | null) => {
-    if (!url) return null;
+    if (!url) return PLACEHOLDER_IMAGE;
     return `${url}?t=${Date.now()}`;
   };
 
@@ -118,6 +95,12 @@ export default function SignatureRecipesScreen() {
     }
     return `$${price}`;
   };
+
+  // Group recipes by subcategory
+  const groupedRecipes = SUBCATEGORIES.map(category => ({
+    category,
+    recipes: recipes.filter(recipe => recipe.subcategory === category),
+  })).filter(group => group.recipes.length > 0);
 
   return (
     <View style={styles.container}>
@@ -135,77 +118,6 @@ export default function SignatureRecipesScreen() {
         <View style={styles.backButton} />
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <IconSymbol
-          ios_icon_name="magnifyingglass"
-          android_material_icon_name="search"
-          size={20}
-          color={employeeColors.textSecondary}
-        />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search recipes..."
-          placeholderTextColor={employeeColors.textSecondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <IconSymbol
-              ios_icon_name="xmark.circle.fill"
-              android_material_icon_name="cancel"
-              size={20}
-              color={employeeColors.textSecondary}
-            />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Subcategory Tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.subcategoryScroll}
-        contentContainerStyle={styles.subcategoryScrollContent}
-      >
-        <TouchableOpacity
-          style={[
-            styles.subcategoryTab,
-            selectedSubcategory === null && styles.subcategoryTabActive,
-          ]}
-          onPress={() => setSelectedSubcategory(null)}
-        >
-          <Text
-            style={[
-              styles.subcategoryTabText,
-              selectedSubcategory === null && styles.subcategoryTabTextActive,
-            ]}
-          >
-            All
-          </Text>
-        </TouchableOpacity>
-        {SUBCATEGORIES.map((subcategory, index) => (
-          <TouchableOpacity
-            key={index}
-            style={[
-              styles.subcategoryTab,
-              selectedSubcategory === subcategory && styles.subcategoryTabActive,
-            ]}
-            onPress={() => setSelectedSubcategory(subcategory)}
-          >
-            <Text
-              style={[
-                styles.subcategoryTabText,
-                selectedSubcategory === subcategory && styles.subcategoryTabTextActive,
-              ]}
-            >
-              {subcategory}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
       {/* Recipes Grid */}
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -213,7 +125,7 @@ export default function SignatureRecipesScreen() {
         </View>
       ) : (
         <ScrollView style={styles.recipesList} contentContainerStyle={styles.recipesListContent}>
-          {filteredRecipes.length === 0 ? (
+          {groupedRecipes.length === 0 ? (
             <View style={styles.emptyContainer}>
               <IconSymbol
                 ios_icon_name="wineglass"
@@ -221,49 +133,41 @@ export default function SignatureRecipesScreen() {
                 size={64}
                 color={employeeColors.textSecondary}
               />
-              <Text style={styles.emptyText}>No recipes found</Text>
+              <Text style={styles.emptyText}>No recipes available</Text>
               <Text style={styles.emptySubtext}>
-                Try adjusting your search or filter
+                Check back later for signature cocktail recipes
               </Text>
             </View>
           ) : (
-            <View style={styles.recipesGrid}>
-              {filteredRecipes.map((recipe, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.recipeCard}
-                  onPress={() => openDetailModal(recipe)}
-                >
-                  {recipe.thumbnail_url ? (
-                    <Image
-                      source={{ uri: getImageUrl(recipe.thumbnail_url) }}
-                      style={styles.recipeImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={styles.recipePlaceholder}>
-                      <IconSymbol
-                        ios_icon_name="wineglass"
-                        android_material_icon_name="local-bar"
-                        size={48}
-                        color={employeeColors.textSecondary}
+            groupedRecipes.map((group, groupIndex) => (
+              <React.Fragment key={groupIndex}>
+                {/* Category Header */}
+                <Text style={styles.categoryHeader}>{group.category}</Text>
+
+                {/* 2-Column Grid for this category */}
+                <View style={styles.recipesGrid}>
+                  {group.recipes.map((recipe, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.recipeCard}
+                      onPress={() => openDetailModal(recipe)}
+                    >
+                      <Image
+                        source={{ uri: getImageUrl(recipe.thumbnail_url) }}
+                        style={styles.recipeImage}
+                        resizeMode="cover"
                       />
-                    </View>
-                  )}
-                  <View style={styles.recipeInfo}>
-                    <Text style={styles.recipeName} numberOfLines={2}>
-                      {recipe.name}
-                    </Text>
-                    {recipe.subcategory && (
-                      <View style={styles.subcategoryBadge}>
-                        <Text style={styles.subcategoryBadgeText}>{recipe.subcategory}</Text>
+                      <View style={styles.recipeOverlay}>
+                        <Text style={styles.recipeName} numberOfLines={2}>
+                          {recipe.name}
+                        </Text>
+                        <Text style={styles.recipePrice}>{formatPrice(recipe.price)}</Text>
                       </View>
-                    )}
-                    <Text style={styles.recipePrice}>{formatPrice(recipe.price)}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </React.Fragment>
+            ))
           )}
         </ScrollView>
       )}
@@ -299,37 +203,60 @@ export default function SignatureRecipesScreen() {
               contentContainerStyle={styles.modalScrollContent}
               showsVerticalScrollIndicator={true}
             >
-              {selectedRecipe?.thumbnail_url && (
-                <Image
-                  source={{ uri: getImageUrl(selectedRecipe.thumbnail_url) }}
-                  style={styles.modalImage}
-                  resizeMode="cover"
-                />
-              )}
+              {/* Thumbnail Image */}
+              <Image
+                source={{ uri: getImageUrl(selectedRecipe?.thumbnail_url || null) }}
+                style={styles.modalImage}
+                resizeMode="cover"
+              />
 
+              {/* Name, Price, and Glassware */}
               <View style={styles.detailSection}>
-                <View style={styles.detailHeader}>
-                  {selectedRecipe?.subcategory && (
-                    <View style={styles.modalSubcategoryBadge}>
-                      <Text style={styles.modalSubcategoryText}>{selectedRecipe.subcategory}</Text>
+                <Text style={styles.modalRecipeName}>{selectedRecipe?.name}</Text>
+                <View style={styles.priceGlasswareRow}>
+                  <Text style={styles.modalPrice}>{formatPrice(selectedRecipe?.price || '')}</Text>
+                  {selectedRecipe?.glassware && (
+                    <View style={styles.glasswareBadge}>
+                      <IconSymbol
+                        ios_icon_name="wineglass"
+                        android_material_icon_name="local-bar"
+                        size={16}
+                        color="#666666"
+                      />
+                      <Text style={styles.glasswareText}>{selectedRecipe.glassware}</Text>
                     </View>
                   )}
-                  <Text style={styles.modalPrice}>{formatPrice(selectedRecipe?.price || '')}</Text>
                 </View>
-                {selectedRecipe?.description && (
-                  <Text style={styles.modalDescription}>{selectedRecipe.description}</Text>
-                )}
               </View>
 
+              {/* Ingredients Section */}
               <View style={styles.detailSection}>
                 <Text style={styles.detailLabel}>Ingredients</Text>
-                <Text style={styles.detailText}>{selectedRecipe?.ingredients}</Text>
+                <View style={styles.ingredientsList}>
+                  {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
+                    selectedRecipe.ingredients.map((item, index) => (
+                      <View key={index} style={styles.ingredientItem}>
+                        <View style={styles.ingredientBullet} />
+                        <View style={styles.ingredientContent}>
+                          <Text style={styles.ingredientAmount}>{item.amount}</Text>
+                          <Text style={styles.ingredientName}>{item.ingredient}</Text>
+                        </View>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.detailText}>No ingredients listed</Text>
+                  )}
+                </View>
               </View>
 
+              {/* Procedure Section */}
               <View style={styles.detailSection}>
                 <Text style={styles.detailLabel}>Procedure</Text>
-                <Text style={styles.detailText}>{selectedRecipe?.procedure}</Text>
+                <Text style={styles.detailText}>{selectedRecipe?.procedure || 'No procedure listed'}</Text>
               </View>
+
+              {/* Extra padding at bottom for iOS/Android */}
+              <View style={styles.bottomPadding} />
             </ScrollView>
           </View>
         </View>
@@ -363,50 +290,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: employeeColors.text,
   },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: employeeColors.card,
-    marginHorizontal: 16,
-    marginTop: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-    color: employeeColors.text,
-  },
-  subcategoryScroll: {
-    marginTop: 12,
-    maxHeight: 50,
-  },
-  subcategoryScrollContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  subcategoryTab: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: employeeColors.card,
-    marginRight: 8,
-  },
-  subcategoryTabActive: {
-    backgroundColor: employeeColors.primary,
-  },
-  subcategoryTabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: employeeColors.textSecondary,
-  },
-  subcategoryTabTextActive: {
-    color: employeeColors.text,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -414,10 +297,10 @@ const styles = StyleSheet.create({
   },
   recipesList: {
     flex: 1,
-    marginTop: 16,
   },
   recipesListContent: {
     paddingHorizontal: 16,
+    paddingTop: 20,
     paddingBottom: 100,
   },
   emptyContainer: {
@@ -438,11 +321,19 @@ const styles = StyleSheet.create({
     marginTop: 8,
     textAlign: 'center',
   },
+  categoryHeader: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: employeeColors.text,
+    marginBottom: 16,
+    marginTop: 8,
+  },
   recipesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 16,
     justifyContent: 'space-between',
+    marginBottom: 24,
   },
   recipeCard: {
     width: '48%',
@@ -451,45 +342,30 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
+    position: 'relative',
   },
   recipeImage: {
     width: '100%',
-    height: 150,
+    height: 180,
   },
-  recipePlaceholder: {
-    width: '100%',
-    height: 150,
-    backgroundColor: employeeColors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  recipeInfo: {
+  recipeOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 12,
   },
   recipeName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: employeeColors.text,
-    marginBottom: 8,
-    minHeight: 40,
-  },
-  subcategoryBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: employeeColors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    marginBottom: 8,
-  },
-  subcategoryBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: employeeColors.text,
+    color: '#FFFFFF',
+    marginBottom: 4,
   },
   recipePrice: {
     fontSize: 14,
     fontWeight: '600',
-    color: employeeColors.primary,
+    color: employeeColors.highlight,
   },
   modalContainer: {
     flex: 1,
@@ -534,56 +410,89 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalScrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 60,
   },
   modalImage: {
     width: '100%',
-    height: 250,
-    borderRadius: 16,
-    marginBottom: 24,
+    height: 280,
   },
   detailSection: {
-    marginBottom: 24,
+    paddingHorizontal: 20,
+    paddingTop: 24,
   },
-  detailHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  modalRecipeName: {
+    fontSize: 26,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
     marginBottom: 12,
   },
-  modalSubcategoryBadge: {
-    backgroundColor: employeeColors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  modalSubcategoryText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: employeeColors.text,
+  priceGlasswareRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   modalPrice: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: employeeColors.primary,
   },
-  modalDescription: {
-    fontSize: 15,
+  glasswareBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    gap: 6,
+  },
+  glasswareText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: '#666666',
-    lineHeight: 22,
-    marginTop: 8,
   },
   detailLabel: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#1A1A1A',
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  ingredientsList: {
+    gap: 10,
+  },
+  ingredientItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  ingredientBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: employeeColors.primary,
+    marginTop: 8,
+  },
+  ingredientContent: {
+    flex: 1,
+  },
+  ingredientAmount: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: employeeColors.primary,
+    marginBottom: 2,
+  },
+  ingredientName: {
+    fontSize: 15,
+    color: '#333333',
+    lineHeight: 22,
   },
   detailText: {
     fontSize: 15,
     color: '#333333',
     lineHeight: 24,
     whiteSpace: 'pre-line',
+  },
+  bottomPadding: {
+    height: 40,
   },
 });

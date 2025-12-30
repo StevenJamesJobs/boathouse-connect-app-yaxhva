@@ -22,13 +22,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 
+interface Ingredient {
+  ingredient: string;
+  amount: string;
+}
+
 interface SignatureRecipe {
   id: string;
   name: string;
-  description: string | null;
   price: string;
   subcategory: string | null;
-  ingredients: string;
+  glassware: string | null;
+  ingredients: Ingredient[];
   procedure: string;
   thumbnail_url: string | null;
   display_order: number;
@@ -51,13 +56,13 @@ export default function SignatureRecipesEditorScreen() {
   // Form state
   const [formData, setFormData] = useState({
     name: '',
-    description: '',
     price: '',
     subcategory: 'Signature Cocktails',
-    ingredients: '',
+    glassware: '',
     procedure: '',
     display_order: 0,
   });
+  const [ingredients, setIngredients] = useState<Ingredient[]>([{ ingredient: '', amount: '' }]);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
 
@@ -75,7 +80,8 @@ export default function SignatureRecipesEditorScreen() {
       const { data, error } = await supabase
         .from('signature_recipes')
         .select('*')
-        .order('display_order', { ascending: true });
+        .order('display_order', { ascending: true })
+        .order('name', { ascending: true });
 
       if (error) throw error;
       console.log('Loaded signature recipes:', data);
@@ -102,8 +108,11 @@ export default function SignatureRecipesEditorScreen() {
       filtered = filtered.filter(
         recipe =>
           recipe.name.toLowerCase().includes(query) ||
-          (recipe.description && recipe.description.toLowerCase().includes(query)) ||
-          recipe.ingredients.toLowerCase().includes(query)
+          (recipe.glassware && recipe.glassware.toLowerCase().includes(query)) ||
+          recipe.ingredients.some(ing => 
+            ing.ingredient.toLowerCase().includes(query) || 
+            ing.amount.toLowerCase().includes(query)
+          )
       );
     }
 
@@ -198,9 +207,34 @@ export default function SignatureRecipesEditorScreen() {
     }
   };
 
+  const addIngredient = () => {
+    setIngredients([...ingredients, { ingredient: '', amount: '' }]);
+  };
+
+  const removeIngredient = (index: number) => {
+    if (ingredients.length > 1) {
+      const newIngredients = ingredients.filter((_, i) => i !== index);
+      setIngredients(newIngredients);
+    }
+  };
+
+  const updateIngredient = (index: number, field: 'ingredient' | 'amount', value: string) => {
+    const newIngredients = [...ingredients];
+    newIngredients[index][field] = value;
+    setIngredients(newIngredients);
+  };
+
   const handleSave = async () => {
-    if (!formData.name || !formData.price || !formData.ingredients || !formData.procedure) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    // Validate required fields
+    if (!formData.name || !formData.price || !formData.procedure) {
+      Alert.alert('Error', 'Please fill in Name, Price, and Procedure');
+      return;
+    }
+
+    // Validate ingredients
+    const validIngredients = ingredients.filter(ing => ing.ingredient.trim() && ing.amount.trim());
+    if (validIngredients.length === 0) {
+      Alert.alert('Error', 'Please add at least one ingredient with amount');
       return;
     }
 
@@ -238,10 +272,10 @@ export default function SignatureRecipesEditorScreen() {
           p_user_id: user.id,
           p_recipe_id: editingRecipe.id,
           p_name: formData.name,
-          p_description: formData.description || null,
           p_price: formData.price,
           p_subcategory: formData.subcategory,
-          p_ingredients: formData.ingredients,
+          p_glassware: formData.glassware || null,
+          p_ingredients: JSON.stringify(validIngredients),
           p_procedure: formData.procedure,
           p_thumbnail_url: thumbnailUrl,
           p_display_order: formData.display_order,
@@ -259,10 +293,10 @@ export default function SignatureRecipesEditorScreen() {
         const { error } = await supabase.rpc('create_signature_recipe', {
           p_user_id: user.id,
           p_name: formData.name,
-          p_description: formData.description || null,
           p_price: formData.price,
           p_subcategory: formData.subcategory,
-          p_ingredients: formData.ingredients,
+          p_glassware: formData.glassware || null,
+          p_ingredients: JSON.stringify(validIngredients),
           p_procedure: formData.procedure,
           p_thumbnail_url: thumbnailUrl,
           p_display_order: formData.display_order,
@@ -337,13 +371,13 @@ export default function SignatureRecipesEditorScreen() {
     setEditingRecipe(null);
     setFormData({
       name: '',
-      description: '',
       price: '',
       subcategory: selectedSubcategory || 'Signature Cocktails',
-      ingredients: '',
+      glassware: '',
       procedure: '',
       display_order: 0,
     });
+    setIngredients([{ ingredient: '', amount: '' }]);
     setSelectedImageUri(null);
     setShowAddModal(true);
   };
@@ -352,13 +386,13 @@ export default function SignatureRecipesEditorScreen() {
     setEditingRecipe(recipe);
     setFormData({
       name: recipe.name,
-      description: recipe.description || '',
       price: recipe.price,
       subcategory: recipe.subcategory || 'Signature Cocktails',
-      ingredients: recipe.ingredients,
+      glassware: recipe.glassware || '',
       procedure: recipe.procedure,
       display_order: recipe.display_order,
     });
+    setIngredients(recipe.ingredients.length > 0 ? recipe.ingredients : [{ ingredient: '', amount: '' }]);
     setSelectedImageUri(null);
     setShowAddModal(true);
   };
@@ -524,6 +558,17 @@ export default function SignatureRecipesEditorScreen() {
                         <Text style={styles.subcategoryBadgeText}>{recipe.subcategory}</Text>
                       </View>
                     )}
+                    {recipe.glassware && (
+                      <View style={styles.glasswareBadge}>
+                        <IconSymbol
+                          ios_icon_name="wineglass"
+                          android_material_icon_name="local-bar"
+                          size={14}
+                          color={managerColors.textSecondary}
+                        />
+                        <Text style={styles.glasswareText}>{recipe.glassware}</Text>
+                      </View>
+                    )}
                     {recipe.thumbnail_url && (
                       <View style={styles.thumbnailIndicator}>
                         <IconSymbol
@@ -657,20 +702,6 @@ export default function SignatureRecipesEditorScreen() {
                 />
               </View>
 
-              {/* Description */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Description</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="Enter description"
-                  placeholderTextColor="#999999"
-                  value={formData.description}
-                  onChangeText={(text) => setFormData({ ...formData, description: text })}
-                  multiline
-                  numberOfLines={3}
-                />
-              </View>
-
               {/* Price */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Price *</Text>
@@ -713,32 +744,77 @@ export default function SignatureRecipesEditorScreen() {
                 </ScrollView>
               </View>
 
+              {/* Glassware */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Glassware</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., Martini glass, Rocks glass"
+                  placeholderTextColor="#999999"
+                  value={formData.glassware}
+                  onChangeText={(text) => setFormData({ ...formData, glassware: text })}
+                />
+              </View>
+
               {/* Ingredients */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Ingredients *</Text>
                 <Text style={styles.formHint}>
-                  Enter each ingredient on a separate line with measurements
+                  Add each ingredient with its amount
                 </Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="e.g., 2 oz. vodka&#10;1 oz. sour apple liqueur&#10;0.25 oz. lemon juice"
-                  placeholderTextColor="#999999"
-                  value={formData.ingredients}
-                  onChangeText={(text) => setFormData({ ...formData, ingredients: text })}
-                  multiline
-                  numberOfLines={6}
-                />
+                {ingredients.map((ingredient, index) => (
+                  <View key={index} style={styles.ingredientRow}>
+                    <View style={styles.ingredientInputs}>
+                      <TextInput
+                        style={[styles.input, styles.ingredientAmountInput]}
+                        placeholder="Amount"
+                        placeholderTextColor="#999999"
+                        value={ingredient.amount}
+                        onChangeText={(text) => updateIngredient(index, 'amount', text)}
+                      />
+                      <TextInput
+                        style={[styles.input, styles.ingredientNameInput]}
+                        placeholder="Ingredient"
+                        placeholderTextColor="#999999"
+                        value={ingredient.ingredient}
+                        onChangeText={(text) => updateIngredient(index, 'ingredient', text)}
+                      />
+                    </View>
+                    {ingredients.length > 1 && (
+                      <TouchableOpacity
+                        style={styles.removeIngredientButton}
+                        onPress={() => removeIngredient(index)}
+                      >
+                        <IconSymbol
+                          ios_icon_name="minus.circle.fill"
+                          android_material_icon_name="remove-circle"
+                          size={24}
+                          color="#E74C3C"
+                        />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                <TouchableOpacity style={styles.addIngredientButton} onPress={addIngredient}>
+                  <IconSymbol
+                    ios_icon_name="plus.circle.fill"
+                    android_material_icon_name="add-circle"
+                    size={20}
+                    color={managerColors.highlight}
+                  />
+                  <Text style={styles.addIngredientButtonText}>Add Ingredient</Text>
+                </TouchableOpacity>
               </View>
 
               {/* Procedure */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Procedure *</Text>
                 <Text style={styles.formHint}>
-                  Enter the preparation instructions, glass type, and garnish
+                  Enter the preparation instructions
                 </Text>
                 <TextInput
                   style={[styles.input, styles.textArea]}
-                  placeholder="e.g., - shake w/ ice, strain&#10;*Glass: martini&#10;*Garnish: cherry"
+                  placeholder="e.g., Shake with ice and strain into glass. Garnish with cherry."
                   placeholderTextColor="#999999"
                   value={formData.procedure}
                   onChangeText={(text) => setFormData({ ...formData, procedure: text })}
@@ -953,12 +1029,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    marginBottom: 8,
+    marginBottom: 6,
   },
   subcategoryBadgeText: {
     fontSize: 12,
     fontWeight: '600',
     color: managerColors.text,
+  },
+  glasswareBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginBottom: 6,
+  },
+  glasswareText: {
+    fontSize: 12,
+    color: managerColors.textSecondary,
   },
   thumbnailIndicator: {
     flexDirection: 'row',
@@ -1120,6 +1206,44 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#E74C3C',
+  },
+  ingredientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  ingredientInputs: {
+    flex: 1,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  ingredientAmountInput: {
+    flex: 1,
+  },
+  ingredientNameInput: {
+    flex: 2,
+  },
+  removeIngredientButton: {
+    padding: 4,
+  },
+  addIngredientButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    gap: 8,
+    marginTop: 8,
+  },
+  addIngredientButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: managerColors.highlight,
   },
   optionsScroll: {
     maxHeight: 50,
