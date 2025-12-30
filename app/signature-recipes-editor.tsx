@@ -178,40 +178,52 @@ export default function SignatureRecipesEditorScreen() {
   const uploadImage = async (uri: string): Promise<string | null> => {
     try {
       setUploadingImage(true);
-      console.log('Starting image upload for signature recipe, URI:', uri);
+      console.log('=== STARTING IMAGE UPLOAD FOR SIGNATURE RECIPE ===');
+      console.log('Image URI:', uri);
+      console.log('User ID:', user?.id);
+
+      // Check if user is authenticated
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('Session exists:', !!session);
+      console.log('Session user:', session?.user?.id);
+
+      if (!session) {
+        console.error('No active session found');
+        Alert.alert('Error', 'You must be logged in to upload images');
+        return null;
+      }
 
       // Read the file as base64
+      console.log('Reading file as base64...');
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
-
-      console.log('File read as base64, length:', base64.length);
+      console.log('File read successfully, base64 length:', base64.length);
 
       // Convert base64 to Uint8Array
+      console.log('Converting to byte array...');
       const byteCharacters = atob(base64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
         byteNumbers[i] = byteCharacters.charCodeAt(i);
       }
       const byteArray = new Uint8Array(byteNumbers);
-
-      console.log('Converted to byte array, size:', byteArray.length);
+      console.log('Byte array created, size:', byteArray.length);
 
       // Get file extension
       const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${Date.now()}.${ext}`;
-
-      console.log('Uploading image with filename:', fileName);
+      console.log('Generated filename:', fileName);
 
       // Determine content type
       let contentType = 'image/jpeg';
       if (ext === 'png') contentType = 'image/png';
       else if (ext === 'gif') contentType = 'image/gif';
       else if (ext === 'webp') contentType = 'image/webp';
-
       console.log('Content type:', contentType);
 
       // Upload to Supabase Storage
+      console.log('Uploading to Supabase storage bucket: signature-recipe-images');
       const { data, error } = await supabase.storage
         .from('signature-recipe-images')
         .upload(fileName, byteArray, {
@@ -220,12 +232,15 @@ export default function SignatureRecipesEditorScreen() {
         });
 
       if (error) {
-        console.error('Error uploading image to storage:', error);
+        console.error('=== STORAGE UPLOAD ERROR ===');
+        console.error('Error code:', error.message);
+        console.error('Error details:', JSON.stringify(error, null, 2));
         Alert.alert('Upload Error', `Failed to upload image: ${error.message}`);
-        throw error;
+        return null;
       }
 
-      console.log('Upload successful, data:', data);
+      console.log('Upload successful!');
+      console.log('Upload data:', JSON.stringify(data, null, 2));
 
       // Get public URL
       const { data: urlData } = supabase.storage
@@ -233,10 +248,14 @@ export default function SignatureRecipesEditorScreen() {
         .getPublicUrl(fileName);
 
       console.log('Public URL generated:', urlData.publicUrl);
+      console.log('=== IMAGE UPLOAD COMPLETE ===');
 
       return urlData.publicUrl;
     } catch (error: any) {
-      console.error('Error in uploadImage function:', error);
+      console.error('=== EXCEPTION IN UPLOAD IMAGE ===');
+      console.error('Error type:', error.constructor.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
       Alert.alert('Error', `Failed to upload image: ${error.message || 'Unknown error'}`);
       return null;
     } finally {
@@ -279,9 +298,10 @@ export default function SignatureRecipesEditorScreen() {
     try {
       let thumbnailUrl = editingRecipe?.thumbnail_url || null;
 
-      console.log('Starting save process...');
+      console.log('=== STARTING SAVE PROCESS ===');
       console.log('Current thumbnail URL:', thumbnailUrl);
       console.log('Selected image URI:', selectedImageUri);
+      console.log('Editing recipe:', editingRecipe ? 'Yes' : 'No');
 
       // Upload image if selected
       if (selectedImageUri) {
@@ -297,7 +317,7 @@ export default function SignatureRecipesEditorScreen() {
       }
 
       console.log('Final thumbnail URL to save:', thumbnailUrl);
-      console.log('Valid ingredients:', validIngredients);
+      console.log('Valid ingredients:', JSON.stringify(validIngredients, null, 2));
 
       if (editingRecipe) {
         // Update existing recipe using RPC function
