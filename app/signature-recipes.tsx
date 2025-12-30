@@ -27,8 +27,8 @@ interface SignatureRecipe {
   price: string;
   subcategory: string | null;
   glassware: string | null;
-  ingredients: Ingredient[];
-  procedure: string;
+  ingredients: Ingredient[] | null;
+  procedure: string | null;
   thumbnail_url: string | null;
   display_order: number;
   is_active: boolean;
@@ -58,9 +58,39 @@ export default function SignatureRecipesScreen() {
         .order('display_order', { ascending: true })
         .order('name', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading signature recipes:', error);
+        throw error;
+      }
+      
       console.log('Loaded signature recipes:', data);
-      setRecipes(data || []);
+      
+      // Parse ingredients if they're stored as strings
+      const parsedRecipes = (data || []).map(recipe => {
+        let ingredients = recipe.ingredients;
+        
+        // Handle different ingredient formats
+        if (typeof ingredients === 'string') {
+          try {
+            ingredients = JSON.parse(ingredients);
+          } catch (e) {
+            console.error('Error parsing ingredients for recipe:', recipe.name, e);
+            ingredients = [];
+          }
+        }
+        
+        // Ensure ingredients is an array
+        if (!Array.isArray(ingredients)) {
+          ingredients = [];
+        }
+        
+        return {
+          ...recipe,
+          ingredients: ingredients as Ingredient[],
+        };
+      });
+      
+      setRecipes(parsedRecipes);
     } catch (error) {
       console.error('Error loading signature recipes:', error);
     } finally {
@@ -69,6 +99,8 @@ export default function SignatureRecipesScreen() {
   };
 
   const openDetailModal = (recipe: SignatureRecipe) => {
+    console.log('Opening detail modal for recipe:', recipe.name);
+    console.log('Recipe ingredients:', recipe.ingredients);
     setSelectedRecipe(recipe);
     setShowDetailModal(true);
   };
@@ -90,6 +122,7 @@ export default function SignatureRecipesScreen() {
 
   // Helper function to format price with $ sign
   const formatPrice = (price: string) => {
+    if (!price) return '$0.00';
     if (price.includes('$')) {
       return price;
     }
@@ -233,13 +266,13 @@ export default function SignatureRecipesScreen() {
               <View style={styles.detailSection}>
                 <Text style={styles.detailLabel}>Ingredients</Text>
                 <View style={styles.ingredientsList}>
-                  {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
+                  {selectedRecipe?.ingredients && Array.isArray(selectedRecipe.ingredients) && selectedRecipe.ingredients.length > 0 ? (
                     selectedRecipe.ingredients.map((item, index) => (
                       <View key={index} style={styles.ingredientItem}>
                         <View style={styles.ingredientBullet} />
                         <View style={styles.ingredientContent}>
-                          <Text style={styles.ingredientAmount}>{item.amount}</Text>
-                          <Text style={styles.ingredientName}>{item.ingredient}</Text>
+                          <Text style={styles.ingredientAmount}>{item.amount || 'N/A'}</Text>
+                          <Text style={styles.ingredientName}>{item.ingredient || 'Unknown ingredient'}</Text>
                         </View>
                       </View>
                     ))

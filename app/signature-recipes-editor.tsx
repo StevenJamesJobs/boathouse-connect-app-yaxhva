@@ -33,8 +33,8 @@ interface SignatureRecipe {
   price: string;
   subcategory: string | null;
   glassware: string | null;
-  ingredients: Ingredient[];
-  procedure: string;
+  ingredients: Ingredient[] | null;
+  procedure: string | null;
   thumbnail_url: string | null;
   display_order: number;
   is_active: boolean;
@@ -83,9 +83,39 @@ export default function SignatureRecipesEditorScreen() {
         .order('display_order', { ascending: true })
         .order('name', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading signature recipes:', error);
+        throw error;
+      }
+      
       console.log('Loaded signature recipes:', data);
-      setRecipes(data || []);
+      
+      // Parse ingredients if they're stored as strings
+      const parsedRecipes = (data || []).map(recipe => {
+        let ingredients = recipe.ingredients;
+        
+        // Handle different ingredient formats
+        if (typeof ingredients === 'string') {
+          try {
+            ingredients = JSON.parse(ingredients);
+          } catch (e) {
+            console.error('Error parsing ingredients for recipe:', recipe.name, e);
+            ingredients = [];
+          }
+        }
+        
+        // Ensure ingredients is an array
+        if (!Array.isArray(ingredients)) {
+          ingredients = [];
+        }
+        
+        return {
+          ...recipe,
+          ingredients: ingredients as Ingredient[],
+        };
+      });
+      
+      setRecipes(parsedRecipes);
     } catch (error) {
       console.error('Error loading signature recipes:', error);
       Alert.alert('Error', 'Failed to load signature recipes');
@@ -109,10 +139,10 @@ export default function SignatureRecipesEditorScreen() {
         recipe =>
           recipe.name.toLowerCase().includes(query) ||
           (recipe.glassware && recipe.glassware.toLowerCase().includes(query)) ||
-          recipe.ingredients.some(ing => 
+          (recipe.ingredients && Array.isArray(recipe.ingredients) && recipe.ingredients.some(ing => 
             ing.ingredient.toLowerCase().includes(query) || 
             ing.amount.toLowerCase().includes(query)
-          )
+          ))
       );
     }
 
@@ -226,18 +256,14 @@ export default function SignatureRecipesEditorScreen() {
 
   const handleSave = async () => {
     // Validate required fields
-    if (!formData.name || !formData.price || !formData.procedure) {
-      Alert.alert('Error', 'Please fill in Name, Price, and Procedure');
+    if (!formData.name || !formData.price) {
+      Alert.alert('Error', 'Please fill in Name and Price');
       return;
     }
 
     // Validate ingredients
     const validIngredients = ingredients.filter(ing => ing.ingredient.trim() && ing.amount.trim());
-    if (validIngredients.length === 0) {
-      Alert.alert('Error', 'Please add at least one ingredient with amount');
-      return;
-    }
-
+    
     if (!user?.id) {
       Alert.alert('Error', 'User not authenticated');
       return;
@@ -264,6 +290,11 @@ export default function SignatureRecipesEditorScreen() {
       }
 
       console.log('Final thumbnail URL to save:', thumbnailUrl);
+      console.log('Valid ingredients:', validIngredients);
+
+      // Convert ingredients to JSON string
+      const ingredientsJson = JSON.stringify(validIngredients);
+      console.log('Ingredients JSON:', ingredientsJson);
 
       if (editingRecipe) {
         // Update existing recipe
@@ -275,8 +306,8 @@ export default function SignatureRecipesEditorScreen() {
           p_price: formData.price,
           p_subcategory: formData.subcategory,
           p_glassware: formData.glassware || null,
-          p_ingredients: JSON.stringify(validIngredients),
-          p_procedure: formData.procedure,
+          p_ingredients: ingredientsJson,
+          p_procedure: formData.procedure || '',
           p_thumbnail_url: thumbnailUrl,
           p_display_order: formData.display_order,
         });
@@ -285,7 +316,7 @@ export default function SignatureRecipesEditorScreen() {
           console.error('Error updating recipe:', error);
           throw error;
         }
-        console.log('Recipe updated successfully with thumbnail URL:', thumbnailUrl);
+        console.log('Recipe updated successfully');
         Alert.alert('Success', 'Recipe updated successfully');
       } else {
         // Create new recipe
@@ -296,8 +327,8 @@ export default function SignatureRecipesEditorScreen() {
           p_price: formData.price,
           p_subcategory: formData.subcategory,
           p_glassware: formData.glassware || null,
-          p_ingredients: JSON.stringify(validIngredients),
-          p_procedure: formData.procedure,
+          p_ingredients: ingredientsJson,
+          p_procedure: formData.procedure || '',
           p_thumbnail_url: thumbnailUrl,
           p_display_order: formData.display_order,
         });
@@ -306,7 +337,7 @@ export default function SignatureRecipesEditorScreen() {
           console.error('Error creating recipe:', error);
           throw error;
         }
-        console.log('Recipe created successfully with thumbnail URL:', thumbnailUrl);
+        console.log('Recipe created successfully');
         Alert.alert('Success', 'Recipe created successfully');
       }
 
@@ -383,16 +414,26 @@ export default function SignatureRecipesEditorScreen() {
   };
 
   const openEditModal = (recipe: SignatureRecipe) => {
+    console.log('Opening edit modal for recipe:', recipe);
+    console.log('Recipe ingredients:', recipe.ingredients);
+    
     setEditingRecipe(recipe);
     setFormData({
       name: recipe.name,
       price: recipe.price,
       subcategory: recipe.subcategory || 'Signature Cocktails',
       glassware: recipe.glassware || '',
-      procedure: recipe.procedure,
+      procedure: recipe.procedure || '',
       display_order: recipe.display_order,
     });
-    setIngredients(recipe.ingredients.length > 0 ? recipe.ingredients : [{ ingredient: '', amount: '' }]);
+    
+    // Handle ingredients - ensure it's an array
+    let recipeIngredients = recipe.ingredients;
+    if (!recipeIngredients || !Array.isArray(recipeIngredients) || recipeIngredients.length === 0) {
+      recipeIngredients = [{ ingredient: '', amount: '' }];
+    }
+    
+    setIngredients(recipeIngredients);
     setSelectedImageUri(null);
     setShowAddModal(true);
   };
@@ -415,6 +456,7 @@ export default function SignatureRecipesEditorScreen() {
 
   // Helper function to format price with $ sign
   const formatPrice = (price: string) => {
+    if (!price) return '$0.00';
     if (price.includes('$')) {
       return price;
     }
@@ -758,7 +800,7 @@ export default function SignatureRecipesEditorScreen() {
 
               {/* Ingredients */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Ingredients *</Text>
+                <Text style={styles.formLabel}>Ingredients</Text>
                 <Text style={styles.formHint}>
                   Add each ingredient with its amount
                 </Text>
@@ -808,7 +850,7 @@ export default function SignatureRecipesEditorScreen() {
 
               {/* Procedure */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Procedure *</Text>
+                <Text style={styles.formLabel}>Procedure</Text>
                 <Text style={styles.formHint}>
                   Enter the preparation instructions
                 </Text>
