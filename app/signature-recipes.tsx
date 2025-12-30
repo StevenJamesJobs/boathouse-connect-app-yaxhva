@@ -27,7 +27,7 @@ interface SignatureRecipe {
   price: string;
   subcategory: string | null;
   glassware: string | null;
-  ingredients: Ingredient[] | null;
+  ingredients: Ingredient[];
   procedure: string | null;
   thumbnail_url: string | null;
   display_order: number;
@@ -65,28 +65,35 @@ export default function SignatureRecipesScreen() {
       
       console.log('Loaded signature recipes:', data);
       
-      // Parse ingredients if they're stored as strings
+      // Parse ingredients safely
       const parsedRecipes = (data || []).map(recipe => {
-        let ingredients = recipe.ingredients;
+        let ingredients: Ingredient[] = [];
         
-        // Handle different ingredient formats
-        if (typeof ingredients === 'string') {
-          try {
-            ingredients = JSON.parse(ingredients);
-          } catch (e) {
-            console.error('Error parsing ingredients for recipe:', recipe.name, e);
-            ingredients = [];
+        try {
+          // If ingredients is already an array, use it
+          if (Array.isArray(recipe.ingredients)) {
+            ingredients = recipe.ingredients;
+          } 
+          // If it's a string, try to parse it
+          else if (typeof recipe.ingredients === 'string') {
+            const parsed = JSON.parse(recipe.ingredients);
+            ingredients = Array.isArray(parsed) ? parsed : [];
           }
-        }
-        
-        // Ensure ingredients is an array
-        if (!Array.isArray(ingredients)) {
+          // If it's an object (JSONB), convert to array
+          else if (recipe.ingredients && typeof recipe.ingredients === 'object') {
+            ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+          }
+        } catch (e) {
+          console.error('Error parsing ingredients for recipe:', recipe.name, e);
+          console.error('Raw ingredients value:', recipe.ingredients);
           ingredients = [];
         }
         
         return {
           ...recipe,
-          ingredients: ingredients as Ingredient[],
+          ingredients,
+          procedure: recipe.procedure || '',
+          glassware: recipe.glassware || null,
         };
       });
       
@@ -266,7 +273,7 @@ export default function SignatureRecipesScreen() {
               <View style={styles.detailSection}>
                 <Text style={styles.detailLabel}>Ingredients</Text>
                 <View style={styles.ingredientsList}>
-                  {selectedRecipe?.ingredients && Array.isArray(selectedRecipe.ingredients) && selectedRecipe.ingredients.length > 0 ? (
+                  {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
                     selectedRecipe.ingredients.map((item, index) => (
                       <View key={index} style={styles.ingredientItem}>
                         <View style={styles.ingredientBullet} />

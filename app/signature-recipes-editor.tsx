@@ -33,7 +33,7 @@ interface SignatureRecipe {
   price: string;
   subcategory: string | null;
   glassware: string | null;
-  ingredients: Ingredient[] | null;
+  ingredients: Ingredient[];
   procedure: string | null;
   thumbnail_url: string | null;
   display_order: number;
@@ -90,28 +90,35 @@ export default function SignatureRecipesEditorScreen() {
       
       console.log('Loaded signature recipes:', data);
       
-      // Parse ingredients if they're stored as strings
+      // Parse ingredients safely
       const parsedRecipes = (data || []).map(recipe => {
-        let ingredients = recipe.ingredients;
+        let ingredients: Ingredient[] = [];
         
-        // Handle different ingredient formats
-        if (typeof ingredients === 'string') {
-          try {
-            ingredients = JSON.parse(ingredients);
-          } catch (e) {
-            console.error('Error parsing ingredients for recipe:', recipe.name, e);
-            ingredients = [];
+        try {
+          // If ingredients is already an array, use it
+          if (Array.isArray(recipe.ingredients)) {
+            ingredients = recipe.ingredients;
+          } 
+          // If it's a string, try to parse it
+          else if (typeof recipe.ingredients === 'string') {
+            const parsed = JSON.parse(recipe.ingredients);
+            ingredients = Array.isArray(parsed) ? parsed : [];
           }
-        }
-        
-        // Ensure ingredients is an array
-        if (!Array.isArray(ingredients)) {
+          // If it's an object (JSONB), convert to array
+          else if (recipe.ingredients && typeof recipe.ingredients === 'object') {
+            ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
+          }
+        } catch (e) {
+          console.error('Error parsing ingredients for recipe:', recipe.name, e);
+          console.error('Raw ingredients value:', recipe.ingredients);
           ingredients = [];
         }
         
         return {
           ...recipe,
-          ingredients: ingredients as Ingredient[],
+          ingredients,
+          procedure: recipe.procedure || '',
+          glassware: recipe.glassware || null,
         };
       });
       
@@ -139,7 +146,7 @@ export default function SignatureRecipesEditorScreen() {
         recipe =>
           recipe.name.toLowerCase().includes(query) ||
           (recipe.glassware && recipe.glassware.toLowerCase().includes(query)) ||
-          (recipe.ingredients && Array.isArray(recipe.ingredients) && recipe.ingredients.some(ing => 
+          (recipe.ingredients && recipe.ingredients.length > 0 && recipe.ingredients.some(ing => 
             ing.ingredient.toLowerCase().includes(query) || 
             ing.amount.toLowerCase().includes(query)
           ))
@@ -261,7 +268,7 @@ export default function SignatureRecipesEditorScreen() {
       return;
     }
 
-    // Validate ingredients
+    // Validate ingredients - filter out empty ones
     const validIngredients = ingredients.filter(ing => ing.ingredient.trim() && ing.amount.trim());
     
     if (!user?.id) {
@@ -292,25 +299,31 @@ export default function SignatureRecipesEditorScreen() {
       console.log('Final thumbnail URL to save:', thumbnailUrl);
       console.log('Valid ingredients:', validIngredients);
 
-      // Convert ingredients to JSON string
-      const ingredientsJson = JSON.stringify(validIngredients);
-      console.log('Ingredients JSON:', ingredientsJson);
+      // Prepare the data object
+      const recipeData = {
+        name: formData.name,
+        price: formData.price,
+        subcategory: formData.subcategory,
+        glassware: formData.glassware || null,
+        ingredients: validIngredients, // Send as array, Supabase will convert to JSONB
+        procedure: formData.procedure || '',
+        thumbnail_url: thumbnailUrl,
+        display_order: formData.display_order,
+        is_active: true,
+      };
+
+      console.log('Recipe data to save:', recipeData);
 
       if (editingRecipe) {
         // Update existing recipe
         console.log('Updating recipe with ID:', editingRecipe.id);
-        const { error } = await supabase.rpc('update_signature_recipe', {
-          p_user_id: user.id,
-          p_recipe_id: editingRecipe.id,
-          p_name: formData.name,
-          p_price: formData.price,
-          p_subcategory: formData.subcategory,
-          p_glassware: formData.glassware || null,
-          p_ingredients: ingredientsJson,
-          p_procedure: formData.procedure || '',
-          p_thumbnail_url: thumbnailUrl,
-          p_display_order: formData.display_order,
-        });
+        const { error } = await supabase
+          .from('signature_recipes')
+          .update({
+            ...recipeData,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', editingRecipe.id);
 
         if (error) {
           console.error('Error updating recipe:', error);
@@ -321,17 +334,12 @@ export default function SignatureRecipesEditorScreen() {
       } else {
         // Create new recipe
         console.log('Creating new recipe...');
-        const { error } = await supabase.rpc('create_signature_recipe', {
-          p_user_id: user.id,
-          p_name: formData.name,
-          p_price: formData.price,
-          p_subcategory: formData.subcategory,
-          p_glassware: formData.glassware || null,
-          p_ingredients: ingredientsJson,
-          p_procedure: formData.procedure || '',
-          p_thumbnail_url: thumbnailUrl,
-          p_display_order: formData.display_order,
-        });
+        const { error } = await supabase
+          .from('signature_recipes')
+          .insert({
+            ...recipeData,
+            created_by: user.id,
+          });
 
         if (error) {
           console.error('Error creating recipe:', error);
@@ -365,11 +373,11 @@ export default function SignatureRecipesEditorScreen() {
                 return;
               }
 
-              // Delete using database function
-              const { error } = await supabase.rpc('delete_signature_recipe', {
-                p_user_id: user.id,
-                p_recipe_id: recipe.id,
-              });
+              // Delete the recipe
+              const { error } = await supabase
+                .from('signature_recipes')
+                .delete()
+                .eq('id', recipe.id);
 
               if (error) {
                 console.error('Error deleting recipe:', error);
