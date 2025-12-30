@@ -182,18 +182,7 @@ export default function SignatureRecipesEditorScreen() {
       console.log('Image URI:', uri);
       console.log('User ID:', user?.id);
 
-      // Check if user is authenticated
-      const { data: { session } } = await supabase.auth.getSession();
-      console.log('Session exists:', !!session);
-      console.log('Session user:', session?.user?.id);
-
-      if (!session) {
-        console.error('No active session found');
-        Alert.alert('Error', 'You must be logged in to upload images');
-        return null;
-      }
-
-      // Read the file as base64
+      // Read the file as base64 (same method as menu-editor and announcement-editor)
       console.log('Reading file as base64...');
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
@@ -222,7 +211,7 @@ export default function SignatureRecipesEditorScreen() {
       else if (ext === 'webp') contentType = 'image/webp';
       console.log('Content type:', contentType);
 
-      // Upload to Supabase Storage
+      // Upload to Supabase Storage (same method as menu-editor and announcement-editor)
       console.log('Uploading to Supabase storage bucket: signature-recipe-images');
       const { data, error } = await supabase.storage
         .from('signature-recipe-images')
