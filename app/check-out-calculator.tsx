@@ -30,6 +30,7 @@ export default function CheckOutCalculatorScreen() {
   const [sharedParty, setSharedParty] = useState(false);
   const [partySubtotal, setPartySubtotal] = useState('');
   const [checkUnderMyName, setCheckUnderMyName] = useState<boolean | null>(null);
+  const [partyGratuity, setPartyGratuity] = useState('');
 
   const busserRunnerOptions = [
     { label: '3.5%', value: 0.035 },
@@ -68,6 +69,33 @@ export default function CheckOutCalculatorScreen() {
       return sales + halfParty;
     }
   }, [totalShiftSales, sharedParty, partySubtotal, checkUnderMyName]);
+
+  // Calculate party gratuity split
+  const calculatePartyGratuitySplit = () => {
+    if (!sharedParty || checkUnderMyName === null || !partyGratuity) {
+      return {
+        afterTipOuts: 0,
+        splitAmount: 0,
+      };
+    }
+
+    const gratuity = parseFloat(partyGratuity) || 0;
+    
+    // Subtract busser/runner and bartender percentages from party gratuity
+    const busserAmount = gratuity * busserRunnerPercent;
+    const bartenderAmount = gratuity * bartenderPercent;
+    const afterTipOuts = gratuity - busserAmount - bartenderAmount;
+    
+    // Split evenly between two people
+    const splitAmount = afterTipOuts / 2;
+
+    return {
+      afterTipOuts,
+      splitAmount,
+    };
+  };
+
+  const partyGratuitySplit = calculatePartyGratuitySplit();
 
   // Live calculation
   const calculateResults = () => {
@@ -179,6 +207,7 @@ export default function CheckOutCalculatorScreen() {
                   // Reset party-related fields when unchecking
                   setPartySubtotal('');
                   setCheckUnderMyName(null);
+                  setPartyGratuity('');
                 }
               }}
             >
@@ -270,6 +299,44 @@ export default function CheckOutCalculatorScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
+
+              {/* Party Gratuity - Only show if shared party is checked */}
+              <Text style={[styles.label, { color: colors.text, marginTop: 16 }]}>
+                Party Gratuity (Optional)
+              </Text>
+              <View style={[styles.inputWrapper, { borderColor: colors.border }]}>
+                <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  value={partyGratuity}
+                  onChangeText={setPartyGratuity}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+
+              {/* Live Party Gratuity Calculation */}
+              {partyGratuity !== '' && checkUnderMyName !== null && (
+                <View style={styles.partyGratuityCalculation}>
+                  <View style={styles.liveCalculation}>
+                    <Text style={[styles.liveCalcLabel, { color: colors.textSecondary }]}>
+                      Party Gratuity After Tip Outs:
+                    </Text>
+                    <Text style={[styles.liveCalcValue, { color: colors.primary }]}>
+                      {formatCurrency(partyGratuitySplit.afterTipOuts)}
+                    </Text>
+                  </View>
+                  <View style={styles.liveCalculation}>
+                    <Text style={[styles.liveCalcLabel, { color: colors.textSecondary }]}>
+                      {checkUnderMyName ? 'You Owe Your Teammate:' : 'Your Teammate Owes You:'}
+                    </Text>
+                    <Text style={[styles.liveCalcValue, { color: colors.highlight }]}>
+                      {formatCurrency(partyGratuitySplit.splitAmount)}
+                    </Text>
+                  </View>
+                </View>
+              )}
             </View>
           )}
 
@@ -590,6 +657,48 @@ export default function CheckOutCalculatorScreen() {
                 {formatCurrency(results.finalTally)}
               </Text>
             </View>
+
+            {/* Party Gratuity Split in Final Tally */}
+            {sharedParty && checkUnderMyName !== null && partyGratuity !== '' && (
+              <>
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                <View style={styles.partyGratuityFinalSection}>
+                  <Text style={[styles.partyGratuityFinalTitle, { color: colors.text }]}>
+                    Party Gratuity Split
+                  </Text>
+                  <View style={styles.resultRow}>
+                    <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
+                      Party Gratuity After Tip Outs:
+                    </Text>
+                    <Text style={[styles.resultValue, { color: colors.primary }]}>
+                      {formatCurrency(partyGratuitySplit.afterTipOuts)}
+                    </Text>
+                  </View>
+                  <View style={styles.finalTallyContainer}>
+                    <Text
+                      style={[
+                        styles.partyGratuitySplitLabel,
+                        {
+                          color: checkUnderMyName ? '#D32F2F' : '#388E3C',
+                        },
+                      ]}
+                    >
+                      {checkUnderMyName ? 'You Owe Your Teammate' : 'Your Teammate Owes You'}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.partyGratuitySplitValue,
+                        {
+                          color: checkUnderMyName ? '#D32F2F' : '#388E3C',
+                        },
+                      ]}
+                    >
+                      {formatCurrency(partyGratuitySplit.splitAmount)}
+                    </Text>
+                  </View>
+                </View>
+              </>
+            )}
           </View>
         )}
       </ScrollView>
@@ -797,6 +906,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
+  partyGratuityCalculation: {
+    marginTop: 8,
+  },
   resultsCard: {
     borderRadius: 16,
     padding: 20,
@@ -838,6 +950,24 @@ const styles = StyleSheet.create({
   },
   finalTallyValue: {
     fontSize: 36,
+    fontWeight: 'bold',
+  },
+  partyGratuityFinalSection: {
+    marginTop: 8,
+  },
+  partyGratuityFinalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  partyGratuitySplitLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  partyGratuitySplitValue: {
+    fontSize: 28,
     fontWeight: 'bold',
   },
 });
