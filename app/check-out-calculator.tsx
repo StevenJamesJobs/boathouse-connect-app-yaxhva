@@ -80,10 +80,13 @@ export default function CheckOutCalculatorScreen() {
     }
 
     const gratuity = parseFloat(partyGratuity) || 0;
+    const subtotal = parseFloat(partySubtotal) || 0;
     
-    // Subtract busser/runner and bartender percentages from party gratuity
-    const busserAmount = gratuity * busserRunnerPercent;
-    const bartenderAmount = gratuity * bartenderPercent;
+    // Calculate busser/runner and bartender percentages from PARTY SUBTOTAL
+    const busserAmount = subtotal * busserRunnerPercent;
+    const bartenderAmount = subtotal * bartenderPercent;
+    
+    // Subtract these amounts from the PARTY GRATUITY
     const afterTipOuts = gratuity - busserAmount - bartenderAmount;
     
     // Split evenly between two people
