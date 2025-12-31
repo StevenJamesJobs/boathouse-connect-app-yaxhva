@@ -597,74 +597,58 @@ export default function SignatureRecipesEditorScreen() {
             filteredRecipes.map((recipe, index) => (
               <View key={index} style={styles.recipeCard}>
                 <View style={styles.recipeContent}>
-                  {recipe.thumbnail_url && (
+                  {/* Thumbnail */}
+                  {recipe.thumbnail_url ? (
                     <Image
                       source={{ uri: getImageUrl(recipe.thumbnail_url) }}
                       style={styles.recipeImage}
                       resizeMode="cover"
                     />
+                  ) : (
+                    <View style={styles.placeholderImage}>
+                      <IconSymbol
+                        ios_icon_name="photo"
+                        android_material_icon_name="image"
+                        size={32}
+                        color={managerColors.textSecondary}
+                      />
+                    </View>
                   )}
+                  
+                  {/* Recipe Info */}
                   <View style={styles.recipeInfo}>
-                    <Text style={styles.recipeName}>{recipe.name}</Text>
-                    <Text style={styles.recipePrice}>{formatPrice(recipe.price)}</Text>
+                    <Text style={styles.recipeName} numberOfLines={2}>{recipe.name}</Text>
                     {recipe.subcategory && (
                       <View style={styles.subcategoryBadge}>
                         <Text style={styles.subcategoryBadgeText}>{recipe.subcategory}</Text>
                       </View>
                     )}
-                    {recipe.glassware && (
-                      <View style={styles.glasswareBadge}>
-                        <IconSymbol
-                          ios_icon_name="wineglass"
-                          android_material_icon_name="local-bar"
-                          size={14}
-                          color={managerColors.textSecondary}
-                        />
-                        <Text style={styles.glasswareText}>{recipe.glassware}</Text>
-                      </View>
-                    )}
-                    {recipe.thumbnail_url && (
-                      <View style={styles.thumbnailIndicator}>
-                        <IconSymbol
-                          ios_icon_name="photo"
-                          android_material_icon_name="image"
-                          size={16}
-                          color={managerColors.highlight}
-                        />
-                        <Text style={styles.thumbnailIndicatorText}>Has thumbnail</Text>
-                      </View>
-                    )}
-                    <View style={styles.displayOrderBadge}>
-                      <Text style={styles.displayOrderText}>Order: {recipe.display_order}</Text>
-                    </View>
                   </View>
                 </View>
+                
+                {/* Action Buttons */}
                 <View style={styles.recipeActions}>
                   <TouchableOpacity
-                    style={styles.actionButton}
+                    style={styles.editButton}
                     onPress={() => openEditModal(recipe)}
                   >
                     <IconSymbol
                       ios_icon_name="pencil"
                       android_material_icon_name="edit"
-                      size={20}
+                      size={18}
                       color={managerColors.highlight}
                     />
-                    <Text style={styles.actionButtonText}>Edit</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.actionButton, styles.deleteButton]}
+                    style={styles.deleteButton}
                     onPress={() => handleDelete(recipe)}
                   >
                     <IconSymbol
                       ios_icon_name="trash"
                       android_material_icon_name="delete"
-                      size={20}
+                      size={18}
                       color="#E74C3C"
                     />
-                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                      Delete
-                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1043,39 +1027,44 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   recipeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: managerColors.card,
-    borderRadius: 16,
-    marginBottom: 16,
+    borderRadius: 12,
+    marginBottom: 12,
     overflow: 'hidden',
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
-  },
-  recipeContent: {
-    flexDirection: 'row',
     padding: 12,
     gap: 12,
   },
+  recipeContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
   recipeImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    resizeMode: 'cover',
+    width: 70,
+    height: 70,
+    borderRadius: 8,
+  },
+  placeholderImage: {
+    width: 70,
+    height: 70,
+    borderRadius: 8,
+    backgroundColor: managerColors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   recipeInfo: {
     flex: 1,
-    justifyContent: 'flex-start',
+    gap: 6,
   },
   recipeName: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: managerColors.text,
-    marginBottom: 4,
-  },
-  recipePrice: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: managerColors.highlight,
-    marginBottom: 8,
   },
   subcategoryBadge: {
     alignSelf: 'flex-start',
@@ -1083,73 +1072,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    marginBottom: 6,
   },
   subcategoryBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: managerColors.text,
   },
-  glasswareBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginBottom: 6,
-  },
-  glasswareText: {
-    fontSize: 12,
-    color: managerColors.textSecondary,
-  },
-  thumbnailIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginBottom: 4,
-  },
-  thumbnailIndicatorText: {
-    fontSize: 12,
-    color: managerColors.highlight,
-    fontWeight: '600',
-  },
-  displayOrderBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  displayOrderText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: managerColors.textSecondary,
-  },
   recipeActions: {
     flexDirection: 'row',
-    gap: 12,
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: managerColors.border,
+    gap: 8,
   },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: managerColors.background,
-    paddingVertical: 10,
+  editButton: {
+    width: 40,
+    height: 40,
     borderRadius: 8,
-    gap: 6,
+    backgroundColor: managerColors.background,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   deleteButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
     backgroundColor: '#2C1F1F',
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: managerColors.highlight,
-  },
-  deleteButtonText: {
-    color: '#E74C3C',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContainer: {
     flex: 1,

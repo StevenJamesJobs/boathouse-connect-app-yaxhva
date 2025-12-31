@@ -10,6 +10,7 @@ import {
   Modal,
   Image,
   Platform,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { employeeColors } from '@/styles/commonStyles';
@@ -43,6 +44,7 @@ export default function SignatureRecipesScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedRecipe, setSelectedRecipe] = useState<SignatureRecipe | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [scrollY] = useState(new Animated.Value(0));
 
   useEffect(() => {
     loadRecipes();
@@ -115,6 +117,7 @@ export default function SignatureRecipesScreen() {
   const closeDetailModal = () => {
     setShowDetailModal(false);
     setSelectedRecipe(null);
+    scrollY.setValue(0);
   };
 
   const handleBackPress = () => {
@@ -141,6 +144,19 @@ export default function SignatureRecipesScreen() {
     category,
     recipes: recipes.filter(recipe => recipe.subcategory === category),
   })).filter(group => group.recipes.length > 0);
+
+  // Animated image opacity based on scroll
+  const imageOpacity = scrollY.interpolate({
+    inputRange: [0, 200],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const imageTranslateY = scrollY.interpolate({
+    inputRange: [0, 200],
+    outputRange: [0, -50],
+    extrapolate: 'clamp',
+  });
 
   return (
     <View style={styles.container}>
@@ -191,6 +207,7 @@ export default function SignatureRecipesScreen() {
                       key={index}
                       style={styles.recipeCard}
                       onPress={() => openDetailModal(recipe)}
+                      activeOpacity={0.8}
                     >
                       <Image
                         source={{ uri: getImageUrl(recipe.thumbnail_url) }}
@@ -212,7 +229,7 @@ export default function SignatureRecipesScreen() {
         </ScrollView>
       )}
 
-      {/* Detail Modal */}
+      {/* Detail Modal with Smooth Scrolling */}
       <Modal
         visible={showDetailModal}
         animationType="slide"
@@ -226,78 +243,100 @@ export default function SignatureRecipesScreen() {
             onPress={closeDetailModal}
           />
           <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{selectedRecipe?.name}</Text>
-              <TouchableOpacity onPress={closeDetailModal}>
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color="#666666"
-                />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={styles.modalScroll}
-              contentContainerStyle={styles.modalScrollContent}
-              showsVerticalScrollIndicator={true}
+            {/* Fixed Image Background */}
+            <Animated.View
+              style={[
+                styles.modalImageContainer,
+                {
+                  opacity: imageOpacity,
+                  transform: [{ translateY: imageTranslateY }],
+                },
+              ]}
             >
-              {/* Thumbnail Image */}
               <Image
                 source={{ uri: getImageUrl(selectedRecipe?.thumbnail_url || null) }}
                 style={styles.modalImage}
                 resizeMode="cover"
               />
+              <View style={styles.imageGradient} />
+            </Animated.View>
 
-              {/* Name, Price, and Glassware */}
-              <View style={styles.detailSection}>
-                <Text style={styles.modalRecipeName}>{selectedRecipe?.name}</Text>
-                <View style={styles.priceGlasswareRow}>
-                  <Text style={styles.modalPrice}>{formatPrice(selectedRecipe?.price || '')}</Text>
-                  {selectedRecipe?.glassware && (
-                    <View style={styles.glasswareBadge}>
-                      <IconSymbol
-                        ios_icon_name="wineglass"
-                        android_material_icon_name="local-bar"
-                        size={16}
-                        color="#666666"
-                      />
-                      <Text style={styles.glasswareText}>{selectedRecipe.glassware}</Text>
-                    </View>
-                  )}
+            {/* Close Button */}
+            <TouchableOpacity style={styles.closeButton} onPress={closeDetailModal}>
+              <IconSymbol
+                ios_icon_name="xmark.circle.fill"
+                android_material_icon_name="cancel"
+                size={32}
+                color="#FFFFFF"
+              />
+            </TouchableOpacity>
+
+            {/* Scrollable Content */}
+            <Animated.ScrollView
+              style={styles.modalScroll}
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={true}
+              scrollEventThrottle={16}
+              onScroll={Animated.event(
+                [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                { useNativeDriver: true }
+              )}
+            >
+              {/* Spacer for image */}
+              <View style={styles.imageSpacer} />
+
+              {/* Content Card that slides over image */}
+              <View style={styles.contentCard}>
+                {/* Name, Price, and Glassware */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.modalRecipeName}>{selectedRecipe?.name}</Text>
+                  <View style={styles.priceGlasswareRow}>
+                    <Text style={styles.modalPrice}>{formatPrice(selectedRecipe?.price || '')}</Text>
+                    {selectedRecipe?.glassware && (
+                      <View style={styles.glasswareBadge}>
+                        <IconSymbol
+                          ios_icon_name="wineglass"
+                          android_material_icon_name="local-bar"
+                          size={16}
+                          color="#666666"
+                        />
+                        <Text style={styles.glasswareText}>{selectedRecipe.glassware}</Text>
+                      </View>
+                    )}
+                  </View>
                 </View>
-              </View>
 
-              {/* Ingredients Section */}
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Ingredients</Text>
-                <View style={styles.ingredientsList}>
-                  {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
-                    selectedRecipe.ingredients.map((item, index) => (
-                      <View key={index} style={styles.ingredientItem}>
-                        <View style={styles.ingredientBullet} />
-                        <View style={styles.ingredientContent}>
+                {/* Ingredients Section */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailLabel}>Ingredients</Text>
+                  <View style={styles.ingredientsList}>
+                    {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
+                      selectedRecipe.ingredients.map((item, index) => (
+                        <View key={index} style={styles.ingredientItem}>
+                          <View style={styles.ingredientBullet} />
                           <Text style={styles.ingredientAmount}>{item.amount || 'N/A'}</Text>
                           <Text style={styles.ingredientName}>{item.ingredient || 'Unknown ingredient'}</Text>
                         </View>
-                      </View>
-                    ))
-                  ) : (
-                    <Text style={styles.detailText}>No ingredients listed</Text>
-                  )}
+                      ))
+                    ) : (
+                      <Text style={styles.detailText}>No ingredients listed</Text>
+                    )}
+                  </View>
                 </View>
-              </View>
 
-              {/* Procedure Section */}
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Procedure</Text>
-                <Text style={styles.detailText}>{selectedRecipe?.procedure || 'No procedure listed'}</Text>
-              </View>
+                {/* Separator between Ingredients and Procedure */}
+                <View style={styles.sectionSeparator} />
 
-              {/* Extra padding at bottom for iOS/Android */}
-              <View style={styles.bottomPadding} />
-            </ScrollView>
+                {/* Procedure Section */}
+                <View style={styles.detailSection}>
+                  <Text style={styles.procedureLabel}>Procedure</Text>
+                  <Text style={styles.procedureText}>{selectedRecipe?.procedure || 'No procedure listed'}</Text>
+                </View>
+
+                {/* Extra padding at bottom for iOS/Android */}
+                <View style={styles.bottomPadding} />
+              </View>
+            </Animated.ScrollView>
           </View>
         </View>
       </Modal>
@@ -371,14 +410,14 @@ const styles = StyleSheet.create({
   recipesGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
+    gap: 12,
     justifyContent: 'space-between',
     marginBottom: 24,
   },
   recipeCard: {
     width: '48%',
     backgroundColor: employeeColors.card,
-    borderRadius: 16,
+    borderRadius: 12,
     overflow: 'hidden',
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
@@ -386,24 +425,24 @@ const styles = StyleSheet.create({
   },
   recipeImage: {
     width: '100%',
-    height: 180,
+    height: 140,
   },
   recipeOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    padding: 10,
   },
   recipeName: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginBottom: 4,
   },
   recipePrice: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
     color: employeeColors.highlight,
   },
@@ -420,45 +459,62 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '90%',
+    backgroundColor: 'transparent',
+    height: '95%',
     marginTop: 'auto',
-    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
-    elevation: 10,
+    position: 'relative',
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
+  modalImageContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 300,
+    zIndex: 1,
   },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    flex: 1,
-    paddingRight: 12,
+  modalImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    backgroundColor: 'linear-gradient(to bottom, transparent, rgba(0, 0, 0, 0.3))',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    padding: 4,
   },
   modalScroll: {
     flex: 1,
+    zIndex: 2,
   },
   modalScrollContent: {
     paddingBottom: 60,
   },
-  modalImage: {
-    width: '100%',
-    height: 280,
+  imageSpacer: {
+    height: 220,
+  },
+  contentCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingTop: 24,
+    minHeight: '100%',
+    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.2)',
+    elevation: 10,
   },
   detailSection: {
     paddingHorizontal: 20,
-    paddingTop: 24,
+    paddingBottom: 20,
   },
   modalRecipeName: {
     fontSize: 26,
@@ -498,33 +554,49 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   ingredientsList: {
-    gap: 10,
+    gap: 8,
   },
   ingredientItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+    alignItems: 'center',
+    gap: 10,
   },
   ingredientBullet: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: employeeColors.primary,
-    marginTop: 8,
-  },
-  ingredientContent: {
-    flex: 1,
   },
   ingredientAmount: {
     fontSize: 15,
     fontWeight: '600',
     color: employeeColors.primary,
-    marginBottom: 2,
+    minWidth: 60,
   },
   ingredientName: {
+    flex: 1,
     fontSize: 15,
     color: '#333333',
     lineHeight: 22,
+  },
+  sectionSeparator: {
+    height: 2,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: 20,
+    marginVertical: 16,
+    borderRadius: 1,
+  },
+  procedureLabel: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#C44536',
+    marginBottom: 12,
+  },
+  procedureText: {
+    fontSize: 15,
+    color: '#333333',
+    lineHeight: 24,
+    whiteSpace: 'pre-line',
   },
   detailText: {
     fontSize: 15,
