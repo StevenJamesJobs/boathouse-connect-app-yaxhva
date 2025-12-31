@@ -1,45 +1,46 @@
+
 {
   "expo": {
     "name": "Boathouse Connect",
     "slug": "Boathouse Connect",
-    "version": "1.1.0",
+    "version": "1.2.0",
     "orientation": "default",
-    "icon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png",
+    "icon": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg",
     "scheme": "mcloones",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg",
+      "image": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg",
       "resizeMode": "contain",
       "backgroundColor": "#E8F1F8"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mcloones.boathouseconnect",
-      "buildNumber": "1.1",
+      "buildNumber": "1.2.0",
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
         ],
         "NSPhotoLibraryUsageDescription": "Boathouse Connect needs access to your photos so you can upload a profile picture to personalize your account."
       },
-      "icon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png"
+      "icon": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png",
+        "foregroundImage": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg",
         "backgroundColor": "#E8F1F8"
       },
       "package": "com.mcloonesboathouse.newboathouseconnectapp",
-      "versionCode": 3,
-      "icon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png",
+      "versionCode": 4,
+      "icon": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg",
       "softwareKeyboardLayoutMode": "pan",
       "windowSoftInputMode": "adjustPan"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png"
+      "favicon": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg"
     },
     "plugins": [
       "expo-router",
@@ -47,7 +48,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#E8F1F8",
-          "image": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg",
+          "image": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg",
           "imageWidth": 280
         }
       ],

@@ -165,11 +165,11 @@ export default function WeatherDetailModal({
 
       // Use North Jersey focused radar from NOAA with timestamp to force refresh
       // Adjusted to better center on North Jersey area (West Orange, NJ area)
-      // Using NOAA radar station KOKX (New York) which provides better North Jersey coverage
-      // This station is positioned to show more of the North Jersey area
+      // Using NOAA radar station DIX (Fort Dix/McGuire, NJ) which provides better North Jersey coverage
+      // This station is positioned to show more of the North Jersey area and less of Connecticut/Long Island
       const timestamp = Date.now();
-      const radarImageUrl = `https://radar.weather.gov/ridge/standard/KOKX_loop.gif?t=${timestamp}`;
-      console.log('Radar URL with timestamp (North Jersey focus - KOKX):', radarImageUrl);
+      const radarImageUrl = `https://radar.weather.gov/ridge/standard/KDIX_loop.gif?t=${timestamp}`;
+      console.log('Radar URL with timestamp (North Jersey focus - KDIX):', radarImageUrl);
 
       const weatherDetail: WeatherDetailData = {
         currentTemp: Math.round(data.current.temp_f),
@@ -295,7 +295,7 @@ export default function WeatherDetailModal({
                       </Text>
                     </View>
 
-                    {/* Radar Image - North Jersey Area (Adjusted) */}
+                    {/* Radar Image - North Jersey Area (Adjusted to KDIX) */}
                     <View style={styles.radarContainer}>
                       <Text style={[styles.radarTitle, { color: colors.text }]}>
                         Local Radar
