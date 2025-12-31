@@ -30,11 +30,23 @@ export default function EmployeeToolsScreen() {
   const [feedbackDescription, setFeedbackDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // Check if user is a Manager or Bartender based on job titles
-  const isBartenderOrManager = user?.jobTitle && (
-    user.jobTitle.toLowerCase().includes('bartender') || 
-    user.jobTitle.toLowerCase().includes('manager')
-  );
+  // Helper function to check if user has a specific job title (case-insensitive)
+  const hasJobTitle = (title: string): boolean => {
+    if (!user?.jobTitles || user.jobTitles.length === 0) {
+      return false;
+    }
+    return user.jobTitles.some(jobTitle => 
+      jobTitle.toLowerCase().includes(title.toLowerCase())
+    );
+  };
+
+  // Check visibility for each section based on job titles
+  const canViewCheckOutsCalculator = hasJobTitle('Server') || hasJobTitle('Manager');
+  const canViewBarAssistant = hasJobTitle('Bartender') || hasJobTitle('Manager');
+
+  console.log('User job titles:', user?.jobTitles);
+  console.log('Can view Check Outs Calculator:', canViewCheckOutsCalculator);
+  console.log('Can view Bar Assistant:', canViewBarAssistant);
 
   const handleSubmitFeedback = async () => {
     console.log('=== FEEDBACK SUBMISSION STARTED ===');
@@ -171,37 +183,7 @@ export default function EmployeeToolsScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Check Out Calculator Section */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <IconSymbol
-              ios_icon_name="calculator.fill"
-              android_material_icon_name="calculate"
-              size={32}
-              color={employeeColors.primary}
-            />
-            <View style={styles.cardHeaderText}>
-              <Text style={styles.cardTitle}>Check Out Calculator</Text>
-              <Text style={styles.cardDescription}>
-                Calculate your shift check out totals and tip outs
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity 
-            style={styles.cardButton}
-            onPress={() => router.push('/check-out-calculator')}
-          >
-            <Text style={styles.cardButtonText}>Open Calculator</Text>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={employeeColors.text}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Guides and Training Section */}
+        {/* 1. Guides and Training Section - Always visible to everyone */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <IconSymbol
@@ -231,8 +213,40 @@ export default function EmployeeToolsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Bartender Assistant Section - Only visible to Managers and Bartenders */}
-        {isBartenderOrManager && (
+        {/* 2. Check Out Calculator Section - Only visible to Servers and Managers */}
+        {canViewCheckOutsCalculator && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <IconSymbol
+                ios_icon_name="calculator.fill"
+                android_material_icon_name="calculate"
+                size={32}
+                color={employeeColors.primary}
+              />
+              <View style={styles.cardHeaderText}>
+                <Text style={styles.cardTitle}>Check Out Calculator</Text>
+                <Text style={styles.cardDescription}>
+                  Calculate your shift check out totals and tip outs
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              style={styles.cardButton}
+              onPress={() => router.push('/check-out-calculator')}
+            >
+              <Text style={styles.cardButtonText}>Open Calculator</Text>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={20}
+                color={employeeColors.text}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* 3. Bartender Assistant Section - Only visible to Bartenders and Managers */}
+        {canViewBarAssistant && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <IconSymbol

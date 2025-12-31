@@ -4,7 +4,8 @@ export interface User {
   username: string;
   name: string;
   email: string;
-  jobTitle: string;
+  jobTitle: string; // Display string (comma-separated)
+  jobTitles?: string[]; // Array of job titles for conditional logic
   phoneNumber: string;
   role: 'employee' | 'manager';
   profilePictureUrl?: string;

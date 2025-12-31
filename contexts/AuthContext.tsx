@@ -48,9 +48,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Get job title display - prefer job_titles array, fallback to job_title
       let jobTitleDisplay = '';
+      let jobTitlesArray: string[] = [];
+      
       if (userData.job_titles && Array.isArray(userData.job_titles) && userData.job_titles.length > 0) {
+        jobTitlesArray = userData.job_titles;
         jobTitleDisplay = userData.job_titles.join(', ');
       } else if (userData.job_title) {
+        jobTitlesArray = [userData.job_title];
         jobTitleDisplay = userData.job_title;
       }
 
@@ -61,12 +65,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: userData.name,
         email: userData.email,
         jobTitle: jobTitleDisplay,
+        jobTitles: jobTitlesArray,
         phoneNumber: userData.phone_number || '',
         role: userData.role as 'employee' | 'manager',
         profilePictureUrl: userData.profile_picture_url || undefined,
       };
 
-      console.log('User data fetched successfully, job title:', user.jobTitle, 'profile picture URL:', user.profilePictureUrl);
+      console.log('User data fetched successfully, job titles:', user.jobTitles, 'profile picture URL:', user.profilePictureUrl);
       return user;
     } catch (error) {
       console.log('Error fetching user from database:', error);
@@ -181,9 +186,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Get job title display - prefer job_titles array, fallback to job_title
       let jobTitleDisplay = '';
+      let jobTitlesArray: string[] = [];
+      
       if (userData.job_titles && Array.isArray(userData.job_titles) && userData.job_titles.length > 0) {
+        jobTitlesArray = userData.job_titles;
         jobTitleDisplay = userData.job_titles.join(', ');
       } else if (userData.job_title) {
+        jobTitlesArray = [userData.job_title];
         jobTitleDisplay = userData.job_title;
       }
 
@@ -194,6 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         name: userData.name,
         email: userData.email,
         jobTitle: jobTitleDisplay,
+        jobTitles: jobTitlesArray,
         phoneNumber: userData.phone_number || '',
         role: userData.role as 'employee' | 'manager',
         profilePictureUrl: userData.profile_picture_url || undefined,
@@ -214,7 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isAuthenticated: true,
       });
 
-      console.log('Login successful for user:', user.name, 'Job title:', user.jobTitle, 'Profile picture:', user.profilePictureUrl);
+      console.log('Login successful for user:', user.name, 'Job titles:', user.jobTitles, 'Profile picture:', user.profilePictureUrl);
       return true;
     } catch (error) {
       console.log('Login error:', error);
