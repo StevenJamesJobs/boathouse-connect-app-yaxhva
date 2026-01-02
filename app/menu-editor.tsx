@@ -17,6 +17,8 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+// @ts-expect-error - expo-file-system/legacy is valid for Expo 54
+// eslint-disable-next-line import/no-unresolved
 import * as FileSystem from 'expo-file-system/legacy';
 import { managerColors } from '@/styles/commonStyles';
 import { useAuth } from '@/contexts/AuthContext';

@@ -17,6 +17,8 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+// @ts-expect-error - expo-file-system/legacy is valid for Expo 54
+// eslint-disable-next-line import/no-unresolved
 import * as FileSystem from 'expo-file-system/legacy';
 import { managerColors } from '@/styles/commonStyles';
 import { useAuth } from '@/contexts/AuthContext';
@@ -398,9 +400,28 @@ export default function SignatureRecipesEditorScreen() {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
+  const loadRecipes = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('signature_recipes')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      setRecipes(data || []);
+    } catch (error) {
+      console.error('Error loading recipes:', error);
+      Alert.alert('Error', 'Failed to load recipes');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadRecipes();
-  }, []);
+  }, [loadRecipes]);
 
   const filterRecipes = useCallback(() => {
     let filtered = recipes;
@@ -432,25 +453,6 @@ export default function SignatureRecipesEditorScreen() {
   useEffect(() => {
     filterRecipes();
   }, [filterRecipes]);
-
-  const loadRecipes = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('signature_recipes')
-        .select('*')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
-
-      if (error) throw error;
-      setRecipes(data || []);
-    } catch (error) {
-      console.error('Error loading recipes:', error);
-      Alert.alert('Error', 'Failed to load recipes');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const pickImage = async () => {
     try {

@@ -64,7 +64,10 @@ export default function LoginScreen() {
         }),
       ]).start();
     }, 400);
-  }, []); // Empty dependency array is correct since we're using refs
+    // Empty dependency array is correct - we only want to run this animation once on mount
+    // The animated values are stable because they're wrapped in useRef
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
