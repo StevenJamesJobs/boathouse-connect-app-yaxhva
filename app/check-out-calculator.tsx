@@ -9,9 +9,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
+  Platform,
 } from 'react-native';
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState } from 'react';
 import { useRouter } from 'expo-router';
 
 const CheckOutCalculatorScreen = () => {
@@ -19,11 +19,9 @@ const CheckOutCalculatorScreen = () => {
   const { user } = useAuth();
   const isManager = user?.role === 'manager';
   const colors = isManager ? managerColors : employeeColors;
-  const scrollViewRef = useRef<ScrollView>(null);
 
   // Form state
   const [cashSales, setCashSales] = useState('');
-  const [creditSales, setCreditSales] = useState('');
   const [cashedOutIn, setCashedOutIn] = useState('');
   const [sharedParty, setSharedParty] = useState<boolean | null>(null);
   const [partySubtotal, setPartySubtotal] = useState('');
@@ -33,51 +31,46 @@ const CheckOutCalculatorScreen = () => {
   const [busserTipOut, setBusserTipOut] = useState<number | null>(null);
   const [bartenderTipOut, setBartenderTipOut] = useState<number | null>(null);
 
-  // Real-time calculations using useMemo
-  const calculationResults = useMemo(() => {
-    return calculateResults();
-  }, [
-    cashSales,
-    creditSales,
-    cashedOutIn,
-    sharedParty,
-    partySubtotal,
-    partyGratuity,
-    checkUnderMyName,
-    declarePercentage,
-    busserTipOut,
-    bartenderTipOut,
-  ]);
+  // Results state
+  const [totalSales, setTotalSales] = useState(0);
+  const [declaredTips, setDeclaredTips] = useState(0);
+  const [busserAmount, setBusserAmount] = useState(0);
+  const [bartenderAmount, setBartenderAmount] = useState(0);
+  const [netTips, setNetTips] = useState(0);
+  const [finalAmount, setFinalAmount] = useState(0);
+  const [partyGratuityAfterTipOuts, setPartyGratuityAfterTipOuts] = useState(0);
+  const [partyGratuitySplit, setPartyGratuitySplit] = useState(0);
+  const [partyGratuityMessage, setPartyGratuityMessage] = useState('');
+  const [showResults, setShowResults] = useState(false);
 
-  function calculateResults() {
+  const handleCalculate = () => {
     const cash = parseFloat(cashSales) || 0;
-    const credit = parseFloat(creditSales) || 0;
     const cashedOut = parseFloat(cashedOutIn) || 0;
 
-    const totalSales = cash + credit;
-    const declaredTips = declarePercentage ? (totalSales * declarePercentage) / 100 : 0;
+    const sales = cash;
+    const declaredTipsCalc = declarePercentage ? (sales * declarePercentage) / 100 : 0;
 
-    let busserAmount = 0;
-    let bartenderAmount = 0;
-    let netTips = declaredTips;
+    let busserAmountCalc = 0;
+    let bartenderAmountCalc = 0;
+    let netTipsCalc = declaredTipsCalc;
 
     if (sharedParty && partySubtotal) {
       const partySub = parseFloat(partySubtotal) || 0;
-      busserAmount = busserTipOut ? (partySub * busserTipOut) / 100 : 0;
-      bartenderAmount = bartenderTipOut ? (partySub * bartenderTipOut) / 100 : 0;
+      busserAmountCalc = busserTipOut ? (partySub * busserTipOut) / 100 : 0;
+      bartenderAmountCalc = bartenderTipOut ? (partySub * bartenderTipOut) / 100 : 0;
     } else {
-      busserAmount = busserTipOut ? (totalSales * busserTipOut) / 100 : 0;
-      bartenderAmount = bartenderTipOut ? (totalSales * bartenderTipOut) / 100 : 0;
+      busserAmountCalc = busserTipOut ? (sales * busserTipOut) / 100 : 0;
+      bartenderAmountCalc = bartenderTipOut ? (sales * bartenderTipOut) / 100 : 0;
     }
 
-    netTips = declaredTips - busserAmount - bartenderAmount;
+    netTipsCalc = declaredTipsCalc - busserAmountCalc - bartenderAmountCalc;
 
-    const finalAmount = cash + netTips - cashedOut;
+    const finalAmountCalc = cash + netTipsCalc - cashedOut;
 
     // Party Gratuity Calculation
-    let partyGratuityAfterTipOuts = 0;
-    let partyGratuitySplit = 0;
-    let partyGratuityMessage = '';
+    let partyGratuityAfterTipOutsCalc = 0;
+    let partyGratuitySplitCalc = 0;
+    let partyGratuityMessageCalc = '';
 
     if (sharedParty && partyGratuity && partySubtotal) {
       const gratuity = parseFloat(partyGratuity) || 0;
@@ -85,32 +78,27 @@ const CheckOutCalculatorScreen = () => {
       const partyBusserAmount = busserTipOut ? (partySub * busserTipOut) / 100 : 0;
       const partyBartenderAmount = bartenderTipOut ? (partySub * bartenderTipOut) / 100 : 0;
 
-      partyGratuityAfterTipOuts = gratuity - partyBusserAmount - partyBartenderAmount;
-      partyGratuitySplit = partyGratuityAfterTipOuts / 2;
+      partyGratuityAfterTipOutsCalc = gratuity - partyBusserAmount - partyBartenderAmount;
+      partyGratuitySplitCalc = partyGratuityAfterTipOutsCalc / 2;
 
       if (checkUnderMyName === true) {
-        partyGratuityMessage = 'You owe your Teammate';
+        partyGratuityMessageCalc = 'You owe your Teammate';
       } else if (checkUnderMyName === false) {
-        partyGratuityMessage = 'Your Teammate owes you';
+        partyGratuityMessageCalc = 'Your Teammate owes you';
       }
     }
 
-    return {
-      totalSales,
-      declaredTips,
-      busserAmount,
-      bartenderAmount,
-      netTips,
-      finalAmount,
-      partyGratuityAfterTipOuts,
-      partyGratuitySplit,
-      partyGratuityMessage,
-    };
-  }
-
-  const handleCalculate = () => {
-    // Scroll to results section when Calculate is pressed
-    scrollViewRef.current?.scrollToEnd({ animated: true });
+    // Update state
+    setTotalSales(sales);
+    setDeclaredTips(declaredTipsCalc);
+    setBusserAmount(busserAmountCalc);
+    setBartenderAmount(bartenderAmountCalc);
+    setNetTips(netTipsCalc);
+    setFinalAmount(finalAmountCalc);
+    setPartyGratuityAfterTipOuts(partyGratuityAfterTipOutsCalc);
+    setPartyGratuitySplit(partyGratuitySplitCalc);
+    setPartyGratuityMessage(partyGratuityMessageCalc);
+    setShowResults(true);
   };
 
   const formatCurrency = (value: number) => {
@@ -118,24 +106,23 @@ const CheckOutCalculatorScreen = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      {/* Fixed Header */}
-      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <IconSymbol name="chevron.left" size={24} color={colors.text} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {/* Fixed Header - Matching Guides and Training style */}
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <IconSymbol
+            ios_icon_name="chevron.left"
+            android_material_icon_name="arrow-back"
+            size={24}
+            color={colors.text}
+          />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Check Out Calculator
-        </Text>
-        <View style={styles.headerRight} />
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Check Out Calculator</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView
-        ref={scrollViewRef}
-        style={styles.container}
+        style={styles.scrollView}
         contentContainerStyle={styles.contentContainer}
         keyboardShouldPersistTaps="handled"
       >
@@ -149,19 +136,6 @@ const CheckOutCalculatorScreen = () => {
             keyboardType="numeric"
             value={cashSales}
             onChangeText={setCashSales}
-          />
-        </View>
-
-        {/* Credit Sales */}
-        <View style={styles.inputGroup}>
-          <Text style={[styles.label, { color: colors.text }]}>Credit Sales</Text>
-          <TextInput
-            style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-            placeholder="0.00"
-            placeholderTextColor={colors.textSecondary}
-            keyboardType="numeric"
-            value={creditSales}
-            onChangeText={setCreditSales}
           />
         </View>
 
@@ -273,18 +247,6 @@ const CheckOutCalculatorScreen = () => {
                 </TouchableOpacity>
               </View>
             </View>
-
-            {/* Real-time Party Gratuity Display */}
-            {partyGratuity && calculationResults.partyGratuityAfterTipOuts > 0 && (
-              <View style={styles.realTimeDisplay}>
-                <Text style={[styles.realTimeLabel, { color: colors.textSecondary }]}>
-                  Party Gratuity After Tip Outs:
-                </Text>
-                <Text style={[styles.realTimeValue, { color: colors.primary }]}>
-                  {formatCurrency(calculationResults.partyGratuityAfterTipOuts)}
-                </Text>
-              </View>
-            )}
           </View>
         )}
 
@@ -366,92 +328,94 @@ const CheckOutCalculatorScreen = () => {
           <Text style={styles.calculateButtonText}>Calculate</Text>
         </TouchableOpacity>
 
-        {/* Calculation Results - Now with real-time updates and extra padding */}
-        <View style={[styles.resultsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
-          <Text style={[styles.resultsTitle, { color: colors.text }]}>Calculation Results</Text>
+        {/* Calculation Results - Only shown after Calculate is pressed */}
+        {showResults && (
+          <View style={[styles.resultsContainer, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.resultsTitle, { color: colors.text }]}>Calculation Results</Text>
 
-          <View style={styles.resultRow}>
-            <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>Total Sales:</Text>
-            <Text style={[styles.resultValue, { color: colors.text }]}>
-              {formatCurrency(calculationResults.totalSales)}
-            </Text>
+            <View style={styles.resultRow}>
+              <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>Total Sales:</Text>
+              <Text style={[styles.resultValue, { color: colors.text }]}>
+                {formatCurrency(totalSales)}
+              </Text>
+            </View>
+
+            <View style={styles.resultRow}>
+              <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>Declared Tips:</Text>
+              <Text style={[styles.resultValue, { color: colors.text }]}>
+                {formatCurrency(declaredTips)}
+              </Text>
+            </View>
+
+            <View style={styles.resultRow}>
+              <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>Busser/Runner Tip Out:</Text>
+              <Text style={[styles.resultValue, { color: colors.text }]}>
+                -{formatCurrency(busserAmount)}
+              </Text>
+            </View>
+
+            <View style={styles.resultRow}>
+              <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>Bartender Tip Out:</Text>
+              <Text style={[styles.resultValue, { color: colors.text }]}>
+                -{formatCurrency(bartenderAmount)}
+              </Text>
+            </View>
+
+            <View style={styles.resultRow}>
+              <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>Net Tips:</Text>
+              <Text style={[styles.resultValue, { color: colors.text }]}>
+                {formatCurrency(netTips)}
+              </Text>
+            </View>
+
+            <View style={[styles.finalTallyDivider, { backgroundColor: colors.border }]} />
+
+            <View style={styles.resultRow}>
+              <Text style={[styles.finalTallyLabel, { color: colors.text }]}>Final Tally:</Text>
+              <Text style={[styles.finalTallyValue, { color: colors.primary }]}>
+                {finalAmount >= 0 ? 'You Owe' : 'You are Owed'}
+              </Text>
+            </View>
+
+            <View style={styles.resultRow}>
+              <Text style={[styles.finalAmountValue, { color: colors.primary }]}>
+                {formatCurrency(Math.abs(finalAmount))}
+              </Text>
+            </View>
+
+            {/* Party Gratuity Split Display */}
+            {sharedParty && partyGratuity && partyGratuitySplit > 0 && (
+              <>
+                <View style={[styles.partyGratuityDivider, { backgroundColor: colors.border }]} />
+
+                <View style={styles.resultRow}>
+                  <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
+                    Party Gratuity After Tip Outs:
+                  </Text>
+                  <Text style={[styles.resultValue, { color: colors.text }]}>
+                    {formatCurrency(partyGratuityAfterTipOuts)}
+                  </Text>
+                </View>
+
+                <View style={styles.resultRow}>
+                  <Text style={[styles.finalTallyLabel, { color: colors.text }]}>
+                    {partyGratuityMessage}:
+                  </Text>
+                  <Text style={[styles.finalTallyValue, { color: colors.primary }]}>
+                    {formatCurrency(partyGratuitySplit)}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
-
-          <View style={styles.resultRow}>
-            <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>Declared Tips:</Text>
-            <Text style={[styles.resultValue, { color: colors.text }]}>
-              {formatCurrency(calculationResults.declaredTips)}
-            </Text>
-          </View>
-
-          <View style={styles.resultRow}>
-            <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>Busser/Runner Tip Out:</Text>
-            <Text style={[styles.resultValue, { color: colors.text }]}>
-              -{formatCurrency(calculationResults.busserAmount)}
-            </Text>
-          </View>
-
-          <View style={styles.resultRow}>
-            <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>Bartender Tip Out:</Text>
-            <Text style={[styles.resultValue, { color: colors.text }]}>
-              -{formatCurrency(calculationResults.bartenderAmount)}
-            </Text>
-          </View>
-
-          <View style={styles.resultRow}>
-            <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>Net Tips:</Text>
-            <Text style={[styles.resultValue, { color: colors.text }]}>
-              {formatCurrency(calculationResults.netTips)}
-            </Text>
-          </View>
-
-          <View style={[styles.finalTallyDivider, { backgroundColor: colors.border }]} />
-
-          <View style={styles.resultRow}>
-            <Text style={[styles.finalTallyLabel, { color: colors.text }]}>Final Tally:</Text>
-            <Text style={[styles.finalTallyValue, { color: colors.primary }]}>
-              {calculationResults.finalAmount >= 0 ? 'You Owe' : 'You are Owed'}
-            </Text>
-          </View>
-
-          <View style={styles.resultRow}>
-            <Text style={[styles.finalAmountValue, { color: colors.primary }]}>
-              {formatCurrency(Math.abs(calculationResults.finalAmount))}
-            </Text>
-          </View>
-
-          {/* Party Gratuity Split Display */}
-          {sharedParty && partyGratuity && calculationResults.partyGratuitySplit > 0 && (
-            <>
-              <View style={[styles.partyGratuityDivider, { backgroundColor: colors.border }]} />
-
-              <View style={styles.resultRow}>
-                <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
-                  Party Gratuity After Tip Outs:
-                </Text>
-                <Text style={[styles.resultValue, { color: colors.text }]}>
-                  {formatCurrency(calculationResults.partyGratuityAfterTipOuts)}
-                </Text>
-              </View>
-
-              <View style={styles.resultRow}>
-                <Text style={[styles.finalTallyLabel, { color: colors.text }]}>
-                  {calculationResults.partyGratuityMessage}:
-                </Text>
-                <Text style={[styles.finalTallyValue, { color: colors.primary }]}>
-                  {formatCurrency(calculationResults.partyGratuitySplit)}
-                </Text>
-              </View>
-            </>
-          )}
-        </View>
+        )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     flex: 1,
   },
   header: {
@@ -459,7 +423,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: Platform.OS === 'android' ? 48 : 60,
+    paddingBottom: 16,
     borderBottomWidth: 1,
   },
   backButton: {
@@ -471,17 +436,16 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     flex: 1,
     textAlign: 'center',
-    marginRight: 32, // Balance the back button
   },
-  headerRight: {
-    width: 24,
+  headerSpacer: {
+    width: 40,
   },
-  container: {
+  scrollView: {
     flex: 1,
   },
   contentContainer: {
     padding: 16,
-    paddingBottom: 60, // Extra padding at bottom to prevent cutoff
+    paddingBottom: 100, // Extra padding at bottom to prevent cutoff
   },
   inputGroup: {
     marginBottom: 20,
@@ -544,20 +508,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  realTimeDisplay: {
-    marginTop: 12,
-    padding: 12,
-    borderRadius: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  realTimeLabel: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  realTimeValue: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
   calculateButton: {
     padding: 16,
     borderRadius: 8,
@@ -573,7 +523,7 @@ const styles = StyleSheet.create({
     padding: 20,
     borderRadius: 12,
     borderWidth: 2,
-    marginBottom: 40, // Extra padding at bottom
+    marginBottom: 60, // Extra padding at bottom to prevent cutoff
   },
   resultsTitle: {
     fontSize: 20,
