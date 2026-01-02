@@ -68,7 +68,7 @@ export default function EmployeeToolsScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <IconSymbol
-                ios_icon_name="calculator.fill"
+                ios_icon_name="clock.fill"
                 android_material_icon_name="calculate"
                 size={32}
                 color={employeeColors.highlight}

@@ -470,7 +470,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
             >
               <IconSymbol
                 ios_icon_name="line.3.horizontal.decrease.circle"
-                android_material_icon_name="filter_list"
+                android_material_icon_name="filter-list"
                 size={20}
                 color={selectedFilters.length > 0 ? '#FFFFFF' : colors.text}
               />

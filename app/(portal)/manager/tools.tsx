@@ -68,7 +68,7 @@ export default function ManagerToolsScreen() {
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <IconSymbol
-                ios_icon_name="calculator.fill"
+                ios_icon_name="clock"
                 android_material_icon_name="calculate"
                 size={32}
                 color={managerColors.highlight}

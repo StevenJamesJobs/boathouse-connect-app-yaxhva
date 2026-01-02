@@ -1,35 +1,37 @@
 
 {
   "expo": {
-    "name": "McLoone's Boathouse Connect",
-    "slug": "mcloones-boathouse-connect",
-    "version": "1.0.0",
+    "name": "Natively",
+    "slug": "Natively",
+    "version": "1.2.0",
     "orientation": "portrait",
-    "icon": "./assets/images/c7ef4cde-1fae-408d-8511-e54cab9f4646.jpeg",
+    "icon": "./assets/images/natively-dark.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/c7ef4cde-1fae-408d-8511-e54cab9f4646.jpeg",
+      "image": "./assets/images/natively-dark.png",
       "resizeMode": "contain",
-      "backgroundColor": "#87CEEB"
+      "backgroundColor": "#000000"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mcloones.boathouseconnect",
+      "bundleIdentifier": "com.anonymous.Natively",
+      "buildNumber": "1.2.0",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/c7ef4cde-1fae-408d-8511-e54cab9f4646.jpeg",
-        "backgroundColor": "#87CEEB"
+        "foregroundImage": "./assets/images/natively-dark.png",
+        "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.mcloones.boathouseconnect"
+      "package": "com.anonymous.Natively",
+      "versionCode": 3
     },
     "web": {
-      "favicon": "./assets/images/c7ef4cde-1fae-408d-8511-e54cab9f4646.jpeg",
+      "favicon": "./assets/images/final_quest_240x240.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -37,7 +39,7 @@
       "expo-router",
       "expo-web-browser"
     ],
-    "scheme": "mcloones",
+    "scheme": "natively",
     "experiments": {
       "typedRoutes": true
     },
