@@ -211,6 +211,40 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: 'bold',
   },
+  sectionSeparator: {
+    height: 2,
+    marginVertical: 20,
+    borderRadius: 1,
+  },
+  partySection: {
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 12,
+    borderWidth: 2,
+  },
+  toggleButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    borderWidth: 1,
+    marginLeft: 8,
+  },
+  toggleButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  inputWithToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  realTimeValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+  },
 });
 
 export default function CheckOutCalculatorScreen() {
@@ -221,6 +255,7 @@ export default function CheckOutCalculatorScreen() {
 
   const [totalShiftSales, setTotalShiftSales] = useState('');
   const [cashInOutTotal, setCashInOutTotal] = useState('');
+  const [cashInOutIsNegative, setCashInOutIsNegative] = useState(false);
   const [busserRunnerPercent, setBusserRunnerPercent] = useState(0.035);
   const [bartenderPercent, setBartenderPercent] = useState(0.02);
   const [declarePercent, setDeclarePercent] = useState(0.12); // Default to 12%
@@ -229,6 +264,7 @@ export default function CheckOutCalculatorScreen() {
   // Shared party state
   const [sharedParty, setSharedParty] = useState(false);
   const [partySubtotal, setPartySubtotal] = useState('');
+  const [partyGratuity, setPartyGratuity] = useState('');
   const [checkUnderMyName, setCheckUnderMyName] = useState<boolean | null>(null);
 
   const busserRunnerOptions = [
@@ -248,6 +284,34 @@ export default function CheckOutCalculatorScreen() {
     { label: '12%', value: 0.12 },
     { label: '8%', value: 0.08 },
   ];
+
+  // Calculate party gratuity split in real-time
+  const partyGratuitySplit = useMemo(() => {
+    if (!sharedParty || !partyGratuity || !partySubtotal || checkUnderMyName === null) {
+      return null;
+    }
+
+    const gratuity = parseFloat(partyGratuity) || 0;
+    const subtotal = parseFloat(partySubtotal) || 0;
+    
+    // Calculate tip-outs from Party Subtotal
+    const busserTipOut = subtotal * busserRunnerPercent;
+    const bartenderTipOut = subtotal * bartenderPercent;
+    const totalTipOuts = busserTipOut + bartenderTipOut;
+    
+    // Subtract tip-outs from Party Gratuity
+    const afterTipOuts = gratuity - totalTipOuts;
+    
+    // Split evenly
+    const splitAmount = afterTipOuts / 2;
+    
+    return {
+      afterTipOuts,
+      splitAmount,
+      busserTipOut,
+      bartenderTipOut,
+    };
+  }, [sharedParty, partyGratuity, partySubtotal, checkUnderMyName, busserRunnerPercent, bartenderPercent]);
 
   // Calculate adjusted sales for declare amount
   const adjustedSales = useMemo(() => {
@@ -271,7 +335,8 @@ export default function CheckOutCalculatorScreen() {
 
   const calculateResults = () => {
     const sales = parseFloat(totalShiftSales) || 0;
-    const cashInOut = parseFloat(cashInOutTotal) || 0;
+    const cashInOutValue = parseFloat(cashInOutTotal) || 0;
+    const cashInOut = cashInOutIsNegative ? -cashInOutValue : cashInOutValue;
     
     // Busser/Runner and Bartender amounts are based on ORIGINAL Total Sales
     const busserAmount = sales * busserRunnerPercent;
@@ -366,6 +431,7 @@ export default function CheckOutCalculatorScreen() {
                 if (sharedParty) {
                   // Reset party-related fields when unchecking
                   setPartySubtotal('');
+                  setPartyGratuity('');
                   setCheckUnderMyName(null);
                 }
                 setShowResults(false);
@@ -393,82 +459,131 @@ export default function CheckOutCalculatorScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Party Subtotal - Only show if shared party is checked */}
+          {/* Party Details Section - Only show if shared party is checked */}
           {sharedParty && (
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>
-                Party Subtotal
-              </Text>
-              <View style={[styles.inputWrapper, { borderColor: colors.border }]}>
-                <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
-                <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  value={partySubtotal}
-                  onChangeText={(text) => {
-                    setPartySubtotal(text);
-                    setShowResults(false);
-                  }}
-                  keyboardType="decimal-pad"
-                  placeholder="0.00"
-                  placeholderTextColor={colors.textSecondary}
-                />
+            <>
+              {/* Visual Separator */}
+              <View style={[styles.sectionSeparator, { backgroundColor: colors.primary, opacity: 0.3 }]} />
+              
+              <View style={[styles.partySection, { backgroundColor: colors.background, borderColor: colors.primary }]}>
+                {/* Party Subtotal */}
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.label, { color: colors.text }]}>
+                    Party Subtotal *
+                  </Text>
+                  <View style={[styles.inputWrapper, { borderColor: colors.border }]}>
+                    <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      value={partySubtotal}
+                      onChangeText={(text) => {
+                        setPartySubtotal(text);
+                        setShowResults(false);
+                      }}
+                      keyboardType="decimal-pad"
+                      placeholder="0.00"
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                  </View>
+                </View>
+
+                {/* Party Gratuity */}
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.label, { color: colors.text }]}>
+                    Party Gratuity
+                  </Text>
+                  <Text style={[styles.helperText, { color: colors.textSecondary }]}>
+                    (Automatic gratuity from the party bill)
+                  </Text>
+                  <View style={[styles.inputWrapper, { borderColor: colors.border }]}>
+                    <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      value={partyGratuity}
+                      onChangeText={(text) => {
+                        setPartyGratuity(text);
+                        setShowResults(false);
+                      }}
+                      keyboardType="decimal-pad"
+                      placeholder="0.00"
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                  </View>
+                  
+                  {/* Real-time calculation display */}
+                  {partyGratuitySplit && (
+                    <View style={[styles.realTimeValue, { backgroundColor: colors.highlight }]}>
+                      <Text style={[{ color: colors.text, fontSize: 12 }]}>
+                        After tip-outs: {formatCurrency(partyGratuitySplit.afterTipOuts)}
+                      </Text>
+                      <Text style={[{ color: colors.text, fontSize: 12, marginTop: 2 }]}>
+                        (Busser: {formatCurrency(partyGratuitySplit.busserTipOut)} + Bartender: {formatCurrency(partyGratuitySplit.bartenderTipOut)})
+                      </Text>
+                    </View>
+                  )}
+                </View>
+                
+                {/* Is the check under my name? */}
+                <View style={styles.inputGroup}>
+                  <Text style={[styles.smallText, { color: colors.textSecondary }]}>
+                    Is the check under my name?
+                  </Text>
+                  <View style={styles.yesNoContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.yesNoButton,
+                        {
+                          backgroundColor: checkUnderMyName === true ? colors.primary : colors.card,
+                          borderColor: colors.border,
+                        },
+                      ]}
+                      onPress={() => {
+                        setCheckUnderMyName(true);
+                        setShowResults(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.yesNoButtonText,
+                          {
+                            color: checkUnderMyName === true ? '#FFFFFF' : colors.text,
+                          },
+                        ]}
+                      >
+                        Yes
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.yesNoButton,
+                        {
+                          backgroundColor: checkUnderMyName === false ? colors.primary : colors.card,
+                          borderColor: colors.border,
+                        },
+                      ]}
+                      onPress={() => {
+                        setCheckUnderMyName(false);
+                        setShowResults(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.yesNoButtonText,
+                          {
+                            color: checkUnderMyName === false ? '#FFFFFF' : colors.text,
+                          },
+                        ]}
+                      >
+                        No
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               </View>
               
-              {/* Is the check under my name? */}
-              <Text style={[styles.smallText, { color: colors.textSecondary, marginTop: 12 }]}>
-                Is the check under my name?
-              </Text>
-              <View style={styles.yesNoContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.yesNoButton,
-                    {
-                      backgroundColor: checkUnderMyName === true ? colors.primary : colors.card,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    setCheckUnderMyName(true);
-                    setShowResults(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.yesNoButtonText,
-                      {
-                        color: checkUnderMyName === true ? '#FFFFFF' : colors.text,
-                      },
-                    ]}
-                  >
-                    Yes
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.yesNoButton,
-                    {
-                      backgroundColor: checkUnderMyName === false ? colors.primary : colors.card,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => {
-                    setCheckUnderMyName(false);
-                    setShowResults(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      styles.yesNoButtonText,
-                      {
-                        color: checkUnderMyName === false ? '#FFFFFF' : colors.text,
-                      },
-                    ]}
-                  >
-                    No
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+              {/* Visual Separator */}
+              <View style={[styles.sectionSeparator, { backgroundColor: colors.primary, opacity: 0.3 }]} />
+            </>
           )}
 
           {/* Declare Percentage */}
@@ -519,21 +634,44 @@ export default function CheckOutCalculatorScreen() {
               Cashed Out/In Total *
             </Text>
             <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-              (Enter negative number with - sign if applicable)
+              (Use +/- button to toggle between positive and negative)
             </Text>
-            <View style={[styles.inputWrapper, { borderColor: colors.border }]}>
-              <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                value={cashInOutTotal}
-                onChangeText={(text) => {
-                  setCashInOutTotal(text);
+            <View style={styles.inputWithToggle}>
+              <View style={[styles.inputWrapper, { borderColor: colors.border, flex: 1 }]}>
+                <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>
+                  {cashInOutIsNegative ? '-$' : '$'}
+                </Text>
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  value={cashInOutTotal}
+                  onChangeText={(text) => {
+                    // Remove any negative signs from input
+                    const cleanText = text.replace('-', '');
+                    setCashInOutTotal(cleanText);
+                    setShowResults(false);
+                  }}
+                  keyboardType="decimal-pad"
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  {
+                    backgroundColor: cashInOutIsNegative ? '#D32F2F' : '#388E3C',
+                    borderColor: cashInOutIsNegative ? '#B71C1C' : '#2E7D32',
+                  },
+                ]}
+                onPress={() => {
+                  setCashInOutIsNegative(!cashInOutIsNegative);
                   setShowResults(false);
                 }}
-                keyboardType="numeric"
-                placeholder="0.00 or -0.00"
-                placeholderTextColor={colors.textSecondary}
-              />
+              >
+                <Text style={[styles.toggleButtonText, { color: '#FFFFFF' }]}>
+                  {cashInOutIsNegative ? '(-)' : '(+)'}
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
@@ -734,6 +872,42 @@ export default function CheckOutCalculatorScreen() {
                 {formatCurrency(results.finalTally)}
               </Text>
             </View>
+
+            {/* Party Gratuity Split - Only show if party gratuity was entered */}
+            {partyGratuitySplit && partyGratuity && (
+              <>
+                {/* Visual Separator */}
+                <View style={[styles.divider, { backgroundColor: colors.primary, opacity: 0.5, height: 2 }]} />
+                
+                <View style={styles.finalTallyContainer}>
+                  <Text
+                    style={[
+                      styles.finalTallyLabel,
+                      {
+                        color: checkUnderMyName ? '#D32F2F' : '#388E3C',
+                        fontSize: 14,
+                      },
+                    ]}
+                  >
+                    {checkUnderMyName ? 'You owe your Teammate' : 'Your Teammate owes you'}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.finalTallyValue,
+                      {
+                        color: checkUnderMyName ? '#D32F2F' : '#388E3C',
+                        fontSize: 24,
+                      },
+                    ]}
+                  >
+                    {formatCurrency(partyGratuitySplit.splitAmount)}
+                  </Text>
+                  <Text style={[{ color: colors.textSecondary, fontSize: 12, marginTop: 4 }]}>
+                    (From Party Gratuity split)
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
         )}
       </ScrollView>
