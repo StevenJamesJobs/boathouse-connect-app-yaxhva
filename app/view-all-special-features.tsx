@@ -228,19 +228,17 @@ export default function ViewAllSpecialFeaturesScreen() {
                           )}
                         </View>
                       )}
-                      {(feature.link || feature.guide_file) && (
-                        <View style={styles.actionIndicator}>
-                          <IconSymbol
-                            ios_icon_name="chevron.right"
-                            android_material_icon_name="chevron-right"
-                            size={16}
-                            color={colors.primary}
-                          />
-                          <Text style={[styles.actionText, { color: colors.primary }]}>
-                            Tap for more details
-                          </Text>
-                        </View>
-                      )}
+                      <View style={styles.actionIndicator}>
+                        <IconSymbol
+                          ios_icon_name="chevron.right"
+                          android_material_icon_name="chevron-right"
+                          size={16}
+                          color={colors.primary}
+                        />
+                        <Text style={[styles.actionText, { color: colors.primary }]}>
+                          Tap for more information
+                        </Text>
+                      </View>
                     </View>
                   </View>
                 ) : (
@@ -254,7 +252,7 @@ export default function ViewAllSpecialFeaturesScreen() {
                     <View style={styles.featureContent}>
                       <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>
                       {(feature.content || feature.message) && (
-                        <Text style={[styles.featureMessage, { color: colors.textSecondary }]}>
+                        <Text style={[styles.featureMessage, { color: colors.textSecondary }]} numberOfLines={2}>
                           {feature.content || feature.message}
                         </Text>
                       )}
@@ -286,19 +284,17 @@ export default function ViewAllSpecialFeaturesScreen() {
                           )}
                         </View>
                       )}
-                      {(feature.link || feature.guide_file) && (
-                        <View style={styles.actionIndicator}>
-                          <IconSymbol
-                            ios_icon_name="chevron.right"
-                            android_material_icon_name="chevron-right"
-                            size={16}
-                            color={colors.primary}
-                          />
-                          <Text style={[styles.actionText, { color: colors.primary }]}>
-                            Tap for more details
-                          </Text>
-                        </View>
-                      )}
+                      <View style={styles.actionIndicator}>
+                        <IconSymbol
+                          ios_icon_name="chevron.right"
+                          android_material_icon_name="chevron-right"
+                          size={16}
+                          color={colors.primary}
+                        />
+                        <Text style={[styles.actionText, { color: colors.primary }]}>
+                          Tap for more information
+                        </Text>
+                      </View>
                     </View>
                   </>
                 )}
