@@ -1,7 +1,8 @@
+
 {
   "expo": {
-    "name": "Boathouse Connect",
-    "slug": "Boathouse Connect",
+    "name": "McLoone's Boathouse Connect",
+    "slug": "mcloones-boathouse-connect",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/c7ef4cde-1fae-408d-8511-e54cab9f4646.jpeg",
@@ -43,6 +44,5 @@
     "extra": {
       "router": {}
     }
-  },
-  "scheme": "Boathouse Connect"
+  }
 }
