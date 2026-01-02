@@ -198,7 +198,7 @@ export default function EmployeePortalScreen() {
         .eq('is_active', true)
         .in('visibility', ['everyone', 'employees'])
         .order('display_order', { ascending: true })
-        .limit(10);
+        .limit(4);
 
       if (error) {
         console.error('Error loading announcements:', error);
@@ -234,7 +234,7 @@ export default function EmployeePortalScreen() {
         .eq('is_active', true)
         .order('display_order', { ascending: true })
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(4);
 
       if (error) {
         console.error('Error loading upcoming events:', error);
@@ -270,7 +270,7 @@ export default function EmployeePortalScreen() {
         .eq('is_active', true)
         .order('display_order', { ascending: true })
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(4);
 
       if (error) {
         console.error('Error loading special features:', error);
@@ -616,88 +616,6 @@ export default function EmployeePortalScreen() {
         </CollapsibleSection>
 
         <CollapsibleSection
-          title="Special Features"
-          iconIos="star.fill"
-          iconAndroid="star"
-          iconColor={employeeColors.primary}
-          headerBackgroundColor={headerColor}
-          headerTextColor={employeeColors.text}
-          defaultExpanded={true}
-          onViewAll={() => router.push('/view-all-special-features')}
-        >
-          {loadingFeatures ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={employeeColors.primary} />
-              <Text style={styles.loadingText}>Loading features...</Text>
-            </View>
-          ) : specialFeatures.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No special features</Text>
-            </View>
-          ) : (
-            <>
-              {specialFeatures.map((feature, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.featureItem}
-                  onPress={() => openDetailModal({
-                    title: feature.title,
-                    content: feature.content || feature.message || '',
-                    thumbnailUrl: feature.thumbnail_url,
-                    thumbnailShape: feature.thumbnail_shape,
-                    startDateTime: feature.start_date_time,
-                    endDateTime: feature.end_date_time,
-                    link: feature.link,
-                    guideFile: feature.guide_file || null,
-                  })}
-                  activeOpacity={0.7}
-                >
-                  {feature.thumbnail_shape === 'square' && feature.thumbnail_url ? (
-                    <View style={styles.featureSquareLayout}>
-                      <Image
-                        source={{ uri: getImageUrl(feature.thumbnail_url) }}
-                        style={styles.featureSquareImage}
-                      />
-                      <View style={styles.featureSquareContent}>
-                        <Text style={styles.featureTitle}>{feature.title}</Text>
-                        {(feature.content || feature.message) && (
-                          <Text style={styles.featureDescription} numberOfLines={2}>
-                            {feature.content || feature.message}
-                          </Text>
-                        )}
-                        {feature.start_date_time && (
-                          <Text style={styles.featureTime}>{formatDateTime(feature.start_date_time)}</Text>
-                        )}
-                      </View>
-                    </View>
-                  ) : (
-                    <>
-                      {feature.thumbnail_url && (
-                        <Image
-                          source={{ uri: getImageUrl(feature.thumbnail_url) }}
-                          style={styles.featureBannerImage}
-                        />
-                      )}
-                      <View style={styles.featureContent}>
-                        <Text style={styles.featureTitle}>{feature.title}</Text>
-                        {(feature.content || feature.message) && (
-                          <Text style={styles.featureDescription}>
-                            {truncateText(feature.content || feature.message, 125)}
-                          </Text>
-                        )}
-                        {feature.start_date_time && (
-                          <Text style={styles.featureTime}>{formatDateTime(feature.start_date_time)}</Text>
-                        )}
-                      </View>
-                    </>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </>
-          )}
-        </CollapsibleSection>
-
-        <CollapsibleSection
           title="Weekly Specials"
           iconIos="fork.knife"
           iconAndroid="restaurant"
@@ -812,6 +730,88 @@ export default function EmployeePortalScreen() {
                               </View>
                             )}
                           </View>
+                        )}
+                      </View>
+                    </>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+        </CollapsibleSection>
+
+        <CollapsibleSection
+          title="Special Features"
+          iconIos="star.fill"
+          iconAndroid="star"
+          iconColor={employeeColors.primary}
+          headerBackgroundColor={headerColor}
+          headerTextColor={employeeColors.text}
+          defaultExpanded={true}
+          onViewAll={() => router.push('/view-all-special-features')}
+        >
+          {loadingFeatures ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={employeeColors.primary} />
+              <Text style={styles.loadingText}>Loading features...</Text>
+            </View>
+          ) : specialFeatures.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No special features</Text>
+            </View>
+          ) : (
+            <>
+              {specialFeatures.map((feature, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.featureItem}
+                  onPress={() => openDetailModal({
+                    title: feature.title,
+                    content: feature.content || feature.message || '',
+                    thumbnailUrl: feature.thumbnail_url,
+                    thumbnailShape: feature.thumbnail_shape,
+                    startDateTime: feature.start_date_time,
+                    endDateTime: feature.end_date_time,
+                    link: feature.link,
+                    guideFile: feature.guide_file || null,
+                  })}
+                  activeOpacity={0.7}
+                >
+                  {feature.thumbnail_shape === 'square' && feature.thumbnail_url ? (
+                    <View style={styles.featureSquareLayout}>
+                      <Image
+                        source={{ uri: getImageUrl(feature.thumbnail_url) }}
+                        style={styles.featureSquareImage}
+                      />
+                      <View style={styles.featureSquareContent}>
+                        <Text style={styles.featureTitle}>{feature.title}</Text>
+                        {(feature.content || feature.message) && (
+                          <Text style={styles.featureDescription} numberOfLines={2}>
+                            {feature.content || feature.message}
+                          </Text>
+                        )}
+                        {feature.start_date_time && (
+                          <Text style={styles.featureTime}>{formatDateTime(feature.start_date_time)}</Text>
+                        )}
+                      </View>
+                    </View>
+                  ) : (
+                    <>
+                      {feature.thumbnail_url && (
+                        <Image
+                          source={{ uri: getImageUrl(feature.thumbnail_url) }}
+                          style={styles.featureBannerImage}
+                        />
+                      )}
+                      <View style={styles.featureContent}>
+                        <Text style={styles.featureTitle}>{feature.title}</Text>
+                        {(feature.content || feature.message) && (
+                          <Text style={styles.featureDescription}>
+                            {truncateText(feature.content || feature.message, 125)}
+                          </Text>
+                        )}
+                        {feature.start_date_time && (
+                          <Text style={styles.featureTime}>{formatDateTime(feature.start_date_time)}</Text>
                         )}
                       </View>
                     </>

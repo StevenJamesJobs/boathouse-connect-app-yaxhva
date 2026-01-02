@@ -7,46 +7,51 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { employeeColors } from '@/styles/commonStyles';
+import { employeeColors, managerColors } from '@/styles/commonStyles';
+import { useAuth } from '@/contexts/AuthContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 
 export default function BartenderAssistantScreen() {
   const router = useRouter();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'encyclopedia' | 'exams'>('encyclopedia');
+  
+  // Use manager colors if user is a manager, otherwise use employee colors
+  const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
-            color={employeeColors.text}
+            color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Bartender Assistant</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Bartender Assistant</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {/* Tab Selector */}
-        <View style={styles.tabContainer}>
+        <View style={[styles.tabContainer, { backgroundColor: colors.card }]}>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'encyclopedia' && styles.activeTab]}
+            style={[styles.tab, activeTab === 'encyclopedia' && { backgroundColor: colors.primary }]}
             onPress={() => setActiveTab('encyclopedia')}
           >
-            <Text style={[styles.tabText, activeTab === 'encyclopedia' && styles.activeTabText]}>
+            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'encyclopedia' && { color: colors.text }]}>
               Encyclopedia
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'exams' && styles.activeTab]}
+            style={[styles.tab, activeTab === 'exams' && { backgroundColor: colors.primary }]}
             onPress={() => setActiveTab('exams')}
           >
-            <Text style={[styles.tabText, activeTab === 'exams' && styles.activeTabText]}>
+            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'exams' && { color: colors.text }]}>
               Bar Exams
             </Text>
           </TouchableOpacity>
@@ -55,91 +60,91 @@ export default function BartenderAssistantScreen() {
         {activeTab === 'encyclopedia' ? (
           <>
             {/* Cocktails A-Z Section */}
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: colors.card }]}>
               <View style={styles.cardHeader}>
                 <IconSymbol
                   ios_icon_name="list.bullet"
                   android_material_icon_name="format-list-bulleted"
                   size={32}
-                  color={employeeColors.primary}
+                  color={colors.primary}
                 />
                 <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Cocktails A-Z</Text>
-                  <Text style={styles.cardDescription}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Cocktails A-Z</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     Browse all cocktails alphabetically
                   </Text>
                 </View>
               </View>
               <TouchableOpacity 
-                style={styles.cardButton}
+                style={[styles.cardButton, { backgroundColor: colors.primary }]}
                 onPress={() => router.push('/cocktails-az')}
               >
-                <Text style={styles.cardButtonText}>View Cocktails</Text>
+                <Text style={[styles.cardButtonText, { color: colors.text }]}>View Cocktails</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={employeeColors.text}
+                  color={colors.text}
                 />
               </TouchableOpacity>
             </View>
 
             {/* Signature Recipes Section */}
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: colors.card }]}>
               <View style={styles.cardHeader}>
                 <IconSymbol
                   ios_icon_name="star.fill"
                   android_material_icon_name="star"
                   size={32}
-                  color={employeeColors.primary}
+                  color={colors.primary}
                 />
                 <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Signature Recipes</Text>
-                  <Text style={styles.cardDescription}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Signature Recipes</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     McLoone&apos;s exclusive cocktail recipes
                   </Text>
                 </View>
               </View>
               <TouchableOpacity 
-                style={styles.cardButton}
+                style={[styles.cardButton, { backgroundColor: colors.primary }]}
                 onPress={() => router.push('/signature-recipes')}
               >
-                <Text style={styles.cardButtonText}>View Recipes</Text>
+                <Text style={[styles.cardButtonText, { color: colors.text }]}>View Recipes</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={employeeColors.text}
+                  color={colors.text}
                 />
               </TouchableOpacity>
             </View>
 
             {/* General Knowledge Section */}
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: colors.card }]}>
               <View style={styles.cardHeader}>
                 <IconSymbol
                   ios_icon_name="lightbulb.fill"
                   android_material_icon_name="lightbulb"
                   size={32}
-                  color={employeeColors.primary}
+                  color={colors.primary}
                 />
                 <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>General Knowledge</Text>
-                  <Text style={styles.cardDescription}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>General Knowledge</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     Bar techniques, spirits, and mixology basics
                   </Text>
                 </View>
               </View>
               <TouchableOpacity 
-                style={styles.cardButton}
+                style={[styles.cardButton, { backgroundColor: colors.primary }]}
                 onPress={() => console.log('General Knowledge - Coming Soon')}
               >
-                <Text style={styles.cardButtonText}>Coming Soon</Text>
+                <Text style={[styles.cardButtonText, { color: colors.text }]}>Coming Soon</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={employeeColors.text}
+                  color={colors.text}
                 />
               </TouchableOpacity>
             </View>
@@ -147,44 +152,44 @@ export default function BartenderAssistantScreen() {
         ) : (
           <>
             {/* Weekly Quiz Section */}
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: colors.card }]}>
               <View style={styles.cardHeader}>
                 <IconSymbol
                   ios_icon_name="questionmark.circle.fill"
                   android_material_icon_name="quiz"
                   size={32}
-                  color={employeeColors.primary}
+                  color={colors.primary}
                 />
                 <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Weekly Quiz</Text>
-                  <Text style={styles.cardDescription}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Weekly Quiz</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     Test your bartending knowledge
                   </Text>
                 </View>
               </View>
               <TouchableOpacity 
-                style={styles.cardButton}
+                style={[styles.cardButton, { backgroundColor: colors.primary }]}
                 onPress={() => console.log('Weekly Quiz - Coming Soon')}
               >
-                <Text style={styles.cardButtonText}>Coming Soon</Text>
+                <Text style={[styles.cardButtonText, { color: colors.text }]}>Coming Soon</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={employeeColors.text}
+                  color={colors.text}
                 />
               </TouchableOpacity>
             </View>
 
             {/* Placeholder for future exam sections */}
-            <View style={styles.infoCard}>
+            <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
               <IconSymbol
                 ios_icon_name="info.circle.fill"
                 android_material_icon_name="info"
                 size={24}
-                color={employeeColors.primary}
+                color={colors.primary}
               />
-              <Text style={styles.infoText}>
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                 More exam sections will be added here in the future!
               </Text>
             </View>
@@ -198,18 +203,15 @@ export default function BartenderAssistantScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: employeeColors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: employeeColors.card,
     paddingHorizontal: 16,
     paddingTop: 48,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: employeeColors.border,
   },
   backButton: {
     padding: 8,
@@ -217,7 +219,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: employeeColors.text,
   },
   placeholder: {
     width: 40,
@@ -232,7 +233,6 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: employeeColors.card,
     borderRadius: 12,
     padding: 4,
     marginBottom: 20,
@@ -245,19 +245,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
   },
-  activeTab: {
-    backgroundColor: employeeColors.primary,
-  },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: employeeColors.textSecondary,
-  },
-  activeTabText: {
-    color: employeeColors.text,
   },
   card: {
-    backgroundColor: employeeColors.card,
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -276,18 +268,15 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: employeeColors.text,
     marginBottom: 4,
   },
   cardDescription: {
     fontSize: 14,
-    color: employeeColors.textSecondary,
   },
   cardButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: employeeColors.primary,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -295,12 +284,10 @@ const styles = StyleSheet.create({
   cardButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: employeeColors.text,
   },
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: employeeColors.card,
     borderRadius: 12,
     padding: 16,
     marginTop: 8,
@@ -309,7 +296,6 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 14,
-    color: employeeColors.textSecondary,
     fontStyle: 'italic',
   },
 });

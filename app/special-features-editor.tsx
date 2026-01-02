@@ -56,10 +56,10 @@ export default function SpecialFeaturesEditorScreen() {
   const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
-  const [showFilePickerModal, setShowFilePickerModal] = useState(false);
   const [editingFeature, setEditingFeature] = useState<SpecialFeature | null>(null);
   const [selectedGuideFile, setSelectedGuideFile] = useState<GuideFile | null>(null);
   const [fileSearchQuery, setFileSearchQuery] = useState('');
+  const [showFileSection, setShowFileSection] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -376,6 +376,8 @@ export default function SpecialFeaturesEditorScreen() {
     setEndDateTime(null);
     setSelectedImageUri(null);
     setSelectedGuideFile(null);
+    setFileSearchQuery('');
+    setShowFileSection(false);
     setShowAddModal(true);
   };
 
@@ -400,6 +402,8 @@ export default function SpecialFeaturesEditorScreen() {
       setSelectedGuideFile(null);
     }
     
+    setFileSearchQuery('');
+    setShowFileSection(false);
     setShowAddModal(true);
   };
 
@@ -414,21 +418,13 @@ export default function SpecialFeaturesEditorScreen() {
     setShowStartTimePicker(false);
     setShowEndDatePicker(false);
     setShowEndTimePicker(false);
-  };
-
-  const openFilePicker = () => {
     setFileSearchQuery('');
-    setShowFilePickerModal(true);
-  };
-
-  const closeFilePicker = () => {
-    setShowFilePickerModal(false);
-    setFileSearchQuery('');
+    setShowFileSection(false);
   };
 
   const selectGuideFile = (file: GuideFile) => {
     setSelectedGuideFile(file);
-    closeFilePicker();
+    setShowFileSection(false);
   };
 
   const clearGuideFile = () => {
@@ -528,97 +524,51 @@ export default function SpecialFeaturesEditorScreen() {
           ) : (
             features.map((feature, index) => (
               <View key={index} style={styles.featureCard}>
-                {feature.thumbnail_shape === 'square' && feature.thumbnail_url ? (
-                  <View style={styles.squareLayout}>
+                <View style={styles.squareLayout}>
+                  {feature.thumbnail_url && (
                     <Image
                       key={getImageUrl(feature.thumbnail_url)}
                       source={{ uri: getImageUrl(feature.thumbnail_url) }}
                       style={styles.squareImage}
                     />
-                    <View style={styles.squareContent}>
-                      <Text style={styles.featureTitle}>{feature.title}</Text>
-                      {(feature.content || feature.message) && (
-                        <Text style={styles.squareMessage} numberOfLines={2}>
-                          {feature.content || feature.message}
-                        </Text>
+                  )}
+                  <View style={styles.squareContent}>
+                    <Text style={styles.featureTitle}>{feature.title}</Text>
+                    {(feature.content || feature.message) && (
+                      <Text style={styles.squareMessage} numberOfLines={2}>
+                        {feature.content || feature.message}
+                      </Text>
+                    )}
+                    <View style={styles.featureMeta}>
+                      {feature.start_date_time && (
+                        <View style={styles.metaItem}>
+                          <IconSymbol
+                            ios_icon_name="calendar"
+                            android_material_icon_name="event"
+                            size={14}
+                            color={managerColors.textSecondary}
+                          />
+                          <Text style={styles.metaText}>
+                            {formatDateTime(feature.start_date_time)}
+                          </Text>
+                        </View>
                       )}
-                      <View style={styles.featureMeta}>
-                        {feature.start_date_time && (
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="calendar"
-                              android_material_icon_name="event"
-                              size={14}
-                              color={managerColors.textSecondary}
-                            />
-                            <Text style={styles.metaText}>
-                              {formatDateTime(feature.start_date_time)}
-                            </Text>
-                          </View>
-                        )}
-                        {feature.end_date_time && (
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="clock"
-                              android_material_icon_name="schedule"
-                              size={14}
-                              color={managerColors.textSecondary}
-                            />
-                            <Text style={styles.metaText}>
-                              Ends: {formatDateTime(feature.end_date_time)}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
+                      {feature.end_date_time && (
+                        <View style={styles.metaItem}>
+                          <IconSymbol
+                            ios_icon_name="clock"
+                            android_material_icon_name="schedule"
+                            size={14}
+                            color={managerColors.textSecondary}
+                          />
+                          <Text style={styles.metaText}>
+                            Ends: {formatDateTime(feature.end_date_time)}
+                          </Text>
+                        </View>
+                      )}
                     </View>
                   </View>
-                ) : (
-                  <>
-                    {feature.thumbnail_url && (
-                      <Image
-                        key={getImageUrl(feature.thumbnail_url)}
-                        source={{ uri: getImageUrl(feature.thumbnail_url) }}
-                        style={styles.bannerImage}
-                      />
-                    )}
-                    <View style={styles.featureContent}>
-                      <Text style={styles.featureTitle}>{feature.title}</Text>
-                      {(feature.content || feature.message) && (
-                        <Text style={styles.featureMessage}>
-                          {feature.content || feature.message}
-                        </Text>
-                      )}
-                      <View style={styles.featureMeta}>
-                        {feature.start_date_time && (
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="calendar"
-                              android_material_icon_name="event"
-                              size={14}
-                              color={managerColors.textSecondary}
-                            />
-                            <Text style={styles.metaText}>
-                              {formatDateTime(feature.start_date_time)}
-                            </Text>
-                          </View>
-                        )}
-                        {feature.end_date_time && (
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="clock"
-                              android_material_icon_name="schedule"
-                              size={14}
-                              color={managerColors.textSecondary}
-                            />
-                            <Text style={styles.metaText}>
-                              Ends: {formatDateTime(feature.end_date_time)}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  </>
-                )}
+                </View>
                 <View style={styles.featureActions}>
                   <TouchableOpacity
                     style={styles.actionButton}
@@ -792,6 +742,7 @@ export default function SpecialFeaturesEditorScreen() {
 
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>Attach File from Guides & Training (Optional)</Text>
+                
                 {selectedGuideFile ? (
                   <View style={styles.selectedFileContainer}>
                     <View style={styles.selectedFileInfo}>
@@ -816,16 +767,104 @@ export default function SpecialFeaturesEditorScreen() {
                     </TouchableOpacity>
                   </View>
                 ) : (
-                  <TouchableOpacity style={styles.filePickerButton} onPress={openFilePicker}>
+                  <TouchableOpacity 
+                    style={styles.filePickerButton} 
+                    onPress={() => setShowFileSection(!showFileSection)}
+                  >
                     <IconSymbol
-                      ios_icon_name="doc.badge.plus"
-                      android_material_icon_name="note-add"
+                      ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
+                      android_material_icon_name={showFileSection ? "expand-less" : "expand-more"}
                       size={24}
                       color={managerColors.highlight}
                     />
-                    <Text style={styles.filePickerButtonText}>Select File</Text>
+                    <Text style={styles.filePickerButtonText}>
+                      {showFileSection ? 'Hide File Selection' : 'Show File Selection'}
+                    </Text>
                   </TouchableOpacity>
                 )}
+
+                {showFileSection && !selectedGuideFile && (
+                  <View style={styles.fileSelectionSection}>
+                    <View style={styles.searchContainer}>
+                      <IconSymbol
+                        ios_icon_name="magnifyingglass"
+                        android_material_icon_name="search"
+                        size={20}
+                        color="#666666"
+                      />
+                      <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search files by name, category..."
+                        placeholderTextColor="#999999"
+                        value={fileSearchQuery}
+                        onChangeText={setFileSearchQuery}
+                      />
+                      {fileSearchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setFileSearchQuery('')}>
+                          <IconSymbol
+                            ios_icon_name="xmark.circle.fill"
+                            android_material_icon_name="cancel"
+                            size={20}
+                            color="#999999"
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    <ScrollView style={styles.fileList} nestedScrollEnabled={true}>
+                      {GUIDE_CATEGORIES.map((category, catIndex) => {
+                        const categoryFiles = groupedGuideFiles[category];
+                        if (categoryFiles.length === 0) return null;
+
+                        return (
+                          <View key={catIndex} style={styles.fileCategorySection}>
+                            <Text style={styles.fileCategoryTitle}>{category}</Text>
+                            {categoryFiles.map((file, fileIndex) => (
+                              <TouchableOpacity
+                                key={fileIndex}
+                                style={styles.fileItem}
+                                onPress={() => selectGuideFile(file)}
+                              >
+                                <IconSymbol
+                                  ios_icon_name="doc.fill"
+                                  android_material_icon_name="description"
+                                  size={24}
+                                  color={managerColors.highlight}
+                                />
+                                <View style={styles.fileItemText}>
+                                  <Text style={styles.fileItemTitle}>{file.title}</Text>
+                                  <Text style={styles.fileItemName}>{file.file_name}</Text>
+                                </View>
+                                <IconSymbol
+                                  ios_icon_name="chevron.right"
+                                  android_material_icon_name="chevron-right"
+                                  size={20}
+                                  color="#666666"
+                                />
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        );
+                      })}
+
+                      {filteredGuideFiles.length === 0 && (
+                        <View style={styles.emptyFileList}>
+                          <IconSymbol
+                            ios_icon_name="doc"
+                            android_material_icon_name="description"
+                            size={48}
+                            color="#999999"
+                          />
+                          <Text style={styles.emptyFileListText}>No files found</Text>
+                          <Text style={styles.emptyFileListSubtext}>
+                            Try adjusting your search or check if files are uploaded in Guides & Training
+                          </Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
+
                 <Text style={styles.formHint}>
                   Attach a file from Guides & Training to display View and Download buttons
                 </Text>
@@ -1065,100 +1104,6 @@ export default function SpecialFeaturesEditorScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* File Picker Modal */}
-      <Modal
-        visible={showFilePickerModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={closeFilePicker}
-      >
-        <View style={styles.filePickerModalContainer}>
-          <TouchableOpacity 
-            style={styles.modalBackdrop} 
-            activeOpacity={1} 
-            onPress={closeFilePicker}
-          />
-          <View style={styles.filePickerModalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select File</Text>
-              <TouchableOpacity onPress={closeFilePicker}>
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color="#666666"
-                />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.searchContainer}>
-              <IconSymbol
-                ios_icon_name="magnifyingglass"
-                android_material_icon_name="search"
-                size={20}
-                color="#666666"
-              />
-              <TextInput
-                style={styles.searchInput}
-                placeholder="Search files..."
-                placeholderTextColor="#999999"
-                value={fileSearchQuery}
-                onChangeText={setFileSearchQuery}
-              />
-            </View>
-
-            <ScrollView style={styles.fileList} contentContainerStyle={styles.fileListContent}>
-              {GUIDE_CATEGORIES.map((category, catIndex) => {
-                const categoryFiles = groupedGuideFiles[category];
-                if (categoryFiles.length === 0) return null;
-
-                return (
-                  <View key={catIndex} style={styles.fileCategorySection}>
-                    <Text style={styles.fileCategoryTitle}>{category}</Text>
-                    {categoryFiles.map((file, fileIndex) => (
-                      <TouchableOpacity
-                        key={fileIndex}
-                        style={styles.fileItem}
-                        onPress={() => selectGuideFile(file)}
-                      >
-                        <IconSymbol
-                          ios_icon_name="doc.fill"
-                          android_material_icon_name="description"
-                          size={24}
-                          color={managerColors.highlight}
-                        />
-                        <View style={styles.fileItemText}>
-                          <Text style={styles.fileItemTitle}>{file.title}</Text>
-                          <Text style={styles.fileItemName}>{file.file_name}</Text>
-                        </View>
-                        <IconSymbol
-                          ios_icon_name="chevron.right"
-                          android_material_icon_name="chevron-right"
-                          size={20}
-                          color="#666666"
-                        />
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                );
-              })}
-
-              {filteredGuideFiles.length === 0 && (
-                <View style={styles.emptyFileList}>
-                  <IconSymbol
-                    ios_icon_name="doc"
-                    android_material_icon_name="description"
-                    size={48}
-                    color="#999999"
-                  />
-                  <Text style={styles.emptyFileListText}>No files found</Text>
-                </View>
-              )}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
       {/* Android Date/Time Pickers - Rendered as native dialogs */}
       {Platform.OS === 'android' && showStartDatePicker && (
         <DateTimePicker
@@ -1360,25 +1305,11 @@ const styles = StyleSheet.create({
     marginTop: 6,
     lineHeight: 18,
   },
-  bannerImage: {
-    width: '100%',
-    height: 200,
-    resizeMode: 'cover',
-  },
-  featureContent: {
-    padding: 16,
-  },
   featureTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: managerColors.text,
     marginBottom: 8,
-  },
-  featureMessage: {
-    fontSize: 14,
-    color: managerColors.textSecondary,
-    marginBottom: 12,
-    lineHeight: 20,
   },
   featureMeta: {
     gap: 8,
@@ -1594,6 +1525,85 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: managerColors.highlight,
   },
+  fileSelectionSection: {
+    marginTop: 12,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1A1A1A',
+  },
+  fileList: {
+    maxHeight: 300,
+  },
+  fileCategorySection: {
+    marginBottom: 16,
+  },
+  fileCategoryTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  fileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 6,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  fileItemText: {
+    flex: 1,
+  },
+  fileItemTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  fileItemName: {
+    fontSize: 11,
+    color: '#666666',
+    marginTop: 2,
+  },
+  emptyFileList: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyFileListText: {
+    fontSize: 14,
+    color: '#999999',
+    marginTop: 12,
+    fontWeight: '600',
+  },
+  emptyFileListSubtext: {
+    fontSize: 12,
+    color: '#999999',
+    marginTop: 4,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
   dateTimeButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1648,84 +1658,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#666666',
-  },
-  filePickerModalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  filePickerModalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '80%',
-    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
-    elevation: 10,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 16,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: '#1A1A1A',
-  },
-  fileList: {
-    flex: 1,
-  },
-  fileListContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-  fileCategorySection: {
-    marginBottom: 24,
-  },
-  fileCategoryTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    marginBottom: 12,
-  },
-  fileItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 8,
-    gap: 12,
-  },
-  fileItemText: {
-    flex: 1,
-  },
-  fileItemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  fileItemName: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 2,
-  },
-  emptyFileList: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyFileListText: {
-    fontSize: 16,
-    color: '#999999',
-    marginTop: 12,
   },
   datePickerOverlay: {
     position: 'absolute',

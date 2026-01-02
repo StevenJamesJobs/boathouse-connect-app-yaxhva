@@ -187,121 +187,55 @@ export default function ViewAllSpecialFeaturesScreen() {
                 onPress={() => openDetailModal(feature)}
                 activeOpacity={0.7}
               >
-                {feature.thumbnail_shape === 'square' && feature.thumbnail_url ? (
-                  <View style={styles.squareLayout}>
-                    <Image
-                      source={{ uri: getImageUrl(feature.thumbnail_url) }}
-                      style={styles.squareImage}
-                    />
-                    <View style={styles.squareContent}>
-                      <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>
-                      {(feature.content || feature.message) && (
-                        <Text style={[styles.featureMessage, { color: colors.textSecondary }]} numberOfLines={2}>
-                          {feature.content || feature.message}
-                        </Text>
-                      )}
-                      {feature.start_date_time && (
-                        <View style={styles.featureMeta}>
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="calendar"
-                              android_material_icon_name="event"
-                              size={14}
-                              color={colors.textSecondary}
-                            />
-                            <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                              {formatDateTime(feature.start_date_time)}
-                            </Text>
-                          </View>
-                          {feature.end_date_time && (
-                            <View style={styles.metaItem}>
-                              <IconSymbol
-                                ios_icon_name="clock"
-                                android_material_icon_name="schedule"
-                                size={14}
-                                color={colors.textSecondary}
-                              />
-                              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                                Ends: {formatDateTime(feature.end_date_time)}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      )}
-                      {(feature.link || feature.guide_file) && (
-                        <View style={styles.actionIndicator}>
-                          <IconSymbol
-                            ios_icon_name="chevron.right"
-                            android_material_icon_name="chevron-right"
-                            size={16}
-                            color={colors.primary}
-                          />
-                          <Text style={[styles.actionText, { color: colors.primary }]}>
-                            Tap for more details
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                ) : (
-                  <>
-                    {feature.thumbnail_url && (
-                      <Image
-                        source={{ uri: getImageUrl(feature.thumbnail_url) }}
-                        style={styles.bannerImage}
-                      />
-                    )}
-                    <View style={styles.featureContent}>
-                      <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>
-                      {(feature.content || feature.message) && (
-                        <Text style={[styles.featureMessage, { color: colors.textSecondary }]}>
-                          {feature.content || feature.message}
-                        </Text>
-                      )}
-                      {feature.start_date_time && (
-                        <View style={styles.featureMeta}>
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="calendar"
-                              android_material_icon_name="event"
-                              size={14}
-                              color={colors.textSecondary}
-                            />
-                            <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                              {formatDateTime(feature.start_date_time)}
-                            </Text>
-                          </View>
-                          {feature.end_date_time && (
-                            <View style={styles.metaItem}>
-                              <IconSymbol
-                                ios_icon_name="clock"
-                                android_material_icon_name="schedule"
-                                size={14}
-                                color={colors.textSecondary}
-                              />
-                              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                                Ends: {formatDateTime(feature.end_date_time)}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      )}
-                      {(feature.link || feature.guide_file) && (
-                        <View style={styles.actionIndicator}>
-                          <IconSymbol
-                            ios_icon_name="chevron.right"
-                            android_material_icon_name="chevron-right"
-                            size={16}
-                            color={colors.primary}
-                          />
-                          <Text style={[styles.actionText, { color: colors.primary }]}>
-                            Tap for more details
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </>
+                <View style={styles.squareLayout}>
+                {feature.thumbnail_url && (
+                  <Image
+                    source={{ uri: getImageUrl(feature.thumbnail_url) }}
+                    style={styles.squareImage}
+                  />
                 )}
+                <View style={styles.squareContent}>
+                  <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>
+                  {(feature.content || feature.message) && (
+                    <Text style={[styles.featureMessage, { color: colors.textSecondary }]} numberOfLines={2}>
+                      {feature.content || feature.message}
+                    </Text>
+                  )}
+                  {feature.start_date_time && (
+                    <View style={styles.featureMeta}>
+                      <View style={styles.metaItem}>
+                        <IconSymbol
+                          ios_icon_name="calendar"
+                          android_material_icon_name="event"
+                          size={14}
+                          color={colors.textSecondary}
+                        />
+                        <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                          {formatDateTime(feature.start_date_time)}
+                        </Text>
+                      </View>
+                      {feature.end_date_time && (
+                        <View style={styles.metaItem}>
+                          <IconSymbol
+                            ios_icon_name="clock"
+                            android_material_icon_name="schedule"
+                            size={14}
+                            color={colors.textSecondary}
+                          />
+                          <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                            Ends: {formatDateTime(feature.end_date_time)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
+                  <View style={styles.actionIndicator}>
+                    <Text style={[styles.actionText, { color: colors.primary }]}>
+                      Tap for more information
+                    </Text>
+                  </View>
+                </View>
+              </View>
               </TouchableOpacity>
             ))
           )}
@@ -400,35 +334,27 @@ const styles = StyleSheet.create({
   },
   squareLayout: {
     flexDirection: 'row',
-    padding: 16,
-    gap: 16,
+    padding: 12,
+    gap: 12,
   },
   squareImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
+    width: 80,
+    height: 80,
+    borderRadius: 8,
     resizeMode: 'cover',
   },
   squareContent: {
     flex: 1,
   },
-  bannerImage: {
-    width: '100%',
-    height: 200,
-    resizeMode: 'cover',
-  },
-  featureContent: {
-    padding: 16,
-  },
   featureTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
   },
   featureMessage: {
-    fontSize: 15,
-    marginBottom: 12,
-    lineHeight: 22,
+    fontSize: 13,
+    marginBottom: 8,
+    lineHeight: 18,
   },
   featureMeta: {
     gap: 8,
@@ -440,16 +366,13 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   metaText: {
-    fontSize: 13,
+    fontSize: 11,
   },
   actionIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 12,
+    marginTop: 8,
   },
   actionText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
 });
