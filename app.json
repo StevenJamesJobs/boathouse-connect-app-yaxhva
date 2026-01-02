@@ -58,7 +58,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "your-eas-project-id-here"
+        "projectId": "f7f98351-f034-4baa-8eb8-ef50cd4aaf7b"
       }
     },
     "jsEngine": "hermes"
