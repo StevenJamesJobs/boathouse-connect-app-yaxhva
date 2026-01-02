@@ -21,6 +21,10 @@ function createSupabaseClient() {
       persistSession: true,
       detectSessionInUrl: false,
     },
+    global: {
+      // Explicitly use native fetch to avoid any adapter issues
+      fetch: fetch.bind(globalThis),
+    },
   });
 }
 

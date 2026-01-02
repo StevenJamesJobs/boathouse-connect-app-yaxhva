@@ -9,4 +9,10 @@ config.cacheStores = [
     new FileStore({ root: path.join(__dirname, 'node_modules', '.cache', 'metro') }),
   ];
 
+// Ensure proper resolution of modules
+config.resolver = {
+  ...config.resolver,
+  sourceExts: [...(config.resolver?.sourceExts || []), 'jsx', 'js', 'ts', 'tsx', 'json'],
+};
+
 module.exports = config;

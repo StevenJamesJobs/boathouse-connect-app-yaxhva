@@ -1,4 +1,16 @@
 
+// Ensure fetch is available globally and properly bound
+if (typeof global.fetch !== 'undefined') {
+  // Ensure fetch is bound to globalThis to prevent context issues
+  const originalFetch = global.fetch;
+  global.fetch = function(...args: any[]) {
+    return originalFetch.apply(globalThis, args);
+  };
+  console.log('Fetch polyfill applied successfully');
+} else {
+  console.warn('Fetch is not available globally, this may cause issues');
+}
+
 // Polyfill window object
 if (typeof window === 'undefined') {
   (global as any).window = global;
@@ -6,6 +18,11 @@ if (typeof window === 'undefined') {
 
 // Add all window properties
 if (typeof window !== 'undefined') {
+  // Ensure fetch is also available on window
+  if (typeof window.fetch === 'undefined' && typeof global.fetch !== 'undefined') {
+    (window as any).fetch = global.fetch;
+  }
+  
   if (!window.addEventListener) {
     window.addEventListener = () => {};
   }

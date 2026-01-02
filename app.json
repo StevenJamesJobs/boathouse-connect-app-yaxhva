@@ -1,8 +1,8 @@
 
 {
   "expo": {
-    "name": "Boathouse Connect",
-    "slug": "Boathouse Connect",
+    "name": "McLoone's Boathouse Connect",
+    "slug": "mcloones-boathouse-connect",
     "version": "1.2.0",
     "orientation": "default",
     "icon": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg",
@@ -17,7 +17,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mcloones.boathouseconnect",
-      "buildNumber": "1.2.0",
+      "buildNumber": "6",
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
@@ -32,7 +32,7 @@
         "backgroundColor": "#E8F1F8"
       },
       "package": "com.mcloonesboathouse.newboathouseconnectapp",
-      "versionCode": 4,
+      "versionCode": 6,
       "icon": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg",
       "softwareKeyboardLayoutMode": "pan",
       "windowSoftInputMode": "adjustPan"
@@ -55,7 +55,12 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
-  },
-  "scheme": "Boathouse Connect"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id-here"
+      }
+    },
+    "jsEngine": "hermes"
+  }
 }
