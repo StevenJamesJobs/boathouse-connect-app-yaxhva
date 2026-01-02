@@ -16,7 +16,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mcloones.boathouseconnect",
+      "bundleIdentifier": "com.stevenjamesjobs.mcloonesboathouseconnect",
       "buildNumber": "6",
       "infoPlist": {
         "UIBackgroundModes": [
