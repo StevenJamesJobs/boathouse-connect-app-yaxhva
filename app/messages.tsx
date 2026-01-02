@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -53,50 +53,7 @@ export default function MessagesScreen() {
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
   const isManager = user?.role === 'manager';
 
-  // Refresh when screen comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      console.log('Messages screen focused, refreshing data...');
-      loadMessages();
-      loadUnreadCount();
-      loadInboxCount();
-      if (isManager) {
-        loadFeedbackCount();
-      }
-    }, [activeTab])
-  );
-
-  useEffect(() => {
-    loadMessages();
-    loadUnreadCount();
-    loadInboxCount();
-    if (isManager) {
-      loadFeedbackCount();
-    }
-  }, [activeTab]);
-
-  const loadMessages = async () => {
-    if (!user?.id) return;
-
-    try {
-      setLoading(true);
-
-      if (activeTab === 'inbox') {
-        await loadInboxMessages();
-      } else if (activeTab === 'sent') {
-        await loadSentMessages();
-      } else if (activeTab === 'feedback' && isManager) {
-        await loadFeedbackMessages();
-      }
-    } catch (error) {
-      console.error('Error loading messages:', error);
-      Alert.alert('Error', 'Failed to load messages');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadInboxMessages = async () => {
+  const loadInboxMessages = useCallback(async () => {
     if (!user?.id) return;
 
     // Get all messages where user is a recipient, grouped by thread
@@ -207,9 +164,9 @@ export default function MessagesScreen() {
 
     console.log('Loaded inbox messages:', messages.length);
     setInboxMessages(messages);
-  };
+  }, [user?.id]);
 
-  const loadSentMessages = async () => {
+  const loadSentMessages = useCallback(async () => {
     if (!user?.id) return;
 
     const { data, error } = await supabase
@@ -287,9 +244,9 @@ export default function MessagesScreen() {
     );
 
     setSentMessages(messages);
-  };
+  }, [user?.id, user?.name, user?.jobTitle, user?.profilePictureUrl]);
 
-  const loadFeedbackMessages = async () => {
+  const loadFeedbackMessages = useCallback(async () => {
     if (!user?.id || !isManager) return;
 
     console.log('Loading feedback messages...');
@@ -347,9 +304,9 @@ export default function MessagesScreen() {
 
     console.log('Feedback messages loaded:', feedbackMsgs.length);
     setFeedbackMessages(feedbackMsgs);
-  };
+  }, [user?.id, isManager]);
 
-  const loadUnreadCount = async () => {
+  const loadUnreadCount = useCallback(async () => {
     if (!user?.id) return;
 
     const { data, error } = await supabase.rpc('get_unread_message_count', {
@@ -360,9 +317,9 @@ export default function MessagesScreen() {
       console.log('Unread count:', data);
       setUnreadCount(data);
     }
-  };
+  }, [user?.id]);
 
-  const loadInboxCount = async () => {
+  const loadInboxCount = useCallback(async () => {
     if (!user?.id) return;
 
     const { count, error } = await supabase
@@ -374,9 +331,9 @@ export default function MessagesScreen() {
     if (!error && count !== null) {
       setInboxCount(count);
     }
-  };
+  }, [user?.id]);
 
-  const loadFeedbackCount = async () => {
+  const loadFeedbackCount = useCallback(async () => {
     if (!user?.id || !isManager) return;
 
     const { data, error } = await supabase
@@ -395,7 +352,50 @@ export default function MessagesScreen() {
       ).length;
       setFeedbackCount(feedbackCount);
     }
-  };
+  }, [user?.id, isManager]);
+
+  const loadMessages = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      setLoading(true);
+
+      if (activeTab === 'inbox') {
+        await loadInboxMessages();
+      } else if (activeTab === 'sent') {
+        await loadSentMessages();
+      } else if (activeTab === 'feedback' && isManager) {
+        await loadFeedbackMessages();
+      }
+    } catch (error) {
+      console.error('Error loading messages:', error);
+      Alert.alert('Error', 'Failed to load messages');
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id, activeTab, isManager, loadInboxMessages, loadSentMessages, loadFeedbackMessages]);
+
+  // Refresh when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      console.log('Messages screen focused, refreshing data...');
+      loadMessages();
+      loadUnreadCount();
+      loadInboxCount();
+      if (isManager) {
+        loadFeedbackCount();
+      }
+    }, [loadMessages, loadUnreadCount, loadInboxCount, loadFeedbackCount, isManager])
+  );
+
+  useEffect(() => {
+    loadMessages();
+    loadUnreadCount();
+    loadInboxCount();
+    if (isManager) {
+      loadFeedbackCount();
+    }
+  }, [loadMessages, loadUnreadCount, loadInboxCount, loadFeedbackCount, isManager]);
 
   const onRefresh = async () => {
     setRefreshing(true);

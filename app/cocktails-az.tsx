@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -49,30 +49,7 @@ export default function CocktailsAZScreen() {
     loadCocktails();
   }, []);
 
-  useEffect(() => {
-    filterCocktails();
-  }, [cocktails, searchQuery, selectedLetter]);
-
-  const loadCocktails = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('cocktails')
-        .select('*')
-        .eq('is_active', true)
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      console.log('Loaded cocktails:', data);
-      setCocktails(data || []);
-    } catch (error) {
-      console.error('Error loading cocktails:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterCocktails = () => {
+  const filterCocktails = useCallback(() => {
     let filtered = cocktails;
 
     // Filter by selected letter
@@ -94,6 +71,29 @@ export default function CocktailsAZScreen() {
     }
 
     setFilteredCocktails(filtered);
+  }, [cocktails, searchQuery, selectedLetter]);
+
+  useEffect(() => {
+    filterCocktails();
+  }, [filterCocktails]);
+
+  const loadCocktails = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('cocktails')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (error) throw error;
+      console.log('Loaded cocktails:', data);
+      setCocktails(data || []);
+    } catch (error) {
+      console.error('Error loading cocktails:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const openDetailModal = (cocktail: Cocktail) => {

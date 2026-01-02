@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -87,30 +87,7 @@ export default function MenuEditorScreen() {
     loadMenuItems();
   }, []);
 
-  useEffect(() => {
-    filterItems();
-  }, [menuItems, searchQuery, selectedCategory, selectedSubcategory]);
-
-  const loadMenuItems = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('menu_items')
-        .select('*')
-        .order('display_order', { ascending: true });
-
-      if (error) throw error;
-      console.log('Loaded menu items:', data);
-      setMenuItems(data || []);
-    } catch (error) {
-      console.error('Error loading menu items:', error);
-      Alert.alert('Error', 'Failed to load menu items');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterItems = () => {
+  const filterItems = useCallback(() => {
     let filtered = menuItems;
 
     // Filter by category
@@ -141,6 +118,29 @@ export default function MenuEditorScreen() {
     }
 
     setFilteredItems(filtered);
+  }, [menuItems, searchQuery, selectedCategory, selectedSubcategory]);
+
+  useEffect(() => {
+    filterItems();
+  }, [filterItems]);
+
+  const loadMenuItems = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('menu_items')
+        .select('*')
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      console.log('Loaded menu items:', data);
+      setMenuItems(data || []);
+    } catch (error) {
+      console.error('Error loading menu items:', error);
+      Alert.alert('Error', 'Failed to load menu items');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const pickImage = async () => {
@@ -559,7 +559,7 @@ export default function MenuEditorScreen() {
             <View style={styles.emptyContainer}>
               <IconSymbol
                 ios_icon_name="fork.knife"
-                android_material_icon_name="food"
+                android_material_icon_name="restaurant"
                 size={64}
                 color={managerColors.textSecondary}
               />

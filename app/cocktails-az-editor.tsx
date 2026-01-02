@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -58,15 +58,7 @@ export default function CocktailsAZEditorScreen() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadCocktails();
-  }, []);
-
-  useEffect(() => {
-    filterCocktails();
-  }, [cocktails, searchQuery, selectedLetter]);
-
-  const loadCocktails = async () => {
+  const loadCocktails = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -83,9 +75,13 @@ export default function CocktailsAZEditorScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const filterCocktails = () => {
+  useEffect(() => {
+    loadCocktails();
+  }, [loadCocktails]);
+
+  const filterCocktails = useCallback(() => {
     let filtered = cocktails;
 
     // Filter by selected letter
@@ -107,7 +103,11 @@ export default function CocktailsAZEditorScreen() {
     }
 
     setFilteredCocktails(filtered);
-  };
+  }, [cocktails, searchQuery, selectedLetter]);
+
+  useEffect(() => {
+    filterCocktails();
+  }, [filterCocktails]);
 
   const pickImage = async () => {
     try {
