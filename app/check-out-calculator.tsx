@@ -239,6 +239,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  signToggleButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 8,
+  },
+  signToggleText: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  inputWrapperWithToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
 });
 
 export default function CheckOutCalculatorScreen() {
@@ -249,6 +266,7 @@ export default function CheckOutCalculatorScreen() {
 
   const [totalShiftSales, setTotalShiftSales] = useState('');
   const [cashInOutTotal, setCashInOutTotal] = useState('');
+  const [isNegativeCashOut, setIsNegativeCashOut] = useState(false);
   const [busserRunnerPercent, setBusserRunnerPercent] = useState(0.035);
   const [bartenderPercent, setBartenderPercent] = useState(0.02);
   const [declarePercent, setDeclarePercent] = useState(0.12); // Default to 12%
@@ -329,7 +347,9 @@ export default function CheckOutCalculatorScreen() {
 
   const calculateResults = () => {
     const sales = parseFloat(totalShiftSales) || 0;
-    const cashInOut = parseFloat(cashInOutTotal) || 0;
+    const cashInOutValue = parseFloat(cashInOutTotal) || 0;
+    // Apply negative sign if toggle is set to negative
+    const cashInOut = isNegativeCashOut ? -cashInOutValue : cashInOutValue;
     
     // Busser/Runner and Bartender amounts are based on ORIGINAL Total Sales
     const busserAmount = sales * busserRunnerPercent;
@@ -631,27 +651,57 @@ export default function CheckOutCalculatorScreen() {
               Cashed Out/In Total *
             </Text>
             <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-              (Enter negative number with - sign if applicable)
+              (Use the +/- button to toggle between positive and negative)
             </Text>
-            <View style={[styles.inputWrapper, { borderColor: colors.border }]}>
-              <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                value={cashInOutTotal}
-                onChangeText={(text) => {
-                  // Allow negative sign at the beginning
-                  const cleanedText = text.replace(/[^0-9.-]/g, '');
-                  // Ensure only one negative sign at the start
-                  const finalText = cleanedText.startsWith('-') 
-                    ? '-' + cleanedText.slice(1).replace(/-/g, '')
-                    : cleanedText.replace(/-/g, '');
-                  setCashInOutTotal(finalText);
+            <View style={styles.inputWrapperWithToggle}>
+              {/* Positive/Negative Toggle Button */}
+              <TouchableOpacity
+                style={[
+                  styles.signToggleButton,
+                  {
+                    backgroundColor: isNegativeCashOut ? '#FFEBEE' : '#E8F5E9',
+                    borderColor: isNegativeCashOut ? '#EF5350' : '#66BB6A',
+                  },
+                ]}
+                onPress={() => {
+                  setIsNegativeCashOut(!isNegativeCashOut);
                   setShowResults(false);
                 }}
-                keyboardType="numbers-and-punctuation"
-                placeholder="0.00 or -0.00"
-                placeholderTextColor={colors.textSecondary}
-              />
+              >
+                <Text
+                  style={[
+                    styles.signToggleText,
+                    {
+                      color: isNegativeCashOut ? '#D32F2F' : '#388E3C',
+                    },
+                  ]}
+                >
+                  {isNegativeCashOut ? '−' : '+'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* Input Field */}
+              <View style={[styles.inputWrapper, { borderColor: colors.border, flex: 1 }]}>
+                <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  value={cashInOutTotal}
+                  onChangeText={(text) => {
+                    // Only allow numbers and decimal point
+                    const cleanedText = text.replace(/[^0-9.]/g, '');
+                    // Ensure only one decimal point
+                    const parts = cleanedText.split('.');
+                    const finalText = parts.length > 2 
+                      ? parts[0] + '.' + parts.slice(1).join('')
+                      : cleanedText;
+                    setCashInOutTotal(finalText);
+                    setShowResults(false);
+                  }}
+                  keyboardType="numeric"
+                  placeholder="0.00"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
             </View>
           </View>
 
