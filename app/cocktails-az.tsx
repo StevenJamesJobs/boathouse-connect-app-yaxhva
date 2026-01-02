@@ -13,10 +13,9 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { employeeColors, managerColors } from '@/styles/commonStyles';
+import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 
 interface Cocktail {
   id: string;
@@ -33,7 +32,6 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function CocktailsAZScreen() {
   const router = useRouter();
-  const { user } = useAuth();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,17 +40,13 @@ export default function CocktailsAZScreen() {
   const [selectedCocktail, setSelectedCocktail] = useState<Cocktail | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // Use manager colors if user is a manager, otherwise use employee colors
-  const isManager = user?.role === 'manager';
-  const colors = isManager ? managerColors : employeeColors;
-
   useEffect(() => {
     loadCocktails();
   }, []);
 
   useEffect(() => {
     filterCocktails();
-  }, [cocktails, searchQuery, selectedLetter, filterCocktails]);
+  }, [cocktails, searchQuery, selectedLetter]);
 
   const loadCocktails = async () => {
     try {
@@ -118,33 +112,33 @@ export default function CocktailsAZScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
-            color={colors.text}
+            color={employeeColors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Cocktails A-Z</Text>
+        <Text style={styles.headerTitle}>Cocktails A-Z</Text>
         <View style={styles.backButton} />
       </View>
 
       {/* Search Bar */}
-      <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
+      <View style={styles.searchContainer}>
         <IconSymbol
           ios_icon_name="magnifyingglass"
           android_material_icon_name="search"
           size={20}
-          color={colors.textSecondary}
+          color={employeeColors.textSecondary}
         />
         <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
+          style={styles.searchInput}
           placeholder="Search by name, ingredient, or alcohol type..."
-          placeholderTextColor={colors.textSecondary}
+          placeholderTextColor={employeeColors.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -154,7 +148,7 @@ export default function CocktailsAZScreen() {
               ios_icon_name="xmark.circle.fill"
               android_material_icon_name="cancel"
               size={20}
-              color={colors.textSecondary}
+              color={employeeColors.textSecondary}
             />
           </TouchableOpacity>
         )}
@@ -164,7 +158,7 @@ export default function CocktailsAZScreen() {
         {/* Cocktails List */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
+            <ActivityIndicator size="large" color={employeeColors.primary} />
           </View>
         ) : (
           <ScrollView style={styles.cocktailsList} contentContainerStyle={styles.cocktailsListContent}>
@@ -174,10 +168,10 @@ export default function CocktailsAZScreen() {
                   ios_icon_name="wineglass"
                   android_material_icon_name="local-bar"
                   size={64}
-                  color={colors.textSecondary}
+                  color={employeeColors.textSecondary}
                 />
-                <Text style={[styles.emptyText, { color: colors.text }]}>No cocktails found</Text>
-                <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                <Text style={styles.emptyText}>No cocktails found</Text>
+                <Text style={styles.emptySubtext}>
                   Try adjusting your search or filter
                 </Text>
               </View>
@@ -185,18 +179,18 @@ export default function CocktailsAZScreen() {
               filteredCocktails.map((cocktail, index) => (
                 <TouchableOpacity
                   key={index}
-                  style={[styles.cocktailCard, { backgroundColor: colors.card }]}
+                  style={styles.cocktailCard}
                   onPress={() => openDetailModal(cocktail)}
                 >
                   <View style={styles.cocktailInfo}>
-                    <Text style={[styles.cocktailName, { color: colors.text }]}>{cocktail.name}</Text>
-                    <Text style={[styles.cocktailAlcoholType, { color: colors.textSecondary }]}>{cocktail.alcohol_type}</Text>
+                    <Text style={styles.cocktailName}>{cocktail.name}</Text>
+                    <Text style={styles.cocktailAlcoholType}>{cocktail.alcohol_type}</Text>
                   </View>
                   <IconSymbol
                     ios_icon_name="chevron.right"
                     android_material_icon_name="chevron-right"
                     size={20}
-                    color={colors.textSecondary}
+                    color={employeeColors.textSecondary}
                   />
                 </TouchableOpacity>
               ))
@@ -205,7 +199,7 @@ export default function CocktailsAZScreen() {
         )}
 
         {/* Alphabetical Navigation Bar */}
-        <View style={[styles.alphabetNav, { backgroundColor: colors.card }]}>
+        <View style={styles.alphabetNav}>
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.alphabetNavContent}
@@ -213,14 +207,14 @@ export default function CocktailsAZScreen() {
             <TouchableOpacity
               style={[
                 styles.alphabetButton,
-                selectedLetter === null && { backgroundColor: colors.primary },
+                selectedLetter === null && styles.alphabetButtonActive,
               ]}
               onPress={() => setSelectedLetter(null)}
             >
               <Text
                 style={[
                   styles.alphabetButtonText,
-                  { color: selectedLetter === null ? colors.text : colors.textSecondary },
+                  selectedLetter === null && styles.alphabetButtonTextActive,
                 ]}
               >
                 All
@@ -231,14 +225,14 @@ export default function CocktailsAZScreen() {
                 key={index}
                 style={[
                   styles.alphabetButton,
-                  selectedLetter === letter && { backgroundColor: colors.primary },
+                  selectedLetter === letter && styles.alphabetButtonActive,
                 ]}
                 onPress={() => setSelectedLetter(letter)}
               >
                 <Text
                   style={[
                     styles.alphabetButtonText,
-                    { color: selectedLetter === letter ? colors.text : colors.textSecondary },
+                    selectedLetter === letter && styles.alphabetButtonTextActive,
                   ]}
                 >
                   {letter}
@@ -290,8 +284,8 @@ export default function CocktailsAZScreen() {
 
               <View style={styles.detailSection}>
                 <Text style={styles.detailLabel}>Alcohol Type</Text>
-                <View style={[styles.alcoholTypeBadge, { backgroundColor: colors.primary }]}>
-                  <Text style={[styles.alcoholTypeText, { color: colors.text }]}>{selectedCocktail?.alcohol_type}</Text>
+                <View style={styles.alcoholTypeBadge}>
+                  <Text style={styles.alcoholTypeText}>{selectedCocktail?.alcohol_type}</Text>
                 </View>
               </View>
 
@@ -315,6 +309,7 @@ export default function CocktailsAZScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: employeeColors.background,
   },
   header: {
     flexDirection: 'row',
@@ -323,6 +318,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 48 : 60,
     paddingBottom: 12,
+    backgroundColor: employeeColors.card,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
   },
@@ -333,10 +329,12 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: employeeColors.text,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: employeeColors.card,
     marginHorizontal: 16,
     marginTop: 12,
     paddingHorizontal: 16,
@@ -349,6 +347,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     fontSize: 16,
+    color: employeeColors.text,
   },
   contentContainer: {
     flex: 1,
@@ -377,10 +376,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
+    color: employeeColors.text,
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
+    color: employeeColors.textSecondary,
     marginTop: 8,
     textAlign: 'center',
   },
@@ -388,6 +389,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: employeeColors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -400,13 +402,16 @@ const styles = StyleSheet.create({
   cocktailName: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: employeeColors.text,
     marginBottom: 4,
   },
   cocktailAlcoholType: {
     fontSize: 14,
+    color: employeeColors.textSecondary,
   },
   alphabetNav: {
     width: 40,
+    backgroundColor: employeeColors.card,
     borderTopLeftRadius: 12,
     borderBottomLeftRadius: 12,
     marginRight: 16,
@@ -425,9 +430,16 @@ const styles = StyleSheet.create({
     marginVertical: 2,
     borderRadius: 16,
   },
+  alphabetButtonActive: {
+    backgroundColor: employeeColors.primary,
+  },
   alphabetButtonText: {
     fontSize: 12,
     fontWeight: '600',
+    color: employeeColors.textSecondary,
+  },
+  alphabetButtonTextActive: {
+    color: employeeColors.text,
   },
   modalContainer: {
     flex: 1,
@@ -491,6 +503,7 @@ const styles = StyleSheet.create({
   },
   alcoholTypeBadge: {
     alignSelf: 'flex-start',
+    backgroundColor: employeeColors.primary,
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
@@ -498,6 +511,7 @@ const styles = StyleSheet.create({
   alcoholTypeText: {
     fontSize: 14,
     fontWeight: '600',
+    color: employeeColors.text,
   },
   detailText: {
     fontSize: 15,

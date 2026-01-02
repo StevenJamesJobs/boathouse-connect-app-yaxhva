@@ -89,7 +89,7 @@ export default function MenuEditorScreen() {
 
   useEffect(() => {
     filterItems();
-  }, [menuItems, searchQuery, selectedCategory, selectedSubcategory, filterItems]);
+  }, [menuItems, searchQuery, selectedCategory, selectedSubcategory]);
 
   const loadMenuItems = async () => {
     try {

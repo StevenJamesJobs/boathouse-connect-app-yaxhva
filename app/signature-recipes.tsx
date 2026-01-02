@@ -13,10 +13,9 @@ import {
   Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { employeeColors, managerColors } from '@/styles/commonStyles';
+import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 
 interface Ingredient {
   ingredient: string;
@@ -41,16 +40,11 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1514362545857-3bc16
 
 export default function SignatureRecipesScreen() {
   const router = useRouter();
-  const { user } = useAuth();
   const [recipes, setRecipes] = useState<SignatureRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecipe, setSelectedRecipe] = useState<SignatureRecipe | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [scrollY] = useState(new Animated.Value(0));
-
-  // Use manager colors if user is a manager, otherwise use employee colors
-  const isManager = user?.role === 'manager';
-  const colors = isManager ? managerColors : employeeColors;
 
   useEffect(() => {
     loadRecipes();
@@ -165,25 +159,25 @@ export default function SignatureRecipesScreen() {
   });
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
-            color={colors.text}
+            color={employeeColors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Signature Recipes</Text>
+        <Text style={styles.headerTitle}>Signature Recipes</Text>
         <View style={styles.backButton} />
       </View>
 
       {/* Recipes Grid */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={employeeColors.primary} />
         </View>
       ) : (
         <ScrollView style={styles.recipesList} contentContainerStyle={styles.recipesListContent}>
@@ -193,10 +187,10 @@ export default function SignatureRecipesScreen() {
                 ios_icon_name="wineglass"
                 android_material_icon_name="local-bar"
                 size={64}
-                color={colors.textSecondary}
+                color={employeeColors.textSecondary}
               />
-              <Text style={[styles.emptyText, { color: colors.text }]}>No recipes available</Text>
-              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+              <Text style={styles.emptyText}>No recipes available</Text>
+              <Text style={styles.emptySubtext}>
                 Check back later for signature cocktail recipes
               </Text>
             </View>
@@ -204,14 +198,14 @@ export default function SignatureRecipesScreen() {
             groupedRecipes.map((group, groupIndex) => (
               <React.Fragment key={groupIndex}>
                 {/* Category Header */}
-                <Text style={[styles.categoryHeader, { color: colors.text }]}>{group.category}</Text>
+                <Text style={styles.categoryHeader}>{group.category}</Text>
 
                 {/* 2-Column Grid for this category */}
                 <View style={styles.recipesGrid}>
                   {group.recipes.map((recipe, index) => (
                     <TouchableOpacity
                       key={index}
-                      style={[styles.recipeCard, { backgroundColor: colors.card }]}
+                      style={styles.recipeCard}
                       onPress={() => openDetailModal(recipe)}
                       activeOpacity={0.8}
                     >
@@ -224,7 +218,7 @@ export default function SignatureRecipesScreen() {
                         <Text style={styles.recipeName} numberOfLines={2}>
                           {recipe.name}
                         </Text>
-                        <Text style={[styles.recipePrice, { color: colors.highlight }]}>{formatPrice(recipe.price)}</Text>
+                        <Text style={styles.recipePrice}>{formatPrice(recipe.price)}</Text>
                       </View>
                     </TouchableOpacity>
                   ))}
@@ -297,7 +291,7 @@ export default function SignatureRecipesScreen() {
                 <View style={styles.detailSection}>
                   <Text style={styles.modalRecipeName}>{selectedRecipe?.name}</Text>
                   <View style={styles.priceGlasswareRow}>
-                    <Text style={[styles.modalPrice, { color: colors.primary }]}>{formatPrice(selectedRecipe?.price || '')}</Text>
+                    <Text style={styles.modalPrice}>{formatPrice(selectedRecipe?.price || '')}</Text>
                     {selectedRecipe?.glassware && (
                       <View style={styles.glasswareBadge}>
                         <IconSymbol
@@ -319,8 +313,8 @@ export default function SignatureRecipesScreen() {
                     {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
                       selectedRecipe.ingredients.map((item, index) => (
                         <View key={index} style={styles.ingredientItem}>
-                          <View style={[styles.ingredientBullet, { backgroundColor: colors.primary }]} />
-                          <Text style={[styles.ingredientAmount, { color: colors.primary }]}>{item.amount || 'N/A'}</Text>
+                          <View style={styles.ingredientBullet} />
+                          <Text style={styles.ingredientAmount}>{item.amount || 'N/A'}</Text>
                           <Text style={styles.ingredientName}>{item.ingredient || 'Unknown ingredient'}</Text>
                         </View>
                       ))
@@ -353,6 +347,7 @@ export default function SignatureRecipesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: employeeColors.background,
   },
   header: {
     flexDirection: 'row',
@@ -361,6 +356,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 48 : 60,
     paddingBottom: 12,
+    backgroundColor: employeeColors.card,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
   },
@@ -371,6 +367,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    color: employeeColors.text,
   },
   loadingContainer: {
     flex: 1,
@@ -394,16 +391,19 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
+    color: employeeColors.text,
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
+    color: employeeColors.textSecondary,
     marginTop: 8,
     textAlign: 'center',
   },
   categoryHeader: {
     fontSize: 22,
     fontWeight: 'bold',
+    color: employeeColors.text,
     marginBottom: 16,
     marginTop: 8,
   },
@@ -416,6 +416,7 @@ const styles = StyleSheet.create({
   },
   recipeCard: {
     width: '48%',
+    backgroundColor: employeeColors.card,
     borderRadius: 12,
     overflow: 'hidden',
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
@@ -443,6 +444,7 @@ const styles = StyleSheet.create({
   recipePrice: {
     fontSize: 13,
     fontWeight: '600',
+    color: employeeColors.highlight,
   },
   modalContainer: {
     flex: 1,
@@ -529,6 +531,7 @@ const styles = StyleSheet.create({
   modalPrice: {
     fontSize: 22,
     fontWeight: 'bold',
+    color: employeeColors.primary,
   },
   glasswareBadge: {
     flexDirection: 'row',
@@ -562,10 +565,12 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
+    backgroundColor: employeeColors.primary,
   },
   ingredientAmount: {
     fontSize: 15,
     fontWeight: '600',
+    color: employeeColors.primary,
     minWidth: 60,
   },
   ingredientName: {

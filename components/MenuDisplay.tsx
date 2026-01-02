@@ -191,7 +191,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
 
   useEffect(() => {
     filterItems();
-  }, [menuItems, selectedCategory, selectedSubcategory, searchQuery, selectedFilters, filterItems]);
+  }, [menuItems, selectedCategory, selectedSubcategory, searchQuery, selectedFilters]);
 
   // Set the default subcategory when category changes
   useEffect(() => {

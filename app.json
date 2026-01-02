@@ -1,46 +1,45 @@
-
 {
   "expo": {
-    "name": "McLoone's Boathouse Connect",
-    "slug": "mcloones-boathouse-connect",
-    "version": "1.2.0",
+    "name": "Boathouse Connect",
+    "slug": "Boathouse Connect",
+    "version": "1.1.0",
     "orientation": "default",
-    "icon": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg",
+    "icon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png",
     "scheme": "mcloones",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg",
+      "image": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg",
       "resizeMode": "contain",
       "backgroundColor": "#E8F1F8"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mcloones.boathouseconnect",
-      "buildNumber": "6",
+      "buildNumber": "1.1",
       "infoPlist": {
         "UIBackgroundModes": [
           "remote-notification"
         ],
         "NSPhotoLibraryUsageDescription": "Boathouse Connect needs access to your photos so you can upload a profile picture to personalize your account."
       },
-      "icon": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg"
+      "icon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg",
+        "foregroundImage": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png",
         "backgroundColor": "#E8F1F8"
       },
       "package": "com.mcloonesboathouse.newboathouseconnectapp",
-      "versionCode": 6,
-      "icon": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg",
+      "versionCode": 3,
+      "icon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png",
       "softwareKeyboardLayoutMode": "pan",
       "windowSoftInputMode": "adjustPan"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg"
+      "favicon": "./assets/images/ec64137a-b4be-4bf1-bf5b-7667ff8c8d95.png"
     },
     "plugins": [
       "expo-router",
@@ -48,18 +47,22 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#E8F1F8",
-          "image": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg",
+          "image": "./assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg",
           "imageWidth": 280
+        }
+      ],
+      [
+        "react-native-edge-to-edge",
+        {
+          "android": {
+            "enforceNavigationBarContrast": false
+          }
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "eas": {
-        "projectId": "f7f98351-f034-4baa-8eb8-ef50cd4aaf7b"
-      }
     }
-  }
+  },
+  "scheme": "Boathouse Connect"
 }

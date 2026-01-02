@@ -47,7 +47,7 @@ export default function MessageDetailScreen() {
   useEffect(() => {
     loadThread();
     markThreadAsRead();
-  }, [loadThread, markThreadAsRead]);
+  }, []);
 
   const loadThread = async () => {
     try {
