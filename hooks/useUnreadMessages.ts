@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppState, AppStateStatus } from 'react-native';
@@ -9,7 +9,7 @@ export function useUnreadMessages() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const loadUnreadCount = async () => {
+  const loadUnreadCount = useCallback(async () => {
     if (!user?.id) {
       setUnreadCount(0);
       setLoading(false);
@@ -29,7 +29,7 @@ export function useUnreadMessages() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   useEffect(() => {
     loadUnreadCount();
@@ -72,7 +72,7 @@ export function useUnreadMessages() {
       subscription.remove();
       clearInterval(interval);
     };
-  }, [user?.id]);
+  }, [loadUnreadCount, user?.id]);
 
   return { unreadCount, loading, refresh: loadUnreadCount };
 }

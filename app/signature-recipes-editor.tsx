@@ -1,5 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import { supabase } from '@/app/integrations/supabase/client';
+import { useRouter } from 'expo-router';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,13 +16,11 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { managerColors } from '@/styles/commonStyles';
-import { IconSymbol } from '@/components/IconSymbol';
-import { supabase } from '@/app/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { managerColors } from '@/styles/commonStyles';
+import { useAuth } from '@/contexts/AuthContext';
+import { IconSymbol } from '@/components/IconSymbol';
 
 interface Ingredient {
   ingredient: string;
@@ -40,39 +40,398 @@ interface SignatureRecipe {
   is_active: boolean;
 }
 
-const SUBCATEGORIES = ['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV'];
+const SUBCATEGORIES = [
+  'Signature Cocktails',
+  'Martinis',
+  'Sangria',
+  'Low ABV',
+  'Zero ABV',
+];
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: managerColors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 48,
+    paddingBottom: 16,
+    backgroundColor: managerColors.card,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  backButton: {
+    padding: 8,
+    width: 40,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: managerColors.text,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingTop: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 100,
+  },
+  addButton: {
+    backgroundColor: managerColors.highlight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 8,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  addButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: managerColors.text,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: managerColors.card,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    gap: 10,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: managerColors.text,
+    padding: 0,
+  },
+  subcategoryScroll: {
+    maxHeight: 40,
+    marginBottom: 16,
+  },
+  subcategoryScrollContent: {
+    gap: 8,
+  },
+  subcategoryTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: managerColors.card,
+    marginRight: 8,
+    boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)',
+    elevation: 1,
+  },
+  subcategoryTabActive: {
+    backgroundColor: managerColors.highlight,
+  },
+  subcategoryTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: managerColors.textSecondary,
+  },
+  subcategoryTabTextActive: {
+    color: managerColors.text,
+  },
+  recipeCard: {
+    backgroundColor: managerColors.card,
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  recipeImage: {
+    width: '100%',
+    height: 200,
+  },
+  recipeContent: {
+    padding: 16,
+  },
+  recipeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  recipeName: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: managerColors.text,
+    marginRight: 12,
+  },
+  recipePrice: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: managerColors.highlight,
+  },
+  recipeSubcategory: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginBottom: 8,
+  },
+  recipeGlassware: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginBottom: 12,
+  },
+  ingredientsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: managerColors.text,
+    marginBottom: 6,
+  },
+  ingredientItem: {
+    fontSize: 13,
+    color: managerColors.textSecondary,
+    marginBottom: 4,
+  },
+  recipeProcedure: {
+    fontSize: 13,
+    color: managerColors.textSecondary,
+    marginTop: 8,
+    lineHeight: 18,
+  },
+  recipeActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  editButton: {
+    flex: 1,
+    backgroundColor: managerColors.highlight,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  deleteButton: {
+    flex: 1,
+    backgroundColor: '#F44336',
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  buttonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: managerColors.text,
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: managerColors.textSecondary,
+    marginTop: 40,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: managerColors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: managerColors.highlight,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: managerColors.text,
+  },
+  modalForm: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+  },
+  formField: {
+    marginBottom: 20,
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: managerColors.text,
+    marginBottom: 8,
+  },
+  formInput: {
+    backgroundColor: managerColors.card,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: managerColors.text,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+  },
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  picker: {
+    backgroundColor: managerColors.card,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+  },
+  imagePickerButton: {
+    backgroundColor: managerColors.highlight,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  imagePickerButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: managerColors.text,
+  },
+  thumbnailPreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  ingredientsContainer: {
+    gap: 12,
+  },
+  ingredientRow: {
+    flexDirection: 'row',
+    gap: 8,
+    alignItems: 'flex-start',
+  },
+  ingredientInputContainer: {
+    flex: 1,
+  },
+  ingredientInput: {
+    backgroundColor: managerColors.card,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: managerColors.text,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+  },
+  removeIngredientButton: {
+    backgroundColor: '#F44336',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  addIngredientButton: {
+    backgroundColor: managerColors.highlight,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  addIngredientButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: managerColors.text,
+  },
+  submitButton: {
+    backgroundColor: managerColors.highlight,
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  submitButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: managerColors.text,
+  },
+});
 
 export default function SignatureRecipesEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const [recipes, setRecipes] = useState<SignatureRecipe[]>([]);
   const [filteredRecipes, setFilteredRecipes] = useState<SignatureRecipe[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [editingRecipe, setEditingRecipe] = useState<SignatureRecipe | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingRecipe, setEditingRecipe] = useState<SignatureRecipe | null>(null);
 
   // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    price: '',
-    subcategory: 'Signature Cocktails',
-    glassware: '',
-    procedure: '',
-    display_order: 0,
-  });
+  const [name, setName] = useState('');
+  const [price, setPrice] = useState('');
+  const [subcategory, setSubcategory] = useState('');
+  const [glassware, setGlassware] = useState('');
   const [ingredients, setIngredients] = useState<Ingredient[]>([{ ingredient: '', amount: '' }]);
+  const [procedure, setProcedure] = useState('');
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
-  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
 
   useEffect(() => {
     loadRecipes();
   }, []);
 
+  const filterRecipes = useCallback(() => {
+    let filtered = recipes;
+
+    // Filter by subcategory
+    if (selectedSubcategory) {
+      filtered = filtered.filter((recipe) => recipe.subcategory === selectedSubcategory);
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (recipe) =>
+          recipe.name.toLowerCase().includes(query) ||
+          recipe.subcategory?.toLowerCase().includes(query) ||
+          recipe.glassware?.toLowerCase().includes(query) ||
+          recipe.ingredients.some(
+            (ing) =>
+              ing.ingredient.toLowerCase().includes(query) ||
+              ing.amount.toLowerCase().includes(query)
+          )
+      );
+    }
+
+    setFilteredRecipes(filtered);
+  }, [recipes, searchQuery, selectedSubcategory]);
+
   useEffect(() => {
     filterRecipes();
-  }, [recipes, searchQuery, selectedSubcategory]);
+  }, [filterRecipes]);
 
   const loadRecipes = async () => {
     try {
@@ -80,80 +439,17 @@ export default function SignatureRecipesEditorScreen() {
       const { data, error } = await supabase
         .from('signature_recipes')
         .select('*')
-        .order('display_order', { ascending: true })
-        .order('name', { ascending: true });
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
 
-      if (error) {
-        console.error('Error loading signature recipes:', error);
-        throw error;
-      }
-      
-      console.log('Loaded signature recipes:', data);
-      
-      // Parse ingredients safely
-      const parsedRecipes = (data || []).map(recipe => {
-        let ingredients: Ingredient[] = [];
-        
-        try {
-          // If ingredients is already an array, use it
-          if (Array.isArray(recipe.ingredients)) {
-            ingredients = recipe.ingredients;
-          } 
-          // If it's a string, try to parse it
-          else if (typeof recipe.ingredients === 'string') {
-            const parsed = JSON.parse(recipe.ingredients);
-            ingredients = Array.isArray(parsed) ? parsed : [];
-          }
-          // If it's an object (JSONB), convert to array
-          else if (recipe.ingredients && typeof recipe.ingredients === 'object') {
-            ingredients = Array.isArray(recipe.ingredients) ? recipe.ingredients : [];
-          }
-        } catch (e) {
-          console.error('Error parsing ingredients for recipe:', recipe.name, e);
-          console.error('Raw ingredients value:', recipe.ingredients);
-          ingredients = [];
-        }
-        
-        return {
-          ...recipe,
-          ingredients,
-          procedure: recipe.procedure || '',
-          glassware: recipe.glassware || null,
-        };
-      });
-      
-      setRecipes(parsedRecipes);
+      if (error) throw error;
+      setRecipes(data || []);
     } catch (error) {
-      console.error('Error loading signature recipes:', error);
-      Alert.alert('Error', 'Failed to load signature recipes');
+      console.error('Error loading recipes:', error);
+      Alert.alert('Error', 'Failed to load recipes');
     } finally {
       setLoading(false);
     }
-  };
-
-  const filterRecipes = () => {
-    let filtered = recipes;
-
-    // Filter by subcategory
-    if (selectedSubcategory) {
-      filtered = filtered.filter(recipe => recipe.subcategory === selectedSubcategory);
-    }
-
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        recipe =>
-          recipe.name.toLowerCase().includes(query) ||
-          (recipe.glassware && recipe.glassware.toLowerCase().includes(query)) ||
-          (recipe.ingredients && recipe.ingredients.length > 0 && recipe.ingredients.some(ing => 
-            ing.ingredient.toLowerCase().includes(query) || 
-            ing.amount.toLowerCase().includes(query)
-          ))
-      );
-    }
-
-    setFilteredRecipes(filtered);
   };
 
   const pickImage = async () => {
@@ -161,13 +457,12 @@ export default function SignatureRecipesEditorScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [1, 1],
+        aspect: [16, 9],
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets[0]) {
-        setSelectedImageUri(result.assets[0].uri);
-        console.log('Image selected:', result.assets[0].uri);
+        await uploadImage(result.assets[0].uri);
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -175,81 +470,50 @@ export default function SignatureRecipesEditorScreen() {
     }
   };
 
-  const uploadImage = async (uri: string): Promise<string | null> => {
+  const uploadImage = async (uri: string) => {
     try {
       setUploadingImage(true);
-      console.log('=== STARTING IMAGE UPLOAD FOR SIGNATURE RECIPE ===');
-      console.log('Image URI:', uri);
-      console.log('User ID:', user?.id);
 
-      // Read the file as base64 (same method as menu-editor and announcement-editor)
-      console.log('Reading file as base64...');
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      if (!fileInfo.exists) {
+        throw new Error('File does not exist');
+      }
+
+      const fileName = `signature-recipe-${Date.now()}.jpg`;
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
-      console.log('File read successfully, base64 length:', base64.length);
 
-      // Convert base64 to Uint8Array
-      console.log('Converting to byte array...');
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      console.log('Byte array created, size:', byteArray.length);
-
-      // Get file extension
-      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${Date.now()}.${ext}`;
-      console.log('Generated filename:', fileName);
-
-      // Determine content type
-      let contentType = 'image/jpeg';
-      if (ext === 'png') contentType = 'image/png';
-      else if (ext === 'gif') contentType = 'image/gif';
-      else if (ext === 'webp') contentType = 'image/webp';
-      console.log('Content type:', contentType);
-
-      // Upload to Supabase Storage (same method as menu-editor and announcement-editor)
-      console.log('Uploading to Supabase storage bucket: signature-recipe-images');
       const { data, error } = await supabase.storage
-        .from('signature-recipe-images')
-        .upload(fileName, byteArray, {
-          contentType: contentType,
+        .from('signature-recipes')
+        .upload(fileName, decode(base64), {
+          contentType: 'image/jpeg',
           upsert: false,
         });
 
-      if (error) {
-        console.error('=== STORAGE UPLOAD ERROR ===');
-        console.error('Error code:', error.message);
-        console.error('Error details:', JSON.stringify(error, null, 2));
-        Alert.alert('Upload Error', `Failed to upload image: ${error.message}`);
-        return null;
-      }
+      if (error) throw error;
 
-      console.log('Upload successful!');
-      console.log('Upload data:', JSON.stringify(data, null, 2));
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from('signature-recipes').getPublicUrl(data.path);
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('signature-recipe-images')
-        .getPublicUrl(fileName);
-
-      console.log('Public URL generated:', urlData.publicUrl);
-      console.log('=== IMAGE UPLOAD COMPLETE ===');
-
-      return urlData.publicUrl;
+      setThumbnailUrl(publicUrl);
+      Alert.alert('Success', 'Image uploaded successfully');
     } catch (error: any) {
-      console.error('=== EXCEPTION IN UPLOAD IMAGE ===');
-      console.error('Error type:', error.constructor.name);
-      console.error('Error message:', error.message);
-      console.error('Error stack:', error.stack);
-      Alert.alert('Error', `Failed to upload image: ${error.message || 'Unknown error'}`);
-      return null;
+      console.error('Error uploading image:', error);
+      Alert.alert('Error', error.message || 'Failed to upload image');
     } finally {
       setUploadingImage(false);
     }
+  };
+
+  const decode = (base64: string) => {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
   };
 
   const addIngredient = () => {
@@ -257,226 +521,161 @@ export default function SignatureRecipesEditorScreen() {
   };
 
   const removeIngredient = (index: number) => {
-    if (ingredients.length > 1) {
-      const newIngredients = ingredients.filter((_, i) => i !== index);
-      setIngredients(newIngredients);
-    }
+    setIngredients(ingredients.filter((_, i) => i !== index));
   };
 
   const updateIngredient = (index: number, field: 'ingredient' | 'amount', value: string) => {
-    const newIngredients = [...ingredients];
-    newIngredients[index][field] = value;
-    setIngredients(newIngredients);
+    const updated = [...ingredients];
+    updated[index][field] = value;
+    setIngredients(updated);
   };
 
   const handleSave = async () => {
-    // Validate required fields
-    if (!formData.name || !formData.price) {
-      Alert.alert('Error', 'Please fill in Name and Price');
-      return;
-    }
-
-    // Validate ingredients - filter out empty ones
-    const validIngredients = ingredients.filter(ing => ing.ingredient.trim() && ing.amount.trim());
-    
-    if (!user?.id) {
-      Alert.alert('Error', 'User not authenticated');
-      return;
-    }
-
     try {
-      let thumbnailUrl = editingRecipe?.thumbnail_url || null;
-
-      console.log('=== STARTING SAVE PROCESS ===');
-      console.log('Current thumbnail URL:', thumbnailUrl);
-      console.log('Selected image URI:', selectedImageUri);
-      console.log('Editing recipe:', editingRecipe ? 'Yes' : 'No');
-
-      // Upload image if selected
-      if (selectedImageUri) {
-        console.log('Uploading new image...');
-        const uploadedUrl = await uploadImage(selectedImageUri);
-        if (uploadedUrl) {
-          thumbnailUrl = uploadedUrl;
-          console.log('New thumbnail URL set:', thumbnailUrl);
-        } else {
-          console.error('Image upload returned null');
-          Alert.alert('Warning', 'Image upload failed. Saving recipe without image.');
-        }
+      if (!name.trim()) {
+        Alert.alert('Error', 'Please enter a recipe name');
+        return;
       }
 
-      console.log('Final thumbnail URL to save:', thumbnailUrl);
-      console.log('Valid ingredients:', JSON.stringify(validIngredients, null, 2));
+      if (!price.trim()) {
+        Alert.alert('Error', 'Please enter a price');
+        return;
+      }
+
+      // Filter out empty ingredients
+      const validIngredients = ingredients.filter(
+        (ing) => ing.ingredient.trim() && ing.amount.trim()
+      );
+
+      if (validIngredients.length === 0) {
+        Alert.alert('Error', 'Please add at least one ingredient');
+        return;
+      }
+
+      setLoading(true);
+
+      const recipeData = {
+        name: name.trim(),
+        price: price.trim(),
+        subcategory: subcategory || null,
+        glassware: glassware.trim() || null,
+        ingredients: validIngredients,
+        procedure: procedure.trim() || null,
+        thumbnail_url: thumbnailUrl,
+        display_order: editingRecipe ? editingRecipe.display_order : recipes.length,
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      };
 
       if (editingRecipe) {
-        // Update existing recipe using RPC function
-        console.log('Updating recipe with ID:', editingRecipe.id);
-        const { data, error } = await supabase.rpc('update_signature_recipe', {
-          p_user_id: user.id,
-          p_recipe_id: editingRecipe.id,
-          p_name: formData.name,
-          p_price: formData.price,
-          p_subcategory: formData.subcategory,
-          p_glassware: formData.glassware || null,
-          p_ingredients: validIngredients,
-          p_procedure: formData.procedure || '',
-          p_thumbnail_url: thumbnailUrl,
-          p_display_order: formData.display_order,
-        });
+        const { error } = await supabase
+          .from('signature_recipes')
+          .update(recipeData)
+          .eq('id', editingRecipe.id);
 
-        if (error) {
-          console.error('Error updating recipe:', error);
-          throw error;
-        }
-        console.log('Recipe updated successfully');
+        if (error) throw error;
         Alert.alert('Success', 'Recipe updated successfully');
       } else {
-        // Create new recipe using RPC function
-        console.log('Creating new recipe...');
-        const { data, error } = await supabase.rpc('create_signature_recipe', {
-          p_user_id: user.id,
-          p_name: formData.name,
-          p_price: formData.price,
-          p_subcategory: formData.subcategory,
-          p_glassware: formData.glassware || null,
-          p_ingredients: validIngredients,
-          p_procedure: formData.procedure || '',
-          p_thumbnail_url: thumbnailUrl,
-          p_display_order: formData.display_order,
+        const { error } = await supabase.from('signature_recipes').insert({
+          ...recipeData,
+          created_by: user?.id,
         });
 
-        if (error) {
-          console.error('Error creating recipe:', error);
-          throw error;
-        }
-        console.log('Recipe created successfully');
-        Alert.alert('Success', 'Recipe created successfully');
+        if (error) throw error;
+        Alert.alert('Success', 'Recipe added successfully');
       }
 
-      closeModal();
+      setShowModal(false);
+      resetForm();
       loadRecipes();
     } catch (error: any) {
       console.error('Error saving recipe:', error);
       Alert.alert('Error', error.message || 'Failed to save recipe');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleDelete = async (recipe: SignatureRecipe) => {
-    Alert.alert(
-      'Delete Recipe',
-      `Are you sure you want to delete "${recipe.name}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              if (!user?.id) {
-                Alert.alert('Error', 'User not authenticated');
-                return;
-              }
+    Alert.alert('Delete Recipe', 'Are you sure you want to delete this recipe?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const { error } = await supabase
+              .from('signature_recipes')
+              .update({ is_active: false })
+              .eq('id', recipe.id);
 
-              // Delete the recipe using RPC function
-              const { error } = await supabase.rpc('delete_signature_recipe', {
-                p_user_id: user.id,
-                p_recipe_id: recipe.id,
-              });
-
-              if (error) {
-                console.error('Error deleting recipe:', error);
-                throw error;
-              }
-
-              // Delete image if exists
-              if (recipe.thumbnail_url) {
-                const fileName = recipe.thumbnail_url.split('/').pop();
-                if (fileName) {
-                  await supabase.storage
-                    .from('signature-recipe-images')
-                    .remove([fileName]);
-                }
-              }
-
-              Alert.alert('Success', 'Recipe deleted successfully');
-              loadRecipes();
-            } catch (error: any) {
-              console.error('Error deleting recipe:', error);
-              Alert.alert('Error', error.message || 'Failed to delete recipe');
-            }
-          },
+            if (error) throw error;
+            Alert.alert('Success', 'Recipe deleted successfully');
+            loadRecipes();
+          } catch (error: any) {
+            console.error('Error deleting recipe:', error);
+            Alert.alert('Error', error.message || 'Failed to delete recipe');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const openAddModal = () => {
-    setEditingRecipe(null);
-    setFormData({
-      name: '',
-      price: '',
-      subcategory: selectedSubcategory || 'Signature Cocktails',
-      glassware: '',
-      procedure: '',
-      display_order: 0,
-    });
-    setIngredients([{ ingredient: '', amount: '' }]);
-    setSelectedImageUri(null);
-    setShowAddModal(true);
+    resetForm();
+    setShowModal(true);
   };
 
   const openEditModal = (recipe: SignatureRecipe) => {
-    console.log('Opening edit modal for recipe:', recipe);
-    console.log('Recipe ingredients:', recipe.ingredients);
-    
     setEditingRecipe(recipe);
-    setFormData({
-      name: recipe.name,
-      price: recipe.price,
-      subcategory: recipe.subcategory || 'Signature Cocktails',
-      glassware: recipe.glassware || '',
-      procedure: recipe.procedure || '',
-      display_order: recipe.display_order,
-    });
-    
-    // Handle ingredients - ensure it's an array
-    let recipeIngredients = recipe.ingredients;
-    if (!recipeIngredients || !Array.isArray(recipeIngredients) || recipeIngredients.length === 0) {
-      recipeIngredients = [{ ingredient: '', amount: '' }];
-    }
-    
-    setIngredients(recipeIngredients);
-    setSelectedImageUri(null);
-    setShowAddModal(true);
+    setName(recipe.name);
+    setPrice(recipe.price);
+    setSubcategory(recipe.subcategory || '');
+    setGlassware(recipe.glassware || '');
+    setIngredients(recipe.ingredients.length > 0 ? recipe.ingredients : [{ ingredient: '', amount: '' }]);
+    setProcedure(recipe.procedure || '');
+    setThumbnailUrl(recipe.thumbnail_url);
+    setShowModal(true);
   };
 
   const closeModal = () => {
-    setShowAddModal(false);
+    setShowModal(false);
+    resetForm();
+  };
+
+  const resetForm = () => {
     setEditingRecipe(null);
-    setSelectedImageUri(null);
+    setName('');
+    setPrice('');
+    setSubcategory('');
+    setGlassware('');
+    setIngredients([{ ingredient: '', amount: '' }]);
+    setProcedure('');
+    setThumbnailUrl(null);
   };
 
   const handleBackPress = () => {
     router.back();
   };
 
-  // Helper function to get image URL with cache busting
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
-    return `${url}?t=${Date.now()}`;
+    if (url.startsWith('http')) return url;
+    const { data } = supabase.storage.from('signature-recipes').getPublicUrl(url);
+    return data.publicUrl;
   };
 
-  // Helper function to format price with $ sign
   const formatPrice = (price: string) => {
-    if (!price) return '$0.00';
-    if (price.includes('$')) {
-      return price;
-    }
+    if (price.includes('$')) return price;
     return `$${price}`;
   };
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
@@ -491,189 +690,157 @@ export default function SignatureRecipesEditorScreen() {
         <View style={styles.backButton} />
       </View>
 
-      {/* Add New Recipe Button */}
-      <TouchableOpacity style={styles.addNewButton} onPress={openAddModal}>
-        <IconSymbol
-          ios_icon_name="plus.circle.fill"
-          android_material_icon_name="add-circle"
-          size={24}
-          color={managerColors.text}
-        />
-        <Text style={styles.addNewButtonText}>Add New Recipe</Text>
-      </TouchableOpacity>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <IconSymbol
-          ios_icon_name="magnifyingglass"
-          android_material_icon_name="search"
-          size={20}
-          color={managerColors.textSecondary}
-        />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search recipes..."
-          placeholderTextColor={managerColors.textSecondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <IconSymbol
-              ios_icon_name="xmark.circle.fill"
-              android_material_icon_name="cancel"
-              size={20}
-              color={managerColors.textSecondary}
-            />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      {/* Subcategory Tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.subcategoryScroll}
-        contentContainerStyle={styles.subcategoryScrollContent}
-      >
-        <TouchableOpacity
-          style={[
-            styles.subcategoryTab,
-            selectedSubcategory === null && styles.subcategoryTabActive,
-          ]}
-          onPress={() => setSelectedSubcategory(null)}
-        >
-          <Text
-            style={[
-              styles.subcategoryTabText,
-              selectedSubcategory === null && styles.subcategoryTabTextActive,
-            ]}
-          >
-            All
-          </Text>
+      {/* Content */}
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        {/* Add Button */}
+        <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
+          <IconSymbol
+            ios_icon_name="plus.circle.fill"
+            android_material_icon_name="add-circle"
+            size={24}
+            color={managerColors.text}
+          />
+          <Text style={styles.addButtonText}>Add Recipe</Text>
         </TouchableOpacity>
-        {SUBCATEGORIES.map((subcategory, index) => (
+
+        {/* Search Box */}
+        <View style={styles.searchContainer}>
+          <IconSymbol
+            ios_icon_name="magnifyingglass"
+            android_material_icon_name="search"
+            size={20}
+            color={managerColors.textSecondary}
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search recipes..."
+            placeholderTextColor={managerColors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <IconSymbol
+                ios_icon_name="xmark.circle.fill"
+                android_material_icon_name="cancel"
+                size={20}
+                color={managerColors.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Subcategory Tabs */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.subcategoryScroll}
+          contentContainerStyle={styles.subcategoryScrollContent}
+        >
           <TouchableOpacity
-            key={index}
             style={[
               styles.subcategoryTab,
-              selectedSubcategory === subcategory && styles.subcategoryTabActive,
+              selectedSubcategory === null && styles.subcategoryTabActive,
             ]}
-            onPress={() => setSelectedSubcategory(subcategory)}
+            onPress={() => setSelectedSubcategory(null)}
           >
             <Text
               style={[
                 styles.subcategoryTabText,
-                selectedSubcategory === subcategory && styles.subcategoryTabTextActive,
+                selectedSubcategory === null && styles.subcategoryTabTextActive,
               ]}
             >
-              {subcategory}
+              All
             </Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Recipes List */}
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={managerColors.highlight} />
-        </View>
-      ) : (
-        <ScrollView style={styles.recipesList} contentContainerStyle={styles.recipesListContent}>
-          {filteredRecipes.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <IconSymbol
-                ios_icon_name="wineglass"
-                android_material_icon_name="local-bar"
-                size={64}
-                color={managerColors.textSecondary}
-              />
-              <Text style={styles.emptyText}>No recipes found</Text>
-              <Text style={styles.emptySubtext}>
-                Tap &quot;Add New Recipe&quot; to create one
+          {SUBCATEGORIES.map((sub, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.subcategoryTab,
+                selectedSubcategory === sub && styles.subcategoryTabActive,
+              ]}
+              onPress={() => setSelectedSubcategory(sub)}
+            >
+              <Text
+                style={[
+                  styles.subcategoryTabText,
+                  selectedSubcategory === sub && styles.subcategoryTabTextActive,
+                ]}
+              >
+                {sub}
               </Text>
-            </View>
-          ) : (
-            filteredRecipes.map((recipe, index) => (
-              <View key={index} style={styles.recipeCard}>
-                <View style={styles.recipeContent}>
-                  {/* Thumbnail */}
-                  {recipe.thumbnail_url ? (
-                    <Image
-                      source={{ uri: getImageUrl(recipe.thumbnail_url) }}
-                      style={styles.recipeImage}
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View style={styles.placeholderImage}>
-                      <IconSymbol
-                        ios_icon_name="photo"
-                        android_material_icon_name="image"
-                        size={32}
-                        color={managerColors.textSecondary}
-                      />
-                    </View>
-                  )}
-                  
-                  {/* Recipe Info */}
-                  <View style={styles.recipeInfo}>
-                    <Text style={styles.recipeName} numberOfLines={2}>{recipe.name}</Text>
-                    {recipe.subcategory && (
-                      <View style={styles.subcategoryBadge}>
-                        <Text style={styles.subcategoryBadgeText}>{recipe.subcategory}</Text>
-                      </View>
-                    )}
-                  </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Recipes List */}
+        {filteredRecipes.length === 0 ? (
+          <Text style={styles.emptyText}>No recipes found</Text>
+        ) : (
+          filteredRecipes.map((recipe, index) => (
+            <View key={index} style={styles.recipeCard}>
+              {recipe.thumbnail_url && (
+                <Image
+                  source={{ uri: getImageUrl(recipe.thumbnail_url) || undefined }}
+                  style={styles.recipeImage}
+                  resizeMode="cover"
+                />
+              )}
+              <View style={styles.recipeContent}>
+                <View style={styles.recipeHeader}>
+                  <Text style={styles.recipeName}>{recipe.name}</Text>
+                  <Text style={styles.recipePrice}>{formatPrice(recipe.price)}</Text>
                 </View>
-                
-                {/* Action Buttons */}
+                {recipe.subcategory && (
+                  <Text style={styles.recipeSubcategory}>{recipe.subcategory}</Text>
+                )}
+                {recipe.glassware && (
+                  <Text style={styles.recipeGlassware}>Glassware: {recipe.glassware}</Text>
+                )}
+                {recipe.ingredients.length > 0 && (
+                  <React.Fragment>
+                    <Text style={styles.ingredientsTitle}>Ingredients:</Text>
+                    {recipe.ingredients.map((ing, idx) => (
+                      <Text key={idx} style={styles.ingredientItem}>
+                        • {ing.amount} {ing.ingredient}
+                      </Text>
+                    ))}
+                  </React.Fragment>
+                )}
+                {recipe.procedure && (
+                  <Text style={styles.recipeProcedure}>{recipe.procedure}</Text>
+                )}
                 <View style={styles.recipeActions}>
                   <TouchableOpacity
                     style={styles.editButton}
                     onPress={() => openEditModal(recipe)}
                   >
-                    <IconSymbol
-                      ios_icon_name="pencil"
-                      android_material_icon_name="edit"
-                      size={18}
-                      color={managerColors.highlight}
-                    />
+                    <Text style={styles.buttonText}>Edit</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.deleteButton}
                     onPress={() => handleDelete(recipe)}
                   >
-                    <IconSymbol
-                      ios_icon_name="trash"
-                      android_material_icon_name="delete"
-                      size={18}
-                      color="#E74C3C"
-                    />
+                    <Text style={styles.buttonText}>Delete</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-            ))
-          )}
-        </ScrollView>
+            </View>
+          ))
+        )}
+      </ScrollView>
+
+      {/* Loading Overlay */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color={managerColors.highlight} />
+        </View>
       )}
 
       {/* Add/Edit Modal */}
-      <Modal
-        visible={showAddModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={closeModal}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalContainer}
-          keyboardVerticalOffset={0}
-        >
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={closeModal}
-          />
+      <Modal visible={showModal} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
@@ -684,616 +851,175 @@ export default function SignatureRecipesEditorScreen() {
                   ios_icon_name="xmark.circle.fill"
                   android_material_icon_name="cancel"
                   size={28}
-                  color="#666666"
+                  color={managerColors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
 
-            <ScrollView
-              style={styles.modalScroll}
-              contentContainerStyle={styles.modalScrollContent}
-              showsVerticalScrollIndicator={true}
-              bounces={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              {/* Image Upload */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Thumbnail Image</Text>
-                <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
-                  {selectedImageUri || editingRecipe?.thumbnail_url ? (
-                    <Image
-                      source={{ uri: selectedImageUri || getImageUrl(editingRecipe?.thumbnail_url || '') || '' }}
-                      style={styles.uploadedImage}
-                      key={selectedImageUri || getImageUrl(editingRecipe?.thumbnail_url || '')}
-                    />
-                  ) : (
-                    <View style={styles.imageUploadPlaceholder}>
-                      <IconSymbol
-                        ios_icon_name="photo"
-                        android_material_icon_name="add-photo-alternate"
-                        size={48}
-                        color="#666666"
-                      />
-                      <Text style={styles.imageUploadText}>Tap to upload image</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                {selectedImageUri && (
-                  <TouchableOpacity 
-                    style={styles.removeImageButton}
-                    onPress={() => setSelectedImageUri(null)}
-                  >
-                    <Text style={styles.removeImageButtonText}>Remove Selected Image</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
+            <ScrollView style={styles.modalForm}>
               {/* Name */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Name *</Text>
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Recipe Name *</Text>
                 <TextInput
-                  style={styles.input}
+                  style={styles.formInput}
+                  value={name}
+                  onChangeText={setName}
                   placeholder="Enter recipe name"
-                  placeholderTextColor="#999999"
-                  value={formData.name}
-                  onChangeText={(text) => setFormData({ ...formData, name: text })}
+                  placeholderTextColor={managerColors.textSecondary}
                 />
               </View>
 
               {/* Price */}
-              <View style={styles.formGroup}>
+              <View style={styles.formField}>
                 <Text style={styles.formLabel}>Price *</Text>
                 <TextInput
-                  style={styles.input}
-                  placeholder="e.g., $12.99"
-                  placeholderTextColor="#999999"
-                  value={formData.price}
-                  onChangeText={(text) => setFormData({ ...formData, price: text })}
+                  style={styles.formInput}
+                  value={price}
+                  onChangeText={setPrice}
+                  placeholder="e.g., 12 or $12"
+                  placeholderTextColor={managerColors.textSecondary}
+                  keyboardType="numeric"
                 />
               </View>
 
               {/* Subcategory */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Subcategory *</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.optionsScroll}
-                >
-                  {SUBCATEGORIES.map((subcategory, index) => (
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Subcategory</Text>
+                <View style={styles.picker}>
+                  {SUBCATEGORIES.map((sub, index) => (
                     <TouchableOpacity
                       key={index}
-                      style={[
-                        styles.optionButton,
-                        formData.subcategory === subcategory && styles.optionButtonActive,
-                      ]}
-                      onPress={() => setFormData({ ...formData, subcategory })}
+                      style={{
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        backgroundColor:
+                          subcategory === sub ? managerColors.highlight : 'transparent',
+                      }}
+                      onPress={() => setSubcategory(sub)}
                     >
                       <Text
-                        style={[
-                          styles.optionButtonText,
-                          formData.subcategory === subcategory && styles.optionButtonTextActive,
-                        ]}
+                        style={{
+                          color: managerColors.text,
+                          fontWeight: subcategory === sub ? '600' : '400',
+                        }}
                       >
-                        {subcategory}
+                        {sub}
                       </Text>
                     </TouchableOpacity>
                   ))}
-                </ScrollView>
+                </View>
               </View>
 
               {/* Glassware */}
-              <View style={styles.formGroup}>
+              <View style={styles.formField}>
                 <Text style={styles.formLabel}>Glassware</Text>
                 <TextInput
-                  style={styles.input}
-                  placeholder="e.g., Martini glass, Rocks glass"
-                  placeholderTextColor="#999999"
-                  value={formData.glassware}
-                  onChangeText={(text) => setFormData({ ...formData, glassware: text })}
+                  style={styles.formInput}
+                  value={glassware}
+                  onChangeText={setGlassware}
+                  placeholder="e.g., Martini Glass, Rocks Glass"
+                  placeholderTextColor={managerColors.textSecondary}
                 />
               </View>
 
               {/* Ingredients */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Ingredients</Text>
-                <Text style={styles.formHint}>
-                  Add each ingredient with its amount
-                </Text>
-                {ingredients.map((ingredient, index) => (
-                  <View key={index} style={styles.ingredientRow}>
-                    <View style={styles.ingredientInputs}>
-                      <TextInput
-                        style={[styles.input, styles.ingredientAmountInput]}
-                        placeholder="Amount"
-                        placeholderTextColor="#999999"
-                        value={ingredient.amount}
-                        onChangeText={(text) => updateIngredient(index, 'amount', text)}
-                      />
-                      <TextInput
-                        style={[styles.input, styles.ingredientNameInput]}
-                        placeholder="Ingredient"
-                        placeholderTextColor="#999999"
-                        value={ingredient.ingredient}
-                        onChangeText={(text) => updateIngredient(index, 'ingredient', text)}
-                      />
-                    </View>
-                    {ingredients.length > 1 && (
-                      <TouchableOpacity
-                        style={styles.removeIngredientButton}
-                        onPress={() => removeIngredient(index)}
-                      >
-                        <IconSymbol
-                          ios_icon_name="minus.circle.fill"
-                          android_material_icon_name="remove-circle"
-                          size={24}
-                          color="#E74C3C"
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Ingredients *</Text>
+                <View style={styles.ingredientsContainer}>
+                  {ingredients.map((ing, index) => (
+                    <View key={index} style={styles.ingredientRow}>
+                      <View style={styles.ingredientInputContainer}>
+                        <TextInput
+                          style={styles.ingredientInput}
+                          value={ing.amount}
+                          onChangeText={(text) => updateIngredient(index, 'amount', text)}
+                          placeholder="Amount (e.g., 2 oz)"
+                          placeholderTextColor={managerColors.textSecondary}
                         />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))}
-                <TouchableOpacity style={styles.addIngredientButton} onPress={addIngredient}>
-                  <IconSymbol
-                    ios_icon_name="plus.circle.fill"
-                    android_material_icon_name="add-circle"
-                    size={20}
-                    color={managerColors.highlight}
-                  />
-                  <Text style={styles.addIngredientButtonText}>Add Ingredient</Text>
-                </TouchableOpacity>
+                      </View>
+                      <View style={[styles.ingredientInputContainer, { flex: 2 }]}>
+                        <TextInput
+                          style={styles.ingredientInput}
+                          value={ing.ingredient}
+                          onChangeText={(text) => updateIngredient(index, 'ingredient', text)}
+                          placeholder="Ingredient"
+                          placeholderTextColor={managerColors.textSecondary}
+                        />
+                      </View>
+                      {ingredients.length > 1 && (
+                        <TouchableOpacity
+                          style={styles.removeIngredientButton}
+                          onPress={() => removeIngredient(index)}
+                        >
+                          <IconSymbol
+                            ios_icon_name="minus.circle.fill"
+                            android_material_icon_name="remove-circle"
+                            size={20}
+                            color="#FFFFFF"
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                  <TouchableOpacity style={styles.addIngredientButton} onPress={addIngredient}>
+                    <Text style={styles.addIngredientButtonText}>+ Add Ingredient</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Procedure */}
-              <View style={styles.formGroup}>
+              <View style={styles.formField}>
                 <Text style={styles.formLabel}>Procedure</Text>
-                <Text style={styles.formHint}>
-                  Enter the preparation instructions
-                </Text>
                 <TextInput
-                  style={[styles.input, styles.textArea]}
-                  placeholder="e.g., Shake with ice and strain into glass. Garnish with cherry."
-                  placeholderTextColor="#999999"
-                  value={formData.procedure}
-                  onChangeText={(text) => setFormData({ ...formData, procedure: text })}
+                  style={[styles.formInput, styles.textArea]}
+                  value={procedure}
+                  onChangeText={setProcedure}
+                  placeholder="Enter preparation instructions"
+                  placeholderTextColor={managerColors.textSecondary}
                   multiline
-                  numberOfLines={6}
+                  numberOfLines={4}
                 />
               </View>
 
-              {/* Display Order */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Display Order</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter display order (e.g., 1, 2, 3...)"
-                  placeholderTextColor="#999999"
-                  value={formData.display_order.toString()}
-                  onChangeText={(text) => {
-                    const num = parseInt(text) || 0;
-                    setFormData({ ...formData, display_order: num });
-                  }}
-                  keyboardType="numeric"
-                />
-                <Text style={styles.formHint}>
-                  Lower numbers appear first. Items with the same order are sorted alphabetically.
-                </Text>
+              {/* Image Upload */}
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Recipe Image</Text>
+                <TouchableOpacity
+                  style={styles.imagePickerButton}
+                  onPress={pickImage}
+                  disabled={uploadingImage}
+                >
+                  <Text style={styles.imagePickerButtonText}>
+                    {uploadingImage ? 'Uploading...' : 'Choose Image'}
+                  </Text>
+                </TouchableOpacity>
+                {thumbnailUrl && (
+                  <Image
+                    source={{ uri: getImageUrl(thumbnailUrl) || undefined }}
+                    style={styles.thumbnailPreview}
+                    resizeMode="cover"
+                  />
+                )}
               </View>
 
-              {/* Save Button */}
+              {/* Submit Button */}
               <TouchableOpacity
-                style={styles.saveButton}
+                style={styles.submitButton}
                 onPress={handleSave}
-                disabled={uploadingImage}
+                disabled={loading || uploadingImage}
               >
-                {uploadingImage ? (
-                  <ActivityIndicator color="#1A1A1A" />
+                {loading ? (
+                  <ActivityIndicator color={managerColors.text} />
                 ) : (
-                  <Text style={styles.saveButtonText}>
+                  <Text style={styles.submitButtonText}>
                     {editingRecipe ? 'Update Recipe' : 'Add Recipe'}
                   </Text>
                 )}
               </TouchableOpacity>
-
-              {/* Cancel Button */}
-              <TouchableOpacity style={styles.cancelButton} onPress={closeModal}>
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
             </ScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: managerColors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 48 : 60,
-    paddingBottom: 12,
-    backgroundColor: managerColors.card,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  backButton: {
-    padding: 8,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  addNewButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: managerColors.highlight,
-    marginHorizontal: 16,
-    marginTop: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-    gap: 10,
-  },
-  addNewButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: managerColors.card,
-    marginHorizontal: 16,
-    marginTop: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-    color: managerColors.text,
-  },
-  subcategoryScroll: {
-    marginTop: 12,
-    maxHeight: 50,
-  },
-  subcategoryScrollContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  subcategoryTab: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: managerColors.card,
-    marginRight: 8,
-  },
-  subcategoryTabActive: {
-    backgroundColor: managerColors.highlight,
-  },
-  subcategoryTabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: managerColors.textSecondary,
-  },
-  subcategoryTabTextActive: {
-    color: managerColors.text,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  recipesList: {
-    flex: 1,
-    marginTop: 16,
-  },
-  recipesListContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 100,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: managerColors.text,
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: managerColors.textSecondary,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  recipeCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    marginBottom: 12,
-    overflow: 'hidden',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-    padding: 12,
-    gap: 12,
-  },
-  recipeContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  recipeImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 8,
-  },
-  placeholderImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 8,
-    backgroundColor: managerColors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  recipeInfo: {
-    flex: 1,
-    gap: 6,
-  },
-  recipeName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  subcategoryBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: managerColors.background,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  subcategoryBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: managerColors.text,
-  },
-  recipeActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  editButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: managerColors.background,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  deleteButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#2C1F1F',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '95%',
-    marginTop: 'auto',
-    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
-    elevation: 10,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-  },
-  modalScroll: {
-    flex: 1,
-  },
-  modalScrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  formLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 8,
-  },
-  formHint: {
-    fontSize: 12,
-    color: '#666666',
-    marginBottom: 8,
-    fontStyle: 'italic',
-  },
-  input: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#1A1A1A',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  textArea: {
-    height: 120,
-    textAlignVertical: 'top',
-    paddingTop: 14,
-  },
-  imageUploadButton: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
-  },
-  imageUploadPlaceholder: {
-    height: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageUploadText: {
-    fontSize: 14,
-    color: '#666666',
-    marginTop: 8,
-  },
-  uploadedImage: {
-    width: '100%',
-    height: 200,
-    resizeMode: 'cover',
-  },
-  removeImageButton: {
-    marginTop: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#FFE5E5',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  removeImageButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#E74C3C',
-  },
-  ingredientRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  ingredientInputs: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 8,
-  },
-  ingredientAmountInput: {
-    flex: 1,
-  },
-  ingredientNameInput: {
-    flex: 2,
-  },
-  removeIngredientButton: {
-    padding: 4,
-  },
-  addIngredientButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F5F5F5',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    gap: 8,
-    marginTop: 8,
-  },
-  addIngredientButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: managerColors.highlight,
-  },
-  optionsScroll: {
-    maxHeight: 50,
-  },
-  optionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  optionButtonActive: {
-    backgroundColor: managerColors.highlight,
-    borderColor: managerColors.highlight,
-  },
-  optionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
-  },
-  optionButtonTextActive: {
-    color: '#1A1A1A',
-  },
-  saveButton: {
-    backgroundColor: managerColors.highlight,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-  },
-  cancelButton: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666666',
-  },
-});

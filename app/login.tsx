@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,11 +27,11 @@ export default function LoginScreen() {
   const router = useRouter();
   const { login, user } = useAuth();
 
-  // Animation values
-  const logoScale = new Animated.Value(0);
-  const logoOpacity = new Animated.Value(0);
-  const formTranslateY = new Animated.Value(50);
-  const formOpacity = new Animated.Value(0);
+  // Animation values - use useRef to avoid re-renders
+  const logoScale = useRef(new Animated.Value(0)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const formTranslateY = useRef(new Animated.Value(50)).current;
+  const formOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Animate logo
