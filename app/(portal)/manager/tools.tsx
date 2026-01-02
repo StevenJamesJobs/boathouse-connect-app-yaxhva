@@ -16,11 +16,14 @@ export default function ManagerToolsScreen() {
   const router = useRouter();
   const { user } = useAuth();
 
-  // Check if user is a Manager or Bartender based on job titles
-  const isBartenderOrManager = user?.jobTitle && (
-    user.jobTitle.toLowerCase().includes('bartender') || 
-    user.jobTitle.toLowerCase().includes('manager')
-  );
+  // Get job titles array from user
+  const jobTitles = user?.jobTitles || [];
+  
+  // Check if user can see Bar Assistant (Bartender or Manager)
+  const canSeeBarAssistant = jobTitles.includes('Bartender') || jobTitles.includes('Manager');
+  
+  // Check if user can see Check Outs Calculator (Server or Manager)
+  const canSeeCheckOutCalculator = jobTitles.includes('Server') || jobTitles.includes('Manager');
 
   return (
     <View style={styles.container}>
@@ -30,47 +33,17 @@ export default function ManagerToolsScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Check Out Calculator Section */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <IconSymbol
-              ios_icon_name="calculator.fill"
-              android_material_icon_name="calculate"
-              size={32}
-              color={managerColors.highlight}
-            />
-            <View style={styles.cardHeaderText}>
-              <Text style={styles.cardTitle}>Check Out Calculator</Text>
-              <Text style={styles.cardDescription}>
-                Calculate your shift check out totals and tip outs
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity 
-            style={styles.cardButton}
-            onPress={() => router.push('/check-out-calculator')}
-          >
-            <Text style={styles.cardButtonText}>Open Calculator</Text>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={managerColors.text}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* Guides and Training Section */}
+        {/* 1. Guides and Training Section - ALWAYS AT TOP FOR EVERYONE */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <IconSymbol
               ios_icon_name="book.fill"
-              android_material_icon_name="book"
+              android_material_icon_name="menu-book"
               size={32}
               color={managerColors.highlight}
             />
             <View style={styles.cardHeaderText}>
-              <Text style={styles.cardTitle}>Employee Guides and Training</Text>
+              <Text style={styles.cardTitle}>Guides and Training</Text>
               <Text style={styles.cardDescription}>
                 View training materials and guides
               </Text>
@@ -90,8 +63,40 @@ export default function ManagerToolsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Bartender Assistant Section - Only visible to Managers and Bartenders */}
-        {isBartenderOrManager && (
+        {/* 2. Check Out Calculator Section - Only for Servers and Managers */}
+        {canSeeCheckOutCalculator && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <IconSymbol
+                ios_icon_name="calculator.fill"
+                android_material_icon_name="calculate"
+                size={32}
+                color={managerColors.highlight}
+              />
+              <View style={styles.cardHeaderText}>
+                <Text style={styles.cardTitle}>Check Outs Calculator</Text>
+                <Text style={styles.cardDescription}>
+                  Calculate your shift check out totals and tip outs
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              style={styles.cardButton}
+              onPress={() => router.push('/check-out-calculator')}
+            >
+              <Text style={styles.cardButtonText}>Open Calculator</Text>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={20}
+                color={managerColors.text}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* 3. Bartender Assistant Section - Only for Bartenders and Managers */}
+        {canSeeBarAssistant && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
               <IconSymbol

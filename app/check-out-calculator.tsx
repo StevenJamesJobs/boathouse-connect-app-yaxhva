@@ -1,5 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
+import { employeeColors, managerColors } from '@/styles/commonStyles';
+import { useRouter } from 'expo-router';
+import { IconSymbol } from '@/components/IconSymbol';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   View,
   Text,
@@ -8,94 +12,209 @@ import {
   StyleSheet,
   ScrollView,
 } from 'react-native';
-import { IconSymbol } from '@/components/IconSymbol';
-import { useRouter } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
-import { employeeColors, managerColors } from '@/styles/commonStyles';
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  backButton: {
+    padding: 8,
+  },
+  scrollContent: {
+    padding: 20,
+  },
+  section: {
+    marginBottom: 24,
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+  },
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  optionButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+  },
+  optionButtonSelected: {
+    borderWidth: 2,
+  },
+  optionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  resultSection: {
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 2,
+    marginTop: 8,
+  },
+  resultTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  resultLabel: {
+    fontSize: 14,
+  },
+  resultValue: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  finalTallySection: {
+    marginTop: 24,
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 2,
+  },
+  finalTallyTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  finalTallyRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  finalTallyLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  finalTallyValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  divider: {
+    height: 1,
+    marginVertical: 12,
+  },
+  negativeToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 8,
+  },
+  negativeToggleText: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+});
 
 export default function CheckOutCalculatorScreen() {
-  const router = useRouter();
   const { user } = useAuth();
+  const router = useRouter();
   const isManager = user?.role === 'manager';
   const colors = isManager ? managerColors : employeeColors;
 
-  const [totalShiftSales, setTotalShiftSales] = useState('');
-  const [cashInOutTotal, setCashInOutTotal] = useState('');
-  const [isNegative, setIsNegative] = useState(false);
-  const [busserRunnerPercent, setBusserRunnerPercent] = useState(0.035);
-  const [bartenderPercent, setBartenderPercent] = useState(0.02);
-  const [declarePercent, setDeclarePercent] = useState(0.12); // Default to 12%
-  
-  // Shared party state
-  const [sharedParty, setSharedParty] = useState(false);
+  const [creditCardTips, setCreditCardTips] = useState('');
+  const [cashTips, setCashTips] = useState('');
+  const [busserRunnerTipOut, setBusserRunnerTipOut] = useState('3');
+  const [bartenderTipOut, setBartenderTipOut] = useState('10');
+  const [sharedParty, setSharedParty] = useState<boolean | null>(null);
   const [partySubtotal, setPartySubtotal] = useState('');
   const [checkUnderMyName, setCheckUnderMyName] = useState<boolean | null>(null);
+  const [partyGratuity, setPartyGratuity] = useState('');
+  const [isNegative, setIsNegative] = useState(false);
 
-  const busserRunnerOptions = [
-    { label: '3.5%', value: 0.035 },
-    { label: '2%', value: 0.02 },
-    { label: '1%', value: 0.01 },
-    { label: '0%', value: 0 },
-  ];
+  const calculateResults = useMemo(() => {
+    const ccTips = parseFloat(creditCardTips) || 0;
+    const cTips = parseFloat(cashTips) || 0;
+    const busserPercent = parseFloat(busserRunnerTipOut) || 0;
+    const bartenderPercent = parseFloat(bartenderTipOut) || 0;
 
-  const bartenderOptions = [
-    { label: '2%', value: 0.02 },
-    { label: '3%', value: 0.03 },
-    { label: '4%', value: 0.04 },
-  ];
+    const totalTips = ccTips + cTips;
+    const busserAmount = (totalTips * busserPercent) / 100;
+    const bartenderAmount = (totalTips * bartenderPercent) / 100;
+    const totalTipOut = busserAmount + bartenderAmount;
+    const netTips = totalTips - totalTipOut;
 
-  const declareOptions = [
-    { label: '12%', value: 0.12 },
-    { label: '8%', value: 0.08 },
-  ];
+    let partyAmount = 0;
+    let partyGratuityAfterTipOut = 0;
+    let partySplit = 0;
 
-  // Calculate adjusted sales for declare amount
-  const adjustedSales = useMemo(() => {
-    const sales = parseFloat(totalShiftSales) || 0;
-    const party = parseFloat(partySubtotal) || 0;
-    
-    if (!sharedParty || checkUnderMyName === null) {
-      return sales;
+    if (sharedParty && partySubtotal) {
+      const subtotal = parseFloat(partySubtotal) || 0;
+      partyAmount = isNegative ? -subtotal : subtotal;
+
+      // Calculate party gratuity split if provided
+      if (partyGratuity) {
+        const gratuity = parseFloat(partyGratuity) || 0;
+        const gratuityTipOut = (gratuity * (busserPercent + bartenderPercent)) / 100;
+        partyGratuityAfterTipOut = gratuity - gratuityTipOut;
+        partySplit = partyGratuityAfterTipOut / 2;
+      }
     }
-    
-    const halfParty = party / 2;
-    
-    if (checkUnderMyName) {
-      // Check is under my name, subtract half
-      return sales - halfParty;
-    } else {
-      // Check is NOT under my name, add half
-      return sales + halfParty;
-    }
-  }, [totalShiftSales, sharedParty, partySubtotal, checkUnderMyName]);
 
-  // Live calculation
-  const calculateResults = () => {
-    const sales = parseFloat(totalShiftSales) || 0;
-    const cashInOutValue = parseFloat(cashInOutTotal) || 0;
-    const cashInOut = isNegative ? -Math.abs(cashInOutValue) : Math.abs(cashInOutValue);
-    
-    // Busser/Runner and Bartender amounts are based on ORIGINAL Total Sales
-    const busserAmount = sales * busserRunnerPercent;
-    const bartenderAmount = sales * bartenderPercent;
-    
-    // Declare amount is based on ADJUSTED sales
-    const declareAmount = adjustedSales * declarePercent;
-    
-    const finalTally = cashInOut + busserAmount + bartenderAmount;
+    const finalAmount = netTips + partyAmount;
 
     return {
+      totalTips,
       busserAmount,
       bartenderAmount,
-      cashInOut,
-      finalTally,
-      declareAmount,
-      adjustedSales,
+      totalTipOut,
+      netTips,
+      partyAmount,
+      partyGratuityAfterTipOut,
+      partySplit,
+      finalAmount,
     };
-  };
-
-  const results = calculateResults();
-  const hasValidInputs = totalShiftSales !== '' && cashInOutTotal !== '';
+  }, [
+    creditCardTips,
+    cashTips,
+    busserRunnerTipOut,
+    bartenderTipOut,
+    sharedParty,
+    partySubtotal,
+    partyGratuity,
+    isNegative,
+  ]);
 
   const formatCurrency = (value: number) => {
     return `$${Math.abs(value).toFixed(2)}`;
@@ -107,737 +226,247 @@ export default function CheckOutCalculatorScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.headerBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="chevron-left"
-            size={24}
-            color={colors.text}
-          />
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <IconSymbol name="chevron.left" size={24} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Check Out Calculator
-        </Text>
-        <View style={styles.headerSpacer} />
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Check Out Calculator</Text>
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView 
-        style={styles.scrollView} 
-        contentContainerStyle={styles.contentContainer}
-      >
-        {/* Header Section */}
-        <View style={styles.header}>
-          <IconSymbol
-            ios_icon_name="calculator.fill"
-            android_material_icon_name="calculate"
-            size={40}
-            color={colors.primary}
-          />
-          <View style={styles.headerText}>
-            <Text style={[styles.title, { color: colors.text }]}>
-              Check Out Calculator
-            </Text>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Please enter required information for check out calculations.
-            </Text>
+      <ScrollView style={styles.scrollContent}>
+        {/* Tips Input Section */}
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Tips Received</Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>Credit Card Tips</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+              value={creditCardTips}
+              onChangeText={setCreditCardTips}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>Cash Tips</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+              value={cashTips}
+              onChangeText={setCashTips}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+              placeholderTextColor={colors.textSecondary}
+            />
           </View>
         </View>
 
-        {/* Input Card */}
-        <View style={[styles.inputCard, { backgroundColor: colors.card }]}>
-          {/* Total Shift Sales */}
+        {/* Tip Out Percentages */}
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Tip Out Percentages</Text>
+
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>
-              Total Shift Sales *
-            </Text>
-            <View style={[styles.inputWrapper, { borderColor: colors.border }]}>
-              <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
-              <TextInput
-                style={[styles.input, { color: colors.text }]}
-                value={totalShiftSales}
-                onChangeText={setTotalShiftSales}
-                keyboardType="decimal-pad"
-                placeholder="0.00"
-                placeholderTextColor={colors.textSecondary}
-              />
+            <Text style={[styles.label, { color: colors.text }]}>Busser/Runner Tip Out %</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+              value={busserRunnerTipOut}
+              onChangeText={setBusserRunnerTipOut}
+              keyboardType="decimal-pad"
+              placeholder="3"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text }]}>Bartender Tip Out %</Text>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+              value={bartenderTipOut}
+              onChangeText={setBartenderTipOut}
+              keyboardType="decimal-pad"
+              placeholder="10"
+              placeholderTextColor={colors.textSecondary}
+            />
+          </View>
+
+          <View style={[styles.resultSection, { backgroundColor: colors.highlight, borderColor: colors.primary }]}>
+            <Text style={[styles.resultTitle, { color: colors.text }]}>Tip Calculations</Text>
+            <View style={styles.resultRow}>
+              <Text style={[styles.resultLabel, { color: colors.text }]}>Total Tips:</Text>
+              <Text style={[styles.resultValue, { color: colors.text }]}>{formatCurrency(calculateResults.totalTips)}</Text>
             </View>
-            
-            {/* Shared Party Section */}
-            <Text style={[styles.smallText, { color: colors.textSecondary, marginTop: 12 }]}>
-              Did you share a party?
-            </Text>
+            <View style={styles.resultRow}>
+              <Text style={[styles.resultLabel, { color: colors.text }]}>Busser/Runner:</Text>
+              <Text style={[styles.resultValue, { color: colors.text }]}>{formatCurrency(calculateResults.busserAmount)}</Text>
+            </View>
+            <View style={styles.resultRow}>
+              <Text style={[styles.resultLabel, { color: colors.text }]}>Bartender:</Text>
+              <Text style={[styles.resultValue, { color: colors.text }]}>{formatCurrency(calculateResults.bartenderAmount)}</Text>
+            </View>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <View style={styles.resultRow}>
+              <Text style={[styles.resultLabel, { color: colors.text, fontWeight: 'bold' }]}>Net Tips:</Text>
+              <Text style={[styles.resultValue, { color: colors.primary }]}>{formatCurrency(calculateResults.netTips)}</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Shared Party Section */}
+        <View style={[styles.section, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>Did you share a party?</Text>
+
+          <View style={styles.buttonRow}>
             <TouchableOpacity
-              style={styles.checkboxContainer}
+              style={[
+                styles.optionButton,
+                { borderColor: colors.border, backgroundColor: sharedParty === true ? colors.primary : colors.background },
+                sharedParty === true && styles.optionButtonSelected,
+              ]}
               onPress={() => {
-                setSharedParty(!sharedParty);
-                if (sharedParty) {
-                  // Reset party-related fields when unchecking
-                  setPartySubtotal('');
-                  setCheckUnderMyName(null);
-                }
+                setSharedParty(true);
+                if (!partySubtotal) setPartySubtotal('');
               }}
             >
-              <View
-                style={[
-                  styles.checkbox,
-                  {
-                    borderColor: colors.border,
-                    backgroundColor: sharedParty ? colors.primary : 'transparent',
-                  },
-                ]}
-              >
-                {sharedParty && (
-                  <IconSymbol
-                    ios_icon_name="checkmark"
-                    android_material_icon_name="check"
-                    size={16}
-                    color="#FFFFFF"
-                  />
-                )}
-              </View>
-              <Text style={[styles.checkboxLabel, { color: colors.text }]}>Yes</Text>
+              <Text style={[styles.optionButtonText, { color: sharedParty === true ? '#fff' : colors.text }]}>Yes</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.optionButton,
+                { borderColor: colors.border, backgroundColor: sharedParty === false ? colors.primary : colors.background },
+                sharedParty === false && styles.optionButtonSelected,
+              ]}
+              onPress={() => {
+                setSharedParty(false);
+                setPartySubtotal('');
+                setCheckUnderMyName(null);
+                setPartyGratuity('');
+              }}
+            >
+              <Text style={[styles.optionButtonText, { color: sharedParty === false ? '#fff' : colors.text }]}>No</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Party Subtotal - Only show if shared party is checked */}
-          {sharedParty && (
-            <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: colors.text }]}>
-                Party Subtotal
-              </Text>
-              <View style={[styles.inputWrapper, { borderColor: colors.border }]}>
-                <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
+          {sharedParty === true && (
+            <>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Party Subtotal</Text>
                 <TextInput
-                  style={[styles.input, { color: colors.text }]}
+                  style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
                   value={partySubtotal}
                   onChangeText={setPartySubtotal}
                   keyboardType="decimal-pad"
                   placeholder="0.00"
                   placeholderTextColor={colors.textSecondary}
                 />
-              </View>
-              
-              {/* Is the check under my name? */}
-              <Text style={[styles.smallText, { color: colors.textSecondary, marginTop: 12 }]}>
-                Is the check under my name?
-              </Text>
-              <View style={styles.yesNoContainer}>
                 <TouchableOpacity
-                  style={[
-                    styles.yesNoButton,
-                    {
-                      backgroundColor: checkUnderMyName === true ? colors.primary : colors.card,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => setCheckUnderMyName(true)}
+                  style={[styles.negativeToggle, { borderColor: colors.border, backgroundColor: isNegative ? colors.primary : colors.background }]}
+                  onPress={toggleNegative}
                 >
-                  <Text
-                    style={[
-                      styles.yesNoButtonText,
-                      {
-                        color: checkUnderMyName === true ? '#FFFFFF' : colors.text,
-                      },
-                    ]}
-                  >
-                    Yes
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.yesNoButton,
-                    {
-                      backgroundColor: checkUnderMyName === false ? colors.primary : colors.card,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => setCheckUnderMyName(false)}
-                >
-                  <Text
-                    style={[
-                      styles.yesNoButtonText,
-                      {
-                        color: checkUnderMyName === false ? '#FFFFFF' : colors.text,
-                      },
-                    ]}
-                  >
-                    No
-                  </Text>
+                  <IconSymbol name={isNegative ? 'checkmark.square.fill' : 'square'} size={20} color={isNegative ? '#fff' : colors.text} />
+                  <Text style={[styles.negativeToggleText, { color: isNegative ? '#fff' : colors.text }]}>Make Negative</Text>
                 </TouchableOpacity>
               </View>
-            </View>
-          )}
 
-          {/* Declare Percentage */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>
-              Declare Percentage *
-            </Text>
-            <View style={styles.buttonGroup}>
-              {declareOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[
-                    styles.optionButton,
-                    {
-                      backgroundColor:
-                        declarePercent === option.value
-                          ? colors.primary
-                          : colors.card,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => setDeclarePercent(option.value)}
-                >
-                  <Text
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Is the check under my name?</Text>
+                <View style={styles.buttonRow}>
+                  <TouchableOpacity
                     style={[
-                      styles.optionButtonText,
-                      {
-                        color:
-                          declarePercent === option.value
-                            ? '#FFFFFF'
-                            : colors.text,
-                      },
+                      styles.optionButton,
+                      { borderColor: colors.border, backgroundColor: checkUnderMyName === true ? colors.primary : colors.background },
+                      checkUnderMyName === true && styles.optionButtonSelected,
                     ]}
+                    onPress={() => setCheckUnderMyName(true)}
                   >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {/* Live Declare Calculation */}
-            {totalShiftSales !== '' && (
-              <View style={styles.liveCalculation}>
-                <Text style={[styles.liveCalcLabel, { color: colors.textSecondary }]}>
-                  Declare Amount:
-                </Text>
-                <Text style={[styles.liveCalcValue, { color: colors.primary }]}>
-                  {formatCurrency(results.declareAmount)}
-                </Text>
-              </View>
-            )}
-            {/* Show adjusted sales if different from original */}
-            {sharedParty && checkUnderMyName !== null && totalShiftSales !== '' && (
-              <View style={styles.liveCalculation}>
-                <Text style={[styles.liveCalcLabel, { color: colors.textSecondary }]}>
-                  Adjusted Sales for Declare:
-                </Text>
-                <Text style={[styles.liveCalcValue, { color: colors.highlight }]}>
-                  {formatCurrency(results.adjustedSales)}
-                </Text>
-              </View>
-            )}
-          </View>
+                    <Text style={[styles.optionButtonText, { color: checkUnderMyName === true ? '#fff' : colors.text }]}>Yes</Text>
+                  </TouchableOpacity>
 
-          {/* Cashed Out/In Total */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>
-              Cashed Out/In Total *
-            </Text>
-            <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-              (Use +/- button to toggle between positive and negative)
-            </Text>
-            <View style={styles.cashInputContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.toggleButton,
-                  {
-                    backgroundColor: isNegative ? '#D32F2F' : '#388E3C',
-                  },
-                ]}
-                onPress={toggleNegative}
-              >
-                <Text style={styles.toggleButtonText}>
-                  {isNegative ? '-' : '+'}
-                </Text>
-              </TouchableOpacity>
-              <View style={[styles.inputWrapper, styles.cashInputWrapper, { borderColor: colors.border }]}>
-                <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.optionButton,
+                      { borderColor: colors.border, backgroundColor: checkUnderMyName === false ? colors.primary : colors.background },
+                      checkUnderMyName === false && styles.optionButtonSelected,
+                    ]}
+                    onPress={() => setCheckUnderMyName(false)}
+                  >
+                    <Text style={[styles.optionButtonText, { color: checkUnderMyName === false ? '#fff' : colors.text }]}>No</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.text }]}>Party Gratuity (Optional)</Text>
                 <TextInput
-                  style={[styles.input, { color: colors.text }]}
-                  value={cashInOutTotal}
-                  onChangeText={(text) => {
-                    // Remove any non-numeric characters except decimal point
-                    const cleaned = text.replace(/[^0-9.]/g, '');
-                    setCashInOutTotal(cleaned);
-                  }}
+                  style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                  value={partyGratuity}
+                  onChangeText={setPartyGratuity}
                   keyboardType="decimal-pad"
                   placeholder="0.00"
                   placeholderTextColor={colors.textSecondary}
                 />
               </View>
-            </View>
-            {/* Show current value with sign */}
-            {cashInOutTotal !== '' && (
-              <View style={styles.currentValueContainer}>
-                <Text style={[styles.currentValueLabel, { color: colors.textSecondary }]}>
-                  Current value:
-                </Text>
-                <Text style={[styles.currentValue, { color: isNegative ? '#D32F2F' : '#388E3C' }]}>
-                  {isNegative ? '-' : '+'}${cashInOutTotal || '0.00'}
-                </Text>
-              </View>
-            )}
-          </View>
 
-          {/* Busser/Runner Percentage */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>
-              Busser/Runner Tip Out *
-            </Text>
-            <View style={styles.buttonGroup}>
-              {busserRunnerOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[
-                    styles.optionButton,
-                    {
-                      backgroundColor:
-                        busserRunnerPercent === option.value
-                          ? colors.primary
-                          : colors.card,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => setBusserRunnerPercent(option.value)}
-                >
-                  <Text
-                    style={[
-                      styles.optionButtonText,
-                      {
-                        color:
-                          busserRunnerPercent === option.value
-                            ? '#FFFFFF'
-                            : colors.text,
-                      },
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {/* Live Busser/Runner Calculation */}
-            {totalShiftSales !== '' && (
-              <View style={styles.liveCalculation}>
-                <Text style={[styles.liveCalcLabel, { color: colors.textSecondary }]}>
-                  Busser/Runner Amount:
-                </Text>
-                <Text style={[styles.liveCalcValue, { color: colors.primary }]}>
-                  {formatCurrency(results.busserAmount)}
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Bartender Percentage */}
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text }]}>
-              Bartender Tip Out *
-            </Text>
-            <View style={styles.buttonGroup}>
-              {bartenderOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.value}
-                  style={[
-                    styles.optionButton,
-                    {
-                      backgroundColor:
-                        bartenderPercent === option.value
-                          ? colors.primary
-                          : colors.card,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  onPress={() => setBartenderPercent(option.value)}
-                >
-                  <Text
-                    style={[
-                      styles.optionButtonText,
-                      {
-                        color:
-                          bartenderPercent === option.value
-                            ? '#FFFFFF'
-                            : colors.text,
-                      },
-                    ]}
-                  >
-                    {option.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {/* Live Bartender Calculation */}
-            {totalShiftSales !== '' && (
-              <View style={styles.liveCalculation}>
-                <Text style={[styles.liveCalcLabel, { color: colors.textSecondary }]}>
-                  Bartender Amount:
-                </Text>
-                <Text style={[styles.liveCalcValue, { color: colors.primary }]}>
-                  {formatCurrency(results.bartenderAmount)}
-                </Text>
-              </View>
-            )}
-          </View>
+              {partyGratuity && parseFloat(partyGratuity) > 0 && (
+                <View style={[styles.resultSection, { backgroundColor: colors.highlight, borderColor: colors.primary }]}>
+                  <Text style={[styles.resultTitle, { color: colors.text }]}>Party Gratuity Split</Text>
+                  <View style={styles.resultRow}>
+                    <Text style={[styles.resultLabel, { color: colors.text }]}>Original Gratuity:</Text>
+                    <Text style={[styles.resultValue, { color: colors.text }]}>{formatCurrency(parseFloat(partyGratuity))}</Text>
+                  </View>
+                  <View style={styles.resultRow}>
+                    <Text style={[styles.resultLabel, { color: colors.text }]}>After Tip Outs:</Text>
+                    <Text style={[styles.resultValue, { color: colors.text }]}>{formatCurrency(calculateResults.partyGratuityAfterTipOut)}</Text>
+                  </View>
+                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                  <View style={styles.resultRow}>
+                    <Text style={[styles.resultLabel, { color: colors.text, fontWeight: 'bold' }]}>Your Split:</Text>
+                    <Text style={[styles.resultValue, { color: colors.primary }]}>{formatCurrency(calculateResults.partySplit)}</Text>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
         </View>
 
-        {/* Results Card */}
-        {hasValidInputs && (
-          <View style={[styles.resultsCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.resultsTitle, { color: colors.text }]}>
-              Final Tally
-            </Text>
+        {/* Final Tally */}
+        <View style={[styles.finalTallySection, { backgroundColor: colors.primary, borderColor: colors.primary }]}>
+          <Text style={[styles.finalTallyTitle, { color: '#fff' }]}>Final Tally</Text>
 
-            {/* Show adjusted sales if different from original */}
-            {sharedParty && checkUnderMyName !== null && (
-              <View style={styles.resultRow}>
-                <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
-                  Original Total Sales:
-                </Text>
-                <Text style={[styles.resultValue, { color: colors.text }]}>
-                  {formatCurrency(parseFloat(totalShiftSales) || 0)}
-                </Text>
-              </View>
-            )}
-
-            {sharedParty && checkUnderMyName !== null && (
-              <View style={styles.resultRow}>
-                <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
-                  Adjusted Sales for Declare:
-                </Text>
-                <Text style={[styles.resultValue, { color: colors.highlight }]}>
-                  {formatCurrency(results.adjustedSales)}
-                </Text>
-              </View>
-            )}
-
-            {/* Declare Amount */}
-            <View style={styles.resultRow}>
-              <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
-                Declare Amount ({declarePercent === 0.12 ? '12%' : '8%'}):
-              </Text>
-              <Text style={[styles.resultValue, { color: colors.primary }]}>
-                {formatCurrency(results.declareAmount)}
-              </Text>
-            </View>
-
-            {/* Busser/Runner Amount */}
-            <View style={styles.resultRow}>
-              <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
-                Busser/Runner Amount:
-              </Text>
-              <Text style={[styles.resultValue, { color: colors.text }]}>
-                {formatCurrency(results.busserAmount)}
-              </Text>
-            </View>
-
-            {/* Bartender Amount */}
-            <View style={styles.resultRow}>
-              <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
-                Bartender Amount:
-              </Text>
-              <Text style={[styles.resultValue, { color: colors.text }]}>
-                {formatCurrency(results.bartenderAmount)}
-              </Text>
-            </View>
-
-            {/* Cash In/Out Total */}
-            <View style={styles.resultRow}>
-              <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
-                Cash In/Out Total:
-              </Text>
-              <Text
-                style={[
-                  styles.resultValue,
-                  {
-                    color: results.cashInOut >= 0 ? '#388E3C' : '#D32F2F',
-                  },
-                ]}
-              >
-                {results.cashInOut >= 0 ? '+' : '-'}
-                {formatCurrency(results.cashInOut)}
-              </Text>
-            </View>
-
-            {/* Divider */}
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-            {/* Final Tally */}
-            <View style={styles.finalTallyContainer}>
-              <Text
-                style={[
-                  styles.finalTallyLabel,
-                  {
-                    color: results.finalTally >= 0 ? '#D32F2F' : '#388E3C',
-                  },
-                ]}
-              >
-                {results.finalTally >= 0 ? 'You Owe' : 'You are owed'}
-              </Text>
-              <Text
-                style={[
-                  styles.finalTallyValue,
-                  {
-                    color: results.finalTally >= 0 ? '#D32F2F' : '#388E3C',
-                  },
-                ]}
-              >
-                {formatCurrency(results.finalTally)}
-              </Text>
-            </View>
+          <View style={styles.finalTallyRow}>
+            <Text style={[styles.finalTallyLabel, { color: '#fff' }]}>Net Tips:</Text>
+            <Text style={[styles.finalTallyValue, { color: '#fff' }]}>{formatCurrency(calculateResults.netTips)}</Text>
           </View>
-        )}
+
+          {sharedParty && partySubtotal && (
+            <View style={styles.finalTallyRow}>
+              <Text style={[styles.finalTallyLabel, { color: '#fff' }]}>
+                {checkUnderMyName ? 'You Owe:' : 'You Are Owed:'}
+              </Text>
+              <Text style={[styles.finalTallyValue, { color: '#fff' }]}>{formatCurrency(calculateResults.partyAmount)}</Text>
+            </View>
+          )}
+
+          {sharedParty && partyGratuity && parseFloat(partyGratuity) > 0 && (
+            <View style={styles.finalTallyRow}>
+              <Text style={[styles.finalTallyLabel, { color: '#fff' }]}>
+                {checkUnderMyName ? 'You Owe Your Teammate:' : 'Your Teammate Owes You:'}
+              </Text>
+              <Text style={[styles.finalTallyValue, { color: '#fff' }]}>{formatCurrency(calculateResults.partySplit)}</Text>
+            </View>
+          )}
+
+          <View style={[styles.divider, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
+
+          <View style={styles.finalTallyRow}>
+            <Text style={[styles.finalTallyLabel, { color: '#fff', fontSize: 18 }]}>Total:</Text>
+            <Text style={[styles.finalTallyValue, { color: '#fff', fontSize: 22 }]}>{formatCurrency(calculateResults.finalAmount)}</Text>
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  headerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    padding: 8,
-    marginLeft: -8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'center',
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingTop: 20,
-    paddingHorizontal: 16,
-    paddingBottom: 100,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 24,
-  },
-  headerText: {
-    flex: 1,
-    marginLeft: 16,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  inputCard: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  helperText: {
-    fontSize: 12,
-    marginBottom: 8,
-    fontStyle: 'italic',
-  },
-  smallText: {
-    fontSize: 13,
-    marginBottom: 8,
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-  },
-  checkboxLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  yesNoContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 8,
-  },
-  yesNoButton: {
-    flex: 1,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: 'center',
-  },
-  yesNoButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  cashInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  toggleButton: {
-    width: 50,
-    height: 48,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  toggleButtonText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  cashInputWrapper: {
-    flex: 1,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    height: 48,
-  },
-  dollarSign: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginRight: 4,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    height: 48,
-  },
-  currentValueContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 8,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  currentValueLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  currentValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  buttonGroup: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  optionButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    minWidth: 70,
-    alignItems: 'center',
-  },
-  optionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  liveCalculation: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  liveCalcLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  liveCalcValue: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  resultsCard: {
-    borderRadius: 16,
-    padding: 20,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  resultsTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  resultRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  resultLabel: {
-    fontSize: 14,
-    flex: 1,
-  },
-  resultValue: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  divider: {
-    height: 1,
-    marginVertical: 16,
-  },
-  finalTallyContainer: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  finalTallyLabel: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  finalTallyValue: {
-    fontSize: 36,
-    fontWeight: 'bold',
-  },
-});
