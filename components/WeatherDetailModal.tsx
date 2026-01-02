@@ -168,7 +168,7 @@ export default function WeatherDetailModal({
       // Using NOAA radar station KOKX (New York) which provides better North Jersey coverage
       // This station is positioned to show more of the North Jersey area
       const timestamp = Date.now();
-      const radarImageUrl = `https://radar.weather.gov/ridge/standard/KOKX_loop.gif?t=${timestamp}`;
+      const radarImageUrl = `https://radar.weather.gov/ridge/standard/KDIX_loop.gif?t=${timestamp}`;
       console.log('Radar URL with timestamp (North Jersey focus - KOKX):', radarImageUrl);
 
       const weatherDetail: WeatherDetailData = {

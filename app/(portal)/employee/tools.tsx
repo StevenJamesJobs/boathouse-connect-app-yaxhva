@@ -1,575 +1,210 @@
 
-import React, { useState } from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Modal,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-  KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { employeeColors } from '@/styles/commonStyles';
-import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { employeeColors, managerColors } from '@/styles/commonStyles';
+import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/app/integrations/supabase/client';
 
-// Specific managers who should receive feedback
-const FEEDBACK_RECIPIENTS = ['1636', '6956', '251'];
-
-export default function EmployeeToolsScreen() {
+export default function ToolsScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [feedbackTitle, setFeedbackTitle] = useState('');
-  const [feedbackDescription, setFeedbackDescription] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  // Helper function to check if user has a specific job title (case-insensitive)
-  const hasJobTitle = (title: string): boolean => {
-    if (!user?.jobTitles || user.jobTitles.length === 0) {
-      return false;
-    }
-    return user.jobTitles.some(jobTitle => 
-      jobTitle.toLowerCase().includes(title.toLowerCase())
-    );
-  };
-
-  // Check visibility for each section based on job titles
-  const canViewCheckOutsCalculator = hasJobTitle('Server') || hasJobTitle('Manager');
-  const canViewBarAssistant = hasJobTitle('Bartender') || hasJobTitle('Manager');
-
-  console.log('User job titles:', user?.jobTitles);
-  console.log('Can view Check Outs Calculator:', canViewCheckOutsCalculator);
-  console.log('Can view Bar Assistant:', canViewBarAssistant);
-
-  const handleSubmitFeedback = async () => {
-    console.log('=== FEEDBACK SUBMISSION STARTED ===');
-    console.log('User ID:', user?.id);
-    console.log('Title:', feedbackTitle);
-    console.log('Description length:', feedbackDescription.length);
-
-    if (!feedbackTitle.trim()) {
-      Alert.alert('Error', 'Please enter a title for your feedback');
-      return;
-    }
-
-    if (!feedbackDescription.trim()) {
-      Alert.alert('Error', 'Please enter a description for your feedback');
-      return;
-    }
-
-    if (!user?.id) {
-      Alert.alert('Error', 'User not authenticated. Please log in again.');
-      return;
-    }
-
-    try {
-      setSubmitting(true);
-
-      // Get specific managers to send feedback to (by username)
-      console.log('Fetching specific feedback recipients:', FEEDBACK_RECIPIENTS);
-      const { data: managers, error: managersError } = await supabase
-        .from('users')
-        .select('id, username, name')
-        .in('username', FEEDBACK_RECIPIENTS)
-        .eq('is_active', true);
-
-      if (managersError) {
-        console.error('Error fetching managers:', managersError);
-        throw new Error('Failed to fetch feedback recipients');
-      }
-
-      if (!managers || managers.length === 0) {
-        throw new Error('No feedback recipients found. Please contact an administrator.');
-      }
-
-      console.log(`Found ${managers.length} feedback recipient(s):`, managers.map(m => m.name).join(', '));
-
-      // Create the feedback message with a special subject prefix
-      // This prefix will be used to identify feedback messages in the manager's view
-      const feedbackSubject = `[FEEDBACK] ${feedbackTitle.trim()}`;
-      
-      console.log('Creating feedback message...');
-      const { data: messageData, error: messageError } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: user.id,
-          subject: feedbackSubject,
-          body: feedbackDescription.trim(),
-          thread_id: null,
-          parent_message_id: null,
-        })
-        .select()
-        .single();
-
-      if (messageError) {
-        console.error('Error creating message:', messageError);
-        throw new Error('Failed to create feedback message');
-      }
-
-      console.log('Message created:', messageData.id);
-
-      // Create message recipients for specific managers only
-      console.log('Creating message recipients...');
-      const recipients = managers.map(manager => ({
-        message_id: messageData.id,
-        recipient_id: manager.id,
-      }));
-
-      const { error: recipientsError } = await supabase
-        .from('message_recipients')
-        .insert(recipients);
-
-      if (recipientsError) {
-        console.error('Error creating recipients:', recipientsError);
-        throw new Error('Failed to send feedback to managers');
-      }
-
-      console.log('Feedback submitted successfully!');
-      
-      Alert.alert(
-        'Success! 🎉',
-        'Your feedback has been submitted successfully! Management will review it shortly.',
-        [
-          {
-            text: 'OK',
-            onPress: () => {
-              setShowFeedbackModal(false);
-              setFeedbackTitle('');
-              setFeedbackDescription('');
-            },
-          },
-        ]
-      );
-    } catch (error: any) {
-      console.error('Error submitting feedback:', error);
-      
-      let errorMessage = 'An unexpected error occurred. Please try again.';
-      
-      if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      Alert.alert('Submission Failed', errorMessage);
-    } finally {
-      setSubmitting(false);
-      console.log('=== FEEDBACK SUBMISSION ENDED ===');
-    }
-  };
+  const isManager = user?.role === 'manager';
+  const colors = isManager ? managerColors : employeeColors;
+  
+  // Get job titles array from user
+  const jobTitles = user?.jobTitles || [];
+  
+  // Check if user can see Bar Assistant (Bartender or Manager)
+  const canSeeBarAssistant = jobTitles.includes('Bartender') || jobTitles.includes('Manager');
+  
+  // Check if user can see Check Outs Calculator (Server or Manager)
+  const canSeeCheckOutCalculator = jobTitles.includes('Server') || jobTitles.includes('Manager');
 
   return (
-    <View style={styles.container}>
-      {/* User's Name Header with Feedback Button */}
-      <View style={styles.nameHeader}>
-        <Text style={styles.nameHeaderText}>{user?.name}&apos;s Tools</Text>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]} edges={['top']}>
+      <View style={[styles.header, { backgroundColor: colors.primary }]}>
+        <Text style={styles.headerTitle}>{isManager ? 'Manager' : 'Employee'} Portal</Text>
         <TouchableOpacity
-          style={styles.feedbackHeaderButton}
-          onPress={() => setShowFeedbackModal(true)}
+          style={styles.logoutButton}
+          onPress={() => router.replace('/')}
         >
-          <IconSymbol
-            ios_icon_name="bubble.left.and.bubble.right.fill"
-            android_material_icon_name="feedback"
-            size={20}
-            color="#FFFFFF"
-          />
-          <Text style={styles.feedbackHeaderButtonText}>Feedback</Text>
+          <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* 1. Guides and Training Section - Always visible to everyone */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[
+          styles.contentContainer,
+          Platform.OS !== 'ios' && styles.contentContainerWithTabBar
+        ]}
+      >
+        <Text style={[styles.pageTitle, { color: colors.text }]}>Tools & Resources</Text>
+
+        {/* 1. Guides and Training - Always visible at top */}
+        <TouchableOpacity
+          style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => router.push('/guides-and-training')}
+        >
+          <View style={[styles.iconContainer, { backgroundColor: colors.highlight }]}>
             <IconSymbol
               ios_icon_name="book.fill"
-              android_material_icon_name="book"
+              android_material_icon_name="menu-book"
               size={32}
-              color={employeeColors.primary}
+              color={colors.primary}
             />
-            <View style={styles.cardHeaderText}>
-              <Text style={styles.cardTitle}>Guides and Training</Text>
-              <Text style={styles.cardDescription}>
-                Access training materials, handbooks, and guides
+          </View>
+          <View style={styles.toolContent}>
+            <Text style={[styles.toolTitle, { color: colors.text }]}>Guides and Training</Text>
+            <Text style={[styles.toolDescription, { color: colors.textSecondary }]}>
+              Access training materials and guides
+            </Text>
+          </View>
+          <IconSymbol
+            ios_icon_name="chevron.right"
+            android_material_icon_name="chevron-right"
+            size={24}
+            color={colors.textSecondary}
+          />
+        </TouchableOpacity>
+
+        {/* 2. Check Outs Calculator - Only for Servers and Managers */}
+        {canSeeCheckOutCalculator && (
+          <TouchableOpacity
+            style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => router.push('/check-out-calculator')}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: colors.highlight }]}>
+              <IconSymbol
+                ios_icon_name="dollarsign.circle.fill"
+                android_material_icon_name="attach-money"
+                size={32}
+                color={colors.primary}
+              />
+            </View>
+            <View style={styles.toolContent}>
+              <Text style={[styles.toolTitle, { color: colors.text }]}>Check Outs Calculator</Text>
+              <Text style={[styles.toolDescription, { color: colors.textSecondary }]}>
+                Calculate your end-of-shift checkout
               </Text>
             </View>
-          </View>
-          <TouchableOpacity 
-            style={styles.cardButton}
-            onPress={() => router.push('/guides-and-training')}
-          >
-            <Text style={styles.cardButtonText}>View Guides</Text>
             <IconSymbol
               ios_icon_name="chevron.right"
               android_material_icon_name="chevron-right"
-              size={20}
-              color={employeeColors.text}
+              size={24}
+              color={colors.textSecondary}
             />
           </TouchableOpacity>
-        </View>
-
-        {/* 2. Check Out Calculator Section - Only visible to Servers and Managers */}
-        {canViewCheckOutsCalculator && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <IconSymbol
-                ios_icon_name="calculator.fill"
-                android_material_icon_name="calculate"
-                size={32}
-                color={employeeColors.primary}
-              />
-              <View style={styles.cardHeaderText}>
-                <Text style={styles.cardTitle}>Check Out Calculator</Text>
-                <Text style={styles.cardDescription}>
-                  Calculate your shift check out totals and tip outs
-                </Text>
-              </View>
-            </View>
-            <TouchableOpacity 
-              style={styles.cardButton}
-              onPress={() => router.push('/check-out-calculator')}
-            >
-              <Text style={styles.cardButtonText}>Open Calculator</Text>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={20}
-                color={employeeColors.text}
-              />
-            </TouchableOpacity>
-          </View>
         )}
 
-        {/* 3. Bartender Assistant Section - Only visible to Bartenders and Managers */}
-        {canViewBarAssistant && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
+        {/* 3. Bar Assistant - Only for Bartenders and Managers */}
+        {canSeeBarAssistant && (
+          <TouchableOpacity
+            style={[styles.toolCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => router.push('/bartender-assistant')}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: colors.highlight }]}>
               <IconSymbol
                 ios_icon_name="wineglass.fill"
                 android_material_icon_name="local-bar"
                 size={32}
-                color={employeeColors.primary}
+                color={colors.primary}
               />
-              <View style={styles.cardHeaderText}>
-                <Text style={styles.cardTitle}>Bartender Assistant</Text>
-                <Text style={styles.cardDescription}>
-                  Access cocktail recipes, knowledge base, and bar exams
-                </Text>
-              </View>
             </View>
-            <TouchableOpacity 
-              style={styles.cardButton}
-              onPress={() => router.push('/bartender-assistant')}
-            >
-              <Text style={styles.cardButtonText}>Open Bartender Assistant</Text>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={20}
-                color={employeeColors.text}
-              />
-            </TouchableOpacity>
-          </View>
+            <View style={styles.toolContent}>
+              <Text style={[styles.toolTitle, { color: colors.text }]}>Bar Assistant</Text>
+              <Text style={[styles.toolDescription, { color: colors.textSecondary }]}>
+                Quick reference for cocktails and recipes
+              </Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={24}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
         )}
       </ScrollView>
-
-      {/* Feedback Modal - Fixed with proper height */}
-      <Modal
-        visible={showFeedbackModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setShowFeedbackModal(false)}
-      >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
-          <TouchableOpacity 
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={() => {
-              setShowFeedbackModal(false);
-              setFeedbackTitle('');
-              setFeedbackDescription('');
-            }}
-          />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Feedback and Suggestions</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowFeedbackModal(false);
-                  setFeedbackTitle('');
-                  setFeedbackDescription('');
-                }}
-                style={styles.closeButton}
-              >
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color={employeeColors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView 
-              style={styles.modalScroll} 
-              contentContainerStyle={styles.modalScrollContent}
-              keyboardShouldPersistTaps="handled"
-            >
-              <Text style={styles.feedbackInstructions}>
-                Have any feedback or suggestions that can help the team? Let us know below and submit your idea! 
-                Your feedback is not anonymous, but will only be seen as a private message between only you and management.
-              </Text>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Title</Text>
-                <TextInput
-                  style={styles.titleInput}
-                  value={feedbackTitle}
-                  onChangeText={setFeedbackTitle}
-                  placeholder="Enter a brief title"
-                  placeholderTextColor={employeeColors.textSecondary}
-                  maxLength={100}
-                  editable={!submitting}
-                />
-              </View>
-
-              <View style={styles.inputContainer}>
-                <Text style={styles.inputLabel}>Description</Text>
-                <TextInput
-                  style={styles.descriptionInput}
-                  value={feedbackDescription}
-                  onChangeText={setFeedbackDescription}
-                  placeholder="Describe your feedback or suggestion in detail"
-                  placeholderTextColor={employeeColors.textSecondary}
-                  multiline
-                  numberOfLines={8}
-                  textAlignVertical="top"
-                  editable={!submitting}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={[styles.submitButton, submitting && styles.submitButtonDisabled]}
-                onPress={handleSubmitFeedback}
-                disabled={submitting}
-              >
-                {submitting ? (
-                  <>
-                    <ActivityIndicator color="#FFFFFF" />
-                    <Text style={styles.submitButtonText}>Submitting...</Text>
-                  </>
-                ) : (
-                  <>
-                    <IconSymbol
-                      ios_icon_name="paperplane.fill"
-                      android_material_icon_name="send"
-                      size={20}
-                      color="#FFFFFF"
-                    />
-                    <Text style={styles.submitButtonText}>Submit Feedback</Text>
-                  </>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: employeeColors.background,
   },
-  nameHeader: {
+  header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: employeeColors.card,
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: employeeColors.highlight,
-  },
-  nameHeaderText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: employeeColors.text,
-  },
-  feedbackHeaderButton: {
-    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: employeeColors.primary,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 6,
+    paddingHorizontal: 20,
+    paddingVertical: 15,
   },
-  feedbackHeaderButtonText: {
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  logoutButton: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+  },
+  logoutText: {
+    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
-    color: '#FFFFFF',
   },
-  scrollView: {
+  container: {
     flex: 1,
   },
   contentContainer: {
-    paddingTop: 20,
-    paddingHorizontal: 16,
+    padding: 20,
+  },
+  contentContainerWithTabBar: {
     paddingBottom: 100,
   },
-  card: {
-    backgroundColor: employeeColors.card,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+  pageTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    marginBottom: 20,
   },
-  cardHeader: {
+  toolCard: {
     flexDirection: 'row',
     alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
     marginBottom: 16,
+    borderWidth: 1,
   },
-  cardHeaderText: {
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  toolContent: {
     flex: 1,
-    marginLeft: 16,
   },
-  cardTitle: {
+  toolTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: employeeColors.text,
+    fontWeight: '600',
     marginBottom: 4,
   },
-  cardDescription: {
+  toolDescription: {
     fontSize: 14,
-    color: employeeColors.textSecondary,
-  },
-  cardButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: employeeColors.primary,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  cardButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: employeeColors.text,
-  },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: employeeColors.card,
-    borderRadius: 24,
-    width: '90%',
-    maxWidth: 500,
-    height: 600,
-    overflow: 'hidden',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: employeeColors.border,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: employeeColors.text,
-    flex: 1,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  modalScroll: {
-    flex: 1,
-  },
-  modalScrollContent: {
-    padding: 20,
-  },
-  feedbackInstructions: {
-    fontSize: 14,
-    color: employeeColors.textSecondary,
-    lineHeight: 20,
-    marginBottom: 24,
-    fontStyle: 'italic',
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: employeeColors.text,
-    marginBottom: 8,
-  },
-  titleInput: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: employeeColors.text,
-    borderWidth: 1,
-    borderColor: employeeColors.border,
-  },
-  descriptionInput: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: employeeColors.text,
-    borderWidth: 1,
-    borderColor: employeeColors.border,
-    minHeight: 150,
-  },
-  submitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: employeeColors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    gap: 8,
-    marginTop: 8,
-    marginBottom: 20,
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitButtonText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#FFFFFF',
   },
 });
