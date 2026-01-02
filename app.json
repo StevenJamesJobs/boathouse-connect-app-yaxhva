@@ -1,3 +1,4 @@
+
 {
   "expo": {
     "name": "Boathouse Connect",
@@ -49,14 +50,6 @@
           "backgroundColor": "#E8F1F8",
           "image": "./assets/images/b6dc3cd2-93a8-460b-bf7c-b8dea7f7bb8e.jpeg",
           "imageWidth": 280
-        }
-      ],
-      [
-        "react-native-edge-to-edge",
-        {
-          "android": {
-            "enforceNavigationBarContrast": false
-          }
         }
       ]
     ],
