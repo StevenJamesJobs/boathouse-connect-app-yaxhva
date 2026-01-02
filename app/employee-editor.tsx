@@ -74,7 +74,7 @@ export default function EmployeeEditorScreen() {
 
   useEffect(() => {
     filterEmployees();
-  }, [employees, searchQuery, selectedLetter, showInactive]);
+  }, [employees, searchQuery, selectedLetter, showInactive, filterEmployees]);
 
   const fetchEmployees = async () => {
     try {

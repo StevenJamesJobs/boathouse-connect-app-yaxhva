@@ -28,7 +28,7 @@ export default function WeatherWidget({ textColor, secondaryTextColor, onPress }
 
   useEffect(() => {
     fetchWeather();
-  }, []);
+  }, [fetchWeather]);
 
   const generateDetailedForecast = (data: any): string => {
     const day = data.forecast.forecastday[0].day;

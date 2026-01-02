@@ -72,7 +72,7 @@ export function useUnreadMessages() {
       subscription.remove();
       clearInterval(interval);
     };
-  }, [user?.id]);
+  }, [user?.id, loadUnreadCount]);
 
   return { unreadCount, loading, refresh: loadUnreadCount };
 }

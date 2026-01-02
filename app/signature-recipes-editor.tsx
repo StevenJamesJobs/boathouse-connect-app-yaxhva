@@ -72,7 +72,7 @@ export default function SignatureRecipesEditorScreen() {
 
   useEffect(() => {
     filterRecipes();
-  }, [recipes, searchQuery, selectedSubcategory]);
+  }, [recipes, searchQuery, selectedSubcategory, filterRecipes]);
 
   const loadRecipes = async () => {
     try {

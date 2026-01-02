@@ -63,7 +63,7 @@ export default function MessagesScreen() {
       if (isManager) {
         loadFeedbackCount();
       }
-    }, [activeTab])
+    }, [activeTab, isManager, loadFeedbackCount, loadInboxCount, loadMessages, loadUnreadCount])
   );
 
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function MessagesScreen() {
     if (isManager) {
       loadFeedbackCount();
     }
-  }, [activeTab]);
+  }, [activeTab, isManager, loadFeedbackCount, loadInboxCount, loadMessages, loadUnreadCount]);
 
   const loadMessages = async () => {
     if (!user?.id) return;

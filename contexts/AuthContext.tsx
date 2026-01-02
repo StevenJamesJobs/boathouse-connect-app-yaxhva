@@ -24,7 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     loadStoredAuth();
-  }, []);
+  }, [loadStoredAuth]);
 
   const fetchUserFromDatabase = async (userId: string): Promise<User | null> => {
     try {

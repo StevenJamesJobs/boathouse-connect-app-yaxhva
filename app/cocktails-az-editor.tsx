@@ -64,7 +64,7 @@ export default function CocktailsAZEditorScreen() {
 
   useEffect(() => {
     filterCocktails();
-  }, [cocktails, searchQuery, selectedLetter]);
+  }, [cocktails, searchQuery, selectedLetter, filterCocktails]);
 
   const loadCocktails = async () => {
     try {

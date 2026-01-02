@@ -97,7 +97,7 @@ export default function RewardsAndReviewsEditorScreen() {
     fetchEmployees();
     fetchRewardsData();
     fetchReviews();
-  }, []);
+  }, [fetchRewardsData]);
 
   useEffect(() => {
     if (searchQuery) {

@@ -52,7 +52,7 @@ export default function CocktailsAZScreen() {
 
   useEffect(() => {
     filterCocktails();
-  }, [cocktails, searchQuery, selectedLetter]);
+  }, [cocktails, searchQuery, selectedLetter, filterCocktails]);
 
   const loadCocktails = async () => {
     try {
