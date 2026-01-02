@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -93,39 +93,7 @@ export default function RewardsAndReviewsEditorScreen() {
     display_order: 0,
   });
 
-  useEffect(() => {
-    fetchEmployees();
-    fetchRewardsData();
-    fetchReviews();
-  }, []);
-
-  useEffect(() => {
-    if (searchQuery) {
-      const filtered = employees.filter(
-        (emp) =>
-          emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          emp.username.toLowerCase().includes(searchQuery.toLowerCase())
-      );
-      setFilteredEmployees(filtered);
-    } else {
-      setFilteredEmployees([]);
-    }
-  }, [searchQuery, employees]);
-
-  useEffect(() => {
-    if (resetSearchQuery) {
-      const filtered = employees.filter(
-        (emp) =>
-          emp.name.toLowerCase().includes(resetSearchQuery.toLowerCase()) ||
-          emp.username.toLowerCase().includes(resetSearchQuery.toLowerCase())
-      );
-      setResetFilteredEmployees(filtered);
-    } else {
-      setResetFilteredEmployees([]);
-    }
-  }, [resetSearchQuery, employees]);
-
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('users')
@@ -138,9 +106,9 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
-  };
+  }, []);
 
-  const fetchRewardsData = async () => {
+  const fetchRewardsData = useCallback(async () => {
     try {
       // Fetch current user's bucks
       if (user?.id) {
@@ -215,9 +183,9 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error) {
       console.error('Error fetching rewards data:', error);
     }
-  };
+  }, [user?.id]);
 
-  const fetchReviews = async () => {
+  const fetchReviews = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('guest_reviews')
@@ -230,7 +198,39 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchEmployees();
+    fetchRewardsData();
+    fetchReviews();
+  }, [fetchEmployees, fetchRewardsData, fetchReviews]);
+
+  useEffect(() => {
+    if (searchQuery) {
+      const filtered = employees.filter(
+        (emp) =>
+          emp.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          emp.username.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      setFilteredEmployees(filtered);
+    } else {
+      setFilteredEmployees([]);
+    }
+  }, [searchQuery, employees]);
+
+  useEffect(() => {
+    if (resetSearchQuery) {
+      const filtered = employees.filter(
+        (emp) =>
+          emp.name.toLowerCase().includes(resetSearchQuery.toLowerCase()) ||
+          emp.username.toLowerCase().includes(resetSearchQuery.toLowerCase())
+      );
+      setResetFilteredEmployees(filtered);
+    } else {
+      setResetFilteredEmployees([]);
+    }
+  }, [resetSearchQuery, employees]);
 
   const handleRewardEmployee = async () => {
     try {
@@ -884,7 +884,7 @@ export default function RewardsAndReviewsEditorScreen() {
                         >
                           <IconSymbol
                             ios_icon_name={trans.is_visible ? 'eye.slash.fill' : 'eye.fill'}
-                            android_material_icon_name={trans.is_visible ? 'visibility_off' : 'visibility'}
+                            android_material_icon_name={trans.is_visible ? 'visibility-off' : 'visibility'}
                             size={24}
                             color={trans.is_visible ? '#FF9800' : '#4CAF50'}
                           />

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -185,48 +185,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
   const [showFilterModal, setShowFilterModal] = useState(false);
 
-  useEffect(() => {
-    loadMenuItems();
-  }, []);
-
-  useEffect(() => {
-    filterItems();
-  }, [menuItems, selectedCategory, selectedSubcategory, searchQuery, selectedFilters]);
-
-  // Set the default subcategory when category changes
-  useEffect(() => {
-    if (SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0) {
-      // Set to the first subcategory (which is now the proper starting one, not "All")
-      setSelectedSubcategory(SUBCATEGORIES[selectedCategory][0]);
-    } else {
-      setSelectedSubcategory(null);
-    }
-  }, [selectedCategory]);
-
-  // Prefetch images when filtered items change
-  useEffect(() => {
-    const prefetchImages = async () => {
-      const imageUrls = filteredItems
-        .map(item => item.thumbnail_url)
-        .filter((url): url is string => url !== null && url !== undefined);
-      
-      if (imageUrls.length > 0) {
-        console.log('Prefetching', imageUrls.length, 'images...');
-        try {
-          await Image.prefetch(imageUrls, { cachePolicy: 'memory-disk' });
-          console.log('Images prefetched successfully');
-        } catch (error) {
-          console.error('Error prefetching images:', error);
-        }
-      }
-    };
-
-    // Prefetch after a short delay to avoid blocking the UI
-    const timeoutId = setTimeout(prefetchImages, 100);
-    return () => clearTimeout(timeoutId);
-  }, [filteredItems]);
-
-  const loadMenuItems = async () => {
+  const loadMenuItems = useCallback(async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -243,9 +202,45 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const filterItems = () => {
+  useEffect(() => {
+    loadMenuItems();
+  }, [loadMenuItems]);
+
+  const applyMultipleFilters = useCallback((items: MenuItem[], filters: string[]) => {
+    // Apply all filters - item must match ALL selected filters
+    return items.filter(item => {
+      return filters.every(filter => {
+        switch (filter) {
+          case 'lunch':
+            return item.available_for_lunch;
+          case 'dinner':
+            return item.available_for_dinner;
+          case 'gf':
+            return item.is_gluten_free;
+          case 'gfa':
+            return item.is_gluten_free_available;
+          case 'v':
+            return item.is_vegetarian;
+          case 'va':
+            return item.is_vegetarian_available;
+          case 'wine':
+            return item.category === 'Wine';
+          case 'libations':
+            return item.category === 'Libations';
+          case 'happy_hour':
+            return item.category === 'Happy Hour';
+          case 'weekly_specials':
+            return item.category === 'Weekly Specials';
+          default:
+            return true;
+        }
+      });
+    });
+  }, []);
+
+  const filterItems = useCallback(() => {
     let filtered = menuItems;
 
     // If filters are selected, apply filter logic (even without search text)
@@ -308,39 +303,44 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
 
     console.log('Filtered items:', filtered.length);
     setFilteredItems(filtered);
-  };
+  }, [menuItems, selectedCategory, selectedSubcategory, searchQuery, selectedFilters, applyMultipleFilters]);
 
-  const applyMultipleFilters = (items: MenuItem[], filters: string[]) => {
-    // Apply all filters - item must match ALL selected filters
-    return items.filter(item => {
-      return filters.every(filter => {
-        switch (filter) {
-          case 'lunch':
-            return item.available_for_lunch;
-          case 'dinner':
-            return item.available_for_dinner;
-          case 'gf':
-            return item.is_gluten_free;
-          case 'gfa':
-            return item.is_gluten_free_available;
-          case 'v':
-            return item.is_vegetarian;
-          case 'va':
-            return item.is_vegetarian_available;
-          case 'wine':
-            return item.category === 'Wine';
-          case 'libations':
-            return item.category === 'Libations';
-          case 'happy_hour':
-            return item.category === 'Happy Hour';
-          case 'weekly_specials':
-            return item.category === 'Weekly Specials';
-          default:
-            return true;
+  useEffect(() => {
+    filterItems();
+  }, [filterItems]);
+
+  // Set the default subcategory when category changes
+  useEffect(() => {
+    if (SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0) {
+      // Set to the first subcategory (which is now the proper starting one, not "All")
+      setSelectedSubcategory(SUBCATEGORIES[selectedCategory][0]);
+    } else {
+      setSelectedSubcategory(null);
+    }
+  }, [selectedCategory]);
+
+  // Prefetch images when filtered items change
+  useEffect(() => {
+    const prefetchImages = async () => {
+      const imageUrls = filteredItems
+        .map(item => item.thumbnail_url)
+        .filter((url): url is string => url !== null && url !== undefined);
+      
+      if (imageUrls.length > 0) {
+        console.log('Prefetching', imageUrls.length, 'images...');
+        try {
+          await Image.prefetch(imageUrls, { cachePolicy: 'memory-disk' });
+          console.log('Images prefetched successfully');
+        } catch (error) {
+          console.error('Error prefetching images:', error);
         }
-      });
-    });
-  };
+      }
+    };
+
+    // Prefetch after a short delay to avoid blocking the UI
+    const timeoutId = setTimeout(prefetchImages, 100);
+    return () => clearTimeout(timeoutId);
+  }, [filteredItems]);
 
   const toggleFilter = (filterValue: string) => {
     setSelectedFilters(prev => {
@@ -601,7 +601,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           <View style={styles.emptyContainer}>
             <IconSymbol
               ios_icon_name={searchQuery.trim() || selectedFilters.length > 0 ? "magnifyingglass" : "fork.knife"}
-              android_material_icon_name={searchQuery.trim() || selectedFilters.length > 0 ? "search" : "restaurant_menu"}
+              android_material_icon_name={searchQuery.trim() || selectedFilters.length > 0 ? "search" : "restaurant-menu"}
               size={64}
               color={colors.textSecondary}
             />

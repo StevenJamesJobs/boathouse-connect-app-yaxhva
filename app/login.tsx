@@ -64,7 +64,7 @@ export default function LoginScreen() {
         }),
       ]).start();
     }, 400);
-  }, []); // Empty dependency array is correct - only run once on mount
+  }, []); // Empty dependency array is correct since we're using refs
 
   const handleLogin = async () => {
     if (!username.trim() || !password.trim()) {
@@ -169,7 +169,7 @@ export default function LoginScreen() {
             >
               <IconSymbol
                 ios_icon_name={showPassword ? 'eye.slash.fill' : 'eye.fill'}
-                android_material_icon_name={showPassword ? 'visibility_off' : 'visibility'}
+                android_material_icon_name={showPassword ? 'visibility-off' : 'visibility'}
                 size={20}
                 color={splashColors.textSecondary}
               />

@@ -361,10 +361,6 @@ export default function CocktailsAZEditorScreen() {
     filterCocktails();
   }, [filterCocktails]);
 
-  useEffect(() => {
-    loadCocktails();
-  }, []);
-
   const loadCocktails = useCallback(async () => {
     try {
       setLoading(true);
@@ -383,6 +379,10 @@ export default function CocktailsAZEditorScreen() {
       setLoading(false);
     }
   }, []);
+
+  useEffect(() => {
+    loadCocktails();
+  }, [loadCocktails]);
 
   const pickImage = async () => {
     try {

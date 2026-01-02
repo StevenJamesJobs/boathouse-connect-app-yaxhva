@@ -408,9 +408,28 @@ export default function MenuEditorScreen() {
   const [thumbnailShape, setThumbnailShape] = useState<'square' | 'banner'>('banner');
   const [uploadingImage, setUploadingImage] = useState(false);
 
+  const loadMenuItems = useCallback(async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('menu_items')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+      setMenuItems(data || []);
+    } catch (error) {
+      console.error('Error loading menu items:', error);
+      Alert.alert('Error', 'Failed to load menu items');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     loadMenuItems();
-  }, []);
+  }, [loadMenuItems]);
 
   const filterItems = useCallback(() => {
     let filtered = menuItems;
@@ -449,25 +468,6 @@ export default function MenuEditorScreen() {
   useEffect(() => {
     filterItems();
   }, [filterItems]);
-
-  const loadMenuItems = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('menu_items')
-        .select('*')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
-
-      if (error) throw error;
-      setMenuItems(data || []);
-    } catch (error) {
-      console.error('Error loading menu items:', error);
-      Alert.alert('Error', 'Failed to load menu items');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const pickImage = async () => {
     try {
