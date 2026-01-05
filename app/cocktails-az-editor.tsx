@@ -36,16 +36,14 @@ interface Cocktail {
 }
 
 const ALCOHOL_TYPES = [
-  'Vodka',
+  'Bourbon',
+  'Brandy',
+  'Cognac',
   'Gin',
   'Rum',
   'Tequila',
+  'Vodka',
   'Whiskey',
-  'Brandy',
-  'Liqueur',
-  'Wine',
-  'Beer',
-  'Non-Alcoholic',
   'Other',
 ];
 
@@ -366,13 +364,18 @@ export default function CocktailsAZEditorScreen() {
   const loadCocktails = useCallback(async () => {
     try {
       setLoading(true);
+      console.log('Loading cocktails from table: cocktails');
       const { data, error } = await supabase
-        .from('cocktails_az')
+        .from('cocktails')
         .select('*')
         .eq('is_active', true)
         .order('name', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading cocktails:', error);
+        throw error;
+      }
+      console.log('Loaded cocktails:', data);
       setCocktails(data || []);
     } catch (error) {
       console.error('Error loading cocktails:', error);
@@ -481,20 +484,28 @@ export default function CocktailsAZEditorScreen() {
       };
 
       if (editingCocktail) {
+        console.log('Updating cocktail:', editingCocktail.id);
         const { error } = await supabase
-          .from('cocktails_az')
+          .from('cocktails')
           .update(cocktailData)
           .eq('id', editingCocktail.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating cocktail:', error);
+          throw error;
+        }
         Alert.alert('Success', 'Cocktail updated successfully');
       } else {
-        const { error } = await supabase.from('cocktails_az').insert({
+        console.log('Adding new cocktail');
+        const { error } = await supabase.from('cocktails').insert({
           ...cocktailData,
           created_by: user?.id,
         });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error adding cocktail:', error);
+          throw error;
+        }
         Alert.alert('Success', 'Cocktail added successfully');
       }
 
@@ -517,12 +528,16 @@ export default function CocktailsAZEditorScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
+            console.log('Deleting cocktail:', cocktail.id);
             const { error } = await supabase
-              .from('cocktails_az')
+              .from('cocktails')
               .update({ is_active: false })
               .eq('id', cocktail.id);
 
-            if (error) throw error;
+            if (error) {
+              console.error('Error deleting cocktail:', error);
+              throw error;
+            }
             Alert.alert('Success', 'Cocktail deleted successfully');
             loadCocktails();
           } catch (error: any) {
