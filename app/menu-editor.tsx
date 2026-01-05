@@ -1,11 +1,4 @@
 
-import { supabase } from '@/app/integrations/supabase/client';
-import { useRouter } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
-import * as FileSystem from 'expo-file-system/legacy';
-import { managerColors } from '@/styles/commonStyles';
-import * as ImagePicker from 'expo-image-picker';
-import { IconSymbol } from '@/components/IconSymbol';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -21,6 +14,13 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
+import { IconSymbol } from '@/components/IconSymbol';
+import * as ImagePicker from 'expo-image-picker';
+import { useRouter } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import { managerColors } from '@/styles/commonStyles';
+import { supabase } from '@/app/integrations/supabase/client';
+import * as FileSystem from 'expo-file-system';
 
 interface MenuItem {
   id: string;
@@ -59,302 +59,6 @@ const SUBCATEGORIES: { [key: string]: string[] } = {
   Desserts: ['Cakes', 'Ice Cream', 'Specialty'],
   Beverages: ['Soft Drinks', 'Coffee', 'Tea'],
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: managerColors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: managerColors.primary,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    flex: 1,
-    textAlign: 'center',
-  },
-  backButton: {
-    padding: 8,
-  },
-  addButton: {
-    padding: 8,
-  },
-  filterContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: managerColors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
-  },
-  filterScroll: {
-    flexDirection: 'row',
-  },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: managerColors.background,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-  },
-  filterButtonActive: {
-    backgroundColor: managerColors.primary,
-    borderColor: managerColors.primary,
-  },
-  filterButtonText: {
-    fontSize: 14,
-    color: managerColors.text,
-  },
-  filterButtonTextActive: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  menuItem: {
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-  },
-  menuItemHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-  },
-  // FIXED: Always show square thumbnail (80x80) in editor cards
-  menuItemImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    marginRight: 12,
-    backgroundColor: managerColors.background,
-  },
-  menuItemInfo: {
-    flex: 1,
-  },
-  menuItemName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    marginBottom: 4,
-  },
-  menuItemPrice: {
-    fontSize: 16,
-    color: managerColors.primary,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  menuItemCategory: {
-    fontSize: 14,
-    color: managerColors.textSecondary,
-    marginBottom: 2,
-  },
-  menuItemDescription: {
-    fontSize: 14,
-    color: managerColors.textSecondary,
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  menuItemActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: managerColors.border,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    marginLeft: 10,
-  },
-  editButton: {
-    backgroundColor: managerColors.primary,
-  },
-  deleteButton: {
-    backgroundColor: '#dc3545',
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  closeButton: {
-    padding: 4,
-  },
-  formGroup: {
-    marginBottom: 15,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: managerColors.text,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: managerColors.background,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: managerColors.text,
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  picker: {
-    backgroundColor: managerColors.background,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-    borderRadius: 8,
-  },
-  checkboxContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderWidth: 2,
-    borderColor: managerColors.primary,
-    borderRadius: 4,
-    marginRight: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: managerColors.primary,
-  },
-  checkboxLabel: {
-    fontSize: 16,
-    color: managerColors.text,
-  },
-  imagePickerButton: {
-    backgroundColor: managerColors.primary,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  imagePickerButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  previewImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  shapeSelector: {
-    flexDirection: 'row',
-    marginTop: 10,
-  },
-  shapeButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  shapeButtonActive: {
-    backgroundColor: managerColors.primary,
-    borderColor: managerColors.primary,
-  },
-  shapeButtonText: {
-    fontSize: 14,
-    color: managerColors.text,
-  },
-  shapeButtonTextActive: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 20,
-  },
-  modalButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginLeft: 10,
-  },
-  cancelButton: {
-    backgroundColor: managerColors.textSecondary,
-  },
-  saveButton: {
-    backgroundColor: managerColors.primary,
-  },
-  modalButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
-  },
-  emptyStateText: {
-    fontSize: 16,
-    color: managerColors.textSecondary,
-    marginTop: 10,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
 
 export default function MenuEditorScreen() {
   const { user } = useAuth();
@@ -542,7 +246,6 @@ export default function MenuEditorScreen() {
     }
   };
 
-  // FIXED: Improved delete functionality with better error handling
   const handleDelete = async (item: MenuItem) => {
     Alert.alert(
       'Confirm Delete',
@@ -556,7 +259,6 @@ export default function MenuEditorScreen() {
             try {
               console.log('Attempting to delete menu item:', item.id);
               
-              // Check if user is authenticated
               const { data: { session } } = await supabase.auth.getSession();
               if (!session) {
                 Alert.alert('Error', 'You must be logged in to delete items');
@@ -565,7 +267,6 @@ export default function MenuEditorScreen() {
 
               console.log('User is authenticated, proceeding with delete');
               
-              // Delete the item
               const { error } = await supabase
                 .from('menu_items')
                 .delete()
@@ -582,7 +283,6 @@ export default function MenuEditorScreen() {
             } catch (error: any) {
               console.error('Error deleting menu item:', error);
               
-              // Provide more specific error messages
               let errorMessage = 'Failed to delete menu item';
               if (error.code === '42501') {
                 errorMessage = 'Permission denied. Please make sure you are logged in as a manager.';
@@ -677,7 +377,7 @@ export default function MenuEditorScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color="#fff" />
+          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow_back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Menu Editor</Text>
         <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
@@ -910,3 +610,298 @@ export default function MenuEditorScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: managerColors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    backgroundColor: managerColors.primary,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    flex: 1,
+    textAlign: 'center',
+  },
+  backButton: {
+    padding: 8,
+  },
+  addButton: {
+    padding: 8,
+  },
+  filterContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: managerColors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: managerColors.border,
+  },
+  filterScroll: {
+    flexDirection: 'row',
+  },
+  filterButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: managerColors.background,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+  },
+  filterButtonActive: {
+    backgroundColor: managerColors.primary,
+    borderColor: managerColors.primary,
+  },
+  filterButtonText: {
+    fontSize: 14,
+    color: managerColors.text,
+  },
+  filterButtonTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  content: {
+    flex: 1,
+    padding: 20,
+  },
+  menuItem: {
+    backgroundColor: managerColors.card,
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+  },
+  menuItemHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  menuItemImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: managerColors.background,
+  },
+  menuItemInfo: {
+    flex: 1,
+  },
+  menuItemName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: managerColors.text,
+    marginBottom: 4,
+  },
+  menuItemPrice: {
+    fontSize: 16,
+    color: managerColors.primary,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  menuItemCategory: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginBottom: 2,
+  },
+  menuItemDescription: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginTop: 8,
+    lineHeight: 20,
+  },
+  menuItemActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: managerColors.border,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: 10,
+  },
+  editButton: {
+    backgroundColor: managerColors.primary,
+  },
+  deleteButton: {
+    backgroundColor: '#dc3545',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: managerColors.card,
+    borderRadius: 12,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: managerColors.text,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  formGroup: {
+    marginBottom: 15,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: managerColors.text,
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: managerColors.background,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: managerColors.text,
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  picker: {
+    backgroundColor: managerColors.background,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+    borderRadius: 8,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 2,
+    borderColor: managerColors.primary,
+    borderRadius: 4,
+    marginRight: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: managerColors.primary,
+  },
+  checkboxLabel: {
+    fontSize: 16,
+    color: managerColors.text,
+  },
+  imagePickerButton: {
+    backgroundColor: managerColors.primary,
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  imagePickerButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  previewImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  shapeSelector: {
+    flexDirection: 'row',
+    marginTop: 10,
+  },
+  shapeButton: {
+    flex: 1,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  shapeButtonActive: {
+    backgroundColor: managerColors.primary,
+    borderColor: managerColors.primary,
+  },
+  shapeButtonText: {
+    fontSize: 14,
+    color: managerColors.text,
+  },
+  shapeButtonTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 20,
+  },
+  modalButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginLeft: 10,
+  },
+  cancelButton: {
+    backgroundColor: managerColors.textSecondary,
+  },
+  saveButton: {
+    backgroundColor: managerColors.primary,
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: managerColors.textSecondary,
+    marginTop: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+});

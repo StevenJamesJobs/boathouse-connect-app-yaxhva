@@ -1,6 +1,4 @@
 
-import { supabase } from '@/app/integrations/supabase/client';
-import { useRouter } from 'expo-router';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -17,11 +15,11 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-// @ts-expect-error - expo-file-system/legacy is valid for Expo 54
-// eslint-disable-next-line import/no-unresolved
-import * as FileSystem from 'expo-file-system/legacy';
-import { managerColors } from '@/styles/commonStyles';
+import * as FileSystem from 'expo-file-system';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { managerColors } from '@/styles/commonStyles';
+import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 
 interface Cocktail {
@@ -48,271 +46,6 @@ const ALCOHOL_TYPES = [
 ];
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: managerColors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 16,
-    backgroundColor: managerColors.card,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  backButton: {
-    padding: 8,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  contentContainer: {
-    flex: 1,
-    flexDirection: 'row',
-  },
-  mainContent: {
-    flex: 1,
-    paddingTop: 20,
-    paddingHorizontal: 16,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    paddingBottom: 100,
-  },
-  addButton: {
-    backgroundColor: managerColors.highlight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-    gap: 8,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  addButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 16,
-    gap: 10,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: managerColors.text,
-    padding: 0,
-  },
-  cocktailCard: {
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  cocktailInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  cocktailName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    marginBottom: 4,
-  },
-  cocktailAlcoholType: {
-    fontSize: 14,
-    color: managerColors.textSecondary,
-  },
-  cocktailActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  editButton: {
-    backgroundColor: managerColors.highlight,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    minWidth: 60,
-    alignItems: 'center',
-  },
-  deleteButton: {
-    backgroundColor: '#F44336',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    minWidth: 60,
-    alignItems: 'center',
-  },
-  buttonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: managerColors.text,
-  },
-  emptyText: {
-    textAlign: 'center',
-    fontSize: 16,
-    color: managerColors.textSecondary,
-    marginTop: 40,
-  },
-  alphabetNav: {
-    width: 40,
-    backgroundColor: managerColors.card,
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-    marginRight: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  alphabetNavContent: {
-    paddingVertical: 8,
-    alignItems: 'center',
-  },
-  alphabetButton: {
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: 2,
-    borderRadius: 16,
-  },
-  alphabetButtonActive: {
-    backgroundColor: managerColors.primary,
-  },
-  alphabetButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: managerColors.textSecondary,
-  },
-  alphabetButtonTextActive: {
-    color: managerColors.text,
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: managerColors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: managerColors.highlight,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  modalForm: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-  },
-  formField: {
-    marginBottom: 20,
-  },
-  formLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: managerColors.text,
-    marginBottom: 8,
-  },
-  formInput: {
-    backgroundColor: managerColors.card,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: managerColors.text,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  picker: {
-    backgroundColor: managerColors.card,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-  },
-  imagePickerButton: {
-    backgroundColor: managerColors.highlight,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  imagePickerButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: managerColors.text,
-  },
-  thumbnailPreview: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    marginTop: 8,
-  },
-  submitButton: {
-    backgroundColor: managerColors.highlight,
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  submitButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-});
 
 export default function CocktailsAZEditorScreen() {
   const router = useRouter();
@@ -611,7 +344,7 @@ export default function CocktailsAZEditorScreen() {
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
+            android_material_icon_name="arrow_back"
             size={24}
             color={managerColors.text}
           />
@@ -629,7 +362,7 @@ export default function CocktailsAZEditorScreen() {
             <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
               <IconSymbol
                 ios_icon_name="plus.circle.fill"
-                android_material_icon_name="add-circle"
+                android_material_icon_name="add_circle"
                 size={24}
                 color={managerColors.text}
               />
@@ -874,41 +607,268 @@ export default function CocktailsAZEditorScreen() {
     </KeyboardAvoidingView>
   );
 }
-</write file>
 
-Perfect! I've successfully updated the **Cocktails A-Z Editor** with all the requested changes:
-
-## ✅ Changes Implemented:
-
-### 1. **Compact Editor Cards** 
-   - Cards now match the viewable page style
-   - Display only **Name** and **Alcohol Type**
-   - Removed all extra information (ingredients, procedure, thumbnails)
-   - Clean, sleek design with smaller action buttons
-
-### 2. **Vertical A-Z Navigation**
-   - Moved from horizontal scrolling bar to **vertical navigation on the right side**
-   - Matches the exact style of the viewable "Cocktails A-Z" page
-   - Includes "All" button at the top
-   - Smooth scrolling through the alphabet
-
-### 3. **Removed Thumbnails from Editor Cards**
-   - Editor cards no longer show thumbnail images
-   - Cards are now compact and consistent
-   - Thumbnails still available in the add/edit modal
-
-### 4. **Fixed Thumbnail Upload**
-   - Changed storage bucket from `'cocktails'` to `'cocktail-images'`
-   - Added proper error handling with helpful messages
-   - Added console logging for debugging
-   - Thumbnails now save correctly to the `cocktail-images` Supabase storage bucket
-
-## 🎨 Design Improvements:
-
-- **Compact cards** with name + alcohol type only
-- **Smaller edit/delete buttons** (60px min-width) for a cleaner look
-- **Vertical A-Z navigation** on the right side (40px width)
-- **Consistent styling** with the viewable Cocktails A-Z page
-- **Better layout** with flexbox for proper alignment
-
-The editor now has a clean, organized interface that makes it easy to browse and manage cocktails, with the vertical A-Z navigation matching the viewable page exactly! 🍹
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: managerColors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 48,
+    paddingBottom: 16,
+    backgroundColor: managerColors.card,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  backButton: {
+    padding: 8,
+    width: 40,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: managerColors.text,
+  },
+  contentContainer: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  mainContent: {
+    flex: 1,
+    paddingTop: 20,
+    paddingHorizontal: 16,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollViewContent: {
+    paddingBottom: 100,
+  },
+  addButton: {
+    backgroundColor: managerColors.highlight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    marginBottom: 20,
+    gap: 8,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  addButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: managerColors.text,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: managerColors.card,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    gap: 10,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: managerColors.text,
+    padding: 0,
+  },
+  cocktailCard: {
+    backgroundColor: managerColors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  cocktailInfo: {
+    flex: 1,
+    marginRight: 12,
+  },
+  cocktailName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: managerColors.text,
+    marginBottom: 4,
+  },
+  cocktailAlcoholType: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+  },
+  cocktailActions: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  editButton: {
+    backgroundColor: managerColors.highlight,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  deleteButton: {
+    backgroundColor: '#F44336',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    minWidth: 60,
+    alignItems: 'center',
+  },
+  buttonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: managerColors.text,
+  },
+  emptyText: {
+    textAlign: 'center',
+    fontSize: 16,
+    color: managerColors.textSecondary,
+    marginTop: 40,
+  },
+  alphabetNav: {
+    width: 40,
+    backgroundColor: managerColors.card,
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+    marginRight: 16,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  alphabetNavContent: {
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  alphabetButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginVertical: 2,
+    borderRadius: 16,
+  },
+  alphabetButtonActive: {
+    backgroundColor: managerColors.primary,
+  },
+  alphabetButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: managerColors.textSecondary,
+  },
+  alphabetButtonTextActive: {
+    color: managerColors.text,
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContent: {
+    backgroundColor: managerColors.background,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 24,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: managerColors.highlight,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: managerColors.text,
+  },
+  modalForm: {
+    paddingHorizontal: 24,
+    paddingTop: 16,
+  },
+  formField: {
+    marginBottom: 20,
+  },
+  formLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: managerColors.text,
+    marginBottom: 8,
+  },
+  formInput: {
+    backgroundColor: managerColors.card,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: managerColors.text,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+  },
+  textArea: {
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  picker: {
+    backgroundColor: managerColors.card,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+  },
+  imagePickerButton: {
+    backgroundColor: managerColors.highlight,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  imagePickerButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: managerColors.text,
+  },
+  thumbnailPreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginTop: 8,
+  },
+  submitButton: {
+    backgroundColor: managerColors.highlight,
+    borderRadius: 8,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  submitButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: managerColors.text,
+  },
+});
