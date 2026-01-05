@@ -141,60 +141,69 @@ export default function CocktailsAZEditorScreen() {
   };
 
   const uploadImage = async (uri: string) => {
+    if (!user?.id) {
+      Alert.alert('Error', 'You must be logged in to upload images');
+      return;
+    }
+
     try {
       setUploadingImage(true);
-      console.log('Starting image upload to cocktail-images bucket...');
+      console.log('Starting image upload for user:', user.id);
 
-      const fileInfo = await FileSystem.getInfoAsync(uri);
-      if (!fileInfo.exists) {
-        throw new Error('File does not exist');
-      }
-
-      const fileName = `cocktail-${Date.now()}.jpg`;
-      console.log('Uploading file:', fileName);
-
+      // Read the file as base64
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Upload to cocktail-images bucket
-      const { data, error } = await supabase.storage
+      // Convert base64 to Uint8Array (same as profile image upload)
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+
+      // Create file name
+      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      console.log('Uploading file to cocktail-images bucket:', fileName);
+
+      // Determine content type
+      let contentType = 'image/jpeg';
+      if (fileExt === 'png') contentType = 'image/png';
+      else if (fileExt === 'gif') contentType = 'image/gif';
+      else if (fileExt === 'webp') contentType = 'image/webp';
+
+      // Upload to Supabase Storage (same pattern as profile picture upload)
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('cocktail-images')
-        .upload(fileName, decode(base64), {
-          contentType: 'image/jpeg',
-          upsert: false,
+        .upload(fileName, byteArray, {
+          contentType: contentType,
+          upsert: true,
         });
 
-      if (error) {
-        console.error('Storage upload error:', error);
-        throw error;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
       }
 
-      console.log('Upload successful:', data);
+      console.log('Upload successful:', uploadData);
 
       // Get public URL
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('cocktail-images').getPublicUrl(data.path);
+      const { data: urlData } = supabase.storage
+        .from('cocktail-images')
+        .getPublicUrl(fileName);
 
-      console.log('Public URL:', publicUrl);
-      setThumbnailUrl(publicUrl);
+      console.log('Public URL:', urlData.publicUrl);
+      setThumbnailUrl(urlData.publicUrl);
       Alert.alert('Success', 'Image uploaded successfully');
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', error.message || 'Failed to upload image. Please ensure you have manager permissions.');
+      Alert.alert('Error', error.message || 'Failed to upload image');
     } finally {
       setUploadingImage(false);
     }
-  };
-
-  const decode = (base64: string) => {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
   };
 
   const handleSave = async () => {
@@ -214,47 +223,51 @@ export default function CocktailsAZEditorScreen() {
         return;
       }
 
+      if (!user?.id) {
+        Alert.alert('Error', 'You must be logged in to save cocktails');
+        return;
+      }
+
       setLoading(true);
 
-      const cocktailData = {
-        name: name.trim(),
-        alcohol_type: alcoholType,
-        ingredients: ingredients.trim(),
-        procedure: procedure.trim() || null, // Allow null for optional procedure
-        thumbnail_url: thumbnailUrl,
-        display_order: editingCocktail ? editingCocktail.display_order : cocktails.length,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      };
-
       if (editingCocktail) {
-        console.log('Updating cocktail:', editingCocktail.id, 'with data:', cocktailData);
-        const { data, error } = await supabase
-          .from('cocktails')
-          .update(cocktailData)
-          .eq('id', editingCocktail.id)
-          .select();
+        // Update existing cocktail using RPC function (same pattern as profile update)
+        console.log('Updating cocktail:', editingCocktail.id);
+        const { data, error } = await supabase.rpc('update_cocktail', {
+          p_user_id: user.id,
+          p_cocktail_id: editingCocktail.id,
+          p_name: name.trim(),
+          p_alcohol_type: alcoholType,
+          p_ingredients: ingredients.trim(),
+          p_procedure: procedure.trim() || null,
+          p_thumbnail_url: thumbnailUrl,
+          p_display_order: editingCocktail.display_order,
+        });
 
         if (error) {
           console.error('Error updating cocktail:', error);
-          console.error('Error details:', JSON.stringify(error, null, 2));
-          throw new Error(error.message || 'Failed to update cocktail. Please check your permissions.');
+          throw error;
         }
-        console.log('Cocktail updated successfully:', data);
+        console.log('Cocktail updated successfully');
         Alert.alert('Success', 'Cocktail updated successfully');
       } else {
-        console.log('Adding new cocktail with data:', cocktailData);
-        const { data, error } = await supabase.from('cocktails').insert({
-          ...cocktailData,
-          created_by: user?.id,
-        }).select();
+        // Insert new cocktail using RPC function (same pattern as profile update)
+        console.log('Adding new cocktail');
+        const { data, error } = await supabase.rpc('insert_cocktail', {
+          p_user_id: user.id,
+          p_name: name.trim(),
+          p_alcohol_type: alcoholType,
+          p_ingredients: ingredients.trim(),
+          p_procedure: procedure.trim() || null,
+          p_thumbnail_url: thumbnailUrl,
+          p_display_order: cocktails.length,
+        });
 
         if (error) {
           console.error('Error adding cocktail:', error);
-          console.error('Error details:', JSON.stringify(error, null, 2));
-          throw new Error(error.message || 'Failed to add cocktail. Please check your permissions.');
+          throw error;
         }
-        console.log('Cocktail added successfully:', data);
+        console.log('Cocktail added successfully');
         Alert.alert('Success', 'Cocktail added successfully');
       }
 
@@ -277,11 +290,17 @@ export default function CocktailsAZEditorScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
+            if (!user?.id) {
+              Alert.alert('Error', 'You must be logged in to delete cocktails');
+              return;
+            }
+
             console.log('Deleting cocktail:', cocktail.id);
-            const { error } = await supabase
-              .from('cocktails')
-              .update({ is_active: false })
-              .eq('id', cocktail.id);
+            // Use RPC function to delete (same pattern as profile update)
+            const { error } = await supabase.rpc('delete_cocktail', {
+              p_user_id: user.id,
+              p_cocktail_id: cocktail.id,
+            });
 
             if (error) {
               console.error('Error deleting cocktail:', error);
@@ -349,7 +368,7 @@ export default function CocktailsAZEditorScreen() {
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
+            android_material_icon_name="arrow_back"
             size={24}
             color={managerColors.text}
           />
@@ -367,7 +386,7 @@ export default function CocktailsAZEditorScreen() {
             <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
               <IconSymbol
                 ios_icon_name="plus.circle.fill"
-                android_material_icon_name="add-circle"
+                android_material_icon_name="add_circle"
                 size={24}
                 color={managerColors.text}
               />
