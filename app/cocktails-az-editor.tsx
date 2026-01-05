@@ -27,7 +27,7 @@ interface Cocktail {
   name: string;
   alcohol_type: string;
   ingredients: string;
-  procedure: string;
+  procedure: string | null;
   thumbnail_url: string | null;
   display_order: number;
   is_active: boolean;
@@ -182,7 +182,7 @@ export default function CocktailsAZEditorScreen() {
       Alert.alert('Success', 'Image uploaded successfully');
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', error.message || 'Failed to upload image. Please ensure the cocktail-images storage bucket exists.');
+      Alert.alert('Error', error.message || 'Failed to upload image. Please ensure you have manager permissions.');
     } finally {
       setUploadingImage(false);
     }
@@ -220,7 +220,7 @@ export default function CocktailsAZEditorScreen() {
         name: name.trim(),
         alcohol_type: alcoholType,
         ingredients: ingredients.trim(),
-        procedure: procedure.trim(),
+        procedure: procedure.trim() || null, // Allow null for optional procedure
         thumbnail_url: thumbnailUrl,
         display_order: editingCocktail ? editingCocktail.display_order : cocktails.length,
         is_active: true,
@@ -228,28 +228,33 @@ export default function CocktailsAZEditorScreen() {
       };
 
       if (editingCocktail) {
-        console.log('Updating cocktail:', editingCocktail.id);
-        const { error } = await supabase
+        console.log('Updating cocktail:', editingCocktail.id, 'with data:', cocktailData);
+        const { data, error } = await supabase
           .from('cocktails')
           .update(cocktailData)
-          .eq('id', editingCocktail.id);
+          .eq('id', editingCocktail.id)
+          .select();
 
         if (error) {
           console.error('Error updating cocktail:', error);
-          throw error;
+          console.error('Error details:', JSON.stringify(error, null, 2));
+          throw new Error(error.message || 'Failed to update cocktail. Please check your permissions.');
         }
+        console.log('Cocktail updated successfully:', data);
         Alert.alert('Success', 'Cocktail updated successfully');
       } else {
-        console.log('Adding new cocktail');
-        const { error } = await supabase.from('cocktails').insert({
+        console.log('Adding new cocktail with data:', cocktailData);
+        const { data, error } = await supabase.from('cocktails').insert({
           ...cocktailData,
           created_by: user?.id,
-        });
+        }).select();
 
         if (error) {
           console.error('Error adding cocktail:', error);
-          throw error;
+          console.error('Error details:', JSON.stringify(error, null, 2));
+          throw new Error(error.message || 'Failed to add cocktail. Please check your permissions.');
         }
+        console.log('Cocktail added successfully:', data);
         Alert.alert('Success', 'Cocktail added successfully');
       }
 
@@ -303,7 +308,7 @@ export default function CocktailsAZEditorScreen() {
     setName(cocktail.name);
     setAlcoholType(cocktail.alcohol_type);
     setIngredients(cocktail.ingredients);
-    setProcedure(cocktail.procedure);
+    setProcedure(cocktail.procedure || '');
     setThumbnailUrl(cocktail.thumbnail_url);
     setShowModal(true);
   };
@@ -344,7 +349,7 @@ export default function CocktailsAZEditorScreen() {
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
+            android_material_icon_name="arrow-back"
             size={24}
             color={managerColors.text}
           />
@@ -362,7 +367,7 @@ export default function CocktailsAZEditorScreen() {
             <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
               <IconSymbol
                 ios_icon_name="plus.circle.fill"
-                android_material_icon_name="add_circle"
+                android_material_icon_name="add-circle"
                 size={24}
                 color={managerColors.text}
               />
@@ -558,7 +563,7 @@ export default function CocktailsAZEditorScreen() {
                   style={[styles.formInput, styles.textArea]}
                   value={procedure}
                   onChangeText={setProcedure}
-                  placeholder="Enter preparation instructions"
+                  placeholder="Enter preparation instructions (optional)"
                   placeholderTextColor={managerColors.textSecondary}
                   multiline
                   numberOfLines={4}
