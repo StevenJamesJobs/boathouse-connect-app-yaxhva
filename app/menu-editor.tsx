@@ -1,6 +1,11 @@
 
 import { supabase } from '@/app/integrations/supabase/client';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import * as FileSystem from 'expo-file-system/legacy';
+import { managerColors } from '@/styles/commonStyles';
+import * as ImagePicker from 'expo-image-picker';
+import { IconSymbol } from '@/components/IconSymbol';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
@@ -16,13 +21,6 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-// @ts-expect-error - expo-file-system/legacy is valid for Expo 54
-// eslint-disable-next-line import/no-unresolved
-import * as FileSystem from 'expo-file-system/legacy';
-import { managerColors } from '@/styles/commonStyles';
-import { useAuth } from '@/contexts/AuthContext';
-import { IconSymbol } from '@/components/IconSymbol';
 
 interface MenuItem {
   id: string;
@@ -43,15 +41,23 @@ interface MenuItem {
   is_active: boolean;
 }
 
-const CATEGORIES = ['Weekly Specials', 'Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
+const CATEGORIES = [
+  'All',
+  'Appetizers',
+  'Salads',
+  'Entrees',
+  'Sandwiches',
+  'Desserts',
+  'Beverages',
+];
 
 const SUBCATEGORIES: { [key: string]: string[] } = {
-  'Weekly Specials': [],
-  Lunch: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Burgers', 'Sandwiches', 'Sides'],
-  Dinner: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Entrees', 'Pasta', 'Sides'],
-  Libations: ['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV', 'Draft Beer', 'Bottle & Cans'],
-  Wine: ['Sparkling', 'Rose', 'Chardonnay', 'Pinot Grigio', 'Sauvignon Blanc', 'Interesting Whites', 'Cabernet Sauvignon', 'Pinot Noir', 'Merlot', 'Italian Reds', 'Interesting Reds'],
-  'Happy Hour': ['Appetizers', 'Drinks', 'Spirits'],
+  Appetizers: ['Hot', 'Cold', 'Shared'],
+  Salads: ['House', 'Caesar', 'Specialty'],
+  Entrees: ['Seafood', 'Steak', 'Pasta', 'Chicken'],
+  Sandwiches: ['Burgers', 'Wraps', 'Classic'],
+  Desserts: ['Cakes', 'Ice Cream', 'Specialty'],
+  Beverages: ['Soft Drinks', 'Coffee', 'Tea'],
 };
 
 const styles = StyleSheet.create({
@@ -63,352 +69,321 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 16,
-    backgroundColor: managerColors.card,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
+    paddingHorizontal: 20,
+    paddingTop: 60,
+    paddingBottom: 20,
+    backgroundColor: managerColors.primary,
+  },
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    flex: 1,
+    textAlign: 'center',
   },
   backButton: {
     padding: 8,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingTop: 20,
-    paddingHorizontal: 16,
-    paddingBottom: 100,
   },
   addButton: {
-    backgroundColor: managerColors.highlight,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    borderRadius: 12,
-    marginBottom: 20,
-    gap: 8,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
+    padding: 8,
   },
-  addButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 16,
-    gap: 10,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    color: managerColors.text,
-    padding: 0,
-  },
-  categoryScroll: {
-    maxHeight: 50,
-    marginBottom: 12,
-  },
-  categoryScrollContent: {
-    gap: 8,
-  },
-  categoryTab: {
+  filterContainer: {
     paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+    paddingVertical: 15,
     backgroundColor: managerColors.card,
-    marginRight: 8,
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
-    elevation: 2,
+    borderBottomWidth: 1,
+    borderBottomColor: managerColors.border,
   },
-  categoryTabActive: {
-    backgroundColor: managerColors.highlight,
+  filterScroll: {
+    flexDirection: 'row',
   },
-  categoryTabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: managerColors.textSecondary,
-  },
-  categoryTabTextActive: {
-    color: managerColors.text,
-  },
-  subcategoryScroll: {
-    maxHeight: 40,
-    marginBottom: 16,
-  },
-  subcategoryScrollContent: {
-    gap: 8,
-  },
-  subcategoryTab: {
+  filterButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: managerColors.card,
-    marginRight: 8,
-    boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)',
-    elevation: 1,
+    borderRadius: 20,
+    backgroundColor: managerColors.background,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: managerColors.border,
   },
-  subcategoryTabActive: {
-    backgroundColor: managerColors.highlight,
+  filterButtonActive: {
+    backgroundColor: managerColors.primary,
+    borderColor: managerColors.primary,
   },
-  subcategoryTabText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: managerColors.textSecondary,
-  },
-  subcategoryTabTextActive: {
+  filterButtonText: {
+    fontSize: 14,
     color: managerColors.text,
   },
-  menuItemCard: {
+  filterButtonTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  content: {
+    flex: 1,
+    padding: 20,
+  },
+  menuItem: {
     backgroundColor: managerColors.card,
-    borderRadius: 16,
-    marginBottom: 16,
-    overflow: 'hidden',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  menuItemImage: {
-    width: '100%',
-    height: 200,
-  },
-  menuItemContent: {
-    padding: 16,
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: managerColors.border,
   },
   menuItemHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: 10,
+  },
+  // FIXED: Always show square thumbnail (80x80) in editor cards
+  menuItemImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 12,
+    backgroundColor: managerColors.background,
+  },
+  menuItemInfo: {
+    flex: 1,
   },
   menuItemName: {
-    flex: 1,
     fontSize: 18,
     fontWeight: 'bold',
     color: managerColors.text,
-    marginRight: 12,
+    marginBottom: 4,
   },
   menuItemPrice: {
     fontSize: 16,
+    color: managerColors.primary,
     fontWeight: '600',
-    color: managerColors.highlight,
+    marginBottom: 4,
+  },
+  menuItemCategory: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginBottom: 2,
   },
   menuItemDescription: {
     fontSize: 14,
     color: managerColors.textSecondary,
-    marginBottom: 12,
+    marginTop: 8,
     lineHeight: 20,
-  },
-  menuItemTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginBottom: 12,
-  },
-  tag: {
-    backgroundColor: managerColors.highlight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
-  },
-  tagText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: managerColors.text,
   },
   menuItemActions: {
     flexDirection: 'row',
-    gap: 12,
+    justifyContent: 'flex-end',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: managerColors.border,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    marginLeft: 10,
   },
   editButton: {
-    flex: 1,
-    backgroundColor: managerColors.highlight,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
+    backgroundColor: managerColors.primary,
   },
   deleteButton: {
-    flex: 1,
-    backgroundColor: '#F44336',
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
+    backgroundColor: '#dc3545',
   },
-  buttonText: {
+  actionButtonText: {
+    color: '#fff',
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.text,
-  },
-  emptyText: {
-    textAlign: 'center',
-    fontSize: 16,
-    color: managerColors.textSecondary,
-    marginTop: 40,
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginLeft: 4,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   modalContent: {
-    backgroundColor: managerColors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
+    backgroundColor: managerColors.card,
+    borderRadius: 12,
+    padding: 20,
+    width: '90%',
+    maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: managerColors.highlight,
+    alignItems: 'center',
+    marginBottom: 20,
   },
   modalTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     color: managerColors.text,
   },
-  modalForm: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
+  closeButton: {
+    padding: 4,
   },
-  formField: {
-    marginBottom: 20,
+  formGroup: {
+    marginBottom: 15,
   },
-  formLabel: {
+  label: {
     fontSize: 14,
     fontWeight: '600',
     color: managerColors.text,
     marginBottom: 8,
   },
-  formInput: {
-    backgroundColor: managerColors.card,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: managerColors.text,
+  input: {
+    backgroundColor: managerColors.background,
     borderWidth: 1,
     borderColor: managerColors.border,
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    color: managerColors.text,
   },
   textArea: {
-    minHeight: 100,
+    height: 100,
     textAlignVertical: 'top',
   },
   picker: {
-    backgroundColor: managerColors.card,
-    borderRadius: 8,
+    backgroundColor: managerColors.background,
     borderWidth: 1,
     borderColor: managerColors.border,
+    borderRadius: 8,
   },
-  checkboxRow: {
+  checkboxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    marginBottom: 10,
   },
   checkbox: {
     width: 24,
     height: 24,
-    borderRadius: 4,
     borderWidth: 2,
-    borderColor: managerColors.highlight,
-    marginRight: 12,
-    alignItems: 'center',
+    borderColor: managerColors.primary,
+    borderRadius: 4,
+    marginRight: 10,
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxChecked: {
+    backgroundColor: managerColors.primary,
   },
   checkboxLabel: {
     fontSize: 16,
     color: managerColors.text,
   },
   imagePickerButton: {
-    backgroundColor: managerColors.highlight,
-    paddingVertical: 12,
+    backgroundColor: managerColors.primary,
+    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   imagePickerButtonText: {
-    fontSize: 14,
+    color: '#fff',
+    fontSize: 16,
     fontWeight: '600',
-    color: managerColors.text,
   },
-  thumbnailPreview: {
+  previewImage: {
     width: '100%',
     height: 200,
     borderRadius: 8,
-    marginTop: 8,
+    marginBottom: 10,
   },
-  submitButton: {
-    backgroundColor: managerColors.highlight,
+  shapeSelector: {
+    flexDirection: 'row',
+    marginTop: 10,
+  },
+  shapeButton: {
+    flex: 1,
+    padding: 12,
     borderRadius: 8,
-    paddingVertical: 16,
+    borderWidth: 1,
+    borderColor: managerColors.border,
     alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
+    marginHorizontal: 5,
   },
-  submitButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  shapeButtonActive: {
+    backgroundColor: managerColors.primary,
+    borderColor: managerColors.primary,
+  },
+  shapeButtonText: {
+    fontSize: 14,
     color: managerColors.text,
+  },
+  shapeButtonTextActive: {
+    color: '#fff',
+    fontWeight: '600',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginTop: 20,
+  },
+  modalButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginLeft: 10,
+  },
+  cancelButton: {
+    backgroundColor: managerColors.textSecondary,
+  },
+  saveButton: {
+    backgroundColor: managerColors.primary,
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 40,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: managerColors.textSecondary,
+    marginTop: 10,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
 export default function MenuEditorScreen() {
-  const router = useRouter();
   const { user } = useAuth();
+  const router = useRouter();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [showModal, setShowModal] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('Weekly Specials');
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Form state
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [price, setPrice] = useState('');
-  const [category, setCategory] = useState('Weekly Specials');
-  const [subcategory, setSubcategory] = useState('');
-  const [availableForLunch, setAvailableForLunch] = useState(false);
-  const [availableForDinner, setAvailableForDinner] = useState(false);
-  const [isGlutenFree, setIsGlutenFree] = useState(false);
-  const [isGlutenFreeAvailable, setIsGlutenFreeAvailable] = useState(false);
-  const [isVegetarian, setIsVegetarian] = useState(false);
-  const [isVegetarianAvailable, setIsVegetarianAvailable] = useState(false);
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const [thumbnailShape, setThumbnailShape] = useState<'square' | 'banner'>('banner');
-  const [uploadingImage, setUploadingImage] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    description: '',
+    price: '',
+    category: 'Appetizers',
+    subcategory: '',
+    available_for_lunch: true,
+    available_for_dinner: true,
+    is_gluten_free: false,
+    is_gluten_free_available: false,
+    is_vegetarian: false,
+    is_vegetarian_available: false,
+    thumbnail_url: null as string | null,
+    thumbnail_shape: 'square',
+    is_active: true,
+  });
 
   const loadMenuItems = useCallback(async () => {
     try {
@@ -416,7 +391,6 @@ export default function MenuEditorScreen() {
       const { data, error } = await supabase
         .from('menu_items')
         .select('*')
-        .eq('is_active', true)
         .order('display_order', { ascending: true });
 
       if (error) throw error;
@@ -434,99 +408,67 @@ export default function MenuEditorScreen() {
   }, [loadMenuItems]);
 
   const filterItems = useCallback(() => {
-    let filtered = menuItems;
-
-    // Filter by category
-    if (selectedCategory === 'Weekly Specials') {
-      filtered = filtered.filter(item => item.category === 'Weekly Specials');
-    } else if (selectedCategory === 'Lunch') {
-      filtered = filtered.filter(item => item.available_for_lunch);
-    } else if (selectedCategory === 'Dinner') {
-      filtered = filtered.filter(item => item.available_for_dinner);
+    if (selectedCategory === 'All') {
+      setFilteredItems(menuItems);
     } else {
-      filtered = filtered.filter(item => item.category === selectedCategory);
+      setFilteredItems(menuItems.filter((item) => item.category === selectedCategory));
     }
-
-    // Filter by subcategory
-    if (selectedSubcategory) {
-      filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
-    }
-
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        item =>
-          item.name.toLowerCase().includes(query) ||
-          item.description?.toLowerCase().includes(query) ||
-          item.category.toLowerCase().includes(query) ||
-          item.subcategory?.toLowerCase().includes(query)
-      );
-    }
-
-    setFilteredItems(filtered);
-  }, [menuItems, selectedCategory, selectedSubcategory, searchQuery]);
+  }, [selectedCategory, menuItems]);
 
   useEffect(() => {
     filterItems();
   }, [filterItems]);
 
   const pickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: thumbnailShape === 'square' ? [1, 1] : [16, 9],
-        quality: 0.8,
-      });
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
 
-      if (!result.canceled && result.assets[0]) {
-        await uploadImage(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+    if (!result.canceled && result.assets[0]) {
+      const imageUri = result.assets[0].uri;
+      await uploadImage(imageUri);
     }
   };
 
   const uploadImage = async (uri: string) => {
     try {
-      setUploadingImage(true);
+      setUploading(true);
 
-      const fileInfo = await FileSystem.getInfoAsync(uri);
-      if (!fileInfo.exists) {
-        throw new Error('File does not exist');
-      }
-
-      const fileName = `menu-item-${Date.now()}.jpg`;
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      const { data, error } = await supabase.storage
+      const arrayBuffer = decode(base64);
+      const fileExt = uri.split('.').pop() || 'jpg';
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
         .from('menu-items')
-        .upload(fileName, decode(base64), {
-          contentType: 'image/jpeg',
+        .upload(filePath, arrayBuffer, {
+          contentType: `image/${fileExt}`,
           upsert: false,
         });
 
-      if (error) throw error;
+      if (uploadError) throw uploadError;
 
       const {
         data: { publicUrl },
-      } = supabase.storage.from('menu-items').getPublicUrl(data.path);
+      } = supabase.storage.from('menu-items').getPublicUrl(filePath);
 
-      setThumbnailUrl(publicUrl);
+      setFormData((prev) => ({ ...prev, thumbnail_url: publicUrl }));
       Alert.alert('Success', 'Image uploaded successfully');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', error.message || 'Failed to upload image');
+      Alert.alert('Error', 'Failed to upload image');
     } finally {
-      setUploadingImage(false);
+      setUploading(false);
     }
   };
 
-  const decode = (base64: string) => {
+  const decode = (base64: string): Uint8Array => {
     const binaryString = atob(base64);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) {
@@ -536,676 +478,435 @@ export default function MenuEditorScreen() {
   };
 
   const handleSave = async () => {
+    if (!formData.name || !formData.price) {
+      Alert.alert('Error', 'Please fill in all required fields');
+      return;
+    }
+
     try {
-      if (!name.trim()) {
-        Alert.alert('Error', 'Please enter an item name');
-        return;
-      }
-
-      if (!price.trim()) {
-        Alert.alert('Error', 'Please enter a price');
-        return;
-      }
-
-      setLoading(true);
-
-      const itemData = {
-        name: name.trim(),
-        description: description.trim() || null,
-        price: price.trim(),
-        category,
-        subcategory: subcategory || null,
-        available_for_lunch: availableForLunch,
-        available_for_dinner: availableForDinner,
-        is_gluten_free: isGlutenFree,
-        is_gluten_free_available: isGlutenFreeAvailable,
-        is_vegetarian: isVegetarian,
-        is_vegetarian_available: isVegetarianAvailable,
-        thumbnail_url: thumbnailUrl,
-        thumbnail_shape: thumbnailShape,
-        display_order: editingItem ? editingItem.display_order : menuItems.length,
-        is_active: true,
-        updated_at: new Date().toISOString(),
-      };
+      setUploading(true);
 
       if (editingItem) {
         const { error } = await supabase
           .from('menu_items')
-          .update(itemData)
+          .update({
+            name: formData.name,
+            description: formData.description,
+            price: formData.price,
+            category: formData.category,
+            subcategory: formData.subcategory,
+            available_for_lunch: formData.available_for_lunch,
+            available_for_dinner: formData.available_for_dinner,
+            is_gluten_free: formData.is_gluten_free,
+            is_gluten_free_available: formData.is_gluten_free_available,
+            is_vegetarian: formData.is_vegetarian,
+            is_vegetarian_available: formData.is_vegetarian_available,
+            thumbnail_url: formData.thumbnail_url,
+            thumbnail_shape: formData.thumbnail_shape,
+            is_active: formData.is_active,
+          })
           .eq('id', editingItem.id);
 
         if (error) throw error;
         Alert.alert('Success', 'Menu item updated successfully');
       } else {
         const { error } = await supabase.from('menu_items').insert({
-          ...itemData,
-          created_by: user?.id,
+          name: formData.name,
+          description: formData.description,
+          price: formData.price,
+          category: formData.category,
+          subcategory: formData.subcategory,
+          available_for_lunch: formData.available_for_lunch,
+          available_for_dinner: formData.available_for_dinner,
+          is_gluten_free: formData.is_gluten_free,
+          is_gluten_free_available: formData.is_gluten_free_available,
+          is_vegetarian: formData.is_vegetarian,
+          is_vegetarian_available: formData.is_vegetarian_available,
+          thumbnail_url: formData.thumbnail_url,
+          thumbnail_shape: formData.thumbnail_shape,
+          is_active: formData.is_active,
+          display_order: menuItems.length,
         });
 
         if (error) throw error;
         Alert.alert('Success', 'Menu item added successfully');
       }
 
-      setShowModal(false);
-      resetForm();
+      closeModal();
       loadMenuItems();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving menu item:', error);
-      Alert.alert('Error', error.message || 'Failed to save menu item');
+      Alert.alert('Error', 'Failed to save menu item');
     } finally {
-      setLoading(false);
+      setUploading(false);
     }
   };
 
+  // FIXED: Improved delete functionality with better error handling
   const handleDelete = async (item: MenuItem) => {
-    Alert.alert('Delete Menu Item', 'Are you sure you want to delete this menu item?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            const { error } = await supabase
-              .from('menu_items')
-              .update({ is_active: false })
-              .eq('id', item.id);
+    Alert.alert(
+      'Confirm Delete',
+      `Are you sure you want to delete "${item.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('Attempting to delete menu item:', item.id);
+              
+              // Check if user is authenticated
+              const { data: { session } } = await supabase.auth.getSession();
+              if (!session) {
+                Alert.alert('Error', 'You must be logged in to delete items');
+                return;
+              }
 
-            if (error) throw error;
-            Alert.alert('Success', 'Menu item deleted successfully');
-            loadMenuItems();
-          } catch (error: any) {
-            console.error('Error deleting menu item:', error);
-            Alert.alert('Error', error.message || 'Failed to delete menu item');
-          }
+              console.log('User is authenticated, proceeding with delete');
+              
+              // Delete the item
+              const { error } = await supabase
+                .from('menu_items')
+                .delete()
+                .eq('id', item.id);
+
+              if (error) {
+                console.error('Supabase delete error:', error);
+                throw error;
+              }
+
+              console.log('Menu item deleted successfully');
+              Alert.alert('Success', 'Menu item deleted successfully');
+              loadMenuItems();
+            } catch (error: any) {
+              console.error('Error deleting menu item:', error);
+              
+              // Provide more specific error messages
+              let errorMessage = 'Failed to delete menu item';
+              if (error.code === '42501') {
+                errorMessage = 'Permission denied. Please make sure you are logged in as a manager.';
+              } else if (error.message) {
+                errorMessage = error.message;
+              }
+              
+              Alert.alert('Error', errorMessage);
+            }
+          },
         },
-      },
-    ]);
+      ]
+    );
   };
 
   const openAddModal = () => {
     resetForm();
-    setShowModal(true);
+    setEditingItem(null);
+    setModalVisible(true);
   };
 
   const openEditModal = (item: MenuItem) => {
+    setFormData({
+      name: item.name,
+      description: item.description || '',
+      price: item.price,
+      category: item.category,
+      subcategory: item.subcategory || '',
+      available_for_lunch: item.available_for_lunch,
+      available_for_dinner: item.available_for_dinner,
+      is_gluten_free: item.is_gluten_free,
+      is_gluten_free_available: item.is_gluten_free_available,
+      is_vegetarian: item.is_vegetarian,
+      is_vegetarian_available: item.is_vegetarian_available,
+      thumbnail_url: item.thumbnail_url,
+      thumbnail_shape: item.thumbnail_shape,
+      is_active: item.is_active,
+    });
     setEditingItem(item);
-    setName(item.name);
-    setDescription(item.description || '');
-    setPrice(item.price);
-    setCategory(item.category);
-    setSubcategory(item.subcategory || '');
-    setAvailableForLunch(item.available_for_lunch);
-    setAvailableForDinner(item.available_for_dinner);
-    setIsGlutenFree(item.is_gluten_free);
-    setIsGlutenFreeAvailable(item.is_gluten_free_available);
-    setIsVegetarian(item.is_vegetarian);
-    setIsVegetarianAvailable(item.is_vegetarian_available);
-    setThumbnailUrl(item.thumbnail_url);
-    setThumbnailShape(item.thumbnail_shape as 'square' | 'banner');
-    setShowModal(true);
+    setModalVisible(true);
   };
 
   const closeModal = () => {
-    setShowModal(false);
+    setModalVisible(false);
     resetForm();
   };
 
   const resetForm = () => {
-    setEditingItem(null);
-    setName('');
-    setDescription('');
-    setPrice('');
-    setCategory('Weekly Specials');
-    setSubcategory('');
-    setAvailableForLunch(false);
-    setAvailableForDinner(false);
-    setIsGlutenFree(false);
-    setIsGlutenFreeAvailable(false);
-    setIsVegetarian(false);
-    setIsVegetarianAvailable(false);
-    setThumbnailUrl(null);
-    setThumbnailShape('banner');
+    setFormData({
+      name: '',
+      description: '',
+      price: '',
+      category: 'Appetizers',
+      subcategory: '',
+      available_for_lunch: true,
+      available_for_dinner: true,
+      is_gluten_free: false,
+      is_gluten_free_available: false,
+      is_vegetarian: false,
+      is_vegetarian_available: false,
+      thumbnail_url: null,
+      thumbnail_shape: 'square',
+      is_active: true,
+    });
   };
 
   const handleBackPress = () => {
     router.back();
   };
 
-  const getImageUrl = (url: string | null) => {
-    if (!url) return null;
+  const getImageUrl = (url: string | null): string => {
+    if (!url) return '';
     if (url.startsWith('http')) return url;
     const { data } = supabase.storage.from('menu-items').getPublicUrl(url);
     return data.publicUrl;
   };
 
-  const formatPrice = (price: string) => {
-    if (price.includes('$')) return price;
-    return `$${price}`;
+  const formatPrice = (price: string): string => {
+    const num = parseFloat(price);
+    return isNaN(num) ? price : `$${num.toFixed(2)}`;
   };
 
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={managerColors.primary} />
+      </View>
+    );
+  }
+
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
-      {/* Header */}
+    <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={managerColors.text}
-          />
+        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
+          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Menu Editor</Text>
-        <View style={styles.backButton} />
+        <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
+          <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={24} color="#fff" />
+        </TouchableOpacity>
       </View>
 
-      {/* Content */}
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Add Button */}
-        <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
-          <IconSymbol
-            ios_icon_name="plus.circle.fill"
-            android_material_icon_name="add-circle"
-            size={24}
-            color={managerColors.text}
-          />
-          <Text style={styles.addButtonText}>Add Menu Item</Text>
-        </TouchableOpacity>
-
-        {/* Search Box */}
-        <View style={styles.searchContainer}>
-          <IconSymbol
-            ios_icon_name="magnifyingglass"
-            android_material_icon_name="search"
-            size={20}
-            color={managerColors.textSecondary}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search menu items..."
-            placeholderTextColor={managerColors.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <IconSymbol
-                ios_icon_name="xmark.circle.fill"
-                android_material_icon_name="cancel"
-                size={20}
-                color={managerColors.textSecondary}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* Category Tabs */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
-          contentContainerStyle={styles.categoryScrollContent}
-        >
-          {CATEGORIES.map((cat, index) => (
+      <View style={styles.filterContainer}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
+          {CATEGORIES.map((category) => (
             <TouchableOpacity
-              key={index}
+              key={category}
               style={[
-                styles.categoryTab,
-                selectedCategory === cat && styles.categoryTabActive,
+                styles.filterButton,
+                selectedCategory === category && styles.filterButtonActive,
               ]}
-              onPress={() => {
-                setSelectedCategory(cat);
-                setSelectedSubcategory(null);
-              }}
+              onPress={() => setSelectedCategory(category)}
             >
               <Text
                 style={[
-                  styles.categoryTabText,
-                  selectedCategory === cat && styles.categoryTabTextActive,
+                  styles.filterButtonText,
+                  selectedCategory === category && styles.filterButtonTextActive,
                 ]}
               >
-                {cat}
+                {category}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
+      </View>
 
-        {/* Subcategory Tabs */}
-        {SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.subcategoryScroll}
-            contentContainerStyle={styles.subcategoryScrollContent}
-          >
-            <TouchableOpacity
-              style={[
-                styles.subcategoryTab,
-                selectedSubcategory === null && styles.subcategoryTabActive,
-              ]}
-              onPress={() => setSelectedSubcategory(null)}
-            >
-              <Text
-                style={[
-                  styles.subcategoryTabText,
-                  selectedSubcategory === null && styles.subcategoryTabTextActive,
-                ]}
-              >
-                All
-              </Text>
-            </TouchableOpacity>
-            {SUBCATEGORIES[selectedCategory].map((sub, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.subcategoryTab,
-                  selectedSubcategory === sub && styles.subcategoryTabActive,
-                ]}
-                onPress={() => setSelectedSubcategory(sub)}
-              >
-                <Text
-                  style={[
-                    styles.subcategoryTabText,
-                    selectedSubcategory === sub && styles.subcategoryTabTextActive,
-                  ]}
-                >
-                  {sub}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-
-        {/* Menu Items List */}
+      <ScrollView style={styles.content}>
         {filteredItems.length === 0 ? (
-          <Text style={styles.emptyText}>No menu items found</Text>
+          <View style={styles.emptyState}>
+            <IconSymbol ios_icon_name="tray" android_material_icon_name="inbox" size={48} color={managerColors.textSecondary} />
+            <Text style={styles.emptyStateText}>No menu items found</Text>
+          </View>
         ) : (
-          filteredItems.map((item, index) => (
-            <View key={index} style={styles.menuItemCard}>
-              {item.thumbnail_url && (
-                <Image
-                  source={{ uri: getImageUrl(item.thumbnail_url) || undefined }}
-                  style={styles.menuItemImage}
-                  resizeMode="cover"
-                />
-              )}
-              <View style={styles.menuItemContent}>
-                <View style={styles.menuItemHeader}>
+          filteredItems.map((item) => (
+            <View key={item.id} style={styles.menuItem}>
+              <View style={styles.menuItemHeader}>
+                {item.thumbnail_url && (
+                  <Image
+                    source={{ uri: getImageUrl(item.thumbnail_url) }}
+                    style={styles.menuItemImage}
+                    resizeMode="cover"
+                  />
+                )}
+                <View style={styles.menuItemInfo}>
                   <Text style={styles.menuItemName}>{item.name}</Text>
                   <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                  <Text style={styles.menuItemCategory}>
+                    {item.category}
+                    {item.subcategory ? ` • ${item.subcategory}` : ''}
+                  </Text>
                 </View>
-                {item.description && (
-                  <Text style={styles.menuItemDescription}>{item.description}</Text>
-                )}
-                <View style={styles.menuItemTags}>
-                  {item.is_gluten_free && (
-                    <View style={styles.tag}>
-                      <Text style={styles.tagText}>GF</Text>
-                    </View>
-                  )}
-                  {item.is_gluten_free_available && (
-                    <View style={styles.tag}>
-                      <Text style={styles.tagText}>GFA</Text>
-                    </View>
-                  )}
-                  {item.is_vegetarian && (
-                    <View style={styles.tag}>
-                      <Text style={styles.tagText}>V</Text>
-                    </View>
-                  )}
-                  {item.is_vegetarian_available && (
-                    <View style={styles.tag}>
-                      <Text style={styles.tagText}>VA</Text>
-                    </View>
-                  )}
-                </View>
-                <View style={styles.menuItemActions}>
-                  <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={() => openEditModal(item)}
-                  >
-                    <Text style={styles.buttonText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => handleDelete(item)}
-                  >
-                    <Text style={styles.buttonText}>Delete</Text>
-                  </TouchableOpacity>
-                </View>
+              </View>
+              {item.description && (
+                <Text style={styles.menuItemDescription} numberOfLines={2}>
+                  {item.description}
+                </Text>
+              )}
+              <View style={styles.menuItemActions}>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.editButton]}
+                  onPress={() => openEditModal(item)}
+                >
+                  <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={16} color="#fff" />
+                  <Text style={styles.actionButtonText}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => handleDelete(item)}
+                >
+                  <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={16} color="#fff" />
+                  <Text style={styles.actionButtonText}>Delete</Text>
+                </TouchableOpacity>
               </View>
             </View>
           ))
         )}
       </ScrollView>
 
-      {/* Loading Overlay */}
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={managerColors.highlight} />
-        </View>
-      )}
-
-      {/* Add/Edit Modal */}
-      <Modal visible={showModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+      <Modal visible={modalVisible} animationType="slide" transparent>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {editingItem ? 'Edit Menu Item' : 'Add Menu Item'}
               </Text>
-              <TouchableOpacity onPress={closeModal}>
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color={managerColors.textSecondary}
-                />
+              <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
+                <IconSymbol ios_icon_name="xmark" android_material_icon_name="close" size={24} color={managerColors.text} />
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalForm}>
-              {/* Name */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Item Name *</Text>
+            <ScrollView>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Name *</Text>
                 <TextInput
-                  style={styles.formInput}
-                  value={name}
-                  onChangeText={setName}
+                  style={styles.input}
+                  value={formData.name}
+                  onChangeText={(text) => setFormData({ ...formData, name: text })}
                   placeholder="Enter item name"
                   placeholderTextColor={managerColors.textSecondary}
                 />
               </View>
 
-              {/* Description */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Description</Text>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Description</Text>
                 <TextInput
-                  style={[styles.formInput, styles.textArea]}
-                  value={description}
-                  onChangeText={setDescription}
+                  style={[styles.input, styles.textArea]}
+                  value={formData.description}
+                  onChangeText={(text) => setFormData({ ...formData, description: text })}
                   placeholder="Enter description"
                   placeholderTextColor={managerColors.textSecondary}
                   multiline
-                  numberOfLines={4}
                 />
               </View>
 
-              {/* Price */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Price *</Text>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Price *</Text>
                 <TextInput
-                  style={styles.formInput}
-                  value={price}
-                  onChangeText={setPrice}
-                  placeholder="e.g., 12 or $12"
+                  style={styles.input}
+                  value={formData.price}
+                  onChangeText={(text) => setFormData({ ...formData, price: text })}
+                  placeholder="0.00"
                   placeholderTextColor={managerColors.textSecondary}
-                  keyboardType="numeric"
+                  keyboardType="decimal-pad"
                 />
               </View>
 
-              {/* Category */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Category *</Text>
-                <View style={styles.picker}>
-                  {CATEGORIES.map((cat, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={{
-                        paddingVertical: 12,
-                        paddingHorizontal: 16,
-                        backgroundColor:
-                          category === cat ? managerColors.highlight : 'transparent',
-                      }}
-                      onPress={() => setCategory(cat)}
-                    >
-                      <Text
-                        style={{
-                          color: managerColors.text,
-                          fontWeight: category === cat ? '600' : '400',
-                        }}
-                      >
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Subcategory */}
-              {SUBCATEGORIES[category] && SUBCATEGORIES[category].length > 0 && (
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Subcategory</Text>
-                  <View style={styles.picker}>
-                    {SUBCATEGORIES[category].map((sub, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={{
-                          paddingVertical: 12,
-                          paddingHorizontal: 16,
-                          backgroundColor:
-                            subcategory === sub ? managerColors.highlight : 'transparent',
-                        }}
-                        onPress={() => setSubcategory(sub)}
-                      >
-                        <Text
-                          style={{
-                            color: managerColors.text,
-                            fontWeight: subcategory === sub ? '600' : '400',
-                          }}
-                        >
-                          {sub}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
-
-              {/* Availability */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Availability</Text>
-                <TouchableOpacity
-                  style={styles.checkboxRow}
-                  onPress={() => setAvailableForLunch(!availableForLunch)}
-                >
-                  <View style={styles.checkbox}>
-                    {availableForLunch && (
-                      <IconSymbol
-                        ios_icon_name="checkmark"
-                        android_material_icon_name="check"
-                        size={18}
-                        color={managerColors.highlight}
-                      />
-                    )}
-                  </View>
-                  <Text style={styles.checkboxLabel}>Available for Lunch</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.checkboxRow}
-                  onPress={() => setAvailableForDinner(!availableForDinner)}
-                >
-                  <View style={styles.checkbox}>
-                    {availableForDinner && (
-                      <IconSymbol
-                        ios_icon_name="checkmark"
-                        android_material_icon_name="check"
-                        size={18}
-                        color={managerColors.highlight}
-                      />
-                    )}
-                  </View>
-                  <Text style={styles.checkboxLabel}>Available for Dinner</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Dietary Options */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Dietary Options</Text>
-                <TouchableOpacity
-                  style={styles.checkboxRow}
-                  onPress={() => setIsGlutenFree(!isGlutenFree)}
-                >
-                  <View style={styles.checkbox}>
-                    {isGlutenFree && (
-                      <IconSymbol
-                        ios_icon_name="checkmark"
-                        android_material_icon_name="check"
-                        size={18}
-                        color={managerColors.highlight}
-                      />
-                    )}
-                  </View>
-                  <Text style={styles.checkboxLabel}>Gluten Free</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.checkboxRow}
-                  onPress={() => setIsGlutenFreeAvailable(!isGlutenFreeAvailable)}
-                >
-                  <View style={styles.checkbox}>
-                    {isGlutenFreeAvailable && (
-                      <IconSymbol
-                        ios_icon_name="checkmark"
-                        android_material_icon_name="check"
-                        size={18}
-                        color={managerColors.highlight}
-                      />
-                    )}
-                  </View>
-                  <Text style={styles.checkboxLabel}>Gluten Free Available</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.checkboxRow}
-                  onPress={() => setIsVegetarian(!isVegetarian)}
-                >
-                  <View style={styles.checkbox}>
-                    {isVegetarian && (
-                      <IconSymbol
-                        ios_icon_name="checkmark"
-                        android_material_icon_name="check"
-                        size={18}
-                        color={managerColors.highlight}
-                      />
-                    )}
-                  </View>
-                  <Text style={styles.checkboxLabel}>Vegetarian</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.checkboxRow}
-                  onPress={() => setIsVegetarianAvailable(!isVegetarianAvailable)}
-                >
-                  <View style={styles.checkbox}>
-                    {isVegetarianAvailable && (
-                      <IconSymbol
-                        ios_icon_name="checkmark"
-                        android_material_icon_name="check"
-                        size={18}
-                        color={managerColors.highlight}
-                      />
-                    )}
-                  </View>
-                  <Text style={styles.checkboxLabel}>Vegetarian Available</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Thumbnail Shape */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Thumbnail Shape</Text>
-                <View style={{ flexDirection: 'row', gap: 12 }}>
-                  <TouchableOpacity
-                    style={{
-                      flex: 1,
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      borderRadius: 8,
-                      backgroundColor:
-                        thumbnailShape === 'banner' ? managerColors.highlight : managerColors.card,
-                      borderWidth: 1,
-                      borderColor: managerColors.border,
-                      alignItems: 'center',
-                    }}
-                    onPress={() => setThumbnailShape('banner')}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        fontWeight: '600',
-                        color: managerColors.text,
-                      }}
-                    >
-                      Banner (16:9)
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={{
-                      flex: 1,
-                      paddingVertical: 12,
-                      paddingHorizontal: 16,
-                      borderRadius: 8,
-                      backgroundColor:
-                        thumbnailShape === 'square' ? managerColors.highlight : managerColors.card,
-                      borderWidth: 1,
-                      borderColor: managerColors.border,
-                      alignItems: 'center',
-                    }}
-                    onPress={() => setThumbnailShape('square')}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 16,
-                        fontWeight: '600',
-                        color: managerColors.text,
-                      }}
-                    >
-                      Square (1:1)
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Image Upload */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Item Image</Text>
+              <View style={styles.formGroup}>
+                <Text style={styles.label}>Thumbnail Image</Text>
                 <TouchableOpacity
                   style={styles.imagePickerButton}
                   onPress={pickImage}
-                  disabled={uploadingImage}
+                  disabled={uploading}
                 >
                   <Text style={styles.imagePickerButtonText}>
-                    {uploadingImage ? 'Uploading...' : 'Choose Image'}
+                    {uploading ? 'Uploading...' : 'Choose Image'}
                   </Text>
                 </TouchableOpacity>
-                {thumbnailUrl && (
-                  <Image
-                    source={{ uri: getImageUrl(thumbnailUrl) || undefined }}
-                    style={styles.thumbnailPreview}
-                    resizeMode="cover"
-                  />
+                {formData.thumbnail_url && (
+                  <>
+                    <Image
+                      source={{ uri: getImageUrl(formData.thumbnail_url) }}
+                      style={styles.previewImage}
+                      resizeMode="cover"
+                    />
+                    <Text style={styles.label}>Display Shape (for menu view)</Text>
+                    <View style={styles.shapeSelector}>
+                      <TouchableOpacity
+                        style={[
+                          styles.shapeButton,
+                          formData.thumbnail_shape === 'square' && styles.shapeButtonActive,
+                        ]}
+                        onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
+                      >
+                        <Text
+                          style={[
+                            styles.shapeButtonText,
+                            formData.thumbnail_shape === 'square' &&
+                              styles.shapeButtonTextActive,
+                          ]}
+                        >
+                          Square
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.shapeButton,
+                          formData.thumbnail_shape === 'banner' && styles.shapeButtonActive,
+                        ]}
+                        onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
+                      >
+                        <Text
+                          style={[
+                            styles.shapeButtonText,
+                            formData.thumbnail_shape === 'banner' &&
+                              styles.shapeButtonTextActive,
+                          ]}
+                        >
+                          Banner
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  </>
                 )}
               </View>
 
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={handleSave}
-                disabled={loading || uploadingImage}
-              >
-                {loading ? (
-                  <ActivityIndicator color={managerColors.text} />
-                ) : (
-                  <Text style={styles.submitButtonText}>
-                    {editingItem ? 'Update Item' : 'Add Item'}
-                  </Text>
-                )}
-              </TouchableOpacity>
+              <View style={styles.checkboxContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.checkbox,
+                    formData.is_active && styles.checkboxChecked,
+                  ]}
+                  onPress={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                >
+                  {formData.is_active && (
+                    <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={16} color="#fff" />
+                  )}
+                </TouchableOpacity>
+                <Text style={styles.checkboxLabel}>Active</Text>
+              </View>
             </ScrollView>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={closeModal}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={handleSave}
+                disabled={uploading}
+              >
+                <Text style={styles.modalButtonText}>
+                  {uploading ? 'Saving...' : 'Save'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
