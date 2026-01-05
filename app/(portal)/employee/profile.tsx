@@ -1,4 +1,14 @@
 
+import { supabase } from '@/app/integrations/supabase/client';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import { employeeColors } from '@/styles/commonStyles';
+import * as ImagePicker from 'expo-image-picker';
+// @ts-expect-error - expo-file-system/legacy is valid for Expo 54
+// eslint-disable-next-line import/no-unresolved
+import * as FileSystem from 'expo-file-system/legacy';
+import { IconSymbol } from '@/components/IconSymbol';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,180 +20,93 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { supabase } from '@/app/integrations/supabase/client';
-import { useRouter, useFocusEffect } from 'expo-router';
-import React, { useState, useEffect, useCallback } from 'react';
-import * as ImagePicker from 'expo-image-picker';
-import { employeeColors } from '@/styles/commonStyles';
-import { useAuth } from '@/contexts/AuthContext';
-import { IconSymbol } from '@/components/IconSymbol';
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: employeeColors.background,
   },
-  scrollContent: {
-    paddingBottom: 100,
-  },
-  profileSection: {
-    backgroundColor: employeeColors.card,
-    paddingVertical: 30,
-    paddingHorizontal: 20,
+  profilePictureSection: {
     alignItems: 'center',
+    paddingVertical: 32,
+    backgroundColor: employeeColors.card,
     borderBottomWidth: 1,
     borderBottomColor: employeeColors.border,
   },
-  profileImageContainer: {
+  profilePictureContainer: {
     position: 'relative',
     marginBottom: 16,
   },
-  profileImage: {
+  profilePicture: {
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: '#e0e0e0',
+    backgroundColor: employeeColors.highlight,
   },
-  cameraButton: {
+  editIconContainer: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
     backgroundColor: employeeColors.primary,
-    justifyContent: 'center',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 3,
     borderColor: employeeColors.card,
   },
-  userName: {
+  profileName: {
     fontSize: 24,
     fontWeight: 'bold',
     color: employeeColors.text,
     marginBottom: 4,
   },
-  userJobTitle: {
+  profileJobTitle: {
     fontSize: 16,
     color: employeeColors.textSecondary,
-    marginBottom: 12,
-  },
-  roleBadge: {
-    backgroundColor: '#4ECDC4',
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  roleBadgeText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  messagesSection: {
-    backgroundColor: employeeColors.card,
-    marginHorizontal: 20,
-    marginTop: 20,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  messagesSectionContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  messagesLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  messagesTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: employeeColors.text,
-  },
-  messagesSubtitle: {
-    fontSize: 14,
-    color: employeeColors.textSecondary,
-    marginTop: 2,
-  },
-  messagesRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  unreadBadge: {
-    backgroundColor: '#FF6B6B',
-    minWidth: 24,
-    height: 24,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-  },
-  unreadBadgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: 'bold',
   },
   section: {
     backgroundColor: employeeColors.card,
-    marginHorizontal: 20,
-    marginTop: 20,
+    marginTop: 16,
+    marginHorizontal: 16,
     borderRadius: 12,
-    overflow: 'hidden',
+    padding: 16,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 2,
   },
   sectionHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
-    backgroundColor: employeeColors.card,
+    alignItems: 'center',
+    marginBottom: 16,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: employeeColors.text,
   },
-  sectionContent: {
-    padding: 16,
-    paddingTop: 0,
-  },
-  infoRow: {
+  inputGroup: {
     marginBottom: 16,
   },
-  infoLabel: {
-    fontSize: 12,
+  label: {
+    fontSize: 14,
     fontWeight: '600',
-    color: employeeColors.textSecondary,
+    color: employeeColors.text,
     marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
   },
-  infoValue: {
+  input: {
+    backgroundColor: employeeColors.background,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     fontSize: 16,
     color: employeeColors.text,
-    backgroundColor: employeeColors.background,
-    padding: 12,
-    borderRadius: 8,
     borderWidth: 1,
     borderColor: employeeColors.border,
   },
-  input: {
-    fontSize: 16,
-    color: employeeColors.text,
-    backgroundColor: employeeColors.background,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: employeeColors.primary,
-  },
-  disabledInput: {
-    backgroundColor: '#f5f5f5',
-    color: employeeColors.textSecondary,
+  inputDisabled: {
+    opacity: 0.6,
   },
   buttonRow: {
     flexDirection: 'row',
@@ -197,187 +120,152 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButton: {
-    backgroundColor: employeeColors.border,
+    backgroundColor: employeeColors.background,
+    borderWidth: 1,
+    borderColor: employeeColors.border,
   },
   saveButton: {
     backgroundColor: employeeColors.primary,
   },
-  editButton: {
-    backgroundColor: employeeColors.primary,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  buttonText: {
+  cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-  },
-  passwordInput: {
-    fontSize: 16,
     color: employeeColors.text,
-    backgroundColor: employeeColors.background,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: employeeColors.border,
-    marginBottom: 12,
   },
-  passwordDescription: {
-    fontSize: 14,
-    color: employeeColors.textSecondary,
-    marginBottom: 16,
-    fontStyle: 'italic',
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  logoutButton: {
+    backgroundColor: '#F44336',
+    marginHorizontal: 16,
+    marginTop: 24,
+    marginBottom: 32,
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.2)',
+    elevation: 3,
+  },
+  logoutButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
   },
 });
 
 export default function EmployeeProfileScreen() {
-  const router = useRouter();
   const { user, logout } = useAuth();
+  const router = useRouter();
+  
+  const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  // Profile data
-  const [name, setName] = useState('');
-  const [username, setUsername] = useState('');
+  
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [jobTitle, setJobTitle] = useState('');
-  const [jobTitles, setJobTitles] = useState<string[]>([]);
-  const [role, setRole] = useState('');
   const [profilePictureUrl, setProfilePictureUrl] = useState<string | null>(null);
-
-  // Messages
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  // Edit states
-  const [isEditingInfo, setIsEditingInfo] = useState(false);
-  const [editedEmail, setEditedEmail] = useState('');
-  const [editedPhoneNumber, setEditedPhoneNumber] = useState('');
-
-  // Password change states
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Collapsible sections
-  const [infoExpanded, setInfoExpanded] = useState(true);
-  const [passwordExpanded, setPasswordExpanded] = useState(false);
-
   const loadProfile = useCallback(async () => {
     if (!user?.id) return;
-
+    
     try {
-      setLoading(true);
-      console.log('Loading profile for user:', user.id);
-      
       const { data, error } = await supabase
         .from('users')
-        .select('name, username, email, phone_number, job_title, job_titles, role, profile_picture_url')
+        .select('*')
         .eq('id', user.id)
         .single();
 
-      if (error) {
-        console.error('Error loading profile:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      if (data) {
-        console.log('Profile data loaded:', data);
-        console.log('Profile picture URL from database:', data.profile_picture_url);
-        
-        setName(data.name || '');
-        setUsername(data.username || '');
-        setEmail(data.email || '');
-        setPhoneNumber(data.phone_number || '');
-        setJobTitle(data.job_title || '');
-        setJobTitles(data.job_titles || []);
-        setRole(data.role || '');
-        setProfilePictureUrl(data.profile_picture_url || null);
-        setEditedEmail(data.email || '');
-        setEditedPhoneNumber(data.phone_number || '');
-      }
-    } catch (error: any) {
+      setProfile(data);
+      setEmail(data.email || '');
+      setPhoneNumber(data.phone_number || '');
+      setProfilePictureUrl(data.profile_picture_url);
+    } catch (error) {
       console.error('Error loading profile:', error);
-      Alert.alert('Error', error.message);
+      Alert.alert('Error', 'Failed to load profile');
     } finally {
       setLoading(false);
     }
   }, [user?.id]);
 
-  const loadUnreadCount = useCallback(async () => {
-    if (!user?.id) return;
-
-    try {
-      const { count, error } = await supabase
-        .from('message_recipients')
-        .select('*', { count: 'exact', head: true })
-        .eq('recipient_id', user.id)
-        .eq('is_read', false);
-
-      if (error) throw error;
-      setUnreadCount(count || 0);
-    } catch (error) {
-      console.error('Error loading unread count:', error);
-    }
-  }, [user?.id]);
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   useFocusEffect(
     useCallback(() => {
       loadProfile();
-      loadUnreadCount();
-    }, [loadProfile, loadUnreadCount])
+    }, [loadProfile])
   );
 
-  useEffect(() => {
-    loadProfile();
-    loadUnreadCount();
-  }, [loadProfile, loadUnreadCount]);
-
   const handlePickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission needed', 'Please grant photo library access');
-      return;
-    }
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      await uploadImage(result.assets[0].uri);
+      if (!result.canceled && result.assets[0]) {
+        await uploadImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
     }
   };
 
   const uploadImage = async (uri: string) => {
     if (!user?.id) return;
 
+    setUploading(true);
     try {
-      setUploading(true);
       console.log('=== STARTING IMAGE UPLOAD ===');
       console.log('User ID:', user.id);
       console.log('Image URI:', uri);
-      
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      const arrayBuffer = await new Response(blob).arrayBuffer();
+
+      // Read file as base64 - EXACT same pattern as Menu Editor
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      console.log('Base64 read successfully, length:', base64.length);
+
+      // Decode base64 to binary - EXACT same decode function as Menu Editor
+      const decode = (str: string): Uint8Array => {
+        const binary = atob(str);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+          bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+      };
+
+      const arrayBuffer = decode(base64);
+      console.log('Decoded to array buffer, size:', arrayBuffer.length);
+
       const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      console.log('Uploading to profile-pictures bucket with path:', filePath);
+      console.log('Uploading to profile-pictures bucket, path:', filePath);
 
-      // Upload to the correct bucket: profile-pictures
+      // Upload to profile-pictures bucket
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('profile-pictures')
         .upload(filePath, arrayBuffer, {
           contentType: `image/${fileExt}`,
-          upsert: true, // Changed to true to allow overwriting
+          upsert: true,
         });
 
       if (uploadError) {
@@ -387,58 +275,47 @@ export default function EmployeeProfileScreen() {
 
       console.log('Upload successful:', uploadData);
 
-      // Get public URL from the correct bucket
+      // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('profile-pictures')
         .getPublicUrl(filePath);
 
-      console.log('Generated public URL:', publicUrl);
+      console.log('Public URL:', publicUrl);
 
-      // CRITICAL FIX: Update user profile with new image URL and use .select() to get the updated data
-      console.log('Updating users table with profile_picture_url:', publicUrl);
-      
-      const { data: updateData, error: updateError } = await supabase
+      // Update database with .select() to get the updated row (without .single() to avoid PGRST116)
+      console.log('Updating database for user:', user.id);
+      const { data: updatedUsers, error: updateError } = await supabase
         .from('users')
         .update({ profile_picture_url: publicUrl })
         .eq('id', user.id)
-        .select('profile_picture_url')
-        .single();
+        .select();
 
       if (updateError) {
         console.error('Database update error:', updateError);
         throw updateError;
       }
 
-      console.log('Database update successful. Returned data:', updateData);
+      console.log('Database update response:', updatedUsers);
 
-      // Verify the update by fetching the data again
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('users')
-        .select('profile_picture_url')
-        .eq('id', user.id)
-        .single();
-
-      if (verifyError) {
-        console.error('Verification error:', verifyError);
-      } else {
-        console.log('Verification: profile_picture_url in database is now:', verifyData.profile_picture_url);
+      // Check if we got a result
+      if (!updatedUsers || updatedUsers.length === 0) {
+        throw new Error('No user found to update');
       }
 
-      // Update local state with the URL from the database response
-      if (updateData && updateData.profile_picture_url) {
-        console.log('Setting local state to:', updateData.profile_picture_url);
-        setProfilePictureUrl(updateData.profile_picture_url);
-      } else {
-        console.log('Setting local state to generated URL:', publicUrl);
-        setProfilePictureUrl(publicUrl);
-      }
+      const updatedUser = updatedUsers[0];
+
+      // Update local state
+      setProfilePictureUrl(publicUrl);
+      setProfile({ ...profile, profile_picture_url: publicUrl });
 
       console.log('=== IMAGE UPLOAD COMPLETE ===');
-      Alert.alert('Success', 'Profile picture updated successfully!');
+      Alert.alert('Success', 'Profile picture updated successfully');
     } catch (error: any) {
       console.error('=== IMAGE UPLOAD FAILED ===');
       console.error('Error details:', error);
-      Alert.alert('Error', `Failed to upload profile picture: ${error.message}`);
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      Alert.alert('Error', 'Failed to upload profile picture. Please try again.');
     } finally {
       setUploading(false);
     }
@@ -448,100 +325,74 @@ export default function EmployeeProfileScreen() {
     if (!user?.id) return;
 
     try {
-      setSaving(true);
-      console.log('Saving profile changes...', { email: editedEmail, phone: editedPhoneNumber });
-      
-      // Update the users table with the new email and phone number
-      const { data, error } = await supabase
+      const { data: updatedUsers, error } = await supabase
         .from('users')
         .update({
-          email: editedEmail,
-          phone_number: editedPhoneNumber,
+          email,
+          phone_number: phoneNumber,
         })
         .eq('id', user.id)
-        .select('email, phone_number')
-        .single();
+        .select();
 
-      if (error) {
-        console.error('Error updating profile:', error);
-        throw error;
+      if (error) throw error;
+
+      if (!updatedUsers || updatedUsers.length === 0) {
+        throw new Error('No user found to update');
       }
 
-      console.log('Profile update successful:', data);
-
-      // Update local state with the returned values from the database
-      if (data) {
-        setEmail(data.email || editedEmail);
-        setPhoneNumber(data.phone_number || editedPhoneNumber);
-      } else {
-        setEmail(editedEmail);
-        setPhoneNumber(editedPhoneNumber);
-      }
-      
-      setIsEditingInfo(false);
-      Alert.alert('Success', 'Profile updated successfully!');
-    } catch (error: any) {
+      setProfile(updatedUsers[0]);
+      setIsEditing(false);
+      Alert.alert('Success', 'Profile updated successfully');
+    } catch (error) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', `Failed to update profile: ${error.message}`);
-    } finally {
-      setSaving(false);
+      Alert.alert('Error', 'Failed to update profile');
     }
   };
 
   const handleCancelEdit = () => {
-    setEditedEmail(email);
-    setEditedPhoneNumber(phoneNumber);
-    setIsEditingInfo(false);
+    setEmail(profile?.email || '');
+    setPhoneNumber(profile?.phone_number || '');
+    setIsEditing(false);
   };
 
   const handleChangePassword = async () => {
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match.');
+      Alert.alert('Error', 'Passwords do not match');
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters long.');
+      Alert.alert('Error', 'Password must be at least 6 characters');
       return;
     }
 
     try {
-      setSaving(true);
-      console.log('Checking for active session...');
-      
-      // Get the current session first
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError || !sessionData.session) {
-        console.error('Session error:', sessionError);
-        throw new Error('No active session found. Please log in again.');
+      // Verify current password by attempting to sign in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: profile.email,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        Alert.alert('Error', 'Current password is incorrect');
+        return;
       }
 
-      console.log('Session found, updating password...');
-
-      // Update the password using the session
-      const { data, error } = await supabase.auth.updateUser({
+      // Update password
+      const { error } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
-      if (error) {
-        console.error('Password update error:', error);
-        throw error;
-      }
-
-      console.log('Password update successful:', data);
+      if (error) throw error;
 
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setIsChangingPassword(false);
-      setPasswordExpanded(false);
-      Alert.alert('Success', 'Password changed successfully!');
-    } catch (error: any) {
+      Alert.alert('Success', 'Password updated successfully');
+    } catch (error) {
       console.error('Error changing password:', error);
-      Alert.alert('Error', `Failed to change password: ${error.message}`);
-    } finally {
-      setSaving(false);
+      Alert.alert('Error', 'Failed to change password');
     }
   };
 
@@ -552,44 +403,23 @@ export default function EmployeeProfileScreen() {
     setIsChangingPassword(false);
   };
 
-  const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: () => {
-            logout();
-            router.replace('/login');
-          },
-        },
-      ]
-    );
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/');
   };
 
-  const getProfilePictureUrl = (url: string | null | undefined) => {
-    if (!url) {
-      console.log('No profile picture URL provided');
-      return null;
-    }
-    if (url.startsWith('http')) {
-      console.log('Using full URL:', url);
-      return url;
-    }
-    // If it's a relative path, construct the full URL
-    const { data } = supabase.storage.from('profile-pictures').getPublicUrl(url);
-    console.log('Constructed public URL:', data.publicUrl);
-    return data.publicUrl;
+  const getProfilePictureUrl = (url: string | null | undefined): string => {
+    if (!url) return 'https://via.placeholder.com/100';
+    if (url.startsWith('http')) return url;
+    return `${process.env.EXPO_PUBLIC_SUPABASE_URL}/storage/v1/object/public/profile-pictures/${url}`;
   };
 
-  const getJobTitlesDisplay = () => {
-    if (jobTitles && jobTitles.length > 0) {
-      return jobTitles.join(', ');
+  const getJobTitlesDisplay = (): string => {
+    if (!profile) return '';
+    if (profile.job_titles && Array.isArray(profile.job_titles) && profile.job_titles.length > 0) {
+      return profile.job_titles.join(', ');
     }
-    return jobTitle || 'No job title';
+    return profile.job_title || '';
   };
 
   if (loading) {
@@ -600,257 +430,164 @@ export default function EmployeeProfileScreen() {
     );
   }
 
-  const displayProfilePictureUrl = getProfilePictureUrl(profilePictureUrl);
-  console.log('Rendering with profile picture URL:', profilePictureUrl);
-  console.log('Display URL:', displayProfilePictureUrl);
-
   return (
-    <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        {/* Profile Section */}
-        <View style={styles.profileSection}>
-          <View style={styles.profileImageContainer}>
-            <Image
-              source={
-                displayProfilePictureUrl
-                  ? { uri: displayProfilePictureUrl }
-                  : require('@/assets/images/final_quest_240x240.png')
-              }
-              style={styles.profileImage}
-            />
-            <TouchableOpacity
-              style={styles.cameraButton}
-              onPress={handlePickImage}
-              disabled={uploading}
-            >
-              {uploading ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <IconSymbol ios_icon_name="camera.fill" android_material_icon_name="camera" size={20} color="#fff" />
-              )}
-            </TouchableOpacity>
-          </View>
-
-          <Text style={styles.userName}>{name}</Text>
-          <Text style={styles.userJobTitle}>{getJobTitlesDisplay()}</Text>
-          <View style={styles.roleBadge}>
-            <IconSymbol ios_icon_name="star.fill" android_material_icon_name="star" size={16} color="#fff" />
-            <Text style={styles.roleBadgeText}>{role}</Text>
-          </View>
-        </View>
-
-        {/* Messages Section */}
-        <TouchableOpacity
-          style={styles.messagesSection}
-          onPress={() => router.push('/messages')}
-        >
-          <View style={styles.messagesSectionContent}>
-            <View style={styles.messagesLeft}>
-              <IconSymbol ios_icon_name="envelope.fill" android_material_icon_name="email" size={24} color={employeeColors.primary} />
-              <View>
-                <Text style={styles.messagesTitle}>Messages</Text>
-                <Text style={styles.messagesSubtitle}>
-                  {unreadCount > 0 ? `${unreadCount} new message${unreadCount > 1 ? 's' : ''}` : 'No new messages'}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.messagesRight}>
-              {unreadCount > 0 && (
-                <View style={styles.unreadBadge}>
-                  <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
-                </View>
-              )}
-              <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={20} color={employeeColors.textSecondary} />
+    <ScrollView style={styles.container}>
+      {/* Profile Picture Section */}
+      <View style={styles.profilePictureSection}>
+        <TouchableOpacity onPress={handlePickImage} disabled={uploading}>
+          <View style={styles.profilePictureContainer}>
+            {uploading ? (
+              <ActivityIndicator size="large" color={employeeColors.primary} />
+            ) : (
+              <Image
+                source={{ uri: getProfilePictureUrl(profilePictureUrl) }}
+                style={styles.profilePicture}
+              />
+            )}
+            <View style={styles.editIconContainer}>
+              <IconSymbol
+                ios_icon_name="camera.fill"
+                android_material_icon_name="camera"
+                size={20}
+                color="#fff"
+              />
             </View>
           </View>
         </TouchableOpacity>
+        <Text style={styles.profileName}>{profile?.name}</Text>
+        <Text style={styles.profileJobTitle}>{getJobTitlesDisplay()}</Text>
+      </View>
 
-        {/* Profile Information Section */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.sectionHeader}
-            onPress={() => setInfoExpanded(!infoExpanded)}
-          >
-            <Text style={styles.sectionTitle}>Profile Information</Text>
-            <IconSymbol
-              ios_icon_name={infoExpanded ? 'chevron.up' : 'chevron.down'}
-              android_material_icon_name={infoExpanded ? 'expand-less' : 'expand-more'}
-              size={20}
-              color={employeeColors.textSecondary}
-            />
-          </TouchableOpacity>
-
-          {infoExpanded && (
-            <View style={styles.sectionContent}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Username</Text>
-                <Text style={styles.infoValue}>{username}</Text>
-              </View>
-
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Full Name</Text>
-                <Text style={styles.infoValue}>{name}</Text>
-              </View>
-
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Email</Text>
-                {isEditingInfo ? (
-                  <TextInput
-                    style={styles.input}
-                    value={editedEmail}
-                    onChangeText={setEditedEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    placeholder="Enter email"
-                    placeholderTextColor={employeeColors.textSecondary}
-                  />
-                ) : (
-                  <Text style={styles.infoValue}>{email || 'Not set'}</Text>
-                )}
-              </View>
-
-              <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Phone Number</Text>
-                {isEditingInfo ? (
-                  <TextInput
-                    style={styles.input}
-                    value={editedPhoneNumber}
-                    onChangeText={setEditedPhoneNumber}
-                    keyboardType="phone-pad"
-                    placeholder="Enter phone number"
-                    placeholderTextColor={employeeColors.textSecondary}
-                  />
-                ) : (
-                  <Text style={styles.infoValue}>{phoneNumber || 'Not set'}</Text>
-                )}
-              </View>
-
-              {isEditingInfo ? (
-                <View style={styles.buttonRow}>
-                  <TouchableOpacity
-                    style={[styles.button, styles.cancelButton]}
-                    onPress={handleCancelEdit}
-                    disabled={saving}
-                  >
-                    <Text style={[styles.buttonText, { color: employeeColors.text }]}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.button, styles.saveButton]}
-                    onPress={handleSaveChanges}
-                    disabled={saving}
-                  >
-                    {saving ? (
-                      <ActivityIndicator size="small" color="#fff" />
-                    ) : (
-                      <Text style={[styles.buttonText, { color: '#fff' }]}>Save Changes</Text>
-                    )}
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() => setIsEditingInfo(true)}
-                >
-                  <Text style={[styles.buttonText, { color: '#fff' }]}>Edit Profile</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+      {/* Profile Information Section */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Profile Information</Text>
+          {!isEditing && (
+            <TouchableOpacity onPress={() => setIsEditing(true)}>
+              <IconSymbol
+                ios_icon_name="pencil"
+                android_material_icon_name="edit"
+                size={20}
+                color={employeeColors.primary}
+              />
+            </TouchableOpacity>
           )}
         </View>
 
-        {/* Change Password Section */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.sectionHeader}
-            onPress={() => setPasswordExpanded(!passwordExpanded)}
-          >
-            <Text style={styles.sectionTitle}>Change Password</Text>
-            <IconSymbol
-              ios_icon_name={passwordExpanded ? 'chevron.up' : 'chevron.down'}
-              android_material_icon_name={passwordExpanded ? 'expand-less' : 'expand-more'}
-              size={20}
-              color={employeeColors.textSecondary}
-            />
-          </TouchableOpacity>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={[styles.input, !isEditing && styles.inputDisabled]}
+            value={email}
+            onChangeText={setEmail}
+            editable={isEditing}
+            keyboardType="email-address"
+            autoCapitalize="none"
+          />
+        </View>
 
-          {passwordExpanded && (
-            <View style={styles.sectionContent}>
-              {!isChangingPassword ? (
-                <>
-                  <Text style={styles.passwordDescription}>
-                    You can change your password here. Make sure to remember your new password.
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={() => setIsChangingPassword(true)}
-                  >
-                    <Text style={[styles.buttonText, { color: '#fff' }]}>Change Password</Text>
-                  </TouchableOpacity>
-                </>
-              ) : (
-                <>
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Current Password</Text>
-                    <TextInput
-                      style={styles.passwordInput}
-                      placeholder="Enter current password"
-                      placeholderTextColor={employeeColors.textSecondary}
-                      value={currentPassword}
-                      onChangeText={setCurrentPassword}
-                      secureTextEntry
-                    />
-                  </View>
+        <View style={styles.inputGroup}>
+          <Text style={styles.label}>Phone Number</Text>
+          <TextInput
+            style={[styles.input, !isEditing && styles.inputDisabled]}
+            value={phoneNumber}
+            onChangeText={setPhoneNumber}
+            editable={isEditing}
+            keyboardType="phone-pad"
+          />
+        </View>
 
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>New Password</Text>
-                    <TextInput
-                      style={styles.passwordInput}
-                      placeholder="Enter new password"
-                      placeholderTextColor={employeeColors.textSecondary}
-                      value={newPassword}
-                      onChangeText={setNewPassword}
-                      secureTextEntry
-                    />
-                  </View>
+        {isEditing && (
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.button, styles.cancelButton]}
+              onPress={handleCancelEdit}
+            >
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.button, styles.saveButton]}
+              onPress={handleSaveChanges}
+            >
+              <Text style={styles.saveButtonText}>Save Changes</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
 
-                  <View style={styles.infoRow}>
-                    <Text style={styles.infoLabel}>Confirm New Password</Text>
-                    <TextInput
-                      style={styles.passwordInput}
-                      placeholder="Confirm new password"
-                      placeholderTextColor={employeeColors.textSecondary}
-                      value={confirmPassword}
-                      onChangeText={setConfirmPassword}
-                      secureTextEntry
-                    />
-                  </View>
-
-                  <View style={styles.buttonRow}>
-                    <TouchableOpacity
-                      style={[styles.button, styles.cancelButton]}
-                      onPress={handleCancelPasswordChange}
-                      disabled={saving}
-                    >
-                      <Text style={[styles.buttonText, { color: employeeColors.text }]}>Cancel</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.button, styles.saveButton]}
-                      onPress={handleChangePassword}
-                      disabled={saving}
-                    >
-                      {saving ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Text style={[styles.buttonText, { color: '#fff' }]}>Update Password</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </>
-              )}
-            </View>
+      {/* Change Password Section */}
+      <View style={styles.section}>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Change Password</Text>
+          {!isChangingPassword && (
+            <TouchableOpacity onPress={() => setIsChangingPassword(true)}>
+              <IconSymbol
+                ios_icon_name="lock.fill"
+                android_material_icon_name="lock"
+                size={20}
+                color={employeeColors.primary}
+              />
+            </TouchableOpacity>
           )}
         </View>
-      </ScrollView>
-    </View>
+
+        {isChangingPassword && (
+          <>
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Current Password</Text>
+              <TextInput
+                style={styles.input}
+                value={currentPassword}
+                onChangeText={setCurrentPassword}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>New Password</Text>
+              <TextInput
+                style={styles.input}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Confirm New Password</Text>
+              <TextInput
+                style={styles.input}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                autoCapitalize="none"
+              />
+            </View>
+
+            <View style={styles.buttonRow}>
+              <TouchableOpacity
+                style={[styles.button, styles.cancelButton]}
+                onPress={handleCancelPasswordChange}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, styles.saveButton]}
+                onPress={handleChangePassword}
+              >
+                <Text style={styles.saveButtonText}>Update Password</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </View>
+
+      {/* Logout Button */}
+      <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <Text style={styles.logoutButtonText}>Logout</Text>
+      </TouchableOpacity>
+    </ScrollView>
   );
 }
