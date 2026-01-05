@@ -26,23 +26,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-  header: {
-    backgroundColor: managerColors.primary,
-    paddingTop: 60,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  logoutButton: {
-    padding: 8,
-  },
   profileSection: {
     backgroundColor: managerColors.card,
     paddingVertical: 30,
@@ -410,23 +393,36 @@ export default function ManagerProfileScreen() {
 
     try {
       setSaving(true);
-      const { error } = await supabase
+      
+      // Update the users table with the new email and phone number
+      const { data, error } = await supabase
         .from('users')
         .update({
           email: editedEmail,
           phone_number: editedPhoneNumber,
         })
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating profile:', error);
+        throw error;
+      }
 
+      console.log('Profile update successful:', data);
+
+      // Update local state with the new values
       setEmail(editedEmail);
       setPhoneNumber(editedPhoneNumber);
       setIsEditingInfo(false);
+      
       Alert.alert('Success', 'Profile updated successfully!');
+      
+      // Reload profile to ensure we have the latest data
+      await loadProfile();
     } catch (error: any) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', error.message);
+      Alert.alert('Error', `Failed to update profile: ${error.message}`);
     } finally {
       setSaving(false);
     }
@@ -451,11 +447,28 @@ export default function ManagerProfileScreen() {
 
     try {
       setSaving(true);
-      const { error } = await supabase.auth.updateUser({
+      
+      // Get the current session first
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !sessionData.session) {
+        console.error('Session error:', sessionError);
+        throw new Error('No active session found. Please log in again.');
+      }
+
+      console.log('Session found, updating password...');
+
+      // Update the password using the session
+      const { data, error } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Password update error:', error);
+        throw error;
+      }
+
+      console.log('Password update successful:', data);
 
       setCurrentPassword('');
       setNewPassword('');
@@ -465,7 +478,7 @@ export default function ManagerProfileScreen() {
       Alert.alert('Success', 'Password changed successfully!');
     } catch (error: any) {
       console.error('Error changing password:', error);
-      Alert.alert('Error', error.message);
+      Alert.alert('Error', `Failed to change password: ${error.message}`);
     } finally {
       setSaving(false);
     }
@@ -520,14 +533,6 @@ export default function ManagerProfileScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Manager Portal</Text>
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <IconSymbol ios_icon_name="rectangle.portrait.and.arrow.right" android_material_icon_name="logout" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Profile Section */}
         <View style={styles.profileSection}>
