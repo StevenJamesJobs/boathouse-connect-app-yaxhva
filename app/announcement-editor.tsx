@@ -51,7 +51,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
+    paddingBottom: 15,
     backgroundColor: managerColors.primary,
     borderBottomWidth: 1,
     borderBottomColor: managerColors.border,
@@ -59,68 +60,105 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#FFFFFF',
     flex: 1,
     textAlign: 'center',
   },
   backButton: {
-    padding: 5,
+    padding: 8,
   },
   addButton: {
-    padding: 5,
+    padding: 8,
   },
-  listContainer: {
-    padding: 15,
+  scrollContent: {
+    padding: 20,
   },
-  itemCard: {
+  announcementCard: {
     backgroundColor: managerColors.card,
     borderRadius: 12,
     padding: 15,
     marginBottom: 15,
     borderWidth: 1,
     borderColor: managerColors.border,
-  },
-  itemHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 10,
+    alignItems: 'center',
   },
-  itemTitle: {
-    fontSize: 18,
+  cardContent: {
+    flex: 1,
+    marginRight: 12,
+  },
+  cardTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
     color: managerColors.text,
-    flex: 1,
+    marginBottom: 6,
   },
-  itemActions: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  actionButton: {
-    padding: 5,
-  },
-  itemContent: {
-    fontSize: 14,
+  cardDescription: {
+    fontSize: 13,
     color: managerColors.textSecondary,
     marginBottom: 8,
+    lineHeight: 18,
   },
-  itemMeta: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 8,
-  },
-  metaBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
+  cardMeta: {
     fontSize: 12,
+    color: managerColors.textSecondary,
+    marginBottom: 3,
   },
   thumbnail: {
-    width: 60,
-    height: 60,
+    width: 80,
+    height: 80,
     borderRadius: 8,
+    backgroundColor: managerColors.border,
+  },
+  cardActions: {
+    flexDirection: 'row',
     marginTop: 8,
+    gap: 8,
+  },
+  editButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: managerColors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  priorityBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    alignSelf: 'flex-start',
+    marginBottom: 6,
+  },
+  priorityText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: managerColors.textSecondary,
+    marginTop: 12,
   },
   modalOverlay: {
     flex: 1,
@@ -142,14 +180,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  formGroup: {
-    marginBottom: 15,
-  },
   label: {
     fontSize: 14,
     fontWeight: '600',
     color: managerColors.text,
-    marginBottom: 5,
+    marginBottom: 8,
+    marginTop: 12,
   },
   input: {
     backgroundColor: managerColors.background,
@@ -157,22 +193,24 @@ const styles = StyleSheet.create({
     borderColor: managerColors.border,
     borderRadius: 8,
     padding: 12,
-    fontSize: 16,
+    fontSize: 14,
     color: managerColors.text,
+    marginBottom: 12,
   },
   textArea: {
-    minHeight: 100,
+    height: 100,
     textAlignVertical: 'top',
   },
   pickerContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
+    gap: 8,
+    marginBottom: 12,
   },
   pickerOption: {
-    paddingHorizontal: 15,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: managerColors.border,
     backgroundColor: managerColors.background,
@@ -186,7 +224,7 @@ const styles = StyleSheet.create({
     color: managerColors.text,
   },
   pickerOptionTextSelected: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontWeight: '600',
   },
   imagePickerButton: {
@@ -194,27 +232,27 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 12,
   },
   imagePickerText: {
-    color: '#fff',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
-  previewImage: {
+  selectedImage: {
     width: '100%',
     height: 200,
     borderRadius: 8,
-    marginBottom: 10,
+    marginBottom: 12,
   },
   modalActions: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 12,
     marginTop: 20,
   },
   modalButton: {
     flex: 1,
-    padding: 15,
+    padding: 14,
     borderRadius: 8,
     alignItems: 'center',
   },
@@ -224,20 +262,10 @@ const styles = StyleSheet.create({
   cancelButton: {
     backgroundColor: managerColors.textSecondary,
   },
-  buttonText: {
-    color: '#fff',
+  modalButtonText: {
+    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: managerColors.textSecondary,
-    marginTop: 10,
   },
   loadingContainer: {
     flex: 1,
@@ -253,22 +281,22 @@ export default function AnnouncementEditorScreen() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Form fields
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [message, setMessage] = useState('');
   const [priority, setPriority] = useState('Medium');
   const [visibility, setVisibility] = useState('All');
-  const [link, setLink] = useState('');
-  const [thumbnailUri, setThumbnailUri] = useState<string | null>(null);
-  const [thumbnailShape, setThumbnailShape] = useState('square');
+  const [displayOrder, setDisplayOrder] = useState('0');
   const [isActive, setIsActive] = useState(true);
+  const [thumbnailUri, setThumbnailUri] = useState<string | null>(null);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
   const { user } = useAuth();
   const router = useRouter();
 
   const loadAnnouncements = useCallback(async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('announcements')
         .select('*')
@@ -276,7 +304,7 @@ export default function AnnouncementEditorScreen() {
 
       if (error) throw error;
       setAnnouncements(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading announcements:', error);
       Alert.alert('Error', 'Failed to load announcements');
     } finally {
@@ -292,11 +320,11 @@ export default function AnnouncementEditorScreen() {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: thumbnailShape === 'square' ? [1, 1] : [16, 9],
+      aspect: [1, 1],
       quality: 0.8,
     });
 
-    if (!result.canceled) {
+    if (!result.canceled && result.assets[0]) {
       setThumbnailUri(result.assets[0].uri);
     }
   };
@@ -306,22 +334,24 @@ export default function AnnouncementEditorScreen() {
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
-
+      const arrayBuffer = decode(base64);
       const fileName = `announcement-${Date.now()}.jpg`;
+
       const { data, error } = await supabase.storage
         .from('announcement-images')
-        .upload(fileName, decode(base64), {
+        .upload(fileName, arrayBuffer, {
           contentType: 'image/jpeg',
+          upsert: false,
         });
 
       if (error) throw error;
 
       const { data: urlData } = supabase.storage
         .from('announcement-images')
-        .getPublicUrl(fileName);
+        .getPublicUrl(data.path);
 
       return urlData.publicUrl;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error uploading image:', error);
       Alert.alert('Error', 'Failed to upload image');
       return null;
@@ -343,24 +373,26 @@ export default function AnnouncementEditorScreen() {
       return;
     }
 
-    setSaving(true);
     try {
-      let thumbnailUrl = null;
-      if (thumbnailUri && !thumbnailUri.startsWith('http')) {
-        thumbnailUrl = await uploadImage(thumbnailUri);
-      } else {
-        thumbnailUrl = thumbnailUri;
+      setSaving(true);
+      let finalThumbnailUrl = thumbnailUrl;
+
+      if (thumbnailUri && thumbnailUri !== thumbnailUrl) {
+        const uploadedUrl = await uploadImage(thumbnailUri);
+        if (uploadedUrl) {
+          finalThumbnailUrl = uploadedUrl;
+        }
       }
 
       const announcementData = {
         title: title.trim(),
         content: content.trim(),
         message: message.trim() || null,
-        thumbnail_url: thumbnailUrl,
-        thumbnail_shape: thumbnailShape,
+        thumbnail_url: finalThumbnailUrl,
+        thumbnail_shape: 'square',
         priority,
         visibility,
-        link: link.trim() || null,
+        display_order: parseInt(displayOrder) || 0,
         is_active: isActive,
       };
 
@@ -383,9 +415,9 @@ export default function AnnouncementEditorScreen() {
 
       closeModal();
       loadAnnouncements();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving announcement:', error);
-      Alert.alert('Error', 'Failed to save announcement');
+      Alert.alert('Error', error.message || 'Failed to save announcement');
     } finally {
       setSaving(false);
     }
@@ -410,7 +442,7 @@ export default function AnnouncementEditorScreen() {
               if (error) throw error;
               Alert.alert('Success', 'Announcement deleted successfully');
               loadAnnouncements();
-            } catch (error) {
+            } catch (error: any) {
               console.error('Error deleting announcement:', error);
               Alert.alert('Error', 'Failed to delete announcement');
             }
@@ -432,10 +464,10 @@ export default function AnnouncementEditorScreen() {
     setMessage(announcement.message || '');
     setPriority(announcement.priority);
     setVisibility(announcement.visibility);
-    setLink(announcement.link || '');
-    setThumbnailUri(announcement.thumbnail_url);
-    setThumbnailShape(announcement.thumbnail_shape);
+    setDisplayOrder(announcement.display_order.toString());
     setIsActive(announcement.is_active);
+    setThumbnailUrl(announcement.thumbnail_url);
+    setThumbnailUri(announcement.thumbnail_url);
     setModalVisible(true);
   };
 
@@ -451,10 +483,10 @@ export default function AnnouncementEditorScreen() {
     setMessage('');
     setPriority('Medium');
     setVisibility('All');
-    setLink('');
-    setThumbnailUri(null);
-    setThumbnailShape('square');
+    setDisplayOrder('0');
     setIsActive(true);
+    setThumbnailUri(null);
+    setThumbnailUrl(null);
   };
 
   const handleBackPress = () => {
@@ -464,13 +496,15 @@ export default function AnnouncementEditorScreen() {
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'Urgent':
-        return '#FF3B30';
+        return '#DC2626';
       case 'High':
-        return '#FF9500';
+        return '#EA580C';
       case 'Medium':
-        return '#007AFF';
+        return '#CA8A04';
+      case 'Low':
+        return '#16A34A';
       default:
-        return '#8E8E93';
+        return managerColors.textSecondary;
     }
   };
 
@@ -483,21 +517,18 @@ export default function AnnouncementEditorScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-          <IconSymbol name="chevron.left" size={24} color="#fff" />
+          <IconSymbol name="chevron.left" size={24} color="#FFFFFF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Announcements Editor</Text>
         <TouchableOpacity onPress={openAddModal} style={styles.addButton}>
-          <IconSymbol name="plus" size={24} color="#fff" />
+          <IconSymbol name="plus" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.listContainer}>
+      <ScrollView style={styles.scrollContent}>
         {announcements.length === 0 ? (
           <View style={styles.emptyState}>
             <IconSymbol name="megaphone" size={48} color={managerColors.textSecondary} />
@@ -505,279 +536,178 @@ export default function AnnouncementEditorScreen() {
           </View>
         ) : (
           announcements.map((announcement) => (
-            <View key={announcement.id} style={styles.itemCard}>
-              <View style={styles.itemHeader}>
-                <Text style={styles.itemTitle}>{announcement.title}</Text>
-                <View style={styles.itemActions}>
+            <View key={announcement.id} style={styles.announcementCard}>
+              <View style={styles.cardContent}>
+                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
+                  <Text style={styles.priorityText}>{announcement.priority}</Text>
+                </View>
+                <Text style={styles.cardTitle}>{announcement.title}</Text>
+                <Text style={styles.cardDescription} numberOfLines={2}>
+                  {announcement.content}
+                </Text>
+                <Text style={styles.cardMeta}>Display Order: {announcement.display_order}</Text>
+                <Text style={styles.cardMeta}>Visibility: {announcement.visibility}</Text>
+                
+                <View style={styles.cardActions}>
                   <TouchableOpacity
+                    style={styles.editButton}
                     onPress={() => openEditModal(announcement)}
-                    style={styles.actionButton}
                   >
-                    <IconSymbol name="pencil" size={20} color={managerColors.primary} />
+                    <IconSymbol name="pencil" size={14} color="#FFFFFF" />
+                    <Text style={styles.buttonText}>Edit</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
+                    style={styles.deleteButton}
                     onPress={() => handleDelete(announcement)}
-                    style={styles.actionButton}
                   >
-                    <IconSymbol name="trash" size={20} color="#FF3B30" />
+                    <IconSymbol name="trash" size={14} color="#FFFFFF" />
+                    <Text style={styles.buttonText}>Delete</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-              <Text style={styles.itemContent} numberOfLines={2}>
-                {announcement.content}
-              </Text>
+              
               {announcement.thumbnail_url && (
                 <Image
                   source={{ uri: announcement.thumbnail_url }}
                   style={styles.thumbnail}
+                  resizeMode="cover"
                 />
               )}
-              <View style={styles.itemMeta}>
-                <View
-                  style={[
-                    styles.metaBadge,
-                    { backgroundColor: getPriorityColor(announcement.priority) },
-                  ]}
-                >
-                  <Text style={{ color: '#fff', fontSize: 12 }}>
-                    {announcement.priority}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.metaBadge,
-                    { backgroundColor: managerColors.textSecondary },
-                  ]}
-                >
-                  <Text style={{ color: '#fff', fontSize: 12 }}>
-                    {announcement.visibility}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.metaBadge,
-                    {
-                      backgroundColor: announcement.is_active
-                        ? '#34C759'
-                        : '#8E8E93',
-                    },
-                  ]}
-                >
-                  <Text style={{ color: '#fff', fontSize: 12 }}>
-                    {announcement.is_active ? 'Active' : 'Inactive'}
-                  </Text>
-                </View>
-              </View>
             </View>
           ))
         )}
       </ScrollView>
 
       <Modal visible={modalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            style={styles.modalContent}
-          >
-            <ScrollView>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <View style={styles.modalContent}>
+            <ScrollView showsVerticalScrollIndicator={false}>
               <Text style={styles.modalTitle}>
                 {editingId ? 'Edit Announcement' : 'New Announcement'}
               </Text>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Title *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={title}
-                  onChangeText={setTitle}
-                  placeholder="Enter title"
-                  placeholderTextColor={managerColors.textSecondary}
-                />
-              </View>
+              <Text style={styles.label}>Title *</Text>
+              <TextInput
+                style={styles.input}
+                value={title}
+                onChangeText={setTitle}
+                placeholder="Enter title"
+                placeholderTextColor={managerColors.textSecondary}
+              />
 
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Content *</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={content}
-                  onChangeText={setContent}
-                  placeholder="Enter content"
-                  placeholderTextColor={managerColors.textSecondary}
-                  multiline
-                />
-              </View>
+              <Text style={styles.label}>Content *</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                value={content}
+                onChangeText={setContent}
+                placeholder="Enter content"
+                placeholderTextColor={managerColors.textSecondary}
+                multiline
+              />
 
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Message (Optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={message}
-                  onChangeText={setMessage}
-                  placeholder="Enter message"
-                  placeholderTextColor={managerColors.textSecondary}
-                />
-              </View>
+              <Text style={styles.label}>Short Message (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                value={message}
+                onChangeText={setMessage}
+                placeholder="Enter short message"
+                placeholderTextColor={managerColors.textSecondary}
+              />
 
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Priority</Text>
-                <View style={styles.pickerContainer}>
-                  {PRIORITIES.map((p) => (
-                    <TouchableOpacity
-                      key={p}
-                      onPress={() => setPriority(p)}
-                      style={[
-                        styles.pickerOption,
-                        priority === p && styles.pickerOptionSelected,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.pickerOptionText,
-                          priority === p && styles.pickerOptionTextSelected,
-                        ]}
-                      >
-                        {p}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Visibility</Text>
-                <View style={styles.pickerContainer}>
-                  {VISIBILITIES.map((v) => (
-                    <TouchableOpacity
-                      key={v}
-                      onPress={() => setVisibility(v)}
-                      style={[
-                        styles.pickerOption,
-                        visibility === v && styles.pickerOptionSelected,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.pickerOptionText,
-                          visibility === v && styles.pickerOptionTextSelected,
-                        ]}
-                      >
-                        {v}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Thumbnail Shape</Text>
-                <View style={styles.pickerContainer}>
-                  {['square', 'wide'].map((shape) => (
-                    <TouchableOpacity
-                      key={shape}
-                      onPress={() => setThumbnailShape(shape)}
-                      style={[
-                        styles.pickerOption,
-                        thumbnailShape === shape && styles.pickerOptionSelected,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.pickerOptionText,
-                          thumbnailShape === shape && styles.pickerOptionTextSelected,
-                        ]}
-                      >
-                        {shape.charAt(0).toUpperCase() + shape.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Thumbnail</Text>
-                <TouchableOpacity onPress={pickImage} style={styles.imagePickerButton}>
-                  <Text style={styles.imagePickerText}>
-                    {thumbnailUri ? 'Change Image' : 'Pick Image'}
-                  </Text>
-                </TouchableOpacity>
-                {thumbnailUri && (
-                  <Image source={{ uri: thumbnailUri }} style={styles.previewImage} />
-                )}
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Link (Optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  value={link}
-                  onChangeText={setLink}
-                  placeholder="Enter link URL"
-                  placeholderTextColor={managerColors.textSecondary}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Status</Text>
-                <View style={styles.pickerContainer}>
+              <Text style={styles.label}>Priority</Text>
+              <View style={styles.pickerContainer}>
+                {PRIORITIES.map((p) => (
                   <TouchableOpacity
-                    onPress={() => setIsActive(true)}
+                    key={p}
                     style={[
                       styles.pickerOption,
-                      isActive && styles.pickerOptionSelected,
+                      priority === p && styles.pickerOptionSelected,
                     ]}
+                    onPress={() => setPriority(p)}
                   >
                     <Text
                       style={[
                         styles.pickerOptionText,
-                        isActive && styles.pickerOptionTextSelected,
+                        priority === p && styles.pickerOptionTextSelected,
                       ]}
                     >
-                      Active
+                      {p}
                     </Text>
                   </TouchableOpacity>
+                ))}
+              </View>
+
+              <Text style={styles.label}>Visibility</Text>
+              <View style={styles.pickerContainer}>
+                {VISIBILITIES.map((v) => (
                   <TouchableOpacity
-                    onPress={() => setIsActive(false)}
+                    key={v}
                     style={[
                       styles.pickerOption,
-                      !isActive && styles.pickerOptionSelected,
+                      visibility === v && styles.pickerOptionSelected,
                     ]}
+                    onPress={() => setVisibility(v)}
                   >
                     <Text
                       style={[
                         styles.pickerOptionText,
-                        !isActive && styles.pickerOptionTextSelected,
+                        visibility === v && styles.pickerOptionTextSelected,
                       ]}
                     >
-                      Inactive
+                      {v}
                     </Text>
                   </TouchableOpacity>
-                </View>
+                ))}
               </View>
+
+              <Text style={styles.label}>Display Order</Text>
+              <TextInput
+                style={styles.input}
+                value={displayOrder}
+                onChangeText={setDisplayOrder}
+                placeholder="0"
+                placeholderTextColor={managerColors.textSecondary}
+                keyboardType="numeric"
+              />
+
+              <Text style={styles.label}>Thumbnail Image</Text>
+              <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
+                <Text style={styles.imagePickerText}>
+                  {thumbnailUri ? 'Change Image' : 'Select Image'}
+                </Text>
+              </TouchableOpacity>
+
+              {thumbnailUri && (
+                <Image source={{ uri: thumbnailUri }} style={styles.selectedImage} />
+              )}
 
               <View style={styles.modalActions}>
                 <TouchableOpacity
-                  onPress={closeModal}
                   style={[styles.modalButton, styles.cancelButton]}
+                  onPress={closeModal}
                   disabled={saving}
                 >
-                  <Text style={styles.buttonText}>Cancel</Text>
+                  <Text style={styles.modalButtonText}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={handleSave}
                   style={[styles.modalButton, styles.saveButton]}
+                  onPress={handleSave}
                   disabled={saving}
                 >
                   {saving ? (
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color="#FFFFFF" />
                   ) : (
-                    <Text style={styles.buttonText}>Save</Text>
+                    <Text style={styles.modalButtonText}>Save</Text>
                   )}
                 </TouchableOpacity>
               </View>
             </ScrollView>
-          </KeyboardAvoidingView>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
