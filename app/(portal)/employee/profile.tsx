@@ -270,15 +270,23 @@ export default function EmployeeProfileScreen() {
 
     try {
       setLoading(true);
+      console.log('Loading profile for user:', user.id);
+      
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select('name, username, email, phone_number, job_title, job_titles, role, profile_picture_url')
         .eq('id', user.id)
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading profile:', error);
+        throw error;
+      }
 
       if (data) {
+        console.log('Profile data loaded:', data);
+        console.log('Profile picture URL from database:', data.profile_picture_url);
+        
         setName(data.name || '');
         setUsername(data.username || '');
         setEmail(data.email || '');
@@ -351,7 +359,9 @@ export default function EmployeeProfileScreen() {
 
     try {
       setUploading(true);
-      console.log('Starting image upload...');
+      console.log('=== STARTING IMAGE UPLOAD ===');
+      console.log('User ID:', user.id);
+      console.log('Image URI:', uri);
       
       const response = await fetch(uri);
       const blob = await response.blob();
@@ -360,14 +370,14 @@ export default function EmployeeProfileScreen() {
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      console.log('Uploading to profile-pictures bucket:', filePath);
+      console.log('Uploading to profile-pictures bucket with path:', filePath);
 
       // Upload to the correct bucket: profile-pictures
-      const { error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('profile-pictures')
         .upload(filePath, arrayBuffer, {
           contentType: `image/${fileExt}`,
-          upsert: false,
+          upsert: true, // Changed to true to allow overwriting
         });
 
       if (uploadError) {
@@ -375,33 +385,59 @@ export default function EmployeeProfileScreen() {
         throw uploadError;
       }
 
-      console.log('Image uploaded successfully, getting public URL...');
+      console.log('Upload successful:', uploadData);
 
       // Get public URL from the correct bucket
       const { data: { publicUrl } } = supabase.storage
         .from('profile-pictures')
         .getPublicUrl(filePath);
 
-      console.log('Public URL:', publicUrl);
+      console.log('Generated public URL:', publicUrl);
 
-      // Update user profile with new image URL
+      // CRITICAL FIX: Update user profile with new image URL and use .select() to get the updated data
+      console.log('Updating users table with profile_picture_url:', publicUrl);
+      
       const { data: updateData, error: updateError } = await supabase
         .from('users')
         .update({ profile_picture_url: publicUrl })
         .eq('id', user.id)
-        .select();
+        .select('profile_picture_url')
+        .single();
 
       if (updateError) {
-        console.error('Update error:', updateError);
+        console.error('Database update error:', updateError);
         throw updateError;
       }
 
-      console.log('Profile updated successfully:', updateData);
+      console.log('Database update successful. Returned data:', updateData);
 
-      setProfilePictureUrl(publicUrl);
+      // Verify the update by fetching the data again
+      const { data: verifyData, error: verifyError } = await supabase
+        .from('users')
+        .select('profile_picture_url')
+        .eq('id', user.id)
+        .single();
+
+      if (verifyError) {
+        console.error('Verification error:', verifyError);
+      } else {
+        console.log('Verification: profile_picture_url in database is now:', verifyData.profile_picture_url);
+      }
+
+      // Update local state with the URL from the database response
+      if (updateData && updateData.profile_picture_url) {
+        console.log('Setting local state to:', updateData.profile_picture_url);
+        setProfilePictureUrl(updateData.profile_picture_url);
+      } else {
+        console.log('Setting local state to generated URL:', publicUrl);
+        setProfilePictureUrl(publicUrl);
+      }
+
+      console.log('=== IMAGE UPLOAD COMPLETE ===');
       Alert.alert('Success', 'Profile picture updated successfully!');
     } catch (error: any) {
-      console.error('Error uploading image:', error);
+      console.error('=== IMAGE UPLOAD FAILED ===');
+      console.error('Error details:', error);
       Alert.alert('Error', `Failed to upload profile picture: ${error.message}`);
     } finally {
       setUploading(false);
@@ -423,7 +459,8 @@ export default function EmployeeProfileScreen() {
           phone_number: editedPhoneNumber,
         })
         .eq('id', user.id)
-        .select();
+        .select('email, phone_number')
+        .single();
 
       if (error) {
         console.error('Error updating profile:', error);
@@ -432,15 +469,17 @@ export default function EmployeeProfileScreen() {
 
       console.log('Profile update successful:', data);
 
-      // Update local state with the new values
-      setEmail(editedEmail);
-      setPhoneNumber(editedPhoneNumber);
+      // Update local state with the returned values from the database
+      if (data) {
+        setEmail(data.email || editedEmail);
+        setPhoneNumber(data.phone_number || editedPhoneNumber);
+      } else {
+        setEmail(editedEmail);
+        setPhoneNumber(editedPhoneNumber);
+      }
+      
       setIsEditingInfo(false);
-      
       Alert.alert('Success', 'Profile updated successfully!');
-      
-      // Reload profile to ensure we have the latest data
-      await loadProfile();
     } catch (error: any) {
       console.error('Error updating profile:', error);
       Alert.alert('Error', `Failed to update profile: ${error.message}`);
@@ -532,9 +571,17 @@ export default function EmployeeProfileScreen() {
   };
 
   const getProfilePictureUrl = (url: string | null | undefined) => {
-    if (!url) return null;
-    if (url.startsWith('http')) return url;
+    if (!url) {
+      console.log('No profile picture URL provided');
+      return null;
+    }
+    if (url.startsWith('http')) {
+      console.log('Using full URL:', url);
+      return url;
+    }
+    // If it's a relative path, construct the full URL
     const { data } = supabase.storage.from('profile-pictures').getPublicUrl(url);
+    console.log('Constructed public URL:', data.publicUrl);
     return data.publicUrl;
   };
 
@@ -553,6 +600,10 @@ export default function EmployeeProfileScreen() {
     );
   }
 
+  const displayProfilePictureUrl = getProfilePictureUrl(profilePictureUrl);
+  console.log('Rendering with profile picture URL:', profilePictureUrl);
+  console.log('Display URL:', displayProfilePictureUrl);
+
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
@@ -561,8 +612,8 @@ export default function EmployeeProfileScreen() {
           <View style={styles.profileImageContainer}>
             <Image
               source={
-                getProfilePictureUrl(profilePictureUrl)
-                  ? { uri: getProfilePictureUrl(profilePictureUrl)! }
+                displayProfilePictureUrl
+                  ? { uri: displayProfilePictureUrl }
                   : require('@/assets/images/final_quest_240x240.png')
               }
               style={styles.profileImage}
