@@ -351,38 +351,58 @@ export default function ManagerProfileScreen() {
 
     try {
       setUploading(true);
+      console.log('Starting image upload...');
+      
       const response = await fetch(uri);
       const blob = await response.blob();
       const arrayBuffer = await new Response(blob).arrayBuffer();
       const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `profile-pictures/${fileName}`;
+      const filePath = `${fileName}`;
 
+      console.log('Uploading to profile-pictures bucket:', filePath);
+
+      // Upload to the correct bucket: profile-pictures
       const { error: uploadError } = await supabase.storage
-        .from('app-images')
+        .from('profile-pictures')
         .upload(filePath, arrayBuffer, {
           contentType: `image/${fileExt}`,
           upsert: false,
         });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        throw uploadError;
+      }
 
+      console.log('Image uploaded successfully, getting public URL...');
+
+      // Get public URL from the correct bucket
       const { data: { publicUrl } } = supabase.storage
-        .from('app-images')
+        .from('profile-pictures')
         .getPublicUrl(filePath);
 
-      const { error: updateError } = await supabase
+      console.log('Public URL:', publicUrl);
+
+      // Update user profile with new image URL
+      const { data: updateData, error: updateError } = await supabase
         .from('users')
         .update({ profile_picture_url: publicUrl })
-        .eq('id', user.id);
+        .eq('id', user.id)
+        .select();
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error('Update error:', updateError);
+        throw updateError;
+      }
+
+      console.log('Profile updated successfully:', updateData);
 
       setProfilePictureUrl(publicUrl);
       Alert.alert('Success', 'Profile picture updated successfully!');
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload profile picture. Please try again.');
+      Alert.alert('Error', `Failed to upload profile picture: ${error.message}`);
     } finally {
       setUploading(false);
     }
@@ -393,6 +413,7 @@ export default function ManagerProfileScreen() {
 
     try {
       setSaving(true);
+      console.log('Saving profile changes...', { email: editedEmail, phone: editedPhoneNumber });
       
       // Update the users table with the new email and phone number
       const { data, error } = await supabase
@@ -447,6 +468,7 @@ export default function ManagerProfileScreen() {
 
     try {
       setSaving(true);
+      console.log('Checking for active session...');
       
       // Get the current session first
       const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
@@ -512,7 +534,7 @@ export default function ManagerProfileScreen() {
   const getProfilePictureUrl = (url: string | null | undefined) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
-    const { data } = supabase.storage.from('app-images').getPublicUrl(url);
+    const { data } = supabase.storage.from('profile-pictures').getPublicUrl(url);
     return data.publicUrl;
   };
 
