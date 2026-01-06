@@ -410,7 +410,14 @@ export default function SignatureRecipesEditorScreen() {
         .order('display_order', { ascending: true });
 
       if (error) throw error;
-      setRecipes(data || []);
+      
+      // Ensure ingredients is always an array
+      const recipesWithIngredients = (data || []).map(recipe => ({
+        ...recipe,
+        ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : []
+      }));
+      
+      setRecipes(recipesWithIngredients);
     } catch (error) {
       console.error('Error loading recipes:', error);
       Alert.alert('Error', 'Failed to load recipes');
@@ -439,11 +446,11 @@ export default function SignatureRecipesEditorScreen() {
           recipe.name.toLowerCase().includes(query) ||
           recipe.subcategory?.toLowerCase().includes(query) ||
           recipe.glassware?.toLowerCase().includes(query) ||
-          recipe.ingredients.some(
+          (Array.isArray(recipe.ingredients) && recipe.ingredients.some(
             (ing) =>
               ing.ingredient.toLowerCase().includes(query) ||
               ing.amount.toLowerCase().includes(query)
-          )
+          ))
       );
     }
 
@@ -634,7 +641,11 @@ export default function SignatureRecipesEditorScreen() {
     setPrice(recipe.price);
     setSubcategory(recipe.subcategory || '');
     setGlassware(recipe.glassware || '');
-    setIngredients(recipe.ingredients.length > 0 ? recipe.ingredients : [{ ingredient: '', amount: '' }]);
+    // Ensure ingredients is always an array
+    const recipeIngredients = Array.isArray(recipe.ingredients) && recipe.ingredients.length > 0 
+      ? recipe.ingredients 
+      : [{ ingredient: '', amount: '' }];
+    setIngredients(recipeIngredients);
     setProcedure(recipe.procedure || '');
     setThumbnailUrl(recipe.thumbnail_url);
     setShowModal(true);
@@ -800,7 +811,7 @@ export default function SignatureRecipesEditorScreen() {
                 {recipe.glassware && (
                   <Text style={styles.recipeGlassware}>Glassware: {recipe.glassware}</Text>
                 )}
-                {recipe.ingredients.length > 0 && (
+                {Array.isArray(recipe.ingredients) && recipe.ingredients.length > 0 && (
                   <React.Fragment>
                     <Text style={styles.ingredientsTitle}>Ingredients:</Text>
                     {recipe.ingredients.map((ing, idx) => (

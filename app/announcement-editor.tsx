@@ -1,9 +1,5 @@
 
-import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '@/app/integrations/supabase/client';
-import { useRouter } from 'expo-router';
-import { IconSymbol } from '@/components/IconSymbol';
-import * as FileSystem from 'expo-file-system';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,9 +14,14 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { managerColors } from '@/styles/commonStyles';
+import { IconSymbol } from '@/components/IconSymbol';
+import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import React, { useState, useEffect, useCallback } from 'react';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface Announcement {
   id: string;
@@ -38,392 +39,263 @@ interface Announcement {
   guide_file_id: string | null;
 }
 
-const PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
-const VISIBILITIES = ['All', 'Employees Only', 'Managers Only'];
+interface GuideFile {
+  id: string;
+  title: string;
+  category: string;
+  file_name: string;
+}
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: managerColors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'ios' ? 60 : 40,
-    paddingBottom: 15,
-    backgroundColor: managerColors.primary,
-    borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    flex: 1,
-    textAlign: 'center',
-  },
-  backButton: {
-    padding: 8,
-  },
-  addButton: {
-    padding: 8,
-  },
-  scrollContent: {
-    padding: 20,
-  },
-  announcementCard: {
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  cardContent: {
-    flex: 1,
-    marginRight: 12,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    marginBottom: 6,
-  },
-  cardDescription: {
-    fontSize: 13,
-    color: managerColors.textSecondary,
-    marginBottom: 8,
-    lineHeight: 18,
-  },
-  cardMeta: {
-    fontSize: 12,
-    color: managerColors.textSecondary,
-    marginBottom: 3,
-  },
-  thumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    backgroundColor: managerColors.border,
-  },
-  cardActions: {
-    flexDirection: 'row',
-    marginTop: 8,
-    gap: 8,
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: managerColors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 4,
-  },
-  deleteButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#DC2626',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 4,
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  priorityBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-    alignSelf: 'flex-start',
-    marginBottom: 6,
-  },
-  priorityText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 16,
-    color: managerColors.textSecondary,
-    marginTop: 12,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    marginBottom: 20,
-    textAlign: 'center',
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: managerColors.text,
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  input: {
-    backgroundColor: managerColors.background,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
-    color: managerColors.text,
-    marginBottom: 12,
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  pickerContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 12,
-  },
-  pickerOption: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-    backgroundColor: managerColors.background,
-  },
-  pickerOptionSelected: {
-    backgroundColor: managerColors.primary,
-    borderColor: managerColors.primary,
-  },
-  pickerOptionText: {
-    fontSize: 14,
-    color: managerColors.text,
-  },
-  pickerOptionTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  imagePickerButton: {
-    backgroundColor: managerColors.primary,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  imagePickerText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  selectedImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-  },
-  modalButton: {
-    flex: 1,
-    padding: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  saveButton: {
-    backgroundColor: managerColors.primary,
-  },
-  cancelButton: {
-    backgroundColor: managerColors.textSecondary,
-  },
-  modalButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
+const PRIORITY_LEVELS = ['high', 'medium', 'low'];
+const VISIBILITY_OPTIONS = ['everyone', 'employees', 'managers'];
+const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
 
 export default function AnnouncementEditorScreen() {
-  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [message, setMessage] = useState('');
-  const [priority, setPriority] = useState('Medium');
-  const [visibility, setVisibility] = useState('All');
-  const [displayOrder, setDisplayOrder] = useState('0');
-  const [isActive, setIsActive] = useState(true);
-  const [thumbnailUri, setThumbnailUri] = useState<string | null>(null);
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-
-  const { user } = useAuth();
   const router = useRouter();
+  const { user } = useAuth();
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  const [selectedGuideFile, setSelectedGuideFile] = useState<GuideFile | null>(null);
+  const [fileSearchQuery, setFileSearchQuery] = useState('');
+  const [showFileSection, setShowFileSection] = useState(false);
 
-  const loadAnnouncements = useCallback(async () => {
+  // Form state
+  const [formData, setFormData] = useState({
+    title: '',
+    message: '',
+    priority: 'medium',
+    visibility: 'everyone',
+    thumbnail_shape: 'square',
+    display_order: 0,
+    link: '',
+  });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadAnnouncements();
+    loadGuideFiles();
+  }, []);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Announcement editor screen focused, refreshing data...');
+      loadAnnouncements();
+      loadGuideFiles();
+    }, [])
+  );
+
+  const loadGuideFiles = async () => {
+    try {
+      console.log('Loading guide files from database...');
+      
+      const { data, error } = await supabase
+        .from('guides_and_training')
+        .select('id, title, category, file_name')
+        .in('category', GUIDE_CATEGORIES)
+        .eq('is_active', true)
+        .order('category', { ascending: true })
+        .order('title', { ascending: true });
+
+      if (error) {
+        console.error('Error loading guide files:', error);
+        throw error;
+      }
+      
+      console.log('Guide files loaded successfully:', data?.length || 0, 'items');
+      setGuideFiles(data || []);
+    } catch (error) {
+      console.error('Error loading guide files:', error);
+    }
+  };
+
+  const loadAnnouncements = async () => {
     try {
       setLoading(true);
+      console.log('Loading announcements from database...');
+      
       const { data, error } = await supabase
         .from('announcements')
         .select('*')
         .order('display_order', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading announcements:', error);
+        throw error;
+      }
+      
+      console.log('Announcements loaded successfully:', data?.length || 0, 'items');
+      console.log('Announcement data:', JSON.stringify(data, null, 2));
       setAnnouncements(data || []);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error loading announcements:', error);
-      Alert.alert('Error', 'Failed to load announcements');
+      Alert.alert('Error', 'Failed to load announcements. Please try again.');
     } finally {
       setLoading(false);
     }
-  }, []);
-
-  useEffect(() => {
-    loadAnnouncements();
-  }, [loadAnnouncements]);
+  };
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: formData.thumbnail_shape === 'square' ? [1, 1] : [16, 9],
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets[0]) {
-      setThumbnailUri(result.assets[0].uri);
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImageUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
     }
   };
 
   const uploadImage = async (uri: string): Promise<string | null> => {
     try {
+      setUploadingImage(true);
+      console.log('Starting image upload for announcement');
+
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
-      const arrayBuffer = decode(base64);
-      const fileName = `announcement-${Date.now()}.jpg`;
+
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+
+      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${Date.now()}.${ext}`;
+
+      console.log('Uploading image:', fileName);
+
+      let contentType = 'image/jpeg';
+      if (ext === 'png') contentType = 'image/png';
+      else if (ext === 'gif') contentType = 'image/gif';
+      else if (ext === 'webp') contentType = 'image/webp';
 
       const { data, error } = await supabase.storage
-        .from('announcement-images')
-        .upload(fileName, arrayBuffer, {
-          contentType: 'image/jpeg',
+        .from('announcements')
+        .upload(fileName, byteArray, {
+          contentType: contentType,
           upsert: false,
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error uploading image:', error);
+        throw error;
+      }
+
+      console.log('Upload successful:', data);
 
       const { data: urlData } = supabase.storage
-        .from('announcement-images')
-        .getPublicUrl(data.path);
+        .from('announcements')
+        .getPublicUrl(fileName);
+
+      console.log('Public URL:', urlData.publicUrl);
 
       return urlData.publicUrl;
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error uploading image:', error);
       Alert.alert('Error', 'Failed to upload image');
       return null;
+    } finally {
+      setUploadingImage(false);
     }
-  };
-
-  const decode = (base64: string): ArrayBuffer => {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes.buffer;
   };
 
   const handleSave = async () => {
-    if (!title.trim() || !content.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields');
+    if (!formData.title || !formData.message) {
+      Alert.alert('Error', 'Please fill in title and message');
+      return;
+    }
+
+    if (!user?.id) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+
+    if (!editingAnnouncement && announcements.length >= 10) {
+      Alert.alert('Limit Reached', 'You can only have up to 10 announcements. Please delete an existing announcement before adding a new one.');
       return;
     }
 
     try {
-      setSaving(true);
-      let finalThumbnailUrl = thumbnailUrl;
+      let thumbnailUrl = editingAnnouncement?.thumbnail_url || null;
 
-      if (thumbnailUri && thumbnailUri !== thumbnailUrl) {
-        const uploadedUrl = await uploadImage(thumbnailUri);
+      if (selectedImageUri) {
+        const uploadedUrl = await uploadImage(selectedImageUri);
         if (uploadedUrl) {
-          finalThumbnailUrl = uploadedUrl;
+          thumbnailUrl = uploadedUrl;
+          console.log('New thumbnail URL:', thumbnailUrl);
         }
       }
 
-      const announcementData = {
-        title: title.trim(),
-        content: content.trim(),
-        message: message.trim() || null,
-        thumbnail_url: finalThumbnailUrl,
-        thumbnail_shape: 'square',
-        priority,
-        visibility,
-        display_order: parseInt(displayOrder) || 0,
-        is_active: isActive,
-      };
+      const linkValue = formData.link.trim() || null;
+      const guideFileId = selectedGuideFile?.id || null;
 
-      if (editingId) {
-        const { error } = await supabase
-          .from('announcements')
-          .update(announcementData)
-          .eq('id', editingId);
+      if (editingAnnouncement) {
+        console.log('Updating announcement:', editingAnnouncement.id);
+        const { error } = await supabase.rpc('update_announcement', {
+          p_user_id: user.id,
+          p_announcement_id: editingAnnouncement.id,
+          p_title: formData.title,
+          p_message: formData.message,
+          p_thumbnail_url: thumbnailUrl,
+          p_thumbnail_shape: formData.thumbnail_shape,
+          p_priority: formData.priority,
+          p_visibility: formData.visibility,
+          p_display_order: formData.display_order,
+          p_link: linkValue,
+          p_guide_file_id: guideFileId,
+        });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating announcement:', error);
+          throw error;
+        }
+        console.log('Announcement updated successfully');
         Alert.alert('Success', 'Announcement updated successfully');
       } else {
-        const { error } = await supabase
-          .from('announcements')
-          .insert([announcementData]);
+        console.log('Creating new announcement');
+        const { error } = await supabase.rpc('create_announcement', {
+          p_user_id: user.id,
+          p_title: formData.title,
+          p_message: formData.message,
+          p_thumbnail_url: thumbnailUrl,
+          p_thumbnail_shape: formData.thumbnail_shape,
+          p_priority: formData.priority,
+          p_visibility: formData.visibility,
+          p_display_order: formData.display_order,
+          p_link: linkValue,
+          p_guide_file_id: guideFileId,
+        });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error creating announcement:', error);
+          throw error;
+        }
+        console.log('Announcement created successfully');
         Alert.alert('Success', 'Announcement created successfully');
       }
 
       closeModal();
-      loadAnnouncements();
+      await loadAnnouncements();
     } catch (error: any) {
       console.error('Error saving announcement:', error);
       Alert.alert('Error', error.message || 'Failed to save announcement');
-    } finally {
-      setSaving(false);
     }
   };
 
-  const handleDelete = (announcement: Announcement) => {
+  const handleDelete = async (announcement: Announcement) => {
     Alert.alert(
       'Delete Announcement',
       `Are you sure you want to delete "${announcement.title}"?`,
@@ -434,17 +306,39 @@ export default function AnnouncementEditorScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const { error } = await supabase
-                .from('announcements')
-                .delete()
-                .eq('id', announcement.id);
+              if (!user?.id) {
+                Alert.alert('Error', 'User not authenticated');
+                return;
+              }
 
-              if (error) throw error;
+              console.log('Deleting announcement:', announcement.id);
+              
+              const { error } = await supabase.rpc('delete_announcement', {
+                p_user_id: user.id,
+                p_announcement_id: announcement.id,
+              });
+
+              if (error) {
+                console.error('Error deleting announcement:', error);
+                throw error;
+              }
+
+              if (announcement.thumbnail_url) {
+                const fileName = announcement.thumbnail_url.split('/').pop();
+                if (fileName) {
+                  await supabase.storage
+                    .from('announcements')
+                    .remove([fileName]);
+                }
+              }
+
+              console.log('Announcement deleted successfully');
               Alert.alert('Success', 'Announcement deleted successfully');
-              loadAnnouncements();
+              
+              await loadAnnouncements();
             } catch (error: any) {
               console.error('Error deleting announcement:', error);
-              Alert.alert('Error', 'Failed to delete announcement');
+              Alert.alert('Error', error.message || 'Failed to delete announcement');
             }
           },
         },
@@ -453,257 +347,643 @@ export default function AnnouncementEditorScreen() {
   };
 
   const openAddModal = () => {
-    resetForm();
-    setModalVisible(true);
+    setEditingAnnouncement(null);
+    setFormData({
+      title: '',
+      message: '',
+      priority: 'medium',
+      visibility: 'everyone',
+      thumbnail_shape: 'square',
+      display_order: announcements.length,
+      link: '',
+    });
+    setSelectedImageUri(null);
+    setSelectedGuideFile(null);
+    setFileSearchQuery('');
+    setShowFileSection(false);
+    setShowAddModal(true);
   };
 
-  const openEditModal = (announcement: Announcement) => {
-    setEditingId(announcement.id);
-    setTitle(announcement.title);
-    setContent(announcement.content);
-    setMessage(announcement.message || '');
-    setPriority(announcement.priority);
-    setVisibility(announcement.visibility);
-    setDisplayOrder(announcement.display_order.toString());
-    setIsActive(announcement.is_active);
-    setThumbnailUrl(announcement.thumbnail_url);
-    setThumbnailUri(announcement.thumbnail_url);
-    setModalVisible(true);
+  const openEditModal = async (announcement: Announcement) => {
+    setEditingAnnouncement(announcement);
+    setFormData({
+      title: announcement.title,
+      message: announcement.content || announcement.message || '',
+      priority: announcement.priority,
+      visibility: announcement.visibility,
+      thumbnail_shape: announcement.thumbnail_shape,
+      display_order: announcement.display_order,
+      link: announcement.link || '',
+    });
+    setSelectedImageUri(null);
+    
+    // Load the attached guide file if exists
+    if (announcement.guide_file_id) {
+      const guideFile = guideFiles.find(g => g.id === announcement.guide_file_id);
+      setSelectedGuideFile(guideFile || null);
+    } else {
+      setSelectedGuideFile(null);
+    }
+    
+    setFileSearchQuery('');
+    setShowFileSection(false);
+    setShowAddModal(true);
   };
 
   const closeModal = () => {
-    setModalVisible(false);
-    resetForm();
+    setShowAddModal(false);
+    setEditingAnnouncement(null);
+    setSelectedImageUri(null);
+    setSelectedGuideFile(null);
+    setFileSearchQuery('');
+    setShowFileSection(false);
   };
 
-  const resetForm = () => {
-    setEditingId(null);
-    setTitle('');
-    setContent('');
-    setMessage('');
-    setPriority('Medium');
-    setVisibility('All');
-    setDisplayOrder('0');
-    setIsActive(true);
-    setThumbnailUri(null);
-    setThumbnailUrl(null);
+  const selectGuideFile = (file: GuideFile) => {
+    setSelectedGuideFile(file);
+    setShowFileSection(false);
+  };
+
+  const clearGuideFile = () => {
+    setSelectedGuideFile(null);
   };
 
   const handleBackPress = () => {
-    router.back();
+    router.replace('/(portal)/manager/manage');
+  };
+
+  const getImageUrl = (url: string | null) => {
+    if (!url) return null;
+    return `${url}?t=${Date.now()}`;
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'Urgent':
-        return '#DC2626';
-      case 'High':
-        return '#EA580C';
-      case 'Medium':
-        return '#CA8A04';
-      case 'Low':
-        return '#16A34A';
+      case 'high':
+        return '#E74C3C';
+      case 'medium':
+        return '#F39C12';
+      case 'low':
+        return '#3498DB';
       default:
         return managerColors.textSecondary;
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={managerColors.primary} />
-      </View>
-    );
-  }
+  const getVisibilityIcon = (visibility: string) => {
+    switch (visibility) {
+      case 'employees':
+        return 'person';
+      case 'managers':
+        return 'person.2';
+      case 'everyone':
+        return 'person.3';
+      default:
+        return 'person.3';
+    }
+  };
+
+  const filteredGuideFiles = guideFiles.filter(file =>
+    file.title.toLowerCase().includes(fileSearchQuery.toLowerCase()) ||
+    file.category.toLowerCase().includes(fileSearchQuery.toLowerCase()) ||
+    file.file_name.toLowerCase().includes(fileSearchQuery.toLowerCase())
+  );
+
+  const groupedGuideFiles = GUIDE_CATEGORIES.reduce((acc, category) => {
+    acc[category] = filteredGuideFiles.filter(f => f.category === category);
+    return acc;
+  }, {} as Record<string, GuideFile[]>);
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-          <IconSymbol name="chevron.left" size={24} color="#FFFFFF" />
+          <IconSymbol
+            ios_icon_name="chevron.left"
+            android_material_icon_name="arrow_back"
+            size={24}
+            color={managerColors.text}
+          />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Announcements Editor</Text>
-        <TouchableOpacity onPress={openAddModal} style={styles.addButton}>
-          <IconSymbol name="plus" size={24} color="#FFFFFF" />
-        </TouchableOpacity>
+        <View style={styles.backButton} />
       </View>
 
-      <ScrollView style={styles.scrollContent}>
-        {announcements.length === 0 ? (
-          <View style={styles.emptyState}>
-            <IconSymbol name="megaphone" size={48} color={managerColors.textSecondary} />
-            <Text style={styles.emptyText}>No announcements yet</Text>
-          </View>
-        ) : (
-          announcements.map((announcement) => (
-            <View key={announcement.id} style={styles.announcementCard}>
-              <View style={styles.cardContent}>
-                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
-                  <Text style={styles.priorityText}>{announcement.priority}</Text>
-                </View>
-                <Text style={styles.cardTitle}>{announcement.title}</Text>
-                <Text style={styles.cardDescription} numberOfLines={2}>
-                  {announcement.content}
-                </Text>
-                <Text style={styles.cardMeta}>Display Order: {announcement.display_order}</Text>
-                <Text style={styles.cardMeta}>Visibility: {announcement.visibility}</Text>
-                
-                <View style={styles.cardActions}>
+      <View style={styles.subHeader}>
+        <Text style={styles.headerSubtitle}>
+          {announcements.length} / 10 announcements
+        </Text>
+      </View>
+
+      <TouchableOpacity 
+        style={[styles.addNewItemButton, announcements.length >= 10 && styles.addNewItemButtonDisabled]} 
+        onPress={openAddModal}
+        disabled={announcements.length >= 10}
+      >
+        <IconSymbol
+          ios_icon_name="plus.circle.fill"
+          android_material_icon_name="add_circle"
+          size={24}
+          color={announcements.length >= 10 ? managerColors.textSecondary : managerColors.text}
+        />
+        <Text style={[styles.addNewItemButtonText, announcements.length >= 10 && styles.addNewItemButtonTextDisabled]}>
+          {announcements.length >= 10 ? 'Limit Reached (10/10)' : 'Add New Announcement'}
+        </Text>
+      </TouchableOpacity>
+
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={managerColors.highlight} />
+          <Text style={styles.loadingText}>Loading announcements...</Text>
+        </View>
+      ) : (
+        <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
+          {announcements.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <IconSymbol
+                ios_icon_name="plus.cirlce"
+                android_material_icon_name="campaign"
+                size={64}
+                color={managerColors.textSecondary}
+              />
+              <Text style={styles.emptyText}>No announcements found</Text>
+              <Text style={styles.emptySubtext}>
+                Tap the &quot;Add New Announcement&quot; button to create one
+              </Text>
+            </View>
+          ) : (
+            announcements.map((announcement, index) => (
+              <View key={index} style={styles.announcementCard}>
+                {announcement.thumbnail_shape === 'square' && announcement.thumbnail_url ? (
+                  <View style={styles.squareLayout}>
+                    <Image
+                      key={getImageUrl(announcement.thumbnail_url)}
+                      source={{ uri: getImageUrl(announcement.thumbnail_url) }}
+                      style={styles.squareImage}
+                    />
+                    <View style={styles.squareContent}>
+                      <View style={styles.announcementHeader}>
+                        <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                        <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
+                          <Text style={styles.priorityText}>{announcement.priority.toUpperCase()}</Text>
+                        </View>
+                      </View>
+                      {(announcement.content || announcement.message) && (
+                        <Text style={styles.squareMessage} numberOfLines={2}>
+                          {announcement.content || announcement.message}
+                        </Text>
+                      )}
+                      <View style={styles.announcementMeta}>
+                        <View style={styles.metaItem}>
+                          <IconSymbol
+                            ios_icon_name={getVisibilityIcon(announcement.visibility)}
+                            android_material_icon_name="visibility"
+                            size={16}
+                            color={managerColors.textSecondary}
+                          />
+                          <Text style={styles.metaText}>{announcement.visibility}</Text>
+                        </View>
+                        <View style={styles.metaItem}>
+                          <Text style={styles.metaText}>Order: {announcement.display_order}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    {announcement.thumbnail_url && (
+                      <Image
+                        key={getImageUrl(announcement.thumbnail_url)}
+                        source={{ uri: getImageUrl(announcement.thumbnail_url) }}
+                        style={styles.bannerImage}
+                      />
+                    )}
+                    <View style={styles.announcementContent}>
+                      <View style={styles.announcementHeader}>
+                        <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                        <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
+                          <Text style={styles.priorityText}>{announcement.priority.toUpperCase()}</Text>
+                        </View>
+                      </View>
+                      {(announcement.content || announcement.message) && (
+                        <Text style={styles.announcementMessage}>
+                          {announcement.content || announcement.message}
+                        </Text>
+                      )}
+                      <View style={styles.announcementMeta}>
+                        <View style={styles.metaItem}>
+                          <IconSymbol
+                            ios_icon_name={getVisibilityIcon(announcement.visibility)}
+                            android_material_icon_name="visibility"
+                            size={16}
+                            color={managerColors.textSecondary}
+                          />
+                          <Text style={styles.metaText}>{announcement.visibility}</Text>
+                        </View>
+                        <View style={styles.metaItem}>
+                          <Text style={styles.metaText}>Order: {announcement.display_order}</Text>
+                        </View>
+                      </View>
+                    </View>
+                  </>
+                )}
+                <View style={styles.announcementActions}>
                   <TouchableOpacity
-                    style={styles.editButton}
+                    style={styles.actionButton}
                     onPress={() => openEditModal(announcement)}
                   >
-                    <IconSymbol name="pencil" size={14} color="#FFFFFF" />
-                    <Text style={styles.buttonText}>Edit</Text>
+                    <IconSymbol
+                      ios_icon_name="pencil"
+                      android_material_icon_name="edit"
+                      size={20}
+                      color={managerColors.highlight}
+                    />
+                    <Text style={styles.actionButtonText}>Edit</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.deleteButton}
+                    style={[styles.actionButton, styles.deleteButton]}
                     onPress={() => handleDelete(announcement)}
                   >
-                    <IconSymbol name="trash" size={14} color="#FFFFFF" />
-                    <Text style={styles.buttonText}>Delete</Text>
+                    <IconSymbol
+                      ios_icon_name="trash"
+                      android_material_icon_name="delete"
+                      size={20}
+                      color="#E74C3C"
+                    />
+                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
+                      Delete
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
-              
-              {announcement.thumbnail_url && (
-                <Image
-                  source={{ uri: announcement.thumbnail_url }}
-                  style={styles.thumbnail}
-                  resizeMode="cover"
-                />
-              )}
-            </View>
-          ))
-        )}
-      </ScrollView>
+            ))
+          )}
+        </ScrollView>
+      )}
 
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      {/* Add/Edit Modal */}
+      <Modal
+        visible={showAddModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeModal}
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
+          style={styles.modalContainer}
+          keyboardVerticalOffset={0}
         >
+          <TouchableOpacity 
+            style={styles.modalBackdrop} 
+            activeOpacity={1} 
+            onPress={closeModal}
+          />
           <View style={styles.modalContent}>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingId ? 'Edit Announcement' : 'New Announcement'}
+                {editingAnnouncement ? 'Edit Announcement' : 'Add Announcement'}
               </Text>
-
-              <Text style={styles.label}>Title *</Text>
-              <TextInput
-                style={styles.input}
-                value={title}
-                onChangeText={setTitle}
-                placeholder="Enter title"
-                placeholderTextColor={managerColors.textSecondary}
-              />
-
-              <Text style={styles.label}>Content *</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={content}
-                onChangeText={setContent}
-                placeholder="Enter content"
-                placeholderTextColor={managerColors.textSecondary}
-                multiline
-              />
-
-              <Text style={styles.label}>Short Message (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                value={message}
-                onChangeText={setMessage}
-                placeholder="Enter short message"
-                placeholderTextColor={managerColors.textSecondary}
-              />
-
-              <Text style={styles.label}>Priority</Text>
-              <View style={styles.pickerContainer}>
-                {PRIORITIES.map((p) => (
-                  <TouchableOpacity
-                    key={p}
-                    style={[
-                      styles.pickerOption,
-                      priority === p && styles.pickerOptionSelected,
-                    ]}
-                    onPress={() => setPriority(p)}
-                  >
-                    <Text
-                      style={[
-                        styles.pickerOptionText,
-                        priority === p && styles.pickerOptionTextSelected,
-                      ]}
-                    >
-                      {p}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={styles.label}>Visibility</Text>
-              <View style={styles.pickerContainer}>
-                {VISIBILITIES.map((v) => (
-                  <TouchableOpacity
-                    key={v}
-                    style={[
-                      styles.pickerOption,
-                      visibility === v && styles.pickerOptionSelected,
-                    ]}
-                    onPress={() => setVisibility(v)}
-                  >
-                    <Text
-                      style={[
-                        styles.pickerOptionText,
-                        visibility === v && styles.pickerOptionTextSelected,
-                      ]}
-                    >
-                      {v}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <Text style={styles.label}>Display Order</Text>
-              <TextInput
-                style={styles.input}
-                value={displayOrder}
-                onChangeText={setDisplayOrder}
-                placeholder="0"
-                placeholderTextColor={managerColors.textSecondary}
-                keyboardType="numeric"
-              />
-
-              <Text style={styles.label}>Thumbnail Image</Text>
-              <TouchableOpacity style={styles.imagePickerButton} onPress={pickImage}>
-                <Text style={styles.imagePickerText}>
-                  {thumbnailUri ? 'Change Image' : 'Select Image'}
-                </Text>
+              <TouchableOpacity onPress={closeModal}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color="#666666"
+                />
               </TouchableOpacity>
+            </View>
 
-              {thumbnailUri && (
-                <Image source={{ uri: thumbnailUri }} style={styles.selectedImage} />
-              )}
-
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.cancelButton]}
-                  onPress={closeModal}
-                  disabled={saving}
-                >
-                  <Text style={styles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.modalButton, styles.saveButton]}
-                  onPress={handleSave}
-                  disabled={saving}
-                >
-                  {saving ? (
-                    <ActivityIndicator color="#FFFFFF" />
+            <ScrollView 
+              style={styles.modalScroll} 
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={true}
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Thumbnail Image (Optional)</Text>
+                <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
+                  {selectedImageUri || editingAnnouncement?.thumbnail_url ? (
+                    <Image
+                      source={{ uri: selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '') || '' }}
+                      style={styles.uploadedImage}
+                      key={selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '')}
+                    />
                   ) : (
-                    <Text style={styles.modalButtonText}>Save</Text>
+                    <View style={styles.imageUploadPlaceholder}>
+                      <IconSymbol
+                        ios_icon_name="photo"
+                        android_material_icon_name="add_photo_alternate"
+                        size={48}
+                        color="#666666"
+                      />
+                      <Text style={styles.imageUploadText}>Tap to upload image</Text>
+                    </View>
                   )}
                 </TouchableOpacity>
+                
+                <View style={styles.shapeSelector}>
+                  <TouchableOpacity
+                    style={[
+                      styles.shapeOption,
+                      formData.thumbnail_shape === 'square' && styles.shapeOptionActive,
+                    ]}
+                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
+                  >
+                    <Text
+                      style={[
+                        styles.shapeOptionText,
+                        formData.thumbnail_shape === 'square' && styles.shapeOptionTextActive,
+                      ]}
+                    >
+                      Square
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.shapeOption,
+                      formData.thumbnail_shape === 'banner' && styles.shapeOptionActive,
+                    ]}
+                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
+                  >
+                    <Text
+                      style={[
+                        styles.shapeOptionText,
+                        formData.thumbnail_shape === 'banner' && styles.shapeOptionTextActive,
+                      ]}
+                    >
+                      Banner
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Announcement Title *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter announcement title"
+                  placeholderTextColor="#999999"
+                  value={formData.title}
+                  onChangeText={(text) => setFormData({ ...formData, title: text })}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Message *</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Enter announcement message"
+                  placeholderTextColor="#999999"
+                  value={formData.message}
+                  onChangeText={(text) => setFormData({ ...formData, message: text })}
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Link (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter link URL (e.g., https://example.com)"
+                  placeholderTextColor="#999999"
+                  value={formData.link}
+                  onChangeText={(text) => setFormData({ ...formData, link: text })}
+                  autoCapitalize="none"
+                  keyboardType="url"
+                />
+                <Text style={styles.formHint}>
+                  This link will be displayed in the full announcement view and &quot;View All&quot; page
+                </Text>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Attach File from Guides & Training (Optional)</Text>
+                
+                {selectedGuideFile ? (
+                  <View style={styles.selectedFileContainer}>
+                    <View style={styles.selectedFileInfo}>
+                      <IconSymbol
+                        ios_icon_name="doc.fill"
+                        android_material_icon_name="description"
+                        size={24}
+                        color={managerColors.highlight}
+                      />
+                      <View style={styles.selectedFileText}>
+                        <Text style={styles.selectedFileTitle}>{selectedGuideFile.title}</Text>
+                        <Text style={styles.selectedFileCategory}>{selectedGuideFile.category}</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity onPress={clearGuideFile} style={styles.clearFileButton}>
+                      <IconSymbol
+                        ios_icon_name="xmark.circle.fill"
+                        android_material_icon_name="cancel"
+                        size={24}
+                        color="#E74C3C"
+                      />
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <TouchableOpacity 
+                    style={styles.filePickerButton} 
+                    onPress={() => setShowFileSection(!showFileSection)}
+                  >
+                    <IconSymbol
+                      ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
+                      android_material_icon_name={showFileSection ? "expand_less" : "expand_more"}
+                      size={24}
+                      color={managerColors.highlight}
+                    />
+                    <Text style={styles.filePickerButtonText}>
+                      {showFileSection ? 'Hide File Selection' : 'Show File Selection'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
+                {showFileSection && !selectedGuideFile && (
+                  <View style={styles.fileSelectionSection}>
+                    <View style={styles.searchContainer}>
+                      <IconSymbol
+                        ios_icon_name="magnifyingglass"
+                        android_material_icon_name="search"
+                        size={20}
+                        color="#666666"
+                      />
+                      <TextInput
+                        style={styles.searchInput}
+                        placeholder="Search files by name, category..."
+                        placeholderTextColor="#999999"
+                        value={fileSearchQuery}
+                        onChangeText={setFileSearchQuery}
+                      />
+                      {fileSearchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setFileSearchQuery('')}>
+                          <IconSymbol
+                            ios_icon_name="xmark.circle.fill"
+                            android_material_icon_name="cancel"
+                            size={20}
+                            color="#999999"
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+
+                    <ScrollView style={styles.fileList} nestedScrollEnabled={true}>
+                      {GUIDE_CATEGORIES.map((category, catIndex) => {
+                        const categoryFiles = groupedGuideFiles[category];
+                        if (categoryFiles.length === 0) return null;
+
+                        return (
+                          <View key={catIndex} style={styles.fileCategorySection}>
+                            <Text style={styles.fileCategoryTitle}>{category}</Text>
+                            {categoryFiles.map((file, fileIndex) => (
+                              <TouchableOpacity
+                                key={fileIndex}
+                                style={styles.fileItem}
+                                onPress={() => selectGuideFile(file)}
+                              >
+                                <IconSymbol
+                                  ios_icon_name="doc.fill"
+                                  android_material_icon_name="description"
+                                  size={24}
+                                  color={managerColors.highlight}
+                                />
+                                <View style={styles.fileItemText}>
+                                  <Text style={styles.fileItemTitle}>{file.title}</Text>
+                                  <Text style={styles.fileItemName}>{file.file_name}</Text>
+                                </View>
+                                <IconSymbol
+                                  ios_icon_name="chevron.right"
+                                  android_material_icon_name="chevron_right"
+                                  size={20}
+                                  color="#666666"
+                                />
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        );
+                      })}
+
+                      {filteredGuideFiles.length === 0 && (
+                        <View style={styles.emptyFileList}>
+                          <IconSymbol
+                            ios_icon_name="doc"
+                            android_material_icon_name="description"
+                            size={48}
+                            color="#999999"
+                          />
+                          <Text style={styles.emptyFileListText}>No files found</Text>
+                          <Text style={styles.emptyFileListSubtext}>
+                            Try adjusting your search or check if files are uploaded in Guides & Training
+                          </Text>
+                        </View>
+                      )}
+                    </ScrollView>
+                  </View>
+                )}
+
+                <Text style={styles.formHint}>
+                  Attach a file from Guides & Training to display View and Download buttons
+                </Text>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Priority Level</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.optionsScroll}
+                >
+                  {PRIORITY_LEVELS.map((priority, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.optionButton,
+                        formData.priority === priority && styles.optionButtonActive,
+                      ]}
+                      onPress={() => setFormData({ ...formData, priority })}
+                    >
+                      <Text
+                        style={[
+                          styles.optionButtonText,
+                          formData.priority === priority && styles.optionButtonTextActive,
+                        ]}
+                      >
+                        {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Visible To</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.optionsScroll}
+                >
+                  {VISIBILITY_OPTIONS.map((visibility, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.optionButton,
+                        formData.visibility === visibility && styles.optionButtonActive,
+                      ]}
+                      onPress={() => setFormData({ ...formData, visibility })}
+                    >
+                      <Text
+                        style={[
+                          styles.optionButtonText,
+                          formData.visibility === visibility && styles.optionButtonTextActive,
+                        ]}
+                      >
+                        {visibility.charAt(0).toUpperCase() + visibility.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Display Order</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter display order (e.g., 1, 2, 3...)"
+                  placeholderTextColor="#999999"
+                  value={formData.display_order.toString()}
+                  onChangeText={(text) => {
+                    const num = parseInt(text) || 0;
+                    setFormData({ ...formData, display_order: num });
+                  }}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.formHint}>
+                  Lower numbers appear first. Announcements with the same order are sorted by creation date.
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSave}
+                disabled={uploadingImage}
+              >
+                {uploadingImage ? (
+                  <ActivityIndicator color="#1A1A1A" />
+                ) : (
+                  <Text style={styles.saveButtonText}>
+                    {editingAnnouncement ? 'Update Announcement' : 'Add Announcement'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={closeModal}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -711,3 +991,513 @@ export default function AnnouncementEditorScreen() {
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: managerColors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 48 : 60,
+    paddingBottom: 12,
+    backgroundColor: managerColors.card,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  backButton: {
+    padding: 8,
+    width: 40,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: managerColors.text,
+  },
+  subHeader: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: managerColors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: managerColors.border,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+  },
+  addNewItemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: managerColors.highlight,
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+    gap: 10,
+  },
+  addNewItemButtonDisabled: {
+    backgroundColor: managerColors.card,
+    opacity: 0.6,
+  },
+  addNewItemButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: managerColors.text,
+  },
+  addNewItemButtonTextDisabled: {
+    color: managerColors.textSecondary,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginTop: 12,
+  },
+  itemsList: {
+    flex: 1,
+    marginTop: 16,
+  },
+  itemsListContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 100,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: managerColors.text,
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  announcementCard: {
+    backgroundColor: managerColors.card,
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  squareLayout: {
+    flexDirection: 'row',
+    padding: 12,
+    gap: 12,
+  },
+  squareImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    resizeMode: 'cover',
+  },
+  squareContent: {
+    flex: 1,
+    justifyContent: 'flex-start',
+  },
+  squareMessage: {
+    fontSize: 13,
+    color: managerColors.textSecondary,
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  bannerImage: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
+  },
+  announcementContent: {
+    padding: 16,
+  },
+  announcementHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  announcementTitle: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: managerColors.text,
+    marginRight: 12,
+  },
+  priorityBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  priorityText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  announcementMessage: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  announcementMeta: {
+    flexDirection: 'row',
+    gap: 16,
+    marginTop: 8,
+  },
+  metaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  metaText: {
+    fontSize: 12,
+    color: managerColors.textSecondary,
+  },
+  announcementActions: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: managerColors.border,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: managerColors.background,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  deleteButton: {
+    backgroundColor: '#2C1F1F',
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: managerColors.highlight,
+  },
+  deleteButtonText: {
+    color: '#E74C3C',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-start',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '95%',
+    marginTop: 'auto',
+    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    backgroundColor: '#FFFFFF',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  modalScroll: {
+    flex: 1,
+  },
+  modalScrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  formGroup: {
+    marginBottom: 20,
+  },
+  formLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 8,
+  },
+  formHint: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+  input: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#1A1A1A',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+    paddingTop: 14,
+  },
+  imageUploadButton: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+  },
+  imageUploadPlaceholder: {
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageUploadText: {
+    fontSize: 14,
+    color: '#666666',
+    marginTop: 8,
+  },
+  uploadedImage: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
+  },
+  shapeSelector: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  shapeOption: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+  },
+  shapeOptionActive: {
+    backgroundColor: managerColors.highlight,
+    borderColor: managerColors.highlight,
+  },
+  shapeOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666666',
+  },
+  shapeOptionTextActive: {
+    color: '#1A1A1A',
+  },
+  selectedFileContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: managerColors.highlight,
+  },
+  selectedFileInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  selectedFileText: {
+    flex: 1,
+  },
+  selectedFileTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  selectedFileCategory: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 2,
+  },
+  clearFileButton: {
+    padding: 4,
+  },
+  filePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+    gap: 8,
+  },
+  filePickerButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: managerColors.highlight,
+  },
+  fileSelectionSection: {
+    marginTop: 12,
+    backgroundColor: '#FAFAFA',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 14,
+    color: '#1A1A1A',
+  },
+  fileList: {
+    maxHeight: 300,
+  },
+  fileCategorySection: {
+    marginBottom: 16,
+  },
+  fileCategoryTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  fileItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 6,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  fileItemText: {
+    flex: 1,
+  },
+  fileItemTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  fileItemName: {
+    fontSize: 11,
+    color: '#666666',
+    marginTop: 2,
+  },
+  emptyFileList: {
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyFileListText: {
+    fontSize: 14,
+    color: '#999999',
+    marginTop: 12,
+    fontWeight: '600',
+  },
+  emptyFileListSubtext: {
+    fontSize: 12,
+    color: '#999999',
+    marginTop: 4,
+    textAlign: 'center',
+    paddingHorizontal: 20,
+  },
+  optionsScroll: {
+    maxHeight: 50,
+  },
+  optionButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  optionButtonActive: {
+    backgroundColor: managerColors.highlight,
+    borderColor: managerColors.highlight,
+  },
+  optionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666666',
+  },
+  optionButtonTextActive: {
+    color: '#1A1A1A',
+  },
+  saveButton: {
+    backgroundColor: managerColors.highlight,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  cancelButton: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666666',
+  },
+});

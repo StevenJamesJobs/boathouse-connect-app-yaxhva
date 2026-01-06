@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,13 +14,13 @@ import {
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
-import { IconSymbol } from '@/components/IconSymbol';
-import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
 import { managerColors } from '@/styles/commonStyles';
+import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
-import * as FileSystem from 'expo-file-system';
+import { useAuth } from '@/contexts/AuthContext';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 
 interface MenuItem {
   id: string;
@@ -41,55 +41,57 @@ interface MenuItem {
   is_active: boolean;
 }
 
-const CATEGORIES = [
-  'All',
-  'Appetizers',
-  'Salads',
-  'Entrees',
-  'Sandwiches',
-  'Desserts',
-  'Beverages',
-];
+const CATEGORIES = ['Weekly Specials', 'Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
 
 const SUBCATEGORIES: { [key: string]: string[] } = {
-  Appetizers: ['Hot', 'Cold', 'Shared'],
-  Salads: ['House', 'Caesar', 'Specialty'],
-  Entrees: ['Seafood', 'Steak', 'Pasta', 'Chicken'],
-  Sandwiches: ['Burgers', 'Wraps', 'Classic'],
-  Desserts: ['Cakes', 'Ice Cream', 'Specialty'],
-  Beverages: ['Soft Drinks', 'Coffee', 'Tea'],
+  'Weekly Specials': [],
+  Lunch: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Burgers', 'Sandwiches', 'Sides'],
+  Dinner: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Entrees', 'Pasta', 'Sides'],
+  Libations: ['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV', 'Draft Beer', 'Bottle & Cans'],
+  Wine: ['Sparkling', 'Rose', 'Chardonnay', 'Pinot Grigio', 'Sauvignon Blanc', 'Interesting Whites', 'Cabernet Sauvignon', 'Pinot Noir', 'Merlot', 'Italian Reds', 'Interesting Reds'],
+  'Happy Hour': ['Appetizers', 'Drinks', 'Spirits'],
 };
 
 export default function MenuEditorScreen() {
-  const { user } = useAuth();
   const router = useRouter();
+  const { user } = useAuth();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState('All');
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('Weekly Specials');
+  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
-  const [uploading, setUploading] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     price: '',
-    category: 'Appetizers',
+    category: 'Weekly Specials',
     subcategory: '',
-    available_for_lunch: true,
-    available_for_dinner: true,
+    available_for_lunch: false,
+    available_for_dinner: false,
     is_gluten_free: false,
     is_gluten_free_available: false,
     is_vegetarian: false,
     is_vegetarian_available: false,
-    thumbnail_url: null as string | null,
     thumbnail_shape: 'square',
-    is_active: true,
+    display_order: 0,
   });
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
 
-  const loadMenuItems = useCallback(async () => {
+  useEffect(() => {
+    loadMenuItems();
+  }, []);
+
+  useEffect(() => {
+    filterItems();
+  }, [menuItems, searchQuery, selectedCategory, selectedSubcategory]);
+
+  const loadMenuItems = async () => {
     try {
       setLoading(true);
       const { data, error } = await supabase
@@ -98,6 +100,7 @@ export default function MenuEditorScreen() {
         .order('display_order', { ascending: true });
 
       if (error) throw error;
+      console.log('Loaded menu items:', data);
       setMenuItems(data || []);
     } catch (error) {
       console.error('Error loading menu items:', error);
@@ -105,150 +108,210 @@ export default function MenuEditorScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    loadMenuItems();
-  }, [loadMenuItems]);
+  const filterItems = () => {
+    let filtered = menuItems;
 
-  const filterItems = useCallback(() => {
-    if (selectedCategory === 'All') {
-      setFilteredItems(menuItems);
+    // Filter by category
+    if (selectedCategory === 'Weekly Specials') {
+      filtered = filtered.filter(item => item.category === 'Weekly Specials');
+    } else if (selectedCategory === 'Lunch') {
+      filtered = filtered.filter(item => item.available_for_lunch);
+    } else if (selectedCategory === 'Dinner') {
+      filtered = filtered.filter(item => item.available_for_dinner);
     } else {
-      setFilteredItems(menuItems.filter((item) => item.category === selectedCategory));
+      // For other categories (Libations, Wine, Happy Hour), use the category field
+      filtered = filtered.filter(item => item.category === selectedCategory);
     }
-  }, [selectedCategory, menuItems]);
 
-  useEffect(() => {
-    filterItems();
-  }, [filterItems]);
+    // Filter by subcategory if selected
+    if (selectedSubcategory) {
+      filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
+    }
+
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        item =>
+          item.name.toLowerCase().includes(query) ||
+          (item.description && item.description.toLowerCase().includes(query))
+      );
+    }
+
+    setFilteredItems(filtered);
+  };
 
   const pickImage = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.8,
-    });
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: formData.thumbnail_shape === 'square' ? [1, 1] : [16, 9],
+        quality: 0.8,
+      });
 
-    if (!result.canceled && result.assets[0]) {
-      const imageUri = result.assets[0].uri;
-      await uploadImage(imageUri);
+      if (!result.canceled && result.assets[0]) {
+        setSelectedImageUri(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
     }
   };
 
-  const uploadImage = async (uri: string) => {
+  const uploadImage = async (uri: string): Promise<string | null> => {
     try {
-      setUploading(true);
+      setUploadingImage(true);
+      console.log('Starting image upload for menu item');
 
+      // Read the file as base64 (same method as profile pictures)
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      const arrayBuffer = decode(base64);
-      const fileExt = uri.split('.').pop() || 'jpg';
-      const fileName = `${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
+      // Convert base64 to Uint8Array
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
 
-      const { error: uploadError } = await supabase.storage
+      // Get file extension
+      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${Date.now()}.${ext}`;
+
+      console.log('Uploading image:', fileName);
+
+      // Determine content type
+      let contentType = 'image/jpeg';
+      if (ext === 'png') contentType = 'image/png';
+      else if (ext === 'gif') contentType = 'image/gif';
+      else if (ext === 'webp') contentType = 'image/webp';
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
         .from('menu-items')
-        .upload(filePath, arrayBuffer, {
-          contentType: `image/${fileExt}`,
+        .upload(fileName, byteArray, {
+          contentType: contentType,
           upsert: false,
         });
 
-      if (uploadError) throw uploadError;
+      if (error) {
+        console.error('Error uploading image:', error);
+        throw error;
+      }
 
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('menu-items').getPublicUrl(filePath);
+      console.log('Upload successful:', data);
 
-      setFormData((prev) => ({ ...prev, thumbnail_url: publicUrl }));
-      Alert.alert('Success', 'Image uploaded successfully');
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('menu-items')
+        .getPublicUrl(fileName);
+
+      console.log('Public URL:', urlData.publicUrl);
+
+      return urlData.publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
       Alert.alert('Error', 'Failed to upload image');
+      return null;
     } finally {
-      setUploading(false);
+      setUploadingImage(false);
     }
-  };
-
-  const decode = (base64: string): Uint8Array => {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
   };
 
   const handleSave = async () => {
     if (!formData.name || !formData.price) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      Alert.alert('Error', 'Please fill in name and price');
+      return;
+    }
+
+    if (!user?.id) {
+      Alert.alert('Error', 'User not authenticated');
       return;
     }
 
     try {
-      setUploading(true);
+      let thumbnailUrl = editingItem?.thumbnail_url || null;
+
+      // Upload image if selected
+      if (selectedImageUri) {
+        const uploadedUrl = await uploadImage(selectedImageUri);
+        if (uploadedUrl) {
+          thumbnailUrl = uploadedUrl;
+          console.log('New thumbnail URL:', thumbnailUrl);
+        }
+      }
 
       if (editingItem) {
-        const { error } = await supabase
-          .from('menu_items')
-          .update({
-            name: formData.name,
-            description: formData.description,
-            price: formData.price,
-            category: formData.category,
-            subcategory: formData.subcategory,
-            available_for_lunch: formData.available_for_lunch,
-            available_for_dinner: formData.available_for_dinner,
-            is_gluten_free: formData.is_gluten_free,
-            is_gluten_free_available: formData.is_gluten_free_available,
-            is_vegetarian: formData.is_vegetarian,
-            is_vegetarian_available: formData.is_vegetarian_available,
-            thumbnail_url: formData.thumbnail_url,
-            thumbnail_shape: formData.thumbnail_shape,
-            is_active: formData.is_active,
-          })
-          .eq('id', editingItem.id);
-
-        if (error) throw error;
-        Alert.alert('Success', 'Menu item updated successfully');
-      } else {
-        const { error } = await supabase.from('menu_items').insert({
-          name: formData.name,
-          description: formData.description,
-          price: formData.price,
-          category: formData.category,
-          subcategory: formData.subcategory,
-          available_for_lunch: formData.available_for_lunch,
-          available_for_dinner: formData.available_for_dinner,
-          is_gluten_free: formData.is_gluten_free,
-          is_gluten_free_available: formData.is_gluten_free_available,
-          is_vegetarian: formData.is_vegetarian,
-          is_vegetarian_available: formData.is_vegetarian_available,
-          thumbnail_url: formData.thumbnail_url,
-          thumbnail_shape: formData.thumbnail_shape,
-          is_active: formData.is_active,
-          display_order: menuItems.length,
+        // Update existing item using database function
+        const { data, error } = await supabase.rpc('update_menu_item', {
+          p_user_id: user.id,
+          p_menu_item_id: editingItem.id,
+          p_name: formData.name,
+          p_description: formData.description || null,
+          p_price: formData.price,
+          p_category: formData.category,
+          p_subcategory: formData.subcategory || null,
+          p_available_for_lunch: formData.available_for_lunch,
+          p_available_for_dinner: formData.available_for_dinner,
+          p_is_gluten_free: formData.is_gluten_free,
+          p_is_gluten_free_available: formData.is_gluten_free_available,
+          p_is_vegetarian: formData.is_vegetarian,
+          p_is_vegetarian_available: formData.is_vegetarian_available,
+          p_thumbnail_url: thumbnailUrl,
+          p_thumbnail_shape: formData.thumbnail_shape,
+          p_display_order: formData.display_order,
         });
 
-        if (error) throw error;
-        Alert.alert('Success', 'Menu item added successfully');
+        if (error) {
+          console.error('Error updating menu item:', error);
+          throw error;
+        }
+        console.log('Menu item updated successfully');
+        Alert.alert('Success', 'Menu item updated successfully');
+      } else {
+        // Create new item using database function
+        const { data, error } = await supabase.rpc('create_menu_item', {
+          p_user_id: user.id,
+          p_name: formData.name,
+          p_description: formData.description || null,
+          p_price: formData.price,
+          p_category: formData.category,
+          p_subcategory: formData.subcategory || null,
+          p_available_for_lunch: formData.available_for_lunch,
+          p_available_for_dinner: formData.available_for_dinner,
+          p_is_gluten_free: formData.is_gluten_free,
+          p_is_gluten_free_available: formData.is_gluten_free_available,
+          p_is_vegetarian: formData.is_vegetarian,
+          p_is_vegetarian_available: formData.is_vegetarian_available,
+          p_thumbnail_url: thumbnailUrl,
+          p_thumbnail_shape: formData.thumbnail_shape,
+          p_display_order: formData.display_order,
+        });
+
+        if (error) {
+          console.error('Error creating menu item:', error);
+          throw error;
+        }
+        console.log('Menu item created successfully');
+        Alert.alert('Success', 'Menu item created successfully');
       }
 
       closeModal();
       loadMenuItems();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving menu item:', error);
-      Alert.alert('Error', 'Failed to save menu item');
-    } finally {
-      setUploading(false);
+      Alert.alert('Error', error.message || 'Failed to save menu item');
     }
   };
 
   const handleDelete = async (item: MenuItem) => {
     Alert.alert(
-      'Confirm Delete',
+      'Delete Item',
       `Are you sure you want to delete "${item.name}"?`,
       [
         { text: 'Cancel', style: 'cancel' },
@@ -257,40 +320,37 @@ export default function MenuEditorScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              console.log('Attempting to delete menu item:', item.id);
-              
-              const { data: { session } } = await supabase.auth.getSession();
-              if (!session) {
-                Alert.alert('Error', 'You must be logged in to delete items');
+              if (!user?.id) {
+                Alert.alert('Error', 'User not authenticated');
                 return;
               }
 
-              console.log('User is authenticated, proceeding with delete');
-              
-              const { error } = await supabase
-                .from('menu_items')
-                .delete()
-                .eq('id', item.id);
+              // Delete using database function
+              const { error } = await supabase.rpc('delete_menu_item', {
+                p_user_id: user.id,
+                p_menu_item_id: item.id,
+              });
 
               if (error) {
-                console.error('Supabase delete error:', error);
+                console.error('Error deleting menu item:', error);
                 throw error;
               }
 
-              console.log('Menu item deleted successfully');
+              // Delete image if exists
+              if (item.thumbnail_url) {
+                const fileName = item.thumbnail_url.split('/').pop();
+                if (fileName) {
+                  await supabase.storage
+                    .from('menu-items')
+                    .remove([fileName]);
+                }
+              }
+
               Alert.alert('Success', 'Menu item deleted successfully');
               loadMenuItems();
             } catch (error: any) {
               console.error('Error deleting menu item:', error);
-              
-              let errorMessage = 'Failed to delete menu item';
-              if (error.code === '42501') {
-                errorMessage = 'Permission denied. Please make sure you are logged in as a manager.';
-              } else if (error.message) {
-                errorMessage = error.message;
-              }
-              
-              Alert.alert('Error', errorMessage);
+              Alert.alert('Error', error.message || 'Failed to delete menu item');
             }
           },
         },
@@ -299,12 +359,28 @@ export default function MenuEditorScreen() {
   };
 
   const openAddModal = () => {
-    resetForm();
     setEditingItem(null);
-    setModalVisible(true);
+    setFormData({
+      name: '',
+      description: '',
+      price: '',
+      category: selectedCategory,
+      subcategory: selectedSubcategory || '',
+      available_for_lunch: selectedCategory === 'Lunch',
+      available_for_dinner: selectedCategory === 'Dinner',
+      is_gluten_free: false,
+      is_gluten_free_available: false,
+      is_vegetarian: false,
+      is_vegetarian_available: false,
+      thumbnail_shape: 'square',
+      display_order: 0,
+    });
+    setSelectedImageUri(null);
+    setShowAddModal(true);
   };
 
   const openEditModal = (item: MenuItem) => {
+    setEditingItem(item);
     setFormData({
       name: item.name,
       description: item.description || '',
@@ -317,293 +393,765 @@ export default function MenuEditorScreen() {
       is_gluten_free_available: item.is_gluten_free_available,
       is_vegetarian: item.is_vegetarian,
       is_vegetarian_available: item.is_vegetarian_available,
-      thumbnail_url: item.thumbnail_url,
       thumbnail_shape: item.thumbnail_shape,
-      is_active: item.is_active,
+      display_order: item.display_order,
     });
-    setEditingItem(item);
-    setModalVisible(true);
+    setSelectedImageUri(null);
+    setShowAddModal(true);
   };
 
   const closeModal = () => {
-    setModalVisible(false);
-    resetForm();
-  };
-
-  const resetForm = () => {
-    setFormData({
-      name: '',
-      description: '',
-      price: '',
-      category: 'Appetizers',
-      subcategory: '',
-      available_for_lunch: true,
-      available_for_dinner: true,
-      is_gluten_free: false,
-      is_gluten_free_available: false,
-      is_vegetarian: false,
-      is_vegetarian_available: false,
-      thumbnail_url: null,
-      thumbnail_shape: 'square',
-      is_active: true,
-    });
+    setShowAddModal(false);
+    setEditingItem(null);
+    setSelectedImageUri(null);
   };
 
   const handleBackPress = () => {
-    router.back();
+    router.replace('/(portal)/manager/manage');
   };
 
-  const getImageUrl = (url: string | null): string => {
-    if (!url) return '';
-    if (url.startsWith('http')) return url;
-    const { data } = supabase.storage.from('menu-items').getPublicUrl(url);
-    return data.publicUrl;
+  // Helper function to get image URL with cache busting
+  const getImageUrl = (url: string | null) => {
+    if (!url) return null;
+    // Add timestamp to force reload and bypass cache
+    return `${url}?t=${Date.now()}`;
   };
 
-  const formatPrice = (price: string): string => {
-    const num = parseFloat(price);
-    return isNaN(num) ? price : `$${num.toFixed(2)}`;
+  // Helper function to format price with $ sign
+  const formatPrice = (price: string) => {
+    // If price already has $, return as is
+    if (price.includes('$')) {
+      return price;
+    }
+    // Otherwise add $ at the beginning
+    return `$${price}`;
   };
-
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={managerColors.primary} />
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
+      {/* Header with Back Button */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBackPress}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow_back" size={24} color="#fff" />
+        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+          <IconSymbol
+            ios_icon_name="chevron.left"
+            android_material_icon_name="arrow_back"
+            size={24}
+            color={managerColors.text}
+          />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Menu Editor</Text>
-        <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
-          <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={24} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.backButton} />
       </View>
 
-      <View style={styles.filterContainer}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterScroll}>
-          {CATEGORIES.map((category) => (
-            <TouchableOpacity
-              key={category}
+      {/* Add New Item Button - Elongated button above search bar */}
+      <TouchableOpacity style={styles.addNewItemButton} onPress={openAddModal}>
+        <IconSymbol
+          ios_icon_name="plus.circle.fill"
+          android_material_icon_name="add_circle"
+          size={24}
+          color={managerColors.text}
+        />
+        <Text style={styles.addNewItemButtonText}>Add New Item</Text>
+      </TouchableOpacity>
+
+      {/* Search Bar */}
+      <View style={styles.searchContainer}>
+        <IconSymbol
+          ios_icon_name="magnifyingglass"
+          android_material_icon_name="search"
+          size={20}
+          color={managerColors.textSecondary}
+        />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search menu items..."
+          placeholderTextColor={managerColors.textSecondary}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </View>
+
+      {/* Category Tabs */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.categoryScroll}
+        contentContainerStyle={styles.categoryScrollContent}
+      >
+        {CATEGORIES.map((category, index) => (
+          <TouchableOpacity
+            key={index}
+            style={[
+              styles.categoryTab,
+              selectedCategory === category && styles.categoryTabActive,
+            ]}
+            onPress={() => {
+              setSelectedCategory(category);
+              setSelectedSubcategory(null);
+            }}
+          >
+            <Text
               style={[
-                styles.filterButton,
-                selectedCategory === category && styles.filterButtonActive,
+                styles.categoryTabText,
+                selectedCategory === category && styles.categoryTabTextActive,
               ]}
-              onPress={() => setSelectedCategory(category)}
+            >
+              {category}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      {/* Subcategory Tabs */}
+      {SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.subcategoryScroll}
+          contentContainerStyle={styles.subcategoryScrollContent}
+        >
+          <TouchableOpacity
+            style={[
+              styles.subcategoryTab,
+              selectedSubcategory === null && styles.subcategoryTabActive,
+            ]}
+            onPress={() => setSelectedSubcategory(null)}
+          >
+            <Text
+              style={[
+                styles.subcategoryTabText,
+                selectedSubcategory === null && styles.subcategoryTabTextActive,
+              ]}
+            >
+              All
+            </Text>
+          </TouchableOpacity>
+          {SUBCATEGORIES[selectedCategory].map((subcategory, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.subcategoryTab,
+                selectedSubcategory === subcategory && styles.subcategoryTabActive,
+              ]}
+              onPress={() => setSelectedSubcategory(subcategory)}
             >
               <Text
                 style={[
-                  styles.filterButtonText,
-                  selectedCategory === category && styles.filterButtonTextActive,
+                  styles.subcategoryTabText,
+                  selectedSubcategory === subcategory && styles.subcategoryTabTextActive,
                 ]}
               >
-                {category}
+                {subcategory}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
-      </View>
+      )}
 
-      <ScrollView style={styles.content}>
-        {filteredItems.length === 0 ? (
-          <View style={styles.emptyState}>
-            <IconSymbol ios_icon_name="tray" android_material_icon_name="inbox" size={48} color={managerColors.textSecondary} />
-            <Text style={styles.emptyStateText}>No menu items found</Text>
-          </View>
-        ) : (
-          filteredItems.map((item) => (
-            <View key={item.id} style={styles.menuItem}>
-              <View style={styles.menuItemHeader}>
-                {item.thumbnail_url && (
-                  <Image
-                    source={{ uri: getImageUrl(item.thumbnail_url) }}
-                    style={styles.menuItemImage}
-                    resizeMode="cover"
-                  />
+      {/* Menu Items List */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={managerColors.highlight} />
+        </View>
+      ) : (
+        <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
+          {filteredItems.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <IconSymbol
+                ios_icon_name="fork.knife"
+                android_material_icon_name="restaurant_menu"
+                size={64}
+                color={managerColors.textSecondary}
+              />
+              <Text style={styles.emptyText}>No menu items found</Text>
+              <Text style={styles.emptySubtext}>
+                Tap the &quot;Add New Item&quot; button to add a new item
+              </Text>
+            </View>
+          ) : (
+            filteredItems.map((item, index) => (
+              <View key={index} style={styles.menuItemCard}>
+                {/* Display thumbnail based on shape - Square layout or Banner layout */}
+                {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
+                  <View style={styles.squareLayout}>
+                    <Image
+                      key={getImageUrl(item.thumbnail_url)}
+                      source={{ uri: getImageUrl(item.thumbnail_url) }}
+                      style={styles.squareImage}
+                      onError={(error) => {
+                        console.error('Image load error for item:', item.name, error.nativeEvent);
+                      }}
+                      onLoad={() => {
+                        console.log('Image loaded successfully for item:', item.name);
+                      }}
+                    />
+                    <View style={styles.squareContent}>
+                      <View style={styles.squareHeader}>
+                        <Text style={styles.menuItemName}>{item.name}</Text>
+                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                      </View>
+                      {item.description && (
+                        <Text style={styles.squareDescription} numberOfLines={2}>
+                          {item.description}
+                        </Text>
+                      )}
+                      <View style={styles.menuItemTags}>
+                        {item.subcategory && (
+                          <View style={styles.tag}>
+                            <Text style={styles.tagText}>{item.subcategory}</Text>
+                          </View>
+                        )}
+                        {item.available_for_lunch && (
+                          <View style={[styles.tag, styles.tagAvailability]}>
+                            <Text style={styles.tagText}>Lunch</Text>
+                          </View>
+                        )}
+                        {item.available_for_dinner && (
+                          <View style={[styles.tag, styles.tagAvailability]}>
+                            <Text style={styles.tagText}>Dinner</Text>
+                          </View>
+                        )}
+                        {item.is_gluten_free && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>GF</Text>
+                          </View>
+                        )}
+                        {item.is_gluten_free_available && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>GFA</Text>
+                          </View>
+                        )}
+                        {item.is_vegetarian && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>V</Text>
+                          </View>
+                        )}
+                        {item.is_vegetarian_available && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>VA</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.displayOrderBadge}>
+                        <Text style={styles.displayOrderText}>Order: {item.display_order}</Text>
+                      </View>
+                    </View>
+                  </View>
+                ) : (
+                  <>
+                    {item.thumbnail_url && (
+                      <Image
+                        key={getImageUrl(item.thumbnail_url)}
+                        source={{ uri: getImageUrl(item.thumbnail_url) }}
+                        style={styles.menuItemImageBanner}
+                        onError={(error) => {
+                          console.error('Image load error for item:', item.name, error.nativeEvent);
+                        }}
+                        onLoad={() => {
+                          console.log('Image loaded successfully for item:', item.name);
+                        }}
+                      />
+                    )}
+                    <View style={styles.menuItemContent}>
+                      <View style={styles.menuItemHeader}>
+                        <Text style={styles.menuItemName}>{item.name}</Text>
+                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                      </View>
+                      {item.description && (
+                        <Text style={styles.menuItemDescription} numberOfLines={2}>
+                          {item.description}
+                        </Text>
+                      )}
+                      <View style={styles.menuItemTags}>
+                        {item.subcategory && (
+                          <View style={styles.tag}>
+                            <Text style={styles.tagText}>{item.subcategory}</Text>
+                          </View>
+                        )}
+                        {item.available_for_lunch && (
+                          <View style={[styles.tag, styles.tagAvailability]}>
+                            <Text style={styles.tagText}>Lunch</Text>
+                          </View>
+                        )}
+                        {item.available_for_dinner && (
+                          <View style={[styles.tag, styles.tagAvailability]}>
+                            <Text style={styles.tagText}>Dinner</Text>
+                          </View>
+                        )}
+                        {item.is_gluten_free && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>GF</Text>
+                          </View>
+                        )}
+                        {item.is_gluten_free_available && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>GFA</Text>
+                          </View>
+                        )}
+                        {item.is_vegetarian && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>V</Text>
+                          </View>
+                        )}
+                        {item.is_vegetarian_available && (
+                          <View style={[styles.tag, styles.tagDietary]}>
+                            <Text style={styles.tagText}>VA</Text>
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.displayOrderBadge}>
+                        <Text style={styles.displayOrderText}>Order: {item.display_order}</Text>
+                      </View>
+                    </View>
+                  </>
                 )}
-                <View style={styles.menuItemInfo}>
-                  <Text style={styles.menuItemName}>{item.name}</Text>
-                  <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
-                  <Text style={styles.menuItemCategory}>
-                    {item.category}
-                    {item.subcategory ? ` • ${item.subcategory}` : ''}
-                  </Text>
+                <View style={styles.menuItemActions}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => openEditModal(item)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="pencil"
+                      android_material_icon_name="edit"
+                      size={20}
+                      color={managerColors.highlight}
+                    />
+                    <Text style={styles.actionButtonText}>Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.actionButton, styles.deleteButton]}
+                    onPress={() => handleDelete(item)}
+                  >
+                    <IconSymbol
+                      ios_icon_name="trash"
+                      android_material_icon_name="delete"
+                      size={20}
+                      color="#E74C3C"
+                    />
+                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
+                      Delete
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
-              {item.description && (
-                <Text style={styles.menuItemDescription} numberOfLines={2}>
-                  {item.description}
-                </Text>
-              )}
-              <View style={styles.menuItemActions}>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.editButton]}
-                  onPress={() => openEditModal(item)}
-                >
-                  <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={16} color="#fff" />
-                  <Text style={styles.actionButtonText}>Edit</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.actionButton, styles.deleteButton]}
-                  onPress={() => handleDelete(item)}
-                >
-                  <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={16} color="#fff" />
-                  <Text style={styles.actionButtonText}>Delete</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          ))
-        )}
-      </ScrollView>
+            ))
+          )}
+        </ScrollView>
+      )}
 
-      <Modal visible={modalVisible} animationType="slide" transparent>
+      {/* Add/Edit Modal */}
+      <Modal
+        visible={showAddModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeModal}
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
+          style={styles.modalContainer}
+          keyboardVerticalOffset={0}
         >
+          <TouchableOpacity 
+            style={styles.modalBackdrop} 
+            activeOpacity={1} 
+            onPress={closeModal}
+          />
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
                 {editingItem ? 'Edit Menu Item' : 'Add Menu Item'}
               </Text>
-              <TouchableOpacity style={styles.closeButton} onPress={closeModal}>
-                <IconSymbol ios_icon_name="xmark" android_material_icon_name="close" size={24} color={managerColors.text} />
+              <TouchableOpacity onPress={closeModal}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color="#666666"
+                />
               </TouchableOpacity>
             </View>
 
-            <ScrollView>
+            <ScrollView 
+              style={styles.modalScroll} 
+              contentContainerStyle={styles.modalScrollContent}
+              showsVerticalScrollIndicator={true}
+              bounces={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Image Upload */}
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Name *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.name}
-                  onChangeText={(text) => setFormData({ ...formData, name: text })}
-                  placeholder="Enter item name"
-                  placeholderTextColor={managerColors.textSecondary}
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Description</Text>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={formData.description}
-                  onChangeText={(text) => setFormData({ ...formData, description: text })}
-                  placeholder="Enter description"
-                  placeholderTextColor={managerColors.textSecondary}
-                  multiline
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Price *</Text>
-                <TextInput
-                  style={styles.input}
-                  value={formData.price}
-                  onChangeText={(text) => setFormData({ ...formData, price: text })}
-                  placeholder="0.00"
-                  placeholderTextColor={managerColors.textSecondary}
-                  keyboardType="decimal-pad"
-                />
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.label}>Thumbnail Image</Text>
-                <TouchableOpacity
-                  style={styles.imagePickerButton}
-                  onPress={pickImage}
-                  disabled={uploading}
-                >
-                  <Text style={styles.imagePickerButtonText}>
-                    {uploading ? 'Uploading...' : 'Choose Image'}
-                  </Text>
-                </TouchableOpacity>
-                {formData.thumbnail_url && (
-                  <>
+                <Text style={styles.formLabel}>Thumbnail Image</Text>
+                <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
+                  {selectedImageUri || editingItem?.thumbnail_url ? (
                     <Image
-                      source={{ uri: getImageUrl(formData.thumbnail_url) }}
-                      style={styles.previewImage}
-                      resizeMode="cover"
+                      source={{ uri: selectedImageUri || getImageUrl(editingItem?.thumbnail_url || '') || '' }}
+                      style={styles.uploadedImage}
+                      key={selectedImageUri || getImageUrl(editingItem?.thumbnail_url || '')}
                     />
-                    <Text style={styles.label}>Display Shape (for menu view)</Text>
-                    <View style={styles.shapeSelector}>
-                      <TouchableOpacity
-                        style={[
-                          styles.shapeButton,
-                          formData.thumbnail_shape === 'square' && styles.shapeButtonActive,
-                        ]}
-                        onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
-                      >
-                        <Text
-                          style={[
-                            styles.shapeButtonText,
-                            formData.thumbnail_shape === 'square' &&
-                              styles.shapeButtonTextActive,
-                          ]}
-                        >
-                          Square
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.shapeButton,
-                          formData.thumbnail_shape === 'banner' && styles.shapeButtonActive,
-                        ]}
-                        onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
-                      >
-                        <Text
-                          style={[
-                            styles.shapeButtonText,
-                            formData.thumbnail_shape === 'banner' &&
-                              styles.shapeButtonTextActive,
-                          ]}
-                        >
-                          Banner
-                        </Text>
-                      </TouchableOpacity>
+                  ) : (
+                    <View style={styles.imageUploadPlaceholder}>
+                      <IconSymbol
+                        ios_icon_name="photo"
+                        android_material_icon_name="add_photo_alternate"
+                        size={48}
+                        color="#666666"
+                      />
+                      <Text style={styles.imageUploadText}>Tap to upload image</Text>
                     </View>
-                  </>
-                )}
-              </View>
-
-              <View style={styles.checkboxContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.checkbox,
-                    formData.is_active && styles.checkboxChecked,
-                  ]}
-                  onPress={() => setFormData({ ...formData, is_active: !formData.is_active })}
-                >
-                  {formData.is_active && (
-                    <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={16} color="#fff" />
                   )}
                 </TouchableOpacity>
-                <Text style={styles.checkboxLabel}>Active</Text>
+                
+                {/* Thumbnail Shape */}
+                <View style={styles.shapeSelector}>
+                  <TouchableOpacity
+                    style={[
+                      styles.shapeOption,
+                      formData.thumbnail_shape === 'square' && styles.shapeOptionActive,
+                    ]}
+                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
+                  >
+                    <Text
+                      style={[
+                        styles.shapeOptionText,
+                        formData.thumbnail_shape === 'square' && styles.shapeOptionTextActive,
+                      ]}
+                    >
+                      Square
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.shapeOption,
+                      formData.thumbnail_shape === 'banner' && styles.shapeOptionActive,
+                    ]}
+                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
+                  >
+                    <Text
+                      style={[
+                        styles.shapeOptionText,
+                        formData.thumbnail_shape === 'banner' && styles.shapeOptionTextActive,
+                      ]}
+                    >
+                      Banner
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </ScrollView>
 
-            <View style={styles.modalActions}>
+              {/* Name */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Name *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter item name"
+                  placeholderTextColor="#999999"
+                  value={formData.name}
+                  onChangeText={(text) => setFormData({ ...formData, name: text })}
+                />
+              </View>
+
+              {/* Description */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Description</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="Enter description"
+                  placeholderTextColor="#999999"
+                  value={formData.description}
+                  onChangeText={(text) => setFormData({ ...formData, description: text })}
+                  multiline
+                  numberOfLines={4}
+                />
+              </View>
+
+              {/* Price */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Price *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., $12.99"
+                  placeholderTextColor="#999999"
+                  value={formData.price}
+                  onChangeText={(text) => setFormData({ ...formData, price: text })}
+                />
+              </View>
+
+              {/* Display Order */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Display Order</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter display order (e.g., 1, 2, 3...)"
+                  placeholderTextColor="#999999"
+                  value={formData.display_order.toString()}
+                  onChangeText={(text) => {
+                    const num = parseInt(text) || 0;
+                    setFormData({ ...formData, display_order: num });
+                  }}
+                  keyboardType="numeric"
+                />
+                <Text style={styles.formHint}>
+                  Lower numbers appear first. Items with the same order are sorted alphabetically.
+                </Text>
+              </View>
+
+              {/* Category */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Category</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.optionsScroll}
+                >
+                  {CATEGORIES.map((category, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.optionButton,
+                        formData.category === category && styles.optionButtonActive,
+                      ]}
+                      onPress={() => setFormData({ ...formData, category, subcategory: '' })}
+                    >
+                      <Text
+                        style={[
+                          styles.optionButtonText,
+                          formData.category === category && styles.optionButtonTextActive,
+                        ]}
+                      >
+                        {category}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Subcategory */}
+              {SUBCATEGORIES[formData.category] && SUBCATEGORIES[formData.category].length > 0 && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Subcategory</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.optionsScroll}
+                  >
+                    {SUBCATEGORIES[formData.category].map((subcategory, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.optionButton,
+                          formData.subcategory === subcategory && styles.optionButtonActive,
+                        ]}
+                        onPress={() => setFormData({ ...formData, subcategory })}
+                      >
+                        <Text
+                          style={[
+                            styles.optionButtonText,
+                            formData.subcategory === subcategory && styles.optionButtonTextActive,
+                          ]}
+                        >
+                          {subcategory}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {/* Availability - Only show for Lunch, Dinner, and Weekly Specials */}
+              {(formData.category === 'Lunch' || formData.category === 'Dinner' || formData.category === 'Weekly Specials') && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Available For</Text>
+                  <View style={styles.checkboxGroup}>
+                    <TouchableOpacity
+                      style={styles.checkbox}
+                      onPress={() =>
+                        setFormData({
+                          ...formData,
+                          available_for_lunch: !formData.available_for_lunch,
+                        })
+                      }
+                    >
+                      <View
+                        style={[
+                          styles.checkboxBox,
+                          formData.available_for_lunch && styles.checkboxBoxChecked,
+                        ]}
+                      >
+                        {formData.available_for_lunch && (
+                          <IconSymbol
+                            ios_icon_name="checkmark"
+                            android_material_icon_name="check"
+                            size={16}
+                            color="#1A1A1A"
+                          />
+                        )}
+                      </View>
+                      <Text style={styles.checkboxLabel}>Lunch</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.checkbox}
+                      onPress={() =>
+                        setFormData({
+                          ...formData,
+                          available_for_dinner: !formData.available_for_dinner,
+                        })
+                      }
+                    >
+                      <View
+                        style={[
+                          styles.checkboxBox,
+                          formData.available_for_dinner && styles.checkboxBoxChecked,
+                        ]}
+                      >
+                        {formData.available_for_dinner && (
+                          <IconSymbol
+                            ios_icon_name="checkmark"
+                            android_material_icon_name="check"
+                            size={16}
+                            color="#1A1A1A"
+                          />
+                        )}
+                      </View>
+                      <Text style={styles.checkboxLabel}>Dinner</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* Dietary Options */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Dietary Options</Text>
+                <View style={styles.checkboxGroup}>
+                  <TouchableOpacity
+                    style={styles.checkbox}
+                    onPress={() =>
+                      setFormData({
+                        ...formData,
+                        is_gluten_free: !formData.is_gluten_free,
+                      })
+                    }
+                  >
+                    <View
+                      style={[
+                        styles.checkboxBox,
+                        formData.is_gluten_free && styles.checkboxBoxChecked,
+                      ]}
+                    >
+                      {formData.is_gluten_free && (
+                        <IconSymbol
+                          ios_icon_name="checkmark"
+                          android_material_icon_name="check"
+                          size={16}
+                          color="#1A1A1A"
+                        />
+                      )}
+                    </View>
+                    <Text style={styles.checkboxLabel}>GF</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.checkbox}
+                    onPress={() =>
+                      setFormData({
+                        ...formData,
+                        is_gluten_free_available: !formData.is_gluten_free_available,
+                      })
+                    }
+                  >
+                    <View
+                      style={[
+                        styles.checkboxBox,
+                        formData.is_gluten_free_available && styles.checkboxBoxChecked,
+                      ]}
+                    >
+                      {formData.is_gluten_free_available && (
+                        <IconSymbol
+                          ios_icon_name="checkmark"
+                          android_material_icon_name="check"
+                          size={16}
+                          color="#1A1A1A"
+                        />
+                      )}
+                    </View>
+                    <Text style={styles.checkboxLabel}>GFA</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.checkbox}
+                    onPress={() =>
+                      setFormData({
+                        ...formData,
+                        is_vegetarian: !formData.is_vegetarian,
+                      })
+                    }
+                  >
+                    <View
+                      style={[
+                        styles.checkboxBox,
+                        formData.is_vegetarian && styles.checkboxBoxChecked,
+                      ]}
+                    >
+                      {formData.is_vegetarian && (
+                        <IconSymbol
+                          ios_icon_name="checkmark"
+                          android_material_icon_name="check"
+                          size={16}
+                          color="#1A1A1A"
+                        />
+                      )}
+                    </View>
+                    <Text style={styles.checkboxLabel}>V</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.checkbox}
+                    onPress={() =>
+                      setFormData({
+                        ...formData,
+                        is_vegetarian_available: !formData.is_vegetarian_available,
+                      })
+                    }
+                  >
+                    <View
+                      style={[
+                        styles.checkboxBox,
+                        formData.is_vegetarian_available && styles.checkboxBoxChecked,
+                      ]}
+                    >
+                      {formData.is_vegetarian_available && (
+                        <IconSymbol
+                          ios_icon_name="checkmark"
+                          android_material_icon_name="check"
+                          size={16}
+                          color="#1A1A1A"
+                        />
+                      )}
+                    </View>
+                    <Text style={styles.checkboxLabel}>VA</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              {/* Save Button */}
               <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
+                style={styles.saveButton}
+                onPress={handleSave}
+                disabled={uploadingImage}
+              >
+                {uploadingImage ? (
+                  <ActivityIndicator color="#1A1A1A" />
+                ) : (
+                  <Text style={styles.saveButtonText}>
+                    {editingItem ? 'Update Item' : 'Add Item'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              {/* Cancel Button */}
+              <TouchableOpacity
+                style={styles.cancelButton}
                 onPress={closeModal}
               >
-                <Text style={styles.modalButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleSave}
-                disabled={uploading}
-              >
-                <Text style={styles.modalButtonText}>
-                  {uploading ? 'Saving...' : 'Save'}
-                </Text>
-              </TouchableOpacity>
-            </View>
+            </ScrollView>
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -620,288 +1168,475 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 20,
-    backgroundColor: managerColors.primary,
-  },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
-    flex: 1,
-    textAlign: 'center',
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'android' ? 48 : 60,
+    paddingBottom: 12,
+    backgroundColor: managerColors.card,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
   },
   backButton: {
     padding: 8,
+    width: 40,
   },
-  addButton: {
-    padding: 8,
-  },
-  filterContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    backgroundColor: managerColors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
-  },
-  filterScroll: {
-    flexDirection: 'row',
-  },
-  filterButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: managerColors.background,
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-  },
-  filterButtonActive: {
-    backgroundColor: managerColors.primary,
-    borderColor: managerColors.primary,
-  },
-  filterButtonText: {
-    fontSize: 14,
-    color: managerColors.text,
-  },
-  filterButtonTextActive: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  content: {
-    flex: 1,
-    padding: 20,
-  },
-  menuItem: {
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-  },
-  menuItemHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 10,
-  },
-  menuItemImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    marginRight: 12,
-    backgroundColor: managerColors.background,
-  },
-  menuItemInfo: {
-    flex: 1,
-  },
-  menuItemName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    marginBottom: 4,
-  },
-  menuItemPrice: {
-    fontSize: 16,
-    color: managerColors.primary,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  menuItemCategory: {
-    fontSize: 14,
-    color: managerColors.textSecondary,
-    marginBottom: 2,
-  },
-  menuItemDescription: {
-    fontSize: 14,
-    color: managerColors.textSecondary,
-    marginTop: 8,
-    lineHeight: 20,
-  },
-  menuItemActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: managerColors.border,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    marginLeft: 10,
-  },
-  editButton: {
-    backgroundColor: managerColors.primary,
-  },
-  deleteButton: {
-    backgroundColor: '#dc3545',
-  },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    padding: 20,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
+  headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     color: managerColors.text,
   },
-  closeButton: {
-    padding: 4,
-  },
-  formGroup: {
-    marginBottom: 15,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: managerColors.text,
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: managerColors.background,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: managerColors.text,
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  picker: {
-    backgroundColor: managerColors.background,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-    borderRadius: 8,
-  },
-  checkboxContainer: {
+  addNewItemButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 10,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderWidth: 2,
-    borderColor: managerColors.primary,
-    borderRadius: 4,
-    marginRight: 10,
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxChecked: {
-    backgroundColor: managerColors.primary,
-  },
-  checkboxLabel: {
-    fontSize: 16,
-    color: managerColors.text,
-  },
-  imagePickerButton: {
-    backgroundColor: managerColors.primary,
-    padding: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  imagePickerButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  previewImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    marginBottom: 10,
-  },
-  shapeSelector: {
-    flexDirection: 'row',
-    marginTop: 10,
-  },
-  shapeButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-    alignItems: 'center',
-    marginHorizontal: 5,
-  },
-  shapeButtonActive: {
-    backgroundColor: managerColors.primary,
-    borderColor: managerColors.primary,
-  },
-  shapeButtonText: {
-    fontSize: 14,
-    color: managerColors.text,
-  },
-  shapeButtonTextActive: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    marginTop: 20,
-  },
-  modalButton: {
+    backgroundColor: managerColors.highlight,
+    marginHorizontal: 16,
+    marginTop: 16,
+    paddingVertical: 14,
     paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginLeft: 10,
+    borderRadius: 12,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+    gap: 10,
   },
-  cancelButton: {
-    backgroundColor: managerColors.textSecondary,
-  },
-  saveButton: {
-    backgroundColor: managerColors.primary,
-  },
-  modalButtonText: {
-    color: '#fff',
+  addNewItemButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: 'bold',
+    color: managerColors.text,
   },
-  emptyState: {
+  searchContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 40,
+    backgroundColor: managerColors.card,
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
   },
-  emptyStateText: {
+  searchInput: {
+    flex: 1,
+    marginLeft: 12,
     fontSize: 16,
+    color: managerColors.text,
+  },
+  categoryScroll: {
+    marginTop: 16,
+    maxHeight: 50,
+  },
+  categoryScrollContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  categoryTab: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: managerColors.card,
+    marginRight: 8,
+  },
+  categoryTabActive: {
+    backgroundColor: managerColors.highlight,
+  },
+  categoryTabText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: managerColors.textSecondary,
-    marginTop: 10,
+  },
+  categoryTabTextActive: {
+    color: managerColors.text,
+  },
+  subcategoryScroll: {
+    marginTop: 12,
+    maxHeight: 40,
+  },
+  subcategoryScrollContent: {
+    paddingHorizontal: 16,
+    gap: 8,
+  },
+  subcategoryTab: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 16,
+    backgroundColor: managerColors.card,
+    marginRight: 8,
+  },
+  subcategoryTabActive: {
+    backgroundColor: managerColors.highlight,
+  },
+  subcategoryTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: managerColors.textSecondary,
+  },
+  subcategoryTabTextActive: {
+    color: managerColors.text,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  itemsList: {
+    flex: 1,
+    marginTop: 16,
+  },
+  itemsListContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 100,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: managerColors.text,
+    marginTop: 16,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  menuItemCard: {
+    backgroundColor: managerColors.card,
+    borderRadius: 16,
+    marginBottom: 16,
+    overflow: 'hidden',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  // Square layout styles (image on left, content on right)
+  squareLayout: {
+    flexDirection: 'row',
+    padding: 12,
+    gap: 12,
+  },
+  squareImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 12,
+    resizeMode: 'cover',
+  },
+  squareContent: {
+    flex: 1,
+    justifyContent: 'flex-start',
+  },
+  squareHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 6,
+  },
+  squareDescription: {
+    fontSize: 13,
+    color: managerColors.textSecondary,
+    marginTop: 6,
+    lineHeight: 18,
+  },
+  menuItemImageBanner: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
+  },
+  menuItemContent: {
+    padding: 16,
+  },
+  menuItemHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 8,
+  },
+  menuItemName: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: managerColors.text,
+    marginRight: 12,
+  },
+  menuItemPrice: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: managerColors.highlight,
+  },
+  menuItemDescription: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    marginBottom: 12,
+    lineHeight: 20,
+  },
+  menuItemTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
+  },
+  tag: {
+    backgroundColor: managerColors.background,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  tagAvailability: {
+    backgroundColor: managerColors.primary,
+  },
+  tagDietary: {
+    backgroundColor: managerColors.highlight,
+  },
+  tagText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: managerColors.text,
+  },
+  displayOrderBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    marginTop: 4,
+  },
+  displayOrderText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: managerColors.textSecondary,
+  },
+  menuItemActions: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: managerColors.border,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: managerColors.background,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 6,
+  },
+  deleteButton: {
+    backgroundColor: '#2C1F1F',
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: managerColors.highlight,
+  },
+  deleteButtonText: {
+    color: '#E74C3C',
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-start',
+  },
+  modalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+  },
+  modalContent: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '95%',
+    marginTop: 'auto',
+    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
+    elevation: 10,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    backgroundColor: '#FFFFFF',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  modalScroll: {
+    flex: 1,
+  },
+  modalScrollContent: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  formGroup: {
+    marginBottom: 20,
+  },
+  formLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+    marginBottom: 8,
+  },
+  formHint: {
+    fontSize: 12,
+    color: '#666666',
+    marginTop: 6,
+    fontStyle: 'italic',
+  },
+  input: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#1A1A1A',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  textArea: {
+    height: 100,
+    textAlignVertical: 'top',
+    paddingTop: 14,
+  },
+  imageUploadButton: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+  },
+  imageUploadPlaceholder: {
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageUploadText: {
+    fontSize: 14,
+    color: '#666666',
+    marginTop: 8,
+  },
+  uploadedImage: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
+  },
+  shapeSelector: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  shapeOption: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+  },
+  shapeOptionActive: {
+    backgroundColor: managerColors.highlight,
+    borderColor: managerColors.highlight,
+  },
+  shapeOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666666',
+  },
+  shapeOptionTextActive: {
+    color: '#1A1A1A',
+  },
+  optionsScroll: {
+    maxHeight: 50,
+  },
+  optionButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  optionButtonActive: {
+    backgroundColor: managerColors.highlight,
+    borderColor: managerColors.highlight,
+  },
+  optionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666666',
+  },
+  optionButtonTextActive: {
+    color: '#1A1A1A',
+  },
+  checkboxGroup: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  checkbox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  checkboxBox: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxBoxChecked: {
+    backgroundColor: managerColors.highlight,
+    borderColor: managerColors.highlight,
+  },
+  checkboxLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  saveButton: {
+    backgroundColor: managerColors.highlight,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  saveButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1A1A1A',
+  },
+  cancelButton: {
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666666',
   },
 });
