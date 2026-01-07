@@ -449,7 +449,8 @@ export default function SignatureRecipesEditorScreen() {
 
       if (editingRecipe) {
         const { error } = await supabase.rpc('update_signature_recipe', {
-          p_id: editingRecipe.id,
+          p_user_id: user?.id,
+          p_recipe_id: editingRecipe.id,
           p_name: recipeData.name,
           p_price: recipeData.price,
           p_subcategory: recipeData.subcategory,
@@ -458,13 +459,13 @@ export default function SignatureRecipesEditorScreen() {
           p_procedure: recipeData.procedure,
           p_thumbnail_url: recipeData.thumbnail_url,
           p_display_order: recipeData.display_order,
-          p_is_active: recipeData.is_active,
         });
 
         if (error) throw error;
         Alert.alert('Success', 'Recipe updated successfully');
       } else {
-        const { error } = await supabase.rpc('insert_signature_recipe', {
+        const { error } = await supabase.rpc('create_signature_recipe', {
+          p_user_id: user?.id,
           p_name: recipeData.name,
           p_price: recipeData.price,
           p_subcategory: recipeData.subcategory,
@@ -473,7 +474,6 @@ export default function SignatureRecipesEditorScreen() {
           p_procedure: recipeData.procedure,
           p_thumbnail_url: recipeData.thumbnail_url,
           p_display_order: recipeData.display_order,
-          p_is_active: recipeData.is_active,
         });
 
         if (error) throw error;
@@ -499,7 +499,8 @@ export default function SignatureRecipesEditorScreen() {
         onPress: async () => {
           try {
             const { error } = await supabase.rpc('delete_signature_recipe', {
-              p_id: recipe.id,
+              p_user_id: user?.id,
+              p_recipe_id: recipe.id,
             });
 
             if (error) throw error;
