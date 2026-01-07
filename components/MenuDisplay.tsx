@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -74,9 +74,32 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     loadMenuItems();
   }, []);
 
+  const filterItems = useCallback(() => {
+    let filtered = menuItems;
+
+    // Filter by category
+    if (selectedCategory === 'Weekly Specials') {
+      filtered = filtered.filter(item => item.category === 'Weekly Specials');
+    } else if (selectedCategory === 'Lunch') {
+      filtered = filtered.filter(item => item.available_for_lunch);
+    } else if (selectedCategory === 'Dinner') {
+      filtered = filtered.filter(item => item.available_for_dinner);
+    } else {
+      // For other categories (Libations, Wine, Happy Hour), use the category field
+      filtered = filtered.filter(item => item.category === selectedCategory);
+    }
+
+    // Filter by subcategory if selected and not "All"
+    if (selectedSubcategory && selectedSubcategory !== 'All') {
+      filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
+    }
+
+    setFilteredItems(filtered);
+  }, [menuItems, selectedCategory, selectedSubcategory]);
+
   useEffect(() => {
     filterItems();
-  }, [menuItems, selectedCategory, selectedSubcategory]);
+  }, [filterItems]);
 
   // Set the default subcategory when category changes
   useEffect(() => {
@@ -105,29 +128,6 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const filterItems = () => {
-    let filtered = menuItems;
-
-    // Filter by category
-    if (selectedCategory === 'Weekly Specials') {
-      filtered = filtered.filter(item => item.category === 'Weekly Specials');
-    } else if (selectedCategory === 'Lunch') {
-      filtered = filtered.filter(item => item.available_for_lunch);
-    } else if (selectedCategory === 'Dinner') {
-      filtered = filtered.filter(item => item.available_for_dinner);
-    } else {
-      // For other categories (Libations, Wine, Happy Hour), use the category field
-      filtered = filtered.filter(item => item.category === selectedCategory);
-    }
-
-    // Filter by subcategory if selected and not "All"
-    if (selectedSubcategory && selectedSubcategory !== 'All') {
-      filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
-    }
-
-    setFilteredItems(filtered);
   };
 
   const openImageModal = (imageUrl: string) => {
@@ -284,7 +284,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           <View style={styles.emptyContainer}>
             <IconSymbol
               ios_icon_name="fork.knife"
-              android_material_icon_name="restaurant_menu"
+              android_material_icon_name="restaurant-menu"
               size={64}
               color={colors.textSecondary}
             />
