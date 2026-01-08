@@ -59,7 +59,7 @@ export default function SignatureRecipesScreen() {
     try {
       setLoading(true);
       const { data, error } = await supabase
-        .from('signature-recipes')
+        .from('signature_recipes')
         .select('*')
         .eq('is_active', true)
         .order('display_order', { ascending: true })
