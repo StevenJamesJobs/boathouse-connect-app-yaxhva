@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -87,10 +87,6 @@ export default function MenuEditorScreen() {
     loadMenuItems();
   }, []);
 
-  useEffect(() => {
-    filterItems();
-  }, [menuItems, searchQuery, selectedCategory, selectedSubcategory]);
-
   const loadMenuItems = async () => {
     try {
       setLoading(true);
@@ -110,7 +106,7 @@ export default function MenuEditorScreen() {
     }
   };
 
-  const filterItems = () => {
+  const filterItems = useCallback(() => {
     let filtered = menuItems;
 
     // Filter by category
@@ -141,7 +137,11 @@ export default function MenuEditorScreen() {
     }
 
     setFilteredItems(filtered);
-  };
+  }, [menuItems, searchQuery, selectedCategory, selectedSubcategory]);
+
+  useEffect(() => {
+    filterItems();
+  }, [filterItems]);
 
   const pickImage = async () => {
     try {

@@ -84,36 +84,6 @@ export default function BartenderAssistantEditorScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Signature Recipes Editor */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <IconSymbol
-                  ios_icon_name="star.fill"
-                  android_material_icon_name="star"
-                  size={32}
-                  color={managerColors.highlight}
-                />
-                <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Signature Recipes Editor</Text>
-                  <Text style={styles.cardDescription}>
-                    Create and edit McLoone&apos;s signature cocktails
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => router.push('/signature-recipes-editor')}
-              >
-                <Text style={styles.cardButtonText}>Manage Recipes</Text>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={managerColors.text}
-                />
-              </TouchableOpacity>
-            </View>
-
             {/* General Knowledge Editor */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>

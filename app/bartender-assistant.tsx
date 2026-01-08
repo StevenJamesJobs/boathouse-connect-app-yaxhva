@@ -89,36 +89,6 @@ export default function BartenderAssistantScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Signature Recipes Section */}
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              <View style={styles.cardHeader}>
-                <IconSymbol
-                  ios_icon_name="star.fill"
-                  android_material_icon_name="star"
-                  size={32}
-                  color={colors.primary}
-                />
-                <View style={styles.cardHeaderText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Signature Recipes</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    McLoone&apos;s exclusive cocktail recipes
-                  </Text>
-                </View>
-              </View>
-              <TouchableOpacity 
-                style={[styles.cardButton, { backgroundColor: colors.primary }]}
-                onPress={() => router.push('/signature-recipes')}
-              >
-                <Text style={[styles.cardButtonText, { color: colors.text }]}>View Recipes</Text>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
-            </View>
-
             {/* General Knowledge Section */}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
               <View style={styles.cardHeader}>
