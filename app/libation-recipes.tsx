@@ -261,7 +261,7 @@ export default function LibationRecipesScreen() {
 
               {/* Content Card - Floats over image */}
               <View style={styles.contentCard}>
-                {/* Recipe Name */}
+                {/* Recipe Name - Changed to Blue */}
                 <Text style={styles.recipeTitleLarge}>{selectedRecipe?.name}</Text>
 
                 {/* Information Section */}
@@ -282,21 +282,21 @@ export default function LibationRecipesScreen() {
                     )}
                   </View>
 
-                  {selectedRecipe?.glassware && (
+                  {/* Glassware and Garnish on same line */}
+                  {(selectedRecipe?.glassware || selectedRecipe?.garnish) && (
                     <View style={styles.infoRow}>
-                      <View style={styles.infoItem}>
-                        <Text style={styles.infoLabel}>Glassware</Text>
-                        <Text style={styles.infoValue}>{selectedRecipe.glassware}</Text>
-                      </View>
-                    </View>
-                  )}
-
-                  {selectedRecipe?.garnish && (
-                    <View style={styles.infoRow}>
-                      <View style={styles.infoItem}>
-                        <Text style={styles.infoLabel}>Garnish</Text>
-                        <Text style={styles.infoValue}>{selectedRecipe.garnish}</Text>
-                      </View>
+                      {selectedRecipe?.glassware && (
+                        <View style={styles.infoItem}>
+                          <Text style={styles.infoLabel}>Glassware</Text>
+                          <Text style={styles.infoValue}>{selectedRecipe.glassware}</Text>
+                        </View>
+                      )}
+                      {selectedRecipe?.garnish && (
+                        <View style={styles.infoItem}>
+                          <Text style={styles.infoLabel}>Garnish</Text>
+                          <Text style={styles.infoValue}>{selectedRecipe.garnish}</Text>
+                        </View>
+                      )}
                     </View>
                   )}
                 </View>
@@ -304,16 +304,16 @@ export default function LibationRecipesScreen() {
                 {/* Separator */}
                 <View style={styles.separator} />
 
-                {/* Ingredients Section */}
+                {/* Ingredients Section - Changed to Blue */}
                 <View style={styles.section}>
                   <View style={styles.sectionHeader}>
                     <IconSymbol
                       ios_icon_name="list.bullet"
                       android_material_icon_name="format-list-bulleted"
                       size={24}
-                      color="#2C3E50"
+                      color="#3498DB"
                     />
-                    <Text style={styles.sectionTitle}>Ingredients</Text>
+                    <Text style={styles.sectionTitleBlue}>Ingredients</Text>
                   </View>
                   {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
                     <View style={styles.ingredientsList}>
@@ -333,7 +333,7 @@ export default function LibationRecipesScreen() {
                 {/* Separator */}
                 <View style={styles.separator} />
 
-                {/* Procedure Section */}
+                {/* Procedure Section - Changed to Red */}
                 {selectedRecipe?.procedure && (
                   <View style={styles.section}>
                     <View style={styles.sectionHeader}>
@@ -341,9 +341,9 @@ export default function LibationRecipesScreen() {
                         ios_icon_name="doc.text"
                         android_material_icon_name="description"
                         size={24}
-                        color="#2C3E50"
+                        color="#E74C3C"
                       />
-                      <Text style={styles.sectionTitle}>Procedure</Text>
+                      <Text style={styles.sectionTitleRed}>Procedure</Text>
                     </View>
                     <Text style={styles.procedureText}>{selectedRecipe.procedure}</Text>
                   </View>
@@ -528,7 +528,7 @@ const styles = StyleSheet.create({
   recipeTitleLarge: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: '#3498DB',
     marginBottom: 24,
     lineHeight: 38,
   },
@@ -584,10 +584,15 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     gap: 10,
   },
-  sectionTitle: {
+  sectionTitleBlue: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#2C3E50',
+    color: '#3498DB',
+  },
+  sectionTitleRed: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#E74C3C',
   },
   ingredientsList: {
     gap: 12,

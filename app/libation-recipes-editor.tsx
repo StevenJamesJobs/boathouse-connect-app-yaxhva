@@ -386,11 +386,7 @@ export default function LibationRecipesEditorScreen() {
   }, {} as Record<string, LibationRecipe[]>);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-    >
+    <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
@@ -475,7 +471,11 @@ export default function LibationRecipesEditorScreen() {
 
       {/* Add/Edit Modal */}
       <Modal visible={showModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
@@ -491,7 +491,12 @@ export default function LibationRecipesEditorScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalForm}>
+            <ScrollView 
+              style={styles.modalForm}
+              contentContainerStyle={styles.modalFormContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={true}
+            >
               {/* Image Upload */}
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Recipe Image</Text>
@@ -682,11 +687,14 @@ export default function LibationRecipesEditorScreen() {
                   )}
                 </TouchableOpacity>
               </View>
+
+              {/* Extra padding at bottom to ensure buttons are visible above keyboard */}
+              <View style={styles.extraBottomPadding} />
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 
@@ -835,6 +843,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
+    flex: 1,
   },
   modalHeader: {
     flexDirection: 'row',
@@ -852,8 +861,12 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
   },
   modalForm: {
+    flex: 1,
+  },
+  modalFormContent: {
     paddingHorizontal: 24,
     paddingTop: 16,
+    paddingBottom: 40,
   },
   formField: {
     marginBottom: 20,
@@ -975,5 +988,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: managerColors.text,
+  },
+  extraBottomPadding: {
+    height: 200,
   },
 });
