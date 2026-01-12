@@ -10,6 +10,7 @@ import {
   Modal,
   Image,
   Platform,
+  Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { employeeColors, managerColors } from '@/styles/commonStyles';
@@ -50,6 +51,7 @@ export default function LibationRecipesScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedRecipe, setSelectedRecipe] = useState<LibationRecipe | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [scrollY] = useState(new Animated.Value(0));
   
   // Use manager colors if user is a manager, otherwise use employee colors
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
@@ -88,7 +90,10 @@ export default function LibationRecipesScreen() {
 
   const closeDetailModal = () => {
     setShowDetailModal(false);
-    setSelectedRecipe(null);
+    setTimeout(() => {
+      setSelectedRecipe(null);
+      scrollY.setValue(0);
+    }, 300);
   };
 
   const handleBackPress = () => {
@@ -110,6 +115,19 @@ export default function LibationRecipesScreen() {
     }
     return acc;
   }, {} as Record<string, LibationRecipe[]>);
+
+  // Animated header opacity for parallax effect
+  const imageOpacity = scrollY.interpolate({
+    inputRange: [0, 200],
+    outputRange: [1, 0.3],
+    extrapolate: 'clamp',
+  });
+
+  const imageTranslateY = scrollY.interpolate({
+    inputRange: [0, 200],
+    outputRange: [0, -50],
+    extrapolate: 'clamp',
+  });
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -159,6 +177,7 @@ export default function LibationRecipesScreen() {
                       key={index}
                       style={styles.recipeTile}
                       onPress={() => openDetailModal(recipe)}
+                      activeOpacity={0.8}
                     >
                       <Image
                         source={{ uri: getImageUrl(recipe.thumbnail_url) }}
@@ -180,7 +199,7 @@ export default function LibationRecipesScreen() {
         </ScrollView>
       )}
 
-      {/* Detail Modal */}
+      {/* Detail Modal - Beautiful Styled Card */}
       <Modal
         visible={showDetailModal}
         animationType="slide"
@@ -193,73 +212,147 @@ export default function LibationRecipesScreen() {
             activeOpacity={1}
             onPress={closeDetailModal}
           />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{selectedRecipe?.name}</Text>
-              <TouchableOpacity onPress={closeDetailModal}>
+          <View style={styles.modalCard}>
+            {/* Close Button */}
+            <TouchableOpacity 
+              style={styles.closeButton} 
+              onPress={closeDetailModal}
+              activeOpacity={0.7}
+            >
+              <View style={styles.closeButtonCircle}>
                 <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color="#666666"
+                  ios_icon_name="xmark"
+                  android_material_icon_name="close"
+                  size={20}
+                  color="#FFFFFF"
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
 
-            <ScrollView
+            <Animated.ScrollView
               style={styles.modalScroll}
               contentContainerStyle={styles.modalScrollContent}
-              showsVerticalScrollIndicator={true}
+              showsVerticalScrollIndicator={false}
+              scrollEventThrottle={16}
+              onScroll={Animated.event(
+                [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                { useNativeDriver: true }
+              )}
             >
+              {/* Floating Thumbnail Image with Parallax */}
               {selectedRecipe?.thumbnail_url && (
-                <Image
-                  source={{ uri: getImageUrl(selectedRecipe.thumbnail_url) }}
-                  style={styles.modalImage}
-                  resizeMode="cover"
-                />
+                <Animated.View 
+                  style={[
+                    styles.imageContainer,
+                    {
+                      opacity: imageOpacity,
+                      transform: [{ translateY: imageTranslateY }],
+                    }
+                  ]}
+                >
+                  <Image
+                    source={{ uri: getImageUrl(selectedRecipe.thumbnail_url) }}
+                    style={styles.heroImage}
+                    resizeMode="cover"
+                  />
+                  <View style={styles.imageGradient} />
+                </Animated.View>
               )}
 
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Price</Text>
-                <View style={[styles.priceBadge, { backgroundColor: colors.primary }]}>
-                  <Text style={[styles.priceText, { color: colors.text }]}>{selectedRecipe?.price}</Text>
-                </View>
-              </View>
+              {/* Content Card - Floats over image */}
+              <View style={styles.contentCard}>
+                {/* Recipe Name */}
+                <Text style={styles.recipeTitleLarge}>{selectedRecipe?.name}</Text>
 
-              {selectedRecipe?.glassware && (
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>Glassware</Text>
-                  <Text style={styles.detailText}>{selectedRecipe.glassware}</Text>
-                </View>
-              )}
+                {/* Information Section */}
+                <View style={styles.infoSection}>
+                  <View style={styles.infoRow}>
+                    <View style={styles.infoItem}>
+                      <Text style={styles.infoLabel}>Price</Text>
+                      <View style={styles.priceBadge}>
+                        <Text style={styles.priceValue}>{selectedRecipe?.price}</Text>
+                      </View>
+                    </View>
 
-              {selectedRecipe?.garnish && (
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>Garnish</Text>
-                  <Text style={styles.detailText}>{selectedRecipe.garnish}</Text>
-                </View>
-              )}
+                    {selectedRecipe?.category && (
+                      <View style={styles.infoItem}>
+                        <Text style={styles.infoLabel}>Category</Text>
+                        <Text style={styles.infoValue}>{selectedRecipe.category}</Text>
+                      </View>
+                    )}
+                  </View>
 
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Ingredients</Text>
-                {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
-                  selectedRecipe.ingredients.map((item, index) => (
-                    <Text key={index} style={styles.ingredientItem}>
-                      • {item.amount} {item.ingredient}
-                    </Text>
-                  ))
-                ) : (
-                  <Text style={styles.detailText}>No ingredients listed</Text>
+                  {selectedRecipe?.glassware && (
+                    <View style={styles.infoRow}>
+                      <View style={styles.infoItem}>
+                        <Text style={styles.infoLabel}>Glassware</Text>
+                        <Text style={styles.infoValue}>{selectedRecipe.glassware}</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {selectedRecipe?.garnish && (
+                    <View style={styles.infoRow}>
+                      <View style={styles.infoItem}>
+                        <Text style={styles.infoLabel}>Garnish</Text>
+                        <Text style={styles.infoValue}>{selectedRecipe.garnish}</Text>
+                      </View>
+                    </View>
+                  )}
+                </View>
+
+                {/* Separator */}
+                <View style={styles.separator} />
+
+                {/* Ingredients Section */}
+                <View style={styles.section}>
+                  <View style={styles.sectionHeader}>
+                    <IconSymbol
+                      ios_icon_name="list.bullet"
+                      android_material_icon_name="format-list-bulleted"
+                      size={24}
+                      color="#2C3E50"
+                    />
+                    <Text style={styles.sectionTitle}>Ingredients</Text>
+                  </View>
+                  {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
+                    <View style={styles.ingredientsList}>
+                      {selectedRecipe.ingredients.map((item, index) => (
+                        <View key={index} style={styles.ingredientRow}>
+                          <View style={styles.ingredientBullet} />
+                          <Text style={styles.ingredientAmount}>{item.amount}</Text>
+                          <Text style={styles.ingredientName}>{item.ingredient}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : (
+                    <Text style={styles.noDataText}>No ingredients listed</Text>
+                  )}
+                </View>
+
+                {/* Separator */}
+                <View style={styles.separator} />
+
+                {/* Procedure Section */}
+                {selectedRecipe?.procedure && (
+                  <View style={styles.section}>
+                    <View style={styles.sectionHeader}>
+                      <IconSymbol
+                        ios_icon_name="doc.text"
+                        android_material_icon_name="description"
+                        size={24}
+                        color="#2C3E50"
+                      />
+                      <Text style={styles.sectionTitle}>Procedure</Text>
+                    </View>
+                    <Text style={styles.procedureText}>{selectedRecipe.procedure}</Text>
+                  </View>
                 )}
-              </View>
 
-              {selectedRecipe?.procedure && (
-                <View style={styles.detailSection}>
-                  <Text style={styles.detailLabel}>Procedure</Text>
-                  <Text style={styles.detailText}>{selectedRecipe.procedure}</Text>
-                </View>
-              )}
-            </ScrollView>
+                {/* Bottom Padding for safe scrolling */}
+                <View style={styles.bottomPadding} />
+              </View>
+            </Animated.ScrollView>
           </View>
         </View>
       </Modal>
@@ -364,7 +457,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    justifyContent: 'flex-start',
+    justifyContent: 'flex-end',
   },
   modalBackdrop: {
     position: 'absolute',
@@ -372,75 +465,174 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
   },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '90%',
-    marginTop: 'auto',
-    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
-    elevation: 10,
+  modalCard: {
+    backgroundColor: '#F8F9FA',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    height: '92%',
+    overflow: 'hidden',
+    boxShadow: '0px -4px 24px rgba(0, 0, 0, 0.5)',
+    elevation: 12,
   },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  closeButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 100,
+  },
+  closeButtonCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    flex: 1,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 5,
   },
   modalScroll: {
     flex: 1,
   },
   modalScrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 60,
   },
-  modalImage: {
+  imageContainer: {
     width: '100%',
-    height: 250,
-    borderRadius: 16,
-    marginBottom: 24,
+    height: 300,
+    position: 'relative',
   },
-  detailSection: {
-    marginBottom: 24,
+  heroImage: {
+    width: '100%',
+    height: '100%',
   },
-  detailLabel: {
-    fontSize: 16,
+  imageGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+    background: 'linear-gradient(to bottom, transparent, rgba(248, 249, 250, 0.9))',
+  },
+  contentCard: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    marginTop: -28,
+    paddingTop: 28,
+    paddingHorizontal: 24,
+    boxShadow: '0px -2px 16px rgba(0, 0, 0, 0.1)',
+    elevation: 8,
+  },
+  recipeTitleLarge: {
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#1A1A1A',
+    marginBottom: 24,
+    lineHeight: 38,
+  },
+  infoSection: {
     marginBottom: 8,
   },
+  infoRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 16,
+    gap: 16,
+  },
+  infoItem: {
+    flex: 1,
+    minWidth: '45%',
+  },
+  infoLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#7F8C8D',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  infoValue: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#2C3E50',
+  },
   priceBadge: {
-    alignSelf: 'flex-start',
+    backgroundColor: '#27AE60',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
+    alignSelf: 'flex-start',
   },
-  priceText: {
+  priceValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  separator: {
+    height: 1,
+    backgroundColor: '#E8EAED',
+    marginVertical: 24,
+  },
+  section: {
+    marginBottom: 8,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 10,
+  },
+  sectionTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+  },
+  ingredientsList: {
+    gap: 12,
+  },
+  ingredientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 10,
+    gap: 12,
+  },
+  ingredientBullet: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#3498DB',
+  },
+  ingredientAmount: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#2C3E50',
+    minWidth: 80,
   },
-  detailText: {
-    fontSize: 15,
-    color: '#333333',
-    lineHeight: 24,
+  ingredientName: {
+    fontSize: 16,
+    fontWeight: '400',
+    color: '#34495E',
+    flex: 1,
   },
-  ingredientItem: {
+  noDataText: {
     fontSize: 15,
-    color: '#333333',
-    lineHeight: 24,
-    marginBottom: 4,
+    color: '#95A5A6',
+    fontStyle: 'italic',
+  },
+  procedureText: {
+    fontSize: 16,
+    lineHeight: 26,
+    color: '#34495E',
+    backgroundColor: '#F8F9FA',
+    padding: 16,
+    borderRadius: 12,
+  },
+  bottomPadding: {
+    height: 40,
   },
 });
