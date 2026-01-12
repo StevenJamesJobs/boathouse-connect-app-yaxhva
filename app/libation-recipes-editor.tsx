@@ -131,7 +131,7 @@ export default function LibationRecipesEditorScreen() {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Convert base64 to Uint8Array
+      // Convert base64 to Uint8Array (same as cocktails editor)
       const byteCharacters = atob(base64);
       const byteNumbers = new Array(byteCharacters.length);
       for (let i = 0; i < byteCharacters.length; i++) {
@@ -151,7 +151,7 @@ export default function LibationRecipesEditorScreen() {
       else if (fileExt === 'gif') contentType = 'image/gif';
       else if (fileExt === 'webp') contentType = 'image/webp';
 
-      // Upload to Supabase Storage
+      // Upload to Supabase Storage (same pattern as cocktails editor)
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('libation-recipe-images')
         .upload(fileName, byteArray, {
@@ -216,27 +216,22 @@ export default function LibationRecipesEditorScreen() {
 
       setLoading(true);
 
-      const recipeData = {
-        name: name.trim(),
-        price: price.trim(),
-        category: category,
-        glassware: glassware.trim() || null,
-        garnish: garnish.trim() || null,
-        ingredients: validIngredients,
-        procedure: procedure.trim() || null,
-        thumbnail_url: thumbnailUrl,
-        display_order: displayOrder.trim() ? parseInt(displayOrder.trim()) : (editingRecipe?.display_order || recipes.length),
-        created_by: user.id,
-        updated_at: new Date().toISOString(),
-      };
-
       if (editingRecipe) {
-        // Update existing recipe
+        // Update existing recipe using RPC function (same pattern as cocktails editor)
         console.log('Updating libation recipe:', editingRecipe.id);
-        const { error } = await supabase
-          .from('libation_recipes')
-          .update(recipeData)
-          .eq('id', editingRecipe.id);
+        const { data, error } = await supabase.rpc('update_libation_recipe', {
+          p_user_id: user.id,
+          p_recipe_id: editingRecipe.id,
+          p_name: name.trim(),
+          p_price: price.trim(),
+          p_category: category,
+          p_glassware: glassware.trim() || null,
+          p_garnish: garnish.trim() || null,
+          p_ingredients: validIngredients,
+          p_procedure: procedure.trim() || null,
+          p_thumbnail_url: thumbnailUrl,
+          p_display_order: displayOrder.trim() ? parseInt(displayOrder.trim()) : editingRecipe.display_order,
+        });
 
         if (error) {
           console.error('Error updating libation recipe:', error);
@@ -245,11 +240,20 @@ export default function LibationRecipesEditorScreen() {
         console.log('Libation recipe updated successfully');
         Alert.alert('Success', 'Recipe updated successfully');
       } else {
-        // Insert new recipe
+        // Insert new recipe using RPC function (same pattern as cocktails editor)
         console.log('Adding new libation recipe');
-        const { error } = await supabase
-          .from('libation_recipes')
-          .insert(recipeData);
+        const { data, error } = await supabase.rpc('insert_libation_recipe', {
+          p_user_id: user.id,
+          p_name: name.trim(),
+          p_price: price.trim(),
+          p_category: category,
+          p_glassware: glassware.trim() || null,
+          p_garnish: garnish.trim() || null,
+          p_ingredients: validIngredients,
+          p_procedure: procedure.trim() || null,
+          p_thumbnail_url: thumbnailUrl,
+          p_display_order: displayOrder.trim() ? parseInt(displayOrder.trim()) : recipes.length,
+        });
 
         if (error) {
           console.error('Error adding libation recipe:', error);
@@ -278,11 +282,17 @@ export default function LibationRecipesEditorScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
+            if (!user?.id) {
+              Alert.alert('Error', 'You must be logged in to delete recipes');
+              return;
+            }
+
             console.log('Deleting libation recipe:', recipe.id);
-            const { error } = await supabase
-              .from('libation_recipes')
-              .update({ is_active: false })
-              .eq('id', recipe.id);
+            // Use RPC function to delete (same pattern as cocktails editor)
+            const { error } = await supabase.rpc('delete_libation_recipe', {
+              p_user_id: user.id,
+              p_recipe_id: recipe.id,
+            });
 
             if (error) {
               console.error('Error deleting libation recipe:', error);
