@@ -59,6 +59,36 @@ export default function BartenderAssistantScreen() {
 
         {activeTab === 'encyclopedia' ? (
           <>
+            {/* Libation Recipes Section */}
+            <View style={[styles.card, { backgroundColor: colors.card }]}>
+              <View style={styles.cardHeader}>
+                <IconSymbol
+                  ios_icon_name="wineglass"
+                  android_material_icon_name="local-bar"
+                  size={32}
+                  color={colors.primary}
+                />
+                <View style={styles.cardHeaderText}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Libation Recipes</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                    Browse cocktail recipes by category
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={[styles.cardButton, { backgroundColor: colors.primary }]}
+                onPress={() => router.push('/libation-recipes')}
+              >
+                <Text style={[styles.cardButtonText, { color: colors.text }]}>View Recipes</Text>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={colors.text}
+                />
+              </TouchableOpacity>
+            </View>
+
             {/* Cocktails A-Z Section */}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
               <View style={styles.cardHeader}>

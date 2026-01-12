@@ -54,6 +54,36 @@ export default function BartenderAssistantEditorScreen() {
 
         {activeTab === 'encyclopedia' ? (
           <>
+            {/* Libation Recipes Editor */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <IconSymbol
+                  ios_icon_name="wineglass"
+                  android_material_icon_name="local-bar"
+                  size={32}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardHeaderText}>
+                  <Text style={styles.cardTitle}>Libation Recipes Editor</Text>
+                  <Text style={styles.cardDescription}>
+                    Add and manage cocktail recipes by category
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.cardButton}
+                onPress={() => router.push('/libation-recipes-editor')}
+              >
+                <Text style={styles.cardButtonText}>Manage Recipes</Text>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={managerColors.text}
+                />
+              </TouchableOpacity>
+            </View>
+
             {/* Cocktails A-Z Editor */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
