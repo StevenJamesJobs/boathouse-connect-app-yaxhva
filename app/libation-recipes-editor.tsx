@@ -990,6 +990,6 @@ const styles = StyleSheet.create({
     color: managerColors.text,
   },
   extraBottomPadding: {
-    height: 200,
+    height: 30,
   },
 });

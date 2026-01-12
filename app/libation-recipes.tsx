@@ -340,7 +340,7 @@ export default function LibationRecipesScreen() {
                       <IconSymbol
                         ios_icon_name="doc.text"
                         android_material_icon_name="description"
-                        size={24}
+                        size={30}
                         color="#E74C3C"
                       />
                       <Text style={styles.sectionTitleRed}>Procedure</Text>
@@ -630,7 +630,7 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   procedureText: {
-    fontSize: 16,
+    fontSize: 18,
     lineHeight: 26,
     color: '#34495E',
     backgroundColor: '#F8F9FA',

@@ -10,6 +10,7 @@ import {
   Modal,
   ActivityIndicator,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -47,6 +48,20 @@ const SUBCATEGORIES: { [key: string]: string[] } = {
   'Happy Hour': ['Appetizers', 'Drinks', 'Spirits', 'All'],
 };
 
+// Filter options
+const FILTER_OPTIONS = [
+  { key: 'dinner', label: 'Dinner' },
+  { key: 'lunch', label: 'Lunch' },
+  { key: 'gf', label: 'GF' },
+  { key: 'gfa', label: 'GFA' },
+  { key: 'v', label: 'V' },
+  { key: 'va', label: 'VA' },
+  { key: 'wine', label: 'Wine' },
+  { key: 'libations', label: 'Libations' },
+  { key: 'happyHour', label: 'Happy Hour' },
+  { key: 'weeklySpecials', label: 'Weekly Specials' },
+];
+
 interface MenuDisplayProps {
   colors: {
     background: string;
@@ -63,12 +78,15 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Weekly Specials');
   const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
   useEffect(() => {
     loadMenuItems();
@@ -77,25 +95,70 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const filterItems = useCallback(() => {
     let filtered = menuItems;
 
-    // Filter by category
-    if (selectedCategory === 'Weekly Specials') {
-      filtered = filtered.filter(item => item.category === 'Weekly Specials');
-    } else if (selectedCategory === 'Lunch') {
-      filtered = filtered.filter(item => item.available_for_lunch);
-    } else if (selectedCategory === 'Dinner') {
-      filtered = filtered.filter(item => item.available_for_dinner);
-    } else {
-      // For other categories (Libations, Wine, Happy Hour), use the category field
-      filtered = filtered.filter(item => item.category === selectedCategory);
+    // Apply search query first
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        item =>
+          item.name.toLowerCase().includes(query) ||
+          (item.description && item.description.toLowerCase().includes(query)) ||
+          (item.category && item.category.toLowerCase().includes(query)) ||
+          (item.subcategory && item.subcategory.toLowerCase().includes(query))
+      );
     }
 
-    // Filter by subcategory if selected and not "All"
-    if (selectedSubcategory && selectedSubcategory !== 'All') {
-      filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
+    // Apply active filters
+    if (activeFilters.length > 0) {
+      filtered = filtered.filter(item => {
+        return activeFilters.every(filter => {
+          switch (filter) {
+            case 'dinner':
+              return item.available_for_dinner;
+            case 'lunch':
+              return item.available_for_lunch;
+            case 'gf':
+              return item.is_gluten_free;
+            case 'gfa':
+              return item.is_gluten_free_available;
+            case 'v':
+              return item.is_vegetarian;
+            case 'va':
+              return item.is_vegetarian_available;
+            case 'wine':
+              return item.category === 'Wine';
+            case 'libations':
+              return item.category === 'Libations';
+            case 'happyHour':
+              return item.category === 'Happy Hour';
+            case 'weeklySpecials':
+              return item.category === 'Weekly Specials';
+            default:
+              return true;
+          }
+        });
+      });
+    } else {
+      // Only apply category/subcategory filters if no active filters
+      // Filter by category
+      if (selectedCategory === 'Weekly Specials') {
+        filtered = filtered.filter(item => item.category === 'Weekly Specials');
+      } else if (selectedCategory === 'Lunch') {
+        filtered = filtered.filter(item => item.available_for_lunch);
+      } else if (selectedCategory === 'Dinner') {
+        filtered = filtered.filter(item => item.available_for_dinner);
+      } else {
+        // For other categories (Libations, Wine, Happy Hour), use the category field
+        filtered = filtered.filter(item => item.category === selectedCategory);
+      }
+
+      // Filter by subcategory if selected and not "All"
+      if (selectedSubcategory && selectedSubcategory !== 'All') {
+        filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
+      }
     }
 
     setFilteredItems(filtered);
-  }, [menuItems, selectedCategory, selectedSubcategory]);
+  }, [menuItems, searchQuery, selectedCategory, selectedSubcategory, activeFilters]);
 
   useEffect(() => {
     filterItems();
@@ -148,6 +211,37 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const closeDetailModal = () => {
     setDetailModalVisible(false);
     setSelectedMenuItem(null);
+  };
+
+  const openFilterModal = () => {
+    setFilterModalVisible(true);
+  };
+
+  const closeFilterModal = () => {
+    setFilterModalVisible(false);
+  };
+
+  const toggleFilter = (filterKey: string) => {
+    setActiveFilters(prev => {
+      if (prev.includes(filterKey)) {
+        return prev.filter(f => f !== filterKey);
+      } else {
+        return [...prev, filterKey];
+      }
+    });
+  };
+
+  const removeFilter = (filterKey: string) => {
+    setActiveFilters(prev => prev.filter(f => f !== filterKey));
+  };
+
+  const clearAllFilters = () => {
+    setActiveFilters([]);
+  };
+
+  const getFilterLabel = (filterKey: string) => {
+    const option = FILTER_OPTIONS.find(opt => opt.key === filterKey);
+    return option ? option.label : filterKey;
   };
 
   const handleSwipeGesture = (event: any) => {
@@ -214,39 +308,112 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   return (
     <GestureHandlerRootView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Category Tabs */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
-          contentContainerStyle={styles.categoryScrollContent}
-        >
-          {CATEGORIES.map((category, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.categoryTab,
-                selectedCategory === category && styles.categoryTabActive,
-              ]}
-              onPress={() => {
-                setSelectedCategory(category);
-                // selectedSubcategory will be set by the useEffect
-              }}
-            >
-              <Text
-                style={[
-                  styles.categoryTabText,
-                  selectedCategory === category && styles.categoryTabTextActive,
-                ]}
-              >
-                {category}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+        {/* Search Bar and Filter Button */}
+        <View style={styles.searchFilterContainer}>
+          <View style={styles.searchContainer}>
+            <IconSymbol
+              ios_icon_name="magnifyingglass"
+              android_material_icon_name="search"
+              size={20}
+              color={colors.textSecondary}
+            />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search menu items..."
+              placeholderTextColor={colors.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
+          <TouchableOpacity style={styles.filterButton} onPress={openFilterModal}>
+            <IconSymbol
+              ios_icon_name="line.3.horizontal.decrease.circle"
+              android_material_icon_name="filter_list"
+              size={20}
+              color={colors.text}
+            />
+            <Text style={styles.filterButtonText}>Filter</Text>
+            {activeFilters.length > 0 && (
+              <View style={styles.filterBadge}>
+                <Text style={styles.filterBadgeText}>{activeFilters.length}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
 
-        {/* Subcategory Tabs */}
-        {SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
+        {/* Active Filter Chips */}
+        {activeFilters.length > 0 && (
+          <View style={styles.activeFiltersContainer}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.activeFiltersContent}
+            >
+              {activeFilters.map((filter, index) => (
+                <View key={index} style={styles.activeFilterChip}>
+                  <Text style={styles.activeFilterChipText}>{getFilterLabel(filter)}</Text>
+                  <TouchableOpacity onPress={() => removeFilter(filter)}>
+                    <IconSymbol
+                      ios_icon_name="xmark"
+                      android_material_icon_name="close"
+                      size={14}
+                      color={colors.text}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ))}
+              <TouchableOpacity style={styles.clearAllButton} onPress={clearAllFilters}>
+                <Text style={styles.clearAllButtonText}>Clear All</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Category Tabs - Only show if no active filters */}
+        {activeFilters.length === 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.categoryScroll}
+            contentContainerStyle={styles.categoryScrollContent}
+          >
+            {CATEGORIES.map((category, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.categoryTab,
+                  selectedCategory === category && styles.categoryTabActive,
+                ]}
+                onPress={() => {
+                  setSelectedCategory(category);
+                  // selectedSubcategory will be set by the useEffect
+                }}
+              >
+                <Text
+                  style={[
+                    styles.categoryTabText,
+                    selectedCategory === category && styles.categoryTabTextActive,
+                  ]}
+                >
+                  {category}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* Subcategory Tabs - Only show if no active filters */}
+        {activeFilters.length === 0 && SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -284,13 +451,15 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           <View style={styles.emptyContainer}>
             <IconSymbol
               ios_icon_name="fork.knife"
-              android_material_icon_name="restaurant-menu"
+              android_material_icon_name="restaurant_menu"
               size={64}
               color={colors.textSecondary}
             />
-            <Text style={styles.emptyText}>No menu items available</Text>
+            <Text style={styles.emptyText}>No menu items found</Text>
             <Text style={styles.emptySubtext}>
-              Check back later for updates
+              {searchQuery || activeFilters.length > 0
+                ? 'Try adjusting your search or filters'
+                : 'Check back later for updates'}
             </Text>
           </View>
         ) : (
@@ -417,6 +586,84 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         )}
       </ScrollView>
 
+      {/* Filter Modal */}
+      <Modal
+        visible={filterModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={closeFilterModal}
+      >
+        <View style={styles.filterModalContainer}>
+          <TouchableOpacity 
+            style={styles.filterModalBackdrop} 
+            activeOpacity={1} 
+            onPress={closeFilterModal}
+          />
+          <View style={styles.filterModalContent}>
+            <View style={styles.filterModalHeader}>
+              <Text style={styles.filterModalTitle}>Filter Menu Items</Text>
+              <TouchableOpacity onPress={closeFilterModal}>
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={28}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.filterModalScroll} contentContainerStyle={styles.filterModalScrollContent}>
+              {FILTER_OPTIONS.map((option, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={[
+                    styles.filterOption,
+                    activeFilters.includes(option.key) && styles.filterOptionActive,
+                  ]}
+                  onPress={() => toggleFilter(option.key)}
+                >
+                  <View
+                    style={[
+                      styles.filterCheckbox,
+                      activeFilters.includes(option.key) && styles.filterCheckboxActive,
+                    ]}
+                  >
+                    {activeFilters.includes(option.key) && (
+                      <IconSymbol
+                        ios_icon_name="checkmark"
+                        android_material_icon_name="check"
+                        size={16}
+                        color={colors.text}
+                      />
+                    )}
+                  </View>
+                  <Text
+                    style={[
+                      styles.filterOptionText,
+                      activeFilters.includes(option.key) && styles.filterOptionTextActive,
+                    ]}
+                  >
+                    {option.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+
+              {activeFilters.length > 0 && (
+                <TouchableOpacity style={styles.clearFiltersButton} onPress={clearAllFilters}>
+                  <Text style={styles.clearFiltersButtonText}>Clear All Filters</Text>
+                </TouchableOpacity>
+              )}
+            </ScrollView>
+
+            <TouchableOpacity style={styles.applyFiltersButton} onPress={closeFilterModal}>
+              <Text style={styles.applyFiltersButtonText}>
+                Apply Filters {activeFilters.length > 0 && `(${activeFilters.length})`}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Image Modal (kept for backward compatibility if needed) */}
       <Modal
         visible={imageModalVisible}
@@ -478,6 +725,95 @@ const createStyles = (colors: any) =>
     contentContainer: {
       paddingTop: 20,
       paddingBottom: 100,
+    },
+    searchFilterContainer: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      marginBottom: 12,
+      gap: 8,
+    },
+    searchContainer: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+      boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+      elevation: 2,
+    },
+    searchInput: {
+      flex: 1,
+      marginLeft: 8,
+      fontSize: 15,
+      color: colors.text,
+    },
+    filterButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+      gap: 6,
+      boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
+      elevation: 2,
+    },
+    filterButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    filterBadge: {
+      backgroundColor: colors.primary,
+      borderRadius: 10,
+      width: 20,
+      height: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: 4,
+    },
+    filterBadgeText: {
+      fontSize: 11,
+      fontWeight: 'bold',
+      color: '#FFFFFF',
+    },
+    activeFiltersContainer: {
+      paddingHorizontal: 16,
+      marginBottom: 12,
+    },
+    activeFiltersContent: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    activeFilterChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.highlight,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      gap: 6,
+    },
+    activeFilterChipText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    clearAllButton: {
+      backgroundColor: colors.card,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    clearAllButtonText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
     },
     categoryScroll: {
       maxHeight: 50,
@@ -649,6 +985,111 @@ const createStyles = (colors: any) =>
       fontSize: 11,
       fontWeight: '600',
       color: colors.text,
+    },
+    // Filter Modal Styles
+    filterModalContainer: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    filterModalBackdrop: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    filterModalContent: {
+      backgroundColor: colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      maxHeight: '70%',
+      boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.2)',
+      elevation: 10,
+    },
+    filterModalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 20,
+      paddingTop: 20,
+      paddingBottom: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    filterModalTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    filterModalScroll: {
+      flex: 1,
+    },
+    filterModalScrollContent: {
+      padding: 20,
+      paddingBottom: 20,
+    },
+    filterOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      marginBottom: 10,
+      gap: 12,
+    },
+    filterOptionActive: {
+      backgroundColor: colors.highlight,
+    },
+    filterCheckbox: {
+      width: 24,
+      height: 24,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    filterCheckboxActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    filterOptionText: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: colors.text,
+    },
+    filterOptionTextActive: {
+      fontWeight: '600',
+    },
+    clearFiltersButton: {
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    clearFiltersButtonText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    applyFiltersButton: {
+      backgroundColor: colors.primary,
+      marginHorizontal: 20,
+      marginVertical: 16,
+      borderRadius: 12,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    applyFiltersButtonText: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: '#FFFFFF',
     },
     imageModalOverlay: {
       flex: 1,
