@@ -15,7 +15,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { managerColors } from '@/styles/commonStyles';
@@ -28,6 +28,7 @@ interface LibationRecipe {
   price: string;
   category: string;
   glassware: string | null;
+  garnish: string | null;
   ingredients: { amount: string; ingredient: string }[];
   procedure: string | null;
   thumbnail_url: string | null;
@@ -59,10 +60,12 @@ export default function LibationRecipesEditorScreen() {
   const [price, setPrice] = useState('');
   const [category, setCategory] = useState('');
   const [glassware, setGlassware] = useState('');
+  const [garnish, setGarnish] = useState('');
   const [ingredients, setIngredients] = useState<{ amount: string; ingredient: string }[]>([
     { amount: '', ingredient: '' },
   ]);
   const [procedure, setProcedure] = useState('');
+  const [displayOrder, setDisplayOrder] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
@@ -218,9 +221,11 @@ export default function LibationRecipesEditorScreen() {
         price: price.trim(),
         category: category,
         glassware: glassware.trim() || null,
+        garnish: garnish.trim() || null,
         ingredients: validIngredients,
         procedure: procedure.trim() || null,
         thumbnail_url: thumbnailUrl,
+        display_order: displayOrder.trim() ? parseInt(displayOrder.trim()) : (editingRecipe?.display_order || recipes.length),
         created_by: user.id,
         updated_at: new Date().toISOString(),
       };
@@ -244,10 +249,7 @@ export default function LibationRecipesEditorScreen() {
         console.log('Adding new libation recipe');
         const { error } = await supabase
           .from('libation_recipes')
-          .insert({
-            ...recipeData,
-            display_order: recipes.length,
-          });
+          .insert(recipeData);
 
         if (error) {
           console.error('Error adding libation recipe:', error);
@@ -308,12 +310,14 @@ export default function LibationRecipesEditorScreen() {
     setPrice(recipe.price);
     setCategory(recipe.category);
     setGlassware(recipe.glassware || '');
+    setGarnish(recipe.garnish || '');
     setIngredients(
       recipe.ingredients.length > 0
         ? recipe.ingredients
         : [{ amount: '', ingredient: '' }]
     );
     setProcedure(recipe.procedure || '');
+    setDisplayOrder(recipe.display_order.toString());
     setThumbnailUrl(recipe.thumbnail_url);
     setShowModal(true);
   };
@@ -329,8 +333,10 @@ export default function LibationRecipesEditorScreen() {
     setPrice('');
     setCategory('');
     setGlassware('');
+    setGarnish('');
     setIngredients([{ amount: '', ingredient: '' }]);
     setProcedure('');
+    setDisplayOrder('');
     setThumbnailUrl(null);
   };
 
@@ -407,34 +413,44 @@ export default function LibationRecipesEditorScreen() {
         ) : (
           Object.entries(recipesByCategory).map(([cat, categoryRecipes], categoryIndex) => (
             <React.Fragment key={categoryIndex}>
+              {/* Category Header */}
               <Text style={styles.categoryTitle}>{cat}</Text>
-              {categoryRecipes.map((recipe, index) => (
-                <View key={index} style={styles.recipeCard}>
-                  <Image
-                    source={{ uri: getImageUrl(recipe.thumbnail_url) }}
-                    style={styles.recipeThumbnail}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.recipeInfo}>
-                    <Text style={styles.recipeName}>{recipe.name}</Text>
-                    <Text style={styles.recipePrice}>{recipe.price}</Text>
+              
+              {/* Horizontal Scrollable Recipe Cards */}
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false}
+                style={styles.horizontalScroll}
+                contentContainerStyle={styles.horizontalScrollContent}
+              >
+                {categoryRecipes.map((recipe, index) => (
+                  <View key={index} style={styles.recipeCard}>
+                    <Image
+                      source={{ uri: getImageUrl(recipe.thumbnail_url) }}
+                      style={styles.recipeThumbnail}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.recipeInfo}>
+                      <Text style={styles.recipeName} numberOfLines={2}>{recipe.name}</Text>
+                      <Text style={styles.recipePrice}>{recipe.price}</Text>
+                    </View>
+                    <View style={styles.recipeActions}>
+                      <TouchableOpacity
+                        style={styles.editButton}
+                        onPress={() => openEditModal(recipe)}
+                      >
+                        <Text style={styles.buttonText}>Edit</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.deleteButton}
+                        onPress={() => handleDelete(recipe)}
+                      >
+                        <Text style={styles.buttonText}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <View style={styles.recipeActions}>
-                    <TouchableOpacity
-                      style={styles.editButton}
-                      onPress={() => openEditModal(recipe)}
-                    >
-                      <Text style={styles.buttonText}>Edit</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.deleteButton}
-                      onPress={() => handleDelete(recipe)}
-                    >
-                      <Text style={styles.buttonText}>Delete</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              ))}
+                ))}
+              </ScrollView>
             </React.Fragment>
           ))
         )}
@@ -466,6 +482,53 @@ export default function LibationRecipesEditorScreen() {
             </View>
 
             <ScrollView style={styles.modalForm}>
+              {/* Image Upload */}
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Recipe Image</Text>
+                <TouchableOpacity
+                  style={styles.imagePickerButton}
+                  onPress={pickImage}
+                  disabled={uploadingImage}
+                >
+                  <Text style={styles.imagePickerButtonText}>
+                    {uploadingImage ? 'Uploading...' : 'Choose Image'}
+                  </Text>
+                </TouchableOpacity>
+                {thumbnailUrl && (
+                  <Image
+                    source={{ uri: getImageUrl(thumbnailUrl) }}
+                    style={styles.thumbnailPreview}
+                    resizeMode="cover"
+                  />
+                )}
+              </View>
+
+              {/* Category */}
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Category *</Text>
+                <View style={styles.picker}>
+                  {CATEGORIES.map((cat, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.pickerOption,
+                        category === cat && styles.pickerOptionActive
+                      ]}
+                      onPress={() => setCategory(cat)}
+                    >
+                      <Text
+                        style={[
+                          styles.pickerOptionText,
+                          category === cat && styles.pickerOptionTextActive
+                        ]}
+                      >
+                        {cat}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
               {/* Name */}
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Recipe Name *</Text>
@@ -490,34 +553,6 @@ export default function LibationRecipesEditorScreen() {
                 />
               </View>
 
-              {/* Category */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Category *</Text>
-                <View style={styles.picker}>
-                  {CATEGORIES.map((cat, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={{
-                        paddingVertical: 12,
-                        paddingHorizontal: 16,
-                        backgroundColor:
-                          category === cat ? managerColors.highlight : 'transparent',
-                      }}
-                      onPress={() => setCategory(cat)}
-                    >
-                      <Text
-                        style={{
-                          color: managerColors.text,
-                          fontWeight: category === cat ? '600' : '400',
-                        }}
-                      >
-                        {cat}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
               {/* Glassware */}
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Glassware</Text>
@@ -525,7 +560,19 @@ export default function LibationRecipesEditorScreen() {
                   style={styles.formInput}
                   value={glassware}
                   onChangeText={setGlassware}
-                  placeholder="e.g., Martini Glass (optional)"
+                  placeholder="e.g., Martini Glass"
+                  placeholderTextColor={managerColors.textSecondary}
+                />
+              </View>
+
+              {/* Garnish */}
+              <View style={styles.formField}>
+                <Text style={styles.formLabel}>Garnish</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={garnish}
+                  onChangeText={setGarnish}
+                  placeholder="e.g., Lemon Twist"
                   placeholderTextColor={managerColors.textSecondary}
                 />
               </View>
@@ -582,32 +629,24 @@ export default function LibationRecipesEditorScreen() {
                   style={[styles.formInput, styles.textArea]}
                   value={procedure}
                   onChangeText={setProcedure}
-                  placeholder="Enter preparation instructions (optional)"
+                  placeholder="Enter preparation instructions"
                   placeholderTextColor={managerColors.textSecondary}
                   multiline
                   numberOfLines={4}
                 />
               </View>
 
-              {/* Image Upload */}
+              {/* Display Order */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Recipe Image</Text>
-                <TouchableOpacity
-                  style={styles.imagePickerButton}
-                  onPress={pickImage}
-                  disabled={uploadingImage}
-                >
-                  <Text style={styles.imagePickerButtonText}>
-                    {uploadingImage ? 'Uploading...' : 'Choose Image'}
-                  </Text>
-                </TouchableOpacity>
-                {thumbnailUrl && (
-                  <Image
-                    source={{ uri: getImageUrl(thumbnailUrl) }}
-                    style={styles.thumbnailPreview}
-                    resizeMode="cover"
-                  />
-                )}
+                <Text style={styles.formLabel}>Display Order</Text>
+                <TextInput
+                  style={styles.formInput}
+                  value={displayOrder}
+                  onChangeText={setDisplayOrder}
+                  placeholder="Enter display order (optional)"
+                  placeholderTextColor={managerColors.textSecondary}
+                  keyboardType="numeric"
+                />
               </View>
 
               {/* Action Buttons */}
@@ -671,7 +710,6 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     paddingTop: 20,
-    paddingHorizontal: 16,
     paddingBottom: 100,
   },
   addButton: {
@@ -681,6 +719,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 16,
     borderRadius: 12,
+    marginHorizontal: 16,
     marginBottom: 20,
     gap: 8,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
@@ -697,26 +736,32 @@ const styles = StyleSheet.create({
     color: managerColors.text,
     marginTop: 16,
     marginBottom: 12,
+    marginLeft: 16,
+  },
+  horizontalScroll: {
+    marginBottom: 8,
+  },
+  horizontalScrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
   recipeCard: {
     backgroundColor: managerColors.card,
     borderRadius: 12,
     padding: 12,
-    marginBottom: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginRight: 12,
+    width: 180,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
   recipeThumbnail: {
-    width: 60,
-    height: 60,
+    width: '100%',
+    height: 120,
     borderRadius: 8,
-    marginRight: 12,
+    marginBottom: 12,
   },
   recipeInfo: {
-    flex: 1,
-    marginRight: 12,
+    marginBottom: 12,
   },
   recipeName: {
     fontSize: 16,
@@ -733,19 +778,19 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   editButton: {
+    flex: 1,
     backgroundColor: managerColors.highlight,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    minWidth: 60,
     alignItems: 'center',
   },
   deleteButton: {
+    flex: 1,
     backgroundColor: '#F44336',
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
-    minWidth: 60,
     alignItems: 'center',
   },
   buttonText: {
@@ -758,6 +803,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: managerColors.textSecondary,
     marginTop: 40,
+    marginHorizontal: 16,
   },
   loadingOverlay: {
     position: 'absolute',
@@ -775,7 +821,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: managerColors.background,
+    backgroundColor: '#FFFFFF',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
@@ -788,12 +834,12 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: managerColors.highlight,
+    borderBottomColor: '#E0E0E0',
   },
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: '#1A1A1A',
   },
   modalForm: {
     paddingHorizontal: 24,
@@ -805,28 +851,44 @@ const styles = StyleSheet.create({
   formLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.text,
+    color: '#1A1A1A',
     marginBottom: 8,
   },
   formInput: {
-    backgroundColor: managerColors.card,
+    backgroundColor: '#F5F5F5',
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: managerColors.text,
+    color: '#1A1A1A',
     borderWidth: 1,
-    borderColor: managerColors.border,
+    borderColor: '#E0E0E0',
   },
   textArea: {
     minHeight: 100,
     textAlignVertical: 'top',
   },
   picker: {
-    backgroundColor: managerColors.card,
+    backgroundColor: '#F5F5F5',
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: managerColors.border,
+    borderColor: '#E0E0E0',
+  },
+  pickerOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: 'transparent',
+  },
+  pickerOptionActive: {
+    backgroundColor: managerColors.highlight,
+  },
+  pickerOptionText: {
+    color: '#1A1A1A',
+    fontWeight: '400',
+  },
+  pickerOptionTextActive: {
+    color: managerColors.text,
+    fontWeight: '600',
   },
   ingredientRow: {
     flexDirection: 'row',
@@ -880,17 +942,17 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: managerColors.card,
+    backgroundColor: '#F5F5F5',
     borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: managerColors.border,
+    borderColor: '#E0E0E0',
   },
   cancelButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.text,
+    color: '#1A1A1A',
   },
   submitButton: {
     flex: 1,

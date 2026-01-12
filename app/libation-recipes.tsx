@@ -23,6 +23,7 @@ interface LibationRecipe {
   price: string;
   category: string;
   glassware: string | null;
+  garnish: string | null;
   ingredients: { amount: string; ingredient: string }[];
   procedure: string | null;
   thumbnail_url: string | null;
@@ -229,6 +230,13 @@ export default function LibationRecipesScreen() {
                 <View style={styles.detailSection}>
                   <Text style={styles.detailLabel}>Glassware</Text>
                   <Text style={styles.detailText}>{selectedRecipe.glassware}</Text>
+                </View>
+              )}
+
+              {selectedRecipe?.garnish && (
+                <View style={styles.detailSection}>
+                  <Text style={styles.detailLabel}>Garnish</Text>
+                  <Text style={styles.detailText}>{selectedRecipe.garnish}</Text>
                 </View>
               )}
 
