@@ -109,31 +109,38 @@ export default function MenuEditorScreen() {
   const filterItems = useCallback(() => {
     let filtered = menuItems;
 
-    // Filter by category
-    if (selectedCategory === 'Weekly Specials') {
-      filtered = filtered.filter(item => item.category === 'Weekly Specials');
-    } else if (selectedCategory === 'Lunch') {
-      filtered = filtered.filter(item => item.available_for_lunch);
-    } else if (selectedCategory === 'Dinner') {
-      filtered = filtered.filter(item => item.available_for_dinner);
-    } else {
-      // For other categories (Libations, Wine, Happy Hour), use the category field
-      filtered = filtered.filter(item => item.category === selectedCategory);
-    }
-
-    // Filter by subcategory if selected
-    if (selectedSubcategory) {
-      filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
-    }
-
-    // Filter by search query
+    // FIXED: If there's a search query, search through ALL menu items first
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
         item =>
           item.name.toLowerCase().includes(query) ||
-          (item.description && item.description.toLowerCase().includes(query))
+          (item.description && item.description.toLowerCase().includes(query)) ||
+          item.category.toLowerCase().includes(query) ||
+          (item.subcategory && item.subcategory.toLowerCase().includes(query)) ||
+          (item.is_gluten_free && 'gf'.includes(query)) ||
+          (item.is_gluten_free_available && 'gfa'.includes(query)) ||
+          (item.is_vegetarian && ('v'.includes(query) || 'vegetarian'.includes(query))) ||
+          (item.is_vegetarian_available && ('va'.includes(query) || 'vegetarian available'.includes(query)))
       );
+    } else {
+      // Only filter by category/subcategory if there's NO search query
+      // Filter by category
+      if (selectedCategory === 'Weekly Specials') {
+        filtered = filtered.filter(item => item.category === 'Weekly Specials');
+      } else if (selectedCategory === 'Lunch') {
+        filtered = filtered.filter(item => item.available_for_lunch);
+      } else if (selectedCategory === 'Dinner') {
+        filtered = filtered.filter(item => item.available_for_dinner);
+      } else {
+        // For other categories (Libations, Wine, Happy Hour), use the category field
+        filtered = filtered.filter(item => item.category === selectedCategory);
+      }
+
+      // Filter by subcategory if selected
+      if (selectedSubcategory) {
+        filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
+      }
     }
 
     setFilteredItems(filtered);
@@ -464,46 +471,72 @@ export default function MenuEditorScreen() {
         />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search menu items..."
+          placeholder="Search all menu items..."
           placeholderTextColor={managerColors.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <IconSymbol
+              ios_icon_name="xmark.circle.fill"
+              android_material_icon_name="cancel"
+              size={20}
+              color={managerColors.textSecondary}
+            />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Category Tabs */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.categoryScroll}
-        contentContainerStyle={styles.categoryScrollContent}
-      >
-        {CATEGORIES.map((category, index) => (
-          <TouchableOpacity
-            key={index}
-            style={[
-              styles.categoryTab,
-              selectedCategory === category && styles.categoryTabActive,
-            ]}
-            onPress={() => {
-              setSelectedCategory(category);
-              setSelectedSubcategory(null);
-            }}
-          >
-            <Text
-              style={[
-                styles.categoryTabText,
-                selectedCategory === category && styles.categoryTabTextActive,
-              ]}
-            >
-              {category}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {searchQuery.length > 0 && (
+        <View style={styles.searchInfoBanner}>
+          <IconSymbol
+            ios_icon_name="magnifyingglass"
+            android_material_icon_name="search"
+            size={16}
+            color={managerColors.highlight}
+          />
+          <Text style={styles.searchInfoText}>
+            Searching all menu items - {filteredItems.length} result{filteredItems.length !== 1 ? 's' : ''} found
+          </Text>
+        </View>
+      )}
 
-      {/* Subcategory Tabs */}
-      {SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
+      {/* Category Tabs - Only show when NOT searching */}
+      {!searchQuery && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoryScroll}
+          contentContainerStyle={styles.categoryScrollContent}
+        >
+          {CATEGORIES.map((category, index) => (
+            <TouchableOpacity
+              key={index}
+              style={[
+                styles.categoryTab,
+                selectedCategory === category && styles.categoryTabActive,
+              ]}
+              onPress={() => {
+                setSelectedCategory(category);
+                setSelectedSubcategory(null);
+              }}
+            >
+              <Text
+                style={[
+                  styles.categoryTabText,
+                  selectedCategory === category && styles.categoryTabTextActive,
+                ]}
+              >
+                {category}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
+      {/* Subcategory Tabs - Only show when NOT searching */}
+      {!searchQuery && SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -563,9 +596,14 @@ export default function MenuEditorScreen() {
                 size={64}
                 color={managerColors.textSecondary}
               />
-              <Text style={styles.emptyText}>No menu items found</Text>
+              <Text style={styles.emptyText}>
+                {searchQuery ? 'No menu items found' : 'No menu items found'}
+              </Text>
               <Text style={styles.emptySubtext}>
-                Tap the &quot;Add New Item&quot; button to add a new item
+                {searchQuery 
+                  ? 'Try adjusting your search query'
+                  : 'Tap the "Add New Item" button to add a new item'
+                }
               </Text>
             </View>
           ) : (
@@ -1220,6 +1258,22 @@ const styles = StyleSheet.create({
     marginLeft: 12,
     fontSize: 16,
     color: managerColors.text,
+  },
+  searchInfoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: managerColors.card,
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 8,
+    gap: 8,
+  },
+  searchInfoText: {
+    fontSize: 14,
+    color: managerColors.highlight,
+    fontWeight: '600',
   },
   categoryScroll: {
     marginTop: 16,
