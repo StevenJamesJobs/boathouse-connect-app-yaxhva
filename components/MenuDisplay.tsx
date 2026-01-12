@@ -95,15 +95,24 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const filterItems = useCallback(() => {
     let filtered = menuItems;
 
-    // Apply search query first
+    // Apply search query FIRST - search through ALL menu items, not just filtered ones
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
+      filtered = menuItems.filter(
         item =>
           item.name.toLowerCase().includes(query) ||
           (item.description && item.description.toLowerCase().includes(query)) ||
           (item.category && item.category.toLowerCase().includes(query)) ||
-          (item.subcategory && item.subcategory.toLowerCase().includes(query))
+          (item.subcategory && item.subcategory.toLowerCase().includes(query)) ||
+          // Also search in dietary options
+          (item.is_gluten_free && 'gluten free'.includes(query)) ||
+          (item.is_gluten_free_available && 'gluten free available'.includes(query)) ||
+          (item.is_vegetarian && 'vegetarian'.includes(query)) ||
+          (item.is_vegetarian_available && 'vegetarian available'.includes(query)) ||
+          (item.is_gluten_free && 'gf'.includes(query)) ||
+          (item.is_gluten_free_available && 'gfa'.includes(query)) ||
+          (item.is_vegetarian && 'v'.includes(query)) ||
+          (item.is_vegetarian_available && 'va'.includes(query))
       );
     }
 
@@ -137,8 +146,8 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           }
         });
       });
-    } else {
-      // Only apply category/subcategory filters if no active filters
+    } else if (!searchQuery.trim()) {
+      // Only apply category/subcategory filters if no search query and no active filters
       // Filter by category
       if (selectedCategory === 'Weekly Specials') {
         filtered = filtered.filter(item => item.category === 'Weekly Specials');
@@ -379,8 +388,8 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           </View>
         )}
 
-        {/* Category Tabs - Only show if no active filters */}
-        {activeFilters.length === 0 && (
+        {/* Category Tabs - Only show if no active filters and no search query */}
+        {activeFilters.length === 0 && !searchQuery.trim() && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -412,8 +421,8 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           </ScrollView>
         )}
 
-        {/* Subcategory Tabs - Only show if no active filters */}
-        {activeFilters.length === 0 && SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
+        {/* Subcategory Tabs - Only show if no active filters and no search query */}
+        {activeFilters.length === 0 && !searchQuery.trim() && SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -633,7 +642,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                         ios_icon_name="checkmark"
                         android_material_icon_name="check"
                         size={16}
-                        color={colors.text}
+                        color="#FFFFFF"
                       />
                     )}
                   </View>
@@ -1003,7 +1012,7 @@ const createStyles = (colors: any) =>
       backgroundColor: colors.card,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
-      maxHeight: '70%',
+      height: '70%',
       boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.2)',
       elevation: 10,
     },
@@ -1032,7 +1041,7 @@ const createStyles = (colors: any) =>
     filterOption: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 12,
+      paddingVertical: 14,
       paddingHorizontal: 16,
       backgroundColor: colors.background,
       borderRadius: 12,
