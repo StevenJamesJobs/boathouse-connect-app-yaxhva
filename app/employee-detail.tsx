@@ -56,6 +56,7 @@ export default function EmployeeDetailScreen() {
   const fetchEmployee = useCallback(async () => {
     try {
       setLoading(true);
+      console.log('Fetching employee with ID:', employeeId);
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -64,6 +65,7 @@ export default function EmployeeDetailScreen() {
 
       if (error) throw error;
       console.log('Fetched employee data:', data);
+      console.log('Employee job_titles:', data.job_titles);
       
       // Ensure job_titles is an array
       if (!data.job_titles || !Array.isArray(data.job_titles)) {
@@ -98,6 +100,7 @@ export default function EmployeeDetailScreen() {
       currentTitles.push(title);
     }
     
+    console.log('Job titles updated to:', currentTitles);
     setEmployee({ ...employee, job_titles: currentTitles });
   };
 
@@ -117,15 +120,7 @@ export default function EmployeeDetailScreen() {
     try {
       setSaving(true);
       
-      console.log('Attempting to save employee data:', {
-        manager_id: user.id,
-        employee_id: employee.id,
-        name: employee.name,
-        email: employee.email,
-        job_titles: employee.job_titles,
-        phone_number: employee.phone_number,
-        role: employee.role,
-      });
+      console.log('Saving employee data with job_titles:', employee.job_titles);
 
       // Use the database function to update employee info
       const { data, error } = await supabase.rpc('update_employee_info', {
@@ -133,7 +128,7 @@ export default function EmployeeDetailScreen() {
         p_employee_id: employee.id,
         p_name: employee.name,
         p_email: employee.email,
-        p_job_title: employee.job_titles.join(', '), // For backward compatibility
+        p_job_title: employee.job_titles[0], // Use first job title for backward compatibility
         p_phone_number: employee.phone_number || '',
         p_role: employee.role,
       });
@@ -143,18 +138,20 @@ export default function EmployeeDetailScreen() {
         throw error;
       }
 
-      // Update the job_titles array
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ job_titles: employee.job_titles })
-        .eq('id', employee.id);
+      console.log('Basic info updated, now updating job_titles array...');
+
+      // Update the job_titles array using RPC function
+      const { error: updateError } = await supabase.rpc('update_user_job_titles', {
+        p_user_id: employee.id,
+        p_job_titles: employee.job_titles,
+      });
 
       if (updateError) {
         console.error('Job titles update error:', updateError);
         throw updateError;
       }
 
-      console.log('Update successful, result:', data);
+      console.log('Employee updated successfully with job_titles:', employee.job_titles);
       Alert.alert('Success', 'Employee updated successfully');
       
       // Refresh the employee data to confirm the update

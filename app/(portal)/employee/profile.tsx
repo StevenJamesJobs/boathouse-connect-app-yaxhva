@@ -37,6 +37,11 @@ export default function EmployeeProfileScreen() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  
+  // Password visibility state
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Update local state when user context changes
   useEffect(() => {
@@ -51,6 +56,7 @@ export default function EmployeeProfileScreen() {
       setSaving(true);
       if (!user?.id) return;
 
+      console.log('Employee Profile: Saving profile info');
       // Use the new RPC function to update profile info
       const { error } = await supabase.rpc('update_profile_info', {
         user_id: user.id,
@@ -204,6 +210,7 @@ export default function EmployeeProfileScreen() {
     try {
       if (!user?.id) return;
 
+      console.log('Employee Profile: Changing password');
       // Verify current password using pgcrypto
       const { data: verifyData, error: verifyError } = await supabase.rpc('verify_password', {
         user_id: user.id,
@@ -237,6 +244,9 @@ export default function EmployeeProfileScreen() {
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
+      setShowCurrentPassword(false);
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
     } catch (error: any) {
       console.error('Error changing password:', error);
       Alert.alert('Error', error.message || 'Failed to change password');
@@ -259,7 +269,7 @@ export default function EmployeeProfileScreen() {
           ) : (
             <IconSymbol
               ios_icon_name="person.circle.fill"
-              android_material_icon_name="account_circle"
+              android_material_icon_name="account-circle"
               size={100}
               color={employeeColors.primary}
             />
@@ -267,7 +277,7 @@ export default function EmployeeProfileScreen() {
           <View style={styles.cameraIcon}>
             <IconSymbol
               ios_icon_name="camera.fill"
-              android_material_icon_name="camera_alt"
+              android_material_icon_name="camera-alt"
               size={16}
               color="#FFFFFF"
             />
@@ -307,7 +317,7 @@ export default function EmployeeProfileScreen() {
           </View>
           <IconSymbol
             ios_icon_name="chevron.right"
-            android_material_icon_name="chevron_right"
+            android_material_icon_name="chevron-right"
             size={24}
             color={employeeColors.textSecondary}
           />
@@ -323,7 +333,7 @@ export default function EmployeeProfileScreen() {
           <Text style={styles.sectionTitle}>Profile Information</Text>
           <IconSymbol
             ios_icon_name={profileInfoExpanded ? "chevron.up" : "chevron.down"}
-            android_material_icon_name={profileInfoExpanded ? "expand_less" : "expand_more"}
+            android_material_icon_name={profileInfoExpanded ? "expand-less" : "expand-more"}
             size={24}
             color={employeeColors.text}
           />
@@ -418,7 +428,7 @@ export default function EmployeeProfileScreen() {
           >
             <IconSymbol
               ios_icon_name="key.fill"
-              android_material_icon_name="vpn_key"
+              android_material_icon_name="vpn-key"
               size={20}
               color="#FFFFFF"
             />
@@ -428,38 +438,77 @@ export default function EmployeeProfileScreen() {
           <>
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>Current Password</Text>
-              <TextInput
-                style={styles.input}
-                value={currentPassword}
-                onChangeText={setCurrentPassword}
-                secureTextEntry
-                placeholder="Enter current password"
-                placeholderTextColor={employeeColors.textSecondary}
-              />
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  secureTextEntry={!showCurrentPassword}
+                  placeholder="Enter current password"
+                  placeholderTextColor={employeeColors.textSecondary}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+                >
+                  <IconSymbol
+                    ios_icon_name={showCurrentPassword ? "eye.slash.fill" : "eye.fill"}
+                    android_material_icon_name={showCurrentPassword ? "visibility-off" : "visibility"}
+                    size={24}
+                    color={employeeColors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>New Password</Text>
-              <TextInput
-                style={styles.input}
-                value={newPassword}
-                onChangeText={setNewPassword}
-                secureTextEntry
-                placeholder="Enter new password"
-                placeholderTextColor={employeeColors.textSecondary}
-              />
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry={!showNewPassword}
+                  placeholder="Enter new password"
+                  placeholderTextColor={employeeColors.textSecondary}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowNewPassword(!showNewPassword)}
+                >
+                  <IconSymbol
+                    ios_icon_name={showNewPassword ? "eye.slash.fill" : "eye.fill"}
+                    android_material_icon_name={showNewPassword ? "visibility-off" : "visibility"}
+                    size={24}
+                    color={employeeColors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.fieldContainer}>
               <Text style={styles.fieldLabel}>Confirm New Password</Text>
-              <TextInput
-                style={styles.input}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                placeholder="Confirm new password"
-                placeholderTextColor={employeeColors.textSecondary}
-              />
+              <View style={styles.passwordInputContainer}>
+                <TextInput
+                  style={styles.passwordInput}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  placeholder="Confirm new password"
+                  placeholderTextColor={employeeColors.textSecondary}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  <IconSymbol
+                    ios_icon_name={showConfirmPassword ? "eye.slash.fill" : "eye.fill"}
+                    android_material_icon_name={showConfirmPassword ? "visibility-off" : "visibility"}
+                    size={24}
+                    color={employeeColors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.buttonRow}>
@@ -470,6 +519,9 @@ export default function EmployeeProfileScreen() {
                   setCurrentPassword('');
                   setNewPassword('');
                   setConfirmPassword('');
+                  setShowCurrentPassword(false);
+                  setShowNewPassword(false);
+                  setShowConfirmPassword(false);
                 }}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
@@ -633,6 +685,24 @@ const styles = StyleSheet.create({
     color: employeeColors.textSecondary,
     marginTop: 4,
     fontStyle: 'italic',
+  },
+  passwordInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: employeeColors.border,
+  },
+  passwordInput: {
+    flex: 1,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: employeeColors.text,
+  },
+  eyeIcon: {
+    paddingHorizontal: 12,
   },
   editButton: {
     flexDirection: 'row',

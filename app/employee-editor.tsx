@@ -69,6 +69,7 @@ export default function EmployeeEditorScreen() {
   });
 
   useEffect(() => {
+    console.log('Employee Editor: Initial load');
     fetchEmployees();
   }, []);
 
@@ -108,6 +109,7 @@ export default function EmployeeEditorScreen() {
 
   const fetchEmployees = async () => {
     try {
+      console.log('Fetching employees...');
       setLoading(true);
       const { data, error } = await supabase
         .from('users')
@@ -115,6 +117,7 @@ export default function EmployeeEditorScreen() {
         .order('name', { ascending: true });
 
       if (error) throw error;
+      console.log('Fetched employees:', data?.length);
       setEmployees(data || []);
     } catch (error) {
       console.error('Error fetching employees:', error);
@@ -126,6 +129,8 @@ export default function EmployeeEditorScreen() {
 
   const handleAddEmployee = async () => {
     try {
+      console.log('Adding new employee with job_titles:', newEmployee.job_titles);
+      
       if (!newEmployee.username || !newEmployee.name || !newEmployee.email) {
         Alert.alert('Error', 'Please fill in all required fields');
         return;
@@ -141,22 +146,31 @@ export default function EmployeeEditorScreen() {
         p_username: newEmployee.username,
         p_name: newEmployee.name,
         p_email: newEmployee.email,
-        p_job_title: newEmployee.job_titles.join(', '), // For backward compatibility
+        p_job_title: newEmployee.job_titles[0], // Use first job title for backward compatibility
         p_phone_number: newEmployee.phone_number,
         p_role: newEmployee.role,
         p_password: newEmployee.password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating user:', error);
+        throw error;
+      }
 
-      // Update the job_titles array for the new user
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ job_titles: newEmployee.job_titles })
-        .eq('username', newEmployee.username);
+      console.log('User created, now updating job_titles array...');
 
-      if (updateError) throw updateError;
+      // Update the job_titles array for the new user using RPC function
+      const { error: updateError } = await supabase.rpc('update_user_job_titles', {
+        p_user_id: data,
+        p_job_titles: newEmployee.job_titles,
+      });
 
+      if (updateError) {
+        console.error('Error updating job_titles:', updateError);
+        throw updateError;
+      }
+
+      console.log('Employee added successfully with job_titles:', newEmployee.job_titles);
       Alert.alert('Success', 'Employee added successfully');
       setShowAddModal(false);
       setNewEmployee({
@@ -176,6 +190,7 @@ export default function EmployeeEditorScreen() {
   };
 
   const handleEditEmployee = (employee: Employee) => {
+    console.log('Editing employee:', employee.name, 'with job_titles:', employee.job_titles);
     setSelectedEmployee(employee);
     router.push({
       pathname: '/employee-detail',
@@ -185,16 +200,25 @@ export default function EmployeeEditorScreen() {
 
   const handleToggleActive = async (employee: Employee) => {
     try {
-      const { error } = await supabase
-        .from('users')
-        .update({ is_active: !employee.is_active })
-        .eq('id', employee.id);
+      console.log('Toggling active status for employee:', employee.name, 'Current status:', employee.is_active);
+      
+      const newStatus = !employee.is_active;
+      
+      // Use RPC function to bypass RLS
+      const { error } = await supabase.rpc('update_user_active_status', {
+        p_user_id: employee.id,
+        p_is_active: newStatus,
+      });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error toggling employee status:', error);
+        throw error;
+      }
 
+      console.log('Employee status updated successfully to:', newStatus);
       Alert.alert(
         'Success',
-        `Employee ${employee.is_active ? 'deactivated' : 'activated'} successfully`
+        `Employee ${newStatus ? 'activated' : 'deactivated'} successfully`
       );
       fetchEmployees();
     } catch (error) {
@@ -226,13 +250,16 @@ export default function EmployeeEditorScreen() {
       currentTitles.push(title);
     }
     
+    console.log('Job titles updated to:', currentTitles);
     setNewEmployee({ ...newEmployee, job_titles: currentTitles });
   };
 
   const getJobTitlesDisplay = (employee: Employee) => {
+    // Prioritize job_titles array if it exists and has items
     if (employee.job_titles && employee.job_titles.length > 0) {
       return employee.job_titles.join(', ');
     }
+    // Fall back to old job_title column if job_titles is empty
     return employee.job_title || 'No job title';
   };
 
