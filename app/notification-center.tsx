@@ -1,75 +1,21 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
-  TextInput,
-  TouchableOpacity,
   ScrollView,
   StyleSheet,
-  Alert,
-  ActivityIndicator,
+  TouchableOpacity,
   useColorScheme,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
-import { useNotifications } from '@/contexts/NotificationContext';
-import { useAuth } from '@/contexts/AuthContext';
 
 export default function NotificationCenter() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const { sendNotification } = useNotifications();
-  const { user } = useAuth();
-  
-  const [title, setTitle] = useState('');
-  const [body, setBody] = useState('');
-  const [isSending, setIsSending] = useState(false);
-
-  const handleSendNotification = async () => {
-    if (!title.trim() || !body.trim()) {
-      Alert.alert('Error', 'Please enter both title and message');
-      return;
-    }
-
-    Alert.alert(
-      'Send Notification',
-      'This will send a notification to all staff members. Continue?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Send',
-          style: 'default',
-          onPress: async () => {
-            try {
-              setIsSending(true);
-              
-              await sendNotification({
-                notificationType: 'custom',
-                title: title.trim(),
-                body: body.trim(),
-                data: {
-                  type: 'custom',
-                  sentBy: user?.name,
-                },
-              });
-
-              Alert.alert('Success', 'Notification sent to all staff members!');
-              setTitle('');
-              setBody('');
-            } catch (error) {
-              console.error('Error sending notification:', error);
-              Alert.alert('Error', 'Failed to send notification. Please try again.');
-            } finally {
-              setIsSending(false);
-            }
-          },
-        },
-      ]
-    );
-  };
 
   return (
     <View style={[styles.container, { backgroundColor: isDark ? colors.darkBackground : colors.lightBackground }]}>
@@ -81,7 +27,7 @@ export default function NotificationCenter() {
         >
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
+            android_material_icon_name="arrow-back"
             size={24}
             color={colors.primary}
           />
@@ -96,100 +42,68 @@ export default function NotificationCenter() {
         <View style={[styles.card, { backgroundColor: isDark ? colors.darkCard : colors.lightCard }]}>
           <View style={styles.iconContainer}>
             <IconSymbol
-              ios_icon_name="bell.badge.fill"
-              android_material_icon_name="notifications_active"
-              size={48}
-              color={colors.primary}
+              ios_icon_name="bell.slash.fill"
+              android_material_icon_name="notifications-off"
+              size={64}
+              color={isDark ? colors.darkSecondaryText : colors.lightSecondaryText}
             />
           </View>
           
+          <Text style={[styles.title, { color: isDark ? colors.darkText : colors.lightText }]}>
+            Push Notifications Temporarily Disabled
+          </Text>
+          
           <Text style={[styles.description, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
-            Send custom notifications to all staff members. Use this for important announcements, 
-            menu updates, or any time-sensitive information.
+            Push notification functionality has been temporarily disabled to improve app stability. 
+            This feature will be re-enabled in a future update.
           </Text>
 
-          <View style={styles.form}>
-            <Text style={[styles.label, { color: isDark ? colors.darkText : colors.lightText }]}>
-              Notification Title
-            </Text>
-            <TextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: isDark ? colors.darkBackground : colors.lightBackground,
-                  color: isDark ? colors.darkText : colors.lightText,
-                  borderColor: isDark ? colors.darkBorder : colors.lightBorder,
-                }
-              ]}
-              placeholder="e.g., New Weekly Specials Added"
-              placeholderTextColor={isDark ? colors.darkSecondaryText : colors.lightSecondaryText}
-              value={title}
-              onChangeText={setTitle}
-              maxLength={100}
-            />
+          <Text style={[styles.description, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
+            In the meantime, you can still:
+          </Text>
 
-            <Text style={[styles.label, { color: isDark ? colors.darkText : colors.lightText }]}>
-              Message
-            </Text>
-            <TextInput
-              style={[
-                styles.textArea,
-                {
-                  backgroundColor: isDark ? colors.darkBackground : colors.lightBackground,
-                  color: isDark ? colors.darkText : colors.lightText,
-                  borderColor: isDark ? colors.darkBorder : colors.lightBorder,
-                }
-              ]}
-              placeholder="Enter your message here..."
-              placeholderTextColor={isDark ? colors.darkSecondaryText : colors.lightSecondaryText}
-              value={body}
-              onChangeText={setBody}
-              multiline
-              numberOfLines={6}
-              maxLength={500}
-              textAlignVertical="top"
-            />
-
-            <Text style={[styles.charCount, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
-              {body.length}/500 characters
-            </Text>
+          <View style={styles.featureList}>
+            <View style={styles.featureItem}>
+              <IconSymbol
+                ios_icon_name="checkmark.circle.fill"
+                android_material_icon_name="check-circle"
+                size={20}
+                color={colors.primary}
+              />
+              <Text style={[styles.featureText, { color: isDark ? colors.darkText : colors.lightText }]}>
+                Send and receive messages through the Messages tab
+              </Text>
+            </View>
+            <View style={styles.featureItem}>
+              <IconSymbol
+                ios_icon_name="checkmark.circle.fill"
+                android_material_icon_name="check-circle"
+                size={20}
+                color={colors.primary}
+              />
+              <Text style={[styles.featureText, { color: isDark ? colors.darkText : colors.lightText }]}>
+                View announcements on your home feed
+              </Text>
+            </View>
+            <View style={styles.featureItem}>
+              <IconSymbol
+                ios_icon_name="checkmark.circle.fill"
+                android_material_icon_name="check-circle"
+                size={20}
+                color={colors.primary}
+              />
+              <Text style={[styles.featureText, { color: isDark ? colors.darkText : colors.lightText }]}>
+                Check upcoming events and special features
+              </Text>
+            </View>
           </View>
 
           <TouchableOpacity
-            style={[
-              styles.sendButton,
-              { backgroundColor: colors.primary },
-              (!title.trim() || !body.trim() || isSending) && styles.sendButtonDisabled
-            ]}
-            onPress={handleSendNotification}
-            disabled={!title.trim() || !body.trim() || isSending}
+            style={[styles.backToHomeButton, { backgroundColor: colors.primary }]}
+            onPress={() => router.back()}
           >
-            {isSending ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <>
-                <IconSymbol
-                  ios_icon_name="paperplane.fill"
-                  android_material_icon_name="send"
-                  size={20}
-                  color="#FFFFFF"
-                />
-                <Text style={styles.sendButtonText}>Send to All Staff</Text>
-              </>
-            )}
+            <Text style={styles.backToHomeButtonText}>Back to Home</Text>
           </TouchableOpacity>
-
-          <View style={[styles.infoBox, { backgroundColor: isDark ? colors.darkBackground : colors.lightBackground }]}>
-            <IconSymbol
-              ios_icon_name="info.circle.fill"
-              android_material_icon_name="info"
-              size={20}
-              color={colors.primary}
-            />
-            <Text style={[styles.infoText, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
-              Staff members can manage their notification preferences in their profile settings.
-            </Text>
-          </View>
         </View>
       </ScrollView>
     </View>
@@ -225,78 +139,55 @@ const styles = StyleSheet.create({
   },
   card: {
     borderRadius: 16,
-    padding: 20,
+    padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 3,
+    alignItems: 'center',
   },
   iconContainer: {
-    alignItems: 'center',
+    marginBottom: 24,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    textAlign: 'center',
     marginBottom: 16,
   },
   description: {
     fontSize: 15,
     lineHeight: 22,
     textAlign: 'center',
-    marginBottom: 24,
-  },
-  form: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    marginBottom: 20,
-  },
-  textArea: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    minHeight: 120,
-    marginBottom: 8,
-  },
-  charCount: {
-    fontSize: 13,
-    textAlign: 'right',
-    marginBottom: 20,
-  },
-  sendButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
     marginBottom: 16,
   },
-  sendButtonDisabled: {
-    opacity: 0.5,
+  featureList: {
+    width: '100%',
+    marginTop: 8,
+    marginBottom: 24,
   },
-  sendButtonText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  infoBox: {
+  featureItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    padding: 12,
-    borderRadius: 12,
-    gap: 10,
+    marginBottom: 12,
+    paddingHorizontal: 8,
   },
-  infoText: {
+  featureText: {
     flex: 1,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 15,
+    lineHeight: 22,
+    marginLeft: 12,
+  },
+  backToHomeButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    marginTop: 8,
+  },
+  backToHomeButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

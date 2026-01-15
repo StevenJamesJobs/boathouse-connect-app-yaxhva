@@ -11,6 +11,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,8 +26,19 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [screenReady, setScreenReady] = useState(false);
   const router = useRouter();
   const { login, isAuthenticated, user } = useAuth();
+
+  // Mark screen as ready after a short delay to ensure smooth rendering
+  useEffect(() => {
+    console.log('[Android Login] Initializing screen');
+    const timer = setTimeout(() => {
+      setScreenReady(true);
+      console.log('[Android Login] Screen ready');
+    }, 100);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Check if already authenticated and redirect
   useEffect(() => {
@@ -87,6 +99,16 @@ export default function LoginScreen() {
       Alert.alert('Error', 'An error occurred during login. Please try again.');
     }
   };
+
+  // Show loading indicator while screen initializes
+  if (!screenReady) {
+    return (
+      <View style={[styles.container, styles.loadingContainer]}>
+        <ActivityIndicator size="large" color={splashColors.primary} />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView style={styles.container} behavior="padding">
@@ -193,9 +215,11 @@ export default function LoginScreen() {
             disabled={isLoading}
             activeOpacity={0.8}
           >
-            <Text style={styles.loginButtonText}>
-              {isLoading ? 'Signing In...' : 'Sign In'}
-            </Text>
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.loginButtonText}>Sign In</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -207,6 +231,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: splashColors.background,
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: splashColors.text,
   },
   scrollContent: {
     flexGrow: 1,

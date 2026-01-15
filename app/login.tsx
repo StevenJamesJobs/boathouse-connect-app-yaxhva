@@ -12,6 +12,7 @@ import {
   ScrollView,
   Animated,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -19,13 +20,15 @@ import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 
 export default function LoginScreen() {
+  console.log('[iOS Login] Screen mounted, Platform:', Platform.OS);
+  
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { login, user } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
 
   // Animation values - use useRef to avoid re-renders
   const logoScale = useRef(new Animated.Value(0)).current;
@@ -34,6 +37,7 @@ export default function LoginScreen() {
   const formOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    console.log('[iOS Login] Starting animations');
     // Animate logo
     Animated.parallel([
       Animated.spring(logoScale, {
@@ -69,25 +73,63 @@ export default function LoginScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Check if already authenticated and redirect
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('[iOS Login] Already authenticated, redirecting to portal');
+      const timeout = setTimeout(() => {
+        try {
+          if (user.role === 'manager') {
+            router.replace('/(portal)/manager');
+          } else {
+            router.replace('/(portal)/employee');
+          }
+        } catch (error) {
+          console.error('[iOS Login] Navigation error:', error);
+        }
+      }, 100);
+      return () => clearTimeout(timeout);
+    }
+  }, [isAuthenticated, user, router]);
+
   const handleLogin = async () => {
+    console.log('[iOS Login] Login button pressed');
+    
     if (!username.trim() || !password.trim()) {
+      console.log('[iOS Login] Empty username or password');
       Alert.alert('Error', 'Please enter both username and password');
       return;
     }
 
+    console.log('[iOS Login] Starting login process for username:', username.trim());
     setIsLoading(true);
-    const success = await login(username.trim(), password, rememberMe);
-    setIsLoading(false);
+    
+    try {
+      const success = await login(username.trim(), password, rememberMe);
+      console.log('[iOS Login] Login result:', success);
+      
+      setIsLoading(false);
 
-    if (success) {
-      // Wait a moment for auth state to update, then navigate
-      setTimeout(() => {
-        // Navigation will be handled by redirecting to the portal index
-        // which will then redirect to the appropriate portal based on role
-        router.replace('/(portal)');
-      }, 100);
-    } else {
-      Alert.alert('Login Failed', 'Invalid username or password. Please try again.');
+      if (success) {
+        console.log('[iOS Login] Login successful, navigating to portal');
+        // Wait a moment for auth state to update, then navigate
+        setTimeout(() => {
+          try {
+            router.replace('/(portal)');
+          } catch (navError) {
+            console.error('[iOS Login] Navigation error:', navError);
+            // Try alternative navigation
+            router.push('/(portal)');
+          }
+        }, 200);
+      } else {
+        console.log('[iOS Login] Login failed - invalid credentials');
+        Alert.alert('Login Failed', 'Invalid username or password. Please try again.');
+      }
+    } catch (error) {
+      console.error('[iOS Login] Login error:', error);
+      setIsLoading(false);
+      Alert.alert('Error', 'An error occurred during login. Please try again.');
     }
   };
 
@@ -145,6 +187,8 @@ export default function LoginScreen() {
               onChangeText={setUsername}
               autoCapitalize="none"
               keyboardType="default"
+              returnKeyType="next"
+              editable={!isLoading}
             />
           </View>
 
@@ -165,10 +209,14 @@ export default function LoginScreen() {
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+              editable={!isLoading}
             />
             <TouchableOpacity
               onPress={() => setShowPassword(!showPassword)}
               style={styles.eyeIcon}
+              disabled={isLoading}
             >
               <IconSymbol
                 ios_icon_name={showPassword ? 'eye.slash.fill' : 'eye.fill'}
@@ -183,6 +231,7 @@ export default function LoginScreen() {
           <TouchableOpacity
             style={styles.rememberMeContainer}
             onPress={() => setRememberMe(!rememberMe)}
+            disabled={isLoading}
           >
             <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
               {rememberMe && (
@@ -203,9 +252,11 @@ export default function LoginScreen() {
             onPress={handleLogin}
             disabled={isLoading}
           >
-            <Text style={styles.loginButtonText}>
-              {isLoading ? 'Signing In...' : 'Sign In'}
-            </Text>
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.loginButtonText}>Sign In</Text>
+            )}
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>
