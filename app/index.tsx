@@ -1,14 +1,19 @@
 
 import { Redirect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Platform } from 'react-native';
 
 export default function Index() {
   const { isAuthenticated, isLoading, user } = useAuth();
 
-  console.log('Index screen - Auth state:', { isAuthenticated, isLoading, role: user?.role });
+  console.log('[Index] Screen rendering, Platform:', Platform.OS, 'Auth state:', { 
+    isAuthenticated, 
+    isLoading, 
+    role: user?.role 
+  });
 
   if (isLoading) {
+    console.log('[Index] Still loading auth state...');
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#3498DB" />
@@ -18,7 +23,7 @@ export default function Index() {
 
   if (isAuthenticated && user) {
     // Redirect to appropriate portal based on role
-    console.log('Redirecting to portal for role:', user.role);
+    console.log('[Index] Authenticated, redirecting to portal for role:', user.role);
     if (user.role === 'manager') {
       return <Redirect href="/(portal)/manager" />;
     } else {
@@ -27,7 +32,7 @@ export default function Index() {
   }
 
   // Not authenticated, redirect to login
-  console.log('Not authenticated, redirecting to login');
+  console.log('[Index] Not authenticated, redirecting to login');
   return <Redirect href="/login" />;
 }
 

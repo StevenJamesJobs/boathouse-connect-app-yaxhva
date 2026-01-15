@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Image,
   Alert,
+  ScrollView,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,6 +17,8 @@ import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 
 export default function LoginScreen() {
+  console.log('[Android Login] Screen mounted');
+  
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -24,126 +28,147 @@ export default function LoginScreen() {
   const { login } = useAuth();
 
   const handleLogin = async () => {
+    console.log('[Android Login] Login button pressed');
+    
     if (!username.trim() || !password.trim()) {
+      console.log('[Android Login] Empty username or password');
       Alert.alert('Error', 'Please enter both username and password');
       return;
     }
 
+    console.log('[Android Login] Starting login process for username:', username.trim());
     setIsLoading(true);
-    const success = await login(username.trim(), password, rememberMe);
-    setIsLoading(false);
+    
+    try {
+      const success = await login(username.trim(), password, rememberMe);
+      console.log('[Android Login] Login result:', success);
+      
+      setIsLoading(false);
 
-    if (success) {
-      setTimeout(() => {
-        router.replace('/(portal)');
-      }, 100);
-    } else {
-      Alert.alert('Login Failed', 'Invalid username or password. Please try again.');
+      if (success) {
+        console.log('[Android Login] Login successful, navigating to portal');
+        setTimeout(() => {
+          router.replace('/(portal)');
+        }, 100);
+      } else {
+        console.log('[Android Login] Login failed - invalid credentials');
+        Alert.alert('Login Failed', 'Invalid username or password. Please try again.');
+      }
+    } catch (error) {
+      console.log('[Android Login] Login error:', error);
+      setIsLoading(false);
+      Alert.alert('Error', 'An error occurred during login. Please try again.');
     }
   };
 
   return (
-    <View style={styles.container}>
-      {/* Logo Section */}
-      <View style={styles.logoContainer}>
-        <Image
-          source={require('@/assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
-      </View>
-
-      {/* Form Section */}
-      <View style={styles.formContainer}>
-        {/* Username Input */}
-        <View style={styles.inputContainer}>
-          <IconSymbol
-            ios_icon_name="person.fill"
-            android_material_icon_name="person"
-            size={20}
-            color={splashColors.textSecondary}
-            style={styles.inputIcon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Username"
-            placeholderTextColor={splashColors.textSecondary}
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            keyboardType="default"
-            underlineColorAndroid="transparent"
-            returnKeyType="next"
+    <KeyboardAvoidingView style={styles.container} behavior="padding">
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Logo Section */}
+        <View style={styles.logoContainer}>
+          <Image
+            source={require('@/assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg')}
+            style={styles.logo}
+            resizeMode="contain"
           />
         </View>
 
-        {/* Password Input */}
-        <View style={styles.inputContainer}>
-          <IconSymbol
-            ios_icon_name="lock.fill"
-            android_material_icon_name="lock"
-            size={20}
-            color={splashColors.textSecondary}
-            style={styles.inputIcon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor={splashColors.textSecondary}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            underlineColorAndroid="transparent"
-            returnKeyType="done"
-            onSubmitEditing={handleLogin}
-          />
-          <TouchableOpacity
-            onPress={() => setShowPassword(!showPassword)}
-            style={styles.eyeIcon}
-            activeOpacity={0.7}
-          >
+        {/* Form Section */}
+        <View style={styles.formContainer}>
+          {/* Username Input */}
+          <View style={styles.inputContainer}>
             <IconSymbol
-              ios_icon_name={showPassword ? 'eye.slash.fill' : 'eye.fill'}
-              android_material_icon_name={showPassword ? 'visibility_off' : 'visibility'}
+              ios_icon_name="person.fill"
+              android_material_icon_name="person"
               size={20}
               color={splashColors.textSecondary}
+              style={styles.inputIcon}
             />
+            <TextInput
+              style={styles.input}
+              placeholder="Username"
+              placeholderTextColor={splashColors.textSecondary}
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+              keyboardType="default"
+              underlineColorAndroid="transparent"
+              returnKeyType="next"
+            />
+          </View>
+
+          {/* Password Input */}
+          <View style={styles.inputContainer}>
+            <IconSymbol
+              ios_icon_name="lock.fill"
+              android_material_icon_name="lock"
+              size={20}
+              color={splashColors.textSecondary}
+              style={styles.inputIcon}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="Password"
+              placeholderTextColor={splashColors.textSecondary}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              underlineColorAndroid="transparent"
+              returnKeyType="done"
+              onSubmitEditing={handleLogin}
+            />
+            <TouchableOpacity
+              onPress={() => setShowPassword(!showPassword)}
+              style={styles.eyeIcon}
+              activeOpacity={0.7}
+            >
+              <IconSymbol
+                ios_icon_name={showPassword ? 'eye.slash.fill' : 'eye.fill'}
+                android_material_icon_name={showPassword ? 'visibility-off' : 'visibility'}
+                size={20}
+                color={splashColors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Remember Me */}
+          <TouchableOpacity
+            style={styles.rememberMeContainer}
+            onPress={() => setRememberMe(!rememberMe)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+              {rememberMe && (
+                <IconSymbol
+                  ios_icon_name="checkmark"
+                  android_material_icon_name="check"
+                  size={16}
+                  color="#FFFFFF"
+                />
+              )}
+            </View>
+            <Text style={styles.rememberMeText}>Remember Me</Text>
+          </TouchableOpacity>
+
+          {/* Login Button */}
+          <TouchableOpacity
+            style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
+            onPress={handleLogin}
+            disabled={isLoading}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.loginButtonText}>
+              {isLoading ? 'Signing In...' : 'Sign In'}
+            </Text>
           </TouchableOpacity>
         </View>
-
-        {/* Remember Me */}
-        <TouchableOpacity
-          style={styles.rememberMeContainer}
-          onPress={() => setRememberMe(!rememberMe)}
-          activeOpacity={0.7}
-        >
-          <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-            {rememberMe && (
-              <IconSymbol
-                ios_icon_name="checkmark"
-                android_material_icon_name="check"
-                size={16}
-                color="#FFFFFF"
-              />
-            )}
-          </View>
-          <Text style={styles.rememberMeText}>Remember Me</Text>
-        </TouchableOpacity>
-
-        {/* Login Button */}
-        <TouchableOpacity
-          style={[styles.loginButton, isLoading && styles.loginButtonDisabled]}
-          onPress={handleLogin}
-          disabled={isLoading}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.loginButtonText}>
-            {isLoading ? 'Signing In...' : 'Sign In'}
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -151,8 +176,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: splashColors.background,
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingTop: 60,
     paddingHorizontal: 24,
+    paddingBottom: 40,
   },
   logoContainer: {
     alignItems: 'center',

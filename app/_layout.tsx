@@ -6,7 +6,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { SystemBars } from "react-native-edge-to-edge";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { useColorScheme, Alert } from "react-native";
+import { useColorScheme, Alert, Platform } from "react-native";
 import { useNetworkState } from "expo-network";
 import {
   DarkTheme,
@@ -26,6 +26,8 @@ export const unstable_settings = {
 };
 
 function RootLayoutNav() {
+  console.log('[RootLayout] Component rendering, Platform:', Platform.OS);
+  
   const colorScheme = useColorScheme();
   const networkState = useNetworkState();
   const segments = useSegments();
@@ -38,6 +40,7 @@ function RootLayoutNav() {
 
   useEffect(() => {
     if (loaded) {
+      console.log('[RootLayout] Fonts loaded, hiding splash screen');
       SplashScreen.hideAsync();
     }
   }, [loaded]);
@@ -47,6 +50,7 @@ function RootLayoutNav() {
       !networkState.isConnected &&
       networkState.isInternetReachable === false
     ) {
+      console.log('[RootLayout] Network offline detected');
       Alert.alert(
         "🔌 You are offline",
         "You can keep using the app! Your changes will be saved locally and synced when you are back online."
@@ -56,21 +60,31 @@ function RootLayoutNav() {
 
   // Handle navigation based on auth state
   useEffect(() => {
-    if (isLoading || !loaded) return;
+    if (isLoading || !loaded) {
+      console.log('[RootLayout] Waiting for auth/fonts to load...');
+      return;
+    }
 
     const inPortal = segments[0] === '(portal)';
     const onLogin = segments[0] === 'login';
     const onIndex = segments.length === 0 || segments[0] === 'index';
 
-    console.log('Navigation check:', { isAuthenticated, segments, user: user?.role });
+    console.log('[RootLayout] Navigation check:', { 
+      isAuthenticated, 
+      segments, 
+      user: user?.role,
+      inPortal,
+      onLogin,
+      onIndex
+    });
 
     if (!isAuthenticated && inPortal) {
       // Redirect to login if not authenticated and trying to access portal
-      console.log('Redirecting to login - not authenticated');
+      console.log('[RootLayout] Redirecting to login - not authenticated');
       router.replace('/login');
     } else if (isAuthenticated && (onLogin || onIndex)) {
       // Redirect to appropriate portal based on role when on login or index
-      console.log('Redirecting to portal - authenticated');
+      console.log('[RootLayout] Redirecting to portal - authenticated as', user?.role);
       if (user?.role === 'manager') {
         router.replace('/(portal)/manager');
       } else {
@@ -80,6 +94,7 @@ function RootLayoutNav() {
   }, [isAuthenticated, isLoading, segments, loaded, user?.role, router]);
 
   if (!loaded || isLoading) {
+    console.log('[RootLayout] Still loading, returning null');
     return null;
   }
 
@@ -108,6 +123,8 @@ function RootLayoutNav() {
     },
   };
 
+  console.log('[RootLayout] Rendering main navigation');
+
   return (
     <>
       <StatusBar style="auto" />
@@ -115,7 +132,7 @@ function RootLayoutNav() {
         value={colorScheme === "dark" ? CustomDarkTheme : CustomDefaultTheme}
       >
         <WidgetProvider>
-          <GestureHandlerRootView>
+          <GestureHandlerRootView style={{ flex: 1 }}>
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen name="index" />
               <Stack.Screen name="login" />
@@ -130,6 +147,8 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  console.log('[RootLayout] Root component mounting');
+  
   return (
     <AuthProvider>
       <RootLayoutNav />

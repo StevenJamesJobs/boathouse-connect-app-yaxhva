@@ -12,16 +12,24 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Create a function to initialize the Supabase client
 // This ensures it's only created when actually needed (client-side)
 function createSupabaseClient() {
-  console.log('Initializing Supabase client...');
+  console.log('[Supabase] Initializing Supabase client for platform:', Platform.OS);
   
-  return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-    auth: {
-      storage: AsyncStorage,
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: false,
-    },
-  });
+  try {
+    const client = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+      auth: {
+        storage: AsyncStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+      },
+    });
+    
+    console.log('[Supabase] Client initialized successfully');
+    return client;
+  } catch (error) {
+    console.error('[Supabase] Error initializing client:', error);
+    throw error;
+  }
 }
 
 // Export a lazy-initialized client
@@ -31,6 +39,7 @@ export const supabase = new Proxy({} as ReturnType<typeof createClient<Database>
   get(target, prop) {
     // Initialize the client on first access
     if (!_supabaseClient) {
+      console.log('[Supabase] First access, creating client...');
       _supabaseClient = createSupabaseClient();
     }
     return (_supabaseClient as any)[prop];
