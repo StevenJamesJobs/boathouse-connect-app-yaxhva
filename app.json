@@ -24,7 +24,12 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.mcloones.boathouseconnect",
-      "versionCode": 6
+      "versionCode": 6,
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
+      "softwareKeyboardLayoutMode": "pan"
     },
     "web": {
       "bundler": "metro",
@@ -32,7 +37,15 @@
       "favicon": "./assets/images/9ac97b2a-471a-496b-b6ca-41544a3c6217.jpeg"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#ffffff",
+          "image": "./assets/images/9ac97b2a-471a-496b-b6ca-41544a3c6217.jpeg",
+          "imageWidth": 200
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

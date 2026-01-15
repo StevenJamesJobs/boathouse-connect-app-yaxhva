@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { User, AuthState } from '@/types/user';
+import { Platform } from 'react-native';
 
 interface AuthContextType extends AuthState {
   login: (username: string, password: string, rememberMe: boolean) => Promise<boolean>;
@@ -33,7 +34,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
-        console.log('[AuthContext] Error fetching user from database:', error);
+        console.log('[AuthContext] Error fetching user from database:', error.message);
         return null;
       }
 
@@ -70,14 +71,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[AuthContext] User data fetched successfully, job titles:', user.jobTitles);
       return user;
     } catch (error) {
-      console.log('[AuthContext] Error fetching user from database:', error);
+      console.log('[AuthContext] Exception fetching user from database:', error);
       return null;
     }
   };
 
   const loadStoredAuth = useCallback(async () => {
     try {
-      console.log('[AuthContext] Loading stored auth...');
+      console.log('[AuthContext] Loading stored auth, Platform:', Platform.OS);
       
       const rememberMe = await AsyncStorage.getItem(REMEMBER_ME_KEY);
       console.log('[AuthContext] Remember me setting:', rememberMe);
@@ -85,32 +86,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (rememberMe === 'true') {
         const storedAuth = await AsyncStorage.getItem(STORAGE_KEY);
         if (storedAuth) {
-          const storedUser = JSON.parse(storedAuth);
-          console.log('[AuthContext] Loaded user from storage:', storedUser.name);
-          
-          // Fetch the latest user data from database to get updated profile picture and job titles
-          const freshUser = await fetchUserFromDatabase(storedUser.id);
-          
-          if (freshUser) {
-            // Update storage with fresh data
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
+          try {
+            const storedUser = JSON.parse(storedAuth);
+            console.log('[AuthContext] Loaded user from storage:', storedUser.name);
             
-            console.log('[AuthContext] Setting authenticated state with fresh user data');
-            setAuthState({
-              user: freshUser,
-              isLoading: false,
-              isAuthenticated: true,
-            });
-            return;
+            // Fetch the latest user data from database to get updated profile picture and job titles
+            const freshUser = await fetchUserFromDatabase(storedUser.id);
+            
+            if (freshUser) {
+              // Update storage with fresh data
+              await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
+              
+              console.log('[AuthContext] Setting authenticated state with fresh user data');
+              setAuthState({
+                user: freshUser,
+                isLoading: false,
+                isAuthenticated: true,
+              });
+              return;
+            } else {
+              console.log('[AuthContext] Could not fetch fresh user data, clearing stored auth');
+              await AsyncStorage.removeItem(STORAGE_KEY);
+              await AsyncStorage.removeItem(REMEMBER_ME_KEY);
+            }
+          } catch (parseError) {
+            console.log('[AuthContext] Error parsing stored auth, clearing:', parseError);
+            await AsyncStorage.removeItem(STORAGE_KEY);
+            await AsyncStorage.removeItem(REMEMBER_ME_KEY);
           }
         }
       }
       
-      console.log('[AuthContext] No stored auth found, setting unauthenticated state');
+      console.log('[AuthContext] No valid stored auth found, setting unauthenticated state');
     } catch (error) {
       console.log('[AuthContext] Error loading stored auth:', error);
     }
     
+    // Always set loading to false, even if there's an error
     setAuthState({
       user: null,
       isLoading: false,
@@ -119,8 +131,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    console.log('[AuthContext] AuthProvider mounted, loading stored auth');
-    loadStoredAuth();
+    console.log('[AuthContext] AuthProvider mounted, Platform:', Platform.OS);
+    
+    // Wrap in try-catch to prevent crashes
+    try {
+      loadStoredAuth();
+    } catch (error) {
+      console.error('[AuthContext] CRITICAL ERROR in loadStoredAuth:', error);
+      // Set to unauthenticated state if there's an error
+      setAuthState({
+        user: null,
+        isLoading: false,
+        isAuthenticated: false,
+      });
+    }
   }, [loadStoredAuth]);
 
   const refreshUser = async () => {
@@ -154,7 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (username: string, password: string, rememberMe: boolean): Promise<boolean> => {
     try {
-      console.log('[AuthContext] Attempting login with username:', username);
+      console.log('[AuthContext] Attempting login with username:', username, 'Platform:', Platform.OS);
       
       // Clean username - remove any leading zeros and whitespace
       const cleanUsername = username.trim();
@@ -169,7 +193,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) {
-        console.log('[AuthContext] Database error:', error);
+        console.log('[AuthContext] Database error:', error.message);
         return false;
       }
 
@@ -187,7 +211,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       if (verifyError) {
-        console.log('[AuthContext] Password verification error:', verifyError);
+        console.log('[AuthContext] Password verification error:', verifyError.message);
         return false;
       }
 
@@ -239,7 +263,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[AuthContext] Login successful for user:', user.name, 'Role:', user.role);
       return true;
     } catch (error) {
-      console.log('[AuthContext] Login error:', error);
+      console.log('[AuthContext] Login exception:', error);
       return false;
     }
   };

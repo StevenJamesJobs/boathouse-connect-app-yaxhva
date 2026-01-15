@@ -1,7 +1,8 @@
 
 import { Redirect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { View, ActivityIndicator, StyleSheet, Platform } from 'react-native';
+import { View, ActivityIndicator, StyleSheet, Platform, Text } from 'react-native';
+import React from 'react';
 
 export default function PortalIndex() {
   const { user, isLoading, isAuthenticated } = useAuth();
@@ -17,6 +18,7 @@ export default function PortalIndex() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#3498DB" />
+        <Text style={styles.loadingText}>Loading...</Text>
       </View>
     );
   }
@@ -41,5 +43,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#666666',
   },
 });

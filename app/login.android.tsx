@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Alert,
   ScrollView,
   KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,7 +18,7 @@ import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 
 export default function LoginScreen() {
-  console.log('[Android Login] Screen mounted');
+  console.log('[Android Login] Screen mounted, Platform:', Platform.OS);
   
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -25,7 +26,26 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isAuthenticated, user } = useAuth();
+
+  // Check if already authenticated and redirect
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      console.log('[Android Login] Already authenticated, redirecting to portal');
+      const timeout = setTimeout(() => {
+        try {
+          if (user.role === 'manager') {
+            router.replace('/(portal)/manager');
+          } else {
+            router.replace('/(portal)/employee');
+          }
+        } catch (error) {
+          console.error('[Android Login] Navigation error:', error);
+        }
+      }, 100);
+      return () => clearTimeout(timeout);
+    }
+  }, [isAuthenticated, user, router]);
 
   const handleLogin = async () => {
     console.log('[Android Login] Login button pressed');
@@ -47,15 +67,22 @@ export default function LoginScreen() {
 
       if (success) {
         console.log('[Android Login] Login successful, navigating to portal');
+        // Wait a bit longer for state to update
         setTimeout(() => {
-          router.replace('/(portal)');
-        }, 100);
+          try {
+            router.replace('/(portal)');
+          } catch (navError) {
+            console.error('[Android Login] Navigation error:', navError);
+            // Try alternative navigation
+            router.push('/(portal)');
+          }
+        }, 200);
       } else {
         console.log('[Android Login] Login failed - invalid credentials');
         Alert.alert('Login Failed', 'Invalid username or password. Please try again.');
       }
     } catch (error) {
-      console.log('[Android Login] Login error:', error);
+      console.error('[Android Login] Login error:', error);
       setIsLoading(false);
       Alert.alert('Error', 'An error occurred during login. Please try again.');
     }
@@ -98,6 +125,7 @@ export default function LoginScreen() {
               keyboardType="default"
               underlineColorAndroid="transparent"
               returnKeyType="next"
+              editable={!isLoading}
             />
           </View>
 
@@ -121,11 +149,13 @@ export default function LoginScreen() {
               underlineColorAndroid="transparent"
               returnKeyType="done"
               onSubmitEditing={handleLogin}
+              editable={!isLoading}
             />
             <TouchableOpacity
               onPress={() => setShowPassword(!showPassword)}
               style={styles.eyeIcon}
               activeOpacity={0.7}
+              disabled={isLoading}
             >
               <IconSymbol
                 ios_icon_name={showPassword ? 'eye.slash.fill' : 'eye.fill'}
@@ -141,6 +171,7 @@ export default function LoginScreen() {
             style={styles.rememberMeContainer}
             onPress={() => setRememberMe(!rememberMe)}
             activeOpacity={0.7}
+            disabled={isLoading}
           >
             <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
               {rememberMe && (

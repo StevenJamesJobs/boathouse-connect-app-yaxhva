@@ -1,12 +1,12 @@
 
 import "react-native-reanimated";
-import React, { useEffect } from "react";
+import React, { useEffect, Component, ErrorInfo, ReactNode } from "react";
 import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { SystemBars } from "react-native-edge-to-edge";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { useColorScheme, Alert, Platform } from "react-native";
+import { useColorScheme, Alert, Platform, View, Text, StyleSheet } from "react-native";
 import { useNetworkState } from "expo-network";
 import {
   DarkTheme,
@@ -25,6 +25,71 @@ export const unstable_settings = {
   initialRouteName: "index",
 };
 
+// Error Boundary Component
+class ErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    console.error('[ErrorBoundary] Caught error:', error);
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('[ErrorBoundary] Error details:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={errorStyles.container}>
+          <Text style={errorStyles.title}>Something went wrong</Text>
+          <Text style={errorStyles.message}>
+            {this.state.error?.message || 'An unexpected error occurred'}
+          </Text>
+          <Text style={errorStyles.instruction}>
+            Please restart the app
+          </Text>
+        </View>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+const errorStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 20,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#333333',
+    marginBottom: 16,
+  },
+  message: {
+    fontSize: 16,
+    color: '#666666',
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  instruction: {
+    fontSize: 14,
+    color: '#999999',
+    textAlign: 'center',
+  },
+});
+
 function RootLayoutNav() {
   console.log('[RootLayout] Component rendering, Platform:', Platform.OS);
   
@@ -41,7 +106,9 @@ function RootLayoutNav() {
   useEffect(() => {
     if (loaded) {
       console.log('[RootLayout] Fonts loaded, hiding splash screen');
-      SplashScreen.hideAsync();
+      SplashScreen.hideAsync().catch((error) => {
+        console.log('[RootLayout] Error hiding splash screen:', error);
+      });
     }
   }, [loaded]);
 
@@ -78,19 +145,28 @@ function RootLayoutNav() {
       onIndex
     });
 
-    if (!isAuthenticated && inPortal) {
-      // Redirect to login if not authenticated and trying to access portal
-      console.log('[RootLayout] Redirecting to login - not authenticated');
-      router.replace('/login');
-    } else if (isAuthenticated && (onLogin || onIndex)) {
-      // Redirect to appropriate portal based on role when on login or index
-      console.log('[RootLayout] Redirecting to portal - authenticated as', user?.role);
-      if (user?.role === 'manager') {
-        router.replace('/(portal)/manager');
-      } else {
-        router.replace('/(portal)/employee');
+    // Use setTimeout to avoid navigation during render
+    const navigationTimeout = setTimeout(() => {
+      try {
+        if (!isAuthenticated && inPortal) {
+          // Redirect to login if not authenticated and trying to access portal
+          console.log('[RootLayout] Redirecting to login - not authenticated');
+          router.replace('/login');
+        } else if (isAuthenticated && (onLogin || onIndex)) {
+          // Redirect to appropriate portal based on role when on login or index
+          console.log('[RootLayout] Redirecting to portal - authenticated as', user?.role);
+          if (user?.role === 'manager') {
+            router.replace('/(portal)/manager');
+          } else {
+            router.replace('/(portal)/employee');
+          }
+        }
+      } catch (navError) {
+        console.error('[RootLayout] Navigation error:', navError);
       }
-    }
+    }, 100);
+
+    return () => clearTimeout(navigationTimeout);
   }, [isAuthenticated, isLoading, segments, loaded, user?.role, router]);
 
   if (!loaded || isLoading) {
@@ -147,11 +223,13 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
-  console.log('[RootLayout] Root component mounting');
+  console.log('[RootLayout] Root component mounting, Platform:', Platform.OS);
   
   return (
-    <AuthProvider>
-      <RootLayoutNav />
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <RootLayoutNav />
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
