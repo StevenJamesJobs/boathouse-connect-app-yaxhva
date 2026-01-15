@@ -1,6 +1,5 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { User, AuthState } from '@/types/user';
 import { Platform } from 'react-native';
@@ -15,6 +14,17 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const STORAGE_KEY = '@mcloones_auth';
 const REMEMBER_ME_KEY = '@mcloones_remember_me';
+
+// Lazy-load AsyncStorage to avoid SSR issues
+let AsyncStorage: any = null;
+if (typeof window !== 'undefined' || Platform.OS !== 'web') {
+  try {
+    AsyncStorage = require('@react-native-async-storage/async-storage').default;
+    console.log('[AuthContext] AsyncStorage loaded successfully');
+  } catch (error) {
+    console.warn('[AuthContext] Failed to load AsyncStorage:', error);
+  }
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>({
@@ -79,6 +89,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadStoredAuth = useCallback(async () => {
     try {
       console.log('[AuthContext] Loading stored auth, Platform:', Platform.OS);
+      
+      // Skip if AsyncStorage is not available (SSR)
+      if (!AsyncStorage) {
+        console.log('[AuthContext] AsyncStorage not available, skipping stored auth');
+        setAuthState({
+          user: null,
+          isLoading: false,
+          isAuthenticated: false,
+        });
+        return;
+      }
       
       const rememberMe = await AsyncStorage.getItem(REMEMBER_ME_KEY);
       console.log('[AuthContext] Remember me setting:', rememberMe);
@@ -157,7 +178,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[AuthContext] Refreshing user data...');
       const freshUser = await fetchUserFromDatabase(authState.user.id);
       
-      if (freshUser) {
+      if (freshUser && AsyncStorage) {
         // Update storage
         const rememberMe = await AsyncStorage.getItem(REMEMBER_ME_KEY);
         if (rememberMe === 'true') {
@@ -245,13 +266,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profilePictureUrl: userData.profile_picture_url || undefined,
       };
 
-      // Store auth state
-      if (rememberMe) {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-        await AsyncStorage.setItem(REMEMBER_ME_KEY, 'true');
-      } else {
-        await AsyncStorage.removeItem(STORAGE_KEY);
-        await AsyncStorage.setItem(REMEMBER_ME_KEY, 'false');
+      // Store auth state if AsyncStorage is available
+      if (AsyncStorage) {
+        if (rememberMe) {
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+          await AsyncStorage.setItem(REMEMBER_ME_KEY, 'true');
+        } else {
+          await AsyncStorage.removeItem(STORAGE_KEY);
+          await AsyncStorage.setItem(REMEMBER_ME_KEY, 'false');
+        }
       }
 
       setAuthState({
@@ -271,8 +294,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       console.log('[AuthContext] Logging out...');
-      await AsyncStorage.removeItem(STORAGE_KEY);
-      await AsyncStorage.removeItem(REMEMBER_ME_KEY);
+      if (AsyncStorage) {
+        await AsyncStorage.removeItem(STORAGE_KEY);
+        await AsyncStorage.removeItem(REMEMBER_ME_KEY);
+      }
       setAuthState({
         user: null,
         isLoading: false,

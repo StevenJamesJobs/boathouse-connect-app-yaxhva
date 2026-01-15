@@ -50,6 +50,5 @@
     "experiments": {
       "typedRoutes": true
     }
-  },
-  "scheme": "Boathouse Connect"
+  }
 }
