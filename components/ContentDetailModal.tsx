@@ -245,8 +245,8 @@ export default function ContentDetailModal({
                 </Animated.View>
               )}
 
-              {/* Content Card - Floats over image */}
-              <View style={[styles.contentCard, { backgroundColor: colors.card }]}>
+              {/* Content Card - Floats over image and extends to bottom */}
+              <View style={[styles.contentCard, { backgroundColor: colors.card, minHeight: modalHeight }]}>
                 {/* Swipe Indicator */}
                 <View style={styles.swipeIndicatorContainer}>
                   <View style={[styles.swipeIndicator, { backgroundColor: colors.border || colors.textSecondary }]} />
@@ -367,7 +367,7 @@ export default function ContentDetailModal({
                   </>
                 )}
 
-                {/* Bottom Padding for safe scrolling */}
+                {/* Extended Bottom Padding - ensures card extends fully */}
                 <View style={styles.bottomPadding} />
               </View>
             </Animated.ScrollView>
@@ -419,7 +419,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   modalScrollContent: {
-    paddingBottom: 60,
+    flexGrow: 1,
   },
   imageContainer: {
     width: '100%',
@@ -448,6 +448,7 @@ const styles = StyleSheet.create({
     marginTop: -28,
     paddingTop: 8,
     paddingHorizontal: 24,
+    paddingBottom: 40,
     boxShadow: '0px -2px 16px rgba(0, 0, 0, 0.1)',
     elevation: 8,
   },
@@ -512,6 +513,7 @@ const styles = StyleSheet.create({
   actionsContainer: {
     gap: 16,
     marginTop: 8,
+    marginBottom: 24,
   },
   actionButton: {
     flexDirection: 'row',
@@ -558,6 +560,6 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   bottomPadding: {
-    height: 60,
+    height: 350,
   },
 });
