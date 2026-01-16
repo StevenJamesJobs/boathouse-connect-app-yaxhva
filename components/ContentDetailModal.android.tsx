@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Alert,
-  Animated,
+  Platform,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -61,9 +61,7 @@ export default function ContentDetailModal({
   guideFile,
   colors,
 }: ContentDetailModalProps) {
-  const [scrollY] = useState(new Animated.Value(0));
-
-  console.log('ContentDetailModal (Android) rendering with:', {
+  console.log('ContentDetailModal (Android - Simplified) rendering with:', {
     visible,
     title,
     hasThumbnail: !!thumbnailUrl,
@@ -165,19 +163,6 @@ export default function ContentDetailModal({
     }
   };
 
-  // Animated header opacity for parallax effect
-  const imageOpacity = scrollY.interpolate({
-    inputRange: [0, 200],
-    outputRange: [1, 0.3],
-    extrapolate: 'clamp',
-  });
-
-  const imageTranslateY = scrollY.interpolate({
-    inputRange: [0, 200],
-    outputRange: [0, -50],
-    extrapolate: 'clamp',
-  });
-
   return (
     <Modal
       visible={visible}
@@ -213,165 +198,146 @@ export default function ContentDetailModal({
               />
             </TouchableOpacity>
 
-            {/* Content */}
+            {/* Content - Simple ScrollView without parallax */}
             <ScrollView
               style={styles.scrollView}
               contentContainerStyle={styles.scrollContent}
               showsVerticalScrollIndicator={false}
-              scrollEventThrottle={16}
-              onScroll={Animated.event(
-                [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-                { useNativeDriver: true }
-              )}
             >
-              {/* Floating Thumbnail Image with Parallax */}
-              {thumbnailUrl && (
-                <Animated.View 
-                  style={[
-                    styles.imageContainer,
-                    {
-                      opacity: imageOpacity,
-                      transform: [{ translateY: imageTranslateY }],
-                    }
-                  ]}
-                >
-                  <Image
-                    source={{ uri: thumbnailUrl }}
-                    style={
-                      thumbnailShape === 'square'
-                        ? styles.squareImage
-                        : styles.bannerImage
-                    }
-                    contentFit="cover"
-                    transition={200}
-                    cachePolicy="memory-disk"
-                    placeholder={require('@/assets/images/natively-dark.png')}
-                    placeholderContentFit="cover"
-                  />
-                  <View style={styles.imageGradient} />
-                </Animated.View>
-              )}
-
-              {/* Content Card - Floats over image */}
-              <View style={[styles.contentCard, { backgroundColor: colors.card }]}>
-                {/* Title with Priority Badge */}
-                <View style={styles.titleContainer}>
-                  <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
-                  {priority && (
-                    <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(priority) }]}>
-                      <Text style={styles.priorityText}>{priority.toUpperCase()}</Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Date/Time Information */}
-                {(startDateTime || endDateTime) && (
-                  <View style={styles.dateTimeContainer}>
-                    {startDateTime && (
-                      <View style={styles.dateTimeItem}>
-                        <IconSymbol
-                          ios_icon_name="calendar"
-                          android_material_icon_name="event"
-                          size={16}
-                          color={colors.primary}
-                        />
-                        <Text style={[styles.dateTimeLabel, { color: colors.textSecondary }]}>Start:</Text>
-                        <Text style={[styles.dateTimeText, { color: colors.text }]}>
-                          {formatDateTime(startDateTime)}
-                        </Text>
-                      </View>
-                    )}
-                    {endDateTime && (
-                      <View style={styles.dateTimeItem}>
-                        <IconSymbol
-                          ios_icon_name="clock"
-                          android_material_icon_name="schedule"
-                          size={16}
-                          color={colors.primary}
-                        />
-                        <Text style={[styles.dateTimeLabel, { color: colors.textSecondary }]}>End:</Text>
-                        <Text style={[styles.dateTimeText, { color: colors.text }]}>
-                          {formatDateTime(endDateTime)}
-                        </Text>
-                      </View>
-                    )}
+              {/* Compact Header with Thumbnail and Title */}
+              <View style={styles.headerSection}>
+                {/* Small Thumbnail in Corner */}
+                {thumbnailUrl && (
+                  <View style={styles.thumbnailContainer}>
+                    <Image
+                      source={{ uri: thumbnailUrl }}
+                      style={styles.thumbnailImage}
+                      contentFit="cover"
+                      transition={200}
+                      cachePolicy="memory-disk"
+                      placeholder={require('@/assets/images/natively-dark.png')}
+                      placeholderContentFit="cover"
+                    />
                   </View>
                 )}
 
-                {/* Separator */}
-                {(startDateTime || endDateTime) && (
-                  <View style={[styles.separator, { backgroundColor: colors.border || '#E8EAED' }]} />
-                )}
+                {/* Title and Meta Info */}
+                <View style={styles.headerInfo}>
+                  <View style={styles.titleContainer}>
+                    <Text style={[styles.title, { color: colors.text }]} numberOfLines={2}>
+                      {title}
+                    </Text>
+                    {priority && (
+                      <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(priority) }]}>
+                        <Text style={styles.priorityText}>{priority.toUpperCase()}</Text>
+                      </View>
+                    )}
+                  </View>
 
-                {/* Content */}
-                <Text style={[styles.content, { color: colors.textSecondary }]}>
-                  {content}
-                </Text>
-
-                {/* Action Buttons */}
-                {(link || guideFile) && (
-                  <>
-                    <View style={[styles.separator, { backgroundColor: colors.border || '#E8EAED' }]} />
-                    <View style={styles.actionsContainer}>
-                      {link && (
-                        <TouchableOpacity
-                          style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                          onPress={handleOpenLink}
-                          activeOpacity={0.8}
-                        >
+                  {/* Date/Time Information - Compact */}
+                  {(startDateTime || endDateTime) && (
+                    <View style={styles.dateTimeContainer}>
+                      {startDateTime && (
+                        <View style={styles.dateTimeItem}>
                           <IconSymbol
-                            ios_icon_name="link"
-                            android_material_icon_name="link"
-                            size={20}
-                            color="#FFFFFF"
+                            ios_icon_name="calendar"
+                            android_material_icon_name="event"
+                            size={14}
+                            color={colors.primary}
                           />
-                          <Text style={styles.actionButtonText}>View More Information</Text>
-                        </TouchableOpacity>
-                      )}
-                      
-                      {guideFile && (
-                        <View style={styles.fileActionsContainer}>
-                          <Text style={[styles.fileLabel, { color: colors.text }]}>
-                            Attached File: {guideFile.file_name}
+                          <Text style={[styles.dateTimeText, { color: colors.textSecondary }]} numberOfLines={1}>
+                            {formatDateTime(startDateTime)}
                           </Text>
-                          <View style={styles.fileButtons}>
-                            <TouchableOpacity
-                              style={[styles.fileButton, { backgroundColor: colors.primary }]}
-                              onPress={handleViewFile}
-                              activeOpacity={0.8}
-                            >
-                              <IconSymbol
-                                ios_icon_name="eye.fill"
-                                android_material_icon_name="visibility"
-                                size={20}
-                                color="#FFFFFF"
-                              />
-                              <Text style={styles.fileButtonText}>View</Text>
-                            </TouchableOpacity>
-                            
-                            <TouchableOpacity
-                              style={[styles.fileButton, { backgroundColor: colors.primary }]}
-                              onPress={handleDownloadFile}
-                              activeOpacity={0.8}
-                            >
-                              <IconSymbol
-                                ios_icon_name="arrow.down.circle.fill"
-                                android_material_icon_name="download"
-                                size={20}
-                                color="#FFFFFF"
-                              />
-                              <Text style={styles.fileButtonText}>Download</Text>
-                            </TouchableOpacity>
-                          </View>
+                        </View>
+                      )}
+                      {endDateTime && (
+                        <View style={styles.dateTimeItem}>
+                          <IconSymbol
+                            ios_icon_name="clock"
+                            android_material_icon_name="schedule"
+                            size={14}
+                            color={colors.primary}
+                          />
+                          <Text style={[styles.dateTimeText, { color: colors.textSecondary }]} numberOfLines={1}>
+                            {formatDateTime(endDateTime)}
+                          </Text>
                         </View>
                       )}
                     </View>
-                  </>
-                )}
-
-                {/* Bottom Padding */}
-                <View style={styles.bottomPadding} />
+                  )}
+                </View>
               </View>
+
+              {/* Separator */}
+              <View style={[styles.separator, { backgroundColor: colors.border || '#E8EAED' }]} />
+
+              {/* Action Buttons - Compact */}
+              {(link || guideFile) && (
+                <View style={styles.actionsContainer}>
+                  {link && (
+                    <TouchableOpacity
+                      style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                      onPress={handleOpenLink}
+                      activeOpacity={0.8}
+                    >
+                      <IconSymbol
+                        ios_icon_name="link"
+                        android_material_icon_name="link"
+                        size={18}
+                        color="#FFFFFF"
+                      />
+                      <Text style={styles.actionButtonText}>View More</Text>
+                    </TouchableOpacity>
+                  )}
+                  
+                  {guideFile && (
+                    <>
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                        onPress={handleViewFile}
+                        activeOpacity={0.8}
+                      >
+                        <IconSymbol
+                          ios_icon_name="eye.fill"
+                          android_material_icon_name="visibility"
+                          size={18}
+                          color="#FFFFFF"
+                        />
+                        <Text style={styles.actionButtonText}>View</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                        onPress={handleDownloadFile}
+                        activeOpacity={0.8}
+                      >
+                        <IconSymbol
+                          ios_icon_name="arrow.down.circle.fill"
+                          android_material_icon_name="download"
+                          size={18}
+                          color="#FFFFFF"
+                        />
+                        <Text style={styles.actionButtonText}>Download</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
+              )}
+
+              {/* Separator */}
+              {(link || guideFile) && (
+                <View style={[styles.separator, { backgroundColor: colors.border || '#E8EAED' }]} />
+              )}
+
+              {/* Content - Full Description */}
+              <View style={styles.contentSection}>
+                <Text style={[styles.content, { color: colors.textSecondary }]}>
+                  {content}
+                </Text>
+              </View>
+
+              {/* Bottom Padding */}
+              <View style={styles.bottomPadding} />
             </ScrollView>
           </View>
         </PanGestureHandler>
@@ -396,7 +362,7 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    height: '85%',
+    height: '90%',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.3,
@@ -422,135 +388,96 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    flexGrow: 1,
-    paddingBottom: 20,
-  },
-  imageContainer: {
-    width: '100%',
-    height: 300,
-    position: 'relative',
-  },
-  squareImage: {
-    width: '100%',
-    height: '100%',
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  imageGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 100,
-  },
-  contentCard: {
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -28,
-    paddingTop: 24,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingBottom: 40,
-    minHeight: 400,
+  },
+  headerSection: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  thumbnailContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: '#F0F0F0',
+  },
+  thumbnailImage: {
+    width: '100%',
+    height: '100%',
+  },
+  headerInfo: {
+    flex: 1,
   },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 16,
-    gap: 12,
+    gap: 8,
+    marginBottom: 8,
   },
   title: {
     flex: 1,
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: 'bold',
-    lineHeight: 36,
+    lineHeight: 26,
   },
   priorityBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
   priorityText: {
-    fontSize: 11,
+    fontSize: 9,
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
   dateTimeContainer: {
-    marginBottom: 16,
-    gap: 10,
+    gap: 6,
   },
   dateTimeItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-  },
-  dateTimeLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    gap: 6,
   },
   dateTimeText: {
-    fontSize: 14,
+    fontSize: 12,
     flex: 1,
   },
   separator: {
     height: 1,
-    marginVertical: 20,
-  },
-  content: {
-    fontSize: 17,
-    lineHeight: 26,
-    marginBottom: 8,
+    marginVertical: 16,
   },
   actionsContainer: {
-    gap: 16,
-    marginTop: 8,
-    marginBottom: 24,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 8,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    gap: 10,
-    elevation: 3,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    gap: 6,
+    elevation: 2,
   },
   actionButtonText: {
-    fontSize: 16,
+    fontSize: 13,
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  fileActionsContainer: {
-    gap: 12,
+  contentSection: {
+    marginTop: 8,
   },
-  fileLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  fileButtons: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  fileButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    gap: 8,
-    elevation: 3,
-  },
-  fileButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#FFFFFF',
+  content: {
+    fontSize: 15,
+    lineHeight: 24,
   },
   bottomPadding: {
-    height: 100,
+    height: 60,
   },
 });
