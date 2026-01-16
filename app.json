@@ -1,8 +1,9 @@
+
 {
   "expo": {
     "name": "Boathouse Connect",
-    "slug": "Boathouse Connect",
-    "version": "1.2.5",
+    "slug": "boathouse-connect-app-yaxhva",
+    "version": "1.2.6",
     "orientation": "portrait",
     "icon": "./assets/images/9ac97b2a-471a-496b-b6ca-41544a3c6217.jpeg",
     "scheme": "myapp",
@@ -15,15 +16,15 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mcloones.boathouseconnect",
-      "buildNumber": "1.2.5"
+      "buildNumber": "1.2.6"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/9ac97b2a-471a-496b-b6ca-41544a3c6217.jpeg",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.mcloones.boathouseconnect",
-      "versionCode": 9,
+      "package": "com.mcloonesboathouse.GPboathouseconnect",
+      "versionCode": 10,
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE"
