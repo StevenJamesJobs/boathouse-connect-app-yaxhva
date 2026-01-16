@@ -64,25 +64,35 @@ export default function ContentDetailModal({
   colors,
 }: ContentDetailModalProps) {
   const handleSwipeGesture = (event: any) => {
-    const { translationY } = event.nativeEvent;
-    if (translationY > 100) {
-      onClose();
+    try {
+      const { translationY } = event.nativeEvent;
+      if (translationY > 100) {
+        onClose();
+      }
+    } catch (error) {
+      console.error('Error handling swipe gesture:', error);
     }
   };
 
   const screenHeight = Dimensions.get('window').height;
+  const modalHeight = screenHeight * 0.9;
 
   const formatDateTime = (dateTime: string | null) => {
     if (!dateTime) return null;
-    const date = new Date(dateTime);
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+    try {
+      const date = new Date(dateTime);
+      return date.toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return dateTime;
+    }
   };
 
   const getPriorityColor = (priority: string) => {
@@ -155,6 +165,7 @@ export default function ContentDetailModal({
       transparent={true}
       animationType="slide"
       onRequestClose={onClose}
+      statusBarTranslucent={true}
     >
       <GestureHandlerRootView style={styles.modalOverlay}>
         <TouchableOpacity 
@@ -163,7 +174,7 @@ export default function ContentDetailModal({
           onPress={onClose}
         />
         <PanGestureHandler onGestureEvent={handleSwipeGesture}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card, maxHeight: screenHeight * 0.9 }]}>
+          <View style={[styles.modalContent, { backgroundColor: colors.card, height: modalHeight }]}>
             {/* Swipe Indicator */}
             <View style={styles.swipeIndicatorContainer}>
               <View style={[styles.swipeIndicator, { backgroundColor: colors.border || colors.textSecondary }]} />
@@ -313,8 +324,8 @@ export default function ContentDetailModal({
                 </View>
               )}
 
-              {/* Extra padding at bottom to ensure content is fully scrollable on Android */}
-              <View style={{ height: Platform.OS === 'android' ? 80 : 60 }} />
+              {/* Extra padding at bottom to ensure content is fully scrollable */}
+              <View style={{ height: 100 }} />
             </ScrollView>
           </View>
         </PanGestureHandler>
@@ -339,9 +350,9 @@ const styles = StyleSheet.create({
   modalContent: {
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    paddingBottom: Platform.OS === 'android' ? 20 : 0,
     boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.3)',
     elevation: 10,
+    overflow: 'hidden',
   },
   swipeIndicatorContainer: {
     alignItems: 'center',
@@ -357,13 +368,16 @@ const styles = StyleSheet.create({
     top: 16,
     right: 16,
     zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: 16,
+    padding: 2,
   },
   scrollView: {
-    maxHeight: Dimensions.get('window').height * 0.8,
+    flex: 1,
   },
   scrollContent: {
     paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'android' ? 80 : 60,
+    paddingBottom: 40,
   },
   imageContainer: {
     marginBottom: 20,
