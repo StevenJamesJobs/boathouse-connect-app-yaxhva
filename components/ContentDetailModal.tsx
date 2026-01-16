@@ -9,8 +9,6 @@ import {
   StyleSheet,
   Dimensions,
   Alert,
-  Linking,
-  Platform,
   Animated,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -65,6 +63,13 @@ export default function ContentDetailModal({
   colors,
 }: ContentDetailModalProps) {
   const [scrollY] = useState(new Animated.Value(0));
+
+  console.log('ContentDetailModal (iOS/Web) rendering with:', {
+    visible,
+    title,
+    hasThumbnail: !!thumbnailUrl,
+    thumbnailShape,
+  });
 
   const handleSwipeGesture = (event: any) => {
     try {
@@ -396,7 +401,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     backgroundColor: '#F8F9FA',
     overflow: 'hidden',
-    boxShadow: '0px -4px 24px rgba(0, 0, 0, 0.5)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 24,
     elevation: 12,
   },
   closeButton: {
@@ -412,7 +420,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
     elevation: 5,
   },
   modalScroll: {
@@ -440,7 +451,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 100,
-    background: 'linear-gradient(to bottom, transparent, rgba(248, 249, 250, 0.9))',
   },
   contentCard: {
     borderTopLeftRadius: 28,
@@ -449,7 +459,10 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingHorizontal: 24,
     paddingBottom: 40,
-    boxShadow: '0px -2px 16px rgba(0, 0, 0, 0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
     elevation: 8,
   },
   swipeIndicatorContainer: {
@@ -523,7 +536,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 12,
     gap: 10,
-    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
     elevation: 3,
   },
   actionButtonText: {
@@ -551,7 +567,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 12,
     gap: 8,
-    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
     elevation: 3,
   },
   fileButtonText: {
