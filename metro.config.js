@@ -25,6 +25,12 @@ if (!fs.existsSync(logDir)) {
 config.server = config.server || {};
 config.server.enhanceMiddleware = (middleware) => {
   return (req, res, next) => {
+
+    // DEBUG: log all metro bundle requests
+    if (req.url.includes('index.bundle') || req.url.includes('.bundle')) {
+      console.log('[METRO] Request:', req.method, req.url);
+    }
+
     // Extract pathname without query params for matching
     const pathname = req.url.split('?')[0];
 

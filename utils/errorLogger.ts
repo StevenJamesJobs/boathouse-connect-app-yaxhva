@@ -1,6 +1,9 @@
 // Global error logging for runtime errors
 // Captures console.log/warn/error and sends to Natively server for AI debugging
 
+// Declare __DEV__ global (React Native global for development mode detection)
+declare const __DEV__: boolean;
+
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 
@@ -8,6 +11,17 @@ import Constants from "expo-constants";
 const recentLogs: { [key: string]: boolean } = {};
 const clearLogAfterDelay = (logKey: string) => {
   setTimeout(() => delete recentLogs[logKey], 100);
+};
+
+// Messages to mute (noisy warnings that don't help debugging)
+const MUTED_MESSAGES = [
+  'each child in a list should have a unique "key" prop',
+  'Each child in a list should have a unique "key" prop',
+];
+
+// Check if a message should be muted
+const shouldMuteMessage = (message: string): boolean => {
+  return MUTED_MESSAGES.some(muted => message.includes(muted));
 };
 
 // Queue for batching logs
@@ -261,6 +275,11 @@ const stringifyArgs = (args: any[]): string => {
 };
 
 export const setupErrorLogging = () => {
+  // Don't initialize in production builds - no need for log forwarding
+  if (!__DEV__) {
+    return;
+  }
+
   // Store original console methods BEFORE any modifications
   const originalConsoleLog = console.log;
   const originalConsoleWarn = console.warn;
@@ -288,19 +307,23 @@ export const setupErrorLogging = () => {
     // Always call original first
     originalConsoleWarn.apply(console, args);
 
-    // Queue log for sending to server
+    // Queue log for sending to server (skip muted messages)
     const message = stringifyArgs(args);
+    if (shouldMuteMessage(message)) return;
+
     const source = getCallerInfo();
     queueLog('warn', message, source);
   };
 
   // Override console.error to capture and send to server
   console.error = (...args: any[]) => {
+    // Queue log for sending to server (skip muted messages)
+    const message = stringifyArgs(args);
+    if (shouldMuteMessage(message)) return;
+
     // Always call original first
     originalConsoleError.apply(console, args);
 
-    // Queue log for sending to server
-    const message = stringifyArgs(args);
     const source = getCallerInfo();
     queueLog('error', message, source);
 
@@ -337,4 +360,7 @@ export const setupErrorLogging = () => {
 };
 
 // Auto-initialize logging when this module is imported
-setupErrorLogging();
+// Only run in development mode - production apps don't need log forwarding
+if (__DEV__) {
+  setupErrorLogging();
+}
