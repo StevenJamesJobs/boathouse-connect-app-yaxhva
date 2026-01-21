@@ -808,7 +808,7 @@ export default function EmployeePortalScreen() {
         >
           {loadingFeatures ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={managerColors.highlight} />
+              <ActivityIndicator size="small" color={employeeColors.highlight} />
               <Text style={styles.loadingText}>Loading features...</Text>
             </View>
           ) : specialFeatures.length === 0 ? (
