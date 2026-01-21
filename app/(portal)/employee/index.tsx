@@ -903,7 +903,7 @@ export default function EmployeePortalScreen() {
               <Image
                 source={{ uri: getImageUrl(selectedImage) }}
                 style={styles.fullImage}
-                resizeMode="contain"
+                resizeMode="contain
               />
             )}
             <Text style={styles.swipeHint}>Swipe down to close</Text>
