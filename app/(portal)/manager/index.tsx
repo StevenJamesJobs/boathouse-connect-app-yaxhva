@@ -343,6 +343,15 @@ export default function ManagerPortalScreen() {
     return `${url}?t=${Date.now()}`;
   };
 
+  const getProfilePictureUrl = (url: string | null | undefined) => {
+    if (!url) return null;
+    if (url.startsWith('http')) {
+      return url;
+    }
+    const supabaseUrl = 'https://xvbajqukbakcvdrkcioi.supabase.co';
+    return `${supabaseUrl}/storage/v1/object/public/profile-pictures/${url}`;
+  };
+
   const formatPrice = (price: string) => {
     if (price.includes('$')) {
       return price;
@@ -405,45 +414,64 @@ export default function ManagerPortalScreen() {
     return truncated + '...';
   };
 
+  const profilePictureUrl = getProfilePictureUrl(user?.profilePictureUrl);
+  const unreadText = unreadCount > 0 ? `${unreadCount}` : '0';
+
   return (
     <GestureHandlerRootView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Welcome Section */}
+        {/* Welcome Section - Redesigned */}
         <View style={styles.welcomeSection}>
-          <View style={styles.welcomeTextContainer}>
-            <Text style={styles.welcomeTitle}>Welcome, {user?.name}!</Text>
-            <Text style={styles.jobTitle}>{user?.jobTitle}</Text>
-            <Text style={styles.tagline}>Let&apos;s see what we have going on today!</Text>
-          </View>
-          
-          {/* Messages Button - Redesigned */}
-          <TouchableOpacity
-            style={styles.messageButton}
-            onPress={() => router.push('/messages')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.messageButtonContent}>
-              <View style={styles.messageIconWrapper}>
+          <View style={styles.welcomeRow}>
+            {/* Profile Picture */}
+            <View style={styles.profilePictureContainer}>
+              {profilePictureUrl ? (
+                <Image
+                  source={{ uri: profilePictureUrl }}
+                  style={styles.profilePicture}
+                />
+              ) : (
+                <View style={styles.profilePicturePlaceholder}>
+                  <IconSymbol
+                    ios_icon_name="person.fill"
+                    android_material_icon_name="person"
+                    size={32}
+                    color={managerColors.textSecondary}
+                  />
+                </View>
+              )}
+            </View>
+
+            {/* Welcome Text */}
+            <View style={styles.welcomeTextContainer}>
+              <Text style={styles.welcomeTitle}>Welcome, {user?.name}!</Text>
+              <Text style={styles.jobTitle}>{user?.jobTitle}</Text>
+            </View>
+
+            {/* Compact Messages Button */}
+            <TouchableOpacity
+              style={styles.compactMessageButton}
+              onPress={() => router.push('/messages')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.compactMessageIconWrapper}>
                 <IconSymbol
                   ios_icon_name="envelope.fill"
                   android_material_icon_name="mail"
-                  size={24}
+                  size={20}
                   color="#FFFFFF"
                 />
                 {unreadCount > 0 && (
-                  <View style={styles.messageBadgePosition}>
-                    <MessageBadge count={unreadCount} size="small" />
+                  <View style={styles.compactBadgePosition}>
+                    <View style={styles.compactBadge}>
+                      <Text style={styles.compactBadgeText}>{unreadText}</Text>
+                    </View>
                   </View>
                 )}
               </View>
-              <View style={styles.messageTextContainer}>
-                <Text style={styles.messageButtonLabel}>Messages</Text>
-                <Text style={styles.messageButtonCount}>
-                  {unreadCount > 0 ? `${unreadCount} unread` : 'No new messages'}
-                </Text>
-              </View>
-            </View>
-          </TouchableOpacity>
+              <Text style={styles.compactMessageLabel}>Messages</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Weather Section - Collapsible */}
@@ -932,74 +960,100 @@ const styles = StyleSheet.create({
   welcomeSection: {
     backgroundColor: managerColors.card,
     borderRadius: 16,
-    padding: 24,
+    padding: 20,
     marginBottom: 20,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
+  welcomeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  profilePictureContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    overflow: 'hidden',
+    backgroundColor: managerColors.background,
+    borderWidth: 2,
+    borderColor: managerColors.highlight,
+  },
+  profilePicture: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  profilePicturePlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: managerColors.background,
+  },
   welcomeTextContainer: {
-    marginBottom: 16,
+    flex: 1,
   },
   welcomeTitle: {
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: 'bold',
     color: managerColors.text,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   jobTitle: {
-    fontSize: 18,
+    fontSize: 15,
     color: managerColors.highlight,
     fontWeight: '600',
-    marginBottom: 8,
   },
-  tagline: {
-    fontSize: 16,
-    color: managerColors.textSecondary,
-    fontStyle: 'italic',
-  },
-  messageButton: {
+  compactMessageButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     backgroundColor: 'rgba(52, 152, 219, 0.15)',
     borderRadius: 12,
     borderWidth: 1.5,
     borderColor: '#3498DB',
-    overflow: 'hidden',
+    minWidth: 70,
   },
-  messageButtonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    gap: 14,
-  },
-  messageIconWrapper: {
+  compactMessageIconWrapper: {
     position: 'relative',
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: '#3498DB',
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0px 2px 6px rgba(52, 152, 219, 0.4)',
-    elevation: 3,
+    marginBottom: 4,
+    boxShadow: '0px 2px 4px rgba(52, 152, 219, 0.3)',
+    elevation: 2,
   },
-  messageBadgePosition: {
+  compactBadgePosition: {
     position: 'absolute',
     top: -4,
     right: -4,
   },
-  messageTextContainer: {
-    flex: 1,
+  compactBadge: {
+    backgroundColor: '#E74C3C',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: managerColors.card,
   },
-  messageButtonLabel: {
-    fontSize: 16,
-    fontWeight: '700',
+  compactBadgeText: {
+    fontSize: 11,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
+  compactMessageLabel: {
+    fontSize: 11,
+    fontWeight: '600',
     color: managerColors.text,
-    marginBottom: 2,
-  },
-  messageButtonCount: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: managerColors.textSecondary,
+    textAlign: 'center',
   },
   loadingContainer: {
     paddingVertical: 20,

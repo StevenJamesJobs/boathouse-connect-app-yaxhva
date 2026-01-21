@@ -1,8 +1,8 @@
 {
   "expo": {
     "name": "Boathouse Connect",
-    "slug": "Boathouse Connect",
-    "version": "1.2.6",
+    "slug": "boathouse-connect-app-yaxhva",
+    "version": "1.2.7",
     "orientation": "portrait",
     "icon": "./assets/images/9ac97b2a-471a-496b-b6ca-41544a3c6217.jpeg",
     "scheme": "myapp",
@@ -23,7 +23,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.mcloonesboathouse.GPboathouseconnect",
-      "versionCode": 10,
+      "versionCode": 11,
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE"
