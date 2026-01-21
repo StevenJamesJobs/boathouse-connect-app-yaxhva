@@ -32,12 +32,14 @@ interface Employee {
 }
 
 const JOB_TITLE_OPTIONS = [
+  'Banquet Captain',
   'Banquets',
   'Bartender',
   'Busser',
   'Chef',
   'Host',
   'Kitchen',
+  'Lead Server',
   'Manager',
   'Runner',
   'Server',

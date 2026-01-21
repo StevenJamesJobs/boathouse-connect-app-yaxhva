@@ -19,8 +19,11 @@ export default function EmployeeToolsScreen() {
   // Get job titles array from user
   const jobTitles = user?.jobTitles || [];
   
-  // Check if user can see Bar Assistant (Bartender or Manager)
-  const canSeeBarAssistant = jobTitles.includes('Bartender') || jobTitles.includes('Manager');
+  // Check if user can see Bar Assistant (Bartender, Manager, Lead Server, or Banquet Captain)
+  const canSeeBarAssistant = jobTitles.includes('Bartender') || 
+                             jobTitles.includes('Manager') || 
+                             jobTitles.includes('Lead Server') || 
+                             jobTitles.includes('Banquet Captain');
   
   // Check if user can see Check Outs Calculator (Server or Manager)
   const canSeeCheckOutCalculator = jobTitles.includes('Server') || jobTitles.includes('Manager');
@@ -95,7 +98,7 @@ export default function EmployeeToolsScreen() {
           </View>
         )}
 
-        {/* 3. Bartender Assistant Section - Only for Bartenders and Managers */}
+        {/* 3. Bartender Assistant Section - For Bartenders, Managers, Lead Servers, and Banquet Captains */}
         {canSeeBarAssistant && (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
