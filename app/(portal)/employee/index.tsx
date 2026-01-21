@@ -408,7 +408,7 @@ export default function EmployeePortalScreen() {
     return truncated + '...';
   };
 
-  // Filter events by category
+  // Filter events by categories
   const filteredEvents = upcomingEvents.filter(event => event.category === eventsTab).slice(0, 4);
 
   const profilePictureUrl = getProfilePictureUrl(user?.profilePictureUrl);
