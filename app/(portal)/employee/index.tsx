@@ -907,7 +907,7 @@ export default function EmployeePortalScreen() {
               />
             )}
             <Text style={styles.swipeHint}>Swipe do
-						to close</Text>
+			to close</Text>
           </View>
         </PanGestureHandler>
       </Modal>
