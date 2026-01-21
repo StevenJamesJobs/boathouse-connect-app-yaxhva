@@ -38,6 +38,7 @@ interface UpcomingEvent {
   created_at: string;
   link: string | null;
   guide_file_id: string | null;
+  category: string;
 }
 
 interface GuideFile {
@@ -68,6 +69,7 @@ export default function UpcomingEventsEditorScreen() {
     thumbnail_shape: 'square',
     display_order: 0,
     link: '',
+    category: 'Event',
   });
   const [startDateTime, setStartDateTime] = useState<Date | null>(null);
   const [endDateTime, setEndDateTime] = useState<Date | null>(null);
@@ -240,8 +242,8 @@ export default function UpcomingEventsEditorScreen() {
       return;
     }
 
-    if (!editingEvent && events.length >= 15) {
-      Alert.alert('Limit Reached', 'You can only have up to 15 upcoming events. Please delete an existing event before adding a new one.');
+    if (!editingEvent && events.length >= 25) {
+      Alert.alert('Limit Reached', 'You can only have up to 25 upcoming events. Please delete an existing event before adding a new one.');
       return;
     }
 
@@ -273,6 +275,7 @@ export default function UpcomingEventsEditorScreen() {
           p_display_order: formData.display_order,
           p_link: linkValue,
           p_guide_file_id: guideFileId,
+          p_category: formData.category,
         });
 
         if (error) {
@@ -294,6 +297,7 @@ export default function UpcomingEventsEditorScreen() {
           p_display_order: formData.display_order,
           p_link: linkValue,
           p_guide_file_id: guideFileId,
+          p_category: formData.category,
         });
 
         if (error) {
@@ -371,6 +375,7 @@ export default function UpcomingEventsEditorScreen() {
       thumbnail_shape: 'square',
       display_order: events.length,
       link: '',
+      category: 'Event',
     });
     setStartDateTime(null);
     setEndDateTime(null);
@@ -389,6 +394,7 @@ export default function UpcomingEventsEditorScreen() {
       thumbnail_shape: event.thumbnail_shape,
       display_order: event.display_order,
       link: event.link || '',
+      category: event.category || 'Event',
     });
     setStartDateTime(event.start_date_time ? new Date(event.start_date_time) : null);
     setEndDateTime(event.end_date_time ? new Date(event.end_date_time) : null);
@@ -464,13 +470,17 @@ export default function UpcomingEventsEditorScreen() {
     return acc;
   }, {} as Record<string, GuideFile[]>);
 
+  const getCategoryBadgeColor = (category: string) => {
+    return category === 'Event' ? '#3498DB' : '#9B59B6';
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
-            android_material_icon_name="arrow_back"
+            android_material_icon_name="arrow-back"
             size={24}
             color={managerColors.text}
           />
@@ -481,23 +491,23 @@ export default function UpcomingEventsEditorScreen() {
 
       <View style={styles.subHeader}>
         <Text style={styles.headerSubtitle}>
-          {events.length} / 15 events
+          {events.length} / 25 events
         </Text>
       </View>
 
       <TouchableOpacity 
-        style={[styles.addNewItemButton, events.length >= 15 && styles.addNewItemButtonDisabled]} 
+        style={[styles.addNewItemButton, events.length >= 25 && styles.addNewItemButtonDisabled]} 
         onPress={openAddModal}
-        disabled={events.length >= 15}
+        disabled={events.length >= 25}
       >
         <IconSymbol
           ios_icon_name="plus.circle.fill"
-          android_material_icon_name="add_circle"
+          android_material_icon_name="add-circle"
           size={24}
-          color={events.length >= 15 ? managerColors.textSecondary : managerColors.text}
+          color={events.length >= 25 ? managerColors.textSecondary : managerColors.text}
         />
-        <Text style={[styles.addNewItemButtonText, events.length >= 15 && styles.addNewItemButtonTextDisabled]}>
-          {events.length >= 15 ? 'Limit Reached (15/15)' : 'Add New Event'}
+        <Text style={[styles.addNewItemButtonText, events.length >= 25 && styles.addNewItemButtonTextDisabled]}>
+          {events.length >= 25 ? 'Limit Reached (25/25)' : 'Add New Event'}
         </Text>
       </TouchableOpacity>
 
@@ -532,7 +542,12 @@ export default function UpcomingEventsEditorScreen() {
                       style={styles.squareImage}
                     />
                     <View style={styles.squareContent}>
-                      <Text style={styles.eventTitle}>{event.title}</Text>
+                      <View style={styles.titleRow}>
+                        <Text style={styles.eventTitle}>{event.title}</Text>
+                        <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
+                          <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
+                        </View>
+                      </View>
                       {(event.content || event.message) && (
                         <Text style={styles.squareMessage} numberOfLines={2}>
                           {event.content || event.message}
@@ -576,7 +591,12 @@ export default function UpcomingEventsEditorScreen() {
                       />
                     )}
                     <View style={styles.eventContent}>
-                      <Text style={styles.eventTitle}>{event.title}</Text>
+                      <View style={styles.titleRow}>
+                        <Text style={styles.eventTitle}>{event.title}</Text>
+                        <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
+                          <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
+                        </View>
+                      </View>
                       {(event.content || event.message) && (
                         <Text style={styles.eventMessage}>
                           {event.content || event.message}
@@ -697,7 +717,7 @@ export default function UpcomingEventsEditorScreen() {
                     <View style={styles.imageUploadPlaceholder}>
                       <IconSymbol
                         ios_icon_name="photo"
-                        android_material_icon_name="add_photo_alternate"
+                        android_material_icon_name="add-photo-alternate"
                         size={48}
                         color="#666666"
                       />
@@ -751,6 +771,47 @@ export default function UpcomingEventsEditorScreen() {
                   value={formData.title}
                   onChangeText={(text) => setFormData({ ...formData, title: text })}
                 />
+              </View>
+
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Category *</Text>
+                <View style={styles.categorySelector}>
+                  <TouchableOpacity
+                    style={[
+                      styles.categoryOption,
+                      formData.category === 'Event' && styles.categoryOptionActive,
+                    ]}
+                    onPress={() => setFormData({ ...formData, category: 'Event' })}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryOptionText,
+                        formData.category === 'Event' && styles.categoryOptionTextActive,
+                      ]}
+                    >
+                      Event
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.categoryOption,
+                      formData.category === 'Entertainment' && styles.categoryOptionActive,
+                    ]}
+                    onPress={() => setFormData({ ...formData, category: 'Entertainment' })}
+                  >
+                    <Text
+                      style={[
+                        styles.categoryOptionText,
+                        formData.category === 'Entertainment' && styles.categoryOptionTextActive,
+                      ]}
+                    >
+                      Entertainment
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.formHint}>
+                  Select whether this is a regular Event or Entertainment (music acts, performances, etc.)
+                </Text>
               </View>
 
               <View style={styles.formGroup}>
@@ -815,7 +876,7 @@ export default function UpcomingEventsEditorScreen() {
                   >
                     <IconSymbol
                       ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
-                      android_material_icon_name={showFileSection ? "expand_less" : "expand_more"}
+                      android_material_icon_name={showFileSection ? "expand-less" : "expand-more"}
                       size={24}
                       color={managerColors.highlight}
                     />
@@ -879,7 +940,7 @@ export default function UpcomingEventsEditorScreen() {
                                 </View>
                                 <IconSymbol
                                   ios_icon_name="chevron.right"
-                                  android_material_icon_name="chevron_right"
+                                  android_material_icon_name="chevron-right"
                                   size={20}
                                   color="#666666"
                                 />
@@ -1341,6 +1402,23 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-start',
   },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+    gap: 8,
+  },
+  categoryBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  categoryBadgeText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+  },
   squareMessage: {
     fontSize: 13,
     color: managerColors.textSecondary,
@@ -1359,7 +1437,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: managerColors.text,
-    marginBottom: 8,
+    flex: 1,
   },
   eventMessage: {
     fontSize: 14,
@@ -1530,6 +1608,31 @@ const styles = StyleSheet.create({
   },
   shapeOptionTextActive: {
     color: '#1A1A1A',
+  },
+  categorySelector: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  categoryOption: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F5',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+  },
+  categoryOptionActive: {
+    backgroundColor: '#3498DB',
+    borderColor: '#3498DB',
+  },
+  categoryOptionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666666',
+  },
+  categoryOptionTextActive: {
+    color: '#FFFFFF',
   },
   selectedFileContainer: {
     flexDirection: 'row',
