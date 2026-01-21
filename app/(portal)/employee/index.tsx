@@ -576,7 +576,7 @@ export default function EmployeePortalScreen() {
           onViewAll={() => router.push('/view-all-upcoming-events')}
         >
           {/* Tabs */}
-          <View style={styles.tabContainer}>
+          <View style={styles.tabsContainer}>
             <TouchableOpacity
               style={[styles.tab, eventsTab === 'Event' && styles.activeTab]}
               onPress={() => setEventsTab('Event')}
