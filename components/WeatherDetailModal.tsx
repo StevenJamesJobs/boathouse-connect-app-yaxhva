@@ -12,7 +12,6 @@ import {
   Image,
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
-import { GestureHandlerRootView, PanGestureHandler, State } from 'react-native-gesture-handler';
 
 interface DayForecast {
   date: string;
@@ -198,15 +197,6 @@ export default function WeatherDetailModal({
     }
   };
 
-  const handleSwipeGesture = (event: any) => {
-    if (event.nativeEvent.state === State.END) {
-      const { translationY } = event.nativeEvent;
-      if (translationY > 100) {
-        onClose();
-      }
-    }
-  };
-
   const screenHeight = Dimensions.get('window').height;
 
   return (
@@ -216,35 +206,34 @@ export default function WeatherDetailModal({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <GestureHandlerRootView style={styles.modalOverlay}>
+      <View style={styles.modalOverlay}>
         <TouchableOpacity
           style={styles.modalBackdrop}
           activeOpacity={1}
           onPress={onClose}
         />
-        <PanGestureHandler onHandlerStateChange={handleSwipeGesture}>
-          <View style={[styles.modalContent, { backgroundColor: colors.card, height: screenHeight * 0.85 }]}>
-            {/* Swipe Indicator */}
-            <View style={styles.swipeIndicatorContainer}>
-              <View style={[styles.swipeIndicator, { backgroundColor: colors.border || colors.textSecondary }]} />
-            </View>
+        <View style={[styles.modalContent, { backgroundColor: colors.card, height: screenHeight * 0.85 }]}>
+          {/* Swipe Indicator */}
+          <View style={styles.swipeIndicatorContainer}>
+            <View style={[styles.swipeIndicator, { backgroundColor: colors.border || colors.textSecondary }]} />
+          </View>
 
-            {/* Close Button */}
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <IconSymbol
-                ios_icon_name="xmark.circle.fill"
-                android_material_icon_name="cancel"
-                size={32}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
+          {/* Close Button */}
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <IconSymbol
+              ios_icon_name="xmark.circle.fill"
+              android_material_icon_name="cancel"
+              size={32}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
 
-            {/* Content */}
-            <ScrollView
-              style={styles.scrollView}
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-            >
+          {/* Content */}
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
               {loading ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color={colors.primary} />
@@ -454,8 +443,7 @@ export default function WeatherDetailModal({
               )}
             </ScrollView>
           </View>
-        </PanGestureHandler>
-      </GestureHandlerRootView>
+        </View>
     </Modal>
   );
 }
