@@ -799,7 +799,7 @@ export default function EmployeePortalScreen() {
           title="Special Features"
           iconIos="star.fill"
           iconAndroid="star"
-          iconColor={managerColors.accent}
+          iconColor={employeeColors.accent}
           headerBackgroundColor={headerColor}
           headerTextColor={managerColors.text}
           contentBackgroundColor={contentColor}
