@@ -41,6 +41,7 @@ interface UpcomingEvent {
   link: string | null;
   guide_file_id: string | null;
   guide_file?: GuideFile | null;
+  category: string;
 }
 
 export default function ViewAllUpcomingEventsScreen() {
@@ -48,6 +49,7 @@ export default function ViewAllUpcomingEventsScreen() {
   const { user } = useAuth();
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [eventsTab, setEventsTab] = useState<'Event' | 'Entertainment'>('Event');
   
   // Detail modal state
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -144,6 +146,9 @@ export default function ViewAllUpcomingEventsScreen() {
     router.back();
   };
 
+  // Filter events by category
+  const filteredEvents = events.filter(event => event.category === eventsTab);
+
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
@@ -159,6 +164,28 @@ export default function ViewAllUpcomingEventsScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
+      {/* Tabs */}
+      <View style={[styles.tabsContainer, { backgroundColor: colors.card }]}>
+        <TouchableOpacity
+          style={[styles.tab, eventsTab === 'Event' && [styles.activeTab, { backgroundColor: colors.primary }]]}
+          onPress={() => setEventsTab('Event')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Event' && styles.activeTabText]}>
+            Events
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tab, eventsTab === 'Entertainment' && [styles.activeTab, { backgroundColor: colors.primary }]]}
+          onPress={() => setEventsTab('Entertainment')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && styles.activeTabText]}>
+            Entertainment
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -166,7 +193,7 @@ export default function ViewAllUpcomingEventsScreen() {
         </View>
       ) : (
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-          {events.length === 0 ? (
+          {filteredEvents.length === 0 ? (
             <View style={styles.emptyContainer}>
               <IconSymbol
                 ios_icon_name="calendar"
@@ -174,13 +201,13 @@ export default function ViewAllUpcomingEventsScreen() {
                 size={64}
                 color={colors.textSecondary}
               />
-              <Text style={[styles.emptyText, { color: colors.text }]}>No upcoming events</Text>
+              <Text style={[styles.emptyText, { color: colors.text }]}>No {eventsTab.toLowerCase()} events</Text>
               <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                Check back later for new events
+                Check back later for new {eventsTab.toLowerCase()} events
               </Text>
             </View>
           ) : (
-            events.map((event, index) => (
+            filteredEvents.map((event, index) => (
               <TouchableOpacity
                 key={index}
                 style={[styles.eventCard, { backgroundColor: colors.card }]}
@@ -357,6 +384,31 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 40,
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTab: {
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.2)',
+    elevation: 2,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  activeTabText: {
+    color: '#FFFFFF',
   },
   loadingContainer: {
     flex: 1,

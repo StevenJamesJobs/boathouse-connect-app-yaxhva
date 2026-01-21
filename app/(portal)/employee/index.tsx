@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import ContentDetailModal from '@/components/ContentDetailModal';
 import {
   View,
   Text,
@@ -11,19 +11,19 @@ import {
   Modal,
   Dimensions,
 } from 'react-native';
-import { useAuth } from '@/contexts/AuthContext';
-import { employeeColors } from '@/styles/commonStyles';
+import React, { useState, useEffect } from 'react';
 import { IconSymbol } from '@/components/IconSymbol';
-import CollapsibleSection from '@/components/CollapsibleSection';
-import WeatherWidget from '@/components/WeatherWidget';
-import WeatherDetailModal from '@/components/WeatherDetailModal';
-import ContentDetailModal from '@/components/ContentDetailModal';
-import { supabase } from '@/app/integrations/supabase/client';
-import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
-import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { MessageBadge } from '@/components/MessageBadge';
+import { useUnreadMessages } from '@/hooks/useUnreadMessages';
+import WeatherDetailModal from '@/components/WeatherDetailModal';
+import { useFocusEffect } from '@react-navigation/native';
+import { supabase } from '@/app/integrations/supabase/client';
+import { useRouter } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
+import { employeeColors } from '@/styles/commonStyles';
+import WeatherWidget from '@/components/WeatherWidget';
+import CollapsibleSection from '@/components/CollapsibleSection';
 
 interface MenuItem {
   id: string;
@@ -82,6 +82,7 @@ interface UpcomingEvent {
   link: string | null;
   guide_file_id: string | null;
   guide_file?: GuideFile | null;
+  category: string;
 }
 
 interface SpecialFeature {
@@ -115,6 +116,9 @@ export default function EmployeePortalScreen() {
   const [loadingFeatures, setLoadingFeatures] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
+  
+  // Upcoming Events tab state
+  const [eventsTab, setEventsTab] = useState<'Event' | 'Entertainment'>('Event');
   
   // Weather detail modal state
   const [weatherDetailVisible, setWeatherDetailVisible] = useState(false);
@@ -233,8 +237,7 @@ export default function EmployeePortalScreen() {
         `)
         .eq('is_active', true)
         .order('display_order', { ascending: true })
-        .order('created_at', { ascending: false })
-        .limit(4);
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error loading upcoming events:', error);
@@ -391,12 +394,10 @@ export default function EmployeePortalScreen() {
     });
   };
 
-  // Helper function to truncate text to 100-125 characters
   const truncateText = (text: string | null, maxLength: number = 125): string => {
     if (!text) return '';
     if (text.length <= maxLength) return text;
     
-    // Find the last space before maxLength to avoid cutting words
     const truncated = text.substring(0, maxLength);
     const lastSpace = truncated.lastIndexOf(' ');
     
@@ -407,16 +408,18 @@ export default function EmployeePortalScreen() {
     return truncated + '...';
   };
 
+  // Filter events by category
+  const filteredEvents = upcomingEvents.filter(event => event.category === eventsTab).slice(0, 4);
+
   const profilePictureUrl = getProfilePictureUrl(user?.profilePictureUrl);
   const unreadText = unreadCount > 0 ? `${unreadCount}` : '0';
 
   return (
     <GestureHandlerRootView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Welcome Section - Redesigned */}
+        {/* Welcome Section */}
         <View style={styles.welcomeSection}>
           <View style={styles.welcomeRow}>
-            {/* Profile Picture */}
             <View style={styles.profilePictureContainer}>
               {profilePictureUrl ? (
                 <Image
@@ -435,13 +438,11 @@ export default function EmployeePortalScreen() {
               )}
             </View>
 
-            {/* Welcome Text */}
             <View style={styles.welcomeTextContainer}>
               <Text style={styles.welcomeTitle}>Welcome, {user?.name}!</Text>
               <Text style={styles.jobTitle}>{user?.jobTitle}</Text>
             </View>
 
-            {/* Compact Messages Button */}
             <TouchableOpacity
               style={styles.compactMessageButton}
               onPress={() => router.push('/messages')}
@@ -563,6 +564,7 @@ export default function EmployeePortalScreen() {
           )}
         </CollapsibleSection>
 
+        {/* Upcoming Events Section with Tabs */}
         <CollapsibleSection
           title="Upcoming Events"
           iconIos="calendar"
@@ -573,18 +575,40 @@ export default function EmployeePortalScreen() {
           defaultExpanded={true}
           onViewAll={() => router.push('/view-all-upcoming-events')}
         >
+          {/* Tabs */}
+          <View style={styles.tabsContainer}>
+            <TouchableOpacity
+              style={[styles.tab, eventsTab === 'Event' && styles.activeTab]}
+              onPress={() => setEventsTab('Event')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabText, eventsTab === 'Event' && styles.activeTabText]}>
+                Events
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, eventsTab === 'Entertainment' && styles.activeTab]}
+              onPress={() => setEventsTab('Entertainment')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabText, eventsTab === 'Entertainment' && styles.activeTabText]}>
+                Entertainment
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {loadingEvents ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={employeeColors.primary} />
               <Text style={styles.loadingText}>Loading events...</Text>
             </View>
-          ) : upcomingEvents.length === 0 ? (
+          ) : filteredEvents.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No upcoming events</Text>
+              <Text style={styles.emptyText}>No {eventsTab.toLowerCase()} events</Text>
             </View>
           ) : (
             <>
-              {upcomingEvents.map((event, index) => (
+              {filteredEvents.map((event, index) => (
                 <TouchableOpacity
                   key={index}
                   style={styles.eventItem}
@@ -1031,6 +1055,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: employeeColors.text,
     textAlign: 'center',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    backgroundColor: employeeColors.background,
+    borderRadius: 10,
+    padding: 4,
+    gap: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTab: {
+    backgroundColor: employeeColors.primary,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: employeeColors.textSecondary,
+  },
+  activeTabText: {
+    color: '#FFFFFF',
   },
   loadingContainer: {
     paddingVertical: 20,

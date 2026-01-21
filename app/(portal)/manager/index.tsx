@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import ContentDetailModal from '@/components/ContentDetailModal';
 import {
   View,
   Text,
@@ -11,19 +11,19 @@ import {
   Modal,
   Dimensions,
 } from 'react-native';
-import { useAuth } from '@/contexts/AuthContext';
+import React, { useState, useEffect } from 'react';
 import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
-import CollapsibleSection from '@/components/CollapsibleSection';
-import WeatherWidget from '@/components/WeatherWidget';
-import WeatherDetailModal from '@/components/WeatherDetailModal';
-import ContentDetailModal from '@/components/ContentDetailModal';
-import { supabase } from '@/app/integrations/supabase/client';
-import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import { useFocusEffect } from '@react-navigation/native';
-import { useRouter } from 'expo-router';
-import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { MessageBadge } from '@/components/MessageBadge';
+import { useUnreadMessages } from '@/hooks/useUnreadMessages';
+import WeatherDetailModal from '@/components/WeatherDetailModal';
+import { useFocusEffect } from '@react-navigation/native';
+import { supabase } from '@/app/integrations/supabase/client';
+import { useRouter } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
+import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
+import WeatherWidget from '@/components/WeatherWidget';
+import CollapsibleSection from '@/components/CollapsibleSection';
 
 interface MenuItem {
   id: string;
@@ -82,6 +82,7 @@ interface UpcomingEvent {
   link: string | null;
   guide_file_id: string | null;
   guide_file?: GuideFile | null;
+  category: string;
 }
 
 interface SpecialFeature {
@@ -116,6 +117,9 @@ export default function ManagerPortalScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   
+  // Upcoming Events tab state
+  const [eventsTab, setEventsTab] = useState<'Event' | 'Entertainment'>('Event');
+  
   // Weather detail modal state
   const [weatherDetailVisible, setWeatherDetailVisible] = useState(false);
   
@@ -134,8 +138,8 @@ export default function ManagerPortalScreen() {
   } | null>(null);
 
   // Darker header color for sections
-  const headerColor = '#34495E'; // Slightly darker than card
-  const contentColor = managerColors.card; // Use card color for content
+  const headerColor = '#34495E';
+  const contentColor = managerColors.card;
 
   useEffect(() => {
     loadWeeklySpecials();
@@ -144,7 +148,6 @@ export default function ManagerPortalScreen() {
     loadSpecialFeatures();
   }, []);
 
-  // Refresh data when screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       console.log('Manager portal screen focused, refreshing data...');
@@ -209,7 +212,6 @@ export default function ManagerPortalScreen() {
       }
       
       console.log('Announcements loaded for manager:', data?.length || 0, 'items');
-      console.log('Announcement data with guide files:', JSON.stringify(data, null, 2));
       setAnnouncements(data || []);
     } catch (error) {
       console.error('Error loading announcements:', error);
@@ -237,8 +239,7 @@ export default function ManagerPortalScreen() {
         `)
         .eq('is_active', true)
         .order('display_order', { ascending: true })
-        .order('created_at', { ascending: false })
-        .limit(4);
+        .order('created_at', { ascending: false });
 
       if (error) {
         console.error('Error loading upcoming events:', error);
@@ -246,7 +247,6 @@ export default function ManagerPortalScreen() {
       }
       
       console.log('Upcoming events loaded for manager:', data?.length || 0, 'items');
-      console.log('Upcoming events data with guide files:', JSON.stringify(data, null, 2));
       setUpcomingEvents(data || []);
     } catch (error) {
       console.error('Error loading upcoming events:', error);
@@ -283,7 +283,6 @@ export default function ManagerPortalScreen() {
       }
       
       console.log('Special features loaded for manager:', data?.length || 0, 'items');
-      console.log('Special features data with guide files:', JSON.stringify(data, null, 2));
       setSpecialFeatures(data || []);
     } catch (error) {
       console.error('Error loading special features:', error);
@@ -398,12 +397,10 @@ export default function ManagerPortalScreen() {
     });
   };
 
-  // Helper function to truncate text to 100-125 characters
   const truncateText = (text: string | null, maxLength: number = 125): string => {
     if (!text) return '';
     if (text.length <= maxLength) return text;
     
-    // Find the last space before maxLength to avoid cutting words
     const truncated = text.substring(0, maxLength);
     const lastSpace = truncated.lastIndexOf(' ');
     
@@ -414,16 +411,18 @@ export default function ManagerPortalScreen() {
     return truncated + '...';
   };
 
+  // Filter events by category
+  const filteredEvents = upcomingEvents.filter(event => event.category === eventsTab).slice(0, 4);
+
   const profilePictureUrl = getProfilePictureUrl(user?.profilePictureUrl);
   const unreadText = unreadCount > 0 ? `${unreadCount}` : '0';
 
   return (
     <GestureHandlerRootView style={styles.container}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Welcome Section - Redesigned */}
+        {/* Welcome Section */}
         <View style={styles.welcomeSection}>
           <View style={styles.welcomeRow}>
-            {/* Profile Picture */}
             <View style={styles.profilePictureContainer}>
               {profilePictureUrl ? (
                 <Image
@@ -442,13 +441,11 @@ export default function ManagerPortalScreen() {
               )}
             </View>
 
-            {/* Welcome Text */}
             <View style={styles.welcomeTextContainer}>
               <Text style={styles.welcomeTitle}>Welcome, {user?.name}!</Text>
               <Text style={styles.jobTitle}>{user?.jobTitle}</Text>
             </View>
 
-            {/* Compact Messages Button */}
             <TouchableOpacity
               style={styles.compactMessageButton}
               onPress={() => router.push('/messages')}
@@ -474,7 +471,7 @@ export default function ManagerPortalScreen() {
           </View>
         </View>
 
-        {/* Weather Section - Collapsible */}
+        {/* Weather Section */}
         <CollapsibleSection
           title="Weather"
           iconIos="cloud.sun.fill"
@@ -492,7 +489,7 @@ export default function ManagerPortalScreen() {
           />
         </CollapsibleSection>
 
-        {/* Announcements Section - Collapsible */}
+        {/* Announcements Section */}
         <CollapsibleSection
           title="Announcements"
           iconIos="megaphone.fill"
@@ -575,7 +572,7 @@ export default function ManagerPortalScreen() {
           )}
         </CollapsibleSection>
 
-        {/* Upcoming Events Section - Collapsible */}
+        {/* Upcoming Events Section with Tabs */}
         <CollapsibleSection
           title="Upcoming Events"
           iconIos="calendar"
@@ -587,19 +584,41 @@ export default function ManagerPortalScreen() {
           defaultExpanded={true}
           onViewAll={() => router.push('/view-all-upcoming-events')}
         >
+          {/* Tabs */}
+          <View style={styles.tabsContainer}>
+            <TouchableOpacity
+              style={[styles.tab, eventsTab === 'Event' && styles.activeTab]}
+              onPress={() => setEventsTab('Event')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabText, eventsTab === 'Event' && styles.activeTabText]}>
+                Events
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, eventsTab === 'Entertainment' && styles.activeTab]}
+              onPress={() => setEventsTab('Entertainment')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabText, eventsTab === 'Entertainment' && styles.activeTabText]}>
+                Entertainment
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {loadingEvents ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={managerColors.highlight} />
               <Text style={styles.loadingText}>Loading events...</Text>
             </View>
-          ) : upcomingEvents.length === 0 ? (
+          ) : filteredEvents.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No upcoming events</Text>
+              <Text style={styles.emptyText}>No {eventsTab.toLowerCase()} events</Text>
               <Text style={styles.emptySubtext}>Create events in the Upcoming Events Editor</Text>
             </View>
           ) : (
             <>
-              {upcomingEvents.map((event, index) => (
+              {filteredEvents.map((event, index) => (
                 <TouchableOpacity
                   key={index}
                   style={styles.eventItem}
@@ -660,7 +679,7 @@ export default function ManagerPortalScreen() {
           )}
         </CollapsibleSection>
 
-        {/* Weekly Specials Section - Collapsible - MOVED ABOVE SPECIAL FEATURES */}
+        {/* Weekly Specials Section */}
         <CollapsibleSection
           title="Weekly Specials"
           iconIos="fork.knife"
@@ -788,7 +807,7 @@ export default function ManagerPortalScreen() {
           )}
         </CollapsibleSection>
 
-        {/* Special Features Section - Collapsible - NOW BELOW WEEKLY SPECIALS */}
+        {/* Special Features Section */}
         <CollapsibleSection
           title="Special Features"
           iconIos="star.fill"
@@ -1054,6 +1073,33 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: managerColors.text,
     textAlign: 'center',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    backgroundColor: managerColors.background,
+    borderRadius: 10,
+    padding: 4,
+    gap: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  activeTab: {
+    backgroundColor: managerColors.highlight,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: managerColors.textSecondary,
+  },
+  activeTabText: {
+    color: managerColors.text,
   },
   loadingContainer: {
     paddingVertical: 20,
