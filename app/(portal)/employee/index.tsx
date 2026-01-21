@@ -906,7 +906,7 @@ export default function EmployeePortalScreen() {
                 resizeMode="contain"
               />
             )}
-            <Text style={styles.swipeHint}>Swipe down to close</Text>
+            <Text style={styles.swipeHint}>Swipe do to close</Text>
           </View>
         </PanGestureHandler>
       </Modal>
