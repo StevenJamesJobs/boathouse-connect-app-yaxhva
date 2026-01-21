@@ -801,7 +801,7 @@ export default function EmployeePortalScreen() {
           iconAndroid="star"
           iconColor={employeeColors.accent}
           headerBackgroundColor={headerColor}
-          headerTextColor={managerColors.text}
+          headerTextColor={employeeColors.text}
           contentBackgroundColor={contentColor}
           defaultExpanded={true}
           onViewAll={() => router.push('/view-all-special-features')}
