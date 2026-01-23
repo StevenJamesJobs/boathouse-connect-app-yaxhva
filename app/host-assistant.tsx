@@ -88,6 +88,90 @@ export default function HostAssistantScreen() {
                 />
               </TouchableOpacity>
             </View>
+
+            {/* Checklists Section */}
+            <View style={[styles.card, { backgroundColor: colors.card }]}>
+              <View style={styles.cardHeader}>
+                <IconSymbol
+                  ios_icon_name="checklist"
+                  android_material_icon_name="checklist"
+                  size={32}
+                  color={colors.primary}
+                />
+                <View style={styles.cardHeaderText}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Checklists</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                    Daily opening, running, and closing checklists
+                  </Text>
+                </View>
+              </View>
+              
+              {/* Opening Checklist */}
+              <TouchableOpacity 
+                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => router.push('/opening-checklist')}
+              >
+                <View style={styles.subCardContent}>
+                  <IconSymbol
+                    ios_icon_name="sunrise.fill"
+                    android_material_icon_name="wb-sunny"
+                    size={24}
+                    color={colors.primary}
+                  />
+                  <Text style={[styles.subCardText, { color: colors.text }]}>Opening Checklist</Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+
+              {/* Running Side Work Checklist */}
+              <TouchableOpacity 
+                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => console.log('Running Side Work Checklist - Coming Soon')}
+              >
+                <View style={styles.subCardContent}>
+                  <IconSymbol
+                    ios_icon_name="clock.fill"
+                    android_material_icon_name="schedule"
+                    size={24}
+                    color={colors.primary}
+                  />
+                  <Text style={[styles.subCardText, { color: colors.text }]}>Running Side Work Checklist</Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+
+              {/* Closing Checklist */}
+              <TouchableOpacity 
+                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => console.log('Closing Checklist - Coming Soon')}
+              >
+                <View style={styles.subCardContent}>
+                  <IconSymbol
+                    ios_icon_name="moon.fill"
+                    android_material_icon_name="nightlight"
+                    size={24}
+                    color={colors.primary}
+                  />
+                  <Text style={[styles.subCardText, { color: colors.text }]}>Closing Checklist</Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
           </>
         ) : (
           <>
@@ -237,5 +321,24 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 14,
     fontStyle: 'italic',
+  },
+  subCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginTop: 12,
+    borderWidth: 1,
+  },
+  subCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  subCardText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

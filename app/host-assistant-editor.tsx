@@ -66,6 +66,90 @@ export default function HostAssistantEditorScreen() {
                 OpenTable Academy is a permanent section and does not require an editor. The content is managed directly in the code.
               </Text>
             </View>
+
+            {/* Checklists Editor Section */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <IconSymbol
+                  ios_icon_name="checklist"
+                  android_material_icon_name="checklist"
+                  size={32}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardHeaderText}>
+                  <Text style={styles.cardTitle}>Checklists Editor</Text>
+                  <Text style={styles.cardDescription}>
+                    Manage opening, running, and closing checklists
+                  </Text>
+                </View>
+              </View>
+              
+              {/* Opening Checklist Editor */}
+              <TouchableOpacity 
+                style={styles.subCardButton}
+                onPress={() => router.push('/opening-checklist-editor')}
+              >
+                <View style={styles.subCardContent}>
+                  <IconSymbol
+                    ios_icon_name="sunrise.fill"
+                    android_material_icon_name="wb-sunny"
+                    size={24}
+                    color={managerColors.highlight}
+                  />
+                  <Text style={styles.subCardText}>Opening Checklist Editor</Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={managerColors.text}
+                />
+              </TouchableOpacity>
+
+              {/* Running Side Work Editor */}
+              <TouchableOpacity 
+                style={styles.subCardButton}
+                onPress={() => console.log('Running Side Work Editor - Coming Soon')}
+              >
+                <View style={styles.subCardContent}>
+                  <IconSymbol
+                    ios_icon_name="clock.fill"
+                    android_material_icon_name="schedule"
+                    size={24}
+                    color={managerColors.highlight}
+                  />
+                  <Text style={styles.subCardText}>Running Side Work Editor</Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={managerColors.text}
+                />
+              </TouchableOpacity>
+
+              {/* Closing Checklist Editor */}
+              <TouchableOpacity 
+                style={styles.subCardButton}
+                onPress={() => console.log('Closing Checklist Editor - Coming Soon')}
+              >
+                <View style={styles.subCardContent}>
+                  <IconSymbol
+                    ios_icon_name="moon.fill"
+                    android_material_icon_name="nightlight"
+                    size={24}
+                    color={managerColors.highlight}
+                  />
+                  <Text style={styles.subCardText}>Closing Checklist Editor</Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={managerColors.text}
+                />
+              </TouchableOpacity>
+            </View>
           </>
         ) : (
           <>
@@ -235,5 +319,27 @@ const styles = StyleSheet.create({
     color: managerColors.textSecondary,
     fontStyle: 'italic',
     lineHeight: 20,
+  },
+  subCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: managerColors.background,
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+  },
+  subCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  subCardText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: managerColors.text,
   },
 });
