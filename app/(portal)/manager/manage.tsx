@@ -208,7 +208,7 @@ export default function ManagerManageScreen() {
             </View>
 
             {/* Bartender Assistant Editor */}
-            <View style={[styles.card, styles.lastCard]}>
+            <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <IconSymbol
                   ios_icon_name="wineglass.fill"
@@ -228,6 +228,36 @@ export default function ManagerManageScreen() {
                 onPress={() => router.push('/bartender-assistant-editor')}
               >
                 <Text style={styles.cardButtonText}>Open Bartender Editor</Text>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={managerColors.text}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* Host Assistant Editor */}
+            <View style={[styles.card, styles.lastCard]}>
+              <View style={styles.cardHeader}>
+                <IconSymbol
+                  ios_icon_name="person.2.fill"
+                  android_material_icon_name="people"
+                  size={32}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardHeaderText}>
+                  <Text style={styles.cardTitle}>Host Assistant Editor</Text>
+                  <Text style={styles.cardDescription}>
+                    Manage hosting resources and host exams
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity 
+                style={styles.cardButton}
+                onPress={() => router.push('/host-assistant-editor')}
+              >
+                <Text style={styles.cardButtonText}>Open Host Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"

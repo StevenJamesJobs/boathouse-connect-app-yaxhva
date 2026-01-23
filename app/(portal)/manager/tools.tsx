@@ -25,6 +25,9 @@ export default function ManagerToolsScreen() {
                              jobTitles.includes('Lead Server') || 
                              jobTitles.includes('Banquet Captain');
   
+  // Check if user can see Host Assistant (Host or Manager)
+  const canSeeHostAssistant = jobTitles.includes('Host') || jobTitles.includes('Manager');
+  
   // Check if user can see Check Outs Calculator (Server or Manager)
   const canSeeCheckOutCalculator = jobTitles.includes('Server') || jobTitles.includes('Manager');
 
@@ -120,6 +123,38 @@ export default function ManagerToolsScreen() {
               onPress={() => router.push('/bartender-assistant')}
             >
               <Text style={styles.cardButtonText}>Open Bartender Assistant</Text>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={20}
+                color={managerColors.text}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* 4. Host Assistant Section - For Hosts and Managers */}
+        {canSeeHostAssistant && (
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <IconSymbol
+                ios_icon_name="person.2.fill"
+                android_material_icon_name="people"
+                size={32}
+                color={managerColors.highlight}
+              />
+              <View style={styles.cardHeaderText}>
+                <Text style={styles.cardTitle}>Host Assistant</Text>
+                <Text style={styles.cardDescription}>
+                  Access OpenTable Academy, hosting resources, and host exams
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity 
+              style={styles.cardButton}
+              onPress={() => router.push('/host-assistant')}
+            >
+              <Text style={styles.cardButtonText}>Open Host Assistant</Text>
               <IconSymbol
                 ios_icon_name="chevron.right"
                 android_material_icon_name="chevron-right"
