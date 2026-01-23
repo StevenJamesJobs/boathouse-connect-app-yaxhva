@@ -131,7 +131,7 @@ export default function HostAssistantScreen() {
               {/* Running Side Work Checklist */}
               <TouchableOpacity 
                 style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => console.log('Running Side Work Checklist - Coming Soon')}
+                onPress={() => router.push('/running-side-work-checklist')}
               >
                 <View style={styles.subCardContent}>
                   <IconSymbol
@@ -153,7 +153,7 @@ export default function HostAssistantScreen() {
               {/* Closing Checklist */}
               <TouchableOpacity 
                 style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => console.log('Closing Checklist - Coming Soon')}
+                onPress={() => router.push('/closing-checklist')}
               >
                 <View style={styles.subCardContent}>
                   <IconSymbol

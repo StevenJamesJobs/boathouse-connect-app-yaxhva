@@ -109,7 +109,7 @@ export default function HostAssistantEditorScreen() {
               {/* Running Side Work Editor */}
               <TouchableOpacity 
                 style={styles.subCardButton}
-                onPress={() => console.log('Running Side Work Editor - Coming Soon')}
+                onPress={() => router.push('/running-side-work-editor')}
               >
                 <View style={styles.subCardContent}>
                   <IconSymbol
@@ -131,7 +131,7 @@ export default function HostAssistantEditorScreen() {
               {/* Closing Checklist Editor */}
               <TouchableOpacity 
                 style={styles.subCardButton}
-                onPress={() => console.log('Closing Checklist Editor - Coming Soon')}
+                onPress={() => router.push('/closing-checklist-editor')}
               >
                 <View style={styles.subCardContent}>
                   <IconSymbol
