@@ -107,7 +107,7 @@ export default function BartenderClosingChecklistScreen() {
       const allCategoryIds = new Set(categoriesWithItems.map(c => c.id));
       setExpandedCategories(allCategoryIds);
 
-      console.log('Loaded bartender checklist with', categoriesWithItems.length, 'categories');
+      console.log('Loaded bartender closing checklist with', categoriesWithItems.length, 'categories');
     } catch (error) {
       console.error('Error loading checklist:', error);
       Alert.alert('Error', 'Failed to load checklist. Please try again.');
