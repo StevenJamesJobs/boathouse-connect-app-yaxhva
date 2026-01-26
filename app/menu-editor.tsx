@@ -830,7 +830,7 @@ export default function MenuEditorScreen() {
                     <View style={styles.imageUploadPlaceholder}>
                       <IconSymbol
                         ios_icon_name="photo"
-                        android_material_icon_name="add_photo_alternate"
+                        android_material_icon_name="add-photo_alternate"
                         size={48}
                         color="#666666"
                       />
