@@ -940,7 +940,7 @@ const createStyles = (colors: any) =>
       marginBottom: 6,
     },
     squareDescription: {
-      fontSize: 20,
+      fontSize: 16,
       color: colors.textSecondary,
       marginTop: 6,
       lineHeight: 18,
