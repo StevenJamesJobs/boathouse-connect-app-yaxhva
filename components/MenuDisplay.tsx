@@ -460,7 +460,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           <View style={styles.emptyContainer}>
             <IconSymbol
               ios_icon_name="fork.knife"
-              android_material_icon_name="restaurant_menu"
+              android_material_icon_name="restaurant-menu"
               size={64}
               color={colors.textSecondary}
             />
