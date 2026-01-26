@@ -60,126 +60,118 @@ export default function BartenderAssistantScreen() {
         {activeTab === 'encyclopedia' ? (
           <>
             {/* Libation Recipes Section */}
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={[styles.card, { backgroundColor: colors.card }]}
+              onPress={() => router.push('/libation-recipes')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="wineglass"
                   android_material_icon_name="local-bar"
-                  size={32}
+                  size={28}
                   color={colors.primary}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardText}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>Libation Recipes</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     Browse cocktail recipes by category
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={[styles.cardButton, { backgroundColor: colors.primary }]}
-                onPress={() => router.push('/libation-recipes')}
-              >
-                <Text style={[styles.cardButtonText, { color: colors.text }]}>View Recipes</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={colors.text}
+                  color={colors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
 
             {/* Cocktails A-Z Section */}
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={[styles.card, { backgroundColor: colors.card }]}
+              onPress={() => router.push('/cocktails-az')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="list.bullet"
                   android_material_icon_name="format-list-bulleted"
-                  size={32}
+                  size={28}
                   color={colors.primary}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardText}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>Cocktails A-Z</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     Browse all cocktails alphabetically
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={[styles.cardButton, { backgroundColor: colors.primary }]}
-                onPress={() => router.push('/cocktails-az')}
-              >
-                <Text style={[styles.cardButtonText, { color: colors.text }]}>View Cocktails</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={colors.text}
+                  color={colors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
 
             {/* General Knowledge Section */}
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={[styles.card, { backgroundColor: colors.card }]}
+              onPress={() => console.log('General Knowledge - Coming Soon')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="lightbulb.fill"
                   android_material_icon_name="lightbulb"
-                  size={32}
+                  size={28}
                   color={colors.primary}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardText}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>General Knowledge</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     Bar techniques, spirits, and mixology basics
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={[styles.cardButton, { backgroundColor: colors.primary }]}
-                onPress={() => console.log('General Knowledge - Coming Soon')}
-              >
-                <Text style={[styles.cardButtonText, { color: colors.text }]}>Coming Soon</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={colors.text}
+                  color={colors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
           </>
         ) : (
           <>
             {/* Weekly Quiz Section */}
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={[styles.card, { backgroundColor: colors.card }]}
+              onPress={() => console.log('Weekly Quiz - Coming Soon')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="questionmark.circle.fill"
                   android_material_icon_name="quiz"
-                  size={32}
+                  size={28}
                   color={colors.primary}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardText}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>Weekly Quiz</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     Test your bartending knowledge
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={[styles.cardButton, { backgroundColor: colors.primary }]}
-                onPress={() => console.log('Weekly Quiz - Coming Soon')}
-              >
-                <Text style={[styles.cardButtonText, { color: colors.text }]}>Coming Soon</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={colors.text}
+                  color={colors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
 
             {/* Placeholder for future exam sections */}
             <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
@@ -250,40 +242,28 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   card: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 12,
+    marginBottom: 12,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
   },
-  cardHeader: {
+  cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    padding: 16,
+    gap: 12,
   },
-  cardHeaderText: {
+  cardText: {
     flex: 1,
-    marginLeft: 16,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 4,
   },
   cardDescription: {
-    fontSize: 14,
-  },
-  cardButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  cardButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 13,
+    lineHeight: 18,
   },
   infoCard: {
     flexDirection: 'row',

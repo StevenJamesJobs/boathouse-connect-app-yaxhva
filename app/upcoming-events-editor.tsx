@@ -532,135 +532,145 @@ export default function UpcomingEventsEditorScreen() {
               </Text>
             </View>
           ) : (
-            events.map((event, index) => (
-              <View key={index} style={styles.eventCard}>
-                {event.thumbnail_shape === 'square' && event.thumbnail_url ? (
-                  <View style={styles.squareLayout}>
-                    <Image
-                      key={getImageUrl(event.thumbnail_url)}
-                      source={{ uri: getImageUrl(event.thumbnail_url) }}
-                      style={styles.squareImage}
-                    />
-                    <View style={styles.squareContent}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.eventTitle}>{event.title}</Text>
-                        <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
-                          <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
-                        </View>
-                      </View>
-                      {(event.content || event.message) && (
-                        <Text style={styles.squareMessage} numberOfLines={2}>
-                          {event.content || event.message}
-                        </Text>
-                      )}
-                      <View style={styles.eventMeta}>
-                        <View style={styles.metaItem}>
-                          <IconSymbol
-                            ios_icon_name="calendar"
-                            android_material_icon_name="event"
-                            size={14}
-                            color={managerColors.textSecondary}
-                          />
-                          <Text style={styles.metaText}>
-                            {formatDateTime(event.start_date_time)}
-                          </Text>
-                        </View>
-                        {event.end_date_time && (
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="clock"
-                              android_material_icon_name="schedule"
-                              size={14}
-                              color={managerColors.textSecondary}
-                            />
-                            <Text style={styles.metaText}>
-                              Ends: {formatDateTime(event.end_date_time)}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  </View>
-                ) : (
-                  <>
-                    {event.thumbnail_url && (
+            events.map((event, index) => {
+              const displayOrderText = `#${event.display_order}`;
+              
+              return (
+                <View key={index} style={styles.eventCard}>
+                  {event.thumbnail_shape === 'square' && event.thumbnail_url ? (
+                    <View style={styles.squareLayout}>
                       <Image
                         key={getImageUrl(event.thumbnail_url)}
                         source={{ uri: getImageUrl(event.thumbnail_url) }}
-                        style={styles.bannerImage}
+                        style={styles.squareImage}
                       />
-                    )}
-                    <View style={styles.eventContent}>
-                      <View style={styles.titleRow}>
-                        <Text style={styles.eventTitle}>{event.title}</Text>
-                        <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
-                          <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
+                      <View style={styles.squareContent}>
+                        <View style={styles.titleRow}>
+                          <Text style={styles.eventTitle}>{event.title}</Text>
+                          <View style={styles.badgeContainer}>
+                            <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
+                              <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
+                            </View>
+                            <Text style={styles.viewOrderText}>{displayOrderText}</Text>
+                          </View>
                         </View>
-                      </View>
-                      {(event.content || event.message) && (
-                        <Text style={styles.eventMessage}>
-                          {event.content || event.message}
-                        </Text>
-                      )}
-                      <View style={styles.eventMeta}>
-                        <View style={styles.metaItem}>
-                          <IconSymbol
-                            ios_icon_name="calendar"
-                            android_material_icon_name="event"
-                            size={14}
-                            color={managerColors.textSecondary}
-                          />
-                          <Text style={styles.metaText}>
-                            {formatDateTime(event.start_date_time)}
+                        {(event.content || event.message) && (
+                          <Text style={styles.squareMessage} numberOfLines={2}>
+                            {event.content || event.message}
                           </Text>
-                        </View>
-                        {event.end_date_time && (
+                        )}
+                        <View style={styles.eventMeta}>
                           <View style={styles.metaItem}>
                             <IconSymbol
-                              ios_icon_name="clock"
-                              android_material_icon_name="schedule"
+                              ios_icon_name="calendar"
+                              android_material_icon_name="event"
                               size={14}
                               color={managerColors.textSecondary}
                             />
                             <Text style={styles.metaText}>
-                              Ends: {formatDateTime(event.end_date_time)}
+                              {formatDateTime(event.start_date_time)}
                             </Text>
                           </View>
-                        )}
+                          {event.end_date_time && (
+                            <View style={styles.metaItem}>
+                              <IconSymbol
+                                ios_icon_name="clock"
+                                android_material_icon_name="schedule"
+                                size={14}
+                                color={managerColors.textSecondary}
+                              />
+                              <Text style={styles.metaText}>
+                                Ends: {formatDateTime(event.end_date_time)}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
                       </View>
                     </View>
-                  </>
-                )}
-                <View style={styles.eventActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => openEditModal(event)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="pencil"
-                      android_material_icon_name="edit"
-                      size={20}
-                      color={managerColors.highlight}
-                    />
-                    <Text style={styles.actionButtonText}>Edit</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.deleteButton]}
-                    onPress={() => handleDelete(event)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="trash"
-                      android_material_icon_name="delete"
-                      size={20}
-                      color="#E74C3C"
-                    />
-                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                      Delete
-                    </Text>
-                  </TouchableOpacity>
+                  ) : (
+                    <>
+                      {event.thumbnail_url && (
+                        <Image
+                          key={getImageUrl(event.thumbnail_url)}
+                          source={{ uri: getImageUrl(event.thumbnail_url) }}
+                          style={styles.bannerImage}
+                        />
+                      )}
+                      <View style={styles.eventContent}>
+                        <View style={styles.titleRow}>
+                          <Text style={styles.eventTitle}>{event.title}</Text>
+                          <View style={styles.badgeContainer}>
+                            <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
+                              <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
+                            </View>
+                            <Text style={styles.viewOrderText}>{displayOrderText}</Text>
+                          </View>
+                        </View>
+                        {(event.content || event.message) && (
+                          <Text style={styles.eventMessage}>
+                            {event.content || event.message}
+                          </Text>
+                        )}
+                        <View style={styles.eventMeta}>
+                          <View style={styles.metaItem}>
+                            <IconSymbol
+                              ios_icon_name="calendar"
+                              android_material_icon_name="event"
+                              size={14}
+                              color={managerColors.textSecondary}
+                            />
+                            <Text style={styles.metaText}>
+                              {formatDateTime(event.start_date_time)}
+                            </Text>
+                          </View>
+                          {event.end_date_time && (
+                            <View style={styles.metaItem}>
+                              <IconSymbol
+                                ios_icon_name="clock"
+                                android_material_icon_name="schedule"
+                                size={14}
+                                color={managerColors.textSecondary}
+                              />
+                              <Text style={styles.metaText}>
+                                Ends: {formatDateTime(event.end_date_time)}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    </>
+                  )}
+                  <View style={styles.eventActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => openEditModal(event)}
+                    >
+                      <IconSymbol
+                        ios_icon_name="pencil"
+                        android_material_icon_name="edit"
+                        size={20}
+                        color={managerColors.highlight}
+                      />
+                      <Text style={styles.actionButtonText}>Edit</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.actionButton, styles.deleteButton]}
+                      onPress={() => handleDelete(event)}
+                    >
+                      <IconSymbol
+                        ios_icon_name="trash"
+                        android_material_icon_name="delete"
+                        size={20}
+                        color="#E74C3C"
+                      />
+                      <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
+                        Delete
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            ))
+              );
+            })
           )}
         </ScrollView>
       )}
@@ -1409,6 +1419,10 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     gap: 8,
   },
+  badgeContainer: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
   categoryBadge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -1418,6 +1432,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     color: '#FFFFFF',
+  },
+  viewOrderText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: managerColors.textSecondary,
   },
   squareMessage: {
     fontSize: 13,

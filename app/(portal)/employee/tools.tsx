@@ -40,129 +40,121 @@ export default function EmployeeToolsScreen() {
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {/* 1. Guides and Training Section - ALWAYS AT TOP FOR EVERYONE */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
+        <TouchableOpacity 
+          style={styles.card}
+          onPress={() => router.push('/guides-and-training')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.cardContent}>
             <IconSymbol
               ios_icon_name="book.fill"
               android_material_icon_name="menu-book"
-              size={32}
+              size={28}
               color={employeeColors.highlight}
             />
-            <View style={styles.cardHeaderText}>
+            <View style={styles.cardText}>
               <Text style={styles.cardTitle}>Guides and Training</Text>
               <Text style={styles.cardDescription}>
                 View training materials and guides
               </Text>
             </View>
-          </View>
-          <TouchableOpacity 
-            style={styles.cardButton}
-            onPress={() => router.push('/guides-and-training')}
-          >
-            <Text style={styles.cardButtonText}>View Guides</Text>
             <IconSymbol
               ios_icon_name="chevron.right"
               android_material_icon_name="chevron-right"
               size={20}
-              color={employeeColors.text}
+              color={employeeColors.textSecondary}
             />
-          </TouchableOpacity>
-        </View>
+          </View>
+        </TouchableOpacity>
 
         {/* 2. Check Out Calculator Section - Only for Servers and Managers */}
         {canSeeCheckOutCalculator && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
+          <TouchableOpacity 
+            style={styles.card}
+            onPress={() => router.push('/check-out-calculator')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.cardContent}>
               <IconSymbol
                 ios_icon_name="clock.fill"
                 android_material_icon_name="calculate"
-                size={32}
+                size={28}
                 color={employeeColors.highlight}
               />
-              <View style={styles.cardHeaderText}>
+              <View style={styles.cardText}>
                 <Text style={styles.cardTitle}>Check Outs Calculator</Text>
                 <Text style={styles.cardDescription}>
                   Calculate your shift check out totals and tip outs
                 </Text>
               </View>
-            </View>
-            <TouchableOpacity 
-              style={styles.cardButton}
-              onPress={() => router.push('/check-out-calculator')}
-            >
-              <Text style={styles.cardButtonText}>Open Calculator</Text>
               <IconSymbol
                 ios_icon_name="chevron.right"
                 android_material_icon_name="chevron-right"
                 size={20}
-                color={employeeColors.text}
+                color={employeeColors.textSecondary}
               />
-            </TouchableOpacity>
-          </View>
+            </View>
+          </TouchableOpacity>
         )}
 
         {/* 3. Bartender Assistant Section - For Bartenders, Managers, Lead Servers, and Banquet Captains */}
         {canSeeBarAssistant && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
+          <TouchableOpacity 
+            style={styles.card}
+            onPress={() => router.push('/bartender-assistant')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.cardContent}>
               <IconSymbol
                 ios_icon_name="wineglass.fill"
                 android_material_icon_name="local-bar"
-                size={32}
+                size={28}
                 color={employeeColors.highlight}
               />
-              <View style={styles.cardHeaderText}>
+              <View style={styles.cardText}>
                 <Text style={styles.cardTitle}>Bartender Assistant</Text>
                 <Text style={styles.cardDescription}>
                   Access cocktail recipes, knowledge base, and bar exams
                 </Text>
               </View>
-            </View>
-            <TouchableOpacity 
-              style={styles.cardButton}
-              onPress={() => router.push('/bartender-assistant')}
-            >
-              <Text style={styles.cardButtonText}>Open Bar Assistant</Text>
               <IconSymbol
                 ios_icon_name="chevron.right"
                 android_material_icon_name="chevron-right"
                 size={20}
-                color={employeeColors.text}
+                color={employeeColors.textSecondary}
               />
-            </TouchableOpacity>
-          </View>
+            </View>
+          </TouchableOpacity>
         )}
 
         {/* 4. Host Assistant Section - For Hosts and Managers */}
         {canSeeHostAssistant && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
+          <TouchableOpacity 
+            style={styles.card}
+            onPress={() => router.push('/host-assistant')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.cardContent}>
               <IconSymbol
                 ios_icon_name="person.2.fill"
                 android_material_icon_name="people"
-                size={32}
+                size={28}
                 color={employeeColors.highlight}
               />
-              <View style={styles.cardHeaderText}>
+              <View style={styles.cardText}>
                 <Text style={styles.cardTitle}>Host Assistant</Text>
                 <Text style={styles.cardDescription}>
                   Access OpenTable Academy, hosting resources, and host exams
                 </Text>
               </View>
-            </View>
-            <TouchableOpacity 
-              style={styles.cardButton}
-              onPress={() => router.push('/host-assistant')}
-            >
-              <Text style={styles.cardButtonText}>Open Host Assistant</Text>
               <IconSymbol
                 ios_icon_name="chevron.right"
                 android_material_icon_name="chevron-right"
                 size={20}
-                color={employeeColors.text}
+                color={employeeColors.textSecondary}
               />
-            </TouchableOpacity>
-          </View>
+            </View>
+          </TouchableOpacity>
         )}
       </ScrollView>
     </View>
@@ -197,43 +189,29 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: employeeColors.card,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 12,
+    marginBottom: 12,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 2,
   },
-  cardHeader: {
+  cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    padding: 16,
+    gap: 12,
   },
-  cardHeaderText: {
+  cardText: {
     flex: 1,
-    marginLeft: 16,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: employeeColors.text,
     marginBottom: 4,
   },
   cardDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: employeeColors.textSecondary,
-  },
-  cardButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: employeeColors.highlight,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  cardButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: employeeColors.text,
+    lineHeight: 18,
   },
 });

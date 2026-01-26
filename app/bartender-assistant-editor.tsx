@@ -55,126 +55,118 @@ export default function BartenderAssistantEditorScreen() {
         {activeTab === 'encyclopedia' ? (
           <>
             {/* Libation Recipes Editor */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/libation-recipes-editor')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="wineglass"
                   android_material_icon_name="local-bar"
-                  size={32}
+                  size={28}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardText}>
                   <Text style={styles.cardTitle}>Libation Recipes Editor</Text>
                   <Text style={styles.cardDescription}>
                     Add and manage cocktail recipes by category
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => router.push('/libation-recipes-editor')}
-              >
-                <Text style={styles.cardButtonText}>Manage Recipes</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={managerColors.text}
+                  color={managerColors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
 
             {/* Cocktails A-Z Editor */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/cocktails-az-editor')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="list.bullet"
                   android_material_icon_name="format-list-bulleted"
-                  size={32}
+                  size={28}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardText}>
                   <Text style={styles.cardTitle}>Cocktails A-Z Editor</Text>
                   <Text style={styles.cardDescription}>
                     Add and manage cocktail recipes alphabetically
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => router.push('/cocktails-az-editor')}
-              >
-                <Text style={styles.cardButtonText}>Manage Cocktails</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={managerColors.text}
+                  color={managerColors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
 
             {/* General Knowledge Editor */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => console.log('General Knowledge Editor - Coming Soon')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="lightbulb.fill"
                   android_material_icon_name="lightbulb"
-                  size={32}
+                  size={28}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardText}>
                   <Text style={styles.cardTitle}>General Knowledge Editor</Text>
                   <Text style={styles.cardDescription}>
                     Add bar techniques, spirits info, and mixology guides
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => console.log('General Knowledge Editor - Coming Soon')}
-              >
-                <Text style={styles.cardButtonText}>Coming Soon</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={managerColors.text}
+                  color={managerColors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
           </>
         ) : (
           <>
             {/* Weekly Quiz Editor */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => console.log('Weekly Quiz Editor - Coming Soon')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="questionmark.circle.fill"
                   android_material_icon_name="quiz"
-                  size={32}
+                  size={28}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardText}>
                   <Text style={styles.cardTitle}>Weekly Quiz Editor</Text>
                   <Text style={styles.cardDescription}>
                     Create and manage weekly bartending quizzes
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => console.log('Weekly Quiz Editor - Coming Soon')}
-              >
-                <Text style={styles.cardButtonText}>Coming Soon</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={managerColors.text}
+                  color={managerColors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
 
             {/* Placeholder for future exam editors */}
             <View style={styles.infoCard}>
@@ -258,44 +250,30 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: managerColors.card,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 12,
+    marginBottom: 12,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
-  cardHeader: {
+  cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    padding: 16,
+    gap: 12,
   },
-  cardHeaderText: {
+  cardText: {
     flex: 1,
-    marginLeft: 16,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: managerColors.text,
     marginBottom: 4,
   },
   cardDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: managerColors.textSecondary,
-  },
-  cardButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: managerColors.highlight,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  cardButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: managerColors.text,
+    lineHeight: 18,
   },
   infoCard: {
     flexDirection: 'row',
