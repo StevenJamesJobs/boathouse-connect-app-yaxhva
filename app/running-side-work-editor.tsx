@@ -172,13 +172,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
   },
   modalContent: {
     backgroundColor: managerColors.card,
     borderRadius: 16,
     padding: 24,
-    width: '90%',
+    width: '100%',
     maxWidth: 500,
+    maxHeight: '80%',
   },
   modalTitle: {
     fontSize: 20,
@@ -200,7 +202,32 @@ const styles = StyleSheet.create({
     color: managerColors.text,
     borderWidth: 1,
     borderColor: managerColors.border,
-    marginBottom: 16,
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  categoryPicker: {
+    maxHeight: 200,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+    marginTop: 8,
+  },
+  categoryOption: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: managerColors.border,
+  },
+  categoryOptionSelected: {
+    backgroundColor: managerColors.highlight,
+  },
+  categoryOptionText: {
+    fontSize: 15,
+    color: managerColors.text,
+  },
+  categoryOptionTextSelected: {
+    fontWeight: '600',
   },
   modalButtons: {
     flexDirection: 'row',
@@ -627,65 +654,81 @@ export default function RunningSideWorkEditorScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.modalOverlay}
         >
-          <TouchableOpacity
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => setModalVisible(false)}
-          >
-            <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-              <View style={styles.modalContent}>
-                <Text style={styles.modalTitle}>
-                  {editingId
-                    ? modalType === 'category'
-                      ? 'Edit Category'
-                      : 'Edit Item'
-                    : modalType === 'category'
-                    ? 'Add Category'
-                    : 'Add Item'}
-                </Text>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>
+              {editingId
+                ? modalType === 'category'
+                  ? 'Edit Category'
+                  : 'Edit Item'
+                : modalType === 'category'
+                ? 'Add Category'
+                : 'Add Item'}
+            </Text>
 
-                {modalType === 'category' ? (
-                  <>
-                    <Text style={styles.inputLabel}>Category Name</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={categoryName}
-                      onChangeText={setCategoryName}
-                      placeholder="Enter category name"
-                      placeholderTextColor={managerColors.textSecondary}
-                    />
-                  </>
-                ) : (
-                  <>
-                    <Text style={styles.inputLabel}>Item Text</Text>
-                    <TextInput
-                      style={[styles.input, { minHeight: 80 }]}
-                      value={itemText}
-                      onChangeText={setItemText}
-                      placeholder="Enter item text"
-                      placeholderTextColor={managerColors.textSecondary}
-                      multiline
-                    />
-                  </>
-                )}
+            {modalType === 'category' ? (
+              <>
+                <TextInput
+                  style={styles.input}
+                  value={categoryName}
+                  onChangeText={setCategoryName}
+                  placeholder="Category name (e.g., Restrooms)"
+                  placeholderTextColor={managerColors.textSecondary}
+                  autoFocus
+                />
+              </>
+            ) : (
+              <>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={itemText}
+                  onChangeText={setItemText}
+                  placeholder="Item text"
+                  placeholderTextColor={managerColors.textSecondary}
+                  multiline
+                  numberOfLines={3}
+                  autoFocus
+                />
 
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.cancelButton]}
-                    onPress={() => setModalVisible(false)}
-                  >
-                    <Text style={styles.modalButtonText}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.modalButton, styles.saveButton]}
-                    onPress={modalType === 'category' ? handleSaveCategory : handleSaveItem}
-                  >
-                    <Text style={styles.modalButtonText}>Save</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
+                <Text style={styles.inputLabel}>Category</Text>
+                <ScrollView style={styles.categoryPicker}>
+                  {categories.map((cat) => (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={[
+                        styles.categoryOption,
+                        selectedCategoryId === cat.id && styles.categoryOptionSelected,
+                      ]}
+                      onPress={() => setSelectedCategoryId(cat.id)}
+                    >
+                      <Text
+                        style={[
+                          styles.categoryOptionText,
+                          selectedCategoryId === cat.id && styles.categoryOptionTextSelected,
+                        ]}
+                      >
+                        {cat.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </>
+            )}
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.saveButton]}
+                onPress={modalType === 'category' ? handleSaveCategory : handleSaveItem}
+              >
+                <Text style={styles.modalButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </View>
