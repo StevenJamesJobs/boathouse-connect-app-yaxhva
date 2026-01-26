@@ -97,7 +97,7 @@ export default function BartenderBinderScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Purees and Syrups Recipes Section - Coming Soon */}
+        {/* Purees and Syrups Recipes Section */}
         <View style={[styles.card, { backgroundColor: colors.card }]}>
           <View style={styles.cardHeader}>
             <IconSymbol
@@ -109,10 +109,32 @@ export default function BartenderBinderScreen() {
             <View style={styles.cardHeaderText}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>Purees & Syrups Recipes</Text>
               <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                Coming soon
+                Recipe collection for purees and simple syrups
               </Text>
             </View>
           </View>
+          
+          {/* Purees & Syrups Recipes Button */}
+          <TouchableOpacity 
+            style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => router.push('/puree-syrup-recipes')}
+          >
+            <View style={styles.subCardContent}>
+              <IconSymbol
+                ios_icon_name="drop.fill"
+                android_material_icon_name="opacity"
+                size={24}
+                color={colors.primary}
+              />
+              <Text style={[styles.subCardText, { color: colors.text }]}>View Recipes</Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>

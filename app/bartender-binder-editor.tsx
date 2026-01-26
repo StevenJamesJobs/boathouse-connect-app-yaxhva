@@ -93,7 +93,7 @@ export default function BartenderBinderEditorScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Purees and Syrups Recipes Editor - Coming Soon */}
+        {/* Purees and Syrups Recipes Editor */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <IconSymbol
@@ -105,10 +105,32 @@ export default function BartenderBinderEditorScreen() {
             <View style={styles.cardHeaderText}>
               <Text style={styles.cardTitle}>Purees & Syrups Recipes Editor</Text>
               <Text style={styles.cardDescription}>
-                Coming soon
+                Manage puree and simple syrup recipes
               </Text>
             </View>
           </View>
+          
+          {/* Purees & Syrups Recipes Editor Button */}
+          <TouchableOpacity 
+            style={styles.subCardButton}
+            onPress={() => router.push('/puree-syrup-recipes-editor')}
+          >
+            <View style={styles.subCardContent}>
+              <IconSymbol
+                ios_icon_name="drop.fill"
+                android_material_icon_name="opacity"
+                size={24}
+                color={managerColors.highlight}
+              />
+              <Text style={styles.subCardText}>Purees & Syrups Editor</Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={managerColors.text}
+            />
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
