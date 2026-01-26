@@ -626,7 +626,12 @@ export default function MenuEditorScreen() {
                     <View style={styles.squareContent}>
                       <View style={styles.squareHeader}>
                         <Text style={styles.menuItemName}>{item.name}</Text>
-                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                        <View style={styles.priceOrderContainer}>
+                          <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                          <View style={styles.displayOrderBadgeCompact}>
+                            <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
+                          </View>
+                        </View>
                       </View>
                       {item.description && (
                         <Text style={styles.squareDescription} numberOfLines={2}>
@@ -670,9 +675,6 @@ export default function MenuEditorScreen() {
                           </View>
                         )}
                       </View>
-                      <View style={styles.displayOrderBadge}>
-                        <Text style={styles.displayOrderText}>Order: {item.display_order}</Text>
-                      </View>
                     </View>
                   </View>
                 ) : (
@@ -693,7 +695,12 @@ export default function MenuEditorScreen() {
                     <View style={styles.menuItemContent}>
                       <View style={styles.menuItemHeader}>
                         <Text style={styles.menuItemName}>{item.name}</Text>
-                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                        <View style={styles.priceOrderContainer}>
+                          <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                          <View style={styles.displayOrderBadgeCompact}>
+                            <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
+                          </View>
+                        </View>
                       </View>
                       {item.description && (
                         <Text style={styles.menuItemDescription} numberOfLines={2}>
@@ -736,9 +743,6 @@ export default function MenuEditorScreen() {
                             <Text style={styles.tagText}>VA</Text>
                           </View>
                         )}
-                      </View>
-                      <View style={styles.displayOrderBadge}>
-                        <Text style={styles.displayOrderText}>Order: {item.display_order}</Text>
                       </View>
                     </View>
                   </>
@@ -1415,10 +1419,25 @@ const styles = StyleSheet.create({
     color: managerColors.text,
     marginRight: 12,
   },
+  priceOrderContainer: {
+    alignItems: 'flex-end',
+    gap: 4,
+  },
   menuItemPrice: {
     fontSize: 16,
     fontWeight: '600',
     color: managerColors.highlight,
+  },
+  displayOrderBadgeCompact: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  displayOrderTextCompact: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: managerColors.textSecondary,
   },
   menuItemDescription: {
     fontSize: 14,
