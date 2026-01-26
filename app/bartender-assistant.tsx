@@ -59,24 +59,36 @@ export default function BartenderAssistantScreen() {
 
         {activeTab === 'encyclopedia' ? (
           <>
-            {/* Bartender Binder Section - MOVED TO TOP */}
-            <TouchableOpacity 
-              style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => router.push('/bartender-binder')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
+            {/* Checklists Section - MOVED FROM BARTENDER BINDER */}
+            <View style={[styles.card, { backgroundColor: colors.card }]}>
+              <View style={styles.cardHeader}>
                 <IconSymbol
-                  ios_icon_name="book.fill"
-                  android_material_icon_name="menu-book"
-                  size={28}
+                  ios_icon_name="checklist"
+                  android_material_icon_name="checklist"
+                  size={32}
                   color={colors.primary}
                 />
-                <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Bartender Binder</Text>
+                <View style={styles.cardHeaderText}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Checklists</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    Puree Mixes & Syrup Recipes, Checklists, and other important information
+                    Daily opening and closing checklists
                   </Text>
+                </View>
+              </View>
+              
+              {/* Opening Checklist */}
+              <TouchableOpacity 
+                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => router.push('/bartender-opening-checklist')}
+              >
+                <View style={styles.subCardContent}>
+                  <IconSymbol
+                    ios_icon_name="sunrise.fill"
+                    android_material_icon_name="wb-sunny"
+                    size={24}
+                    color={colors.primary}
+                  />
+                  <Text style={[styles.subCardText, { color: colors.text }]}>Opening Checklist</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
@@ -84,8 +96,30 @@ export default function BartenderAssistantScreen() {
                   size={20}
                   color={colors.textSecondary}
                 />
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+
+              {/* Closing Checklist */}
+              <TouchableOpacity 
+                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => router.push('/bartender-closing-checklist')}
+              >
+                <View style={styles.subCardContent}>
+                  <IconSymbol
+                    ios_icon_name="moon.fill"
+                    android_material_icon_name="nightlight"
+                    size={24}
+                    color={colors.primary}
+                  />
+                  <Text style={[styles.subCardText, { color: colors.text }]}>Closing Checklist</Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
 
             {/* Libation Recipes Section */}
             <TouchableOpacity 
@@ -142,6 +176,46 @@ export default function BartenderAssistantScreen() {
                 />
               </View>
             </TouchableOpacity>
+
+            {/* Purees & Syrups Recipes Section - MOVED FROM BARTENDER BINDER */}
+            <View style={[styles.card, { backgroundColor: colors.card }]}>
+              <View style={styles.cardHeader}>
+                <IconSymbol
+                  ios_icon_name="drop.fill"
+                  android_material_icon_name="opacity"
+                  size={32}
+                  color={colors.primary}
+                />
+                <View style={styles.cardHeaderText}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Purees & Simple Syrups Recipes</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                    Recipe collection for purees and simple syrups
+                  </Text>
+                </View>
+              </View>
+              
+              {/* Purees & Syrups Recipes Button */}
+              <TouchableOpacity 
+                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                onPress={() => router.push('/puree-syrup-recipes')}
+              >
+                <View style={styles.subCardContent}>
+                  <IconSymbol
+                    ios_icon_name="drop.fill"
+                    android_material_icon_name="opacity"
+                    size={24}
+                    color={colors.primary}
+                  />
+                  <Text style={[styles.subCardText, { color: colors.text }]}>View Recipes</Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </TouchableOpacity>
+            </View>
           </>
         ) : (
           <>
@@ -264,6 +338,36 @@ const styles = StyleSheet.create({
   cardDescription: {
     fontSize: 13,
     lineHeight: 18,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    paddingBottom: 8,
+  },
+  cardHeaderText: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  subCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+  },
+  subCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  subCardText: {
+    fontSize: 15,
+    fontWeight: '600',
   },
   infoCard: {
     flexDirection: 'row',

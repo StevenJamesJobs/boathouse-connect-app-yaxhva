@@ -54,33 +54,67 @@ export default function BartenderAssistantEditorScreen() {
 
         {activeTab === 'encyclopedia' ? (
           <>
-            {/* Bartender Binder Editor - MOVED TO TOP */}
-            <TouchableOpacity 
-              style={styles.card}
-              onPress={() => router.push('/bartender-binder-editor')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
+            {/* Checklists Editor Section - MOVED FROM BARTENDER BINDER EDITOR */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
                 <IconSymbol
-                  ios_icon_name="book.fill"
-                  android_material_icon_name="menu-book"
-                  size={28}
+                  ios_icon_name="checklist"
+                  android_material_icon_name="checklist"
+                  size={32}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>Bartender Binder Editor</Text>
+                <View style={styles.cardHeaderText}>
+                  <Text style={styles.cardTitle}>Checklists Editor</Text>
                   <Text style={styles.cardDescription}>
-                    Puree Mixes & Syrup Recipes, Checklists, and other important information
+                    Manage opening and closing checklists
                   </Text>
+                </View>
+              </View>
+              
+              {/* Opening Checklist Editor */}
+              <TouchableOpacity 
+                style={styles.subCardButton}
+                onPress={() => router.push('/bartender-opening-checklist-editor')}
+              >
+                <View style={styles.subCardContent}>
+                  <IconSymbol
+                    ios_icon_name="sunrise.fill"
+                    android_material_icon_name="wb-sunny"
+                    size={24}
+                    color={managerColors.highlight}
+                  />
+                  <Text style={styles.subCardText}>Opening Checklist Editor</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={managerColors.textSecondary}
+                  color={managerColors.text}
                 />
-              </View>
-            </TouchableOpacity>
+              </TouchableOpacity>
+
+              {/* Closing Checklist Editor */}
+              <TouchableOpacity 
+                style={styles.subCardButton}
+                onPress={() => router.push('/bartender-closing-checklist-editor')}
+              >
+                <View style={styles.subCardContent}>
+                  <IconSymbol
+                    ios_icon_name="moon.fill"
+                    android_material_icon_name="nightlight"
+                    size={24}
+                    color={managerColors.highlight}
+                  />
+                  <Text style={styles.subCardText}>Closing Checklist Editor</Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={managerColors.text}
+                />
+              </TouchableOpacity>
+            </View>
 
             {/* Libation Recipes Editor */}
             <TouchableOpacity 
@@ -137,6 +171,46 @@ export default function BartenderAssistantEditorScreen() {
                 />
               </View>
             </TouchableOpacity>
+
+            {/* Purees & Syrups Recipes Editor - MOVED FROM BARTENDER BINDER EDITOR */}
+            <View style={styles.card}>
+              <View style={styles.cardHeader}>
+                <IconSymbol
+                  ios_icon_name="drop.fill"
+                  android_material_icon_name="opacity"
+                  size={32}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardHeaderText}>
+                  <Text style={styles.cardTitle}>Purees & Simple Syrups Recipes Editor</Text>
+                  <Text style={styles.cardDescription}>
+                    Manage puree and simple syrup recipes
+                  </Text>
+                </View>
+              </View>
+              
+              {/* Purees & Syrups Recipes Editor Button */}
+              <TouchableOpacity 
+                style={styles.subCardButton}
+                onPress={() => router.push('/puree-syrup-recipes-editor')}
+              >
+                <View style={styles.subCardContent}>
+                  <IconSymbol
+                    ios_icon_name="drop.fill"
+                    android_material_icon_name="opacity"
+                    size={24}
+                    color={managerColors.highlight}
+                  />
+                  <Text style={styles.subCardText}>Purees & Syrups Editor</Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={managerColors.text}
+                />
+              </TouchableOpacity>
+            </View>
           </>
         ) : (
           <>
@@ -274,6 +348,39 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: managerColors.textSecondary,
     lineHeight: 18,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    paddingBottom: 8,
+  },
+  cardHeaderText: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  subCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: managerColors.background,
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+  },
+  subCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  subCardText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: managerColors.text,
   },
   infoCard: {
     flexDirection: 'row',
