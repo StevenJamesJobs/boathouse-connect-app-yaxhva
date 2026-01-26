@@ -57,7 +57,7 @@ export default function BartenderAssistantEditorScreen() {
             {/* Bartender Binder Editor - MOVED TO TOP */}
             <TouchableOpacity 
               style={styles.card}
-              onPress={() => console.log('Bartender Binder Editor - Coming Soon')}
+              onPress={() => router.push('/bartender-binder-editor')}
               activeOpacity={0.7}
             >
               <View style={styles.cardContent}>

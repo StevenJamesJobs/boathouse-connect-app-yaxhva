@@ -62,7 +62,7 @@ export default function BartenderAssistantScreen() {
             {/* Bartender Binder Section - MOVED TO TOP */}
             <TouchableOpacity 
               style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => console.log('Bartender Binder - Coming Soon')}
+              onPress={() => router.push('/bartender-binder')}
               activeOpacity={0.7}
             >
               <View style={styles.cardContent}>
