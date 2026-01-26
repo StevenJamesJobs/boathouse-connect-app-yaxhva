@@ -819,7 +819,7 @@ export default function SpecialFeaturesEditorScreen() {
                   >
                     <IconSymbol
                       ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
-                      android_material_icon_name={showFileSection ? "expand_less" : "expand_more"}
+                      android_material_icon_name={showFileSection ? "expand-less" : "expand_more"}
                       size={24}
                       color={managerColors.highlight}
                     />
