@@ -59,6 +59,34 @@ export default function BartenderAssistantScreen() {
 
         {activeTab === 'encyclopedia' ? (
           <>
+            {/* Bartender Binder Section - MOVED TO TOP */}
+            <TouchableOpacity 
+              style={[styles.card, { backgroundColor: colors.card }]}
+              onPress={() => console.log('Bartender Binder - Coming Soon')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
+                <IconSymbol
+                  ios_icon_name="book.fill"
+                  android_material_icon_name="menu-book"
+                  size={28}
+                  color={colors.primary}
+                />
+                <View style={styles.cardText}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>Bartender Binder</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                    Puree Mixes & Syrup Recipes, Checklists, and other important information
+                  </Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={colors.textSecondary}
+                />
+              </View>
+            </TouchableOpacity>
+
             {/* Libation Recipes Section */}
             <TouchableOpacity 
               style={[styles.card, { backgroundColor: colors.card }]}
@@ -104,34 +132,6 @@ export default function BartenderAssistantScreen() {
                   <Text style={[styles.cardTitle, { color: colors.text }]}>Cocktails A-Z</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     Browse all cocktails alphabetically
-                  </Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-
-            {/* General Knowledge Section */}
-            <TouchableOpacity 
-              style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => console.log('General Knowledge - Coming Soon')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <IconSymbol
-                  ios_icon_name="lightbulb.fill"
-                  android_material_icon_name="lightbulb"
-                  size={28}
-                  color={colors.primary}
-                />
-                <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>General Knowledge</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    Bar techniques, spirits, and mixology basics
                   </Text>
                 </View>
                 <IconSymbol

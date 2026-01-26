@@ -54,6 +54,34 @@ export default function BartenderAssistantEditorScreen() {
 
         {activeTab === 'encyclopedia' ? (
           <>
+            {/* Bartender Binder Editor - MOVED TO TOP */}
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => console.log('Bartender Binder Editor - Coming Soon')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
+                <IconSymbol
+                  ios_icon_name="book.fill"
+                  android_material_icon_name="menu-book"
+                  size={28}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardText}>
+                  <Text style={styles.cardTitle}>Bartender Binder Editor</Text>
+                  <Text style={styles.cardDescription}>
+                    Puree Mixes & Syrup Recipes, Checklists, and other important information
+                  </Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={20}
+                  color={managerColors.textSecondary}
+                />
+              </View>
+            </TouchableOpacity>
+
             {/* Libation Recipes Editor */}
             <TouchableOpacity 
               style={styles.card}
@@ -99,34 +127,6 @@ export default function BartenderAssistantEditorScreen() {
                   <Text style={styles.cardTitle}>Cocktails A-Z Editor</Text>
                   <Text style={styles.cardDescription}>
                     Add and manage cocktail recipes alphabetically
-                  </Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={managerColors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-
-            {/* General Knowledge Editor */}
-            <TouchableOpacity 
-              style={styles.card}
-              onPress={() => console.log('General Knowledge Editor - Coming Soon')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <IconSymbol
-                  ios_icon_name="lightbulb.fill"
-                  android_material_icon_name="lightbulb"
-                  size={28}
-                  color={managerColors.highlight}
-                />
-                <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>General Knowledge Editor</Text>
-                  <Text style={styles.cardDescription}>
-                    Add bar techniques, spirits info, and mixology guides
                   </Text>
                 </View>
                 <IconSymbol
