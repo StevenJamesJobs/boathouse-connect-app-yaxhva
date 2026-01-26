@@ -56,278 +56,251 @@ export default function ManagerManageScreen() {
         {activeTab === 'newsfeed' ? (
           <>
             {/* Announcements Editor */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/announcement-editor')}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="megaphone.fill"
                   android_material_icon_name="campaign"
-                  size={32}
+                  size={28}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardTextContainer}>
                   <Text style={styles.cardTitle}>Announcements Editor</Text>
                   <Text style={styles.cardDescription}>
                     Create and manage announcements for staff
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => router.push('/announcement-editor')}
-              >
-                <Text style={styles.cardButtonText}>Open Announcements Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
-                  size={20}
-                  color={managerColors.text}
+                  size={24}
+                  color={managerColors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
-
-            {/* Upcoming Events Editor */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <IconSymbol
-                  ios_icon_name="calendar"
-                  android_material_icon_name="event"
-                  size={32}
-                  color={managerColors.highlight}
-                />
-                <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Upcoming Events Editor</Text>
-                  <Text style={styles.cardDescription}>
-                    Create and manage upcoming events
-                  </Text>
-                </View>
               </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => router.push('/upcoming-events-editor')}
-              >
-                <Text style={styles.cardButtonText}>Open Events Editor</Text>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={managerColors.text}
-                />
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
 
-            {/* Special Features Editor */}
-            <View style={[styles.card, styles.lastCard]}>
-              <View style={styles.cardHeader}>
+            {/* Special Features Editor - MOVED ABOVE Upcoming Events */}
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/special-features-editor')}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="star.fill"
                   android_material_icon_name="star"
-                  size={32}
+                  size={28}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardTextContainer}>
                   <Text style={styles.cardTitle}>Special Features Editor</Text>
                   <Text style={styles.cardDescription}>
                     Create and manage special features
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => router.push('/special-features-editor')}
-              >
-                <Text style={styles.cardButtonText}>Open Features Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
-                  size={20}
-                  color={managerColors.text}
+                  size={24}
+                  color={managerColors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
+
+            {/* Upcoming Events Editor - MOVED BELOW Special Features */}
+            <TouchableOpacity 
+              style={[styles.card, styles.lastCard]}
+              onPress={() => router.push('/upcoming-events-editor')}
+            >
+              <View style={styles.cardContent}>
+                <IconSymbol
+                  ios_icon_name="calendar"
+                  android_material_icon_name="event"
+                  size={28}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardTextContainer}>
+                  <Text style={styles.cardTitle}>Upcoming Events Editor</Text>
+                  <Text style={styles.cardDescription}>
+                    Create and manage upcoming events
+                  </Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={24}
+                  color={managerColors.textSecondary}
+                />
+              </View>
+            </TouchableOpacity>
           </>
         ) : activeTab === 'employee' ? (
           <>
             {/* Guides and Training Editor */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/guides-and-training-editor')}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="square.and.pencil"
                   android_material_icon_name="book"
-                  size={32}
+                  size={28}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardTextContainer}>
                   <Text style={styles.cardTitle}>Guides and Training Editor</Text>
                   <Text style={styles.cardDescription}>
                     Upload and manage training materials
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => router.push('/guides-and-training-editor')}
-              >
-                <Text style={styles.cardButtonText}>Open Guides Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
-                  size={20}
-                  color={managerColors.text}
+                  size={24}
+                  color={managerColors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
-
-            {/* Rewards and Reviews Editor */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <IconSymbol
-                  ios_icon_name="gift.fill"
-                  android_material_icon_name="star"
-                  size={32}
-                  color={managerColors.highlight}
-                />
-                <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Rewards and Reviews Editor</Text>
-                  <Text style={styles.cardDescription}>
-                    Manage employee rewards and guest reviews
-                  </Text>
-                </View>
               </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => router.push('/rewards-and-reviews-editor')}
-              >
-                <Text style={styles.cardButtonText}>Open Rewards & Reviews</Text>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={managerColors.text}
-                />
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
 
             {/* Bartender Assistant Editor */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/bartender-assistant-editor')}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="wineglass.fill"
                   android_material_icon_name="local-bar"
-                  size={32}
+                  size={28}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardTextContainer}>
                   <Text style={styles.cardTitle}>Bartender Assistant Editor</Text>
                   <Text style={styles.cardDescription}>
                     Manage cocktail recipes, knowledge base, and bar exams
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => router.push('/bartender-assistant-editor')}
-              >
-                <Text style={styles.cardButtonText}>Open Bartender Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
-                  size={20}
-                  color={managerColors.text}
+                  size={24}
+                  color={managerColors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
 
             {/* Host Assistant Editor */}
-            <View style={[styles.card, styles.lastCard]}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={[styles.card, styles.lastCard]}
+              onPress={() => router.push('/host-assistant-editor')}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="person.2.fill"
                   android_material_icon_name="people"
-                  size={32}
+                  size={28}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardTextContainer}>
                   <Text style={styles.cardTitle}>Host Assistant Editor</Text>
                   <Text style={styles.cardDescription}>
                     Manage hosting resources and host exams
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => router.push('/host-assistant-editor')}
-              >
-                <Text style={styles.cardButtonText}>Open Host Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
-                  size={20}
-                  color={managerColors.text}
+                  size={24}
+                  color={managerColors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
           </>
         ) : (
           <>
             {/* Employee Management */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/employee-editor')}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="person.2.fill"
                   android_material_icon_name="people"
-                  size={32}
+                  size={28}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardTextContainer}>
                   <Text style={styles.cardTitle}>Employee Management</Text>
                   <Text style={styles.cardDescription}>
                     Add, edit, and manage employee accounts
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => router.push('/employee-editor')}
-              >
-                <Text style={styles.cardButtonText}>Open Employee Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
-                  size={20}
-                  color={managerColors.text}
+                  size={24}
+                  color={managerColors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
+
+            {/* Rewards and Reviews Editor - MOVED FROM Employee tab */}
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/rewards-and-reviews-editor')}
+            >
+              <View style={styles.cardContent}>
+                <IconSymbol
+                  ios_icon_name="gift.fill"
+                  android_material_icon_name="star"
+                  size={28}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardTextContainer}>
+                  <Text style={styles.cardTitle}>Rewards and Reviews Editor</Text>
+                  <Text style={styles.cardDescription}>
+                    Manage employee rewards and guest reviews
+                  </Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={24}
+                  color={managerColors.textSecondary}
+                />
+              </View>
+            </TouchableOpacity>
 
             {/* Menu Editor */}
-            <View style={[styles.card, styles.lastCard]}>
-              <View style={styles.cardHeader}>
+            <TouchableOpacity 
+              style={[styles.card, styles.lastCard]}
+              onPress={() => router.push('/menu-editor')}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="fork.knife"
                   android_material_icon_name="restaurant"
-                  size={32}
+                  size={28}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardTextContainer}>
                   <Text style={styles.cardTitle}>Menu Editor</Text>
                   <Text style={styles.cardDescription}>
                     Create, edit, and manage menu items
                   </Text>
                 </View>
-              </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => router.push('/menu-editor')}
-              >
-                <Text style={styles.cardButtonText}>Open Menu Editor</Text>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
-                  size={20}
-                  color={managerColors.text}
+                  size={24}
+                  color={managerColors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
           </>
         )}
       </ScrollView>
@@ -389,46 +362,33 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: managerColors.card,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
   lastCard: {
     marginBottom: 0,
   },
-  cardHeader: {
+  cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
   },
-  cardHeaderText: {
+  cardTextContainer: {
     flex: 1,
-    marginLeft: 16,
+    marginLeft: 12,
+    marginRight: 8,
   },
   cardTitle: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
     color: managerColors.text,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   cardDescription: {
-    fontSize: 14,
+    fontSize: 13,
     color: managerColors.textSecondary,
-  },
-  cardButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: managerColors.highlight,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  cardButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: managerColors.text,
+    lineHeight: 18,
   },
 });
