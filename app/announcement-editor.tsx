@@ -855,7 +855,7 @@ export default function AnnouncementEditorScreen() {
                                 </View>
                                 <IconSymbol
                                   ios_icon_name="chevron.right"
-                                  android_material_icon_name="chevron_right"
+                                  android_material_icon_name="chevron-right"
                                   size={20}
                                   color="#666666"
                                 />
