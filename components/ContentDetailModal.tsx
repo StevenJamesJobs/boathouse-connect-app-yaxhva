@@ -394,7 +394,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   detailText: {
-    fontSize: 15,
+    fontSize: 16,
     lineHeight: 24,
     whiteSpace: 'pre-line',
   },
