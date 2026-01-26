@@ -201,6 +201,58 @@ export default function ContentDetailModal({
               />
             )}
 
+            {link && (
+              <View style={styles.buttonSection}>
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                  onPress={handleOpenLink}
+                  activeOpacity={0.8}
+                >
+                  <IconSymbol
+                    ios_icon_name="link"
+                    android_material_icon_name="link"
+                    size={20}
+                    color="#FFFFFF"
+                  />
+                  <Text style={styles.actionButtonText}>View More Information</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {guideFile && (
+              <View style={styles.buttonSection}>
+                <View style={styles.fileButtons}>
+                  <TouchableOpacity
+                    style={[styles.fileButton, { backgroundColor: colors.primary }]}
+                    onPress={handleViewFile}
+                    activeOpacity={0.8}
+                  >
+                    <IconSymbol
+                      ios_icon_name="eye.fill"
+                      android_material_icon_name="visibility"
+                      size={20}
+                      color="#FFFFFF"
+                    />
+                    <Text style={styles.fileButtonText}>View</Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    style={[styles.fileButton, { backgroundColor: colors.primary }]}
+                    onPress={handleDownloadFile}
+                    activeOpacity={0.8}
+                  >
+                    <IconSymbol
+                      ios_icon_name="arrow.down.circle.fill"
+                      android_material_icon_name="download"
+                      size={20}
+                      color="#FFFFFF"
+                    />
+                    <Text style={styles.fileButtonText}>Download</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
             {priority && (
               <View style={styles.detailSection}>
                 <View style={[styles.priorityBadge, { backgroundColor: priorityColor }]}>
@@ -245,61 +297,6 @@ export default function ContentDetailModal({
             <View style={styles.detailSection}>
               <Text style={[styles.detailText, { color: colors.textSecondary }]}>{content}</Text>
             </View>
-
-            {link && (
-              <View style={styles.detailSection}>
-                <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                  onPress={handleOpenLink}
-                  activeOpacity={0.8}
-                >
-                  <IconSymbol
-                    ios_icon_name="link"
-                    android_material_icon_name="link"
-                    size={20}
-                    color="#FFFFFF"
-                  />
-                  <Text style={styles.actionButtonText}>View More Information</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            {guideFile && (
-              <View style={styles.detailSection}>
-                <Text style={[styles.fileLabel, { color: colors.text }]}>
-                  Attached File: {guideFile.file_name}
-                </Text>
-                <View style={styles.fileButtons}>
-                  <TouchableOpacity
-                    style={[styles.fileButton, { backgroundColor: colors.primary }]}
-                    onPress={handleViewFile}
-                    activeOpacity={0.8}
-                  >
-                    <IconSymbol
-                      ios_icon_name="eye.fill"
-                      android_material_icon_name="visibility"
-                      size={20}
-                      color="#FFFFFF"
-                    />
-                    <Text style={styles.fileButtonText}>View</Text>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity
-                    style={[styles.fileButton, { backgroundColor: colors.primary }]}
-                    onPress={handleDownloadFile}
-                    activeOpacity={0.8}
-                  >
-                    <IconSymbol
-                      ios_icon_name="arrow.down.circle.fill"
-                      android_material_icon_name="download"
-                      size={20}
-                      color="#FFFFFF"
-                    />
-                    <Text style={styles.fileButtonText}>Download</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            )}
           </ScrollView>
         </View>
       </View>
@@ -351,18 +348,21 @@ const styles = StyleSheet.create({
   },
   modalScrollContent: {
     padding: 20,
-    paddingBottom: 40,
+    paddingBottom: 60,
   },
   squareImage: {
     width: '100%',
     aspectRatio: 1,
     borderRadius: 16,
-    marginBottom: 24,
+    marginBottom: 20,
   },
   bannerImage: {
     width: '100%',
     height: 250,
     borderRadius: 16,
+    marginBottom: 20,
+  },
+  buttonSection: {
     marginBottom: 24,
   },
   detailSection: {
@@ -397,11 +397,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 24,
     whiteSpace: 'pre-line',
-  },
-  fileLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
   },
   actionButton: {
     flexDirection: 'row',
