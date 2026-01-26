@@ -454,7 +454,7 @@ export default function MenuEditorScreen() {
       <TouchableOpacity style={styles.addNewItemButton} onPress={openAddModal}>
         <IconSymbol
           ios_icon_name="plus.circle.fill"
-          android_material_icon_name="add_circle"
+          android_material_icon_name="add-circle"
           size={24}
           color={managerColors.text}
         />
