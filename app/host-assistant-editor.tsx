@@ -54,19 +54,6 @@ export default function HostAssistantEditorScreen() {
 
         {activeTab === 'encyclopedia' ? (
           <>
-            {/* OpenTable Academy Info Card */}
-            <View style={styles.infoCard}>
-              <IconSymbol
-                ios_icon_name="info.circle.fill"
-                android_material_icon_name="info"
-                size={24}
-                color={managerColors.highlight}
-              />
-              <Text style={styles.infoText}>
-                OpenTable Academy is a permanent section and does not require an editor. The content is managed directly in the code.
-              </Text>
-            </View>
-
             {/* Checklists Editor Section */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
@@ -153,35 +140,32 @@ export default function HostAssistantEditorScreen() {
           </>
         ) : (
           <>
-            {/* Weekly Quiz Editor */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
+            {/* Weekly Quiz Editor - Compact Design */}
+            <TouchableOpacity 
+              style={styles.sectionCard}
+              onPress={() => console.log('Weekly Quiz Editor - Coming Soon')}
+            >
+              <View style={styles.sectionCardContent}>
                 <IconSymbol
                   ios_icon_name="questionmark.circle.fill"
                   android_material_icon_name="quiz"
                   size={32}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Weekly Quiz Editor</Text>
-                  <Text style={styles.cardDescription}>
+                <View style={styles.sectionCardText}>
+                  <Text style={styles.sectionCardTitle}>Weekly Quiz Editor</Text>
+                  <Text style={styles.sectionCardDescription}>
                     Create and manage weekly hosting quizzes
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity 
-                style={styles.cardButton}
-                onPress={() => console.log('Weekly Quiz Editor - Coming Soon')}
-              >
-                <Text style={styles.cardButtonText}>Coming Soon</Text>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={managerColors.text}
-                />
-              </TouchableOpacity>
-            </View>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={24}
+                color={managerColors.text}
+              />
+            </TouchableOpacity>
 
             {/* Placeholder for future exam editors */}
             <View style={styles.infoCard}>
@@ -263,6 +247,39 @@ const styles = StyleSheet.create({
   activeTabText: {
     color: managerColors.text,
   },
+  sectionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: managerColors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: managerColors.border,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  sectionCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 16,
+  },
+  sectionCardText: {
+    flex: 1,
+  },
+  sectionCardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: managerColors.text,
+    marginBottom: 4,
+  },
+  sectionCardDescription: {
+    fontSize: 14,
+    color: managerColors.textSecondary,
+    lineHeight: 18,
+  },
   card: {
     backgroundColor: managerColors.card,
     borderRadius: 16,
@@ -289,20 +306,6 @@ const styles = StyleSheet.create({
   cardDescription: {
     fontSize: 14,
     color: managerColors.textSecondary,
-  },
-  cardButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: managerColors.highlight,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  cardButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: managerColors.text,
   },
   infoCard: {
     flexDirection: 'row',

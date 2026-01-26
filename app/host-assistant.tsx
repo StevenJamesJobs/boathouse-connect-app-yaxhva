@@ -59,35 +59,32 @@ export default function HostAssistantScreen() {
 
         {activeTab === 'encyclopedia' ? (
           <>
-            {/* OpenTable Academy Section */}
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              <View style={styles.cardHeader}>
+            {/* OpenTable Academy Section - Compact Design */}
+            <TouchableOpacity 
+              style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => router.push('/opentable-academy')}
+            >
+              <View style={styles.sectionCardContent}>
                 <IconSymbol
                   ios_icon_name="graduationcap.fill"
                   android_material_icon_name="school"
                   size={32}
                   color={colors.primary}
                 />
-                <View style={styles.cardHeaderText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>OpenTable Academy</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                <View style={styles.sectionCardText}>
+                  <Text style={[styles.sectionCardTitle, { color: colors.text }]}>OpenTable Academy</Text>
+                  <Text style={[styles.sectionCardDescription, { color: colors.textSecondary }]}>
                     Earn your Beginner, Intermediate, and Advanced OpenTable Academy Certifications
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity 
-                style={[styles.cardButton, { backgroundColor: colors.primary }]}
-                onPress={() => router.push('/opentable-academy')}
-              >
-                <Text style={[styles.cardButtonText, { color: colors.text }]}>Start Learning</Text>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
-            </View>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={24}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
 
             {/* Checklists Section */}
             <View style={[styles.card, { backgroundColor: colors.card }]}>
@@ -175,35 +172,32 @@ export default function HostAssistantScreen() {
           </>
         ) : (
           <>
-            {/* Weekly Quiz Section */}
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              <View style={styles.cardHeader}>
+            {/* Weekly Quiz Section - Compact Design */}
+            <TouchableOpacity 
+              style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+              onPress={() => console.log('Weekly Quiz - Coming Soon')}
+            >
+              <View style={styles.sectionCardContent}>
                 <IconSymbol
                   ios_icon_name="questionmark.circle.fill"
                   android_material_icon_name="quiz"
                   size={32}
                   color={colors.primary}
                 />
-                <View style={styles.cardHeaderText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Weekly Quiz</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                <View style={styles.sectionCardText}>
+                  <Text style={[styles.sectionCardTitle, { color: colors.text }]}>Weekly Quiz</Text>
+                  <Text style={[styles.sectionCardDescription, { color: colors.textSecondary }]}>
                     Test your hosting knowledge
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity 
-                style={[styles.cardButton, { backgroundColor: colors.primary }]}
-                onPress={() => console.log('Weekly Quiz - Coming Soon')}
-              >
-                <Text style={[styles.cardButtonText, { color: colors.text }]}>Coming Soon</Text>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
-            </View>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={24}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
 
             {/* Placeholder for future exam sections */}
             <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
@@ -273,6 +267,35 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  sectionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    borderWidth: 1,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+    elevation: 3,
+  },
+  sectionCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 16,
+  },
+  sectionCardText: {
+    flex: 1,
+  },
+  sectionCardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  sectionCardDescription: {
+    fontSize: 14,
+    lineHeight: 18,
+  },
   card: {
     borderRadius: 16,
     padding: 20,
@@ -296,18 +319,6 @@ const styles = StyleSheet.create({
   },
   cardDescription: {
     fontSize: 14,
-  },
-  cardButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  cardButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
   },
   infoCard: {
     flexDirection: 'row',
