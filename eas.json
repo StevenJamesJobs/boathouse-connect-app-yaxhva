@@ -1,3 +1,4 @@
+
 {
   "cli": {
     "version": ">=16.0.0",
@@ -28,7 +29,8 @@
         "buildType": "apk"
       },
       "ios": {
-        "buildConfiguration": "Release"
+        "buildConfiguration": "Release",
+        "credentialsSource": "remote"
       },
       "env": {
         "EXPO_NO_TELEMETRY": "1"
@@ -36,6 +38,12 @@
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "your-apple-id@example.com",
+        "ascAppId": "your-app-store-connect-app-id",
+        "appleTeamId": "your-team-id"
+      }
+    }
   }
 }
