@@ -5,11 +5,11 @@
     "slug": "Boathouse Connect",
     "version": "1.3.0",
     "orientation": "portrait",
-    "icon": "./assets/images/9ac97b2a-471a-496b-b6ca-41544a3c6217.jpeg",
+    "icon": "./assets/images/9e5ac5f9-f39c-450c-a30c-fcf877bbaeaf.png",
     "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/9ac97b2a-471a-496b-b6ca-41544a3c6217.jpeg",
+      "image": "./assets/images/9e5ac5f9-f39c-450c-a30c-fcf877bbaeaf.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -20,7 +20,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/9ac97b2a-471a-496b-b6ca-41544a3c6217.jpeg",
+        "foregroundImage": "./assets/images/9e5ac5f9-f39c-450c-a30c-fcf877bbaeaf.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.mcloonesboathouse.GPboathouseconnect",
@@ -34,7 +34,7 @@
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/9ac97b2a-471a-496b-b6ca-41544a3c6217.jpeg"
+      "favicon": "./assets/images/9e5ac5f9-f39c-450c-a30c-fcf877bbaeaf.png"
     },
     "plugins": [
       "expo-router",
@@ -42,7 +42,7 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#ffffff",
-          "image": "./assets/images/9ac97b2a-471a-496b-b6ca-41544a3c6217.jpeg",
+          "image": "./assets/images/9e5ac5f9-f39c-450c-a30c-fcf877bbaeaf.png",
           "imageWidth": 200
         }
       ]
