@@ -177,36 +177,24 @@ export default function BartenderAssistantScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* Purees & Syrups Recipes Section - MOVED FROM BARTENDER BINDER */}
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              <View style={styles.cardHeader}>
+            {/* Purees & Simple Syrups Recipes Section - NOW MATCHES COCKTAILS A-Z DESIGN */}
+            <TouchableOpacity 
+              style={[styles.card, { backgroundColor: colors.card }]}
+              onPress={() => router.push('/puree-syrup-recipes')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="drop.fill"
                   android_material_icon_name="opacity"
-                  size={32}
+                  size={28}
                   color={colors.primary}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardText}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>Purees & Simple Syrups Recipes</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     Recipe collection for purees and simple syrups
                   </Text>
-                </View>
-              </View>
-              
-              {/* Purees & Syrups Recipes Button */}
-              <TouchableOpacity 
-                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => router.push('/puree-syrup-recipes')}
-              >
-                <View style={styles.subCardContent}>
-                  <IconSymbol
-                    ios_icon_name="drop.fill"
-                    android_material_icon_name="opacity"
-                    size={24}
-                    color={colors.primary}
-                  />
-                  <Text style={[styles.subCardText, { color: colors.text }]}>View Recipes</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
@@ -214,8 +202,8 @@ export default function BartenderAssistantScreen() {
                   size={20}
                   color={colors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
           </>
         ) : (
           <>

@@ -172,45 +172,33 @@ export default function BartenderAssistantEditorScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* Purees & Syrups Recipes Editor - MOVED FROM BARTENDER BINDER EDITOR */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
+            {/* Purees & Simple Syrups Recipes Editor - NOW MATCHES COCKTAILS A-Z DESIGN */}
+            <TouchableOpacity 
+              style={styles.card}
+              onPress={() => router.push('/puree-syrup-recipes-editor')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.cardContent}>
                 <IconSymbol
                   ios_icon_name="drop.fill"
                   android_material_icon_name="opacity"
-                  size={32}
+                  size={28}
                   color={managerColors.highlight}
                 />
-                <View style={styles.cardHeaderText}>
+                <View style={styles.cardText}>
                   <Text style={styles.cardTitle}>Purees & Simple Syrups Recipes Editor</Text>
                   <Text style={styles.cardDescription}>
                     Manage puree and simple syrup recipes
                   </Text>
                 </View>
-              </View>
-              
-              {/* Purees & Syrups Recipes Editor Button */}
-              <TouchableOpacity 
-                style={styles.subCardButton}
-                onPress={() => router.push('/puree-syrup-recipes-editor')}
-              >
-                <View style={styles.subCardContent}>
-                  <IconSymbol
-                    ios_icon_name="drop.fill"
-                    android_material_icon_name="opacity"
-                    size={24}
-                    color={managerColors.highlight}
-                  />
-                  <Text style={styles.subCardText}>Purees & Syrups Editor</Text>
-                </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={managerColors.text}
+                  color={managerColors.textSecondary}
                 />
-              </TouchableOpacity>
-            </View>
+              </View>
+            </TouchableOpacity>
           </>
         ) : (
           <>
