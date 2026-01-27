@@ -1,6 +1,6 @@
 {
   "name": "boathouse-connect-app-yaxhva",
-  "version": "1.3.5",
+  "version": "1.3.0",
   "main": "index.ts",
   "scripts": {
     "dev": "EXPO_NO_TELEMETRY=1 expo start --tunnel",
