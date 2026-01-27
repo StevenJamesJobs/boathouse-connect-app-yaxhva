@@ -40,7 +40,7 @@
   "submit": {
     "production": {
       "ios": {
-        "appleId": "stevejamesjobscom",
+        "appleId": "stevejamesjobs@gmailcom",
         "ascAppId": "your-app-store-connect-app-id",
         "appleTeamId": "your-team-id"
       }
