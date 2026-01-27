@@ -1,6 +1,7 @@
+
 {
   "cli": {
-    "version": "latest",
+    "version": ">=16.0.0",
     "appVersionSource": "local"
   },
   "build": {
@@ -26,6 +27,9 @@
       },
       "android": {
         "buildType": "apk"
+      },
+      "ios": {
+        "buildConfiguration": "Release"
       },
       "env": {
         "EXPO_NO_TELEMETRY": "1"
