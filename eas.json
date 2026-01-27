@@ -1,7 +1,6 @@
-
 {
   "cli": {
-    "version": ">= 5.9.0",
+    "version": "latest",
     "appVersionSource": "local"
   },
   "build": {
@@ -24,6 +23,9 @@
       "autoIncrement": true,
       "cache": {
         "disabled": false
+      },
+      "android": {
+        "buildType": "apk"
       },
       "env": {
         "EXPO_NO_TELEMETRY": "1"
