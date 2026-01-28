@@ -1,3 +1,4 @@
+
 {
   "cli": {
     "version": ">=16.0.0",
@@ -29,7 +30,8 @@
       },
       "ios": {
         "buildConfiguration": "Release",
-        "credentialsSource": "remote"
+        "credentialsSource": "remote",
+        "autoIncrement": true
       },
       "env": {
         "EXPO_NO_TELEMETRY": "1"
@@ -42,6 +44,10 @@
         "appleId": "stevenjamesjobs@gmail.com",
         "ascAppId": "6756323107",
         "appleTeamId": "86JRKCMC65"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./google-service-account.json",
+        "track": "internal"
       }
     }
   }
