@@ -1,11 +1,11 @@
 {
   "expo": {
     "name": "Boathouse Connect",
-    "slug": "boathouse-connect",
+    "slug": "Boathouse Connect",
     "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/images/final_quest_240x240.png",
-    "scheme": "boathouse-connect",
+    "scheme": "Boathouse Connect",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/final_quest_240x240.png",
