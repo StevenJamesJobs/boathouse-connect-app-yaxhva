@@ -1,9 +1,4 @@
-
 {
-  "cli": {
-    "version": ">=16.0.0",
-    "appVersionSource": "local"
-  },
   "build": {
     "development": {
       "developmentClient": true,
@@ -25,30 +20,12 @@
       "cache": {
         "disabled": false
       },
-      "android": {
-        "buildType": "apk"
-      },
-      "ios": {
-        "buildConfiguration": "Release",
-        "credentialsSource": "remote",
-        "autoIncrement": true
-      },
       "env": {
         "EXPO_NO_TELEMETRY": "1"
       }
     }
   },
   "submit": {
-    "production": {
-      "ios": {
-        "appleId": "stevenjamesjobs@gmail.com",
-        "ascAppId": "6756323107",
-        "appleTeamId": "86JRKCMC65"
-      },
-      "android": {
-        "serviceAccountKeyPath": "./google-service-account.json",
-        "track": "internal"
-      }
-    }
+    "production": {}
   }
 }
