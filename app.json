@@ -6,7 +6,7 @@
     "version": "1.3.0",
     "orientation": "portrait",
     "icon": "./assets/images/57b2b2e5-dd37-4d86-a5d4-03c600dda0ca.png",
-    "scheme": "mcloones",
+    "scheme": "myapp",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/57b2b2e5-dd37-4d86-a5d4-03c600dda0ca.png",
@@ -16,10 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.mcloones.boathouseconnect",
-      "buildNumber": "1.3.0",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "buildNumber": "1.2.4"
     },
     "android": {
       "adaptiveIcon": {
@@ -52,11 +49,6 @@
     ],
     "experiments": {
       "typedRoutes": true
-    },
-    "extra": {
-      "eas": {
-        "projectId": "f7f98351-f034-4baa-8eb8-ef50cd4aaf7b"
-      }
     }
   }
 }
