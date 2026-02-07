@@ -20,6 +20,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { MessageBadge } from '@/components/MessageBadge';
+import NotificationPreferences from '@/components/NotificationPreferences';
 
 export default function ManagerProfileScreen() {
   const { user, refreshUser } = useAuth();
@@ -31,6 +32,7 @@ export default function ManagerProfileScreen() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [profileInfoExpanded, setProfileInfoExpanded] = useState(false);
+  const [notificationPrefsExpanded, setNotificationPrefsExpanded] = useState(false);
   
   // Password change state
   const [showPasswordChange, setShowPasswordChange] = useState(false);
@@ -421,6 +423,26 @@ export default function ManagerProfileScreen() {
               </View>
             )}
           </>
+        )}
+      </View>
+
+      {/* Notification Preferences - Collapsible */}
+      <View style={styles.card}>
+        <TouchableOpacity 
+          style={styles.collapsibleHeader}
+          onPress={() => setNotificationPrefsExpanded(!notificationPrefsExpanded)}
+        >
+          <Text style={styles.sectionTitle}>Notification Preferences</Text>
+          <IconSymbol
+            ios_icon_name={notificationPrefsExpanded ? "chevron.up" : "chevron.down"}
+            android_material_icon_name={notificationPrefsExpanded ? "expand-less" : "expand-more"}
+            size={24}
+            color={managerColors.text}
+          />
+        </TouchableOpacity>
+
+        {notificationPrefsExpanded && (
+          <NotificationPreferences />
         )}
       </View>
 

@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useNotification } from '@/contexts/NotificationContext';
 
 interface User {
   id: string;
@@ -35,6 +36,7 @@ interface RecipientGroup {
 
 export default function ComposeMessageScreen() {
   const { user } = useAuth();
+  const { sendNotification } = useNotification();
   const router = useRouter();
   const params = useLocalSearchParams();
   
@@ -310,6 +312,26 @@ export default function ComposeMessageScreen() {
         .insert(recipients);
 
       if (recipientsError) throw recipientsError;
+
+      // Send push notification to recipients (don't block on failure)
+      try {
+        await sendNotification({
+          userIds: selectedRecipients.map(r => r.id),
+          notificationType: 'message',
+          title: '📨 New Message',
+          body: subject.trim() 
+            ? `${user?.name}: ${subject.trim()}`
+            : `${user?.name} sent you a message`,
+          data: {
+            messageId: messageData.id,
+            senderId: user?.id,
+            senderName: user?.name,
+          },
+        });
+      } catch (notificationError) {
+        // Silent fail - don't block message sending
+        console.error('Failed to send push notification:', notificationError);
+      }
 
       Alert.alert('Success', 'Message sent successfully!', [
         { text: 'OK', onPress: () => router.back() },

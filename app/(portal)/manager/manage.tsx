@@ -277,7 +277,7 @@ export default function ManagerManageScreen() {
 
             {/* Menu Editor */}
             <TouchableOpacity 
-              style={[styles.card, styles.lastCard]}
+              style={styles.card}
               onPress={() => router.push('/menu-editor')}
             >
               <View style={styles.cardContent}>
@@ -291,6 +291,33 @@ export default function ManagerManageScreen() {
                   <Text style={styles.cardTitle}>Menu Editor</Text>
                   <Text style={styles.cardDescription}>
                     Create, edit, and manage menu items
+                  </Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={24}
+                  color={managerColors.textSecondary}
+                />
+              </View>
+            </TouchableOpacity>
+
+            {/* Notification Center */}
+            <TouchableOpacity 
+              style={[styles.card, styles.lastCard]}
+              onPress={() => router.push('/notification-center')}
+            >
+              <View style={styles.cardContent}>
+                <IconSymbol
+                  ios_icon_name="bell.fill"
+                  android_material_icon_name="notifications"
+                  size={28}
+                  color={managerColors.highlight}
+                />
+                <View style={styles.cardTextContainer}>
+                  <Text style={styles.cardTitle}>Notification Center</Text>
+                  <Text style={styles.cardDescription}>
+                    Send push notifications to all staff members
                   </Text>
                 </View>
                 <IconSymbol

@@ -19,6 +19,7 @@ import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotification } from '@/contexts/NotificationContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
@@ -53,6 +54,7 @@ const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'E
 export default function AnnouncementEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { sendNotification } = useNotification();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -284,6 +286,23 @@ export default function AnnouncementEditorScreen() {
           throw error;
         }
         console.log('Announcement created successfully');
+        
+        // Send push notification for new announcements only
+        try {
+          await sendNotification({
+            notificationType: 'announcement',
+            title: '📢 New Announcement',
+            body: formData.title,
+            data: {
+              announcementId: null, // Will be set by the database
+              priority: formData.priority,
+            },
+          });
+        } catch (notificationError) {
+          // Silent fail - don't block announcement creation
+          console.error('Failed to send push notification:', notificationError);
+        }
+        
         Alert.alert('Success', 'Announcement created successfully');
       }
 

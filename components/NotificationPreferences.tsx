@@ -1,40 +1,199 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   useColorScheme,
+  Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { IconSymbol } from './IconSymbol';
 import { colors } from '@/styles/commonStyles';
+import { supabase } from '@/app/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+
+interface NotificationPreferencesData {
+  messages_enabled: boolean;
+  rewards_enabled: boolean;
+  announcements_enabled: boolean;
+  events_enabled: boolean;
+  special_features_enabled: boolean;
+  custom_notifications_enabled: boolean;
+}
 
 export default function NotificationPreferences() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+  const { user } = useAuth();
+  
+  const [loading, setLoading] = useState(true);
+  const [preferences, setPreferences] = useState<NotificationPreferencesData>({
+    messages_enabled: true,
+    rewards_enabled: true,
+    announcements_enabled: true,
+    events_enabled: true,
+    special_features_enabled: true,
+    custom_notifications_enabled: true,
+  });
+
+  useEffect(() => {
+    loadPreferences();
+  }, [user]);
+
+  async function loadPreferences() {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('notification_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        // PGRST116 means no rows found, which is okay
+        console.error('Error loading preferences:', error);
+        return;
+      }
+
+      if (data) {
+        setPreferences({
+          messages_enabled: data.messages_enabled,
+          rewards_enabled: data.rewards_enabled,
+          announcements_enabled: data.announcements_enabled,
+          events_enabled: data.events_enabled,
+          special_features_enabled: data.special_features_enabled,
+          custom_notifications_enabled: data.custom_notifications_enabled,
+        });
+      }
+    } catch (error) {
+      console.error('Error in loadPreferences:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function updatePreference(key: keyof NotificationPreferencesData, value: boolean) {
+    if (!user) return;
+
+    // Optimistically update UI
+    setPreferences(prev => ({ ...prev, [key]: value }));
+
+    try {
+      // Use RPC function to bypass RLS
+      const { error } = await supabase.rpc('upsert_notification_preferences', {
+        p_user_id: user.id,
+        [`p_${key}`]: value,
+      });
+
+      if (error) {
+        console.error('Error updating preference:', error);
+        // Revert on error
+        setPreferences(prev => ({ ...prev, [key]: !value }));
+      }
+    } catch (error) {
+      console.error('Error in updatePreference:', error);
+      // Revert on error
+      setPreferences(prev => ({ ...prev, [key]: !value }));
+    }
+  }
+
+  const preferenceItems = [
+    {
+      key: 'messages_enabled' as keyof NotificationPreferencesData,
+      label: 'Messages',
+      icon: 'message.fill',
+      androidIcon: 'message',
+      description: 'Get notified when you receive a new message',
+    },
+    {
+      key: 'rewards_enabled' as keyof NotificationPreferencesData,
+      label: "McLoone's Bucks",
+      icon: 'dollarsign.circle.fill',
+      androidIcon: 'attach-money',
+      description: "Get notified when you earn McLoone's Bucks",
+    },
+    {
+      key: 'announcements_enabled' as keyof NotificationPreferencesData,
+      label: 'Announcements',
+      icon: 'megaphone.fill',
+      androidIcon: 'campaign',
+      description: 'Get notified about new announcements',
+    },
+    {
+      key: 'events_enabled' as keyof NotificationPreferencesData,
+      label: 'Events',
+      icon: 'calendar',
+      androidIcon: 'event',
+      description: 'Get notified about new events',
+    },
+    {
+      key: 'special_features_enabled' as keyof NotificationPreferencesData,
+      label: 'Special Features',
+      icon: 'star.fill',
+      androidIcon: 'star',
+      description: 'Get notified about new special features',
+    },
+    {
+      key: 'custom_notifications_enabled' as keyof NotificationPreferencesData,
+      label: 'Management Updates',
+      icon: 'bell.fill',
+      androidIcon: 'notifications',
+      description: 'Get notified about important updates from management',
+    },
+  ];
 
   return (
-    <View style={[styles.container, { backgroundColor: isDark ? colors.darkCard : colors.lightCard }]}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <IconSymbol
-            ios_icon_name="bell.slash.fill"
-            android_material_icon_name="notifications-off"
-            size={24}
-            color={isDark ? colors.darkSecondaryText : colors.lightSecondaryText}
-          />
-          <Text style={[styles.headerTitle, { color: isDark ? colors.darkText : colors.lightText }]}>
-            Notifications
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.content}>
-        <Text style={[styles.description, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
-          Push notification preferences are temporarily unavailable. This feature will be re-enabled in a future update.
-        </Text>
-      </View>
+    <View style={styles.content}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.loadingText, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
+                Loading preferences...
+              </Text>
+            </View>
+          ) : (
+            <>
+              <Text style={[styles.description, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
+                Choose which notifications you want to receive
+              </Text>
+              
+              {preferenceItems.map((item, index) => (
+                <View
+                  key={item.key}
+                  style={[
+                    styles.preferenceItem,
+                    index === preferenceItems.length - 1 && styles.lastItem,
+                    { borderBottomColor: isDark ? colors.darkBorder : colors.lightBorder },
+                  ]}
+                >
+                  <View style={styles.preferenceLeft}>
+                    <IconSymbol
+                      ios_icon_name={item.icon}
+                      android_material_icon_name={item.androidIcon}
+                      size={20}
+                      color={colors.primary}
+                    />
+                    <View style={styles.preferenceTextContainer}>
+                      <Text style={[styles.preferenceLabel, { color: isDark ? colors.darkText : colors.lightText }]}>
+                        {item.label}
+                      </Text>
+                      <Text style={[styles.preferenceDescription, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
+                        {item.description}
+                      </Text>
+                    </View>
+                  </View>
+                  <Switch
+                    value={preferences[item.key]}
+                    onValueChange={(value) => updatePreference(item.key, value)}
+                    trackColor={{ false: '#767577', true: colors.primary }}
+                    thumbColor="#f4f3f4"
+                  />
+                </View>
+              ))}
+            </>
+          )}
     </View>
   );
 }
@@ -72,6 +231,45 @@ const styles = StyleSheet.create({
   description: {
     fontSize: 14,
     lineHeight: 20,
-    fontStyle: 'italic',
+    marginBottom: 16,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+  },
+  preferenceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  lastItem: {
+    borderBottomWidth: 0,
+  },
+  preferenceLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+    marginRight: 12,
+  },
+  preferenceTextContainer: {
+    flex: 1,
+  },
+  preferenceLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 2,
+  },
+  preferenceDescription: {
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

@@ -19,6 +19,7 @@ import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotification } from '@/contexts/NotificationContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
@@ -53,6 +54,7 @@ const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'E
 export default function UpcomingEventsEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { sendNotification } = useNotification();
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -305,6 +307,24 @@ export default function UpcomingEventsEditorScreen() {
           throw error;
         }
         console.log('Upcoming event created successfully');
+        
+        // Send push notification for new events only
+        try {
+          await sendNotification({
+            notificationType: 'event',
+            title: '📅 New Event',
+            body: formData.title,
+            data: {
+              eventId: null, // Will be set by the database
+              category: formData.category,
+              startDateTime: startDateTime?.toISOString() || null,
+            },
+          });
+        } catch (notificationError) {
+          // Silent fail - don't block event creation
+          console.error('Failed to send push notification:', notificationError);
+        }
+        
         Alert.alert('Success', 'Upcoming event created successfully');
       }
 

@@ -18,6 +18,7 @@ import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotification } from '@/contexts/NotificationContext';
 
 interface Employee {
   id: string;
@@ -51,6 +52,7 @@ interface GuestReview {
 export default function RewardsAndReviewsEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { sendNotification } = useNotification();
   const [activeTab, setActiveTab] = useState<'rewards' | 'reviews'>('rewards');
   const [loading, setLoading] = useState(false);
 
@@ -263,6 +265,26 @@ export default function RewardsAndReviewsEditorScreen() {
       });
 
       if (error) throw error;
+
+      // Send push notification (only for rewards, not deductions)
+      if (isReward) {
+        try {
+          await sendNotification({
+            userIds: [selectedEmployee.id],
+            notificationType: 'reward',
+            title: '🎉 You Earned McLoone\'s Bucks!',
+            body: `+${rewardAmount} - ${rewardDescription}`,
+            data: {
+              amount: finalAmount,
+              description: rewardDescription,
+              senderId: user?.id,
+            },
+          });
+        } catch (notificationError) {
+          // Silent fail - don't block reward
+          console.error('Failed to send push notification:', notificationError);
+        }
+      }
 
       Alert.alert('Success', `${isReward ? 'Reward' : 'Deduction'} added successfully`);
       setShowRewardModal(false);
