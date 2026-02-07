@@ -1,32 +1,41 @@
 {
   "expo": {
     "name": "Boathouse Connect",
-    "slug": "Boathouse Connect",
-    "version": "1.3.0",
+    "slug": "BoathouseConnect",
+    "version": "1.5.0",
     "orientation": "portrait",
-    "icon": "./assets/images/57b2b2e5-dd37-4d86-a5d4-03c600dda0ca.png",
-    "scheme": "Boathouse Connect",
+    "icon": "./assets/images/winter-app-icon.png",
+    "scheme": "boathouseconnect",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/57b2b2e5-dd37-4d86-a5d4-03c600dda0ca.png",
+      "image": "./assets/images/winter-splash-screen.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.mcloones.boathouseconnect",
-      "buildNumber": "1.2.4"
+      "bundleIdentifier": "com.stevenjamesjobs.mcloonesboathouseconnect",
+      "buildNumber": "1.5.0",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["remote-notification"]
+      },
+      "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/57b2b2e5-dd37-4d86-a5d4-03c600dda0ca.png",
+        "foregroundImage": "./assets/images/winter-app-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.mcloones.boathouseconnect",
-      "versionCode": 12,
+      "package": "com.mcloonesboathouse.GPboathouseconnect",
+      "versionCode": 150,
+      "googleServicesFile": "./google-services.json",
       "permissions": [
         "INTERNET",
-        "ACCESS_NETWORK_STATE"
+        "ACCESS_NETWORK_STATE",
+        "POST_NOTIFICATIONS",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE"
       ],
       "softwareKeyboardLayoutMode": "pan"
     },
@@ -41,13 +50,27 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#ffffff",
-          "image": "./assets/images/57b2b2e5-dd37-4d86-a5d4-03c600dda0ca.png",
+          "image": "./assets/images/winter-splash-screen.png",
           "imageWidth": 200
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/winter-app-icon.png",
+          "color": "#ffffff",
+          "sounds": [],
+          "mode": "production"
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "eas": {
+        "projectId": "1ab6bb51-f4ea-445b-8c25-cd0c5d0d4fea"
+      }
     }
   }
 }
