@@ -2,6 +2,7 @@
   "expo": {
     "name": "Boathouse Connect",
     "slug": "BoathouseConnect",
+    "owner": "stevenjamesjobs",
     "version": "1.5.0",
     "orientation": "portrait",
     "icon": "./assets/images/winter-app-icon.png",

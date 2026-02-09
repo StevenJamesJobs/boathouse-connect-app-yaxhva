@@ -156,7 +156,7 @@ export default function NotificationPreferences() {
           ) : (
             <>
               <Text style={[styles.description, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
-                Choose which notifications you want to receive
+                Choose which notification you want to receive
               </Text>
               
               {preferenceItems.map((item, index) => (
