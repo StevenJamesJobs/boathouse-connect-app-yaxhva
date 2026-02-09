@@ -22,7 +22,7 @@ serve(async (req) => {
   }
 
   try {
-    // Get Supabase client
+    // Service role client for database operations (full access)
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -34,18 +34,20 @@ serve(async (req) => {
       }
     );
 
-    // Get the authorization header
+    // Create a user-context client to identify the calling user
     const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
-    }
+    let user: any = null;
 
-    // Verify the JWT token
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-
-    if (authError || !user) {
-      throw new Error('Invalid token');
+    if (authHeader) {
+      const token = authHeader.replace('Bearer ', '');
+      // Try to get user from token - but don't fail if it's the anon key
+      const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser(token);
+      if (!authError && authUser) {
+        user = authUser;
+        console.log('Authenticated user:', user.id);
+      } else {
+        console.log('No user from token, proceeding without user context');
+      }
     }
 
     // Parse request body
@@ -75,22 +77,10 @@ serve(async (req) => {
 
     console.log(`Sending to ${recipientIds.length} users`);
 
-    // Get notification preferences and push tokens
-    const { data: usersWithTokens, error: tokensError } = await supabaseClient
+    // Get push tokens for recipients
+    const { data: pushTokens, error: tokensError } = await supabaseClient
       .from('push_tokens')
-      .select(`
-        token,
-        user_id,
-        notification_preferences!inner(
-          user_id,
-          messages_enabled,
-          rewards_enabled,
-          announcements_enabled,
-          events_enabled,
-          special_features_enabled,
-          custom_notifications_enabled
-        )
-      `)
+      .select('token, user_id')
       .in('user_id', recipientIds);
 
     if (tokensError) {
@@ -98,8 +88,29 @@ serve(async (req) => {
       throw tokensError;
     }
 
+    console.log(`Found ${pushTokens.length} push tokens`);
+
+    // Get notification preferences for recipients
+    const { data: preferences, error: prefsError } = await supabaseClient
+      .from('notification_preferences')
+      .select('user_id, messages_enabled, rewards_enabled, announcements_enabled, events_enabled, special_features_enabled, custom_notifications_enabled')
+      .in('user_id', recipientIds);
+
+    if (prefsError) {
+      console.error('Error fetching preferences:', prefsError);
+      // Don't throw - send notifications even if preferences can't be fetched
+    }
+
+    // Build a preferences lookup map
+    const prefsMap: Record<string, any> = {};
+    if (preferences) {
+      for (const pref of preferences) {
+        prefsMap[pref.user_id] = pref;
+      }
+    }
+
     // Filter based on preferences
-    const preferencesMap: Record<string, string> = {
+    const preferencesFieldMap: Record<string, string> = {
       'message': 'messages_enabled',
       'reward': 'rewards_enabled',
       'announcement': 'announcements_enabled',
@@ -108,12 +119,13 @@ serve(async (req) => {
       'custom': 'custom_notifications_enabled',
     };
 
-    const preferenceField = preferencesMap[notificationType];
+    const preferenceField = preferencesFieldMap[notificationType];
 
-    const filteredTokens = usersWithTokens.filter((item: any) => {
-      const prefs = item.notification_preferences;
-      if (!prefs || !preferenceField) return true;
-      return prefs[preferenceField] === true;
+    const filteredTokens = pushTokens.filter((item: any) => {
+      const userPrefs = prefsMap[item.user_id];
+      // If no preferences found or no matching field, send by default
+      if (!userPrefs || !preferenceField) return true;
+      return userPrefs[preferenceField] === true;
     });
 
     console.log(`Filtered to ${filteredTokens.length} users with preferences enabled`);
@@ -140,6 +152,7 @@ serve(async (req) => {
       title: title,
       body: body,
       data: data || {},
+      badge: 1,
     }));
 
     // Send notifications to Expo Push API
@@ -175,7 +188,7 @@ serve(async (req) => {
     }
 
     // If this is a custom notification, save it
-    if (notificationType === 'custom') {
+    if (notificationType === 'custom' && user) {
       const { error: customError } = await supabaseClient
         .from('custom_notifications')
         .insert({

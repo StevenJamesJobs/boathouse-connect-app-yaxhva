@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
-import { Platform } from 'react-native';
+import { Platform, AppState } from 'react-native';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
 
@@ -48,6 +48,15 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
       });
 
+      // Clear badge when app is opened/foregrounded
+      Notifications.setBadgeCountAsync(0);
+
+      const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
+        if (nextAppState === 'active') {
+          Notifications.setBadgeCountAsync(0);
+        }
+      });
+
       // Listen for notifications received while app is in foreground
       notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
         setNotification(notification);
@@ -56,10 +65,13 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       // Listen for notification interactions (user taps notification)
       responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
         console.log('Notification tapped:', response);
+        // Clear badge when user taps a notification
+        Notifications.setBadgeCountAsync(0);
         // TODO: Add deep linking based on notification data
       });
 
       return () => {
+        appStateSubscription.remove();
         if (notificationListener.current) {
           Notifications.removeNotificationSubscription(notificationListener.current);
         }

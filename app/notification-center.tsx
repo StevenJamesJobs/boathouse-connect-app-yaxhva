@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  useColorScheme,
   TextInput,
   Alert,
   ActivityIndicator,
@@ -14,13 +13,11 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
-import { colors } from '@/styles/commonStyles';
+import { managerColors } from '@/styles/commonStyles';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
 
 export default function NotificationCenter() {
   const router = useRouter();
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -79,10 +76,10 @@ export default function NotificationCenter() {
     } catch (error: any) {
       console.error('Error sending notification:', error);
       console.error('Error context:', JSON.stringify(error?.context));
-      
+
       // Try to get the actual error message from the response
       let errorMessage = 'Failed to send notification. Please try again.';
-      
+
       if (error?.context) {
         try {
           // Clone the response before reading it
@@ -103,7 +100,7 @@ export default function NotificationCenter() {
           console.error('Could not read error response:', e);
         }
       }
-      
+
       Alert.alert(
         'Error',
         errorMessage,
@@ -119,9 +116,9 @@ export default function NotificationCenter() {
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={[styles.container, { backgroundColor: isDark ? colors.darkBackground : colors.lightBackground }]}>
+      <View style={styles.container}>
         {/* Header */}
-        <View style={[styles.header, { backgroundColor: isDark ? colors.darkCard : colors.lightCard }]}>
+        <View style={styles.header}>
           <TouchableOpacity
             onPress={() => router.back()}
             style={styles.backButton}
@@ -130,55 +127,48 @@ export default function NotificationCenter() {
               ios_icon_name="chevron.left"
               android_material_icon_name="arrow-back"
               size={24}
-              color={colors.primary}
+              color={managerColors.highlight}
             />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: isDark ? colors.darkText : colors.lightText }]}>
+          <Text style={styles.headerTitle}>
             Notification Center
           </Text>
           <View style={{ width: 40 }} />
         </View>
 
         <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-          <View style={[styles.card, { backgroundColor: isDark ? colors.darkCard : colors.lightCard }]}>
+          <View style={styles.card}>
             <View style={styles.iconContainer}>
               <IconSymbol
                 ios_icon_name="megaphone.fill"
                 android_material_icon_name="campaign"
                 size={48}
-                color={colors.primary}
+                color={managerColors.highlight}
               />
             </View>
 
-            <Text style={[styles.cardTitle, { color: isDark ? colors.darkText : colors.lightText }]}>
+            <Text style={styles.cardTitle}>
               Send Notification to All Staff
             </Text>
 
-            <Text style={[styles.cardDescription, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
+            <Text style={styles.cardDescription}>
               This notification will be sent to all staff members who have notifications enabled.
             </Text>
 
             {/* Title Input */}
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
-                <Text style={[styles.inputLabel, { color: isDark ? colors.darkText : colors.lightText }]}>
+                <Text style={styles.inputLabel}>
                   Title
                 </Text>
-                <Text style={[styles.characterCount, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
+                <Text style={styles.characterCount}>
                   {title.length}/{maxTitleLength}
                 </Text>
               </View>
               <TextInput
-                style={[
-                  styles.titleInput,
-                  {
-                    backgroundColor: isDark ? colors.darkBackground : colors.lightBackground,
-                    color: isDark ? colors.darkText : colors.lightText,
-                    borderColor: isDark ? colors.darkBorder : colors.lightBorder,
-                  },
-                ]}
+                style={styles.titleInput}
                 placeholder="Enter notification title"
-                placeholderTextColor={isDark ? colors.darkSecondaryText : colors.lightSecondaryText}
+                placeholderTextColor={managerColors.textSecondary}
                 value={title}
                 onChangeText={(text) => {
                   if (text.length <= maxTitleLength) {
@@ -192,24 +182,17 @@ export default function NotificationCenter() {
             {/* Body Input */}
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
-                <Text style={[styles.inputLabel, { color: isDark ? colors.darkText : colors.lightText }]}>
+                <Text style={styles.inputLabel}>
                   Message
                 </Text>
-                <Text style={[styles.characterCount, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
+                <Text style={styles.characterCount}>
                   {body.length}/{maxBodyLength}
                 </Text>
               </View>
               <TextInput
-                style={[
-                  styles.bodyInput,
-                  {
-                    backgroundColor: isDark ? colors.darkBackground : colors.lightBackground,
-                    color: isDark ? colors.darkText : colors.lightText,
-                    borderColor: isDark ? colors.darkBorder : colors.lightBorder,
-                  },
-                ]}
+                style={styles.bodyInput}
                 placeholder="Enter notification message"
-                placeholderTextColor={isDark ? colors.darkSecondaryText : colors.lightSecondaryText}
+                placeholderTextColor={managerColors.textSecondary}
                 value={body}
                 onChangeText={(text) => {
                   if (text.length <= maxBodyLength) {
@@ -226,17 +209,17 @@ export default function NotificationCenter() {
             {/* Preview */}
             {(title || body) && (
               <View style={styles.previewContainer}>
-                <Text style={[styles.previewLabel, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
+                <Text style={styles.previewLabel}>
                   Preview:
                 </Text>
-                <View style={[styles.previewCard, { backgroundColor: isDark ? colors.darkBackground : colors.lightBackground }]}>
+                <View style={styles.previewCard}>
                   {title && (
-                    <Text style={[styles.previewTitle, { color: isDark ? colors.darkText : colors.lightText }]}>
+                    <Text style={styles.previewTitle}>
                       {title}
                     </Text>
                   )}
                   {body && (
-                    <Text style={[styles.previewBody, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
+                    <Text style={styles.previewBody}>
                       {body}
                     </Text>
                   )}
@@ -248,7 +231,6 @@ export default function NotificationCenter() {
             <TouchableOpacity
               style={[
                 styles.sendButton,
-                { backgroundColor: colors.primary },
                 (!title.trim() || !body.trim() || sending) && styles.sendButtonDisabled,
               ]}
               onPress={handleSendNotification}
@@ -275,9 +257,9 @@ export default function NotificationCenter() {
                 ios_icon_name="info.circle"
                 android_material_icon_name="info"
                 size={16}
-                color={isDark ? colors.darkSecondaryText : colors.lightSecondaryText}
+                color={managerColors.textSecondary}
               />
-              <Text style={[styles.infoText, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
+              <Text style={styles.infoText}>
                 Staff members can manage their notification preferences in their profile settings
               </Text>
             </View>
@@ -291,6 +273,7 @@ export default function NotificationCenter() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: managerColors.background,
   },
   header: {
     flexDirection: 'row',
@@ -300,7 +283,8 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: colors.lightBorder,
+    borderBottomColor: managerColors.border,
+    backgroundColor: managerColors.card,
   },
   backButton: {
     padding: 8,
@@ -308,6 +292,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
+    color: managerColors.text,
   },
   content: {
     flex: 1,
@@ -318,9 +303,10 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 16,
     padding: 24,
+    backgroundColor: managerColors.card,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 3,
   },
@@ -333,12 +319,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 8,
+    color: managerColors.text,
   },
   cardDescription: {
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
     marginBottom: 24,
+    color: managerColors.textSecondary,
   },
   inputContainer: {
     marginBottom: 20,
@@ -352,15 +340,20 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
+    color: managerColors.text,
   },
   characterCount: {
     fontSize: 12,
+    color: managerColors.textSecondary,
   },
   titleInput: {
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
     fontSize: 16,
+    backgroundColor: managerColors.background,
+    color: managerColors.text,
+    borderColor: managerColors.border,
   },
   bodyInput: {
     borderWidth: 1,
@@ -368,6 +361,9 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     minHeight: 100,
+    backgroundColor: managerColors.background,
+    color: managerColors.text,
+    borderColor: managerColors.border,
   },
   previewContainer: {
     marginBottom: 20,
@@ -376,19 +372,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
+    color: managerColors.textSecondary,
   },
   previewCard: {
     borderRadius: 12,
     padding: 16,
+    backgroundColor: managerColors.background,
   },
   previewTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
+    color: managerColors.text,
   },
   previewBody: {
     fontSize: 14,
     lineHeight: 20,
+    color: managerColors.textSecondary,
   },
   sendButton: {
     flexDirection: 'row',
@@ -398,6 +398,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     marginBottom: 16,
+    backgroundColor: managerColors.highlight,
   },
   sendButtonDisabled: {
     opacity: 0.5,
@@ -416,5 +417,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     lineHeight: 18,
+    color: managerColors.textSecondary,
   },
 });

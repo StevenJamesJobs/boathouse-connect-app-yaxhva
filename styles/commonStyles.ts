@@ -20,12 +20,14 @@ export const employeeColors = {
 export const managerColors = {
   background: '#1A2332',
   text: '#FFFFFF',
-  textSecondary: '#A8B8D8',
+  textSecondary: '#FFFFFF',
   primary: '#4A90E2',
   card: '#2C3E50',
   highlight: '#5DADE2',
   border: '#34495E',
   accent: '#3498DB',
+darkText: '#FFFFFF',
+darkSecondaryText: '#A8B8D8',
 };
 
 // Splash Screen Colors

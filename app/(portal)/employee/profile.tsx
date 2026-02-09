@@ -433,7 +433,7 @@ export default function EmployeeProfileScreen() {
         </TouchableOpacity>
 
         {notificationPrefsExpanded && (
-          <NotificationPreferences />
+          <NotificationPreferences variant="employee" />
         )}
       </View>
 

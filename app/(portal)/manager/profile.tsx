@@ -442,7 +442,7 @@ export default function ManagerProfileScreen() {
         </TouchableOpacity>
 
         {notificationPrefsExpanded && (
-          <NotificationPreferences />
+          <NotificationPreferences variant="manager" />
         )}
       </View>
 

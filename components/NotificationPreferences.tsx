@@ -4,14 +4,17 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  useColorScheme,
   Switch,
   ActivityIndicator,
 } from 'react-native';
 import { IconSymbol } from './IconSymbol';
-import { colors } from '@/styles/commonStyles';
+import { managerColors, employeeColors } from '@/styles/commonStyles';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+
+interface NotificationPreferencesProps {
+  variant?: 'manager' | 'employee';
+}
 
 interface NotificationPreferencesData {
   messages_enabled: boolean;
@@ -22,9 +25,8 @@ interface NotificationPreferencesData {
   custom_notifications_enabled: boolean;
 }
 
-export default function NotificationPreferences() {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+export default function NotificationPreferences({ variant = 'employee' }: NotificationPreferencesProps) {
+  const themeColors = variant === 'manager' ? managerColors : employeeColors;
   const { user } = useAuth();
   
   const [loading, setLoading] = useState(true);
@@ -148,15 +150,15 @@ export default function NotificationPreferences() {
     <View style={styles.content}>
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={colors.primary} />
-              <Text style={[styles.loadingText, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
+              <ActivityIndicator size="small" color={themeColors.primary} />
+              <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>
                 Loading preferences...
               </Text>
             </View>
           ) : (
             <>
-              <Text style={[styles.description, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
-                Choose which notification you want to receive
+              <Text style={[styles.description, { color: themeColors.textSecondary }]}>
+                Choose which notifications you want to receive
               </Text>
               
               {preferenceItems.map((item, index) => (
@@ -165,7 +167,7 @@ export default function NotificationPreferences() {
                   style={[
                     styles.preferenceItem,
                     index === preferenceItems.length - 1 && styles.lastItem,
-                    { borderBottomColor: isDark ? colors.darkBorder : colors.lightBorder },
+                    { borderBottomColor: themeColors.border },
                   ]}
                 >
                   <View style={styles.preferenceLeft}>
@@ -173,13 +175,13 @@ export default function NotificationPreferences() {
                       ios_icon_name={item.icon}
                       android_material_icon_name={item.androidIcon}
                       size={20}
-                      color={colors.primary}
+                      color={themeColors.text}
                     />
                     <View style={styles.preferenceTextContainer}>
-                      <Text style={[styles.preferenceLabel, { color: isDark ? colors.darkText : colors.lightText }]}>
+                      <Text style={[styles.preferenceLabel, { color: themeColors.text }]}>
                         {item.label}
                       </Text>
-                      <Text style={[styles.preferenceDescription, { color: isDark ? colors.darkSecondaryText : colors.lightSecondaryText }]}>
+                      <Text style={[styles.preferenceDescription, { color: themeColors.textSecondary }]}>
                         {item.description}
                       </Text>
                     </View>
@@ -187,7 +189,7 @@ export default function NotificationPreferences() {
                   <Switch
                     value={preferences[item.key]}
                     onValueChange={(value) => updatePreference(item.key, value)}
-                    trackColor={{ false: '#767577', true: colors.primary }}
+                    trackColor={{ false: '#767577', true: themeColors.primary }}
                     thumbColor="#f4f3f4"
                   />
                 </View>
