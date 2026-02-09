@@ -50,10 +50,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
       // Clear badge when app is opened/foregrounded
       Notifications.setBadgeCountAsync(0);
+      Notifications.dismissAllNotificationsAsync();
 
       const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
         if (nextAppState === 'active') {
           Notifications.setBadgeCountAsync(0);
+          Notifications.dismissAllNotificationsAsync();
         }
       });
 
@@ -67,6 +69,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         console.log('Notification tapped:', response);
         // Clear badge when user taps a notification
         Notifications.setBadgeCountAsync(0);
+        Notifications.dismissAllNotificationsAsync();
         // TODO: Add deep linking based on notification data
       });
 
