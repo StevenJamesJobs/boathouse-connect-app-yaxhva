@@ -10,17 +10,31 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { managerColors } from '@/styles/commonStyles';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
 
+const DESTINATION_OPTIONS = [
+  { value: '', label: 'None (Open app only)' },
+  { value: 'messages', label: 'Messages / Inbox' },
+  { value: 'announcements', label: 'Announcements' },
+  { value: 'events', label: 'Upcoming Events' },
+  { value: 'special_features', label: 'Special Features' },
+  { value: 'rewards', label: 'Rewards' },
+  { value: 'menus', label: 'Menus' },
+  { value: 'tools', label: 'Tools' },
+];
+
 export default function NotificationCenter() {
   const router = useRouter();
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [destination, setDestination] = useState('');
+  const [showDestinationPicker, setShowDestinationPicker] = useState(false);
   const [sending, setSending] = useState(false);
 
   const maxTitleLength = 50;
@@ -41,7 +55,7 @@ export default function NotificationCenter() {
     // Confirm sending
     Alert.alert(
       'Send Notification?',
-      `This will send a notification to all staff members.\n\nTitle: "${title}"\nMessage: "${body}"`,
+      `This will send a notification to all staff members.\n\nTitle: "${title}"\nMessage: "${body}"${destination ? `\nOpens: ${DESTINATION_OPTIONS.find(d => d.value === destination)?.label}` : ''}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -57,7 +71,7 @@ export default function NotificationCenter() {
     setSending(true);
 
     try {
-      await sendCustomNotification(title, body);
+      await sendCustomNotification(title, body, destination ? { destination } : undefined);
 
       Alert.alert(
         '✅ Notification Sent!',
@@ -68,6 +82,7 @@ export default function NotificationCenter() {
             onPress: () => {
               setTitle('');
               setBody('');
+              setDestination('');
               router.back();
             },
           },
@@ -205,6 +220,86 @@ export default function NotificationCenter() {
                 textAlignVertical="top"
               />
             </View>
+
+            {/* Destination Picker */}
+            <View style={styles.inputContainer}>
+              <View style={styles.inputHeader}>
+                <Text style={styles.inputLabel}>
+                  Opens To
+                </Text>
+                <Text style={styles.characterCount}>
+                  Optional
+                </Text>
+              </View>
+              <TouchableOpacity
+                style={styles.destinationSelector}
+                onPress={() => setShowDestinationPicker(true)}
+              >
+                <Text style={[
+                  styles.destinationSelectorText,
+                  !destination && { color: managerColors.textSecondary }
+                ]}>
+                  {destination
+                    ? DESTINATION_OPTIONS.find(d => d.value === destination)?.label
+                    : 'Select where notification opens to...'}
+                </Text>
+                <IconSymbol
+                  ios_icon_name="chevron.down"
+                  android_material_icon_name="expand-more"
+                  size={20}
+                  color={managerColors.textSecondary}
+                />
+              </TouchableOpacity>
+              <Text style={styles.destinationHint}>
+                Choose which section of the app opens when staff tap this notification
+              </Text>
+            </View>
+
+            {/* Destination Picker Modal */}
+            <Modal
+              visible={showDestinationPicker}
+              transparent
+              animationType="fade"
+              onRequestClose={() => setShowDestinationPicker(false)}
+            >
+              <TouchableOpacity
+                style={styles.pickerOverlay}
+                activeOpacity={1}
+                onPress={() => setShowDestinationPicker(false)}
+              >
+                <View style={styles.pickerContainer}>
+                  <Text style={styles.pickerTitle}>Opens To</Text>
+                  {DESTINATION_OPTIONS.map((option) => (
+                    <TouchableOpacity
+                      key={option.value}
+                      style={[
+                        styles.pickerOption,
+                        destination === option.value && styles.pickerOptionSelected,
+                      ]}
+                      onPress={() => {
+                        setDestination(option.value);
+                        setShowDestinationPicker(false);
+                      }}
+                    >
+                      <Text style={[
+                        styles.pickerOptionText,
+                        destination === option.value && styles.pickerOptionTextSelected,
+                      ]}>
+                        {option.label}
+                      </Text>
+                      {destination === option.value && (
+                        <IconSymbol
+                          ios_icon_name="checkmark"
+                          android_material_icon_name="check"
+                          size={18}
+                          color={managerColors.highlight}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </TouchableOpacity>
+            </Modal>
 
             {/* Preview */}
             {(title || body) && (
@@ -406,6 +501,67 @@ const styles = StyleSheet.create({
   sendButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
+    fontWeight: '600',
+  },
+  destinationSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    backgroundColor: managerColors.background,
+    borderColor: managerColors.border,
+  },
+  destinationSelectorText: {
+    fontSize: 16,
+    color: managerColors.text,
+    flex: 1,
+  },
+  destinationHint: {
+    fontSize: 12,
+    color: managerColors.textSecondary,
+    marginTop: 6,
+  },
+  pickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  pickerContainer: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: managerColors.card,
+    borderRadius: 16,
+    padding: 20,
+  },
+  pickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: managerColors.text,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  pickerOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  pickerOptionSelected: {
+    backgroundColor: managerColors.background,
+  },
+  pickerOptionText: {
+    fontSize: 16,
+    color: managerColors.text,
+  },
+  pickerOptionTextSelected: {
+    color: managerColors.highlight,
     fontWeight: '600',
   },
   infoContainer: {

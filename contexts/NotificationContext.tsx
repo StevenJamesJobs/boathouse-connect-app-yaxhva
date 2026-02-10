@@ -4,6 +4,7 @@ import * as Device from 'expo-device';
 import { Platform, AppState } from 'react-native';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
+import { router } from 'expo-router';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -70,7 +71,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         // Clear badge when user taps a notification
         Notifications.setBadgeCountAsync(0);
         Notifications.dismissAllNotificationsAsync();
-        // TODO: Add deep linking based on notification data
+
+        // Deep link based on notification data
+        const data = response.notification.request.content.data;
+        if (data?.type) {
+          handleNotificationDeepLink(data);
+        }
       });
 
       return () => {
@@ -164,6 +170,98 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }
     } catch (error) {
       console.error('[NotificationContext] ❌ Exception in savePushTokenToDatabase:', error);
+    }
+  }
+
+  function handleNotificationDeepLink(data: Record<string, any>) {
+    console.log('[NotificationContext] Deep linking with data:', data);
+    const portalPrefix = user?.role === 'manager' ? '/(portal)/manager' : '/(portal)/employee';
+
+    try {
+      switch (data.type) {
+        case 'message':
+          if (data.messageId) {
+            router.push({
+              pathname: '/message-detail',
+              params: {
+                messageId: data.messageId,
+                threadId: data.threadId || data.messageId,
+              },
+            });
+          } else {
+            router.push('/messages');
+          }
+          break;
+
+        case 'reward':
+          router.push(`${portalPrefix}/rewards`);
+          break;
+
+        case 'announcement':
+          if (data.announcementId) {
+            router.push({
+              pathname: portalPrefix,
+              params: { openAnnouncementId: data.announcementId },
+            });
+          }
+          break;
+
+        case 'event':
+          if (data.eventId) {
+            router.push({
+              pathname: portalPrefix,
+              params: { openEventId: data.eventId },
+            });
+          }
+          break;
+
+        case 'special_feature':
+          if (data.featureId) {
+            router.push({
+              pathname: portalPrefix,
+              params: { openFeatureId: data.featureId },
+            });
+          }
+          break;
+
+        case 'custom':
+          // Custom notifications can specify a destination
+          if (data.destination) {
+            switch (data.destination) {
+              case 'messages':
+                router.push('/messages');
+                break;
+              case 'rewards':
+                router.push(`${portalPrefix}/rewards`);
+                break;
+              case 'announcements':
+              case 'events':
+              case 'special_features':
+                // Navigate to home screen where these sections are
+                router.push(portalPrefix);
+                break;
+              case 'menus':
+                router.push(`${portalPrefix}/menus`);
+                break;
+              case 'tools':
+                router.push(`${portalPrefix}/tools`);
+                break;
+              case 'profile':
+                router.push(`${portalPrefix}/profile`);
+                break;
+              default:
+                // Default: just open the app (no specific navigation)
+                break;
+            }
+          }
+          break;
+
+        default:
+          console.log('[NotificationContext] Unknown notification type:', data.type);
+          break;
+      }
+    } catch (error) {
+      console.error('[NotificationContext] Deep link navigation error:', error);
     }
   }
 

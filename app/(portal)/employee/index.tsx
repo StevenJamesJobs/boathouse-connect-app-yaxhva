@@ -1,7 +1,7 @@
 
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   View,
   Text,
@@ -105,6 +105,7 @@ interface SpecialFeature {
 export default function EmployeePortalScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const params = useLocalSearchParams();
   const { unreadCount } = useUnreadMessages();
   const [weeklySpecials, setWeeklySpecials] = useState<MenuItem[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
@@ -159,6 +160,75 @@ export default function EmployeePortalScreen() {
       loadSpecialFeatures();
     }, [])
   );
+
+  // Handle deep link params from notification taps
+  useEffect(() => {
+    async function openDeepLinkItem() {
+      const { openAnnouncementId, openEventId, openFeatureId } = params;
+      if (!openAnnouncementId && !openEventId && !openFeatureId) return;
+
+      try {
+        if (openAnnouncementId) {
+          const { data } = await supabase
+            .from('announcements')
+            .select('*, guide_file:guides_and_training!announcements_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
+            .eq('id', openAnnouncementId)
+            .single();
+          if (data) {
+            openDetailModal({
+              title: data.title,
+              content: data.content,
+              thumbnailUrl: data.thumbnail_url,
+              thumbnailShape: data.thumbnail_shape,
+              priority: data.priority,
+              link: data.link,
+              guideFile: data.guide_file,
+            });
+          }
+        } else if (openEventId) {
+          const { data } = await supabase
+            .from('upcoming_events')
+            .select('*, guide_file:guides_and_training!upcoming_events_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
+            .eq('id', openEventId)
+            .single();
+          if (data) {
+            openDetailModal({
+              title: data.title,
+              content: data.content,
+              thumbnailUrl: data.thumbnail_url,
+              thumbnailShape: data.thumbnail_shape,
+              startDateTime: data.start_date_time,
+              endDateTime: data.end_date_time,
+              link: data.link,
+              guideFile: data.guide_file,
+            });
+          }
+        } else if (openFeatureId) {
+          const { data } = await supabase
+            .from('special_features')
+            .select('*, guide_file:guides_and_training!special_features_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
+            .eq('id', openFeatureId)
+            .single();
+          if (data) {
+            openDetailModal({
+              title: data.title,
+              content: data.content,
+              thumbnailUrl: data.thumbnail_url,
+              thumbnailShape: data.thumbnail_shape,
+              startDateTime: data.start_date_time,
+              endDateTime: data.end_date_time,
+              link: data.link,
+              guideFile: data.guide_file,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error opening deep link item:', error);
+      }
+    }
+
+    openDeepLinkItem();
+  }, [params.openAnnouncementId, params.openEventId, params.openFeatureId]);
 
   const loadWeeklySpecials = async () => {
     try {
