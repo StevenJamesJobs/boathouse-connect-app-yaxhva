@@ -21,7 +21,7 @@ import { managerColors, employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import { File, Directory, Paths } from 'expo-file-system';
+import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import ContentDetailModal from '@/components/ContentDetailModal';
 
@@ -157,99 +157,70 @@ export default function GuidesAndTrainingScreen() {
       }
 
       console.log('Downloading from URL:', guide.file_url);
-      
-      const downloadsDir = new Directory(Paths.cache, 'downloads');
-      console.log('Downloads directory path:', downloadsDir.uri);
-      
-      if (!downloadsDir.exists) {
-        console.log('Creating downloads directory...');
-        try {
-          downloadsDir.create({ intermediates: true });
-          console.log('Downloads directory created successfully');
-        } catch (createError: any) {
-          console.error('Error creating downloads directory:', createError);
-          throw new Error(`Failed to create downloads directory: ${createError.message}`);
-        }
-      }
 
-      const fileExtension = guide.file_name.includes('.') 
+      // Use the stable expo-file-system downloadAsync API
+      const fileExtension = guide.file_name.includes('.')
         ? guide.file_name.substring(guide.file_name.lastIndexOf('.'))
         : '';
       const fileNameWithoutExt = guide.file_name.includes('.')
         ? guide.file_name.substring(0, guide.file_name.lastIndexOf('.'))
         : guide.file_name;
-      
+
       const timestamp = Date.now();
       const randomString = Math.random().toString(36).substring(2, 8);
       const uniqueFileName = `${fileNameWithoutExt}_${timestamp}_${randomString}${fileExtension}`;
-      
+
       console.log('Generated unique filename:', uniqueFileName);
 
-      const destinationFile = new File(downloadsDir, uniqueFileName);
-      console.log('Destination file path:', destinationFile.uri);
-
-      if (destinationFile.exists) {
-        console.log('Destination file already exists, deleting...');
-        try {
-          destinationFile.delete();
-          console.log('Existing file deleted successfully');
-        } catch (deleteError: any) {
-          console.error('Error deleting existing file:', deleteError);
-        }
+      // Ensure downloads directory exists
+      const downloadsDir = `${FileSystem.cacheDirectory}downloads/`;
+      const dirInfo = await FileSystem.getInfoAsync(downloadsDir);
+      if (!dirInfo.exists) {
+        console.log('Creating downloads directory...');
+        await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
       }
+
+      const destinationUri = `${downloadsDir}${uniqueFileName}`;
+      console.log('Destination file path:', destinationUri);
 
       console.log('Starting file download...');
-      let downloadedFile: File;
-      try {
-        downloadedFile = await File.downloadFileAsync(
-          guide.file_url,
-          destinationFile
-        );
-        console.log('File downloaded successfully to:', downloadedFile.uri);
-      } catch (downloadError: any) {
-        console.error('Download error:', downloadError);
-        console.error('Download error code:', downloadError.code);
-        console.error('Download error message:', downloadError.message);
-        
-        if (downloadError.message?.includes('already exists')) {
-          throw new Error('File already exists. Please try again.');
-        } else if (downloadError.message?.includes('network')) {
-          throw new Error('Network error. Please check your connection and try again.');
-        } else if (downloadError.message?.includes('permission')) {
-          throw new Error('Permission denied. Please check app permissions.');
-        } else {
-          throw new Error(`Download failed: ${downloadError.message || 'Unknown error'}`);
-        }
+      const downloadResult = await FileSystem.downloadAsync(
+        guide.file_url,
+        destinationUri
+      );
+      console.log('File downloaded successfully to:', downloadResult.uri);
+      console.log('Download status:', downloadResult.status);
+
+      if (downloadResult.status !== 200) {
+        throw new Error(`Download failed with status ${downloadResult.status}`);
       }
 
-      console.log('Verifying downloaded file...');
-      if (!downloadedFile.exists) {
+      // Verify downloaded file
+      const fileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
+      console.log('Downloaded file info:', fileInfo);
+
+      if (!fileInfo.exists) {
         throw new Error('Downloaded file does not exist after download');
       }
 
-      const fileSize = downloadedFile.size;
-      console.log('Downloaded file size:', fileSize, 'bytes');
-      
-      if (fileSize === 0) {
+      if (fileInfo.size === 0) {
         throw new Error('Downloaded file is empty');
       }
+
+      console.log('Downloaded file size:', fileInfo.size, 'bytes');
 
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
         console.log('Opening share dialog...');
-        await Sharing.shareAsync(downloadedFile.uri, {
+        await Sharing.shareAsync(downloadResult.uri, {
           mimeType: guide.file_type || 'application/octet-stream',
           dialogTitle: `Save ${guide.file_name}`,
           UTI: guide.file_type || 'public.data',
         });
-        Alert.alert(
-          'Success', 
-          `File "${guide.file_name}" is ready to save. Choose where to save it from the share menu.`
-        );
       } else {
         Alert.alert(
-          'Success', 
-          `File downloaded successfully to:\n${downloadedFile.uri}\n\nFile size: ${(fileSize / 1024).toFixed(2)} KB`
+          'Downloaded',
+          `File "${guide.file_name}" downloaded successfully.\n\nFile size: ${((fileInfo.size || 0) / 1024).toFixed(2)} KB`
         );
       }
     } catch (error: any) {
@@ -259,12 +230,16 @@ export default function GuidesAndTrainingScreen() {
         message: error.message,
         stack: error.stack,
       });
-      
+
       let errorMessage = 'Failed to download file. Please try again.';
-      if (error.message) {
+      if (error.message?.includes('network') || error.message?.includes('Network')) {
+        errorMessage = 'Network error. Please check your connection and try again.';
+      } else if (error.message?.includes('permission')) {
+        errorMessage = 'Permission denied. Please check app permissions.';
+      } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       Alert.alert('Download Error', errorMessage);
     } finally {
       setDownloadingFile(null);

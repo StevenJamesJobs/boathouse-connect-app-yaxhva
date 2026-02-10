@@ -3,20 +3,20 @@
     "name": "Boathouse Connect",
     "slug": "BoathouseConnect",
     "owner": "stevenjamesjobs",
-    "version": "1.5.0",
+    "version": "1.5.2",
     "orientation": "portrait",
     "icon": "./assets/images/winter-app-icon.png",
     "scheme": "boathouseconnect",
     "userInterfaceStyle": "automatic",
     "splash": {
       "image": "./assets/images/winter-splash-screen.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#ffffff"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.stevenjamesjobs.mcloonesboathouseconnect",
-      "buildNumber": "1.5.0",
+      "buildNumber": "1.5.2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": ["remote-notification"]
@@ -29,7 +29,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.mcloonesboathouse.GPboathouseconnect",
-      "versionCode": 150,
+      "versionCode": 152,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "INTERNET",
@@ -52,7 +52,10 @@
         {
           "backgroundColor": "#ffffff",
           "image": "./assets/images/winter-splash-screen.png",
-          "imageWidth": 200
+          "dark": {
+            "backgroundColor": "#ffffff",
+            "image": "./assets/images/winter-splash-screen.png"
+          }
         }
       ],
       [

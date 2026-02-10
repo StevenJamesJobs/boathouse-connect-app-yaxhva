@@ -103,15 +103,24 @@ function RootLayoutNav() {
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
+  const [splashReady, setSplashReady] = React.useState(false);
+
+  // Track when the app started loading
+  useEffect(() => {
+    const splashMinDelay = setTimeout(() => {
+      setSplashReady(true);
+    }, 1500); // Minimum 1.5 seconds splash display
+    return () => clearTimeout(splashMinDelay);
+  }, []);
 
   useEffect(() => {
-    if (loaded) {
-      console.log('[RootLayout] Fonts loaded, hiding splash screen');
+    if (loaded && splashReady) {
+      console.log('[RootLayout] Fonts loaded & splash delay complete, hiding splash screen');
       SplashScreen.hideAsync().catch((error) => {
         console.log('[RootLayout] Error hiding splash screen:', error);
       });
     }
-  }, [loaded]);
+  }, [loaded, splashReady]);
 
   useEffect(() => {
     if (
@@ -170,7 +179,7 @@ function RootLayoutNav() {
     return () => clearTimeout(navigationTimeout);
   }, [isAuthenticated, isLoading, segments, loaded, user?.role, router]);
 
-  if (!loaded || isLoading) {
+  if (!loaded || isLoading || !splashReady) {
     console.log('[RootLayout] Still loading, returning null');
     return null;
   }

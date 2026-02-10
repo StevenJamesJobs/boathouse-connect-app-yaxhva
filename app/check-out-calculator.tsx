@@ -12,6 +12,7 @@ import {
   StyleSheet,
   ScrollView,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 
 const styles = StyleSheet.create({
@@ -291,6 +292,7 @@ export default function CheckOutCalculatorScreen() {
     { label: '2%', value: 0.02 },
     { label: '3%', value: 0.03 },
     { label: '4%', value: 0.04 },
+    { label: '0%', value: 0 },
   ];
 
   const declareOptions = [
@@ -386,7 +388,10 @@ export default function CheckOutCalculatorScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <KeyboardAvoidingView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
@@ -395,7 +400,7 @@ export default function CheckOutCalculatorScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView style={styles.scrollContent}>
+      <ScrollView style={styles.scrollContent} contentContainerStyle={{ paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
         {/* Header */}
         <View style={styles.calculatorHeader}>
           <IconSymbol
@@ -941,6 +946,6 @@ export default function CheckOutCalculatorScreen() {
           </View>
         )}
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
