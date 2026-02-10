@@ -188,6 +188,7 @@ export default function MessagesScreen() {
         )
       `)
       .eq('sender_id', user.id)
+      .eq('deleted_by_sender', false)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -503,18 +504,12 @@ export default function MessagesScreen() {
                   .eq('recipient_id', user?.id)
                   .in('message_id', messageIds);
               } else {
-                // Delete sent messages
-                for (const messageId of messageIds) {
-                  await supabase
-                    .from('message_recipients')
-                    .delete()
-                    .eq('message_id', messageId);
-                  
-                  await supabase
-                    .from('messages')
-                    .delete()
-                    .eq('id', messageId);
-                }
+                // Soft delete sent messages - mark as deleted by sender
+                await supabase
+                  .from('messages')
+                  .update({ deleted_by_sender: true })
+                  .in('id', messageIds)
+                  .eq('sender_id', user?.id);
               }
 
               await loadMessages();
@@ -587,15 +582,22 @@ export default function MessagesScreen() {
                   .eq('recipient_id', user?.id)
                   .eq('message_id', message.id);
               } else {
-                await supabase
-                  .from('message_recipients')
-                  .delete()
-                  .eq('message_id', message.id);
-                
+                // Soft delete sent messages - mark as deleted by sender
+                // Get thread messages to mark all in thread
+                const threadId = message.thread_id || message.id;
+                const { data: threadMessages } = await supabase
+                  .from('messages')
+                  .select('id')
+                  .eq('sender_id', user?.id)
+                  .or(`id.eq.${threadId},thread_id.eq.${threadId}`);
+
+                const messageIds = threadMessages?.map(m => m.id) || [message.id];
+
                 await supabase
                   .from('messages')
-                  .delete()
-                  .eq('id', message.id);
+                  .update({ deleted_by_sender: true })
+                  .in('id', messageIds)
+                  .eq('sender_id', user?.id);
               }
 
               await loadMessages();
@@ -604,6 +606,7 @@ export default function MessagesScreen() {
               if (isManager) {
                 await loadFeedbackCount();
               }
+              Alert.alert('Success', `${messageType === 'feedback' ? 'Feedback' : 'Message'} deleted`);
             } catch (error) {
               console.error('Error deleting message:', error);
               Alert.alert('Error', `Failed to delete ${messageType}`);
@@ -990,11 +993,11 @@ function MessageCard({
           </Text>
         )}
         
-        {activeTab !== 'sent' && (
+        {activeTab !== 'sent' && message.sender_job_title ? (
           <Text style={[styles.messageJobTitle, { color: colors.textSecondary }]} numberOfLines={1}>
             {message.sender_job_title}
           </Text>
-        )}
+        ) : null}
         {message.subject && (
           <Text style={[styles.messageSubject, { color: colors.text }]} numberOfLines={1}>
             {message.subject}

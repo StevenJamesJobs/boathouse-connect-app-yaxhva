@@ -203,9 +203,15 @@ export default function MessageDetailScreen() {
   };
 
   const handleDelete = () => {
+    // Check if user is the sender of the original message
+    const originalMessage = messages.find(m => m.id === messageId || m.id === threadId);
+    const isSender = originalMessage?.sender_id === user?.id;
+
     Alert.alert(
       'Delete Message',
-      'Are you sure you want to delete this message from your inbox?',
+      isSender
+        ? 'Are you sure you want to delete this sent message?'
+        : 'Are you sure you want to delete this message from your inbox?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -213,11 +219,22 @@ export default function MessageDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await supabase
-                .from('message_recipients')
-                .update({ is_deleted: true, deleted_at: new Date().toISOString() })
-                .eq('recipient_id', user?.id)
-                .eq('message_id', messageId);
+              if (isSender) {
+                // Soft delete sent message - mark as deleted by sender
+                const deleteThreadId = threadId || messageId;
+                await supabase
+                  .from('messages')
+                  .update({ deleted_by_sender: true })
+                  .eq('sender_id', user?.id)
+                  .or(`id.eq.${deleteThreadId},thread_id.eq.${deleteThreadId}`);
+              } else {
+                // Soft delete from inbox
+                await supabase
+                  .from('message_recipients')
+                  .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+                  .eq('recipient_id', user?.id)
+                  .eq('message_id', messageId);
+              }
 
               Alert.alert('Success', 'Message deleted', [
                 { text: 'OK', onPress: () => router.back() },
