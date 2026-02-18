@@ -806,7 +806,7 @@
     "no_files_found": "No se encontraron archivos",
     "no_files_subtext": "Intenta ajustar tu búsqueda o verifica si los archivos están subidos en Guías y Entrenamiento",
     "attach_file_hint": "Adjunta un archivo de Guías y Entrenamiento para mostrar botones de Ver y Descargar",
-    "priority_label": "Nivel de Prioridad",
+    "priority_label": "Tipo de Insignia",
     "visible_to_label": "Visible Para",
     "display_order_label": "Orden de Visualización",
     "display_order_placeholder": "Ingresa el orden de visualización (e.g., 1, 2, 3...)",

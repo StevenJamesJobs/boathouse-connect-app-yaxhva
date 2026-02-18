@@ -433,14 +433,27 @@ export default function EmployeePortalScreen() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high':
-        return '#E74C3C';
-      case 'medium':
-        return '#F39C12';
-      case 'low':
+      case 'new':
         return '#3498DB';
+      case 'important':
+        return '#E74C3C';
+      case 'update':
+        return '#F39C12';
       default:
         return employeeColors.textSecondary;
+    }
+  };
+
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case 'new':
+        return 'New';
+      case 'important':
+        return 'Important';
+      case 'update':
+        return 'Update';
+      default:
+        return priority.charAt(0).toUpperCase() + priority.slice(1);
     }
   };
 
@@ -631,14 +644,23 @@ export default function EmployeePortalScreen() {
                           <View style={styles.announcementSquareContent}>
                             <View style={styles.announcementHeader}>
                               <Text style={styles.announcementTitle}>{announcement.title}</Text>
-                              <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
-                                <Text style={styles.priorityText}>{announcement.priority.toUpperCase()}</Text>
-                              </View>
+                              {announcement.priority && announcement.priority !== 'none' && (
+                                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
+                                  {announcement.priority === 'new' && (
+                                    <IconSymbol
+                                      ios_icon_name="star.fill"
+                                      android_material_icon_name="star"
+                                      size={9}
+                                      color="#FFFFFF"
+                                    />
+                                  )}
+                                  <Text style={styles.priorityText}>{getPriorityLabel(announcement.priority).toUpperCase()}</Text>
+                                </View>
+                              )}
                             </View>
                             <Text style={styles.announcementText} numberOfLines={2}>
                               {announcement.content || announcement.message}
                             </Text>
-                            <Text style={styles.announcementDate}>{getTimeAgo(announcement.created_at)}</Text>
                           </View>
                         </View>
                       ) : (
@@ -651,14 +673,23 @@ export default function EmployeePortalScreen() {
                           )}
                           <View style={styles.announcementHeader}>
                             <Text style={styles.announcementTitle}>{announcement.title}</Text>
-                            <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
-                              <Text style={styles.priorityText}>{announcement.priority.toUpperCase()}</Text>
-                            </View>
+                            {announcement.priority && announcement.priority !== 'none' && (
+                              <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
+                                {announcement.priority === 'new' && (
+                                  <IconSymbol
+                                    ios_icon_name="star.fill"
+                                    android_material_icon_name="star"
+                                    size={9}
+                                    color="#FFFFFF"
+                                  />
+                                )}
+                                <Text style={styles.priorityText}>{getPriorityLabel(announcement.priority).toUpperCase()}</Text>
+                              </View>
+                            )}
                           </View>
                           <Text style={styles.announcementText}>
                             {truncateText(announcement.content || announcement.message, 125)}
                           </Text>
-                          <Text style={styles.announcementDate}>{getTimeAgo(announcement.created_at)}</Text>
                         </>
                       )}
                     </TouchableOpacity>
@@ -1240,6 +1271,9 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   priorityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,

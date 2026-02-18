@@ -86,14 +86,27 @@ export default function ContentDetailModal({
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high':
-        return '#E74C3C';
-      case 'medium':
-        return '#F39C12';
-      case 'low':
+      case 'new':
         return '#3498DB';
+      case 'important':
+        return '#E74C3C';
+      case 'update':
+        return '#F39C12';
       default:
         return colors.textSecondary;
+    }
+  };
+
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case 'new':
+        return 'New';
+      case 'important':
+        return 'Important';
+      case 'update':
+        return 'Update';
+      default:
+        return priority.charAt(0).toUpperCase() + priority.slice(1);
     }
   };
 
@@ -155,7 +168,7 @@ export default function ContentDetailModal({
   const startDateTimeFormatted = formatDateTime(startDateTime || null);
   const endDateTimeFormatted = formatDateTime(endDateTime || null);
   const priorityColor = priority ? getPriorityColor(priority) : colors.textSecondary;
-  const priorityUpperCase = priority ? priority.toUpperCase() : '';
+  const priorityUpperCase = priority ? getPriorityLabel(priority).toUpperCase() : '';
   const imageUrl = getImageUrl(thumbnailUrl || null);
 
   return (
@@ -253,9 +266,17 @@ export default function ContentDetailModal({
               </View>
             )}
 
-            {priority && (
+            {priority && priority !== 'none' && (
               <View style={styles.detailSection}>
                 <View style={[styles.priorityBadge, { backgroundColor: priorityColor }]}>
+                  {priority === 'new' && (
+                    <IconSymbol
+                      ios_icon_name="star.fill"
+                      android_material_icon_name="star"
+                      size={14}
+                      color="#FFFFFF"
+                    />
+                  )}
                   <Text style={styles.priorityText}>{priorityUpperCase}</Text>
                 </View>
               </View>
@@ -369,6 +390,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   priorityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     alignSelf: 'flex-start',
     paddingHorizontal: 16,
     paddingVertical: 8,

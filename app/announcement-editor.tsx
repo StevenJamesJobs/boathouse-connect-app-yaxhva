@@ -48,7 +48,7 @@ interface GuideFile {
   file_name: string;
 }
 
-const PRIORITY_LEVELS = ['high', 'medium', 'low'];
+const PRIORITY_LEVELS = ['none', 'new', 'important', 'update'];
 const VISIBILITY_OPTIONS = ['everyone', 'employees', 'managers'];
 const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
 
@@ -70,7 +70,7 @@ export default function AnnouncementEditorScreen() {
   const [formData, setFormData] = useState({
     title: '',
     message: '',
-    priority: 'medium',
+    priority: 'none',
     visibility: 'everyone',
     thumbnail_shape: 'square',
     display_order: 0,
@@ -372,7 +372,7 @@ export default function AnnouncementEditorScreen() {
     setFormData({
       title: '',
       message: '',
-      priority: 'medium',
+      priority: 'none',
       visibility: 'everyone',
       thumbnail_shape: 'square',
       display_order: announcements.length,
@@ -440,14 +440,29 @@ export default function AnnouncementEditorScreen() {
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high':
-        return '#E74C3C';
-      case 'medium':
-        return '#F39C12';
-      case 'low':
+      case 'new':
         return '#3498DB';
+      case 'important':
+        return '#E74C3C';
+      case 'update':
+        return '#F39C12';
       default:
         return managerColors.textSecondary;
+    }
+  };
+
+  const getPriorityLabel = (priority: string) => {
+    switch (priority) {
+      case 'new':
+        return 'New';
+      case 'important':
+        return 'Important';
+      case 'update':
+        return 'Update';
+      case 'none':
+        return 'None';
+      default:
+        return priority.charAt(0).toUpperCase() + priority.slice(1);
     }
   };
 
@@ -545,9 +560,19 @@ export default function AnnouncementEditorScreen() {
                     <View style={styles.squareContent}>
                       <View style={styles.announcementHeader}>
                         <Text style={styles.announcementTitle}>{announcement.title}</Text>
-                        <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
-                          <Text style={styles.priorityText}>{announcement.priority.toUpperCase()}</Text>
-                        </View>
+                        {announcement.priority && announcement.priority !== 'none' && (
+                          <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
+                            {announcement.priority === 'new' && (
+                              <IconSymbol
+                                ios_icon_name="star.fill"
+                                android_material_icon_name="star"
+                                size={10}
+                                color="#FFFFFF"
+                              />
+                            )}
+                            <Text style={styles.priorityText}>{getPriorityLabel(announcement.priority).toUpperCase()}</Text>
+                          </View>
+                        )}
                       </View>
                       {(announcement.content || announcement.message) && (
                         <Text style={styles.squareMessage} numberOfLines={2}>
@@ -582,9 +607,19 @@ export default function AnnouncementEditorScreen() {
                     <View style={styles.announcementContent}>
                       <View style={styles.announcementHeader}>
                         <Text style={styles.announcementTitle}>{announcement.title}</Text>
-                        <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
-                          <Text style={styles.priorityText}>{announcement.priority.toUpperCase()}</Text>
-                        </View>
+                        {announcement.priority && announcement.priority !== 'none' && (
+                          <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
+                            {announcement.priority === 'new' && (
+                              <IconSymbol
+                                ios_icon_name="star.fill"
+                                android_material_icon_name="star"
+                                size={10}
+                                color="#FFFFFF"
+                              />
+                            )}
+                            <Text style={styles.priorityText}>{getPriorityLabel(announcement.priority).toUpperCase()}</Text>
+                          </View>
+                        )}
                       </View>
                       {(announcement.content || announcement.message) && (
                         <Text style={styles.announcementMessage}>
@@ -910,7 +945,7 @@ export default function AnnouncementEditorScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Priority Level</Text>
+                <Text style={styles.formLabel}>Badge Type</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -931,7 +966,7 @@ export default function AnnouncementEditorScreen() {
                           formData.priority === priority && styles.optionButtonTextActive,
                         ]}
                       >
-                        {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                        {getPriorityLabel(priority)}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -1162,6 +1197,9 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   priorityBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,

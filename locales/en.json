@@ -806,7 +806,7 @@
     "no_files_found": "No files found",
     "no_files_subtext": "Try adjusting your search or check if files are uploaded in Guides & Training",
     "attach_file_hint": "Attach a file from Guides & Training to display View and Download buttons",
-    "priority_label": "Priority Level",
+    "priority_label": "Badge Type",
     "visible_to_label": "Visible To",
     "display_order_label": "Display Order",
     "display_order_placeholder": "Enter display order (e.g., 1, 2, 3...)",
