@@ -23,6 +23,7 @@ import { useNotification } from '@/contexts/NotificationContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 
 interface Announcement {
   id: string;
@@ -52,6 +53,7 @@ const VISIBILITY_OPTIONS = ['everyone', 'employees', 'managers'];
 const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
 
 export default function AnnouncementEditorScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
   const { sendNotification } = useNotification();
@@ -134,7 +136,7 @@ export default function AnnouncementEditorScreen() {
       setAnnouncements(data || []);
     } catch (error) {
       console.error('Error loading announcements:', error);
-      Alert.alert('Error', 'Failed to load announcements. Please try again.');
+      Alert.alert('Error', t('announcement_editor:load_error'));
     } finally {
       setLoading(false);
     }
@@ -154,7 +156,7 @@ export default function AnnouncementEditorScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      Alert.alert('Error', t('announcement_editor:pick_image_error'));
     }
   };
 
@@ -207,7 +209,7 @@ export default function AnnouncementEditorScreen() {
       return urlData.publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload image');
+      Alert.alert('Error', t('announcement_editor:upload_image_error'));
       return null;
     } finally {
       setUploadingImage(false);
@@ -216,17 +218,17 @@ export default function AnnouncementEditorScreen() {
 
   const handleSave = async () => {
     if (!formData.title || !formData.message) {
-      Alert.alert('Error', 'Please fill in title and message');
+      Alert.alert('Error', t('announcement_editor:error_fill_fields'));
       return;
     }
 
     if (!user?.id) {
-      Alert.alert('Error', 'User not authenticated');
+      Alert.alert('Error', t('announcement_editor:error_not_authenticated'));
       return;
     }
 
     if (!editingAnnouncement && announcements.length >= 10) {
-      Alert.alert('Limit Reached', 'You can only have up to 10 announcements. Please delete an existing announcement before adding a new one.');
+      Alert.alert(t('announcement_editor:limit_reached_title'), t('announcement_editor:limit_reached_msg'));
       return;
     }
 
@@ -265,7 +267,7 @@ export default function AnnouncementEditorScreen() {
           throw error;
         }
         console.log('Announcement updated successfully');
-        Alert.alert('Success', 'Announcement updated successfully');
+        Alert.alert('Success', t('announcement_editor:updated_success'));
       } else {
         console.log('Creating new announcement');
         const { error } = await supabase.rpc('create_announcement', {
@@ -303,30 +305,30 @@ export default function AnnouncementEditorScreen() {
           console.error('Failed to send push notification:', notificationError);
         }
         
-        Alert.alert('Success', 'Announcement created successfully');
+        Alert.alert('Success', t('announcement_editor:created_success'));
       }
 
       closeModal();
       await loadAnnouncements();
     } catch (error: any) {
       console.error('Error saving announcement:', error);
-      Alert.alert('Error', error.message || 'Failed to save announcement');
+      Alert.alert('Error', error.message || t('announcement_editor:save_error'));
     }
   };
 
   const handleDelete = async (announcement: Announcement) => {
     Alert.alert(
-      'Delete Announcement',
-      `Are you sure you want to delete "${announcement.title}"?`,
+      t('announcement_editor:delete_title'),
+      t('announcement_editor:delete_confirm', { title: announcement.title }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('announcement_editor:cancel_button'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               if (!user?.id) {
-                Alert.alert('Error', 'User not authenticated');
+                Alert.alert('Error', t('announcement_editor:error_not_authenticated'));
                 return;
               }
 
@@ -352,12 +354,12 @@ export default function AnnouncementEditorScreen() {
               }
 
               console.log('Announcement deleted successfully');
-              Alert.alert('Success', 'Announcement deleted successfully');
+              Alert.alert('Success', t('announcement_editor:deleted_success'));
               
               await loadAnnouncements();
             } catch (error: any) {
               console.error('Error deleting announcement:', error);
-              Alert.alert('Error', error.message || 'Failed to delete announcement');
+              Alert.alert('Error', error.message || t('announcement_editor:delete_error'));
             }
           },
         },
@@ -484,13 +486,13 @@ export default function AnnouncementEditorScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Announcements Editor</Text>
+        <Text style={styles.headerTitle}>{t('announcement_editor:title')}</Text>
         <View style={styles.backButton} />
       </View>
 
       <View style={styles.subHeader}>
         <Text style={styles.headerSubtitle}>
-          {announcements.length} / 10 announcements
+          {t('announcement_editor:count', { count: announcements.length })}
         </Text>
       </View>
 
@@ -506,14 +508,14 @@ export default function AnnouncementEditorScreen() {
           color={announcements.length >= 10 ? managerColors.textSecondary : managerColors.text}
         />
         <Text style={[styles.addNewItemButtonText, announcements.length >= 10 && styles.addNewItemButtonTextDisabled]}>
-          {announcements.length >= 10 ? 'Limit Reached (10/10)' : 'Add New Announcement'}
+          {announcements.length >= 10 ? t('announcement_editor:limit_reached') : t('announcement_editor:add_button')}
         </Text>
       </TouchableOpacity>
 
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={managerColors.highlight} />
-          <Text style={styles.loadingText}>Loading announcements...</Text>
+          <Text style={styles.loadingText}>{t('announcement_editor:loading')}</Text>
         </View>
       ) : (
         <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
@@ -525,9 +527,9 @@ export default function AnnouncementEditorScreen() {
                 size={64}
                 color={managerColors.textSecondary}
               />
-              <Text style={styles.emptyText}>No announcements found</Text>
+              <Text style={styles.emptyText}>{t('announcement_editor:empty_title')}</Text>
               <Text style={styles.emptySubtext}>
-                Tap the &quot;Add New Announcement&quot; button to create one
+                {t('announcement_editor:empty_subtitle')}
               </Text>
             </View>
           ) : (
@@ -563,7 +565,7 @@ export default function AnnouncementEditorScreen() {
                           <Text style={styles.metaText}>{announcement.visibility}</Text>
                         </View>
                         <View style={styles.metaItem}>
-                          <Text style={styles.metaText}>Order: {announcement.display_order}</Text>
+                          <Text style={styles.metaText}>{t('announcement_editor:order_label', { order: announcement.display_order })}</Text>
                         </View>
                       </View>
                     </View>
@@ -600,7 +602,7 @@ export default function AnnouncementEditorScreen() {
                           <Text style={styles.metaText}>{announcement.visibility}</Text>
                         </View>
                         <View style={styles.metaItem}>
-                          <Text style={styles.metaText}>Order: {announcement.display_order}</Text>
+                          <Text style={styles.metaText}>{t('announcement_editor:order_label', { order: announcement.display_order })}</Text>
                         </View>
                       </View>
                     </View>
@@ -617,7 +619,7 @@ export default function AnnouncementEditorScreen() {
                       size={20}
                       color={managerColors.highlight}
                     />
-                    <Text style={styles.actionButtonText}>Edit</Text>
+                    <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionButton, styles.deleteButton]}
@@ -630,7 +632,7 @@ export default function AnnouncementEditorScreen() {
                       color="#E74C3C"
                     />
                     <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                      Delete
+                      {t('common:delete')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -660,7 +662,7 @@ export default function AnnouncementEditorScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingAnnouncement ? 'Edit Announcement' : 'Add Announcement'}
+                {editingAnnouncement ? t('announcement_editor:modal_edit') : t('announcement_editor:modal_add')}
               </Text>
               <TouchableOpacity onPress={closeModal}>
                 <IconSymbol
@@ -680,7 +682,7 @@ export default function AnnouncementEditorScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Thumbnail Image (Optional)</Text>
+                <Text style={styles.formLabel}>{t('announcement_editor:thumbnail_label')}</Text>
                 <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
                   {selectedImageUri || editingAnnouncement?.thumbnail_url ? (
                     <Image
@@ -696,7 +698,7 @@ export default function AnnouncementEditorScreen() {
                         size={48}
                         color="#666666"
                       />
-                      <Text style={styles.imageUploadText}>Tap to upload image</Text>
+                      <Text style={styles.imageUploadText}>{t('announcement_editor:tap_upload')}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -715,7 +717,7 @@ export default function AnnouncementEditorScreen() {
                         formData.thumbnail_shape === 'square' && styles.shapeOptionTextActive,
                       ]}
                     >
-                      Square
+                      {t('announcement_editor:shape_square')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -731,17 +733,17 @@ export default function AnnouncementEditorScreen() {
                         formData.thumbnail_shape === 'banner' && styles.shapeOptionTextActive,
                       ]}
                     >
-                      Banner
+                      {t('announcement_editor:shape_banner')}
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Announcement Title *</Text>
+                <Text style={styles.formLabel}>{t('announcement_editor:announcement_title_label')}</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter announcement title"
+                  placeholder={t('announcement_editor:announcement_title_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.title}
                   onChangeText={(text) => setFormData({ ...formData, title: text })}
@@ -749,10 +751,10 @@ export default function AnnouncementEditorScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Message *</Text>
+                <Text style={styles.formLabel}>{t('announcement_editor:message_label')}</Text>
                 <TextInput
                   style={[styles.input, styles.textArea]}
-                  placeholder="Enter announcement message"
+                  placeholder={t('announcement_editor:message_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.message}
                   onChangeText={(text) => setFormData({ ...formData, message: text })}
@@ -762,10 +764,10 @@ export default function AnnouncementEditorScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Link (Optional)</Text>
+                <Text style={styles.formLabel}>{t('announcement_editor:link_label')}</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter link URL (e.g., https://example.com)"
+                  placeholder={t('announcement_editor:link_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.link}
                   onChangeText={(text) => setFormData({ ...formData, link: text })}
@@ -773,7 +775,7 @@ export default function AnnouncementEditorScreen() {
                   keyboardType="url"
                 />
                 <Text style={styles.formHint}>
-                  This link will be displayed in the full announcement view and &quot;View All&quot; page
+                  {t('announcement_editor:link_hint')}
                 </Text>
               </View>
 

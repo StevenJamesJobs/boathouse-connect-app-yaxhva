@@ -19,6 +19,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
+import { useTranslation } from 'react-i18next';
 
 interface Employee {
   id: string;
@@ -50,6 +51,7 @@ interface GuestReview {
 }
 
 export default function RewardsAndReviewsEditorScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
   const { sendNotification } = useNotification();
@@ -237,17 +239,17 @@ export default function RewardsAndReviewsEditorScreen() {
   const handleRewardEmployee = async () => {
     try {
       if (!selectedEmployee) {
-        Alert.alert('Error', 'Please select an employee');
+        Alert.alert(t('common:error'), t('rewards_reviews_editor:error_select_employee'));
         return;
       }
 
       if (!rewardAmount || isNaN(parseInt(rewardAmount))) {
-        Alert.alert('Error', 'Please enter a valid amount');
+        Alert.alert(t('common:error'), t('rewards_reviews_editor:error_valid_amount'));
         return;
       }
 
       if (!rewardDescription.trim()) {
-        Alert.alert('Error', 'Please enter a description');
+        Alert.alert(t('common:error'), t('rewards_reviews_editor:error_description'));
         return;
       }
 
@@ -286,14 +288,14 @@ export default function RewardsAndReviewsEditorScreen() {
         }
       }
 
-      Alert.alert('Success', `${isReward ? 'Reward' : 'Deduction'} added successfully`);
+      Alert.alert(t('common:success'), isReward ? t('rewards_reviews_editor:reward_success') : t('rewards_reviews_editor:deduction_success'));
       setShowRewardModal(false);
       resetRewardForm();
       fetchEmployees();
       fetchRewardsData();
     } catch (error: any) {
       console.error('Error adding reward:', error);
-      Alert.alert('Error', error.message || 'Failed to add reward');
+      Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:reward_error'));
     } finally {
       setLoading(false);
     }
@@ -301,17 +303,17 @@ export default function RewardsAndReviewsEditorScreen() {
 
   const handleResetSingleUser = async () => {
     if (!resetSelectedEmployee) {
-      Alert.alert('Error', 'Please select an employee');
+      Alert.alert(t('common:error'), t('rewards_reviews_editor:error_select_employee'));
       return;
     }
 
     Alert.alert(
-      'Reset User Bucks',
-      `Are you sure you want to reset ${resetSelectedEmployee.name}'s McLoone's Bucks to $0? This will also delete all their transaction history. This action cannot be undone.`,
+      t('rewards_reviews_editor:reset_user_title'),
+      t('rewards_reviews_editor:reset_user_confirm', { name: resetSelectedEmployee.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('rewards_reviews_editor:reset_cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('rewards_reviews_editor:reset_action'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -371,7 +373,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 console.log('Verified user bucks after reset:', verifyData);
               }
 
-              Alert.alert('Success', `${resetSelectedEmployee.name}'s McLoone's Bucks have been reset to $0 and all transactions deleted`);
+              Alert.alert(t('common:success'), t('rewards_reviews_editor:reset_success', { name: resetSelectedEmployee.name }));
               setShowResetBucksModal(false);
               setResetSelectedEmployee(null);
               setResetSearchQuery('');
@@ -379,7 +381,7 @@ export default function RewardsAndReviewsEditorScreen() {
               fetchRewardsData();
             } catch (error: any) {
               console.error('Error resetting user bucks:', error);
-              Alert.alert('Error', error.message || 'Failed to reset user bucks');
+              Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:reset_error'));
             } finally {
               setLoading(false);
             }
@@ -391,12 +393,12 @@ export default function RewardsAndReviewsEditorScreen() {
 
   const handleResetAllUsers = async () => {
     Alert.alert(
-      'Reset All Users Bucks',
-      'Are you sure you want to reset ALL employees\' McLoone\'s Bucks to $0? This will also delete ALL transaction history for everyone. This action cannot be undone.',
+      t('rewards_reviews_editor:reset_all_confirm_title'),
+      t('rewards_reviews_editor:reset_all_confirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('rewards_reviews_editor:reset_cancel'), style: 'cancel' },
         {
-          text: 'Reset All',
+          text: t('rewards_reviews_editor:reset_all_action'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -474,7 +476,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 }
               }
 
-              Alert.alert('Success', 'All employees\' McLoone\'s Bucks have been reset to $0 and all transactions deleted');
+              Alert.alert(t('common:success'), t('rewards_reviews_editor:reset_all_success'));
               setShowResetBucksModal(false);
               setResetSelectedEmployee(null);
               setResetSearchQuery('');
@@ -482,7 +484,7 @@ export default function RewardsAndReviewsEditorScreen() {
               fetchRewardsData();
             } catch (error: any) {
               console.error('Error resetting all users bucks:', error);
-              Alert.alert('Error', error.message || 'Failed to reset all users bucks');
+              Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:reset_all_error'));
             } finally {
               setLoading(false);
             }
@@ -506,17 +508,17 @@ export default function RewardsAndReviewsEditorScreen() {
       if (!editingTransaction) return;
 
       if (!editAmount || isNaN(parseInt(editAmount))) {
-        Alert.alert('Error', 'Please enter a valid amount');
+        Alert.alert(t('common:error'), t('rewards_reviews_editor:error_valid_amount'));
         return;
       }
 
       if (!editDescription.trim()) {
-        Alert.alert('Error', 'Please enter a description');
+        Alert.alert(t('common:error'), t('rewards_reviews_editor:error_description'));
         return;
       }
 
       if (!user?.id) {
-        Alert.alert('Error', 'User not authenticated');
+        Alert.alert(t('common:error'), t('rewards_reviews_editor:error_not_authenticated'));
         return;
       }
 
@@ -547,14 +549,14 @@ export default function RewardsAndReviewsEditorScreen() {
 
       console.log('Transaction updated successfully, result:', data);
 
-      Alert.alert('Success', 'Transaction updated successfully and user balance recalculated');
+      Alert.alert(t('common:success'), t('rewards_reviews_editor:transaction_updated'));
       setShowEditTransactionModal(false);
       setEditingTransaction(null);
       fetchEmployees();
       fetchRewardsData();
     } catch (error: any) {
       console.error('Error updating transaction:', error);
-      Alert.alert('Error', error.message || 'Failed to update transaction');
+      Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:transaction_update_error'));
     } finally {
       setLoading(false);
     }
@@ -562,12 +564,12 @@ export default function RewardsAndReviewsEditorScreen() {
 
   const handleDeleteTransaction = async (transaction: RewardTransaction) => {
     Alert.alert(
-      'Delete Transaction',
-      `Are you sure you want to delete this transaction? This will remove it from the history but will NOT affect ${transaction.user_name}'s total balance.`,
+      t('rewards_reviews_editor:delete_transaction_title'),
+      t('rewards_reviews_editor:delete_transaction_confirm', { name: transaction.user_name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('rewards_reviews_editor:delete_cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -581,12 +583,12 @@ export default function RewardsAndReviewsEditorScreen() {
 
               if (deleteError) throw deleteError;
 
-              Alert.alert('Success', 'Transaction deleted successfully');
+              Alert.alert(t('common:success'), t('rewards_reviews_editor:transaction_deleted'));
               fetchEmployees();
               fetchRewardsData();
             } catch (error: any) {
               console.error('Error deleting transaction:', error);
-              Alert.alert('Error', error.message || 'Failed to delete transaction');
+              Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:transaction_delete_error'));
             } finally {
               setLoading(false);
             }
@@ -601,12 +603,12 @@ export default function RewardsAndReviewsEditorScreen() {
     const actionText = newVisibility ? 'show' : 'hide';
     
     Alert.alert(
-      `${newVisibility ? 'Show' : 'Hide'} Transaction`,
-      `Are you sure you want to ${actionText} this transaction? This will ${newVisibility ? 'show it to' : 'hide it from'} all employees in their recent transaction list but will NOT affect their total balance. Managers will still be able to see all transactions.`,
+      newVisibility ? t('rewards_reviews_editor:hide_transaction_title_show') : t('rewards_reviews_editor:hide_transaction_title_hide'),
+      newVisibility ? t('rewards_reviews_editor:hide_transaction_confirm_show') : t('rewards_reviews_editor:hide_transaction_confirm_hide'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: newVisibility ? 'Show' : 'Hide',
+          text: newVisibility ? t('rewards_reviews_editor:show_action') : t('rewards_reviews_editor:hide_action'),
           onPress: async () => {
             try {
               setLoading(true);
@@ -619,12 +621,12 @@ export default function RewardsAndReviewsEditorScreen() {
 
               if (visibilityError) throw visibilityError;
 
-              Alert.alert('Success', `Transaction ${actionText === 'hide' ? 'hidden' : 'shown'} successfully`);
+              Alert.alert(t('common:success'), actionText === 'hide' ? t('rewards_reviews_editor:transaction_hidden') : t('rewards_reviews_editor:transaction_shown'));
               fetchEmployees();
               fetchRewardsData();
             } catch (error: any) {
               console.error(`Error ${actionText}ing transaction:`, error);
-              Alert.alert('Error', error.message || `Failed to ${actionText} transaction`);
+              Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:transaction_visibility_error'));
             } finally {
               setLoading(false);
             }
@@ -646,12 +648,12 @@ export default function RewardsAndReviewsEditorScreen() {
   const handleSaveReview = async () => {
     try {
       if (!reviewForm.guest_name.trim()) {
-        Alert.alert('Error', 'Please enter guest name');
+        Alert.alert(t('common:error'), t('rewards_reviews_editor:error_guest_name'));
         return;
       }
 
       if (!reviewForm.review_text.trim()) {
-        Alert.alert('Error', 'Please enter review text');
+        Alert.alert(t('common:error'), t('rewards_reviews_editor:error_review_text'));
         return;
       }
 
@@ -672,7 +674,7 @@ export default function RewardsAndReviewsEditorScreen() {
           .eq('id', editingReview.id);
 
         if (error) throw error;
-        Alert.alert('Success', 'Review updated successfully');
+        Alert.alert(t('common:success'), t('rewards_reviews_editor:review_updated'));
       } else {
         // Create new review
         const { error } = await supabase.from('guest_reviews').insert({
@@ -685,7 +687,7 @@ export default function RewardsAndReviewsEditorScreen() {
         });
 
         if (error) throw error;
-        Alert.alert('Success', 'Review added successfully');
+        Alert.alert(t('common:success'), t('rewards_reviews_editor:review_added'));
       }
 
       setShowReviewModal(false);
@@ -693,7 +695,7 @@ export default function RewardsAndReviewsEditorScreen() {
       fetchReviews();
     } catch (error: any) {
       console.error('Error saving review:', error);
-      Alert.alert('Error', error.message || 'Failed to save review');
+      Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:review_save_error'));
     } finally {
       setLoading(false);
     }
@@ -723,10 +725,10 @@ export default function RewardsAndReviewsEditorScreen() {
   };
 
   const handleDeleteReview = async (reviewId: string) => {
-    Alert.alert('Delete Review', 'Are you sure you want to delete this review?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('rewards_reviews_editor:delete_review_title'), t('rewards_reviews_editor:delete_review_confirm'), [
+      { text: t('common:cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common:delete'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -736,11 +738,11 @@ export default function RewardsAndReviewsEditorScreen() {
               .eq('id', reviewId);
 
             if (error) throw error;
-            Alert.alert('Success', 'Review deleted successfully');
+            Alert.alert(t('common:success'), t('rewards_reviews_editor:review_deleted'));
             fetchReviews();
           } catch (error: any) {
             console.error('Error deleting review:', error);
-            Alert.alert('Error', error.message || 'Failed to delete review');
+            Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:review_delete_error'));
           }
         },
       },
@@ -779,7 +781,7 @@ export default function RewardsAndReviewsEditorScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Rewards & Reviews Editor</Text>
+        <Text style={styles.headerTitle}>{t('rewards_reviews_editor:title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -790,7 +792,7 @@ export default function RewardsAndReviewsEditorScreen() {
           onPress={() => setActiveTab('rewards')}
         >
           <Text style={[styles.tabText, activeTab === 'rewards' && styles.activeTabText]}>
-            Rewards
+            {t('rewards_reviews_editor:tab_rewards')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -798,7 +800,7 @@ export default function RewardsAndReviewsEditorScreen() {
           onPress={() => setActiveTab('reviews')}
         >
           <Text style={[styles.tabText, activeTab === 'reviews' && styles.activeTabText]}>
-            Reviews
+            {t('rewards_reviews_editor:tab_reviews')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -819,7 +821,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   size={24}
                   color={managerColors.text}
                 />
-                <Text style={styles.actionButtonText}>Reward Bucks</Text>
+                <Text style={styles.actionButtonText}>{t('rewards_reviews_editor:reward_bucks_button')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -832,19 +834,19 @@ export default function RewardsAndReviewsEditorScreen() {
                   size={24}
                   color={managerColors.text}
                 />
-                <Text style={styles.actionButtonText}>Reset Bucks</Text>
+                <Text style={styles.actionButtonText}>{t('rewards_reviews_editor:reset_bucks_button')}</Text>
               </TouchableOpacity>
             </View>
 
             {/* My McLoone's Bucks */}
             <View style={styles.bucksCard}>
-              <Text style={styles.bucksLabel}>My McLoone&apos;s Bucks</Text>
+              <Text style={styles.bucksLabel}>{t('rewards_reviews_editor:my_bucks_label')}</Text>
               <Text style={styles.bucksAmount}>${myBucks}</Text>
             </View>
 
             {/* Top 5 Leaderboard */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Top 5 Leaderboard</Text>
+              <Text style={styles.sectionTitle}>{t('rewards_reviews_editor:top_leaderboard')}</Text>
               {topEmployees.map((emp, index) => (
                 <View key={index} style={styles.leaderboardItem}>
                   <View style={styles.leaderboardRank}>
@@ -861,9 +863,9 @@ export default function RewardsAndReviewsEditorScreen() {
 
             {/* Recent Transactions */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Recent Transactions</Text>
+              <Text style={styles.sectionTitle}>{t('rewards_reviews_editor:recent_transactions')}</Text>
               {recentTransactions.length === 0 ? (
-                <Text style={styles.emptyText}>No transactions yet</Text>
+                <Text style={styles.emptyText}>{t('rewards_reviews_editor:no_transactions')}</Text>
               ) : (
                 recentTransactions.map((trans, index) => (
                   <View key={index} style={styles.transactionItem}>
@@ -876,7 +878,7 @@ export default function RewardsAndReviewsEditorScreen() {
                         {new Date(trans.created_at).toLocaleDateString()}
                       </Text>
                       {!trans.is_visible && (
-                        <Text style={styles.hiddenBadge}>Hidden from all employees</Text>
+                        <Text style={styles.hiddenBadge}>{t('rewards_reviews_editor:hidden_badge')}</Text>
                       )}
                     </View>
                     <View style={styles.transactionRight}>
@@ -945,14 +947,14 @@ export default function RewardsAndReviewsEditorScreen() {
                 size={24}
                 color={managerColors.text}
               />
-              <Text style={styles.rewardButtonText}>Add Review</Text>
+              <Text style={styles.rewardButtonText}>{t('rewards_reviews_editor:add_review_button')}</Text>
             </TouchableOpacity>
 
             {/* Reviews List */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Guest Reviews</Text>
+              <Text style={styles.sectionTitle}>{t('rewards_reviews_editor:guest_reviews_title')}</Text>
               {reviews.length === 0 ? (
-                <Text style={styles.emptyText}>No reviews yet</Text>
+                <Text style={styles.emptyText}>{t('rewards_reviews_editor:no_reviews')}</Text>
               ) : (
                 reviews.map((review, index) => (
                   <View key={index} style={styles.reviewCard}>
@@ -1004,7 +1006,7 @@ export default function RewardsAndReviewsEditorScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Reward Employee</Text>
+              <Text style={styles.modalTitle}>{t('rewards_reviews_editor:reward_modal_title')}</Text>
               <TouchableOpacity
                 onPress={() => {
                   setShowRewardModal(false);
@@ -1023,12 +1025,12 @@ export default function RewardsAndReviewsEditorScreen() {
             <ScrollView style={styles.modalForm}>
               {/* Employee Search */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Search Employee *</Text>
+                <Text style={styles.formLabel}>{t('rewards_reviews_editor:search_employee_label')}</Text>
                 <TextInput
                   style={styles.formInput}
                   value={searchQuery}
                   onChangeText={setSearchQuery}
-                  placeholder="Type employee name..."
+                  placeholder={t('rewards_reviews_editor:search_employee_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                 />
                 {filteredEmployees.length > 0 && (
@@ -1052,7 +1054,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 {selectedEmployee && (
                   <View style={styles.selectedEmployee}>
                     <Text style={styles.selectedEmployeeText}>
-                      Selected: {selectedEmployee.name}
+                      {t('rewards_reviews_editor:selected_prefix', { name: selectedEmployee.name })}
                     </Text>
                   </View>
                 )}
@@ -1060,7 +1062,7 @@ export default function RewardsAndReviewsEditorScreen() {
 
               {/* Reward/Deduct Toggle */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Action Type *</Text>
+                <Text style={styles.formLabel}>{t('rewards_reviews_editor:action_type_label')}</Text>
                 <View style={styles.toggleContainer}>
                   <TouchableOpacity
                     style={[
@@ -1082,7 +1084,7 @@ export default function RewardsAndReviewsEditorScreen() {
                         isReward && styles.toggleOptionTextActive,
                       ]}
                     >
-                      Reward
+                      {t('rewards_reviews_editor:reward_action')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -1105,7 +1107,7 @@ export default function RewardsAndReviewsEditorScreen() {
                         !isReward && styles.toggleOptionTextActive,
                       ]}
                     >
-                      Deduct
+                      {t('rewards_reviews_editor:deduct_action')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1113,34 +1115,34 @@ export default function RewardsAndReviewsEditorScreen() {
 
               {/* Amount */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Amount *</Text>
+                <Text style={styles.formLabel}>{t('rewards_reviews_editor:amount_label')}</Text>
                 <TextInput
                   style={styles.formInput}
                   value={rewardAmount}
                   onChangeText={setRewardAmount}
-                  placeholder="Enter amount (e.g., 50)"
+                  placeholder={t('rewards_reviews_editor:amount_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                   keyboardType="numeric"
                 />
                 {rewardAmount && (
                   <Text style={styles.amountPreview}>
-                    This will {isReward ? 'add' : 'deduct'}{' '}
+                    {isReward ? t('rewards_reviews_editor:amount_preview_add') : t('rewards_reviews_editor:amount_preview_deduct')}{' '}
                     <Text style={{ color: isReward ? '#4CAF50' : '#F44336', fontWeight: 'bold' }}>
                       {isReward ? '+' : '-'}${rewardAmount}
                     </Text>
-                    {' '}McLoone&apos;s Bucks
+                    {' '}{t('rewards_reviews_editor:amount_preview_suffix')}
                   </Text>
                 )}
               </View>
 
               {/* Description */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Description *</Text>
+                <Text style={styles.formLabel}>{t('rewards_reviews_editor:description_label')}</Text>
                 <TextInput
                   style={[styles.formInput, styles.textArea]}
                   value={rewardDescription}
                   onChangeText={setRewardDescription}
-                  placeholder={`Why are they ${isReward ? 'receiving' : 'losing'} bucks?`}
+                  placeholder={isReward ? t('rewards_reviews_editor:description_placeholder_reward') : t('rewards_reviews_editor:description_placeholder_deduct')}
                   placeholderTextColor={managerColors.textSecondary}
                   multiline
                   numberOfLines={4}
@@ -1150,7 +1152,7 @@ export default function RewardsAndReviewsEditorScreen() {
               {/* Visibility Toggle */}
               <View style={styles.formField}>
                 <View style={styles.visibilityToggle}>
-                  <Text style={styles.formLabel}>Visible to Employees</Text>
+                  <Text style={styles.formLabel}>{t('rewards_reviews_editor:visible_to_employees')}</Text>
                   <TouchableOpacity
                     style={[styles.toggleButton, isVisible && styles.toggleButtonActive]}
                     onPress={() => setIsVisible(!isVisible)}
@@ -1164,7 +1166,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.formNote}>
-                  If hidden, the transaction won&apos;t show in any employee&apos;s transaction history, but the bucks will still be added/deducted from their total. Managers will still be able to see all transactions.
+                  {t('rewards_reviews_editor:visibility_note')}
                 </Text>
               </View>
 
@@ -1177,7 +1179,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   <ActivityIndicator color={managerColors.text} />
                 ) : (
                   <Text style={styles.submitButtonText}>
-                    Submit {isReward ? 'Reward' : 'Deduction'}
+                    {isReward ? t('rewards_reviews_editor:submit_reward') : t('rewards_reviews_editor:submit_deduction')}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -1191,7 +1193,7 @@ export default function RewardsAndReviewsEditorScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Reset McLoone&apos;s Bucks</Text>
+              <Text style={styles.modalTitle}>{t('rewards_reviews_editor:reset_modal_title')}</Text>
               <TouchableOpacity
                 onPress={() => {
                   setShowResetBucksModal(false);
@@ -1210,19 +1212,19 @@ export default function RewardsAndReviewsEditorScreen() {
 
             <ScrollView style={styles.modalForm}>
               <Text style={styles.resetWarning}>
-                ⚠️ Warning: Resetting bucks will set the balance to $0 and delete all transaction history. This action cannot be undone.
+                {t('rewards_reviews_editor:reset_warning')}
               </Text>
 
               {/* Reset Single User */}
               <View style={styles.resetSection}>
-                <Text style={styles.resetSectionTitle}>Reset Single User</Text>
+                <Text style={styles.resetSectionTitle}>{t('rewards_reviews_editor:reset_single_title')}</Text>
                 <View style={styles.formField}>
-                  <Text style={styles.formLabel}>Search Employee</Text>
+                  <Text style={styles.formLabel}>{t('rewards_reviews_editor:search_reset_employee_label')}</Text>
                   <TextInput
                     style={styles.formInput}
                     value={resetSearchQuery}
                     onChangeText={setResetSearchQuery}
-                    placeholder="Type employee name..."
+                    placeholder={t('rewards_reviews_editor:search_employee_placeholder')}
                     placeholderTextColor={managerColors.textSecondary}
                   />
                   {resetFilteredEmployees.length > 0 && (
@@ -1248,7 +1250,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   {resetSelectedEmployee && (
                     <View style={styles.selectedEmployee}>
                       <Text style={styles.selectedEmployeeText}>
-                        Selected: {resetSelectedEmployee.name}
+                        {t('rewards_reviews_editor:selected_prefix', { name: resetSelectedEmployee.name })}
                       </Text>
                       <Text style={styles.selectedEmployeeBalance}>
                         Current Balance: ${resetSelectedEmployee.mcloones_bucks || 0}
@@ -1265,7 +1267,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   {loading ? (
                     <ActivityIndicator color={managerColors.text} />
                   ) : (
-                    <Text style={styles.submitButtonText}>Reset Selected User</Text>
+                    <Text style={styles.submitButtonText}>{t('rewards_reviews_editor:reset_selected_button')}</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -1275,9 +1277,9 @@ export default function RewardsAndReviewsEditorScreen() {
 
               {/* Reset All Users */}
               <View style={styles.resetSection}>
-                <Text style={styles.resetSectionTitle}>Reset All Users</Text>
+                <Text style={styles.resetSectionTitle}>{t('rewards_reviews_editor:reset_all_title')}</Text>
                 <Text style={styles.resetAllWarning}>
-                  This will reset ALL employees&apos; McLoone&apos;s Bucks to $0 and delete ALL transaction history for everyone.
+                  {t('rewards_reviews_editor:reset_all_warning')}
                 </Text>
 
                 <TouchableOpacity
@@ -1288,7 +1290,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   {loading ? (
                     <ActivityIndicator color={managerColors.text} />
                   ) : (
-                    <Text style={styles.submitButtonText}>Reset All Users</Text>
+                    <Text style={styles.submitButtonText}>{t('rewards_reviews_editor:reset_all_button')}</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -1302,7 +1304,7 @@ export default function RewardsAndReviewsEditorScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Edit Transaction</Text>
+              <Text style={styles.modalTitle}>{t('rewards_reviews_editor:edit_transaction_title')}</Text>
               <TouchableOpacity
                 onPress={() => {
                   setShowEditTransactionModal(false);
@@ -1321,7 +1323,7 @@ export default function RewardsAndReviewsEditorScreen() {
             <ScrollView style={styles.modalForm}>
               {/* Employee Info (Read-only) */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Employee</Text>
+                <Text style={styles.formLabel}>{t('rewards_reviews_editor:employee_label')}</Text>
                 <View style={[styles.formInput, styles.formInputDisabled]}>
                   <Text style={styles.formInputTextDisabled}>
                     {editingTransaction?.user_name || 'Unknown Employee'}
@@ -1331,7 +1333,7 @@ export default function RewardsAndReviewsEditorScreen() {
 
               {/* Reward/Deduct Toggle */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Action Type *</Text>
+                <Text style={styles.formLabel}>{t('rewards_reviews_editor:action_type_label')}</Text>
                 <View style={styles.toggleContainer}>
                   <TouchableOpacity
                     style={[
@@ -1353,7 +1355,7 @@ export default function RewardsAndReviewsEditorScreen() {
                         editIsReward && styles.toggleOptionTextActive,
                       ]}
                     >
-                      Reward
+                      {t('rewards_reviews_editor:reward_action')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -1376,7 +1378,7 @@ export default function RewardsAndReviewsEditorScreen() {
                         !editIsReward && styles.toggleOptionTextActive,
                       ]}
                     >
-                      Deduct
+                      {t('rewards_reviews_editor:deduct_action')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -1384,34 +1386,34 @@ export default function RewardsAndReviewsEditorScreen() {
 
               {/* Amount */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Amount *</Text>
+                <Text style={styles.formLabel}>{t('rewards_reviews_editor:amount_label')}</Text>
                 <TextInput
                   style={styles.formInput}
                   value={editAmount}
                   onChangeText={setEditAmount}
-                  placeholder="Enter amount (e.g., 50)"
+                  placeholder={t('rewards_reviews_editor:amount_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                   keyboardType="numeric"
                 />
                 {editAmount && (
                   <Text style={styles.amountPreview}>
-                    This will {editIsReward ? 'add' : 'deduct'}{' '}
+                    {editIsReward ? t('rewards_reviews_editor:amount_preview_add') : t('rewards_reviews_editor:amount_preview_deduct')}{' '}
                     <Text style={{ color: editIsReward ? '#4CAF50' : '#F44336', fontWeight: 'bold' }}>
                       {editIsReward ? '+' : '-'}${editAmount}
                     </Text>
-                    {' '}McLoone&apos;s Bucks
+                    {' '}{t('rewards_reviews_editor:amount_preview_suffix')}
                   </Text>
                 )}
               </View>
 
               {/* Description */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Description *</Text>
+                <Text style={styles.formLabel}>{t('rewards_reviews_editor:description_label')}</Text>
                 <TextInput
                   style={[styles.formInput, styles.textArea]}
                   value={editDescription}
                   onChangeText={setEditDescription}
-                  placeholder={`Why are they ${editIsReward ? 'receiving' : 'losing'} bucks?`}
+                  placeholder={editIsReward ? t('rewards_reviews_editor:description_placeholder_reward') : t('rewards_reviews_editor:description_placeholder_deduct')}
                   placeholderTextColor={managerColors.textSecondary}
                   multiline
                   numberOfLines={4}
@@ -1426,7 +1428,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 {loading ? (
                   <ActivityIndicator color={managerColors.text} />
                 ) : (
-                  <Text style={styles.submitButtonText}>Save Changes</Text>
+                  <Text style={styles.submitButtonText}>{t('rewards_reviews_editor:save_changes')}</Text>
                 )}
               </TouchableOpacity>
             </ScrollView>
@@ -1440,7 +1442,7 @@ export default function RewardsAndReviewsEditorScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingReview ? 'Edit Review' : 'Add Review'}
+                {editingReview ? t('rewards_reviews_editor:edit_review_modal_title') : t('rewards_reviews_editor:add_review_modal_title')}
               </Text>
               <TouchableOpacity
                 onPress={() => {
@@ -1460,21 +1462,21 @@ export default function RewardsAndReviewsEditorScreen() {
             <ScrollView style={styles.modalForm}>
               {/* Guest Name */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Guest Name *</Text>
+                <Text style={styles.formLabel}>{t('rewards_reviews_editor:guest_name_label')}</Text>
                 <TextInput
                   style={styles.formInput}
                   value={reviewForm.guest_name}
                   onChangeText={(text) =>
                     setReviewForm({ ...reviewForm, guest_name: text })
                   }
-                  placeholder="Enter guest name"
+                  placeholder={t('rewards_reviews_editor:guest_name_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                 />
               </View>
 
               {/* Rating */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Rating *</Text>
+                <Text style={styles.formLabel}>{t('rewards_reviews_editor:rating_label')}</Text>
                 <View style={styles.ratingSelector}>
                   {[1, 2, 3, 4, 5].map((star) => (
                     <TouchableOpacity
@@ -1496,14 +1498,14 @@ export default function RewardsAndReviewsEditorScreen() {
 
               {/* Review Text */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Review *</Text>
+                <Text style={styles.formLabel}>{t('rewards_reviews_editor:review_label')}</Text>
                 <TextInput
                   style={[styles.formInput, styles.textArea]}
                   value={reviewForm.review_text}
                   onChangeText={(text) =>
                     setReviewForm({ ...reviewForm, review_text: text })
                   }
-                  placeholder="Enter review text"
+                  placeholder={t('rewards_reviews_editor:review_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                   multiline
                   numberOfLines={6}
@@ -1512,28 +1514,28 @@ export default function RewardsAndReviewsEditorScreen() {
 
               {/* Review Date */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Review Date *</Text>
+                <Text style={styles.formLabel}>{t('rewards_reviews_editor:review_date_label')}</Text>
                 <TextInput
                   style={styles.formInput}
                   value={reviewForm.review_date}
                   onChangeText={(text) =>
                     setReviewForm({ ...reviewForm, review_date: text })
                   }
-                  placeholder="YYYY-MM-DD"
+                  placeholder={t('rewards_reviews_editor:review_date_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                 />
               </View>
 
               {/* Display Order */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Display Order</Text>
+                <Text style={styles.formLabel}>{t('rewards_reviews_editor:display_order_label')}</Text>
                 <TextInput
                   style={styles.formInput}
                   value={reviewForm.display_order.toString()}
                   onChangeText={(text) =>
                     setReviewForm({ ...reviewForm, display_order: parseInt(text) || 0 })
                   }
-                  placeholder="0"
+                  placeholder={t('rewards_reviews_editor:display_order_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                   keyboardType="numeric"
                 />
@@ -1548,7 +1550,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   <ActivityIndicator color={managerColors.text} />
                 ) : (
                   <Text style={styles.submitButtonText}>
-                    {editingReview ? 'Update Review' : 'Add Review'}
+                    {editingReview ? t('rewards_reviews_editor:update_review_button') : t('rewards_reviews_editor:add_review_submit')}
                   </Text>
                 )}
               </TouchableOpacity>

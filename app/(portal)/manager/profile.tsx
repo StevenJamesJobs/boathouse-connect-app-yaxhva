@@ -12,6 +12,7 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,8 +24,12 @@ import * as FileSystem from 'expo-file-system';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { MessageBadge } from '@/components/MessageBadge';
 import NotificationPreferences from '@/components/NotificationPreferences';
+import { useTranslation } from 'react-i18next';
+import { useLanguage, SupportedLanguage } from '@/contexts/LanguageContext';
 
 export default function ManagerProfileScreen() {
+  const { t } = useTranslation();
+  const { language, setLanguage } = useLanguage();
   const { user, refreshUser } = useAuth();
   const router = useRouter();
   const { unreadCount } = useUnreadMessages();
@@ -35,7 +40,8 @@ export default function ManagerProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [profileInfoExpanded, setProfileInfoExpanded] = useState(false);
   const [notificationPrefsExpanded, setNotificationPrefsExpanded] = useState(false);
-  
+  const [languageModalVisible, setLanguageModalVisible] = useState(false);
+
   // Password change state
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -76,11 +82,11 @@ export default function ManagerProfileScreen() {
       // Refresh user data in context
       await refreshUser();
 
-      Alert.alert('Success', 'Profile updated successfully!');
+      Alert.alert(t('common.success'), t('profile.profile_updated'));
       setIsEditing(false);
     } catch (error) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', 'Failed to update profile');
+      Alert.alert(t('common.error'), t('profile.error_update_profile'));
     } finally {
       setSaving(false);
     }
@@ -96,7 +102,7 @@ export default function ManagerProfileScreen() {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please grant camera roll permissions');
+        Alert.alert(t('profile.permission_required'), t('profile.grant_camera_permissions'));
         return;
       }
 
@@ -112,7 +118,7 @@ export default function ManagerProfileScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      Alert.alert(t('common.error'), t('profile.error_pick_image'));
     }
   };
 
@@ -186,10 +192,10 @@ export default function ManagerProfileScreen() {
       // Refresh user data in context to update profile picture everywhere
       await refreshUser();
 
-      Alert.alert('Success', 'Profile picture updated successfully');
+      Alert.alert(t('common.success'), t('profile.profile_picture_updated'));
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', error.message || 'Failed to upload profile picture');
+      Alert.alert(t('common.error'), error.message || t('profile.error_upload_picture'));
     } finally {
       setUploading(false);
     }
@@ -197,17 +203,17 @@ export default function ManagerProfileScreen() {
 
   const handleChangePassword = async () => {
     if (!currentPassword.trim()) {
-      Alert.alert('Error', 'Please enter your current password');
+      Alert.alert(t('common.error'), t('profile.error_enter_current_password'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      Alert.alert('Error', 'New passwords do not match');
+      Alert.alert(t('common.error'), t('profile.error_passwords_no_match'));
       return;
     }
 
     if (newPassword.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      Alert.alert(t('common.error'), t('profile.error_password_too_short'));
       return;
     }
 
@@ -223,12 +229,12 @@ export default function ManagerProfileScreen() {
 
       if (verifyError) {
         console.error('Password verification error:', verifyError);
-        Alert.alert('Error', 'Failed to verify current password');
+        Alert.alert(t('common.error'), t('profile.error_verify_password'));
         return;
       }
 
       if (!verifyData) {
-        Alert.alert('Error', 'Current password is incorrect');
+        Alert.alert(t('common.error'), t('profile.error_password_incorrect'));
         return;
       }
 
@@ -243,7 +249,7 @@ export default function ManagerProfileScreen() {
         throw updateError;
       }
 
-      Alert.alert('Success', 'Password changed successfully');
+      Alert.alert(t('common.success'), t('profile.password_changed'));
       setShowPasswordChange(false);
       setCurrentPassword('');
       setNewPassword('');
@@ -253,7 +259,7 @@ export default function ManagerProfileScreen() {
       setShowConfirmPassword(false);
     } catch (error: any) {
       console.error('Error changing password:', error);
-      Alert.alert('Error', error.message || 'Failed to change password');
+      Alert.alert(t('common.error'), error.message || t('profile.error_change_password'));
     }
   };
 
@@ -291,7 +297,7 @@ export default function ManagerProfileScreen() {
             />
           </View>
         </TouchableOpacity>
-        <Text style={styles.uploadHint}>Tap to change photo</Text>
+        <Text style={styles.uploadHint}>{t('profile.tap_to_change_photo')}</Text>
         <Text style={styles.userName}>{user?.name}</Text>
         <Text style={styles.userRole}>{user?.jobTitle}</Text>
         <View style={styles.managerBadge}>
@@ -301,7 +307,7 @@ export default function ManagerProfileScreen() {
             size={16}
             color={managerColors.text}
           />
-          <Text style={styles.managerBadgeText}>Manager</Text>
+          <Text style={styles.managerBadgeText}>{t('profile.manager_badge')}</Text>
         </View>
       </View>
 
@@ -325,11 +331,11 @@ export default function ManagerProfileScreen() {
             )}
           </View>
           <View style={styles.messagesContent}>
-            <Text style={styles.messagesTitle}>Messages</Text>
+            <Text style={styles.messagesTitle}>{t('common.messages')}</Text>
             <Text style={styles.messagesSubtitle}>
               {unreadCount > 0
-                ? `${unreadCount} unread message${unreadCount > 1 ? 's' : ''}`
-                : 'No new messages'}
+                ? t(unreadCount > 1 ? 'profile.unread_message_other' : 'profile.unread_message_one', { count: unreadCount })
+                : t('profile.no_new_messages')}
             </Text>
           </View>
           <IconSymbol
@@ -343,11 +349,11 @@ export default function ManagerProfileScreen() {
 
       {/* Profile Information - Collapsible */}
       <View style={styles.card}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.collapsibleHeader}
           onPress={() => setProfileInfoExpanded(!profileInfoExpanded)}
         >
-          <Text style={styles.sectionTitle}>Profile Information</Text>
+          <Text style={styles.sectionTitle}>{t('profile.profile_information')}</Text>
           <IconSymbol
             ios_icon_name={profileInfoExpanded ? "chevron.up" : "chevron.down"}
             android_material_icon_name={profileInfoExpanded ? "expand-less" : "expand-more"}
@@ -360,25 +366,25 @@ export default function ManagerProfileScreen() {
           <>
             {/* Username (Read-only) */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Username</Text>
+              <Text style={styles.fieldLabel}>{t('profile.username')}</Text>
               <View style={[styles.input, styles.inputDisabled]}>
                 <Text style={styles.inputTextDisabled}>{user?.username}</Text>
               </View>
-              <Text style={styles.fieldNote}>Username cannot be changed</Text>
+              <Text style={styles.fieldNote}>{t('profile.username_cannot_change')}</Text>
             </View>
 
             {/* Full Name (Read-only) */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Full Name</Text>
+              <Text style={styles.fieldLabel}>{t('profile.full_name')}</Text>
               <View style={[styles.input, styles.inputDisabled]}>
                 <Text style={styles.inputTextDisabled}>{user?.name}</Text>
               </View>
-              <Text style={styles.fieldNote}>Name cannot be changed</Text>
+              <Text style={styles.fieldNote}>{t('profile.name_cannot_change')}</Text>
             </View>
 
             {/* Email (Editable) */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Email</Text>
+              <Text style={styles.fieldLabel}>{t('profile.email')}</Text>
               <TextInput
                 style={[styles.input, !isEditing && styles.inputDisabled]}
                 value={email}
@@ -392,7 +398,7 @@ export default function ManagerProfileScreen() {
 
             {/* Phone Number (Editable) */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Phone Number</Text>
+              <Text style={styles.fieldLabel}>{t('profile.phone_number')}</Text>
               <TextInput
                 style={[styles.input, !isEditing && styles.inputDisabled]}
                 value={phoneNumber}
@@ -412,18 +418,18 @@ export default function ManagerProfileScreen() {
                   size={20}
                   color={managerColors.text}
                 />
-                <Text style={styles.editButtonText}>Edit Profile</Text>
+                <Text style={styles.editButtonText}>{t('profile.edit_profile')}</Text>
               </TouchableOpacity>
             ) : (
               <View style={styles.buttonRow}>
                 <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
                   {saving ? (
                     <ActivityIndicator color={managerColors.text} />
                   ) : (
-                    <Text style={styles.saveButtonText}>Save Changes</Text>
+                    <Text style={styles.saveButtonText}>{t('profile.save_changes')}</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -434,11 +440,11 @@ export default function ManagerProfileScreen() {
 
       {/* Notification Preferences - Collapsible */}
       <View style={styles.card}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.collapsibleHeader}
           onPress={() => setNotificationPrefsExpanded(!notificationPrefsExpanded)}
         >
-          <Text style={styles.sectionTitle}>Notification Preferences</Text>
+          <Text style={styles.sectionTitle}>{t('profile.notification_preferences')}</Text>
           <IconSymbol
             ios_icon_name={notificationPrefsExpanded ? "chevron.up" : "chevron.down"}
             android_material_icon_name={notificationPrefsExpanded ? "expand-less" : "expand-more"}
@@ -452,12 +458,29 @@ export default function ManagerProfileScreen() {
         )}
       </View>
 
+      {/* Language Settings */}
+      <View style={styles.card}>
+        <TouchableOpacity
+          style={styles.collapsibleHeader}
+          onPress={() => setLanguageModalVisible(true)}
+        >
+          <Text style={styles.sectionTitle}>{t('profile.language')}</Text>
+          <View style={styles.languageDisplay}>
+            <Text style={styles.languageValue}>{language === 'en' ? '🇺🇸 English' : '🇲🇽 Español'}</Text>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={24}
+              color={managerColors.textSecondary}
+            />
+          </View>
+        </TouchableOpacity>
+      </View>
+
       {/* Password Change */}
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Change Password</Text>
-        <Text style={styles.passwordNote}>
-          You can change your password here. Make sure to remember your new password.
-        </Text>
+        <Text style={styles.sectionTitle}>{t('profile.change_password')}</Text>
+        <Text style={styles.passwordNote}>{t('profile.password_note')}</Text>
         {!showPasswordChange ? (
           <TouchableOpacity
             style={styles.passwordButton}
@@ -469,19 +492,19 @@ export default function ManagerProfileScreen() {
               size={20}
               color={managerColors.text}
             />
-            <Text style={styles.passwordButtonText}>Change Password</Text>
+            <Text style={styles.passwordButtonText}>{t('profile.change_password')}</Text>
           </TouchableOpacity>
         ) : (
           <>
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Current Password</Text>
+              <Text style={styles.fieldLabel}>{t('profile.current_password')}</Text>
               <View style={styles.passwordInputContainer}>
                 <TextInput
                   style={styles.passwordInput}
                   value={currentPassword}
                   onChangeText={setCurrentPassword}
                   secureTextEntry={!showCurrentPassword}
-                  placeholder="Enter current password"
+                  placeholder={t('profile.enter_current_password')}
                   placeholderTextColor={managerColors.textSecondary}
                 />
                 <TouchableOpacity
@@ -499,14 +522,14 @@ export default function ManagerProfileScreen() {
             </View>
 
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>New Password</Text>
+              <Text style={styles.fieldLabel}>{t('profile.new_password')}</Text>
               <View style={styles.passwordInputContainer}>
                 <TextInput
                   style={styles.passwordInput}
                   value={newPassword}
                   onChangeText={setNewPassword}
                   secureTextEntry={!showNewPassword}
-                  placeholder="Enter new password"
+                  placeholder={t('profile.enter_new_password')}
                   placeholderTextColor={managerColors.textSecondary}
                 />
                 <TouchableOpacity
@@ -524,14 +547,14 @@ export default function ManagerProfileScreen() {
             </View>
 
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Confirm New Password</Text>
+              <Text style={styles.fieldLabel}>{t('profile.confirm_new_password')}</Text>
               <View style={styles.passwordInputContainer}>
                 <TextInput
                   style={styles.passwordInput}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
-                  placeholder="Confirm new password"
+                  placeholder={t('profile.confirm_new_password_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                 />
                 <TouchableOpacity
@@ -561,15 +584,51 @@ export default function ManagerProfileScreen() {
                   setShowConfirmPassword(false);
                 }}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.saveButton} onPress={handleChangePassword}>
-                <Text style={styles.saveButtonText}>Update Password</Text>
+                <Text style={styles.saveButtonText}>{t('profile.update_password')}</Text>
               </TouchableOpacity>
             </View>
           </>
         )}
       </View>
+
+      {/* Language Picker Modal */}
+      <Modal
+        visible={languageModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setLanguageModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setLanguageModalVisible(false)}
+        >
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>{t('profile.select_language')}</Text>
+            <TouchableOpacity
+              style={[styles.languageOption, language === 'en' && styles.languageOptionActive]}
+              onPress={() => { setLanguage('en'); setLanguageModalVisible(false); }}
+            >
+              <Text style={styles.languageOptionText}>🇺🇸 English</Text>
+              {language === 'en' && (
+                <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={20} color={managerColors.highlight} />
+              )}
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.languageOption, language === 'es' && styles.languageOptionActive]}
+              onPress={() => { setLanguage('es'); setLanguageModalVisible(false); }}
+            >
+              <Text style={styles.languageOptionText}>🇲🇽 Español</Text>
+              {language === 'es' && (
+                <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={20} color={managerColors.highlight} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -820,5 +879,52 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: managerColors.text,
     marginLeft: 8,
+  },
+  languageDisplay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  languageValue: {
+    fontSize: 16,
+    color: managerColors.text,
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    backgroundColor: managerColors.card,
+    borderRadius: 16,
+    padding: 24,
+    width: '80%',
+    maxWidth: 320,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: managerColors.text,
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  languageOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  languageOptionActive: {
+    backgroundColor: `${managerColors.highlight}40`,
+  },
+  languageOptionText: {
+    fontSize: 16,
+    color: managerColors.text,
+    fontWeight: '500',
   },
 });

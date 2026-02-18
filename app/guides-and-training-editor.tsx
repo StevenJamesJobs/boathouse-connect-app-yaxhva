@@ -23,6 +23,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 
 interface GuideItem {
   id: string;
@@ -43,6 +44,7 @@ const CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events 
 
 export default function GuidesAndTrainingEditorScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [guides, setGuides] = useState<GuideItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,7 +99,7 @@ export default function GuidesAndTrainingEditorScreen() {
       setGuides(data || []);
     } catch (error) {
       console.error('Error loading guides:', error);
-      Alert.alert('Error', 'Failed to load guides. Please try again.');
+      Alert.alert(t('common.error'), t('guides_training_editor.loading_guides'));
     } finally {
       setLoading(false);
     }
@@ -118,7 +120,7 @@ export default function GuidesAndTrainingEditorScreen() {
       }
     } catch (error) {
       console.error('Error picking thumbnail:', error);
-      Alert.alert('Error', 'Failed to pick thumbnail');
+      Alert.alert(t('common.error'), t('guides_training_editor.error_failed_thumbnail'));
     }
   };
 
@@ -140,7 +142,7 @@ export default function GuidesAndTrainingEditorScreen() {
       }
     } catch (error) {
       console.error('Error picking file:', error);
-      Alert.alert('Error', 'Failed to pick file');
+      Alert.alert(t('common.error'), t('guides_training_editor.error_failed_file'));
     }
   };
 
@@ -258,17 +260,17 @@ export default function GuidesAndTrainingEditorScreen() {
 
   const handleSave = async () => {
     if (!formData.title) {
-      Alert.alert('Error', 'Please enter a title');
+      Alert.alert(t('common.error'), t('guides_training_editor.error_no_title'));
       return;
     }
 
     if (!editingGuide && !selectedFile) {
-      Alert.alert('Error', 'Please select a file to upload');
+      Alert.alert(t('common.error'), t('guides_training_editor.error_no_file'));
       return;
     }
 
     if (!user?.id) {
-      Alert.alert('Error', 'User not authenticated');
+      Alert.alert(t('common.error'), t('guides_training_editor.error_not_authenticated'));
       return;
     }
 
@@ -300,7 +302,7 @@ export default function GuidesAndTrainingEditorScreen() {
           fileName = selectedFile.name;
           console.log('File uploaded successfully');
         } else {
-          Alert.alert('Error', 'Failed to upload file');
+          Alert.alert(t('common.error'), t('guides_training_editor.error_upload_file'));
           return;
         }
       }
@@ -326,7 +328,7 @@ export default function GuidesAndTrainingEditorScreen() {
           console.error('Error updating guide:', error);
           throw error;
         }
-        Alert.alert('Success', 'Guide updated successfully');
+        Alert.alert(t('common.success'), t('guides_training_editor.guide_updated'));
       } else {
         console.log('Creating new guide');
         const { error } = await supabase
@@ -347,7 +349,7 @@ export default function GuidesAndTrainingEditorScreen() {
           console.error('Error creating guide:', error);
           throw error;
         }
-        Alert.alert('Success', 'Guide created successfully');
+        Alert.alert(t('common.success'), t('guides_training_editor.guide_created'));
       }
 
       closeModal();
@@ -360,12 +362,12 @@ export default function GuidesAndTrainingEditorScreen() {
 
   const handleDelete = async (guide: GuideItem) => {
     Alert.alert(
-      'Delete Guide',
-      `Are you sure you want to delete "${guide.title}"?`,
+      t('guides_training_editor.delete_title'),
+      t('guides_training_editor.delete_confirm', { title: guide.title }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -391,7 +393,7 @@ export default function GuidesAndTrainingEditorScreen() {
                 await supabase.storage.from('guides-and-training').remove([filePath]);
               }
 
-              Alert.alert('Success', 'Guide deleted successfully');
+              Alert.alert(t('common.success'), t('guides_training_editor.guide_deleted'));
               await loadGuides();
             } catch (error: any) {
               console.error('Error deleting guide:', error);
@@ -467,7 +469,7 @@ export default function GuidesAndTrainingEditorScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Guides and Training Editor</Text>
+        <Text style={styles.headerTitle}>{t('guides_training_editor.title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -506,13 +508,13 @@ export default function GuidesAndTrainingEditorScreen() {
           size={24}
           color={managerColors.text}
         />
-        <Text style={styles.addNewItemButtonText}>Add New Guide</Text>
+        <Text style={styles.addNewItemButtonText}>{t('guides_training_editor.add_new_guide')}</Text>
       </TouchableOpacity>
 
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={managerColors.highlight} />
-          <Text style={styles.loadingText}>Loading guides...</Text>
+          <Text style={styles.loadingText}>{t('guides_training_editor.loading_guides')}</Text>
         </View>
       ) : (
         <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
@@ -524,9 +526,9 @@ export default function GuidesAndTrainingEditorScreen() {
                 size={64}
                 color={managerColors.textSecondary}
               />
-              <Text style={styles.emptyText}>No guides in this category</Text>
+              <Text style={styles.emptyText}>{t('guides_training_editor.no_guides_in_category')}</Text>
               <Text style={styles.emptySubtext}>
-                Tap &quot;Add New Guide&quot; to create one
+                {t('guides_training_editor.tap_to_create')}
               </Text>
             </View>
           ) : (
@@ -564,7 +566,7 @@ export default function GuidesAndTrainingEditorScreen() {
                           color={managerColors.textSecondary}
                         />
                         <Text style={styles.metaText}>
-                          Updated: {formatDate(guide.updated_at)}
+                          {t('guides_training_editor.updated_label', { date: formatDate(guide.updated_at) })}
                         </Text>
                       </View>
                     </View>
@@ -581,7 +583,7 @@ export default function GuidesAndTrainingEditorScreen() {
                       size={20}
                       color={managerColors.highlight}
                     />
-                    <Text style={styles.actionButtonText}>Edit</Text>
+                    <Text style={styles.actionButtonText}>{t('common.edit')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionButton, styles.deleteButton]}
@@ -594,7 +596,7 @@ export default function GuidesAndTrainingEditorScreen() {
                       color="#E74C3C"
                     />
                     <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                      Delete
+                      {t('common.delete')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -624,7 +626,7 @@ export default function GuidesAndTrainingEditorScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingGuide ? 'Edit Guide' : 'Add Guide'}
+                {editingGuide ? t('guides_training_editor.modal_edit_title') : t('guides_training_editor.modal_add_title')}
               </Text>
               <TouchableOpacity onPress={closeModal}>
                 <IconSymbol
@@ -645,7 +647,7 @@ export default function GuidesAndTrainingEditorScreen() {
             >
               {/* Thumbnail Upload */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Thumbnail (Optional)</Text>
+                <Text style={styles.formLabel}>{t('guides_training_editor.thumbnail_label')}</Text>
                 <TouchableOpacity style={styles.imageUploadButton} onPress={pickThumbnail}>
                   {selectedThumbnailUri || editingGuide?.thumbnail_url ? (
                     <Image
@@ -660,7 +662,7 @@ export default function GuidesAndTrainingEditorScreen() {
                         size={48}
                         color="#666666"
                       />
-                      <Text style={styles.imageUploadText}>Tap to upload thumbnail</Text>
+                      <Text style={styles.imageUploadText}>{t('guides_training_editor.tap_to_upload_thumbnail')}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -668,7 +670,7 @@ export default function GuidesAndTrainingEditorScreen() {
 
               {/* File Upload */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>File *</Text>
+                <Text style={styles.formLabel}>{t('guides_training_editor.file_label')}</Text>
                 <TouchableOpacity style={styles.fileUploadButton} onPress={pickFile}>
                   <IconSymbol
                     ios_icon_name="doc.fill"
@@ -677,17 +679,17 @@ export default function GuidesAndTrainingEditorScreen() {
                     color={managerColors.highlight}
                   />
                   <Text style={styles.fileUploadText}>
-                    {selectedFile ? selectedFile.name : editingGuide ? editingGuide.file_name : 'Select File'}
+                    {selectedFile ? selectedFile.name : editingGuide ? editingGuide.file_name : t('guides_training_editor.select_file')}
                   </Text>
                 </TouchableOpacity>
               </View>
 
               {/* Title */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Title *</Text>
+                <Text style={styles.formLabel}>{t('guides_training_editor.title_label')}</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter title"
+                  placeholder={t('guides_training_editor.title_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.title}
                   onChangeText={(text) => setFormData({ ...formData, title: text })}
@@ -696,10 +698,10 @@ export default function GuidesAndTrainingEditorScreen() {
 
               {/* Description */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Description</Text>
+                <Text style={styles.formLabel}>{t('guides_training_editor.description_label')}</Text>
                 <TextInput
                   style={[styles.input, styles.textArea]}
-                  placeholder="Enter description"
+                  placeholder={t('guides_training_editor.description_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.description}
                   onChangeText={(text) => setFormData({ ...formData, description: text })}
@@ -710,7 +712,7 @@ export default function GuidesAndTrainingEditorScreen() {
 
               {/* Category */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Category</Text>
+                <Text style={styles.formLabel}>{t('guides_training_editor.category_label')}</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -740,10 +742,10 @@ export default function GuidesAndTrainingEditorScreen() {
 
               {/* Display Order */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Display Order</Text>
+                <Text style={styles.formLabel}>{t('guides_training_editor.display_order_label')}</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter display order (e.g., 1, 2, 3...)"
+                  placeholder={t('guides_training_editor.display_order_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.display_order.toString()}
                   onChangeText={(text) => {
@@ -753,7 +755,7 @@ export default function GuidesAndTrainingEditorScreen() {
                   keyboardType="numeric"
                 />
                 <Text style={styles.formHint}>
-                  Lower numbers appear first
+                  {t('guides_training_editor.display_order_hint')}
                 </Text>
               </View>
 
@@ -767,7 +769,7 @@ export default function GuidesAndTrainingEditorScreen() {
                   <ActivityIndicator color="#1A1A1A" />
                 ) : (
                   <Text style={styles.saveButtonText}>
-                    {editingGuide ? 'Update Guide' : 'Add Guide'}
+                    {editingGuide ? t('guides_training_editor.save_button_update') : t('guides_training_editor.save_button_add')}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -777,7 +779,7 @@ export default function GuidesAndTrainingEditorScreen() {
                 style={styles.cancelButton}
                 onPress={closeModal}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

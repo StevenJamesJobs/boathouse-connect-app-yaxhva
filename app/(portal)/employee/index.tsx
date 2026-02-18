@@ -1,6 +1,7 @@
 
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
+import { useTranslation } from 'react-i18next';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   View,
@@ -104,6 +105,7 @@ interface SpecialFeature {
 
 export default function EmployeePortalScreen() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams();
   const { unreadCount } = useUnreadMessages();
@@ -537,7 +539,7 @@ export default function EmployeePortalScreen() {
                   </View>
                 )}
               </View>
-              <Text style={styles.compactMessageLabel}>Messages</Text>
+              <Text style={styles.compactMessageLabel}>{t('common.messages')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -577,7 +579,7 @@ export default function EmployeePortalScreen() {
               activeOpacity={0.7}
             >
               <Text style={[styles.tabText, whatsHappeningTab === 'Announcements' && styles.activeTabText]}>
-                Announcements
+                {t('employee_home.announcements')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -586,7 +588,7 @@ export default function EmployeePortalScreen() {
               activeOpacity={0.7}
             >
               <Text style={[styles.tabText, whatsHappeningTab === 'Special Features' && styles.activeTabText]}>
-                Special Features
+                {t('employee_home.special_features')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -597,11 +599,11 @@ export default function EmployeePortalScreen() {
               {loadingAnnouncements ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="small" color={employeeColors.primary} />
-                  <Text style={styles.loadingText}>Loading announcements...</Text>
+                  <Text style={styles.loadingText}>{t('employee_home.loading')}</Text>
                 </View>
               ) : announcements.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No announcements available</Text>
+                  <Text style={styles.emptyText}>{t('employee_home.no_announcements')}</Text>
                 </View>
               ) : (
                 <>
@@ -672,11 +674,11 @@ export default function EmployeePortalScreen() {
               {loadingFeatures ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="small" color={employeeColors.primary} />
-                  <Text style={styles.loadingText}>Loading features...</Text>
+                  <Text style={styles.loadingText}>{t('employee_home.loading')}</Text>
                 </View>
               ) : specialFeatures.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No special features</Text>
+                  <Text style={styles.emptyText}>{t('employee_home.no_features')}</Text>
                 </View>
               ) : (
                 <>
@@ -762,7 +764,7 @@ export default function EmployeePortalScreen() {
               activeOpacity={0.7}
             >
               <Text style={[styles.tabText, eventsTab === 'Event' && styles.activeTabText]}>
-                Events
+                {t('upcoming_events.events')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -771,7 +773,7 @@ export default function EmployeePortalScreen() {
               activeOpacity={0.7}
             >
               <Text style={[styles.tabText, eventsTab === 'Entertainment' && styles.activeTabText]}>
-                Entertainment
+                {t('upcoming_events.entertainment')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -779,11 +781,11 @@ export default function EmployeePortalScreen() {
           {loadingEvents ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={employeeColors.primary} />
-              <Text style={styles.loadingText}>Loading events...</Text>
+              <Text style={styles.loadingText}>{t('employee_home.loading')}</Text>
             </View>
           ) : filteredEvents.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No {eventsTab.toLowerCase()} events</Text>
+              <Text style={styles.emptyText}>{t('employee_home.no_events')}</Text>
             </View>
           ) : (
             <>
@@ -861,11 +863,11 @@ export default function EmployeePortalScreen() {
           {loadingSpecials ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={employeeColors.primary} />
-              <Text style={styles.loadingText}>Loading specials...</Text>
+              <Text style={styles.loadingText}>{t('employee_home.loading')}</Text>
             </View>
           ) : weeklySpecials.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No weekly specials available</Text>
+              <Text style={styles.emptyText}>{t('common.no_results')}</Text>
             </View>
           ) : (
             <>
@@ -1001,7 +1003,7 @@ export default function EmployeePortalScreen() {
                 resizeMode="contain"
               />
             )}
-            <Text style={styles.swipeHint}>Swipe down to close</Text>
+            <Text style={styles.swipeHint}>{t('common.close')}</Text>
           </View>
         </PanGestureHandler>
       </Modal>

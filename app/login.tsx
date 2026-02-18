@@ -18,10 +18,12 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import { useTranslation } from 'react-i18next';
 
 export default function LoginScreen() {
   console.log('[iOS Login] Screen mounted, Platform:', Platform.OS);
-  
+  const { t } = useTranslation();
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
@@ -97,7 +99,7 @@ export default function LoginScreen() {
     
     if (!username.trim() || !password.trim()) {
       console.log('[iOS Login] Empty username or password');
-      Alert.alert('Error', 'Please enter both username and password');
+      Alert.alert(t('common.error'), t('login.error_empty_fields'));
       return;
     }
 
@@ -124,12 +126,12 @@ export default function LoginScreen() {
         }, 200);
       } else {
         console.log('[iOS Login] Login failed - invalid credentials');
-        Alert.alert('Login Failed', 'Invalid username or password. Please try again.');
+        Alert.alert(t('login.error_login_failed'), t('login.error_invalid'));
       }
     } catch (error) {
       console.error('[iOS Login] Login error:', error);
       setIsLoading(false);
-      Alert.alert('Error', 'An error occurred during login. Please try again.');
+      Alert.alert(t('common.error'), t('login.error_generic'));
     }
   };
 
@@ -181,7 +183,7 @@ export default function LoginScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="Username"
+              placeholder={t('login.username')}
               placeholderTextColor={splashColors.textSecondary}
               value={username}
               onChangeText={setUsername}
@@ -203,7 +205,7 @@ export default function LoginScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="Password"
+              placeholder={t('login.password')}
               placeholderTextColor={splashColors.textSecondary}
               value={password}
               onChangeText={setPassword}
@@ -243,7 +245,7 @@ export default function LoginScreen() {
                 />
               )}
             </View>
-            <Text style={styles.rememberMeText}>Remember Me</Text>
+            <Text style={styles.rememberMeText}>{t('login.remember_me')}</Text>
           </TouchableOpacity>
 
           {/* Login Button */}
@@ -255,7 +257,7 @@ export default function LoginScreen() {
             {isLoading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.loginButtonText}>Sign In</Text>
+              <Text style={styles.loginButtonText}>{t('login.sign_in')}</Text>
             )}
           </TouchableOpacity>
         </Animated.View>

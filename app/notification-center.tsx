@@ -13,23 +13,25 @@ import {
   Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { IconSymbol } from '@/components/IconSymbol';
 import { managerColors } from '@/styles/commonStyles';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
 
-const DESTINATION_OPTIONS = [
-  { value: '', label: 'None (Open app only)' },
-  { value: 'messages', label: 'Messages / Inbox' },
-  { value: 'announcements', label: 'Announcements' },
-  { value: 'events', label: 'Upcoming Events' },
-  { value: 'special_features', label: 'Special Features' },
-  { value: 'rewards', label: 'Rewards' },
-  { value: 'menus', label: 'Menus' },
-  { value: 'tools', label: 'Tools' },
-];
-
 export default function NotificationCenter() {
   const router = useRouter();
+  const { t } = useTranslation();
+
+  const DESTINATION_OPTIONS = [
+    { value: '', label: t('notification_center.opens_to_none') },
+    { value: 'messages', label: t('notification_center.opens_to_messages') },
+    { value: 'announcements', label: t('notification_center.opens_to_announcements') },
+    { value: 'events', label: t('notification_center.opens_to_events') },
+    { value: 'special_features', label: t('notification_center.opens_to_features') },
+    { value: 'rewards', label: t('notification_center.opens_to_rewards') },
+    { value: 'menus', label: t('notification_center.opens_to_menus') },
+    { value: 'tools', label: t('notification_center.opens_to_tools') },
+  ];
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
@@ -43,23 +45,23 @@ export default function NotificationCenter() {
   async function handleSendNotification() {
     // Validation
     if (!title.trim()) {
-      Alert.alert('Title Required', 'Please enter a notification title');
+      Alert.alert(t('notification_center.title_required'), t('notification_center.title_required_message'));
       return;
     }
 
     if (!body.trim()) {
-      Alert.alert('Message Required', 'Please enter a notification message');
+      Alert.alert(t('notification_center.message_required'), t('notification_center.message_required_message'));
       return;
     }
 
     // Confirm sending
     Alert.alert(
-      'Send Notification?',
-      `This will send a notification to all staff members.\n\nTitle: "${title}"\nMessage: "${body}"${destination ? `\nOpens: ${DESTINATION_OPTIONS.find(d => d.value === destination)?.label}` : ''}`,
+      t('notification_center.send_confirm_title'),
+      `${t('notification_center.send_confirm_body')}\n\n${t('notification_center.title_label')}: "${title}"\n${t('notification_center.message_label')}: "${body}"${destination ? `\n${t('notification_center.opens_to')}: ${DESTINATION_OPTIONS.find(d => d.value === destination)?.label}` : ''}`,
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Send',
+          text: t('common.send'),
           style: 'default',
           onPress: sendNotification,
         },
@@ -74,11 +76,11 @@ export default function NotificationCenter() {
       await sendCustomNotification(title, body, destination ? { destination } : undefined);
 
       Alert.alert(
-        '✅ Notification Sent!',
-        'Your notification has been sent to all staff members.',
+        t('notification_center.sent_title'),
+        t('notification_center.sent_body'),
         [
           {
-            text: 'OK',
+            text: t('common.ok'),
             onPress: () => {
               setTitle('');
               setBody('');
@@ -117,9 +119,9 @@ export default function NotificationCenter() {
       }
 
       Alert.alert(
-        'Error',
+        t('notification_center.error_title'),
         errorMessage,
-        [{ text: 'OK' }]
+        [{ text: t('common.ok') }]
       );
     } finally {
       setSending(false);
@@ -146,7 +148,7 @@ export default function NotificationCenter() {
             />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
-            Notification Center
+            {t('notification_center.title')}
           </Text>
           <View style={{ width: 40 }} />
         </View>
@@ -163,18 +165,18 @@ export default function NotificationCenter() {
             </View>
 
             <Text style={styles.cardTitle}>
-              Send Notification to All Staff
+              {t('notification_center.send_to_all')}
             </Text>
 
             <Text style={styles.cardDescription}>
-              This notification will be sent to all staff members who have notifications enabled.
+              {t('notification_center.description')}
             </Text>
 
             {/* Title Input */}
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
                 <Text style={styles.inputLabel}>
-                  Title
+                  {t('notification_center.title_label')}
                 </Text>
                 <Text style={styles.characterCount}>
                   {title.length}/{maxTitleLength}
@@ -182,7 +184,7 @@ export default function NotificationCenter() {
               </View>
               <TextInput
                 style={styles.titleInput}
-                placeholder="Enter notification title"
+                placeholder={t('notification_center.title_placeholder')}
                 placeholderTextColor={managerColors.textSecondary}
                 value={title}
                 onChangeText={(text) => {
@@ -198,7 +200,7 @@ export default function NotificationCenter() {
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
                 <Text style={styles.inputLabel}>
-                  Message
+                  {t('notification_center.message_label')}
                 </Text>
                 <Text style={styles.characterCount}>
                   {body.length}/{maxBodyLength}
@@ -206,7 +208,7 @@ export default function NotificationCenter() {
               </View>
               <TextInput
                 style={styles.bodyInput}
-                placeholder="Enter notification message"
+                placeholder={t('notification_center.message_placeholder')}
                 placeholderTextColor={managerColors.textSecondary}
                 value={body}
                 onChangeText={(text) => {
@@ -225,7 +227,7 @@ export default function NotificationCenter() {
             <View style={styles.inputContainer}>
               <View style={styles.inputHeader}>
                 <Text style={styles.inputLabel}>
-                  Opens To
+                  {t('notification_center.opens_to')}
                 </Text>
                 <Text style={styles.characterCount}>
                   Optional
@@ -241,7 +243,7 @@ export default function NotificationCenter() {
                 ]}>
                   {destination
                     ? DESTINATION_OPTIONS.find(d => d.value === destination)?.label
-                    : 'Select where notification opens to...'}
+                    : t('notification_center.opens_to_placeholder')}
                 </Text>
                 <IconSymbol
                   ios_icon_name="chevron.down"
@@ -251,7 +253,7 @@ export default function NotificationCenter() {
                 />
               </TouchableOpacity>
               <Text style={styles.destinationHint}>
-                Choose which section of the app opens when staff tap this notification
+                {t('notification_center.opens_to_hint')}
               </Text>
             </View>
 
@@ -268,7 +270,7 @@ export default function NotificationCenter() {
                 onPress={() => setShowDestinationPicker(false)}
               >
                 <View style={styles.pickerContainer}>
-                  <Text style={styles.pickerTitle}>Opens To</Text>
+                  <Text style={styles.pickerTitle}>{t('notification_center.opens_to')}</Text>
                   {DESTINATION_OPTIONS.map((option) => (
                     <TouchableOpacity
                       key={option.value}
@@ -305,7 +307,7 @@ export default function NotificationCenter() {
             {(title || body) && (
               <View style={styles.previewContainer}>
                 <Text style={styles.previewLabel}>
-                  Preview:
+                  {t('notification_center.preview')}
                 </Text>
                 <View style={styles.previewCard}>
                   {title && (
@@ -341,7 +343,7 @@ export default function NotificationCenter() {
                     size={20}
                     color="#FFFFFF"
                   />
-                  <Text style={styles.sendButtonText}>Send to All Staff</Text>
+                  <Text style={styles.sendButtonText}>{t('notification_center.send_button')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -355,7 +357,7 @@ export default function NotificationCenter() {
                 color={managerColors.textSecondary}
               />
               <Text style={styles.infoText}>
-                Staff members can manage their notification preferences in their profile settings
+                {t('notification_center.preferences_hint')}
               </Text>
             </View>
           </View>

@@ -17,6 +17,7 @@ import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useTranslation } from 'react-i18next';
 
 interface ChecklistItem {
   id: string;
@@ -34,6 +35,7 @@ interface ChecklistCategory {
 
 export default function BartenderOpeningChecklistEditorScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [categories, setCategories] = useState<ChecklistCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -103,7 +105,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
       console.log('Loaded checklist with', categoriesWithItems.length, 'categories');
     } catch (error) {
       console.error('Error loading checklist:', error);
-      Alert.alert('Error', 'Failed to load checklist. Please try again.');
+      Alert.alert(t('common:error'), t('checklist_editor:error_load_checklist'));
     } finally {
       setLoading(false);
     }
@@ -154,7 +156,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
 
   const handleSaveCategory = async () => {
     if (!categoryName.trim()) {
-      Alert.alert('Error', 'Please enter a category name');
+      Alert.alert(t('common:error'), t('checklist_editor:error_enter_category_name'));
       return;
     }
 
@@ -188,7 +190,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
       loadChecklist();
     } catch (error) {
       console.error('Error saving category:', error);
-      Alert.alert('Error', 'Failed to save category. Please try again.');
+      Alert.alert(t('common:error'), t('checklist_editor:error_save_category'));
     } finally {
       setSaving(false);
     }
@@ -197,12 +199,12 @@ export default function BartenderOpeningChecklistEditorScreen() {
   const handleDeleteCategory = (category: ChecklistCategory) => {
     console.log('Deleting category:', category.name);
     Alert.alert(
-      'Delete Category',
-      `Are you sure you want to delete "${category.name}" and all its items?`,
+      t('checklist_editor:delete_category_title'),
+      t('checklist_editor:delete_category_confirm', { name: category.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -216,7 +218,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
               loadChecklist();
             } catch (error) {
               console.error('Error deleting category:', error);
-              Alert.alert('Error', 'Failed to delete category. Please try again.');
+              Alert.alert(t('common:error'), t('checklist_editor:error_delete_category'));
             }
           },
         },
@@ -226,12 +228,12 @@ export default function BartenderOpeningChecklistEditorScreen() {
 
   const handleSaveItem = async () => {
     if (!itemText.trim()) {
-      Alert.alert('Error', 'Please enter item text');
+      Alert.alert(t('common:error'), t('checklist_editor:error_enter_item_text'));
       return;
     }
 
     if (!selectedCategoryId) {
-      Alert.alert('Error', 'Please select a category');
+      Alert.alert(t('common:error'), t('checklist_editor:error_select_category'));
       return;
     }
 
@@ -270,7 +272,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
       loadChecklist();
     } catch (error) {
       console.error('Error saving item:', error);
-      Alert.alert('Error', 'Failed to save item. Please try again.');
+      Alert.alert(t('common:error'), t('checklist_editor:error_save_item'));
     } finally {
       setSaving(false);
     }
@@ -279,12 +281,12 @@ export default function BartenderOpeningChecklistEditorScreen() {
   const handleDeleteItem = (item: ChecklistItem) => {
     console.log('Deleting item:', item.text);
     Alert.alert(
-      'Delete Item',
-      `Are you sure you want to delete this item?`,
+      t('checklist_editor:delete_item_title'),
+      t('checklist_editor:delete_item_confirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -298,7 +300,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
               loadChecklist();
             } catch (error) {
               console.error('Error deleting item:', error);
-              Alert.alert('Error', 'Failed to delete item. Please try again.');
+              Alert.alert(t('common:error'), t('checklist_editor:error_delete_item'));
             }
           },
         },
@@ -318,7 +320,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
               color={managerColors.text}
             />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Opening Checklist Editor</Text>
+          <Text style={styles.headerTitle}>{t('checklist_editor:opening_checklist_editor')}</Text>
           <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
@@ -359,7 +361,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
             color={managerColors.highlight}
           />
           <Text style={styles.infoText}>
-            Manage categories (subheadings) and items for the Bartender Opening Checklist. Changes will be visible to all bartenders immediately.
+            {t('checklist_editor:info_bartender_opening')}
           </Text>
         </View>
 
@@ -383,7 +385,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
                   <View style={styles.categoryHeaderText}>
                     <Text style={styles.categoryTitle}>{category.name}</Text>
                     <Text style={styles.categoryItemCount}>
-                      {category.items.length} items
+                      {t('checklist_editor:items_count', { count: category.items.length })}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -454,7 +456,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
                       size={20}
                       color={managerColors.highlight}
                     />
-                    <Text style={styles.addItemText}>Add Item</Text>
+                    <Text style={styles.addItemText}>{t('checklist_editor:add_item')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -475,12 +477,12 @@ export default function BartenderOpeningChecklistEditorScreen() {
         >
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {editingCategory ? 'Edit Category' : 'Add Category'}
+              {editingCategory ? t('checklist_editor:edit_category') : t('checklist_editor:add_category')}
             </Text>
-            
+
             <TextInput
               style={styles.input}
-              placeholder="Category name"
+              placeholder={t('checklist_editor:category_name_placeholder')}
               placeholderTextColor={managerColors.textSecondary}
               value={categoryName}
               onChangeText={setCategoryName}
@@ -493,7 +495,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
                 onPress={() => setCategoryModalVisible(false)}
                 disabled={saving}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('common:cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton]}
@@ -503,7 +505,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
                 {saving ? (
                   <ActivityIndicator color={managerColors.text} />
                 ) : (
-                  <Text style={styles.saveButtonText}>Save</Text>
+                  <Text style={styles.saveButtonText}>{t('common:save')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -523,12 +525,12 @@ export default function BartenderOpeningChecklistEditorScreen() {
         >
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>
-              {editingItem ? 'Edit Item' : 'Add Item'}
+              {editingItem ? t('checklist_editor:edit_item') : t('checklist_editor:add_item')}
             </Text>
-            
+
             <TextInput
               style={[styles.input, styles.textArea]}
-              placeholder="Item text"
+              placeholder={t('checklist_editor:item_text_placeholder')}
               placeholderTextColor={managerColors.textSecondary}
               value={itemText}
               onChangeText={setItemText}
@@ -537,7 +539,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
               autoFocus
             />
 
-            <Text style={styles.label}>Category</Text>
+            <Text style={styles.label}>{t('checklist_editor:category_label')}</Text>
             <ScrollView style={styles.categoryPicker}>
               {categories.map((cat) => (
                 <TouchableOpacity
@@ -566,7 +568,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
                 onPress={() => setItemModalVisible(false)}
                 disabled={saving}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('common:cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton]}
@@ -576,7 +578,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
                 {saving ? (
                   <ActivityIndicator color={managerColors.text} />
                 ) : (
-                  <Text style={styles.saveButtonText}>Save</Text>
+                  <Text style={styles.saveButtonText}>{t('common:save')}</Text>
                 )}
               </TouchableOpacity>
             </View>

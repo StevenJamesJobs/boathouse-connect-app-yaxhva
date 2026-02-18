@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { managerColors, employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -46,6 +47,7 @@ interface SpecialFeature {
 export default function ViewAllSpecialFeaturesScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [features, setFeatures] = useState<SpecialFeature[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -155,14 +157,14 @@ export default function ViewAllSpecialFeaturesScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>All Special Features</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('special_features.title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading features...</Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('special_features.loading')}</Text>
         </View>
       ) : (
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
@@ -174,9 +176,9 @@ export default function ViewAllSpecialFeaturesScreen() {
                 size={64}
                 color={colors.textSecondary}
               />
-              <Text style={[styles.emptyText, { color: colors.text }]}>No special features</Text>
+              <Text style={[styles.emptyText, { color: colors.text }]}>{t('special_features.no_features')}</Text>
               <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                Check back later for new features
+                {t('special_features.check_back')}
               </Text>
             </View>
           ) : (
@@ -223,7 +225,7 @@ export default function ViewAllSpecialFeaturesScreen() {
                             color={colors.textSecondary}
                           />
                           <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                            Ends: {formatDateTime(feature.end_date_time)}
+                            {t('special_features.ends', { datetime: formatDateTime(feature.end_date_time) })}
                           </Text>
                         </View>
                       )}
@@ -231,7 +233,7 @@ export default function ViewAllSpecialFeaturesScreen() {
                   )}
                   <View style={styles.actionIndicator}>
                     <Text style={[styles.actionText, { color: colors.primary }]}>
-                      Tap for more information
+                      {t('special_features.tap_for_info')}
                     </Text>
                   </View>
                 </View>

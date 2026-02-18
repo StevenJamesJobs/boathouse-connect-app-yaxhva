@@ -11,6 +11,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { managerColors, employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -47,6 +48,7 @@ interface UpcomingEvent {
 export default function ViewAllUpcomingEventsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventsTab, setEventsTab] = useState<'Event' | 'Entertainment'>('Event');
@@ -160,7 +162,7 @@ export default function ViewAllUpcomingEventsScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>All Upcoming Events</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('upcoming_events:title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -172,7 +174,7 @@ export default function ViewAllUpcomingEventsScreen() {
           activeOpacity={0.7}
         >
           <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Event' && styles.activeTabText]}>
-            Events
+            {t('upcoming_events:events')}
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -181,7 +183,7 @@ export default function ViewAllUpcomingEventsScreen() {
           activeOpacity={0.7}
         >
           <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && styles.activeTabText]}>
-            Entertainment
+            {t('upcoming_events:entertainment')}
           </Text>
         </TouchableOpacity>
       </View>
@@ -189,7 +191,7 @@ export default function ViewAllUpcomingEventsScreen() {
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading events...</Text>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('upcoming_events:loading')}</Text>
         </View>
       ) : (
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
@@ -201,9 +203,9 @@ export default function ViewAllUpcomingEventsScreen() {
                 size={64}
                 color={colors.textSecondary}
               />
-              <Text style={[styles.emptyText, { color: colors.text }]}>No {eventsTab.toLowerCase()} events</Text>
+              <Text style={[styles.emptyText, { color: colors.text }]}>{t('upcoming_events:no_events', { type: eventsTab.toLowerCase() })}</Text>
               <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                Check back later for new {eventsTab.toLowerCase()} events
+                {t('upcoming_events:check_back', { type: eventsTab.toLowerCase() })}
               </Text>
             </View>
           ) : (
@@ -249,7 +251,7 @@ export default function ViewAllUpcomingEventsScreen() {
                                 color={colors.textSecondary}
                               />
                               <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                                Ends: {formatDateTime(event.end_date_time)}
+                                {t('upcoming_events:ends', { datetime: formatDateTime(event.end_date_time) })}
                               </Text>
                             </View>
                           )}
@@ -264,7 +266,7 @@ export default function ViewAllUpcomingEventsScreen() {
                             color={colors.primary}
                           />
                           <Text style={[styles.actionText, { color: colors.primary }]}>
-                            Tap for more details
+                            {t('upcoming_events:tap_for_details')}
                           </Text>
                         </View>
                       )}
@@ -307,7 +309,7 @@ export default function ViewAllUpcomingEventsScreen() {
                                 color={colors.textSecondary}
                               />
                               <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                                Ends: {formatDateTime(event.end_date_time)}
+                                {t('upcoming_events:ends', { datetime: formatDateTime(event.end_date_time) })}
                               </Text>
                             </View>
                           )}
@@ -322,7 +324,7 @@ export default function ViewAllUpcomingEventsScreen() {
                             color={colors.primary}
                           />
                           <Text style={[styles.actionText, { color: colors.primary }]}>
-                            Tap for more details
+                            {t('upcoming_events:tap_for_details')}
                           </Text>
                         </View>
                       )}

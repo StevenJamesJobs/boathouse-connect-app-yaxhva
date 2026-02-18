@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { managerColors } from '@/styles/commonStyles';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
+import { useTranslation } from 'react-i18next';
 
 interface PureeSyrupRecipe {
   id: string;
@@ -38,6 +39,7 @@ const CATEGORIES = ['Purees', 'Simple Syrups'];
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1587049352846-4a222e784acc?w=400&h=400&fit=crop';
 
 export default function PureeSyrupRecipesEditorScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
   const [recipes, setRecipes] = useState<PureeSyrupRecipe[]>([]);
@@ -75,7 +77,7 @@ export default function PureeSyrupRecipesEditorScreen() {
       setRecipes(data || []);
     } catch (error) {
       console.error('Error loading puree syrup recipes:', error);
-      Alert.alert('Error', 'Failed to load puree syrup recipes');
+      Alert.alert(t('common:error'), t('puree_editor:load_error'));
     } finally {
       setLoading(false);
     }
@@ -99,13 +101,13 @@ export default function PureeSyrupRecipesEditorScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      Alert.alert(t('common:error'), t('puree_editor:pick_image_error'));
     }
   };
 
   const uploadImage = async (uri: string) => {
     if (!user?.id) {
-      Alert.alert('Error', 'You must be logged in to upload images');
+      Alert.alert(t('common:error'), t('puree_editor:error_not_authenticated'));
       return;
     }
 
@@ -160,10 +162,10 @@ export default function PureeSyrupRecipesEditorScreen() {
 
       console.log('Public URL:', urlData.publicUrl);
       setThumbnailUrl(urlData.publicUrl);
-      Alert.alert('Success', 'Image uploaded successfully');
+      Alert.alert(t('common:success'), t('puree_editor:updated_success'));
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', error.message || 'Failed to upload image');
+      Alert.alert(t('common:error'), error.message || t('puree_editor:upload_image_error'));
     } finally {
       setUploadingImage(false);
     }
@@ -172,12 +174,12 @@ export default function PureeSyrupRecipesEditorScreen() {
   const handleSave = async () => {
     try {
       if (!name.trim()) {
-        Alert.alert('Error', 'Please enter a recipe name');
+        Alert.alert(t('common:error'), t('puree_editor:error_fill_fields'));
         return;
       }
 
       if (!category) {
-        Alert.alert('Error', 'Please select a category');
+        Alert.alert(t('common:error'), t('puree_editor:error_fill_fields'));
         return;
       }
 
@@ -187,12 +189,12 @@ export default function PureeSyrupRecipesEditorScreen() {
       );
 
       if (validIngredients.length === 0) {
-        Alert.alert('Error', 'Please add at least one ingredient');
+        Alert.alert(t('common:error'), t('puree_editor:error_ingredients'));
         return;
       }
 
       if (!user?.id) {
-        Alert.alert('Error', 'You must be logged in to save recipes');
+        Alert.alert(t('common:error'), t('puree_editor:error_not_authenticated'));
         return;
       }
 
@@ -217,7 +219,7 @@ export default function PureeSyrupRecipesEditorScreen() {
           throw error;
         }
         console.log('Puree syrup recipe updated successfully');
-        Alert.alert('Success', 'Recipe updated successfully');
+        Alert.alert(t('common:success'), t('puree_editor:updated_success'));
       } else {
         // Insert new recipe using RPC function
         console.log('Adding new puree syrup recipe');
@@ -236,7 +238,7 @@ export default function PureeSyrupRecipesEditorScreen() {
           throw error;
         }
         console.log('Puree syrup recipe added successfully');
-        Alert.alert('Success', 'Recipe added successfully');
+        Alert.alert(t('common:success'), t('puree_editor:created_success'));
       }
 
       setShowModal(false);
@@ -244,22 +246,22 @@ export default function PureeSyrupRecipesEditorScreen() {
       loadRecipes();
     } catch (error: any) {
       console.error('Error saving puree syrup recipe:', error);
-      Alert.alert('Error', error.message || 'Failed to save recipe');
+      Alert.alert(t('common:error'), error.message || t('puree_editor:save_error'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (recipe: PureeSyrupRecipe) => {
-    Alert.alert('Delete Recipe', 'Are you sure you want to delete this recipe?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('puree_editor:delete_title'), t('puree_editor:delete_confirm', { name: recipe.name }), [
+      { text: t('common:cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common:delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             if (!user?.id) {
-              Alert.alert('Error', 'You must be logged in to delete recipes');
+              Alert.alert(t('common:error'), t('puree_editor:error_not_authenticated'));
               return;
             }
 
@@ -273,11 +275,11 @@ export default function PureeSyrupRecipesEditorScreen() {
               console.error('Error deleting puree syrup recipe:', error);
               throw error;
             }
-            Alert.alert('Success', 'Recipe deleted successfully');
+            Alert.alert(t('common:success'), t('puree_editor:deleted_success'));
             loadRecipes();
           } catch (error: any) {
             console.error('Error deleting puree syrup recipe:', error);
-            Alert.alert('Error', error.message || 'Failed to delete recipe');
+            Alert.alert(t('common:error'), error.message || t('puree_editor:delete_error'));
           }
         },
       },
@@ -366,7 +368,7 @@ export default function PureeSyrupRecipesEditorScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Purees & Syrups Editor</Text>
+        <Text style={styles.headerTitle}>{t('puree_editor:title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -379,12 +381,12 @@ export default function PureeSyrupRecipesEditorScreen() {
             size={24}
             color={managerColors.text}
           />
-          <Text style={styles.addButtonText}>Add Recipe</Text>
+          <Text style={styles.addButtonText}>{t('puree_editor:add_button')}</Text>
         </TouchableOpacity>
 
         {/* Recipes List by Category */}
         {Object.keys(recipesByCategory).length === 0 ? (
-          <Text style={styles.emptyText}>No recipes found. Add your first recipe!</Text>
+          <Text style={styles.emptyText}>{t('puree_editor:empty_title')}</Text>
         ) : (
           Object.entries(recipesByCategory).map(([cat, categoryRecipes], categoryIndex) => (
             <React.Fragment key={categoryIndex}>
@@ -413,13 +415,13 @@ export default function PureeSyrupRecipesEditorScreen() {
                         style={styles.editButton}
                         onPress={() => openEditModal(recipe)}
                       >
-                        <Text style={styles.buttonText}>Edit</Text>
+                        <Text style={styles.buttonText}>{t('common:edit')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.deleteButton}
                         onPress={() => handleDelete(recipe)}
                       >
-                        <Text style={styles.buttonText}>Delete</Text>
+                        <Text style={styles.buttonText}>{t('common:delete')}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -447,7 +449,7 @@ export default function PureeSyrupRecipesEditorScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingRecipe ? 'Edit Recipe' : 'Add Recipe'}
+                {editingRecipe ? t('puree_editor:modal_edit') : t('puree_editor:modal_add')}
               </Text>
               <TouchableOpacity onPress={closeModal}>
                 <IconSymbol
@@ -467,14 +469,14 @@ export default function PureeSyrupRecipesEditorScreen() {
             >
               {/* Image Upload */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Recipe Image</Text>
+                <Text style={styles.formLabel}>{t('puree_editor:image_label')}</Text>
                 <TouchableOpacity
                   style={styles.imagePickerButton}
                   onPress={pickImage}
                   disabled={uploadingImage}
                 >
                   <Text style={styles.imagePickerButtonText}>
-                    {uploadingImage ? 'Uploading...' : 'Choose Image'}
+                    {thumbnailUrl ? t('puree_editor:change_image_button') : t('puree_editor:pick_image_button')}
                   </Text>
                 </TouchableOpacity>
                 {thumbnailUrl && (
@@ -488,7 +490,7 @@ export default function PureeSyrupRecipesEditorScreen() {
 
               {/* Category */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Category *</Text>
+                <Text style={styles.formLabel}>{t('puree_editor:category_label')}</Text>
                 <View style={styles.picker}>
                   {CATEGORIES.map((cat, index) => (
                     <TouchableOpacity
@@ -514,33 +516,33 @@ export default function PureeSyrupRecipesEditorScreen() {
 
               {/* Name */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Recipe Name *</Text>
+                <Text style={styles.formLabel}>{t('puree_editor:name_label')}</Text>
                 <TextInput
                   style={styles.formInput}
                   value={name}
                   onChangeText={setName}
-                  placeholder="Enter recipe name"
+                  placeholder={t('puree_editor:name_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                 />
               </View>
 
               {/* Ingredients */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Ingredients *</Text>
+                <Text style={styles.formLabel}>{t('puree_editor:ingredients_label')}</Text>
                 {ingredients.map((ingredient, index) => (
                   <View key={index} style={styles.ingredientRow}>
                     <TextInput
                       style={[styles.formInput, styles.ingredientAmount]}
                       value={ingredient.amount}
                       onChangeText={(value) => updateIngredient(index, 'amount', value)}
-                      placeholder="Amount"
+                      placeholder={t('puree_editor:amount_placeholder')}
                       placeholderTextColor={managerColors.textSecondary}
                     />
                     <TextInput
                       style={[styles.formInput, styles.ingredientName]}
                       value={ingredient.ingredient}
                       onChangeText={(value) => updateIngredient(index, 'ingredient', value)}
-                      placeholder="Ingredient"
+                      placeholder={t('puree_editor:ingredient_placeholder')}
                       placeholderTextColor={managerColors.textSecondary}
                     />
                     {ingredients.length > 1 && (
@@ -565,18 +567,18 @@ export default function PureeSyrupRecipesEditorScreen() {
                     size={20}
                     color={managerColors.highlight}
                   />
-                  <Text style={styles.addIngredientText}>Add Ingredient</Text>
+                  <Text style={styles.addIngredientText}>{t('puree_editor:add_ingredient')}</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Procedure */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Procedure</Text>
+                <Text style={styles.formLabel}>{t('puree_editor:procedure_label')}</Text>
                 <TextInput
                   style={[styles.formInput, styles.textArea]}
                   value={procedure}
                   onChangeText={setProcedure}
-                  placeholder="Enter preparation instructions"
+                  placeholder={t('puree_editor:procedure_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                   multiline
                   numberOfLines={4}
@@ -585,12 +587,12 @@ export default function PureeSyrupRecipesEditorScreen() {
 
               {/* Display Order */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Display Order</Text>
+                <Text style={styles.formLabel}>{t('puree_editor:display_order_label')}</Text>
                 <TextInput
                   style={styles.formInput}
                   value={displayOrder}
                   onChangeText={setDisplayOrder}
-                  placeholder="Enter display order (optional)"
+                  placeholder={t('puree_editor:display_order_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                   keyboardType="numeric"
                 />
@@ -603,7 +605,7 @@ export default function PureeSyrupRecipesEditorScreen() {
                   onPress={closeModal}
                   disabled={loading}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={styles.cancelButtonText}>{t('puree_editor:cancel_button')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.submitButton}
@@ -614,7 +616,7 @@ export default function PureeSyrupRecipesEditorScreen() {
                     <ActivityIndicator color={managerColors.text} />
                   ) : (
                     <Text style={styles.submitButtonText}>
-                      {editingRecipe ? 'Update' : 'Save'}
+                      {editingRecipe ? t('puree_editor:save_button') : t('puree_editor:add_save_button')}
                     </Text>
                   )}
                 </TouchableOpacity>

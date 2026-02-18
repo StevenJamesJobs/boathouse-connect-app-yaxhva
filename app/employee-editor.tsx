@@ -15,6 +15,7 @@ import {
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -50,6 +51,7 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function EmployeeEditorScreen() {
   const router = useRouter();
+  const { t } = useTranslation('employee_editor');
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,7 +125,7 @@ export default function EmployeeEditorScreen() {
       setEmployees(data || []);
     } catch (error) {
       console.error('Error fetching employees:', error);
-      Alert.alert('Error', 'Failed to fetch employees');
+      Alert.alert(t('common:error'), t('error_fetch'));
     } finally {
       setLoading(false);
     }
@@ -134,12 +136,12 @@ export default function EmployeeEditorScreen() {
       console.log('Adding new employee with job_titles:', newEmployee.job_titles);
       
       if (!newEmployee.username || !newEmployee.name || !newEmployee.email) {
-        Alert.alert('Error', 'Please fill in all required fields');
+        Alert.alert(t('common:error'), t('error_required_fields'));
         return;
       }
 
       if (newEmployee.job_titles.length === 0) {
-        Alert.alert('Error', 'Please select at least one job title');
+        Alert.alert(t('common:error'), t('error_job_title'));
         return;
       }
 
@@ -173,7 +175,7 @@ export default function EmployeeEditorScreen() {
       }
 
       console.log('Employee added successfully with job_titles:', newEmployee.job_titles);
-      Alert.alert('Success', 'Employee added successfully');
+      Alert.alert(t('common:success'), t('employee_added'));
       setShowAddModal(false);
       setNewEmployee({
         username: '',
@@ -187,7 +189,7 @@ export default function EmployeeEditorScreen() {
       fetchEmployees();
     } catch (error: any) {
       console.error('Error adding employee:', error);
-      Alert.alert('Error', error.message || 'Failed to add employee');
+      Alert.alert(t('common:error'), error.message || t('error_fetch'));
     }
   };
 
@@ -219,13 +221,13 @@ export default function EmployeeEditorScreen() {
 
       console.log('Employee status updated successfully to:', newStatus);
       Alert.alert(
-        'Success',
-        `Employee ${newStatus ? 'activated' : 'deactivated'} successfully`
+        t('common:success'),
+        newStatus ? t('employee_activated') : t('employee_deactivated')
       );
       fetchEmployees();
     } catch (error) {
       console.error('Error toggling employee status:', error);
-      Alert.alert('Error', 'Failed to update employee status');
+      Alert.alert(t('common:error'), t('error_toggle_status'));
     }
   };
 
@@ -262,7 +264,7 @@ export default function EmployeeEditorScreen() {
       return employee.job_titles.join(', ');
     }
     // Fall back to old job_title column if job_titles is empty
-    return employee.job_title || 'No job title';
+    return employee.job_title || t('no_job_title');
   };
 
   if (loading) {
@@ -289,7 +291,7 @@ export default function EmployeeEditorScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Employee Editor</Text>
+        <Text style={styles.headerTitle}>{t('title')}</Text>
         <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.addButton}>
           <IconSymbol
             ios_icon_name="plus.circle.fill"
@@ -310,7 +312,7 @@ export default function EmployeeEditorScreen() {
         />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search employees..."
+          placeholder={t('search_placeholder')}
           placeholderTextColor={managerColors.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -343,7 +345,7 @@ export default function EmployeeEditorScreen() {
               />
             )}
           </View>
-          <Text style={styles.toggleLabel}>Show Inactive Employees</Text>
+          <Text style={styles.toggleLabel}>{t('show_inactive')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -352,7 +354,7 @@ export default function EmployeeEditorScreen() {
         {/* Employee List */}
         <ScrollView style={styles.employeeList} contentContainerStyle={styles.employeeListContent}>
           {filteredEmployees.length === 0 ? (
-            <Text style={styles.emptyText}>No employees found</Text>
+            <Text style={styles.emptyText}>{t('no_employees')}</Text>
           ) : (
             filteredEmployees.map((employee, index) => {
               const profilePictureUrl = getProfilePictureUrl(employee.profile_picture_url);
@@ -430,7 +432,7 @@ export default function EmployeeEditorScreen() {
                   selectedLetter === null && styles.alphabetButtonTextActive,
                 ]}
               >
-                All
+                {t('all')}
               </Text>
             </TouchableOpacity>
             {ALPHABET.map((letter, index) => (
@@ -461,7 +463,7 @@ export default function EmployeeEditorScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add New Employee</Text>
+              <Text style={styles.modalTitle}>{t('add_employee_title')}</Text>
               <TouchableOpacity onPress={() => setShowAddModal(false)}>
                 <IconSymbol
                   ios_icon_name="xmark.circle.fill"
@@ -474,34 +476,34 @@ export default function EmployeeEditorScreen() {
 
             <ScrollView style={styles.modalForm}>
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Username *</Text>
+                <Text style={styles.formLabel}>{t('username_label')}</Text>
                 <TextInput
                   style={styles.formInput}
                   value={newEmployee.username}
                   onChangeText={(text) => setNewEmployee({ ...newEmployee, username: text })}
-                  placeholder="Enter username"
+                  placeholder={t('username_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                 />
               </View>
 
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Full Name *</Text>
+                <Text style={styles.formLabel}>{t('full_name_label')}</Text>
                 <TextInput
                   style={styles.formInput}
                   value={newEmployee.name}
                   onChangeText={(text) => setNewEmployee({ ...newEmployee, name: text })}
-                  placeholder="Enter full name"
+                  placeholder={t('full_name_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                 />
               </View>
 
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Email *</Text>
+                <Text style={styles.formLabel}>{t('email_label')}</Text>
                 <TextInput
                   style={styles.formInput}
                   value={newEmployee.email}
                   onChangeText={(text) => setNewEmployee({ ...newEmployee, email: text })}
-                  placeholder="Enter email"
+                  placeholder={t('email_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                   keyboardType="email-address"
                   autoCapitalize="none"
@@ -509,7 +511,7 @@ export default function EmployeeEditorScreen() {
               </View>
 
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Job Titles * (Select one or more)</Text>
+                <Text style={styles.formLabel}>{t('job_titles_label')}</Text>
                 <View style={styles.jobTitlesContainer}>
                   {JOB_TITLE_OPTIONS.map((title, idx) => (
                     <TouchableOpacity
@@ -534,19 +536,19 @@ export default function EmployeeEditorScreen() {
               </View>
 
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Phone Number</Text>
+                <Text style={styles.formLabel}>{t('phone_number_label')}</Text>
                 <TextInput
                   style={styles.formInput}
                   value={newEmployee.phone_number}
                   onChangeText={(text) => setNewEmployee({ ...newEmployee, phone_number: text })}
-                  placeholder="Enter phone number"
+                  placeholder={t('phone_number_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                   keyboardType="phone-pad"
                 />
               </View>
 
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Role</Text>
+                <Text style={styles.formLabel}>{t('role_label')}</Text>
                 <View style={styles.roleSelector}>
                   <TouchableOpacity
                     style={[
@@ -561,7 +563,7 @@ export default function EmployeeEditorScreen() {
                         newEmployee.role === 'employee' && styles.roleButtonTextActive,
                       ]}
                     >
-                      Employee
+                      {t('employee')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -577,24 +579,24 @@ export default function EmployeeEditorScreen() {
                         newEmployee.role === 'manager' && styles.roleButtonTextActive,
                       ]}
                     >
-                      Manager
+                      {t('manager')}
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Default Password</Text>
+                <Text style={styles.formLabel}>{t('default_password_label')}</Text>
                 <View style={[styles.formInput, styles.formInputDisabled]}>
                   <Text style={styles.formInputTextDisabled}>boathouseconnect</Text>
                 </View>
                 <Text style={styles.formNote}>
-                  Employee can change password after first login
+                  {t('default_password_note')}
                 </Text>
               </View>
 
               <TouchableOpacity style={styles.submitButton} onPress={handleAddEmployee}>
-                <Text style={styles.submitButtonText}>Add Employee</Text>
+                <Text style={styles.submitButtonText}>{t('add_employee_button')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

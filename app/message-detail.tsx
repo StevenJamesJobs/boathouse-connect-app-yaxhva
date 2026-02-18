@@ -13,6 +13,7 @@ import {
   Image,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -32,6 +33,7 @@ interface MessageThread {
 }
 
 export default function MessageDetailScreen() {
+  const { t } = useTranslation('message_detail');
   const { user } = useAuth();
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -123,7 +125,7 @@ export default function MessageDetailScreen() {
       setMessages(formattedMessages);
     } catch (error) {
       console.error('Error loading thread:', error);
-      Alert.alert('Error', 'Failed to load message');
+      Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_load'));
     } finally {
       setLoading(false);
     }
@@ -208,14 +210,14 @@ export default function MessageDetailScreen() {
     const isSender = originalMessage?.sender_id === user?.id;
 
     Alert.alert(
-      'Delete Message',
+      t('delete_title'),
       isSender
-        ? 'Are you sure you want to delete this sent message?'
-        : 'Are you sure you want to delete this message from your inbox?',
+        ? t('delete_sent_confirm')
+        : t('delete_inbox_confirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common:cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common:delete', { defaultValue: 'Delete' }),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -236,12 +238,12 @@ export default function MessageDetailScreen() {
                   .eq('message_id', messageId);
               }
 
-              Alert.alert('Success', 'Message deleted', [
-                { text: 'OK', onPress: () => router.back() },
+              Alert.alert(t('common:success', { defaultValue: 'Success' }), t('message_deleted'), [
+                { text: t('common:ok', { defaultValue: 'OK' }), onPress: () => router.back() },
               ]);
             } catch (error) {
               console.error('Error deleting message:', error);
-              Alert.alert('Error', 'Failed to delete message');
+              Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_delete'));
             }
           },
         },
@@ -273,7 +275,7 @@ export default function MessageDetailScreen() {
               color={colors.text}
             />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Message</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('title')}</Text>
           <View style={styles.headerRight} />
         </View>
         <View style={styles.loadingContainer}>
@@ -343,7 +345,7 @@ export default function MessageDetailScreen() {
 
                 <View style={styles.senderInfo}>
                   <Text style={[styles.senderName, { color: message.is_current_user ? '#FFFFFF' : colors.text }]}>
-                    {message.is_current_user ? 'You' : message.sender_name}
+                    {message.is_current_user ? t('you') : message.sender_name}
                   </Text>
                   <Text style={[styles.senderJobTitle, { color: message.is_current_user ? 'rgba(255, 255, 255, 0.8)' : colors.textSecondary }]}>
                     {message.sender_job_title}
@@ -358,7 +360,7 @@ export default function MessageDetailScreen() {
               {index === 0 && message.recipient_names && message.recipient_names.length > 0 && (
                 <View style={styles.recipientsSection}>
                   <Text style={[styles.recipientsLabel, { color: message.is_current_user ? 'rgba(255, 255, 255, 0.9)' : colors.textSecondary }]}>
-                    To: {message.recipient_names.join(', ')}
+                    {t('to', { names: message.recipient_names.join(', ') })}
                   </Text>
                 </View>
               )}
@@ -397,7 +399,7 @@ export default function MessageDetailScreen() {
               color={user?.role === 'manager' ? colors.text : '#FFFFFF'}
             />
             <Text style={[styles.replyButtonText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
-              Reply
+              {t('reply')}
             </Text>
           </TouchableOpacity>
           
@@ -413,7 +415,7 @@ export default function MessageDetailScreen() {
                 color={user?.role === 'manager' ? colors.text : '#FFFFFF'}
               />
               <Text style={[styles.replyButtonText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
-                Reply All
+                {t('reply_all')}
               </Text>
             </TouchableOpacity>
           )}

@@ -11,10 +11,12 @@ import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 export default function EmployeeToolsScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   // Get job titles array from user
   const jobTitles = user?.jobTitles || [];
@@ -53,9 +55,9 @@ export default function EmployeeToolsScreen() {
               color={employeeColors.highlight}
             />
             <View style={styles.cardText}>
-              <Text style={styles.cardTitle}>Guides and Training</Text>
+              <Text style={styles.cardTitle}>{t('employee_tools.guides_training')}</Text>
               <Text style={styles.cardDescription}>
-                View training materials and guides
+                {t('employee_tools.guides_training_desc')}
               </Text>
             </View>
             <IconSymbol
@@ -82,9 +84,9 @@ export default function EmployeeToolsScreen() {
                 color={employeeColors.highlight}
               />
               <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>Check Outs Calculator</Text>
+                <Text style={styles.cardTitle}>{t('employee_tools.check_out_calculator')}</Text>
                 <Text style={styles.cardDescription}>
-                  Calculate your shift check out totals and tip outs
+                  {t('employee_tools.check_out_calculator_desc')}
                 </Text>
               </View>
               <IconSymbol
@@ -112,9 +114,9 @@ export default function EmployeeToolsScreen() {
                 color={employeeColors.highlight}
               />
               <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>Bartender Assistant</Text>
+                <Text style={styles.cardTitle}>{t('employee_tools.bartender_assistant')}</Text>
                 <Text style={styles.cardDescription}>
-                  Access cocktail recipes, knowledge base, and bar exams
+                  {t('employee_tools.bartender_assistant_desc')}
                 </Text>
               </View>
               <IconSymbol
@@ -142,9 +144,9 @@ export default function EmployeeToolsScreen() {
                 color={employeeColors.highlight}
               />
               <View style={styles.cardText}>
-                <Text style={styles.cardTitle}>Host Assistant</Text>
+                <Text style={styles.cardTitle}>{t('employee_tools.host_assistant')}</Text>
                 <Text style={styles.cardDescription}>
-                  Access OpenTable Academy, hosting resources, and host exams
+                  {t('employee_tools.host_assistant_desc')}
                 </Text>
               </View>
               <IconSymbol

@@ -13,6 +13,7 @@ import {
   Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { useAuth } from '@/contexts/AuthContext';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -46,6 +47,7 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1514362545857-3bc16
 
 export default function LibationRecipesScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -106,6 +108,18 @@ export default function LibationRecipesScreen() {
     return `${url}?t=${Date.now()}`;
   };
 
+  const getCategoryLabel = (category: string) => {
+    const map: Record<string, string> = {
+      'Featured': t('libation_recipes.featured'),
+      'Signature Cocktails': t('libation_recipes.signature_cocktails'),
+      'Martinis': t('libation_recipes.martinis'),
+      'Sangrias': t('libation_recipes.sangrias'),
+      'Low ABV': t('libation_recipes.low_abv'),
+      'No ABV': t('libation_recipes.no_abv'),
+    };
+    return map[category] ?? category;
+  };
+
   // Group recipes by category
   const recipesByCategory = CATEGORIES.reduce((acc, category) => {
     const categoryRecipes = recipes.filter(r => r.category === category);
@@ -141,7 +155,7 @@ export default function LibationRecipesScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Libation Recipes</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('libation_recipes.title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -159,16 +173,16 @@ export default function LibationRecipesScreen() {
                 size={64}
                 color={colors.textSecondary}
               />
-              <Text style={[styles.emptyText, { color: colors.text }]}>No recipes available</Text>
+              <Text style={[styles.emptyText, { color: colors.text }]}>{t('libation_recipes.no_recipes')}</Text>
               <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                Check back later for new libation recipes!
+                {t('libation_recipes.check_back')}
               </Text>
             </View>
           ) : (
             Object.entries(recipesByCategory).map(([category, categoryRecipes], categoryIndex) => (
               <React.Fragment key={categoryIndex}>
                 {/* Category Header */}
-                <Text style={[styles.categoryTitle, { color: colors.text }]}>{category}</Text>
+                <Text style={[styles.categoryTitle, { color: colors.text }]}>{getCategoryLabel(category)}</Text>
 
                 {/* Recipe Tiles in 2 columns */}
                 <View style={styles.tilesContainer}>
@@ -268,7 +282,7 @@ export default function LibationRecipesScreen() {
                 <View style={styles.infoSection}>
                   <View style={styles.infoRow}>
                     <View style={styles.infoItem}>
-                      <Text style={styles.infoLabel}>Price</Text>
+                      <Text style={styles.infoLabel}>{t('libation_recipes.price')}</Text>
                       <View style={styles.priceBadge}>
                         <Text style={styles.priceValue}>{selectedRecipe?.price}</Text>
                       </View>
@@ -276,7 +290,7 @@ export default function LibationRecipesScreen() {
 
                     {selectedRecipe?.category && (
                       <View style={styles.infoItem}>
-                        <Text style={styles.infoLabel}>Category</Text>
+                        <Text style={styles.infoLabel}>{t('libation_recipes.category')}</Text>
                         <Text style={styles.infoValue}>{selectedRecipe.category}</Text>
                       </View>
                     )}
@@ -287,13 +301,13 @@ export default function LibationRecipesScreen() {
                     <View style={styles.infoRow}>
                       {selectedRecipe?.glassware && (
                         <View style={styles.infoItem}>
-                          <Text style={styles.infoLabel}>Glassware</Text>
+                          <Text style={styles.infoLabel}>{t('libation_recipes.glassware')}</Text>
                           <Text style={styles.infoValue}>{selectedRecipe.glassware}</Text>
                         </View>
                       )}
                       {selectedRecipe?.garnish && (
                         <View style={styles.infoItem}>
-                          <Text style={styles.infoLabel}>Garnish</Text>
+                          <Text style={styles.infoLabel}>{t('libation_recipes.garnish')}</Text>
                           <Text style={styles.infoValue}>{selectedRecipe.garnish}</Text>
                         </View>
                       )}
@@ -313,7 +327,7 @@ export default function LibationRecipesScreen() {
                       size={24}
                       color="#3498DB"
                     />
-                    <Text style={styles.sectionTitleBlue}>Ingredients</Text>
+                    <Text style={styles.sectionTitleBlue}>{t('libation_recipes.ingredients')}</Text>
                   </View>
                   {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
                     <View style={styles.ingredientsList}>
@@ -326,7 +340,7 @@ export default function LibationRecipesScreen() {
                       ))}
                     </View>
                   ) : (
-                    <Text style={styles.noDataText}>No ingredients listed</Text>
+                    <Text style={styles.noDataText}>{t('libation_recipes.no_ingredients')}</Text>
                   )}
                 </View>
 
@@ -343,7 +357,7 @@ export default function LibationRecipesScreen() {
                         size={30}
                         color="#E74C3C"
                       />
-                      <Text style={styles.sectionTitleRed}>Procedure</Text>
+                      <Text style={styles.sectionTitleRed}>{t('libation_recipes.procedure')}</Text>
                     </View>
                     <Text style={styles.procedureText}>{selectedRecipe.procedure}</Text>
                   </View>

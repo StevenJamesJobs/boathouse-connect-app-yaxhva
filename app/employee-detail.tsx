@@ -14,6 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -51,6 +52,7 @@ export default function EmployeeDetailScreen() {
   const router = useRouter();
   const { employeeId } = useLocalSearchParams();
   const { user } = useAuth();
+  const { t } = useTranslation('employee_detail');
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -79,7 +81,7 @@ export default function EmployeeDetailScreen() {
       setEmployee(data);
     } catch (error) {
       console.error('Error fetching employee:', error);
-      Alert.alert('Error', 'Failed to fetch employee details');
+      Alert.alert(t('common:error'), t('error_load'));
       router.back();
     } finally {
       setLoading(false);
@@ -112,12 +114,12 @@ export default function EmployeeDetailScreen() {
     if (!employee) return;
 
     if (!user?.id) {
-      Alert.alert('Error', 'User not authenticated');
+      Alert.alert(t('common:error'), t('error_not_authenticated'));
       return;
     }
 
     if (!employee.job_titles || employee.job_titles.length === 0) {
-      Alert.alert('Error', 'Please select at least one job title');
+      Alert.alert(t('common:error'), t('error_job_title'));
       return;
     }
 
@@ -156,13 +158,13 @@ export default function EmployeeDetailScreen() {
       }
 
       console.log('Employee updated successfully with job_titles:', employee.job_titles);
-      Alert.alert('Success', 'Employee updated successfully');
-      
+      Alert.alert(t('common:success'), t('employee_updated'));
+
       // Refresh the employee data to confirm the update
       await fetchEmployee();
     } catch (error: any) {
       console.error('Error updating employee:', error);
-      Alert.alert('Error', error.message || 'Failed to update employee');
+      Alert.alert(t('common:error'), error.message || t('error_load'));
     } finally {
       setSaving(false);
     }
@@ -172,24 +174,24 @@ export default function EmployeeDetailScreen() {
     if (!employee) return;
 
     Alert.alert(
-      'Reset Password',
-      `Reset password to "boathouseconnect" for ${employee.name}?`,
+      t('reset_password'),
+      t('reset_password_confirm', { name: employee.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('reset'),
           style: 'destructive',
           onPress: async () => {
             try {
               // Note: In a real app, you'd need to implement password reset via Supabase Auth
               // For now, we'll just show a success message
               Alert.alert(
-                'Success',
-                'Password reset to "boathouseconnect". Employee should change it on next login.'
+                t('common:success'),
+                t('reset_password_success')
               );
             } catch (error) {
               console.error('Error resetting password:', error);
-              Alert.alert('Error', 'Failed to reset password');
+              Alert.alert(t('common:error'), t('error_reset_password'));
             }
           },
         },
@@ -201,7 +203,7 @@ export default function EmployeeDetailScreen() {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please grant camera roll permissions');
+        Alert.alert(t('permission_required'), t('grant_camera_permissions'));
         return;
       }
 
@@ -217,7 +219,7 @@ export default function EmployeeDetailScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      Alert.alert(t('common:error'), t('error_pick_image'));
     }
   };
 
@@ -259,10 +261,10 @@ export default function EmployeeDetailScreen() {
       if (updateError) throw updateError;
 
       setEmployee({ ...employee, profile_picture_url: urlData.publicUrl });
-      Alert.alert('Success', 'Profile picture updated successfully');
+      Alert.alert(t('common:success'), t('picture_updated'));
     } catch (error) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload profile picture');
+      Alert.alert(t('common:error'), t('error_upload_picture'));
     } finally {
       setUploading(false);
     }
@@ -272,12 +274,12 @@ export default function EmployeeDetailScreen() {
     if (!employee) return;
 
     Alert.alert(
-      'Delete Employee',
-      `Are you sure you want to delete ${employee.name}? This action cannot be undone.`,
+      t('delete_employee'),
+      t('delete_confirm', { name: employee.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -285,11 +287,11 @@ export default function EmployeeDetailScreen() {
 
               if (error) throw error;
 
-              Alert.alert('Success', 'Employee deleted successfully');
+              Alert.alert(t('common:success'), t('employee_deleted'));
               router.back();
             } catch (error) {
               console.error('Error deleting employee:', error);
-              Alert.alert('Error', 'Failed to delete employee');
+              Alert.alert(t('common:error'), t('error_delete'));
             }
           },
         },
@@ -324,7 +326,7 @@ export default function EmployeeDetailScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Employee</Text>
+        <Text style={styles.headerTitle}>{t('title')}</Text>
         <TouchableOpacity onPress={handleDeleteEmployee} style={styles.deleteButton}>
           <IconSymbol
             ios_icon_name="trash.fill"
@@ -360,23 +362,23 @@ export default function EmployeeDetailScreen() {
               />
             </View>
           </TouchableOpacity>
-          <Text style={styles.uploadHint}>Tap to change profile picture</Text>
+          <Text style={styles.uploadHint}>{t('tap_change_photo')}</Text>
         </View>
 
         {/* Employee Information */}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Employee Information</Text>
+          <Text style={styles.sectionTitle}>{t('employee_info')}</Text>
 
           <View style={styles.formField}>
-            <Text style={styles.formLabel}>Username</Text>
+            <Text style={styles.formLabel}>{t('username')}</Text>
             <View style={[styles.formInput, styles.formInputDisabled]}>
               <Text style={styles.formInputTextDisabled}>{employee.username}</Text>
             </View>
-            <Text style={styles.formNote}>Username cannot be changed</Text>
+            <Text style={styles.formNote}>{t('username_cannot_change')}</Text>
           </View>
 
           <View style={styles.formField}>
-            <Text style={styles.formLabel}>Full Name *</Text>
+            <Text style={styles.formLabel}>{t('full_name')}</Text>
             <TextInput
               style={styles.formInput}
               value={employee.name}
@@ -386,7 +388,7 @@ export default function EmployeeDetailScreen() {
           </View>
 
           <View style={styles.formField}>
-            <Text style={styles.formLabel}>Email *</Text>
+            <Text style={styles.formLabel}>{t('email')}</Text>
             <TextInput
               style={styles.formInput}
               value={employee.email}
@@ -398,7 +400,7 @@ export default function EmployeeDetailScreen() {
           </View>
 
           <View style={styles.formField}>
-            <Text style={styles.formLabel}>Job Titles * (Select one or more)</Text>
+            <Text style={styles.formLabel}>{t('job_titles')}</Text>
             <View style={styles.jobTitlesContainer}>
               {JOB_TITLE_OPTIONS.map((title, idx) => (
                 <TouchableOpacity
@@ -423,7 +425,7 @@ export default function EmployeeDetailScreen() {
           </View>
 
           <View style={styles.formField}>
-            <Text style={styles.formLabel}>Phone Number</Text>
+            <Text style={styles.formLabel}>{t('phone_number')}</Text>
             <TextInput
               style={styles.formInput}
               value={employee.phone_number}
@@ -434,7 +436,7 @@ export default function EmployeeDetailScreen() {
           </View>
 
           <View style={styles.formField}>
-            <Text style={styles.formLabel}>Role</Text>
+            <Text style={styles.formLabel}>{t('role')}</Text>
             <View style={styles.roleSelector}>
               <TouchableOpacity
                 style={[styles.roleButton, employee.role === 'employee' && styles.roleButtonActive]}
@@ -446,7 +448,7 @@ export default function EmployeeDetailScreen() {
                     employee.role === 'employee' && styles.roleButtonTextActive,
                   ]}
                 >
-                  Employee
+                  {t('employee')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -459,7 +461,7 @@ export default function EmployeeDetailScreen() {
                     employee.role === 'manager' && styles.roleButtonTextActive,
                   ]}
                 >
-                  Manager
+                  {t('manager')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -473,16 +475,16 @@ export default function EmployeeDetailScreen() {
             {saving ? (
               <ActivityIndicator color={managerColors.text} />
             ) : (
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+              <Text style={styles.saveButtonText}>{t('save_changes')}</Text>
             )}
           </TouchableOpacity>
         </View>
 
         {/* Password Reset */}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Password Management</Text>
+          <Text style={styles.sectionTitle}>{t('password_management')}</Text>
           <Text style={styles.sectionDescription}>
-            Reset employee password to default "boathouseconnect"
+            {t('reset_password_desc')}
           </Text>
           <TouchableOpacity style={styles.resetButton} onPress={handleResetPassword}>
             <IconSymbol
@@ -491,15 +493,15 @@ export default function EmployeeDetailScreen() {
               size={20}
               color={managerColors.text}
             />
-            <Text style={styles.resetButtonText}>Reset Password</Text>
+            <Text style={styles.resetButtonText}>{t('reset_password')}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Account Status */}
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Account Status</Text>
+          <Text style={styles.sectionTitle}>{t('account_status')}</Text>
           <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Status:</Text>
+            <Text style={styles.statusLabel}>{t('status')}</Text>
             <View
               style={[
                 styles.statusBadge,
@@ -507,7 +509,7 @@ export default function EmployeeDetailScreen() {
               ]}
             >
               <Text style={styles.statusBadgeText}>
-                {employee.is_active ? 'Active' : 'Inactive'}
+                {employee.is_active ? t('active') : t('inactive')}
               </Text>
             </View>
           </View>

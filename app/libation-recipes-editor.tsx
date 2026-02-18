@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { managerColors } from '@/styles/commonStyles';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
+import { useTranslation } from 'react-i18next';
 
 interface LibationRecipe {
   id: string;
@@ -49,6 +50,7 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1514362545857-3bc16
 
 export default function LibationRecipesEditorScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
   const [loading, setLoading] = useState(false);
@@ -88,7 +90,7 @@ export default function LibationRecipesEditorScreen() {
       setRecipes(data || []);
     } catch (error) {
       console.error('Error loading libation recipes:', error);
-      Alert.alert('Error', 'Failed to load libation recipes');
+      Alert.alert(t('common.error'), t('libation_editor.no_recipes'));
     } finally {
       setLoading(false);
     }
@@ -112,13 +114,13 @@ export default function LibationRecipesEditorScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      Alert.alert(t('common.error'), t('libation_editor.error_pick_image'));
     }
   };
 
   const uploadImage = async (uri: string) => {
     if (!user?.id) {
-      Alert.alert('Error', 'You must be logged in to upload images');
+      Alert.alert(t('common.error'), t('libation_editor.error_not_authenticated_upload'));
       return;
     }
 
@@ -173,7 +175,7 @@ export default function LibationRecipesEditorScreen() {
 
       console.log('Public URL:', urlData.publicUrl);
       setThumbnailUrl(urlData.publicUrl);
-      Alert.alert('Success', 'Image uploaded successfully');
+      Alert.alert(t('common.success'), t('libation_editor.image_uploaded'));
     } catch (error: any) {
       console.error('Error uploading image:', error);
       Alert.alert('Error', error.message || 'Failed to upload image');
@@ -185,17 +187,17 @@ export default function LibationRecipesEditorScreen() {
   const handleSave = async () => {
     try {
       if (!name.trim()) {
-        Alert.alert('Error', 'Please enter a recipe name');
+        Alert.alert(t('common.error'), t('libation_editor.error_no_name'));
         return;
       }
 
       if (!price.trim()) {
-        Alert.alert('Error', 'Please enter a price');
+        Alert.alert(t('common.error'), t('libation_editor.error_no_price'));
         return;
       }
 
       if (!category) {
-        Alert.alert('Error', 'Please select a category');
+        Alert.alert(t('common.error'), t('libation_editor.error_no_category'));
         return;
       }
 
@@ -205,12 +207,12 @@ export default function LibationRecipesEditorScreen() {
       );
 
       if (validIngredients.length === 0) {
-        Alert.alert('Error', 'Please add at least one ingredient');
+        Alert.alert(t('common.error'), t('libation_editor.error_no_ingredients'));
         return;
       }
 
       if (!user?.id) {
-        Alert.alert('Error', 'You must be logged in to save recipes');
+        Alert.alert(t('common.error'), t('libation_editor.error_not_authenticated'));
         return;
       }
 
@@ -238,7 +240,7 @@ export default function LibationRecipesEditorScreen() {
           throw error;
         }
         console.log('Libation recipe updated successfully');
-        Alert.alert('Success', 'Recipe updated successfully');
+        Alert.alert(t('common.success'), t('libation_editor.recipe_updated'));
       } else {
         // Insert new recipe using RPC function (same pattern as cocktails editor)
         console.log('Adding new libation recipe');
@@ -260,7 +262,7 @@ export default function LibationRecipesEditorScreen() {
           throw error;
         }
         console.log('Libation recipe added successfully');
-        Alert.alert('Success', 'Recipe added successfully');
+        Alert.alert(t('common.success'), t('libation_editor.recipe_added'));
       }
 
       setShowModal(false);
@@ -275,15 +277,15 @@ export default function LibationRecipesEditorScreen() {
   };
 
   const handleDelete = async (recipe: LibationRecipe) => {
-    Alert.alert('Delete Recipe', 'Are you sure you want to delete this recipe?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('libation_editor.delete_title'), t('libation_editor.delete_confirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             if (!user?.id) {
-              Alert.alert('Error', 'You must be logged in to delete recipes');
+              Alert.alert(t('common.error'), t('libation_editor.error_not_authenticated_delete'));
               return;
             }
 
@@ -298,7 +300,7 @@ export default function LibationRecipesEditorScreen() {
               console.error('Error deleting libation recipe:', error);
               throw error;
             }
-            Alert.alert('Success', 'Recipe deleted successfully');
+            Alert.alert(t('common.success'), t('libation_editor.recipe_deleted'));
             loadRecipes();
           } catch (error: any) {
             console.error('Error deleting libation recipe:', error);
@@ -397,7 +399,7 @@ export default function LibationRecipesEditorScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Libation Recipes Editor</Text>
+        <Text style={styles.headerTitle}>{t('libation_editor.title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -410,12 +412,12 @@ export default function LibationRecipesEditorScreen() {
             size={24}
             color={managerColors.text}
           />
-          <Text style={styles.addButtonText}>Add Recipe</Text>
+          <Text style={styles.addButtonText}>{t('libation_editor.add_recipe')}</Text>
         </TouchableOpacity>
 
         {/* Recipes List by Category */}
         {Object.keys(recipesByCategory).length === 0 ? (
-          <Text style={styles.emptyText}>No recipes found. Add your first recipe!</Text>
+          <Text style={styles.emptyText}>{t('libation_editor.no_recipes')}</Text>
         ) : (
           Object.entries(recipesByCategory).map(([cat, categoryRecipes], categoryIndex) => (
             <React.Fragment key={categoryIndex}>
@@ -445,13 +447,13 @@ export default function LibationRecipesEditorScreen() {
                         style={styles.editButton}
                         onPress={() => openEditModal(recipe)}
                       >
-                        <Text style={styles.buttonText}>Edit</Text>
+                        <Text style={styles.buttonText}>{t('common.edit')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.deleteButton}
                         onPress={() => handleDelete(recipe)}
                       >
-                        <Text style={styles.buttonText}>Delete</Text>
+                        <Text style={styles.buttonText}>{t('common.delete')}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -479,7 +481,7 @@ export default function LibationRecipesEditorScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingRecipe ? 'Edit Recipe' : 'Add Recipe'}
+                {editingRecipe ? t('libation_editor.modal_edit_title') : t('libation_editor.modal_add_title')}
               </Text>
               <TouchableOpacity onPress={closeModal}>
                 <IconSymbol
@@ -499,14 +501,14 @@ export default function LibationRecipesEditorScreen() {
             >
               {/* Image Upload */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Recipe Image</Text>
+                <Text style={styles.formLabel}>{t('libation_editor.image_label')}</Text>
                 <TouchableOpacity
                   style={styles.imagePickerButton}
                   onPress={pickImage}
                   disabled={uploadingImage}
                 >
                   <Text style={styles.imagePickerButtonText}>
-                    {uploadingImage ? 'Uploading...' : 'Choose Image'}
+                    {uploadingImage ? t('libation_editor.uploading') : t('libation_editor.choose_image')}
                   </Text>
                 </TouchableOpacity>
                 {thumbnailUrl && (
@@ -520,7 +522,7 @@ export default function LibationRecipesEditorScreen() {
 
               {/* Category */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Category *</Text>
+                <Text style={styles.formLabel}>{t('libation_editor.category_label')}</Text>
                 <View style={styles.picker}>
                   {CATEGORIES.map((cat, index) => (
                     <TouchableOpacity

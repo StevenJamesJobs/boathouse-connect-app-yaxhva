@@ -10,9 +10,11 @@ import {
 import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 export default function BartenderAssistantEditorScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'encyclopedia' | 'exams'>('encyclopedia');
 
   return (
@@ -27,7 +29,7 @@ export default function BartenderAssistantEditorScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Bartender Assistant Editor</Text>
+        <Text style={styles.headerTitle}>{t('bartender_assistant_editor.title')}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -39,7 +41,7 @@ export default function BartenderAssistantEditorScreen() {
             onPress={() => setActiveTab('encyclopedia')}
           >
             <Text style={[styles.tabText, activeTab === 'encyclopedia' && styles.activeTabText]}>
-              Encyclopedia
+              {t('bartender_assistant_editor.tab_encyclopedia')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -47,7 +49,7 @@ export default function BartenderAssistantEditorScreen() {
             onPress={() => setActiveTab('exams')}
           >
             <Text style={[styles.tabText, activeTab === 'exams' && styles.activeTabText]}>
-              Bar Exams
+              {t('bartender_assistant_editor.tab_bar_exams')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -64,9 +66,9 @@ export default function BartenderAssistantEditorScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Checklists Editor</Text>
+                  <Text style={styles.cardTitle}>{t('bartender_assistant_editor.checklists_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Manage opening and closing checklists
+                    {t('bartender_assistant_editor.checklists_editor_desc')}
                   </Text>
                 </View>
               </View>
@@ -83,7 +85,7 @@ export default function BartenderAssistantEditorScreen() {
                     size={24}
                     color={managerColors.highlight}
                   />
-                  <Text style={styles.subCardText}>Opening Checklist Editor</Text>
+                  <Text style={styles.subCardText}>{t('bartender_assistant_editor.opening_checklist_editor')}</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
@@ -94,7 +96,7 @@ export default function BartenderAssistantEditorScreen() {
               </TouchableOpacity>
 
               {/* Closing Checklist Editor */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.subCardButton}
                 onPress={() => router.push('/bartender-closing-checklist-editor')}
               >
@@ -105,7 +107,7 @@ export default function BartenderAssistantEditorScreen() {
                     size={24}
                     color={managerColors.highlight}
                   />
-                  <Text style={styles.subCardText}>Closing Checklist Editor</Text>
+                  <Text style={styles.subCardText}>{t('bartender_assistant_editor.closing_checklist_editor')}</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
@@ -130,9 +132,9 @@ export default function BartenderAssistantEditorScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>Libation Recipes Editor</Text>
+                  <Text style={styles.cardTitle}>{t('bartender_assistant_editor.libation_recipes_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Add and manage cocktail recipes by category
+                    {t('bartender_assistant_editor.libation_recipes_editor_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -158,9 +160,9 @@ export default function BartenderAssistantEditorScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>Cocktails A-Z Editor</Text>
+                  <Text style={styles.cardTitle}>{t('bartender_assistant_editor.cocktails_az_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Add and manage cocktail recipes alphabetically
+                    {t('bartender_assistant_editor.cocktails_az_editor_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -186,9 +188,9 @@ export default function BartenderAssistantEditorScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>Purees & Simple Syrups Recipes Editor</Text>
+                  <Text style={styles.cardTitle}>{t('bartender_assistant_editor.purees_syrups_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Manage puree and simple syrup recipes
+                    {t('bartender_assistant_editor.purees_syrups_editor_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -216,9 +218,9 @@ export default function BartenderAssistantEditorScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>Weekly Quiz Editor</Text>
+                  <Text style={styles.cardTitle}>{t('bartender_assistant_editor.weekly_quiz_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Create and manage weekly bartending quizzes
+                    {t('bartender_assistant_editor.weekly_quiz_editor_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -239,7 +241,7 @@ export default function BartenderAssistantEditorScreen() {
                 color={managerColors.highlight}
               />
               <Text style={styles.infoText}>
-                More exam editor sections will be added here in the future!
+                {t('bartender_assistant_editor.more_exam_editors_coming')}
               </Text>
             </View>
           </>

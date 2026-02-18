@@ -11,11 +11,13 @@ import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { useAuth } from '@/contexts/AuthContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 export default function BartenderBinderScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  
+  const { t } = useTranslation();
+
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
   return (
@@ -30,7 +32,7 @@ export default function BartenderBinderScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Bartender Binder</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('bartender_binder.title')}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -45,9 +47,9 @@ export default function BartenderBinderScreen() {
               color={colors.primary}
             />
             <View style={styles.cardHeaderText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Checklists</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_binder.checklists')}</Text>
               <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                Daily opening and closing checklists
+                {t('bartender_binder.checklists_desc')}
               </Text>
             </View>
           </View>
@@ -64,7 +66,7 @@ export default function BartenderBinderScreen() {
                 size={24}
                 color={colors.primary}
               />
-              <Text style={[styles.subCardText, { color: colors.text }]}>Opening Checklist</Text>
+              <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_binder.opening_checklist')}</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -86,7 +88,7 @@ export default function BartenderBinderScreen() {
                 size={24}
                 color={colors.primary}
               />
-              <Text style={[styles.subCardText, { color: colors.text }]}>Closing Checklist</Text>
+              <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_binder.closing_checklist')}</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -107,9 +109,9 @@ export default function BartenderBinderScreen() {
               color={colors.primary}
             />
             <View style={styles.cardHeaderText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Purees & Syrups Recipes</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_binder.purees_syrups')}</Text>
               <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                Recipe collection for purees and simple syrups
+                {t('bartender_binder.purees_syrups_desc')}
               </Text>
             </View>
           </View>
@@ -126,7 +128,7 @@ export default function BartenderBinderScreen() {
                 size={24}
                 color={colors.primary}
               />
-              <Text style={[styles.subCardText, { color: colors.text }]}>View Recipes</Text>
+              <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_binder.view_recipes')}</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"

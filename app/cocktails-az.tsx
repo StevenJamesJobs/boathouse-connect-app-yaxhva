@@ -13,6 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { useAuth } from '@/contexts/AuthContext';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -33,6 +34,7 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function CocktailsAZScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
@@ -128,7 +130,7 @@ export default function CocktailsAZScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Cocktails A-Z</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('cocktails.title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -142,7 +144,7 @@ export default function CocktailsAZScreen() {
         />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Search by name, ingredient, or alcohol type..."
+          placeholder={t('cocktails.search_placeholder')}
           placeholderTextColor={colors.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -175,9 +177,9 @@ export default function CocktailsAZScreen() {
                   size={64}
                   color={colors.textSecondary}
                 />
-                <Text style={[styles.emptyText, { color: colors.text }]}>No cocktails found</Text>
+                <Text style={[styles.emptyText, { color: colors.text }]}>{t('cocktails.no_results')}</Text>
                 <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                  Try adjusting your search or filter
+                  {t('cocktails.no_results_hint')}
                 </Text>
               </View>
             ) : (
@@ -223,7 +225,7 @@ export default function CocktailsAZScreen() {
                   selectedLetter === null && { color: colors.text },
                 ]}
               >
-                All
+                {t('cocktails.all')}
               </Text>
             </TouchableOpacity>
             {ALPHABET.map((letter, index) => (
@@ -290,19 +292,19 @@ export default function CocktailsAZScreen() {
               )}
 
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Alcohol Type</Text>
+                <Text style={styles.detailLabel}>{t('cocktails.alcohol_type')}</Text>
                 <View style={[styles.alcoholTypeBadge, { backgroundColor: colors.primary }]}>
                   <Text style={[styles.alcoholTypeText, { color: colors.text }]}>{selectedCocktail?.alcohol_type}</Text>
                 </View>
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Ingredients</Text>
+                <Text style={styles.detailLabel}>{t('cocktails.ingredients')}</Text>
                 <Text style={styles.detailText}>{selectedCocktail?.ingredients}</Text>
               </View>
 
               <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>Procedure</Text>
+                <Text style={styles.detailLabel}>{t('cocktails.procedure')}</Text>
                 <Text style={styles.detailText}>{selectedCocktail?.procedure}</Text>
               </View>
             </ScrollView>

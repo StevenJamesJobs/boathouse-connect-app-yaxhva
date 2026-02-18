@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { managerColors } from '@/styles/commonStyles';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
+import { useTranslation } from 'react-i18next';
 
 interface Cocktail {
   id: string;
@@ -49,6 +50,7 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function CocktailsAZEditorScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
@@ -112,7 +114,7 @@ export default function CocktailsAZEditorScreen() {
       setCocktails(data || []);
     } catch (error) {
       console.error('Error loading cocktails:', error);
-      Alert.alert('Error', 'Failed to load cocktails');
+      Alert.alert(t('common.error'), t('cocktails_editor.no_cocktails'));
     } finally {
       setLoading(false);
     }
@@ -136,13 +138,13 @@ export default function CocktailsAZEditorScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      Alert.alert(t('common.error'), t('cocktails_editor.error_pick_image'));
     }
   };
 
   const uploadImage = async (uri: string) => {
     if (!user?.id) {
-      Alert.alert('Error', 'You must be logged in to upload images');
+      Alert.alert(t('common.error'), t('cocktails_editor.error_not_authenticated_upload'));
       return;
     }
 
@@ -197,7 +199,7 @@ export default function CocktailsAZEditorScreen() {
 
       console.log('Public URL:', urlData.publicUrl);
       setThumbnailUrl(urlData.publicUrl);
-      Alert.alert('Success', 'Image uploaded successfully');
+      Alert.alert(t('common.success'), t('cocktails_editor.image_uploaded'));
     } catch (error: any) {
       console.error('Error uploading image:', error);
       Alert.alert('Error', error.message || 'Failed to upload image');
@@ -209,22 +211,22 @@ export default function CocktailsAZEditorScreen() {
   const handleSave = async () => {
     try {
       if (!name.trim()) {
-        Alert.alert('Error', 'Please enter a cocktail name');
+        Alert.alert(t('common.error'), t('cocktails_editor.error_no_name'));
         return;
       }
 
       if (!alcoholType) {
-        Alert.alert('Error', 'Please select an alcohol type');
+        Alert.alert(t('common.error'), t('cocktails_editor.error_no_alcohol_type'));
         return;
       }
 
       if (!ingredients.trim()) {
-        Alert.alert('Error', 'Please enter ingredients');
+        Alert.alert(t('common.error'), t('cocktails_editor.error_no_ingredients'));
         return;
       }
 
       if (!user?.id) {
-        Alert.alert('Error', 'You must be logged in to save cocktails');
+        Alert.alert(t('common.error'), t('cocktails_editor.error_not_authenticated'));
         return;
       }
 
@@ -249,7 +251,7 @@ export default function CocktailsAZEditorScreen() {
           throw error;
         }
         console.log('Cocktail updated successfully');
-        Alert.alert('Success', 'Cocktail updated successfully');
+        Alert.alert(t('common.success'), t('cocktails_editor.cocktail_updated'));
       } else {
         // Insert new cocktail using RPC function (same pattern as profile update)
         console.log('Adding new cocktail');
@@ -268,7 +270,7 @@ export default function CocktailsAZEditorScreen() {
           throw error;
         }
         console.log('Cocktail added successfully');
-        Alert.alert('Success', 'Cocktail added successfully');
+        Alert.alert(t('common.success'), t('cocktails_editor.cocktail_added'));
       }
 
       setShowModal(false);
@@ -283,15 +285,15 @@ export default function CocktailsAZEditorScreen() {
   };
 
   const handleDelete = async (cocktail: Cocktail) => {
-    Alert.alert('Delete Cocktail', 'Are you sure you want to delete this cocktail?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('cocktails_editor.delete_title'), t('cocktails_editor.delete_confirm'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Delete',
+        text: t('common.delete'),
         style: 'destructive',
         onPress: async () => {
           try {
             if (!user?.id) {
-              Alert.alert('Error', 'You must be logged in to delete cocktails');
+              Alert.alert(t('common.error'), t('cocktails_editor.error_not_authenticated_delete'));
               return;
             }
 
@@ -306,7 +308,7 @@ export default function CocktailsAZEditorScreen() {
               console.error('Error deleting cocktail:', error);
               throw error;
             }
-            Alert.alert('Success', 'Cocktail deleted successfully');
+            Alert.alert(t('common.success'), t('cocktails_editor.cocktail_deleted'));
             loadCocktails();
           } catch (error: any) {
             console.error('Error deleting cocktail:', error);
@@ -373,7 +375,7 @@ export default function CocktailsAZEditorScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Cocktails A-Z Editor</Text>
+        <Text style={styles.headerTitle}>{t('cocktails_editor.title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -390,7 +392,7 @@ export default function CocktailsAZEditorScreen() {
                 size={24}
                 color={managerColors.text}
               />
-              <Text style={styles.addButtonText}>Add Cocktail</Text>
+              <Text style={styles.addButtonText}>{t('cocktails_editor.add_cocktail')}</Text>
             </TouchableOpacity>
 
             {/* Search Box */}
@@ -403,7 +405,7 @@ export default function CocktailsAZEditorScreen() {
               />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search cocktails..."
+                placeholder={t('cocktails_editor.search_placeholder')}
                 placeholderTextColor={managerColors.textSecondary}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
@@ -422,7 +424,7 @@ export default function CocktailsAZEditorScreen() {
 
             {/* Cocktails List - Compact Cards */}
             {filteredCocktails.length === 0 ? (
-              <Text style={styles.emptyText}>No cocktails found</Text>
+              <Text style={styles.emptyText}>{t('cocktails_editor.no_cocktails')}</Text>
             ) : (
               filteredCocktails.map((cocktail, index) => (
                 <View key={index} style={styles.cocktailCard}>
@@ -435,13 +437,13 @@ export default function CocktailsAZEditorScreen() {
                       style={styles.editButton}
                       onPress={() => openEditModal(cocktail)}
                     >
-                      <Text style={styles.buttonText}>Edit</Text>
+                      <Text style={styles.buttonText}>{t('common.edit')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.deleteButton}
                       onPress={() => handleDelete(cocktail)}
                     >
-                      <Text style={styles.buttonText}>Delete</Text>
+                      <Text style={styles.buttonText}>{t('common.delete')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -469,7 +471,7 @@ export default function CocktailsAZEditorScreen() {
                   selectedLetter === null && styles.alphabetButtonTextActive,
                 ]}
               >
-                All
+                {t('cocktails_editor.all_letters')}
               </Text>
             </TouchableOpacity>
             {ALPHABET.map((letter, index) => (
@@ -508,7 +510,7 @@ export default function CocktailsAZEditorScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingCocktail ? 'Edit Cocktail' : 'Add Cocktail'}
+                {editingCocktail ? t('cocktails_editor.modal_edit_title') : t('cocktails_editor.modal_add_title')}
               </Text>
               <TouchableOpacity onPress={closeModal}>
                 <IconSymbol
@@ -523,19 +525,19 @@ export default function CocktailsAZEditorScreen() {
             <ScrollView style={styles.modalForm}>
               {/* Name */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Cocktail Name *</Text>
+                <Text style={styles.formLabel}>{t('cocktails_editor.cocktail_name_label')}</Text>
                 <TextInput
                   style={styles.formInput}
                   value={name}
                   onChangeText={setName}
-                  placeholder="Enter cocktail name"
+                  placeholder={t('cocktails_editor.cocktail_name_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                 />
               </View>
 
               {/* Alcohol Type */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Alcohol Type *</Text>
+                <Text style={styles.formLabel}>{t('cocktails_editor.alcohol_type_label')}</Text>
                 <View style={styles.picker}>
                   {ALCOHOL_TYPES.map((type, index) => (
                     <TouchableOpacity
@@ -563,12 +565,12 @@ export default function CocktailsAZEditorScreen() {
 
               {/* Ingredients */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Ingredients *</Text>
+                <Text style={styles.formLabel}>{t('cocktails_editor.ingredients_label')}</Text>
                 <TextInput
                   style={[styles.formInput, styles.textArea]}
                   value={ingredients}
                   onChangeText={setIngredients}
-                  placeholder="Enter ingredients"
+                  placeholder={t('cocktails_editor.ingredients_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                   multiline
                   numberOfLines={4}
@@ -577,12 +579,12 @@ export default function CocktailsAZEditorScreen() {
 
               {/* Procedure */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Procedure</Text>
+                <Text style={styles.formLabel}>{t('cocktails_editor.procedure_label')}</Text>
                 <TextInput
                   style={[styles.formInput, styles.textArea]}
                   value={procedure}
                   onChangeText={setProcedure}
-                  placeholder="Enter preparation instructions (optional)"
+                  placeholder={t('cocktails_editor.procedure_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                   multiline
                   numberOfLines={4}
@@ -591,14 +593,14 @@ export default function CocktailsAZEditorScreen() {
 
               {/* Image Upload */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>Cocktail Image</Text>
+                <Text style={styles.formLabel}>{t('cocktails_editor.image_label')}</Text>
                 <TouchableOpacity
                   style={styles.imagePickerButton}
                   onPress={pickImage}
                   disabled={uploadingImage}
                 >
                   <Text style={styles.imagePickerButtonText}>
-                    {uploadingImage ? 'Uploading...' : 'Choose Image'}
+                    {uploadingImage ? t('cocktails_editor.uploading') : t('cocktails_editor.choose_image')}
                   </Text>
                 </TouchableOpacity>
                 {thumbnailUrl && (
@@ -620,7 +622,7 @@ export default function CocktailsAZEditorScreen() {
                   <ActivityIndicator color={managerColors.text} />
                 ) : (
                   <Text style={styles.submitButtonText}>
-                    {editingCocktail ? 'Update Cocktail' : 'Add Cocktail'}
+                    {editingCocktail ? t('cocktails_editor.update_button') : t('cocktails_editor.add_button')}
                   </Text>
                 )}
               </TouchableOpacity>

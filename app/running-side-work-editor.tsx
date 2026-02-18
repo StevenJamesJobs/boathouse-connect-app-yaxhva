@@ -4,6 +4,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { managerColors } from '@/styles/commonStyles';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -257,6 +258,7 @@ const styles = StyleSheet.create({
 
 export default function RunningSideWorkEditorScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [categories, setCategories] = useState<ChecklistCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -307,7 +309,7 @@ export default function RunningSideWorkEditorScreen() {
       console.log('Loaded checklist with', categoriesWithItems.length, 'categories');
     } catch (error) {
       console.error('Error loading checklist:', error);
-      Alert.alert('Error', 'Failed to load checklist. Please try again.');
+      Alert.alert(t('common:error'), t('checklist_editor:error_load_checklist'));
     } finally {
       setLoading(false);
     }
@@ -357,7 +359,7 @@ export default function RunningSideWorkEditorScreen() {
 
   const handleSaveCategory = async () => {
     if (!categoryName.trim()) {
-      Alert.alert('Error', 'Please enter a category name');
+      Alert.alert(t('common:error'), t('checklist_editor:error_enter_category_name'));
       return;
     }
 
@@ -388,18 +390,18 @@ export default function RunningSideWorkEditorScreen() {
       loadChecklist();
     } catch (error) {
       console.error('Error saving category:', error);
-      Alert.alert('Error', 'Failed to save category. Please try again.');
+      Alert.alert(t('common:error'), t('checklist_editor:error_save_category'));
     }
   };
 
   const handleDeleteCategory = async (category: ChecklistCategory) => {
     Alert.alert(
-      'Delete Category',
-      `Are you sure you want to delete "${category.name}" and all its items?`,
+      t('checklist_editor:delete_category_title'),
+      t('checklist_editor:delete_category_confirm', { name: category.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -413,7 +415,7 @@ export default function RunningSideWorkEditorScreen() {
               loadChecklist();
             } catch (error) {
               console.error('Error deleting category:', error);
-              Alert.alert('Error', 'Failed to delete category. Please try again.');
+              Alert.alert(t('common:error'), t('checklist_editor:error_delete_category'));
             }
           },
         },
@@ -423,12 +425,12 @@ export default function RunningSideWorkEditorScreen() {
 
   const handleSaveItem = async () => {
     if (!itemText.trim()) {
-      Alert.alert('Error', 'Please enter item text');
+      Alert.alert(t('common:error'), t('checklist_editor:error_enter_item_text'));
       return;
     }
 
     if (!selectedCategoryId) {
-      Alert.alert('Error', 'No category selected');
+      Alert.alert(t('common:error'), t('checklist_editor:error_no_category_selected'));
       return;
     }
 
@@ -461,18 +463,18 @@ export default function RunningSideWorkEditorScreen() {
       loadChecklist();
     } catch (error) {
       console.error('Error saving item:', error);
-      Alert.alert('Error', 'Failed to save item. Please try again.');
+      Alert.alert(t('common:error'), t('checklist_editor:error_save_item'));
     }
   };
 
   const handleDeleteItem = async (item: ChecklistItem) => {
     Alert.alert(
-      'Delete Item',
-      'Are you sure you want to delete this item?',
+      t('checklist_editor:delete_item_title'),
+      t('checklist_editor:delete_item_confirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -486,7 +488,7 @@ export default function RunningSideWorkEditorScreen() {
               loadChecklist();
             } catch (error) {
               console.error('Error deleting item:', error);
-              Alert.alert('Error', 'Failed to delete item. Please try again.');
+              Alert.alert(t('common:error'), t('checklist_editor:error_delete_item'));
             }
           },
         },
@@ -506,7 +508,7 @@ export default function RunningSideWorkEditorScreen() {
               color={managerColors.text}
             />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Running Side Work Editor</Text>
+          <Text style={styles.headerTitle}>{t('checklist_editor:running_side_work_editor')}</Text>
           <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
@@ -539,7 +541,7 @@ export default function RunningSideWorkEditorScreen() {
             size={24}
             color={managerColors.text}
           />
-          <Text style={styles.addButtonText}>Add Category</Text>
+          <Text style={styles.addButtonText}>{t('checklist_editor:add_category')}</Text>
         </TouchableOpacity>
 
         {categories.map((category) => {
@@ -562,7 +564,7 @@ export default function RunningSideWorkEditorScreen() {
                   <View style={styles.categoryHeaderText}>
                     <Text style={styles.categoryTitle}>{category.name}</Text>
                     <Text style={styles.categoryItemCount}>
-                      {category.items.length} items
+                      {t('checklist_editor:items_count', { count: category.items.length })}
                     </Text>
                   </View>
                 </TouchableOpacity>
@@ -635,7 +637,7 @@ export default function RunningSideWorkEditorScreen() {
                       size={20}
                       color={managerColors.text}
                     />
-                    <Text style={styles.addItemButtonText}>Add Item</Text>
+                    <Text style={styles.addItemButtonText}>{t('checklist_editor:add_item')}</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -658,11 +660,11 @@ export default function RunningSideWorkEditorScreen() {
             <Text style={styles.modalTitle}>
               {editingId
                 ? modalType === 'category'
-                  ? 'Edit Category'
-                  : 'Edit Item'
+                  ? t('checklist_editor:edit_category')
+                  : t('checklist_editor:edit_item')
                 : modalType === 'category'
-                ? 'Add Category'
-                : 'Add Item'}
+                ? t('checklist_editor:add_category')
+                : t('checklist_editor:add_item')}
             </Text>
 
             {modalType === 'category' ? (
@@ -671,7 +673,7 @@ export default function RunningSideWorkEditorScreen() {
                   style={styles.input}
                   value={categoryName}
                   onChangeText={setCategoryName}
-                  placeholder="Category name (e.g., Restrooms)"
+                  placeholder={t('checklist_editor:category_name_placeholder_side_work')}
                   placeholderTextColor={managerColors.textSecondary}
                   autoFocus
                 />
@@ -682,14 +684,14 @@ export default function RunningSideWorkEditorScreen() {
                   style={[styles.input, styles.textArea]}
                   value={itemText}
                   onChangeText={setItemText}
-                  placeholder="Item text"
+                  placeholder={t('checklist_editor:item_text_placeholder')}
                   placeholderTextColor={managerColors.textSecondary}
                   multiline
                   numberOfLines={3}
                   autoFocus
                 />
 
-                <Text style={styles.inputLabel}>Category</Text>
+                <Text style={styles.inputLabel}>{t('checklist_editor:category_label')}</Text>
                 <ScrollView style={styles.categoryPicker}>
                   {categories.map((cat) => (
                     <TouchableOpacity
@@ -719,13 +721,13 @@ export default function RunningSideWorkEditorScreen() {
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => setModalVisible(false)}
               >
-                <Text style={styles.modalButtonText}>Cancel</Text>
+                <Text style={styles.modalButtonText}>{t('common:cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalButton, styles.saveButton]}
                 onPress={modalType === 'category' ? handleSaveCategory : handleSaveItem}
               >
-                <Text style={styles.modalButtonText}>Save</Text>
+                <Text style={styles.modalButtonText}>{t('common:save')}</Text>
               </TouchableOpacity>
             </View>
           </View>

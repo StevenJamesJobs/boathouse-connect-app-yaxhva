@@ -1,6 +1,7 @@
 
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
+import { useTranslation } from 'react-i18next';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   View,
@@ -104,6 +105,7 @@ interface SpecialFeature {
 
 export default function ManagerPortalScreen() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams();
   const { unreadCount } = useUnreadMessages();
@@ -539,7 +541,7 @@ export default function ManagerPortalScreen() {
                   </View>
                 )}
               </View>
-              <Text style={styles.compactMessageLabel}>Messages</Text>
+              <Text style={styles.compactMessageLabel}>{t('common.messages')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -582,7 +584,7 @@ export default function ManagerPortalScreen() {
               activeOpacity={0.7}
             >
               <Text style={[styles.tabText, whatsHappeningTab === 'Announcements' && styles.activeTabText]}>
-                Announcements
+                {t('manager_home.announcements')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -591,7 +593,7 @@ export default function ManagerPortalScreen() {
               activeOpacity={0.7}
             >
               <Text style={[styles.tabText, whatsHappeningTab === 'Special Features' && styles.activeTabText]}>
-                Special Features
+                {t('manager_home.special_features')}
               </Text>
             </TouchableOpacity>
           </View>
@@ -602,11 +604,11 @@ export default function ManagerPortalScreen() {
               {loadingAnnouncements ? (
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="small" color={managerColors.highlight} />
-                  <Text style={styles.loadingText}>Loading announcements...</Text>
+                  <Text style={styles.loadingText}>{t('manager_home.loading')}</Text>
                 </View>
               ) : announcements.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No announcements available</Text>
+                  <Text style={styles.emptyText}>{t('manager_home.announcements')}</Text>
                   <Text style={styles.emptySubtext}>Create announcements in the Announcement Editor</Text>
                 </View>
               ) : (

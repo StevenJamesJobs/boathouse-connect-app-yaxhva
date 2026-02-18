@@ -13,6 +13,7 @@ import {
   FlatList,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -35,6 +36,7 @@ interface RecipientGroup {
 }
 
 export default function ComposeMessageScreen() {
+  const { t } = useTranslation('compose');
   const { user } = useAuth();
   const { sendNotification } = useNotification();
   const router = useRouter();
@@ -120,7 +122,7 @@ export default function ComposeMessageScreen() {
       setAllUsers(data || []);
     } catch (error) {
       console.error('Error loading users:', error);
-      Alert.alert('Error', 'Failed to load users');
+      Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_load_users'));
     }
   }, [user?.id]);
 
@@ -253,12 +255,12 @@ export default function ComposeMessageScreen() {
 
   const handleSend = async () => {
     if (selectedRecipients.length === 0) {
-      Alert.alert('Error', 'Please select at least one recipient');
+      Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_no_recipients'));
       return;
     }
 
     if (!body.trim()) {
-      Alert.alert('Error', 'Please enter a message');
+      Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_no_message'));
       return;
     }
 
@@ -333,12 +335,12 @@ export default function ComposeMessageScreen() {
         console.error('Failed to send push notification:', notificationError);
       }
 
-      Alert.alert('Success', 'Message sent successfully!', [
-        { text: 'OK', onPress: () => router.back() },
+      Alert.alert(t('common:success', { defaultValue: 'Success' }), t('message_sent'), [
+        { text: t('common:ok', { defaultValue: 'OK' }), onPress: () => router.back() },
       ]);
     } catch (error) {
       console.error('Error sending message:', error);
-      Alert.alert('Error', 'Failed to send message');
+      Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_send'));
     } finally {
       setSending(false);
     }
@@ -348,7 +350,7 @@ export default function ComposeMessageScreen() {
     if (u.job_titles && Array.isArray(u.job_titles) && u.job_titles.length > 0) {
       return u.job_titles.join(', ');
     }
-    return u.job_title || 'No job title';
+    return u.job_title || t('no_job_title');
   };
 
   // Filter users based on search query
@@ -377,7 +379,7 @@ export default function ComposeMessageScreen() {
           />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {replyToMessageId ? (isReplyAll ? 'Reply All' : 'Reply') : 'New Message'}
+          {replyToMessageId ? (isReplyAll ? t('reply_all') : t('reply')) : t('new_message')}
         </Text>
         <View style={styles.headerRight} />
       </View>
@@ -385,7 +387,7 @@ export default function ComposeMessageScreen() {
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
         {/* Recipients */}
         <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.text }]}>To:</Text>
+          <Text style={[styles.label, { color: colors.text }]}>{t('to')}</Text>
           <TouchableOpacity
             style={[styles.recipientButton, { backgroundColor: colors.card, borderColor: colors.border }]}
             onPress={() => setShowRecipientPicker(true)}
@@ -398,8 +400,8 @@ export default function ComposeMessageScreen() {
             />
             <Text style={[styles.recipientButtonText, { color: colors.text }]}>
               {selectedRecipients.length === 0
-                ? 'Select Recipients'
-                : `${selectedRecipients.length} recipient${selectedRecipients.length > 1 ? 's' : ''} selected`}
+                ? t('select_recipients')
+                : t('recipients_selected', { count: selectedRecipients.length })}
             </Text>
           </TouchableOpacity>
 
@@ -427,24 +429,24 @@ export default function ComposeMessageScreen() {
 
         {/* Subject */}
         <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.text }]}>Subject (Optional):</Text>
+          <Text style={[styles.label, { color: colors.text }]}>{t('subject_optional')}</Text>
           <TextInput
             style={[styles.input, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
             value={subject}
             onChangeText={setSubject}
-            placeholder="Enter subject"
+            placeholder={t('subject_placeholder')}
             placeholderTextColor={colors.textSecondary}
           />
         </View>
 
         {/* Message Body */}
         <View style={styles.section}>
-          <Text style={[styles.label, { color: colors.text }]}>Message:</Text>
+          <Text style={[styles.label, { color: colors.text }]}>{t('message_label')}</Text>
           <TextInput
             style={[styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
             value={body}
             onChangeText={setBody}
-            placeholder="Type your message here..."
+            placeholder={t('message_placeholder')}
             placeholderTextColor={colors.textSecondary}
             multiline
             numberOfLines={10}
@@ -459,7 +461,7 @@ export default function ComposeMessageScreen() {
             onPress={() => router.back()}
           >
             <Text style={[styles.cancelButtonText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
-              Cancel
+              {t('common:cancel', { defaultValue: 'Cancel' })}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -478,7 +480,7 @@ export default function ComposeMessageScreen() {
                   color={user?.role === 'manager' ? colors.text : '#FFFFFF'}
                 />
                 <Text style={[styles.sendButtonText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
-                  Send
+                  {t('common:send', { defaultValue: 'Send' })}
                 </Text>
               </>
             )}
@@ -496,7 +498,7 @@ export default function ComposeMessageScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <View style={[styles.modalHeader, { backgroundColor: colors.card }]}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Select Recipients</Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>{t('select_recipients')}</Text>
               <TouchableOpacity onPress={() => setShowRecipientPicker(false)}>
                 <IconSymbol
                   ios_icon_name="xmark.circle.fill"
@@ -519,7 +521,7 @@ export default function ComposeMessageScreen() {
                 style={[styles.searchInput, { color: colors.text }]}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
-                placeholder="Search by name or job title..."
+                placeholder={t('search_placeholder')}
                 placeholderTextColor={colors.textSecondary}
               />
             </View>
@@ -527,7 +529,7 @@ export default function ComposeMessageScreen() {
             {/* Recipient Groups - Only show when no search query */}
             {searchQuery === '' && recipientGroups.length > 0 && (
               <View style={styles.groupsSection}>
-                <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>Quick Select</Text>
+                <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>{t('quick_select')}</Text>
                 {recipientGroups.map((group, index) => (
                   <TouchableOpacity
                     key={index}
@@ -554,7 +556,7 @@ export default function ComposeMessageScreen() {
             {/* Individual Users - Always show, either filtered or all users */}
             <View style={styles.usersSection}>
               <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-                {searchQuery === '' ? 'All Users' : 'Search Results'}
+                {searchQuery === '' ? t('all_users') : t('search_results')}
               </Text>
               <FlatList
                 data={filteredUsers}
@@ -586,7 +588,7 @@ export default function ComposeMessageScreen() {
                 ListEmptyComponent={
                   <View style={styles.emptyList}>
                     <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                      No users found
+                      {t('no_users_found')}
                     </Text>
                   </View>
                 }
@@ -599,7 +601,7 @@ export default function ComposeMessageScreen() {
               onPress={() => setShowRecipientPicker(false)}
             >
               <Text style={[styles.doneButtonText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
-                Done ({selectedRecipients.length} selected)
+                {t('done', { count: selectedRecipients.length })}
               </Text>
             </TouchableOpacity>
           </View>

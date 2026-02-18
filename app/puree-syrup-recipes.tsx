@@ -13,6 +13,7 @@ import {
   Animated,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { useAuth } from '@/contexts/AuthContext';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -36,6 +37,7 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1587049352846-4a222
 
 export default function PureeSyrupRecipesScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [recipes, setRecipes] = useState<PureeSyrupRecipe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -96,6 +98,14 @@ export default function PureeSyrupRecipesScreen() {
     return `${url}?t=${Date.now()}`;
   };
 
+  const getCategoryLabel = (category: string) => {
+    const map: Record<string, string> = {
+      'Purees': t('purees_syrups.purees'),
+      'Simple Syrups': t('purees_syrups.simple_syrups'),
+    };
+    return map[category] ?? category;
+  };
+
   // Group recipes by category
   const recipesByCategory = CATEGORIES.reduce((acc, category) => {
     const categoryRecipes = recipes.filter(r => r.category === category);
@@ -131,7 +141,7 @@ export default function PureeSyrupRecipesScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Purees & Syrups Recipes</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('purees_syrups.title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -149,16 +159,16 @@ export default function PureeSyrupRecipesScreen() {
                 size={64}
                 color={colors.textSecondary}
               />
-              <Text style={[styles.emptyText, { color: colors.text }]}>No recipes available</Text>
+              <Text style={[styles.emptyText, { color: colors.text }]}>{t('purees_syrups.no_recipes')}</Text>
               <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                Check back later for new puree and syrup recipes!
+                {t('purees_syrups.check_back')}
               </Text>
             </View>
           ) : (
             Object.entries(recipesByCategory).map(([category, categoryRecipes], categoryIndex) => (
               <React.Fragment key={categoryIndex}>
                 {/* Category Header */}
-                <Text style={[styles.categoryTitle, { color: colors.text }]}>{category}</Text>
+                <Text style={[styles.categoryTitle, { color: colors.text }]}>{getCategoryLabel(category)}</Text>
 
                 {/* Recipe Tiles in 2 columns */}
                 <View style={styles.tilesContainer}>
@@ -258,7 +268,7 @@ export default function PureeSyrupRecipesScreen() {
                   <View style={styles.infoRow}>
                     {selectedRecipe?.category && (
                       <View style={styles.infoItem}>
-                        <Text style={styles.infoLabel}>Category</Text>
+                        <Text style={styles.infoLabel}>{t('purees_syrups.category')}</Text>
                         <Text style={styles.infoValue}>{selectedRecipe.category}</Text>
                       </View>
                     )}
@@ -277,7 +287,7 @@ export default function PureeSyrupRecipesScreen() {
                       size={24}
                       color="#3498DB"
                     />
-                    <Text style={styles.sectionTitleBlue}>Ingredients</Text>
+                    <Text style={styles.sectionTitleBlue}>{t('purees_syrups.ingredients')}</Text>
                   </View>
                   {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
                     <View style={styles.ingredientsList}>
@@ -290,7 +300,7 @@ export default function PureeSyrupRecipesScreen() {
                       ))}
                     </View>
                   ) : (
-                    <Text style={styles.noDataText}>No ingredients listed</Text>
+                    <Text style={styles.noDataText}>{t('purees_syrups.no_ingredients')}</Text>
                   )}
                 </View>
 
@@ -307,7 +317,7 @@ export default function PureeSyrupRecipesScreen() {
                         size={30}
                         color="#E74C3C"
                       />
-                      <Text style={styles.sectionTitleRed}>Procedure</Text>
+                      <Text style={styles.sectionTitleRed}>{t('purees_syrups.procedure')}</Text>
                     </View>
                     <Text style={styles.procedureText}>{selectedRecipe.procedure}</Text>
                   </View>

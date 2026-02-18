@@ -10,9 +10,11 @@ import {
 import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 export default function HostAssistantEditorScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'encyclopedia' | 'exams'>('encyclopedia');
 
   return (
@@ -27,7 +29,7 @@ export default function HostAssistantEditorScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Host Assistant Editor</Text>
+        <Text style={styles.headerTitle}>{t('host_assistant_editor.title')}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -39,7 +41,7 @@ export default function HostAssistantEditorScreen() {
             onPress={() => setActiveTab('encyclopedia')}
           >
             <Text style={[styles.tabText, activeTab === 'encyclopedia' && styles.activeTabText]}>
-              Encyclopedia
+              {t('host_assistant_editor.tab_encyclopedia')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -47,7 +49,7 @@ export default function HostAssistantEditorScreen() {
             onPress={() => setActiveTab('exams')}
           >
             <Text style={[styles.tabText, activeTab === 'exams' && styles.activeTabText]}>
-              Host Exams
+              {t('host_assistant_editor.tab_host_exams')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -64,9 +66,9 @@ export default function HostAssistantEditorScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>Checklists Editor</Text>
+                  <Text style={styles.cardTitle}>{t('host_assistant_editor.checklists_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Manage opening, running, and closing checklists
+                    {t('host_assistant_editor.checklists_editor_desc')}
                   </Text>
                 </View>
               </View>
@@ -83,7 +85,7 @@ export default function HostAssistantEditorScreen() {
                     size={24}
                     color={managerColors.highlight}
                   />
-                  <Text style={styles.subCardText}>Opening Checklist Editor</Text>
+                  <Text style={styles.subCardText}>{t('host_assistant_editor.opening_checklist_editor')}</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
@@ -94,7 +96,7 @@ export default function HostAssistantEditorScreen() {
               </TouchableOpacity>
 
               {/* Running Side Work Editor */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.subCardButton}
                 onPress={() => router.push('/running-side-work-editor')}
               >
@@ -105,7 +107,7 @@ export default function HostAssistantEditorScreen() {
                     size={24}
                     color={managerColors.highlight}
                   />
-                  <Text style={styles.subCardText}>Running Side Work Editor</Text>
+                  <Text style={styles.subCardText}>{t('host_assistant_editor.running_side_work_editor')}</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
@@ -116,7 +118,7 @@ export default function HostAssistantEditorScreen() {
               </TouchableOpacity>
 
               {/* Closing Checklist Editor */}
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.subCardButton}
                 onPress={() => router.push('/closing-checklist-editor')}
               >
@@ -127,7 +129,7 @@ export default function HostAssistantEditorScreen() {
                     size={24}
                     color={managerColors.highlight}
                   />
-                  <Text style={styles.subCardText}>Closing Checklist Editor</Text>
+                  <Text style={styles.subCardText}>{t('host_assistant_editor.closing_checklist_editor')}</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
@@ -153,9 +155,9 @@ export default function HostAssistantEditorScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.sectionCardText}>
-                  <Text style={styles.sectionCardTitle}>Weekly Quiz Editor</Text>
+                  <Text style={styles.sectionCardTitle}>{t('host_assistant_editor.weekly_quiz_editor')}</Text>
                   <Text style={styles.sectionCardDescription}>
-                    Create and manage weekly hosting quizzes
+                    {t('host_assistant_editor.weekly_quiz_editor_desc')}
                   </Text>
                 </View>
               </View>
@@ -176,7 +178,7 @@ export default function HostAssistantEditorScreen() {
                 color={managerColors.highlight}
               />
               <Text style={styles.infoText}>
-                More exam editor sections will be added here in the future!
+                {t('host_assistant_editor.more_exam_editors_coming')}
               </Text>
             </View>
           </>

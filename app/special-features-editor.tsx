@@ -24,6 +24,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useTranslation } from 'react-i18next';
 
 interface SpecialFeature {
   id: string;
@@ -51,6 +52,7 @@ interface GuideFile {
 const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
 
 export default function SpecialFeaturesEditorScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
   const { sendNotification } = useNotification();
@@ -151,7 +153,7 @@ export default function SpecialFeaturesEditorScreen() {
       setFeatures(data || []);
     } catch (error) {
       console.error('Error loading special features:', error);
-      Alert.alert('Error', 'Failed to load special features. Please try again.');
+      Alert.alert(t('common:error'), t('special_features_editor:load_error'));
     } finally {
       setLoading(false);
     }
@@ -171,7 +173,7 @@ export default function SpecialFeaturesEditorScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      Alert.alert(t('common:error'), t('special_features_editor:pick_image_error'));
     }
   };
 
@@ -224,7 +226,7 @@ export default function SpecialFeaturesEditorScreen() {
       return urlData.publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload image');
+      Alert.alert(t('common:error'), t('special_features_editor:upload_image_error'));
       return null;
     } finally {
       setUploadingImage(false);
@@ -233,17 +235,17 @@ export default function SpecialFeaturesEditorScreen() {
 
   const handleSave = async () => {
     if (!formData.title || !formData.message) {
-      Alert.alert('Error', 'Please fill in title and description');
+      Alert.alert(t('common:error'), t('special_features_editor:error_fill_fields'));
       return;
     }
 
     if (!user?.id) {
-      Alert.alert('Error', 'User not authenticated');
+      Alert.alert(t('common:error'), t('special_features_editor:error_not_authenticated'));
       return;
     }
 
     if (!editingFeature && features.length >= 15) {
-      Alert.alert('Limit Reached', 'You can only have up to 15 special features. Please delete an existing feature before adding a new one.');
+      Alert.alert(t('special_features_editor:limit_reached_title'), t('special_features_editor:limit_reached_msg'));
       return;
     }
 
@@ -282,7 +284,7 @@ export default function SpecialFeaturesEditorScreen() {
           throw error;
         }
         console.log('Special feature updated successfully');
-        Alert.alert('Success', 'Special feature updated successfully');
+        Alert.alert(t('common:success'), t('special_features_editor:updated_success'));
       } else {
         console.log('Creating new special feature');
         const { error } = await supabase.rpc('create_special_feature', {
@@ -319,30 +321,30 @@ export default function SpecialFeaturesEditorScreen() {
           console.error('Failed to send push notification:', notificationError);
         }
         
-        Alert.alert('Success', 'Special feature created successfully');
+        Alert.alert(t('common:success'), t('special_features_editor:created_success'));
       }
 
       closeModal();
       await loadFeatures();
     } catch (error: any) {
       console.error('Error saving special feature:', error);
-      Alert.alert('Error', error.message || 'Failed to save special feature');
+      Alert.alert(t('common:error'), error.message || t('special_features_editor:save_error'));
     }
   };
 
   const handleDelete = async (feature: SpecialFeature) => {
     Alert.alert(
-      'Delete Special Feature',
-      `Are you sure you want to delete "${feature.title}"?`,
+      t('special_features_editor:delete_title'),
+      t('special_features_editor:delete_confirm', { title: feature.title }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               if (!user?.id) {
-                Alert.alert('Error', 'User not authenticated');
+                Alert.alert(t('common:error'), t('special_features_editor:error_not_authenticated'));
                 return;
               }
 
@@ -368,12 +370,12 @@ export default function SpecialFeaturesEditorScreen() {
               }
 
               console.log('Special feature deleted successfully');
-              Alert.alert('Success', 'Special feature deleted successfully');
+              Alert.alert(t('common:success'), t('special_features_editor:deleted_success'));
               
               await loadFeatures();
             } catch (error: any) {
               console.error('Error deleting special feature:', error);
-              Alert.alert('Error', error.message || 'Failed to delete special feature');
+              Alert.alert(t('common:error'), error.message || t('special_features_editor:delete_error'));
             }
           },
         },
@@ -493,13 +495,13 @@ export default function SpecialFeaturesEditorScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Special Features Editor</Text>
+        <Text style={styles.headerTitle}>{t('special_features_editor:title')}</Text>
         <View style={styles.backButton} />
       </View>
 
       <View style={styles.subHeader}>
         <Text style={styles.headerSubtitle}>
-          {features.length} / 15 features
+          {t('special_features_editor:count', { count: features.length })}
         </Text>
       </View>
 
@@ -515,14 +517,14 @@ export default function SpecialFeaturesEditorScreen() {
           color={features.length >= 15 ? managerColors.textSecondary : managerColors.text}
         />
         <Text style={[styles.addNewItemButtonText, features.length >= 15 && styles.addNewItemButtonTextDisabled]}>
-          {features.length >= 15 ? 'Limit Reached (15/15)' : 'Add New Feature'}
+          {features.length >= 15 ? t('special_features_editor:limit_reached') : t('special_features_editor:add_button')}
         </Text>
       </TouchableOpacity>
 
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={managerColors.highlight} />
-          <Text style={styles.loadingText}>Loading features...</Text>
+          <Text style={styles.loadingText}>{t('special_features_editor:loading')}</Text>
         </View>
       ) : (
         <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
@@ -534,9 +536,9 @@ export default function SpecialFeaturesEditorScreen() {
                 size={64}
                 color={managerColors.textSecondary}
               />
-              <Text style={styles.emptyText}>No special features found</Text>
+              <Text style={styles.emptyText}>{t('special_features_editor:empty_title')}</Text>
               <Text style={styles.emptySubtext}>
-                Tap the &quot;Add New Feature&quot; button to create one
+                {t('special_features_editor:empty_subtitle')}
               </Text>
             </View>
           ) : (
@@ -579,7 +581,7 @@ export default function SpecialFeaturesEditorScreen() {
                               color={managerColors.textSecondary}
                             />
                             <Text style={styles.metaText}>
-                              Ends: {formatDateTime(feature.end_date_time)}
+                              {t('special_features_editor:ends_label', { datetime: formatDateTime(feature.end_date_time) })}
                             </Text>
                           </View>
                         )}
@@ -625,7 +627,7 @@ export default function SpecialFeaturesEditorScreen() {
                               color={managerColors.textSecondary}
                             />
                             <Text style={styles.metaText}>
-                              Ends: {formatDateTime(feature.end_date_time)}
+                              {t('special_features_editor:ends_label', { datetime: formatDateTime(feature.end_date_time) })}
                             </Text>
                           </View>
                         )}
@@ -644,7 +646,7 @@ export default function SpecialFeaturesEditorScreen() {
                       size={20}
                       color={managerColors.highlight}
                     />
-                    <Text style={styles.actionButtonText}>Edit</Text>
+                    <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionButton, styles.deleteButton]}
@@ -657,7 +659,7 @@ export default function SpecialFeaturesEditorScreen() {
                       color="#E74C3C"
                     />
                     <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                      Delete
+                      {t('common:delete')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -687,7 +689,7 @@ export default function SpecialFeaturesEditorScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingFeature ? 'Edit Feature' : 'Add Feature'}
+                {editingFeature ? t('special_features_editor:modal_edit') : t('special_features_editor:modal_add')}
               </Text>
               <TouchableOpacity onPress={closeModal}>
                 <IconSymbol
@@ -707,7 +709,7 @@ export default function SpecialFeaturesEditorScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Thumbnail Image (Optional)</Text>
+                <Text style={styles.formLabel}>{t('special_features_editor:thumbnail_label')}</Text>
                 <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
                   {selectedImageUri || editingFeature?.thumbnail_url ? (
                     <Image
@@ -723,7 +725,7 @@ export default function SpecialFeaturesEditorScreen() {
                         size={48}
                         color="#666666"
                       />
-                      <Text style={styles.imageUploadText}>Tap to upload image</Text>
+                      <Text style={styles.imageUploadText}>{t('special_features_editor:tap_upload')}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -742,7 +744,7 @@ export default function SpecialFeaturesEditorScreen() {
                         formData.thumbnail_shape === 'square' && styles.shapeOptionTextActive,
                       ]}
                     >
-                      Square
+                      {t('special_features_editor:shape_square')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -758,17 +760,17 @@ export default function SpecialFeaturesEditorScreen() {
                         formData.thumbnail_shape === 'banner' && styles.shapeOptionTextActive,
                       ]}
                     >
-                      Banner
+                      {t('special_features_editor:shape_banner')}
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Feature Title *</Text>
+                <Text style={styles.formLabel}>{t('special_features_editor:feature_title_label')}</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter feature title"
+                  placeholder={t('special_features_editor:feature_title_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.title}
                   onChangeText={(text) => setFormData({ ...formData, title: text })}
@@ -776,10 +778,10 @@ export default function SpecialFeaturesEditorScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Description *</Text>
+                <Text style={styles.formLabel}>{t('special_features_editor:description_label')}</Text>
                 <TextInput
                   style={[styles.input, styles.textArea]}
-                  placeholder="Enter feature description"
+                  placeholder={t('special_features_editor:description_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.message}
                   onChangeText={(text) => setFormData({ ...formData, message: text })}
@@ -789,10 +791,10 @@ export default function SpecialFeaturesEditorScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Link (Optional)</Text>
+                <Text style={styles.formLabel}>{t('special_features_editor:link_label')}</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter link URL (e.g., https://example.com)"
+                  placeholder={t('special_features_editor:link_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.link}
                   onChangeText={(text) => setFormData({ ...formData, link: text })}
@@ -800,12 +802,12 @@ export default function SpecialFeaturesEditorScreen() {
                   keyboardType="url"
                 />
                 <Text style={styles.formHint}>
-                  This link will be displayed in the full feature view and &quot;View All&quot; page
+                  {t('special_features_editor:link_hint')}
                 </Text>
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Attach File from Guides & Training (Optional)</Text>
+                <Text style={styles.formLabel}>{t('special_features_editor:attach_file_label')}</Text>
                 
                 {selectedGuideFile ? (
                   <View style={styles.selectedFileContainer}>
@@ -842,7 +844,7 @@ export default function SpecialFeaturesEditorScreen() {
                       color={managerColors.highlight}
                     />
                     <Text style={styles.filePickerButtonText}>
-                      {showFileSection ? 'Hide File Selection' : 'Show File Selection'}
+                      {showFileSection ? t('special_features_editor:hide_file_selection') : t('special_features_editor:show_file_selection')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -858,7 +860,7 @@ export default function SpecialFeaturesEditorScreen() {
                       />
                       <TextInput
                         style={styles.searchInput}
-                        placeholder="Search files by name, category..."
+                        placeholder={t('special_features_editor:search_files_placeholder')}
                         placeholderTextColor="#999999"
                         value={fileSearchQuery}
                         onChangeText={setFileSearchQuery}
@@ -919,9 +921,9 @@ export default function SpecialFeaturesEditorScreen() {
                             size={48}
                             color="#999999"
                           />
-                          <Text style={styles.emptyFileListText}>No files found</Text>
+                          <Text style={styles.emptyFileListText}>{t('special_features_editor:no_files_found')}</Text>
                           <Text style={styles.emptyFileListSubtext}>
-                            Try adjusting your search or check if files are uploaded in Guides & Training
+                            {t('special_features_editor:no_files_subtext')}
                           </Text>
                         </View>
                       )}
@@ -930,12 +932,12 @@ export default function SpecialFeaturesEditorScreen() {
                 )}
 
                 <Text style={styles.formHint}>
-                  Attach a file from Guides & Training to display View and Download buttons
+                  {t('special_features_editor:attach_file_hint')}
                 </Text>
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Start Date & Time (Optional)</Text>
+                <Text style={styles.formLabel}>{t('special_features_editor:start_datetime_label')}</Text>
                 <TouchableOpacity
                   style={styles.dateTimeButton}
                   onPress={() => setShowStartDatePicker(true)}
@@ -947,7 +949,7 @@ export default function SpecialFeaturesEditorScreen() {
                     color="#666666"
                   />
                   <Text style={styles.dateTimeButtonText}>
-                    {startDateTime ? startDateTime.toLocaleDateString() : 'Select Date'}
+                    {startDateTime ? startDateTime.toLocaleDateString() : t('special_features_editor:select_date')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -961,7 +963,7 @@ export default function SpecialFeaturesEditorScreen() {
                     color="#666666"
                   />
                   <Text style={styles.dateTimeButtonText}>
-                    {startDateTime ? startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Select Time'}
+                    {startDateTime ? startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('special_features_editor:select_time')}
                   </Text>
                 </TouchableOpacity>
                 {startDateTime && (
@@ -969,13 +971,13 @@ export default function SpecialFeaturesEditorScreen() {
                     style={styles.clearButton}
                     onPress={() => setStartDateTime(null)}
                   >
-                    <Text style={styles.clearButtonText}>Clear Start Date/Time</Text>
+                    <Text style={styles.clearButtonText}>{t('special_features_editor:clear_start_datetime')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>End Date & Time (Optional)</Text>
+                <Text style={styles.formLabel}>{t('special_features_editor:end_datetime_label')}</Text>
                 <TouchableOpacity
                   style={styles.dateTimeButton}
                   onPress={() => setShowEndDatePicker(true)}
@@ -987,7 +989,7 @@ export default function SpecialFeaturesEditorScreen() {
                     color="#666666"
                   />
                   <Text style={styles.dateTimeButtonText}>
-                    {endDateTime ? endDateTime.toLocaleDateString() : 'Select Date'}
+                    {endDateTime ? endDateTime.toLocaleDateString() : t('special_features_editor:select_date')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -1001,7 +1003,7 @@ export default function SpecialFeaturesEditorScreen() {
                     color="#666666"
                   />
                   <Text style={styles.dateTimeButtonText}>
-                    {endDateTime ? endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Select Time'}
+                    {endDateTime ? endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('special_features_editor:select_time')}
                   </Text>
                 </TouchableOpacity>
                 {endDateTime && (
@@ -1009,16 +1011,16 @@ export default function SpecialFeaturesEditorScreen() {
                     style={styles.clearButton}
                     onPress={() => setEndDateTime(null)}
                   >
-                    <Text style={styles.clearButtonText}>Clear End Date/Time</Text>
+                    <Text style={styles.clearButtonText}>{t('special_features_editor:clear_end_datetime')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Display Order</Text>
+                <Text style={styles.formLabel}>{t('special_features_editor:display_order_label')}</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter display order (e.g., 1, 2, 3...)"
+                  placeholder={t('special_features_editor:display_order_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.display_order.toString()}
                   onChangeText={(text) => {
@@ -1028,7 +1030,7 @@ export default function SpecialFeaturesEditorScreen() {
                   keyboardType="numeric"
                 />
                 <Text style={styles.formHint}>
-                  Lower numbers appear first. Features with the same order are sorted by creation date.
+                  {t('special_features_editor:display_order_hint')}
                 </Text>
               </View>
 
@@ -1041,7 +1043,7 @@ export default function SpecialFeaturesEditorScreen() {
                   <ActivityIndicator color="#1A1A1A" />
                 ) : (
                   <Text style={styles.saveButtonText}>
-                    {editingFeature ? 'Update Feature' : 'Add Feature'}
+                    {editingFeature ? t('special_features_editor:save_button') : t('special_features_editor:add_save_button')}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -1050,7 +1052,7 @@ export default function SpecialFeaturesEditorScreen() {
                 style={styles.cancelButton}
                 onPress={closeModal}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('special_features_editor:cancel_button')}</Text>
               </TouchableOpacity>
             </ScrollView>
 
@@ -1060,7 +1062,7 @@ export default function SpecialFeaturesEditorScreen() {
                 <View style={styles.datePickerContainer}>
                   <View style={styles.datePickerHeader}>
                     <TouchableOpacity onPress={() => setShowStartDatePicker(false)}>
-                      <Text style={styles.datePickerDone}>Done</Text>
+                      <Text style={styles.datePickerDone}>{t('special_features_editor:done')}</Text>
                     </TouchableOpacity>
                   </View>
                   <DateTimePicker
@@ -1088,7 +1090,7 @@ export default function SpecialFeaturesEditorScreen() {
                 <View style={styles.datePickerContainer}>
                   <View style={styles.datePickerHeader}>
                     <TouchableOpacity onPress={() => setShowStartTimePicker(false)}>
-                      <Text style={styles.datePickerDone}>Done</Text>
+                      <Text style={styles.datePickerDone}>{t('special_features_editor:done')}</Text>
                     </TouchableOpacity>
                   </View>
                   <DateTimePicker
@@ -1115,7 +1117,7 @@ export default function SpecialFeaturesEditorScreen() {
                 <View style={styles.datePickerContainer}>
                   <View style={styles.datePickerHeader}>
                     <TouchableOpacity onPress={() => setShowEndDatePicker(false)}>
-                      <Text style={styles.datePickerDone}>Done</Text>
+                      <Text style={styles.datePickerDone}>{t('special_features_editor:done')}</Text>
                     </TouchableOpacity>
                   </View>
                   <DateTimePicker
@@ -1143,7 +1145,7 @@ export default function SpecialFeaturesEditorScreen() {
                 <View style={styles.datePickerContainer}>
                   <View style={styles.datePickerHeader}>
                     <TouchableOpacity onPress={() => setShowEndTimePicker(false)}>
-                      <Text style={styles.datePickerDone}>Done</Text>
+                      <Text style={styles.datePickerDone}>{t('special_features_editor:done')}</Text>
                     </TouchableOpacity>
                   </View>
                   <DateTimePicker

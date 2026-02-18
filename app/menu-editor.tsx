@@ -21,6 +21,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { useTranslation } from 'react-i18next';
 
 interface MenuItem {
   id: string;
@@ -53,6 +54,7 @@ const SUBCATEGORIES: { [key: string]: string[] } = {
 };
 
 export default function MenuEditorScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -100,7 +102,7 @@ export default function MenuEditorScreen() {
       setMenuItems(data || []);
     } catch (error) {
       console.error('Error loading menu items:', error);
-      Alert.alert('Error', 'Failed to load menu items');
+      Alert.alert(t('common:error'), t('menu_editor:load_error'));
     } finally {
       setLoading(false);
     }
@@ -164,7 +166,7 @@ export default function MenuEditorScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      Alert.alert(t('common:error'), t('menu_editor:pick_image_error'));
     }
   };
 
@@ -223,7 +225,7 @@ export default function MenuEditorScreen() {
       return urlData.publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload image');
+      Alert.alert(t('common:error'), t('menu_editor:upload_image_error'));
       return null;
     } finally {
       setUploadingImage(false);
@@ -232,12 +234,12 @@ export default function MenuEditorScreen() {
 
   const handleSave = async () => {
     if (!formData.name || !formData.price) {
-      Alert.alert('Error', 'Please fill in name and price');
+      Alert.alert(t('common:error'), t('menu_editor:error_fill_fields'));
       return;
     }
 
     if (!user?.id) {
-      Alert.alert('Error', 'User not authenticated');
+      Alert.alert(t('common:error'), t('menu_editor:error_not_authenticated'));
       return;
     }
 
@@ -279,7 +281,7 @@ export default function MenuEditorScreen() {
           throw error;
         }
         console.log('Menu item updated successfully');
-        Alert.alert('Success', 'Menu item updated successfully');
+        Alert.alert(t('common:success'), t('menu_editor:updated_success'));
       } else {
         // Create new item using database function
         const { data, error } = await supabase.rpc('create_menu_item', {
@@ -305,30 +307,30 @@ export default function MenuEditorScreen() {
           throw error;
         }
         console.log('Menu item created successfully');
-        Alert.alert('Success', 'Menu item created successfully');
+        Alert.alert(t('common:success'), t('menu_editor:created_success'));
       }
 
       closeModal();
       loadMenuItems();
     } catch (error: any) {
       console.error('Error saving menu item:', error);
-      Alert.alert('Error', error.message || 'Failed to save menu item');
+      Alert.alert(t('common:error'), error.message || t('menu_editor:save_error'));
     }
   };
 
   const handleDelete = async (item: MenuItem) => {
     Alert.alert(
-      'Delete Item',
-      `Are you sure you want to delete "${item.name}"?`,
+      t('menu_editor:delete_title'),
+      t('menu_editor:delete_confirm', { name: item.name }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               if (!user?.id) {
-                Alert.alert('Error', 'User not authenticated');
+                Alert.alert(t('common:error'), t('menu_editor:error_not_authenticated'));
                 return;
               }
 
@@ -353,11 +355,11 @@ export default function MenuEditorScreen() {
                 }
               }
 
-              Alert.alert('Success', 'Menu item deleted successfully');
+              Alert.alert(t('common:success'), t('menu_editor:deleted_success'));
               loadMenuItems();
             } catch (error: any) {
               console.error('Error deleting menu item:', error);
-              Alert.alert('Error', error.message || 'Failed to delete menu item');
+              Alert.alert(t('common:error'), error.message || t('menu_editor:delete_error'));
             }
           },
         },
@@ -446,7 +448,7 @@ export default function MenuEditorScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Menu Editor</Text>
+        <Text style={styles.headerTitle}>{t('menu_editor:title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -458,7 +460,7 @@ export default function MenuEditorScreen() {
           size={24}
           color={managerColors.text}
         />
-        <Text style={styles.addNewItemButtonText}>Add New Item</Text>
+        <Text style={styles.addNewItemButtonText}>{t('menu_editor:add_button')}</Text>
       </TouchableOpacity>
 
       {/* Search Bar */}
@@ -471,7 +473,7 @@ export default function MenuEditorScreen() {
         />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search all menu items..."
+          placeholder={t('menu_editor:search_placeholder')}
           placeholderTextColor={managerColors.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -497,7 +499,9 @@ export default function MenuEditorScreen() {
             color={managerColors.highlight}
           />
           <Text style={styles.searchInfoText}>
-            Searching all menu items - {filteredItems.length} result{filteredItems.length !== 1 ? 's' : ''} found
+            {filteredItems.length === 1
+              ? t('menu_editor:search_results', { count: filteredItems.length })
+              : t('menu_editor:search_results_plural', { count: filteredItems.length })}
           </Text>
         </View>
       )}
@@ -556,7 +560,7 @@ export default function MenuEditorScreen() {
                 selectedSubcategory === null && styles.subcategoryTabTextActive,
               ]}
             >
-              All
+              {t('menu_editor:subcategory_all')}
             </Text>
           </TouchableOpacity>
           {SUBCATEGORIES[selectedCategory].map((subcategory, index) => (
@@ -597,12 +601,12 @@ export default function MenuEditorScreen() {
                 color={managerColors.textSecondary}
               />
               <Text style={styles.emptyText}>
-                {searchQuery ? 'No menu items found' : 'No menu items found'}
+                {t('menu_editor:empty_title')}
               </Text>
               <Text style={styles.emptySubtext}>
-                {searchQuery 
-                  ? 'Try adjusting your search query'
-                  : 'Tap the "Add New Item" button to add a new item'
+                {searchQuery
+                  ? t('menu_editor:empty_search_subtext')
+                  : t('menu_editor:empty_subtext')
                 }
               </Text>
             </View>
@@ -646,12 +650,12 @@ export default function MenuEditorScreen() {
                         )}
                         {item.available_for_lunch && (
                           <View style={[styles.tag, styles.tagAvailability]}>
-                            <Text style={styles.tagText}>Lunch</Text>
+                            <Text style={styles.tagText}>{t('menu_editor:available_lunch')}</Text>
                           </View>
                         )}
                         {item.available_for_dinner && (
                           <View style={[styles.tag, styles.tagAvailability]}>
-                            <Text style={styles.tagText}>Dinner</Text>
+                            <Text style={styles.tagText}>{t('menu_editor:available_dinner')}</Text>
                           </View>
                         )}
                         {item.is_gluten_free && (
@@ -715,12 +719,12 @@ export default function MenuEditorScreen() {
                         )}
                         {item.available_for_lunch && (
                           <View style={[styles.tag, styles.tagAvailability]}>
-                            <Text style={styles.tagText}>Lunch</Text>
+                            <Text style={styles.tagText}>{t('menu_editor:available_lunch')}</Text>
                           </View>
                         )}
                         {item.available_for_dinner && (
                           <View style={[styles.tag, styles.tagAvailability]}>
-                            <Text style={styles.tagText}>Dinner</Text>
+                            <Text style={styles.tagText}>{t('menu_editor:available_dinner')}</Text>
                           </View>
                         )}
                         {item.is_gluten_free && (
@@ -758,7 +762,7 @@ export default function MenuEditorScreen() {
                       size={20}
                       color={managerColors.highlight}
                     />
-                    <Text style={styles.actionButtonText}>Edit</Text>
+                    <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionButton, styles.deleteButton]}
@@ -771,7 +775,7 @@ export default function MenuEditorScreen() {
                       color="#E74C3C"
                     />
                     <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                      Delete
+                      {t('common:delete')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -801,7 +805,7 @@ export default function MenuEditorScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingItem ? 'Edit Menu Item' : 'Add Menu Item'}
+                {editingItem ? t('menu_editor:modal_edit') : t('menu_editor:modal_add')}
               </Text>
               <TouchableOpacity onPress={closeModal}>
                 <IconSymbol
@@ -822,7 +826,7 @@ export default function MenuEditorScreen() {
             >
               {/* Image Upload */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Thumbnail Image</Text>
+                <Text style={styles.formLabel}>{t('menu_editor:thumbnail_label')}</Text>
                 <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
                   {selectedImageUri || editingItem?.thumbnail_url ? (
                     <Image
@@ -838,7 +842,7 @@ export default function MenuEditorScreen() {
                         size={48}
                         color="#666666"
                       />
-                      <Text style={styles.imageUploadText}>Tap to upload image</Text>
+                      <Text style={styles.imageUploadText}>{t('menu_editor:tap_upload')}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -858,7 +862,7 @@ export default function MenuEditorScreen() {
                         formData.thumbnail_shape === 'square' && styles.shapeOptionTextActive,
                       ]}
                     >
-                      Square
+                      {t('menu_editor:shape_square')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -874,7 +878,7 @@ export default function MenuEditorScreen() {
                         formData.thumbnail_shape === 'banner' && styles.shapeOptionTextActive,
                       ]}
                     >
-                      Banner
+                      {t('menu_editor:shape_banner')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -882,10 +886,10 @@ export default function MenuEditorScreen() {
 
               {/* Name */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Name *</Text>
+                <Text style={styles.formLabel}>{t('menu_editor:name_label')}</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter item name"
+                  placeholder={t('menu_editor:name_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.name}
                   onChangeText={(text) => setFormData({ ...formData, name: text })}
@@ -894,10 +898,10 @@ export default function MenuEditorScreen() {
 
               {/* Description */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Description</Text>
+                <Text style={styles.formLabel}>{t('menu_editor:description_label')}</Text>
                 <TextInput
                   style={[styles.input, styles.textArea]}
-                  placeholder="Enter description"
+                  placeholder={t('menu_editor:description_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.description}
                   onChangeText={(text) => setFormData({ ...formData, description: text })}
@@ -908,10 +912,10 @@ export default function MenuEditorScreen() {
 
               {/* Price */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Price *</Text>
+                <Text style={styles.formLabel}>{t('menu_editor:price_label')}</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="e.g., $12.99"
+                  placeholder={t('menu_editor:price_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.price}
                   onChangeText={(text) => setFormData({ ...formData, price: text })}
@@ -920,10 +924,10 @@ export default function MenuEditorScreen() {
 
               {/* Display Order */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Display Order</Text>
+                <Text style={styles.formLabel}>{t('menu_editor:display_order_label')}</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter display order (e.g., 1, 2, 3...)"
+                  placeholder={t('menu_editor:display_order_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.display_order.toString()}
                   onChangeText={(text) => {
@@ -933,13 +937,13 @@ export default function MenuEditorScreen() {
                   keyboardType="numeric"
                 />
                 <Text style={styles.formHint}>
-                  Lower numbers appear first. Items with the same order are sorted alphabetically.
+                  {t('menu_editor:display_order_hint')}
                 </Text>
               </View>
 
               {/* Category */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Category</Text>
+                <Text style={styles.formLabel}>{t('menu_editor:category_label')}</Text>
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
@@ -970,7 +974,7 @@ export default function MenuEditorScreen() {
               {/* Subcategory */}
               {SUBCATEGORIES[formData.category] && SUBCATEGORIES[formData.category].length > 0 && (
                 <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Subcategory</Text>
+                  <Text style={styles.formLabel}>{t('menu_editor:subcategory_label')}</Text>
                   <ScrollView
                     horizontal
                     showsHorizontalScrollIndicator={false}
@@ -1002,7 +1006,7 @@ export default function MenuEditorScreen() {
               {/* Availability - Only show for Lunch, Dinner, and Weekly Specials */}
               {(formData.category === 'Lunch' || formData.category === 'Dinner' || formData.category === 'Weekly Specials') && (
                 <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>Available For</Text>
+                  <Text style={styles.formLabel}>{t('menu_editor:available_for_label')}</Text>
                   <View style={styles.checkboxGroup}>
                     <TouchableOpacity
                       style={styles.checkbox}
@@ -1028,7 +1032,7 @@ export default function MenuEditorScreen() {
                           />
                         )}
                       </View>
-                      <Text style={styles.checkboxLabel}>Lunch</Text>
+                      <Text style={styles.checkboxLabel}>{t('menu_editor:available_lunch')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.checkbox}
@@ -1054,7 +1058,7 @@ export default function MenuEditorScreen() {
                           />
                         )}
                       </View>
-                      <Text style={styles.checkboxLabel}>Dinner</Text>
+                      <Text style={styles.checkboxLabel}>{t('menu_editor:available_dinner')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1062,7 +1066,7 @@ export default function MenuEditorScreen() {
 
               {/* Dietary Options */}
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Dietary Options</Text>
+                <Text style={styles.formLabel}>{t('menu_editor:dietary_label')}</Text>
                 <View style={styles.checkboxGroup}>
                   <TouchableOpacity
                     style={styles.checkbox}
@@ -1181,7 +1185,7 @@ export default function MenuEditorScreen() {
                   <ActivityIndicator color="#1A1A1A" />
                 ) : (
                   <Text style={styles.saveButtonText}>
-                    {editingItem ? 'Update Item' : 'Add Item'}
+                    {editingItem ? t('menu_editor:save_button') : t('menu_editor:add_save_button')}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -1191,7 +1195,7 @@ export default function MenuEditorScreen() {
                 style={styles.cancelButton}
                 onPress={closeModal}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('menu_editor:cancel_button')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>

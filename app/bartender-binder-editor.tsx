@@ -10,9 +10,11 @@ import {
 import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 export default function BartenderBinderEditorScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   return (
     <View style={styles.container}>
@@ -26,7 +28,7 @@ export default function BartenderBinderEditorScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Bartender Binder Editor</Text>
+        <Text style={styles.headerTitle}>{t('bartender_binder_editor.title')}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -41,9 +43,9 @@ export default function BartenderBinderEditorScreen() {
               color={managerColors.highlight}
             />
             <View style={styles.cardHeaderText}>
-              <Text style={styles.cardTitle}>Checklists Editor</Text>
+              <Text style={styles.cardTitle}>{t('bartender_binder_editor.checklists_editor')}</Text>
               <Text style={styles.cardDescription}>
-                Manage opening and closing checklists
+                {t('bartender_binder_editor.checklists_editor_desc')}
               </Text>
             </View>
           </View>
@@ -60,7 +62,7 @@ export default function BartenderBinderEditorScreen() {
                 size={24}
                 color={managerColors.highlight}
               />
-              <Text style={styles.subCardText}>Opening Checklist Editor</Text>
+              <Text style={styles.subCardText}>{t('bartender_binder_editor.opening_checklist_editor')}</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -71,7 +73,7 @@ export default function BartenderBinderEditorScreen() {
           </TouchableOpacity>
 
           {/* Closing Checklist Editor */}
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.subCardButton}
             onPress={() => router.push('/bartender-closing-checklist-editor')}
           >
@@ -82,7 +84,7 @@ export default function BartenderBinderEditorScreen() {
                 size={24}
                 color={managerColors.highlight}
               />
-              <Text style={styles.subCardText}>Closing Checklist Editor</Text>
+              <Text style={styles.subCardText}>{t('bartender_binder_editor.closing_checklist_editor')}</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -103,9 +105,9 @@ export default function BartenderBinderEditorScreen() {
               color={managerColors.highlight}
             />
             <View style={styles.cardHeaderText}>
-              <Text style={styles.cardTitle}>Purees & Syrups Recipes Editor</Text>
+              <Text style={styles.cardTitle}>{t('bartender_binder_editor.purees_syrups_editor')}</Text>
               <Text style={styles.cardDescription}>
-                Manage puree and simple syrup recipes
+                {t('bartender_binder_editor.purees_syrups_editor_desc')}
               </Text>
             </View>
           </View>
@@ -122,7 +124,7 @@ export default function BartenderBinderEditorScreen() {
                 size={24}
                 color={managerColors.highlight}
               />
-              <Text style={styles.subCardText}>Purees & Syrups Editor</Text>
+              <Text style={styles.subCardText}>{t('bartender_binder_editor.purees_syrups_button')}</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"

@@ -9,10 +9,12 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { BlurView } from 'expo-blur';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { MessageBadge } from '@/components/MessageBadge';
+import { useTranslation } from 'react-i18next';
 
 function ManagerHeader() {
   const router = useRouter();
   const { logout } = useAuth();
+  const { t } = useTranslation();
 
   const handleLogout = async () => {
     await logout();
@@ -21,12 +23,12 @@ function ManagerHeader() {
 
   return (
     <View style={styles.header}>
-      <Image 
+      <Image
         source={require('@/assets/images/421d6130-e7c0-49c4-acac-8398f8d292b4.jpeg')}
         style={styles.cornerIcon}
         resizeMode="contain"
       />
-      <Text style={styles.headerTitle}>Manager Portal</Text>
+      <Text style={styles.headerTitle}>{t('header.manager_portal')}</Text>
       <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
         <IconSymbol
           ios_icon_name="rectangle.portrait.and.arrow.right"
@@ -104,6 +106,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
 }
 
 export default function ManagerLayout() {
+  const { t } = useTranslation();
   return (
     <>
       <ManagerHeader />
@@ -116,7 +119,7 @@ export default function ManagerLayout() {
         <Tabs.Screen
           name="index"
           options={{
-            title: 'Welcome',
+            title: t('tabs.welcome'),
             tabBarIcon: ({ color, size }) => (
               <IconSymbol
                 ios_icon_name="house.fill"
@@ -130,7 +133,7 @@ export default function ManagerLayout() {
         <Tabs.Screen
           name="menus"
           options={{
-            title: 'Menus',
+            title: t('tabs.menus'),
             tabBarIcon: ({ color, size }) => (
               <IconSymbol
                 ios_icon_name="fork.knife"
@@ -144,7 +147,7 @@ export default function ManagerLayout() {
         <Tabs.Screen
           name="tools"
           options={{
-            title: 'Tools',
+            title: t('tabs.tools'),
             tabBarIcon: ({ color, size }) => (
               <IconSymbol
                 ios_icon_name="wrench.and.screwdriver.fill"
@@ -158,7 +161,7 @@ export default function ManagerLayout() {
         <Tabs.Screen
           name="manage"
           options={{
-            title: 'Manage',
+            title: t('tabs.manage'),
             tabBarIcon: ({ color, size }) => (
               <IconSymbol
                 ios_icon_name="slider.horizontal.3"
@@ -172,7 +175,7 @@ export default function ManagerLayout() {
         <Tabs.Screen
           name="profile"
           options={{
-            title: 'Profile',
+            title: t('tabs.profile'),
             tabBarIcon: ({ color, size }) => (
               <IconSymbol
                 ios_icon_name="person.fill"

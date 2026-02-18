@@ -12,6 +12,7 @@ import { employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 interface Employee {
   id: string;
@@ -40,6 +41,7 @@ interface GuestReview {
 
 export default function EmployeeRewardsScreen() {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'rewards' | 'reviews'>('rewards');
   const [loading, setLoading] = useState(true);
   

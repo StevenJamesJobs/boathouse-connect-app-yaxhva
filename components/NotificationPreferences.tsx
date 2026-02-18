@@ -11,6 +11,7 @@ import { IconSymbol } from './IconSymbol';
 import { managerColors, employeeColors } from '@/styles/commonStyles';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 interface NotificationPreferencesProps {
   variant?: 'manager' | 'employee';
@@ -28,6 +29,7 @@ interface NotificationPreferencesData {
 export default function NotificationPreferences({ variant = 'employee' }: NotificationPreferencesProps) {
   const themeColors = variant === 'manager' ? managerColors : employeeColors;
   const { user } = useAuth();
+  const { t } = useTranslation();
   
   const [loading, setLoading] = useState(true);
   const [preferences, setPreferences] = useState<NotificationPreferencesData>({
@@ -104,45 +106,45 @@ export default function NotificationPreferences({ variant = 'employee' }: Notifi
   const preferenceItems = [
     {
       key: 'messages_enabled' as keyof NotificationPreferencesData,
-      label: 'Messages',
+      label: t('notifications.messages'),
       icon: 'message.fill',
       androidIcon: 'message',
-      description: 'Get notified when you receive a new message',
+      description: t('notifications.messages_desc'),
     },
     {
       key: 'rewards_enabled' as keyof NotificationPreferencesData,
-      label: "McLoone's Bucks",
+      label: t('notifications.mcloones_bucks'),
       icon: 'dollarsign.circle.fill',
       androidIcon: 'attach-money',
-      description: "Get notified when you earn McLoone's Bucks",
+      description: t('notifications.mcloones_bucks_desc'),
     },
     {
       key: 'announcements_enabled' as keyof NotificationPreferencesData,
-      label: 'Announcements',
+      label: t('notifications.announcements'),
       icon: 'megaphone.fill',
       androidIcon: 'campaign',
-      description: 'Get notified about new announcements',
+      description: t('notifications.announcements_desc'),
     },
     {
       key: 'events_enabled' as keyof NotificationPreferencesData,
-      label: 'Events',
+      label: t('notifications.events'),
       icon: 'calendar',
       androidIcon: 'event',
-      description: 'Get notified about new events',
+      description: t('notifications.events_desc'),
     },
     {
       key: 'special_features_enabled' as keyof NotificationPreferencesData,
-      label: 'Special Features',
+      label: t('notifications.special_features'),
       icon: 'star.fill',
       androidIcon: 'star',
-      description: 'Get notified about new special features',
+      description: t('notifications.special_features_desc'),
     },
     {
       key: 'custom_notifications_enabled' as keyof NotificationPreferencesData,
-      label: 'Management Updates',
+      label: t('notifications.management_updates'),
       icon: 'bell.fill',
       androidIcon: 'notifications',
-      description: 'Get notified about important updates from management',
+      description: t('notifications.management_updates_desc'),
     },
   ];
 
@@ -152,13 +154,13 @@ export default function NotificationPreferences({ variant = 'employee' }: Notifi
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="small" color={themeColors.primary} />
               <Text style={[styles.loadingText, { color: themeColors.textSecondary }]}>
-                Loading preferences...
+                {t('notifications.loading')}
               </Text>
             </View>
           ) : (
             <>
               <Text style={[styles.description, { color: themeColors.textSecondary }]}>
-                Choose which notifications you want to receive
+                {t('notifications.choose_notifications')}
               </Text>
               
               {preferenceItems.map((item, index) => (

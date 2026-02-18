@@ -11,17 +11,19 @@ import { managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 
 export default function ManagerManageScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'newsfeed' | 'employee' | 'management'>('newsfeed');
 
   return (
     <View style={styles.container}>
       {/* User's Name Header */}
       <View style={styles.nameHeader}>
-        <Text style={styles.nameHeaderText}>{user?.name}&apos;s Editors</Text>
+        <Text style={styles.nameHeaderText}>{t('manager_manage.editors_header', { name: user?.name })}</Text>
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
@@ -32,7 +34,7 @@ export default function ManagerManageScreen() {
             onPress={() => setActiveTab('newsfeed')}
           >
             <Text style={[styles.tabText, activeTab === 'newsfeed' && styles.activeTabText]}>
-              News Feed
+              {t('manager_manage.tab_newsfeed')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -40,7 +42,7 @@ export default function ManagerManageScreen() {
             onPress={() => setActiveTab('employee')}
           >
             <Text style={[styles.tabText, activeTab === 'employee' && styles.activeTabText]}>
-              Employee
+              {t('manager_manage.tab_employee')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -48,7 +50,7 @@ export default function ManagerManageScreen() {
             onPress={() => setActiveTab('management')}
           >
             <Text style={[styles.tabText, activeTab === 'management' && styles.activeTabText]}>
-              Management
+              {t('manager_manage.tab_management')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -68,9 +70,9 @@ export default function ManagerManageScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardTextContainer}>
-                  <Text style={styles.cardTitle}>Announcements Editor</Text>
+                  <Text style={styles.cardTitle}>{t('manager_manage.announcements_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Create and manage announcements for staff
+                    {t('manager_manage.announcements_editor_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -95,9 +97,9 @@ export default function ManagerManageScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardTextContainer}>
-                  <Text style={styles.cardTitle}>Special Features Editor</Text>
+                  <Text style={styles.cardTitle}>{t('manager_manage.special_features_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Create and manage special features
+                    {t('manager_manage.special_features_editor_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -122,9 +124,9 @@ export default function ManagerManageScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardTextContainer}>
-                  <Text style={styles.cardTitle}>Upcoming Events Editor</Text>
+                  <Text style={styles.cardTitle}>{t('manager_manage.upcoming_events_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Create and manage upcoming events
+                    {t('manager_manage.upcoming_events_editor_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -151,9 +153,9 @@ export default function ManagerManageScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardTextContainer}>
-                  <Text style={styles.cardTitle}>Guides and Training Editor</Text>
+                  <Text style={styles.cardTitle}>{t('manager_manage.guides_training_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Upload and manage training materials
+                    {t('manager_manage.guides_training_editor_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -178,9 +180,9 @@ export default function ManagerManageScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardTextContainer}>
-                  <Text style={styles.cardTitle}>Bartender Assistant Editor</Text>
+                  <Text style={styles.cardTitle}>{t('manager_manage.bartender_assistant_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Manage cocktail recipes, knowledge base, and bar exams
+                    {t('manager_manage.bartender_assistant_editor_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -205,9 +207,9 @@ export default function ManagerManageScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardTextContainer}>
-                  <Text style={styles.cardTitle}>Host Assistant Editor</Text>
+                  <Text style={styles.cardTitle}>{t('manager_manage.host_assistant_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Manage hosting resources and host exams
+                    {t('manager_manage.host_assistant_editor_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -234,9 +236,9 @@ export default function ManagerManageScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardTextContainer}>
-                  <Text style={styles.cardTitle}>Employee Management</Text>
+                  <Text style={styles.cardTitle}>{t('manager_tools.employee_management')}</Text>
                   <Text style={styles.cardDescription}>
-                    Add, edit, and manage employee accounts
+                    {t('manager_manage.employee_management_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -261,9 +263,9 @@ export default function ManagerManageScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardTextContainer}>
-                  <Text style={styles.cardTitle}>Rewards and Reviews Editor</Text>
+                  <Text style={styles.cardTitle}>{t('manager_manage.rewards_reviews_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Manage employee rewards and guest reviews
+                    {t('manager_manage.rewards_reviews_editor_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -288,9 +290,9 @@ export default function ManagerManageScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardTextContainer}>
-                  <Text style={styles.cardTitle}>Menu Editor</Text>
+                  <Text style={styles.cardTitle}>{t('manager_manage.menu_editor')}</Text>
                   <Text style={styles.cardDescription}>
-                    Create, edit, and manage menu items
+                    {t('manager_manage.menu_editor_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -315,9 +317,9 @@ export default function ManagerManageScreen() {
                   color={managerColors.highlight}
                 />
                 <View style={styles.cardTextContainer}>
-                  <Text style={styles.cardTitle}>Notification Center</Text>
+                  <Text style={styles.cardTitle}>{t('manager_tools.notification_center')}</Text>
                   <Text style={styles.cardDescription}>
-                    Send push notifications to all staff members
+                    {t('manager_tools.notification_center_desc')}
                   </Text>
                 </View>
                 <IconSymbol

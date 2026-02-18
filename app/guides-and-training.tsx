@@ -16,6 +16,7 @@ import {
   TextInput,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { managerColors, employeeColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -44,6 +45,7 @@ const CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events 
 
 export default function GuidesAndTrainingScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [guides, setGuides] = useState<GuideItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -298,7 +300,7 @@ export default function GuidesAndTrainingScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Guides and Training</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('guides_training.title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -312,7 +314,7 @@ export default function GuidesAndTrainingScreen() {
         />
         <TextInput
           style={[styles.searchInput, { color: colors.text }]}
-          placeholder="Search by name, keywords, or date..."
+          placeholder={t('guides_training.search_placeholder')}
           placeholderTextColor={colors.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
@@ -343,7 +345,7 @@ export default function GuidesAndTrainingScreen() {
                 size={64}
                 color={colors.textSecondary}
               />
-              <Text style={[styles.emptyText, { color: colors.text }]}>No results found</Text>
+              <Text style={[styles.emptyText, { color: colors.text }]}>{t('guides_training.no_results')}</Text>
               <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
                 Try different keywords
               </Text>
@@ -427,7 +429,7 @@ export default function GuidesAndTrainingScreen() {
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.primary} />
-              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading guides...</Text>
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('guides_training.loading')}</Text>
             </View>
           ) : (
             <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
@@ -439,7 +441,7 @@ export default function GuidesAndTrainingScreen() {
                     size={64}
                     color={colors.textSecondary}
                   />
-                  <Text style={[styles.emptyText, { color: colors.text }]}>No guides in this category</Text>
+                  <Text style={[styles.emptyText, { color: colors.text }]}>{t('guides_training.no_guides_in_category')}</Text>
                   <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
                     Check back later for new materials
                   </Text>
@@ -561,7 +563,7 @@ export default function GuidesAndTrainingScreen() {
                 resizeMode="contain"
               />
             )}
-            <Text style={styles.swipeHint}>Swipe down to close</Text>
+            <Text style={styles.swipeHint}>{t('guides_training.swipe_to_close')}</Text>
           </View>
         </PanGestureHandler>
       </Modal>

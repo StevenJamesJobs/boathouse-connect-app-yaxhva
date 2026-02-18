@@ -24,6 +24,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import { useTranslation } from 'react-i18next';
 
 interface UpcomingEvent {
   id: string;
@@ -52,6 +53,7 @@ interface GuideFile {
 const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
 
 export default function UpcomingEventsEditorScreen() {
+  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
   const { sendNotification } = useNotification();
@@ -153,7 +155,7 @@ export default function UpcomingEventsEditorScreen() {
       setEvents(data || []);
     } catch (error) {
       console.error('Error loading upcoming events:', error);
-      Alert.alert('Error', 'Failed to load upcoming events. Please try again.');
+      Alert.alert(t('common:error'), t('upcoming_events_editor:load_error'));
     } finally {
       setLoading(false);
     }
@@ -173,7 +175,7 @@ export default function UpcomingEventsEditorScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', 'Failed to pick image');
+      Alert.alert(t('common:error'), t('upcoming_events_editor:pick_image_error'));
     }
   };
 
@@ -226,7 +228,7 @@ export default function UpcomingEventsEditorScreen() {
       return urlData.publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', 'Failed to upload image');
+      Alert.alert(t('common:error'), t('upcoming_events_editor:upload_image_error'));
       return null;
     } finally {
       setUploadingImage(false);
@@ -235,17 +237,17 @@ export default function UpcomingEventsEditorScreen() {
 
   const handleSave = async () => {
     if (!formData.title || !formData.message) {
-      Alert.alert('Error', 'Please fill in title and message');
+      Alert.alert(t('common:error'), t('upcoming_events_editor:error_fill_fields'));
       return;
     }
 
     if (!user?.id) {
-      Alert.alert('Error', 'User not authenticated');
+      Alert.alert(t('common:error'), t('upcoming_events_editor:error_not_authenticated'));
       return;
     }
 
     if (!editingEvent && events.length >= 25) {
-      Alert.alert('Limit Reached', 'You can only have up to 25 upcoming events. Please delete an existing event before adding a new one.');
+      Alert.alert(t('upcoming_events_editor:limit_reached_title'), t('upcoming_events_editor:limit_reached_msg'));
       return;
     }
 
@@ -285,7 +287,7 @@ export default function UpcomingEventsEditorScreen() {
           throw error;
         }
         console.log('Upcoming event updated successfully');
-        Alert.alert('Success', 'Upcoming event updated successfully');
+        Alert.alert(t('common:success'), t('upcoming_events_editor:updated_success'));
       } else {
         console.log('Creating new upcoming event');
         const { error } = await supabase.rpc('create_upcoming_event', {
@@ -325,30 +327,30 @@ export default function UpcomingEventsEditorScreen() {
           console.error('Failed to send push notification:', notificationError);
         }
         
-        Alert.alert('Success', 'Upcoming event created successfully');
+        Alert.alert(t('common:success'), t('upcoming_events_editor:created_success'));
       }
 
       closeModal();
       await loadEvents();
     } catch (error: any) {
       console.error('Error saving upcoming event:', error);
-      Alert.alert('Error', error.message || 'Failed to save upcoming event');
+      Alert.alert(t('common:error'), error.message || t('upcoming_events_editor:save_error'));
     }
   };
 
   const handleDelete = async (event: UpcomingEvent) => {
     Alert.alert(
-      'Delete Upcoming Event',
-      `Are you sure you want to delete "${event.title}"?`,
+      t('upcoming_events_editor:delete_title'),
+      t('upcoming_events_editor:delete_confirm', { title: event.title }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               if (!user?.id) {
-                Alert.alert('Error', 'User not authenticated');
+                Alert.alert(t('common:error'), t('upcoming_events_editor:error_not_authenticated'));
                 return;
               }
 
@@ -374,12 +376,12 @@ export default function UpcomingEventsEditorScreen() {
               }
 
               console.log('Upcoming event deleted successfully');
-              Alert.alert('Success', 'Upcoming event deleted successfully');
+              Alert.alert(t('common:success'), t('upcoming_events_editor:deleted_success'));
               
               await loadEvents();
             } catch (error: any) {
               console.error('Error deleting upcoming event:', error);
-              Alert.alert('Error', error.message || 'Failed to delete upcoming event');
+              Alert.alert(t('common:error'), error.message || t('upcoming_events_editor:delete_error'));
             }
           },
         },
@@ -505,13 +507,13 @@ export default function UpcomingEventsEditorScreen() {
             color={managerColors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Upcoming Events Editor</Text>
+        <Text style={styles.headerTitle}>{t('upcoming_events_editor:title')}</Text>
         <View style={styles.backButton} />
       </View>
 
       <View style={styles.subHeader}>
         <Text style={styles.headerSubtitle}>
-          {events.length} / 25 events
+          {t('upcoming_events_editor:count', { count: events.length })}
         </Text>
       </View>
 
@@ -527,14 +529,14 @@ export default function UpcomingEventsEditorScreen() {
           color={events.length >= 25 ? managerColors.textSecondary : managerColors.text}
         />
         <Text style={[styles.addNewItemButtonText, events.length >= 25 && styles.addNewItemButtonTextDisabled]}>
-          {events.length >= 25 ? 'Limit Reached (25/25)' : 'Add New Event'}
+          {events.length >= 25 ? t('upcoming_events_editor:limit_reached') : t('upcoming_events_editor:add_button')}
         </Text>
       </TouchableOpacity>
 
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={managerColors.highlight} />
-          <Text style={styles.loadingText}>Loading events...</Text>
+          <Text style={styles.loadingText}>{t('upcoming_events_editor:loading')}</Text>
         </View>
       ) : (
         <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
@@ -546,9 +548,9 @@ export default function UpcomingEventsEditorScreen() {
                 size={64}
                 color={managerColors.textSecondary}
               />
-              <Text style={styles.emptyText}>No upcoming events found</Text>
+              <Text style={styles.emptyText}>{t('upcoming_events_editor:empty_title')}</Text>
               <Text style={styles.emptySubtext}>
-                Tap the &quot;Add New Event&quot; button to create one
+                {t('upcoming_events_editor:empty_subtitle')}
               </Text>
             </View>
           ) : (
@@ -600,7 +602,7 @@ export default function UpcomingEventsEditorScreen() {
                                 color={managerColors.textSecondary}
                               />
                               <Text style={styles.metaText}>
-                                Ends: {formatDateTime(event.end_date_time)}
+                                {t('upcoming_events_editor:ends_label', { datetime: formatDateTime(event.end_date_time) })}
                               </Text>
                             </View>
                           )}
@@ -652,7 +654,7 @@ export default function UpcomingEventsEditorScreen() {
                                 color={managerColors.textSecondary}
                               />
                               <Text style={styles.metaText}>
-                                Ends: {formatDateTime(event.end_date_time)}
+                                {t('upcoming_events_editor:ends_label', { datetime: formatDateTime(event.end_date_time) })}
                               </Text>
                             </View>
                           )}
@@ -671,7 +673,7 @@ export default function UpcomingEventsEditorScreen() {
                         size={20}
                         color={managerColors.highlight}
                       />
-                      <Text style={styles.actionButtonText}>Edit</Text>
+                      <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.actionButton, styles.deleteButton]}
@@ -684,7 +686,7 @@ export default function UpcomingEventsEditorScreen() {
                         color="#E74C3C"
                       />
                       <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                        Delete
+                        {t('common:delete')}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -715,7 +717,7 @@ export default function UpcomingEventsEditorScreen() {
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>
-                {editingEvent ? 'Edit Event' : 'Add Event'}
+                {editingEvent ? t('upcoming_events_editor:modal_edit') : t('upcoming_events_editor:modal_add')}
               </Text>
               <TouchableOpacity onPress={closeModal}>
                 <IconSymbol
@@ -735,7 +737,7 @@ export default function UpcomingEventsEditorScreen() {
               keyboardShouldPersistTaps="handled"
             >
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Thumbnail Image (Optional)</Text>
+                <Text style={styles.formLabel}>{t('upcoming_events_editor:thumbnail_label')}</Text>
                 <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
                   {selectedImageUri || editingEvent?.thumbnail_url ? (
                     <Image
@@ -751,7 +753,7 @@ export default function UpcomingEventsEditorScreen() {
                         size={48}
                         color="#666666"
                       />
-                      <Text style={styles.imageUploadText}>Tap to upload image</Text>
+                      <Text style={styles.imageUploadText}>{t('upcoming_events_editor:tap_upload')}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -770,7 +772,7 @@ export default function UpcomingEventsEditorScreen() {
                         formData.thumbnail_shape === 'square' && styles.shapeOptionTextActive,
                       ]}
                     >
-                      Square
+                      {t('upcoming_events_editor:shape_square')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -786,17 +788,17 @@ export default function UpcomingEventsEditorScreen() {
                         formData.thumbnail_shape === 'banner' && styles.shapeOptionTextActive,
                       ]}
                     >
-                      Banner
+                      {t('upcoming_events_editor:shape_banner')}
                     </Text>
                   </TouchableOpacity>
                 </View>
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Event Title *</Text>
+                <Text style={styles.formLabel}>{t('upcoming_events_editor:event_title_label')}</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter event title"
+                  placeholder={t('upcoming_events_editor:event_title_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.title}
                   onChangeText={(text) => setFormData({ ...formData, title: text })}
@@ -804,7 +806,7 @@ export default function UpcomingEventsEditorScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Category *</Text>
+                <Text style={styles.formLabel}>{t('upcoming_events_editor:category_label')}</Text>
                 <View style={styles.categorySelector}>
                   <TouchableOpacity
                     style={[
@@ -819,7 +821,7 @@ export default function UpcomingEventsEditorScreen() {
                         formData.category === 'Event' && styles.categoryOptionTextActive,
                       ]}
                     >
-                      Event
+                      {t('upcoming_events_editor:category_event')}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -835,20 +837,20 @@ export default function UpcomingEventsEditorScreen() {
                         formData.category === 'Entertainment' && styles.categoryOptionTextActive,
                       ]}
                     >
-                      Entertainment
+                      {t('upcoming_events_editor:category_entertainment')}
                     </Text>
                   </TouchableOpacity>
                 </View>
                 <Text style={styles.formHint}>
-                  Select whether this is a regular Event or Entertainment (music acts, performances, etc.)
+                  {t('upcoming_events_editor:category_hint')}
                 </Text>
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Description *</Text>
+                <Text style={styles.formLabel}>{t('upcoming_events_editor:description_label')}</Text>
                 <TextInput
                   style={[styles.input, styles.textArea]}
-                  placeholder="Enter event description"
+                  placeholder={t('upcoming_events_editor:description_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.message}
                   onChangeText={(text) => setFormData({ ...formData, message: text })}
@@ -858,10 +860,10 @@ export default function UpcomingEventsEditorScreen() {
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Link (Optional)</Text>
+                <Text style={styles.formLabel}>{t('upcoming_events_editor:link_label')}</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter link URL (e.g., https://example.com)"
+                  placeholder={t('upcoming_events_editor:link_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.link}
                   onChangeText={(text) => setFormData({ ...formData, link: text })}
@@ -869,12 +871,12 @@ export default function UpcomingEventsEditorScreen() {
                   keyboardType="url"
                 />
                 <Text style={styles.formHint}>
-                  This link will be displayed in the full event view and &quot;View All&quot; page
+                  {t('upcoming_events_editor:link_hint')}
                 </Text>
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Attach File from Guides & Training (Optional)</Text>
+                <Text style={styles.formLabel}>{t('upcoming_events_editor:attach_file_label')}</Text>
                 
                 {selectedGuideFile ? (
                   <View style={styles.selectedFileContainer}>
@@ -911,7 +913,7 @@ export default function UpcomingEventsEditorScreen() {
                       color={managerColors.highlight}
                     />
                     <Text style={styles.filePickerButtonText}>
-                      {showFileSection ? 'Hide File Selection' : 'Show File Selection'}
+                      {showFileSection ? t('upcoming_events_editor:hide_file_selection') : t('upcoming_events_editor:show_file_selection')}
                     </Text>
                   </TouchableOpacity>
                 )}
@@ -927,7 +929,7 @@ export default function UpcomingEventsEditorScreen() {
                       />
                       <TextInput
                         style={styles.searchInput}
-                        placeholder="Search files by name, category..."
+                        placeholder={t('upcoming_events_editor:search_files_placeholder')}
                         placeholderTextColor="#999999"
                         value={fileSearchQuery}
                         onChangeText={setFileSearchQuery}
@@ -988,9 +990,9 @@ export default function UpcomingEventsEditorScreen() {
                             size={48}
                             color="#999999"
                           />
-                          <Text style={styles.emptyFileListText}>No files found</Text>
+                          <Text style={styles.emptyFileListText}>{t('upcoming_events_editor:no_files_found')}</Text>
                           <Text style={styles.emptyFileListSubtext}>
-                            Try adjusting your search or check if files are uploaded in Guides & Training
+                            {t('upcoming_events_editor:no_files_subtext')}
                           </Text>
                         </View>
                       )}
@@ -999,12 +1001,12 @@ export default function UpcomingEventsEditorScreen() {
                 )}
 
                 <Text style={styles.formHint}>
-                  Attach a file from Guides & Training to display View and Download buttons
+                  {t('upcoming_events_editor:attach_file_hint')}
                 </Text>
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Start Date & Time (Optional)</Text>
+                <Text style={styles.formLabel}>{t('upcoming_events_editor:start_datetime_label')}</Text>
                 <TouchableOpacity
                   style={styles.dateTimeButton}
                   onPress={() => setShowStartDatePicker(true)}
@@ -1016,7 +1018,7 @@ export default function UpcomingEventsEditorScreen() {
                     color="#666666"
                   />
                   <Text style={styles.dateTimeButtonText}>
-                    {startDateTime ? startDateTime.toLocaleDateString() : 'Select Date'}
+                    {startDateTime ? startDateTime.toLocaleDateString() : t('upcoming_events_editor:select_date')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -1030,7 +1032,7 @@ export default function UpcomingEventsEditorScreen() {
                     color="#666666"
                   />
                   <Text style={styles.dateTimeButtonText}>
-                    {startDateTime ? startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Select Time'}
+                    {startDateTime ? startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('upcoming_events_editor:select_time')}
                   </Text>
                 </TouchableOpacity>
                 {startDateTime && (
@@ -1038,13 +1040,13 @@ export default function UpcomingEventsEditorScreen() {
                     style={styles.clearButton}
                     onPress={() => setStartDateTime(null)}
                   >
-                    <Text style={styles.clearButtonText}>Clear Start Date/Time</Text>
+                    <Text style={styles.clearButtonText}>{t('upcoming_events_editor:clear_start_datetime')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>End Date & Time (Optional)</Text>
+                <Text style={styles.formLabel}>{t('upcoming_events_editor:end_datetime_label')}</Text>
                 <TouchableOpacity
                   style={styles.dateTimeButton}
                   onPress={() => setShowEndDatePicker(true)}
@@ -1056,7 +1058,7 @@ export default function UpcomingEventsEditorScreen() {
                     color="#666666"
                   />
                   <Text style={styles.dateTimeButtonText}>
-                    {endDateTime ? endDateTime.toLocaleDateString() : 'Select Date'}
+                    {endDateTime ? endDateTime.toLocaleDateString() : t('upcoming_events_editor:select_date')}
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -1070,7 +1072,7 @@ export default function UpcomingEventsEditorScreen() {
                     color="#666666"
                   />
                   <Text style={styles.dateTimeButtonText}>
-                    {endDateTime ? endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Select Time'}
+                    {endDateTime ? endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('upcoming_events_editor:select_time')}
                   </Text>
                 </TouchableOpacity>
                 {endDateTime && (
@@ -1078,16 +1080,16 @@ export default function UpcomingEventsEditorScreen() {
                     style={styles.clearButton}
                     onPress={() => setEndDateTime(null)}
                   >
-                    <Text style={styles.clearButtonText}>Clear End Date/Time</Text>
+                    <Text style={styles.clearButtonText}>{t('upcoming_events_editor:clear_end_datetime')}</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
               <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Display Order</Text>
+                <Text style={styles.formLabel}>{t('upcoming_events_editor:display_order_label')}</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter display order (e.g., 1, 2, 3...)"
+                  placeholder={t('upcoming_events_editor:display_order_placeholder')}
                   placeholderTextColor="#999999"
                   value={formData.display_order.toString()}
                   onChangeText={(text) => {
@@ -1097,7 +1099,7 @@ export default function UpcomingEventsEditorScreen() {
                   keyboardType="numeric"
                 />
                 <Text style={styles.formHint}>
-                  Lower numbers appear first. Events with the same order are sorted by creation date.
+                  {t('upcoming_events_editor:display_order_hint')}
                 </Text>
               </View>
 
@@ -1110,7 +1112,7 @@ export default function UpcomingEventsEditorScreen() {
                   <ActivityIndicator color="#1A1A1A" />
                 ) : (
                   <Text style={styles.saveButtonText}>
-                    {editingEvent ? 'Update Event' : 'Add Event'}
+                    {editingEvent ? t('upcoming_events_editor:save_button') : t('upcoming_events_editor:add_save_button')}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -1119,7 +1121,7 @@ export default function UpcomingEventsEditorScreen() {
                 style={styles.cancelButton}
                 onPress={closeModal}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{t('upcoming_events_editor:cancel_button')}</Text>
               </TouchableOpacity>
             </ScrollView>
 
@@ -1129,7 +1131,7 @@ export default function UpcomingEventsEditorScreen() {
                 <View style={styles.datePickerContainer}>
                   <View style={styles.datePickerHeader}>
                     <TouchableOpacity onPress={() => setShowStartDatePicker(false)}>
-                      <Text style={styles.datePickerDone}>Done</Text>
+                      <Text style={styles.datePickerDone}>{t('upcoming_events_editor:done')}</Text>
                     </TouchableOpacity>
                   </View>
                   <DateTimePicker
@@ -1157,7 +1159,7 @@ export default function UpcomingEventsEditorScreen() {
                 <View style={styles.datePickerContainer}>
                   <View style={styles.datePickerHeader}>
                     <TouchableOpacity onPress={() => setShowStartTimePicker(false)}>
-                      <Text style={styles.datePickerDone}>Done</Text>
+                      <Text style={styles.datePickerDone}>{t('upcoming_events_editor:done')}</Text>
                     </TouchableOpacity>
                   </View>
                   <DateTimePicker
@@ -1184,7 +1186,7 @@ export default function UpcomingEventsEditorScreen() {
                 <View style={styles.datePickerContainer}>
                   <View style={styles.datePickerHeader}>
                     <TouchableOpacity onPress={() => setShowEndDatePicker(false)}>
-                      <Text style={styles.datePickerDone}>Done</Text>
+                      <Text style={styles.datePickerDone}>{t('upcoming_events_editor:done')}</Text>
                     </TouchableOpacity>
                   </View>
                   <DateTimePicker
@@ -1212,7 +1214,7 @@ export default function UpcomingEventsEditorScreen() {
                 <View style={styles.datePickerContainer}>
                   <View style={styles.datePickerHeader}>
                     <TouchableOpacity onPress={() => setShowEndTimePicker(false)}>
-                      <Text style={styles.datePickerDone}>Done</Text>
+                      <Text style={styles.datePickerDone}>{t('upcoming_events_editor:done')}</Text>
                     </TouchableOpacity>
                   </View>
                   <DateTimePicker

@@ -12,6 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -38,6 +39,7 @@ interface Message {
 export default function MessagesScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'feedback'>('inbox');
   const [inboxMessages, setInboxMessages] = useState<Message[]>([]);
   const [sentMessages, setSentMessages] = useState<Message[]>([]);
@@ -370,7 +372,7 @@ export default function MessagesScreen() {
       }
     } catch (error) {
       console.error('Error loading messages:', error);
-      Alert.alert('Error', 'Failed to load messages');
+      Alert.alert(t('common.error'), t('messages.error_load'));
     } finally {
       setLoading(false);
     }
@@ -472,10 +474,10 @@ export default function MessagesScreen() {
       await loadUnreadCount();
       setSelectionMode(false);
       setSelectedMessages(new Set());
-      Alert.alert('Success', `${messageIds.length} message${messageIds.length > 1 ? 's' : ''} marked as read`);
+      Alert.alert(t('common.success'), t('messages.marked_as_read_success', { count: messageIds.length }));
     } catch (error) {
       console.error('Error marking messages as read:', error);
-      Alert.alert('Error', 'Failed to mark messages as read');
+      Alert.alert(t('common.error'), t('messages.error_mark_read'));
     }
   };
 
@@ -486,17 +488,17 @@ export default function MessagesScreen() {
     const count = selectedMessages.size;
     
     Alert.alert(
-      `Delete ${count} ${messageType}${count > 1 ? 's' : ''}`,
-      `Are you sure you want to delete ${count} selected ${messageType}${count > 1 ? 's' : ''}?`,
+      t('messages.delete_confirm_title', { count, type: messageType }),
+      t('messages.delete_confirm_msg', { count, type: messageType }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
               const messageIds = Array.from(selectedMessages);
-              
+
               if (activeTab === 'inbox' || activeTab === 'feedback') {
                 await supabase
                   .from('message_recipients')
@@ -520,10 +522,10 @@ export default function MessagesScreen() {
               }
               setSelectionMode(false);
               setSelectedMessages(new Set());
-              Alert.alert('Success', `${count} ${messageType}${count > 1 ? 's' : ''} deleted`);
+              Alert.alert(t('common.success'), t('messages.deleted_success', { count, type: messageType }));
             } catch (error) {
               console.error('Error deleting messages:', error);
-              Alert.alert('Error', 'Failed to delete messages');
+              Alert.alert(t('common.error'), t('messages.error_delete'));
             }
           },
         },
@@ -556,22 +558,23 @@ export default function MessagesScreen() {
       await loadUnreadCount();
     } catch (error) {
       console.error('Error marking as read:', error);
-      Alert.alert('Error', 'Failed to mark message as read');
+      Alert.alert(t('common.error'), t('messages.error_mark_read'));
     }
   };
 
   const handleDeleteMessage = async (message: Message) => {
     const messageType = activeTab === 'feedback' ? 'feedback' : 'message';
-    
+    const count = 1;
+
     Alert.alert(
-      `Delete ${messageType === 'feedback' ? 'Feedback' : 'Message'}`,
+      t('messages.delete_confirm_title', { count, type: messageType }),
       activeTab === 'inbox' || activeTab === 'feedback'
-        ? `Are you sure you want to delete this ${messageType} from your inbox?`
-        : 'Are you sure you want to delete this sent message?',
+        ? t('messages.delete_inbox_confirm', { type: messageType })
+        : t('messages.delete_sent_confirm'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -606,10 +609,10 @@ export default function MessagesScreen() {
               if (isManager) {
                 await loadFeedbackCount();
               }
-              Alert.alert('Success', `${messageType === 'feedback' ? 'Feedback' : 'Message'} deleted`);
+              Alert.alert(t('common.success'), t('messages.deleted_success', { count, type: messageType }));
             } catch (error) {
               console.error('Error deleting message:', error);
-              Alert.alert('Error', `Failed to delete ${messageType}`);
+              Alert.alert(t('common.error'), t('messages.error_delete'));
             }
           },
         },
@@ -624,11 +627,11 @@ export default function MessagesScreen() {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return 'Yesterday';
-    if (diffDays < 7) return `${diffDays}d ago`;
-    
+    if (diffHours < 1) return t('messages.just_now');
+    if (diffHours < 24) return t('messages.hours_ago', { count: diffHours });
+    if (diffDays === 1) return t('messages.yesterday');
+    if (diffDays < 7) return t('messages.days_ago', { count: diffDays });
+
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
@@ -643,7 +646,7 @@ export default function MessagesScreen() {
             color="#FFFFFF"
           />
           <Text style={styles.warningText}>
-            Your inbox is almost full ({inboxCount}/40). Delete old messages to avoid losing new ones.
+            {t('messages.inbox_almost_full', { count: inboxCount })}
           </Text>
         </View>
       );
@@ -658,7 +661,7 @@ export default function MessagesScreen() {
             color="#FFFFFF"
           />
           <Text style={styles.warningText}>
-            Your inbox is getting full ({inboxCount}/40). Consider deleting old messages.
+            {t('messages.inbox_getting_full', { count: inboxCount })}
           </Text>
         </View>
       );
@@ -689,7 +692,7 @@ export default function MessagesScreen() {
               />
             </TouchableOpacity>
             <Text style={[styles.headerTitle, { color: colors.text }]}>
-              {selectedMessages.size} selected
+              {t('messages.selected', { count: selectedMessages.size })}
             </Text>
             <View style={styles.headerRight} />
           </>
@@ -703,7 +706,7 @@ export default function MessagesScreen() {
                 color={colors.text}
               />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { color: colors.text }]}>Messages</Text>
+            <Text style={[styles.headerTitle, { color: colors.text }]}>{t('messages.title')}</Text>
             <View style={styles.headerRight} />
           </>
         )}
@@ -723,7 +726,7 @@ export default function MessagesScreen() {
                 size={20}
                 color="#FFFFFF"
               />
-              <Text style={styles.selectionButtonText}>Mark as Read</Text>
+              <Text style={styles.selectionButtonText}>{t('messages.mark_as_read')}</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
@@ -736,7 +739,7 @@ export default function MessagesScreen() {
               size={20}
               color="#FFFFFF"
             />
-            <Text style={styles.selectionButtonText}>Delete</Text>
+            <Text style={styles.selectionButtonText}>{t('common.delete')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -759,7 +762,7 @@ export default function MessagesScreen() {
               { color: activeTab === 'inbox' ? colors.text : colors.textSecondary },
             ]}
           >
-            Inbox
+            {t('messages.inbox')}
           </Text>
           {unreadCount > 0 && (
             <View style={[styles.badge, { backgroundColor: '#E74C3C' }]}>
@@ -780,7 +783,7 @@ export default function MessagesScreen() {
               { color: activeTab === 'sent' ? colors.text : colors.textSecondary },
             ]}
           >
-            Sent
+            {t('messages.sent')}
           </Text>
         </TouchableOpacity>
         {isManager && (
@@ -797,7 +800,7 @@ export default function MessagesScreen() {
                 { color: activeTab === 'feedback' ? colors.text : colors.textSecondary },
               ]}
             >
-              Feedback
+              {t('messages.feedback')}
             </Text>
             {feedbackCount > 0 && (
               <View style={[styles.badge, { backgroundColor: '#3498DB' }]}>
@@ -821,7 +824,7 @@ export default function MessagesScreen() {
             color={user?.role === 'manager' ? colors.text : '#FFFFFF'}
           />
           <Text style={[styles.composeButtonText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
-            Send a New Message
+            {t('messages.send_new_message')}
           </Text>
         </TouchableOpacity>
       )}
@@ -838,7 +841,7 @@ export default function MessagesScreen() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary || colors.highlight} />
             <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-              Loading {activeTab === 'feedback' ? 'feedback' : 'messages'}...
+              {activeTab === 'feedback' ? t('messages.loading_feedback') : t('messages.loading_messages')}
             </Text>
           </View>
         ) : messages.length === 0 ? (
@@ -850,15 +853,15 @@ export default function MessagesScreen() {
               color={colors.textSecondary}
             />
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {activeTab === 'feedback' 
-                ? 'No feedback submissions yet'
-                : activeTab === 'inbox' 
-                ? 'No messages in your inbox' 
-                : 'No sent messages'}
+              {activeTab === 'feedback'
+                ? t('messages.no_feedback')
+                : activeTab === 'inbox'
+                ? t('messages.no_inbox_messages')
+                : t('messages.no_sent_messages')}
             </Text>
             {activeTab === 'feedback' && (
               <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                Employees can submit feedback from their Tools page
+                {t('messages.feedback_hint')}
               </Text>
             )}
           </View>
@@ -913,6 +916,7 @@ function MessageCard({
   onDelete: () => void;
   formatDate: (date: string) => string;
 }) {
+  const { t } = useTranslation();
   return (
     <TouchableOpacity
       style={[
@@ -969,8 +973,8 @@ function MessageCard({
               <View style={styles.unreadDot} />
             )}
             <Text style={[styles.messageSender, { color: colors.text }]} numberOfLines={1}>
-              {activeTab === 'sent' 
-                ? `To: ${message.recipient_count} recipient${message.recipient_count > 1 ? 's' : ''}`
+              {activeTab === 'sent'
+                ? t('messages.recipients', { count: message.recipient_count })
                 : message.sender_name}
             </Text>
           </View>
@@ -1039,7 +1043,7 @@ function MessageCard({
                   size={14}
                   color="#FFFFFF"
                 />
-                <Text style={styles.inlineActionText}>Mark Read</Text>
+                <Text style={styles.inlineActionText}>{t('messages.mark_as_read')}</Text>
               </TouchableOpacity>
             )}
             <TouchableOpacity
@@ -1055,7 +1059,7 @@ function MessageCard({
                 size={14}
                 color="#FFFFFF"
               />
-              <Text style={styles.inlineActionText}>Delete</Text>
+              <Text style={styles.inlineActionText}>{t('common.delete')}</Text>
             </TouchableOpacity>
           </View>
         )}

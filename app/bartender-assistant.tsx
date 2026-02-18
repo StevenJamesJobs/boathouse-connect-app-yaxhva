@@ -11,12 +11,14 @@ import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { useAuth } from '@/contexts/AuthContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 export default function BartenderAssistantScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'encyclopedia' | 'exams'>('encyclopedia');
-  
+
   // Use manager colors if user is a manager, otherwise use employee colors
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
@@ -32,7 +34,7 @@ export default function BartenderAssistantScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Bartender Assistant</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('bartender_assistant.title')}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -44,7 +46,7 @@ export default function BartenderAssistantScreen() {
             onPress={() => setActiveTab('encyclopedia')}
           >
             <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'encyclopedia' && { color: colors.text }]}>
-              Encyclopedia
+              {t('bartender_assistant.encyclopedia')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -52,7 +54,7 @@ export default function BartenderAssistantScreen() {
             onPress={() => setActiveTab('exams')}
           >
             <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'exams' && { color: colors.text }]}>
-              Bar Exams
+              {t('bartender_assistant.bar_exams')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -69,9 +71,9 @@ export default function BartenderAssistantScreen() {
                   color={colors.primary}
                 />
                 <View style={styles.cardHeaderText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Checklists</Text>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant.checklists')}</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    Daily opening and closing checklists
+                    {t('bartender_assistant.checklists_desc')}
                   </Text>
                 </View>
               </View>
@@ -88,7 +90,7 @@ export default function BartenderAssistantScreen() {
                     size={24}
                     color={colors.primary}
                   />
-                  <Text style={[styles.subCardText, { color: colors.text }]}>Opening Checklist</Text>
+                  <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_assistant.opening_checklist')}</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
@@ -110,7 +112,7 @@ export default function BartenderAssistantScreen() {
                     size={24}
                     color={colors.primary}
                   />
-                  <Text style={[styles.subCardText, { color: colors.text }]}>Closing Checklist</Text>
+                  <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_assistant.closing_checklist')}</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
@@ -135,9 +137,9 @@ export default function BartenderAssistantScreen() {
                   color={colors.primary}
                 />
                 <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Libation Recipes</Text>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant.libation_recipes')}</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    Browse cocktail recipes by category
+                    {t('bartender_assistant.libation_recipes_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -163,9 +165,9 @@ export default function BartenderAssistantScreen() {
                   color={colors.primary}
                 />
                 <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Cocktails A-Z</Text>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant.cocktails_az')}</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    Browse all cocktails alphabetically
+                    {t('bartender_assistant.cocktails_az_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -191,9 +193,9 @@ export default function BartenderAssistantScreen() {
                   color={colors.primary}
                 />
                 <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Purees & Simple Syrups Recipes</Text>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant.purees_syrups')}</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    Recipe collection for purees and simple syrups
+                    {t('bartender_assistant.purees_syrups_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -221,9 +223,9 @@ export default function BartenderAssistantScreen() {
                   color={colors.primary}
                 />
                 <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Weekly Quiz</Text>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant.weekly_quiz')}</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    Test your bartending knowledge
+                    {t('bartender_assistant.weekly_quiz_desc')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -244,7 +246,7 @@ export default function BartenderAssistantScreen() {
                 color={colors.primary}
               />
               <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                More exam sections will be added here in the future!
+                {t('bartender_assistant.more_exams_coming')}
               </Text>
             </View>
           </>

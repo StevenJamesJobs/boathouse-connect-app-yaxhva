@@ -14,6 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useTranslation } from 'react-i18next';
 
 interface ChecklistItem {
   id: string;
@@ -32,10 +33,11 @@ interface ChecklistCategory {
 export default function RunningSideWorkChecklistScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [categories, setCategories] = useState<ChecklistCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  
+
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
   useFocusEffect(
@@ -110,7 +112,7 @@ export default function RunningSideWorkChecklistScreen() {
       console.log('Loaded checklist with', categoriesWithItems.length, 'categories');
     } catch (error) {
       console.error('Error loading checklist:', error);
-      Alert.alert('Error', 'Failed to load checklist. Please try again.');
+      Alert.alert(t('common.error'), t('checklist.error_load'));
     } finally {
       setLoading(false);
     }
@@ -212,7 +214,7 @@ export default function RunningSideWorkChecklistScreen() {
               color={colors.text}
             />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Running Side Work</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('checklist.title_running_side_work')}</Text>
           <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
@@ -233,14 +235,14 @@ export default function RunningSideWorkChecklistScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Running Side Work</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('checklist.title_running_side_work')}</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         <View style={[styles.progressCard, { backgroundColor: colors.card }]}>
           <View style={styles.progressHeader}>
-            <Text style={[styles.progressTitle, { color: colors.text }]}>Today's Progress</Text>
+            <Text style={[styles.progressTitle, { color: colors.text }]}>{t('checklist.todays_progress')}</Text>
             <Text style={[styles.progressPercentage, { color: colors.primary }]}>
               {completionPercentage}%
             </Text>
@@ -254,7 +256,7 @@ export default function RunningSideWorkChecklistScreen() {
             />
           </View>
           <Text style={[styles.progressText, { color: colors.textSecondary }]}>
-            {stats.completedItems} of {stats.totalItems} tasks completed
+            {t('checklist.tasks_completed', { completed: stats.completedItems, total: stats.totalItems })}
           </Text>
         </View>
 
@@ -282,7 +284,7 @@ export default function RunningSideWorkChecklistScreen() {
                       {category.name}
                     </Text>
                     <Text style={[styles.categoryProgress, { color: colors.textSecondary }]}>
-                      {categoryProgress}/{category.items.length} completed
+                      {t('checklist.category_progress', { done: categoryProgress, total: category.items.length })}
                     </Text>
                   </View>
                 </View>

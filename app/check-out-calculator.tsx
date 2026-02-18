@@ -2,6 +2,7 @@
 import React, { useState, useMemo } from 'react';
 import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -264,6 +265,7 @@ const styles = StyleSheet.create({
 export default function CheckOutCalculatorScreen() {
   const { user } = useAuth();
   const router = useRouter();
+  const { t } = useTranslation();
   const isManager = user?.role === 'manager';
   const colors = isManager ? managerColors : employeeColors;
 
@@ -396,7 +398,7 @@ export default function CheckOutCalculatorScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Check Out Calculator</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('checkout_calculator:title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -411,10 +413,10 @@ export default function CheckOutCalculatorScreen() {
           />
           <View style={styles.headerText}>
             <Text style={[styles.title, { color: colors.text }]}>
-              Check Out Calculator
+              {t('checkout_calculator:title')}
             </Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Please enter required information for check out calculations.
+              {t('checkout_calculator:subtitle')}
             </Text>
           </View>
         </View>
@@ -424,7 +426,7 @@ export default function CheckOutCalculatorScreen() {
           {/* Total Shift Sales */}
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text }]}>
-              Total Shift Sales *
+              {t('checkout_calculator:total_shift_sales')}
             </Text>
             <View style={[styles.inputWrapper, { borderColor: colors.border }]}>
               <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
@@ -443,7 +445,7 @@ export default function CheckOutCalculatorScreen() {
             
             {/* Shared Party Section */}
             <Text style={[styles.smallText, { color: colors.textSecondary, marginTop: 12 }]}>
-              Did you share a party?
+              {t('checkout_calculator:shared_party')}
             </Text>
             <TouchableOpacity
               style={styles.checkboxContainer}
@@ -476,7 +478,7 @@ export default function CheckOutCalculatorScreen() {
                   />
                 )}
               </View>
-              <Text style={[styles.checkboxLabel, { color: colors.text }]}>Yes</Text>
+              <Text style={[styles.checkboxLabel, { color: colors.text }]}>{t('checkout_calculator:yes')}</Text>
             </TouchableOpacity>
           </View>
 
@@ -490,7 +492,7 @@ export default function CheckOutCalculatorScreen() {
                 {/* Party Subtotal */}
                 <View style={styles.inputGroup}>
                   <Text style={[styles.label, { color: colors.text }]}>
-                    Party Subtotal *
+                    {t('checkout_calculator:party_subtotal')}
                   </Text>
                   <View style={[styles.inputWrapper, { borderColor: colors.border }]}>
                     <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
@@ -511,10 +513,10 @@ export default function CheckOutCalculatorScreen() {
                 {/* Party Gratuity */}
                 <View style={styles.inputGroup}>
                   <Text style={[styles.label, { color: colors.text }]}>
-                    Party Gratuity
+                    {t('checkout_calculator:party_gratuity')}
                   </Text>
                   <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-                    (Automatic gratuity amount to split)
+                    {t('checkout_calculator:party_gratuity_note')}
                   </Text>
                   <View style={[styles.inputWrapper, { borderColor: colors.border }]}>
                     <Text style={[styles.dollarSign, { color: colors.textSecondary }]}>$</Text>
@@ -535,13 +537,17 @@ export default function CheckOutCalculatorScreen() {
                   {partyGratuityCalculation && (
                     <View style={[styles.realtimeCalculation, { backgroundColor: colors.card, borderColor: colors.border }]}>
                       <Text style={[styles.realtimeLabel, { color: colors.textSecondary }]}>
-                        After Tip-Outs:
+                        {t('checkout_calculator:after_tip_outs')}
                       </Text>
                       <Text style={[styles.realtimeValue, { color: colors.primary }]}>
                         {formatCurrency(partyGratuityCalculation.afterTipOuts)}
                       </Text>
                       <Text style={[styles.helperText, { color: colors.textSecondary, marginTop: 4 }]}>
-                        (Gratuity ${formatCurrency(parseFloat(partyGratuity) || 0)} - Busser ${formatCurrency(partyGratuityCalculation.busserTipOut)} - Bartender ${formatCurrency(partyGratuityCalculation.bartenderTipOut)})
+                        {t('checkout_calculator:gratuity_breakdown', {
+                          gratuity: formatCurrency(parseFloat(partyGratuity) || 0),
+                          busser: formatCurrency(partyGratuityCalculation.busserTipOut),
+                          bartender: formatCurrency(partyGratuityCalculation.bartenderTipOut),
+                        })}
                       </Text>
                     </View>
                   )}
@@ -550,7 +556,7 @@ export default function CheckOutCalculatorScreen() {
                 {/* Is the check under my name? */}
                 <View style={styles.inputGroup}>
                   <Text style={[styles.label, { color: colors.text }]}>
-                    Is the check under my name? *
+                    {t('checkout_calculator:under_my_name')}
                   </Text>
                   <View style={styles.yesNoContainer}>
                     <TouchableOpacity
@@ -574,7 +580,7 @@ export default function CheckOutCalculatorScreen() {
                           },
                         ]}
                       >
-                        Yes
+                        {t('checkout_calculator:yes')}
                       </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -598,7 +604,7 @@ export default function CheckOutCalculatorScreen() {
                           },
                         ]}
                       >
-                        No
+                        {t('checkout_calculator:no')}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -613,7 +619,7 @@ export default function CheckOutCalculatorScreen() {
           {/* Declare Percentage */}
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text }]}>
-              Declare Percentage *
+              {t('checkout_calculator:declare_percentage')}
             </Text>
             <View style={styles.buttonGroup}>
               {declareOptions.map((option) => (
@@ -655,10 +661,10 @@ export default function CheckOutCalculatorScreen() {
           {/* Cashed Out/In Total */}
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text }]}>
-              Cashed Out/In Total *
+              {t('checkout_calculator:cashed_out_total')}
             </Text>
             <Text style={[styles.helperText, { color: colors.textSecondary }]}>
-              (Use the +/- button to toggle between positive and negative)
+              {t('checkout_calculator:toggle_hint')}
             </Text>
             <View style={styles.inputWrapperWithToggle}>
               {/* Positive/Negative Toggle Button */}
@@ -715,7 +721,7 @@ export default function CheckOutCalculatorScreen() {
           {/* Busser/Runner Percentage */}
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text }]}>
-              Busser/Runner Tip Out *
+              {t('checkout_calculator:busser_tip_out')}
             </Text>
             <View style={styles.buttonGroup}>
               {busserRunnerOptions.map((option) => (
@@ -757,7 +763,7 @@ export default function CheckOutCalculatorScreen() {
           {/* Bartender Percentage */}
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text }]}>
-              Bartender Tip Out *
+              {t('checkout_calculator:bartender_tip_out')}
             </Text>
             <View style={styles.buttonGroup}>
               {bartenderOptions.map((option) => (
@@ -806,7 +812,7 @@ export default function CheckOutCalculatorScreen() {
             onPress={handleCalculate}
             disabled={!totalShiftSales || !cashInOutTotal}
           >
-            <Text style={styles.calculateButtonText}>Calculate</Text>
+            <Text style={styles.calculateButtonText}>{t('checkout_calculator:calculate')}</Text>
             <IconSymbol
               ios_icon_name="equal.circle.fill"
               android_material_icon_name="calculate"
@@ -820,14 +826,14 @@ export default function CheckOutCalculatorScreen() {
         {showResults && results && (
           <View style={[styles.resultsCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.resultsTitle, { color: colors.text }]}>
-              Calculation Results
+              {t('checkout_calculator:results_title')}
             </Text>
 
             {/* Show adjusted sales if different from original */}
             {sharedParty && checkUnderMyName !== null && (
               <View style={styles.resultRow}>
                 <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
-                  Adjusted Sales for Declare:
+                  {t('checkout_calculator:adjusted_sales')}
                 </Text>
                 <Text style={[styles.resultValue, { color: colors.text }]}>
                   {formatCurrency(results.adjustedSales)}
@@ -838,7 +844,7 @@ export default function CheckOutCalculatorScreen() {
             {/* Declare Amount */}
             <View style={styles.resultRow}>
               <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
-                Declare Amount ({declarePercent === 0.12 ? '12%' : '8%'}):
+                {t('checkout_calculator:declare_amount', { percent: declarePercent === 0.12 ? '12' : '8' })}
               </Text>
               <Text style={[styles.resultValue, { color: colors.text }]}>
                 {formatCurrency(results.declareAmount)}
@@ -848,7 +854,7 @@ export default function CheckOutCalculatorScreen() {
             {/* Busser/Runner Amount */}
             <View style={styles.resultRow}>
               <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
-                Busser/Runner Amount:
+                {t('checkout_calculator:busser_amount')}
               </Text>
               <Text style={[styles.resultValue, { color: colors.text }]}>
                 {formatCurrency(results.busserAmount)}
@@ -858,7 +864,7 @@ export default function CheckOutCalculatorScreen() {
             {/* Bartender Amount */}
             <View style={styles.resultRow}>
               <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
-                Bartender Amount:
+                {t('checkout_calculator:bartender_amount')}
               </Text>
               <Text style={[styles.resultValue, { color: colors.text }]}>
                 {formatCurrency(results.bartenderAmount)}
@@ -868,7 +874,7 @@ export default function CheckOutCalculatorScreen() {
             {/* Cash In/Out Total */}
             <View style={styles.resultRow}>
               <Text style={[styles.resultLabel, { color: colors.textSecondary }]}>
-                Cash In/Out Total:
+                {t('checkout_calculator:cash_total')}
               </Text>
               <Text
                 style={[
@@ -896,7 +902,7 @@ export default function CheckOutCalculatorScreen() {
                   },
                 ]}
               >
-                {results.finalTally >= 0 ? 'You Owe' : 'You are owed'}
+                {results.finalTally >= 0 ? t('checkout_calculator:you_owe') : t('checkout_calculator:you_are_owed')}
               </Text>
               <Text
                 style={[
@@ -925,7 +931,7 @@ export default function CheckOutCalculatorScreen() {
                       },
                     ]}
                   >
-                    {checkUnderMyName ? 'You owe your Teammate' : 'Your Teammate owes you'}
+                    {checkUnderMyName ? t('checkout_calculator:you_owe_teammate') : t('checkout_calculator:teammate_owes_you')}
                   </Text>
                   <Text
                     style={[
@@ -938,7 +944,7 @@ export default function CheckOutCalculatorScreen() {
                     {formatCurrency(results.partyGratuityCalc.splitAmount)}
                   </Text>
                   <Text style={[styles.helperText, { color: colors.textSecondary, marginTop: 8, textAlign: 'center' }]}>
-                    (Party Gratuity split after tip-outs)
+                    {t('checkout_calculator:party_gratuity_split')}
                   </Text>
                 </View>
               </>

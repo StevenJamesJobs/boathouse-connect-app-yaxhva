@@ -11,12 +11,14 @@ import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { useAuth } from '@/contexts/AuthContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 
 export default function HostAssistantScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'encyclopedia' | 'exams'>('encyclopedia');
-  
+
   // Use manager colors if user is a manager, otherwise use employee colors
   const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
@@ -32,7 +34,7 @@ export default function HostAssistantScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Host Assistant</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('host_assistant.title')}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -44,7 +46,7 @@ export default function HostAssistantScreen() {
             onPress={() => setActiveTab('encyclopedia')}
           >
             <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'encyclopedia' && { color: colors.text }]}>
-              Encyclopedia
+              {t('host_assistant.encyclopedia')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -52,7 +54,7 @@ export default function HostAssistantScreen() {
             onPress={() => setActiveTab('exams')}
           >
             <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'exams' && { color: colors.text }]}>
-              Host Exams
+              {t('host_assistant.host_exams')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -72,9 +74,9 @@ export default function HostAssistantScreen() {
                   color={colors.primary}
                 />
                 <View style={styles.sectionCardText}>
-                  <Text style={[styles.sectionCardTitle, { color: colors.text }]}>OpenTable Academy</Text>
+                  <Text style={[styles.sectionCardTitle, { color: colors.text }]}>{t('host_assistant.opentable')}</Text>
                   <Text style={[styles.sectionCardDescription, { color: colors.textSecondary }]}>
-                    Earn your Beginner, Intermediate, and Advanced OpenTable Academy Certifications
+                    {t('host_assistant.opentable_desc')}
                   </Text>
                 </View>
               </View>
@@ -96,9 +98,9 @@ export default function HostAssistantScreen() {
                   color={colors.primary}
                 />
                 <View style={styles.cardHeaderText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>Checklists</Text>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('host_assistant.checklists')}</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    Daily opening, running, and closing checklists
+                    {t('host_assistant.checklists_desc')}
                   </Text>
                 </View>
               </View>
@@ -115,7 +117,7 @@ export default function HostAssistantScreen() {
                     size={24}
                     color={colors.primary}
                   />
-                  <Text style={[styles.subCardText, { color: colors.text }]}>Opening Checklist</Text>
+                  <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant.opening_checklist')}</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
@@ -137,7 +139,7 @@ export default function HostAssistantScreen() {
                     size={24}
                     color={colors.primary}
                   />
-                  <Text style={[styles.subCardText, { color: colors.text }]}>Running Side Work Checklist</Text>
+                  <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant.running_side_work')}</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
@@ -159,7 +161,7 @@ export default function HostAssistantScreen() {
                     size={24}
                     color={colors.primary}
                   />
-                  <Text style={[styles.subCardText, { color: colors.text }]}>Closing Checklist</Text>
+                  <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant.closing_checklist')}</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
@@ -185,9 +187,9 @@ export default function HostAssistantScreen() {
                   color={colors.primary}
                 />
                 <View style={styles.sectionCardText}>
-                  <Text style={[styles.sectionCardTitle, { color: colors.text }]}>Weekly Quiz</Text>
+                  <Text style={[styles.sectionCardTitle, { color: colors.text }]}>{t('host_assistant.weekly_quiz')}</Text>
                   <Text style={[styles.sectionCardDescription, { color: colors.textSecondary }]}>
-                    Test your hosting knowledge
+                    {t('host_assistant.weekly_quiz_desc')}
                   </Text>
                 </View>
               </View>
@@ -208,7 +210,7 @@ export default function HostAssistantScreen() {
                 color={colors.primary}
               />
               <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                More exam sections will be added here in the future!
+                {t('host_assistant.more_exams_coming')}
               </Text>
             </View>
           </>
