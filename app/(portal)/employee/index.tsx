@@ -25,6 +25,7 @@ import WeatherWidget from '@/components/WeatherWidget';
 import { useFocusEffect } from '@react-navigation/native';
 import WeatherDetailModal from '@/components/WeatherDetailModal';
 import { MessageBadge } from '@/components/MessageBadge';
+import UpcomingEventsSection from '@/components/UpcomingEventsSection';
 
 interface MenuItem {
   id: string;
@@ -119,10 +120,7 @@ export default function EmployeePortalScreen() {
   const [loadingFeatures, setLoadingFeatures] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
-  
-  // Upcoming Events tab state
-  const [eventsTab, setEventsTab] = useState<'Event' | 'Entertainment'>('Event');
-  
+
   // What's Happening tab state (Announcements / Special Features)
   const [whatsHappeningTab, setWhatsHappeningTab] = useState<'Announcements' | 'Special Features'>('Announcements');
   
@@ -497,9 +495,6 @@ export default function EmployeePortalScreen() {
     return truncated + '...';
   };
 
-  // Filter events by category
-  const filteredEvents = upcomingEvents.filter(event => event.category === eventsTab).slice(0, 4);
-
   const profilePictureUrl = getProfilePictureUrl(user?.profilePictureUrl);
   const unreadText = unreadCount > 0 ? `${unreadCount}` : '0';
 
@@ -776,7 +771,7 @@ export default function EmployeePortalScreen() {
           )}
         </CollapsibleSection>
 
-        {/* Upcoming Events Section with Tabs */}
+        {/* Upcoming Events Section with Calendar Strip */}
         <CollapsibleSection
           title="Upcoming Events"
           iconIos="calendar"
@@ -787,98 +782,20 @@ export default function EmployeePortalScreen() {
           defaultExpanded={true}
           onViewAll={() => router.push('/view-all-upcoming-events')}
         >
-          {/* Tabs */}
-          <View style={styles.tabsContainer}>
-            <TouchableOpacity
-              style={[styles.tab, eventsTab === 'Event' && styles.activeTab]}
-              onPress={() => setEventsTab('Event')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabText, eventsTab === 'Event' && styles.activeTabText]}>
-                {t('upcoming_events.events')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, eventsTab === 'Entertainment' && styles.activeTab]}
-              onPress={() => setEventsTab('Entertainment')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabText, eventsTab === 'Entertainment' && styles.activeTabText]}>
-                {t('upcoming_events.entertainment')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {loadingEvents ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={employeeColors.primary} />
-              <Text style={styles.loadingText}>{t('employee_home.loading')}</Text>
-            </View>
-          ) : filteredEvents.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>{t('employee_home.no_events')}</Text>
-            </View>
-          ) : (
-            <>
-              {filteredEvents.map((event, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={styles.eventItem}
-                  onPress={() => openDetailModal({
-                    title: event.title,
-                    content: event.content || event.message || '',
-                    thumbnailUrl: event.thumbnail_url,
-                    thumbnailShape: event.thumbnail_shape,
-                    startDateTime: event.start_date_time,
-                    endDateTime: event.end_date_time,
-                    link: event.link,
-                    guideFile: event.guide_file || null,
-                  })}
-                  activeOpacity={0.7}
-                >
-                  {event.thumbnail_shape === 'square' && event.thumbnail_url ? (
-                    <View style={styles.eventSquareLayout}>
-                      <Image
-                        source={{ uri: getImageUrl(event.thumbnail_url) }}
-                        style={styles.eventSquareImage}
-                      />
-                      <View style={styles.eventSquareContent}>
-                        <Text style={styles.eventTitle}>{event.title}</Text>
-                        {(event.content || event.message) && (
-                          <Text style={styles.eventDescription} numberOfLines={2}>
-                            {event.content || event.message}
-                          </Text>
-                        )}
-                        {event.start_date_time && (
-                          <Text style={styles.eventTime}>{formatDateTime(event.start_date_time)}</Text>
-                        )}
-                      </View>
-                    </View>
-                  ) : (
-                    <>
-                      {event.thumbnail_url && (
-                        <Image
-                          source={{ uri: getImageUrl(event.thumbnail_url) }}
-                          style={styles.eventBannerImage}
-                        />
-                      )}
-                      <View style={styles.eventContent}>
-                        <Text style={styles.eventTitle}>{event.title}</Text>
-                        {(event.content || event.message) && (
-                          <Text style={styles.eventDescription}>
-                            {truncateText(event.content || event.message, 125)}
-                          </Text>
-                        )}
-                        {event.start_date_time && (
-                          <Text style={styles.eventTime}>{formatDateTime(event.start_date_time)}</Text>
-                        )}
-                      </View>
-                    </>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </>
-          )}
+          <UpcomingEventsSection
+            events={upcomingEvents}
+            loadingEvents={loadingEvents}
+            colors={{
+              primary: employeeColors.primary,
+              background: employeeColors.background,
+              text: employeeColors.text,
+              textSecondary: employeeColors.textSecondary,
+              card: employeeColors.card,
+              highlight: employeeColors.highlight,
+            }}
+            onEventPress={openDetailModal}
+            maxItems={4}
+          />
         </CollapsibleSection>
 
         {/* Weekly Specials Section */}

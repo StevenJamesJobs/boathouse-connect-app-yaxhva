@@ -18,6 +18,8 @@ import { IconSymbol } from '@/components/IconSymbol';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import MonthlyCalendar from '@/components/MonthlyCalendar';
+import { eventFallsOnDate } from '@/utils/dateUtils';
 
 interface GuideFile {
   id: string;
@@ -52,7 +54,8 @@ export default function ViewAllUpcomingEventsScreen() {
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventsTab, setEventsTab] = useState<'Event' | 'Entertainment'>('Event');
-  
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+
   // Detail modal state
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<{
@@ -76,7 +79,7 @@ export default function ViewAllUpcomingEventsScreen() {
     try {
       setLoading(true);
       console.log('Loading all upcoming events...');
-      
+
       const { data, error } = await supabase
         .from('upcoming_events')
         .select(`
@@ -97,7 +100,7 @@ export default function ViewAllUpcomingEventsScreen() {
         console.error('Error loading upcoming events:', error);
         throw error;
       }
-      
+
       console.log('Upcoming events loaded:', data?.length || 0, 'items');
       setEvents(data || []);
     } catch (error) {
@@ -148,8 +151,15 @@ export default function ViewAllUpcomingEventsScreen() {
     router.back();
   };
 
-  // Filter events by category
-  const filteredEvents = events.filter(event => event.category === eventsTab);
+  // Filter events based on date selection or category tab
+  let filteredEvents: UpcomingEvent[];
+  if (selectedDate !== null) {
+    filteredEvents = events.filter(event =>
+      eventFallsOnDate(event.start_date_time, event.end_date_time, selectedDate)
+    );
+  } else {
+    filteredEvents = events.filter(event => event.category === eventsTab);
+  }
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -166,27 +176,43 @@ export default function ViewAllUpcomingEventsScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* Tabs */}
-      <View style={[styles.tabsContainer, { backgroundColor: colors.card }]}>
-        <TouchableOpacity
-          style={[styles.tab, eventsTab === 'Event' && [styles.activeTab, { backgroundColor: colors.primary }]]}
-          onPress={() => setEventsTab('Event')}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Event' && styles.activeTabText]}>
-            {t('upcoming_events:events')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, eventsTab === 'Entertainment' && [styles.activeTab, { backgroundColor: colors.primary }]]}
-          onPress={() => setEventsTab('Entertainment')}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && styles.activeTabText]}>
-            {t('upcoming_events:entertainment')}
-          </Text>
-        </TouchableOpacity>
-      </View>
+      {/* Monthly Calendar */}
+      <MonthlyCalendar
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+        colors={{
+          primary: colors.primary,
+          background: colors.background,
+          text: colors.text,
+          textSecondary: user?.role === 'manager' ? managerColors.darkSecondaryText : colors.textSecondary,
+          card: colors.card,
+        }}
+        events={events}
+      />
+
+      {/* Tabs (only when no date selected) */}
+      {selectedDate === null && (
+        <View style={[styles.tabsContainer, { backgroundColor: colors.card }]}>
+          <TouchableOpacity
+            style={[styles.tab, eventsTab === 'Event' && [styles.activeTab, { backgroundColor: colors.primary }]]}
+            onPress={() => setEventsTab('Event')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Event' && styles.activeTabText]}>
+              {t('upcoming_events:events')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, eventsTab === 'Entertainment' && [styles.activeTab, { backgroundColor: colors.primary }]]}
+            onPress={() => setEventsTab('Entertainment')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && styles.activeTabText]}>
+              {t('upcoming_events:entertainment')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -203,15 +229,21 @@ export default function ViewAllUpcomingEventsScreen() {
                 size={64}
                 color={colors.textSecondary}
               />
-              <Text style={[styles.emptyText, { color: colors.text }]}>{t('upcoming_events:no_events', { type: eventsTab.toLowerCase() })}</Text>
-              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                {t('upcoming_events:check_back', { type: eventsTab.toLowerCase() })}
+              <Text style={[styles.emptyText, { color: colors.text }]}>
+                {selectedDate !== null
+                  ? t('upcoming_events:no_events_on_date')
+                  : t('upcoming_events:no_events', { type: eventsTab.toLowerCase() })}
               </Text>
+              {selectedDate === null && (
+                <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                  {t('upcoming_events:check_back', { type: eventsTab.toLowerCase() })}
+                </Text>
+              )}
             </View>
           ) : (
             filteredEvents.map((event, index) => (
               <TouchableOpacity
-                key={index}
+                key={event.id || index}
                 style={[styles.eventCard, { backgroundColor: colors.card }]}
                 onPress={() => openDetailModal(event)}
                 activeOpacity={0.7}
@@ -219,7 +251,7 @@ export default function ViewAllUpcomingEventsScreen() {
                 {event.thumbnail_shape === 'square' && event.thumbnail_url ? (
                   <View style={styles.squareLayout}>
                     <Image
-                      source={{ uri: getImageUrl(event.thumbnail_url) }}
+                      source={{ uri: getImageUrl(event.thumbnail_url)! }}
                       style={styles.squareImage}
                     />
                     <View style={styles.squareContent}>
@@ -276,7 +308,7 @@ export default function ViewAllUpcomingEventsScreen() {
                   <>
                     {event.thumbnail_url && (
                       <Image
-                        source={{ uri: getImageUrl(event.thumbnail_url) }}
+                        source={{ uri: getImageUrl(event.thumbnail_url)! }}
                         style={styles.bannerImage}
                       />
                     )}
@@ -330,6 +362,16 @@ export default function ViewAllUpcomingEventsScreen() {
                       )}
                     </View>
                   </>
+                )}
+                {/* Category badge in date-filtered view */}
+                {selectedDate !== null && (
+                  <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '18' }]}>
+                    <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>
+                      {event.category === 'Event'
+                        ? t('upcoming_events:events')
+                        : t('upcoming_events:entertainment')}
+                    </Text>
+                  </View>
                 )}
               </TouchableOpacity>
             ))
@@ -504,6 +546,18 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 13,
+    fontWeight: '600',
+  },
+  categoryBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
+    marginLeft: 16,
+    marginBottom: 12,
+  },
+  categoryBadgeText: {
+    fontSize: 12,
     fontWeight: '600',
   },
 });

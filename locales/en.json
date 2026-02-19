@@ -472,7 +472,10 @@
     "no_events": "No {{type}} events",
     "check_back": "Check back later for new {{type}} events",
     "tap_for_details": "Tap for more details",
-    "ends": "Ends: {{datetime}}"
+    "ends": "Ends: {{datetime}}",
+    "view_top_events": "View Top Events",
+    "no_events_on_date": "No events on this day",
+    "calendar_today": "Today"
   },
   "checklist_editor": {
     "opening_checklist_editor": "Opening Checklist Editor",
