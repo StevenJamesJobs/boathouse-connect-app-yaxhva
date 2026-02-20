@@ -347,7 +347,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           <TouchableOpacity style={styles.filterButton} onPress={openFilterModal}>
             <IconSymbol
               ios_icon_name="line.3.horizontal.decrease.circle"
-              android_material_icon_name="filter_list"
+              android_material_icon_name="filter-list"
               size={20}
               color={colors.text}
             />
