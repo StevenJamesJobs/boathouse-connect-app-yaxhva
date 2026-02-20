@@ -12,24 +12,21 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  Modal,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { employeeColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { MessageBadge } from '@/components/MessageBadge';
-import NotificationPreferences from '@/components/NotificationPreferences';
 import { useTranslation } from 'react-i18next';
-import { useLanguage, SupportedLanguage } from '@/contexts/LanguageContext';
 
 export default function EmployeeProfileScreen() {
   const { t } = useTranslation();
-  const { language, setLanguage } = useLanguage();
+  const colors = useThemeColors();
   const { user, refreshUser } = useAuth();
   const router = useRouter();
   const { unreadCount } = useUnreadMessages();
@@ -39,19 +36,6 @@ export default function EmployeeProfileScreen() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [profileInfoExpanded, setProfileInfoExpanded] = useState(false);
-  const [notificationPrefsExpanded, setNotificationPrefsExpanded] = useState(false);
-  const [languageModalVisible, setLanguageModalVisible] = useState(false);
-
-  // Password change state
-  const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  
-  // Password visibility state
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Update local state when user context changes
   useEffect(() => {
@@ -145,7 +129,7 @@ export default function EmployeeProfileScreen() {
       // Create file name
       const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      
+
       console.log('Uploading file:', fileName);
 
       // Determine content type
@@ -201,82 +185,24 @@ export default function EmployeeProfileScreen() {
     }
   };
 
-  const handleChangePassword = async () => {
-    if (!currentPassword.trim()) {
-      Alert.alert(t('common.error'), t('profile.error_enter_current_password'));
-      return;
-    }
-
-    if (newPassword !== confirmPassword) {
-      Alert.alert(t('common.error'), t('profile.error_passwords_no_match'));
-      return;
-    }
-
-    if (newPassword.length < 6) {
-      Alert.alert(t('common.error'), t('profile.error_password_too_short'));
-      return;
-    }
-
-    try {
-      if (!user?.id) return;
-
-      console.log('Employee Profile: Changing password');
-      // Verify current password using pgcrypto
-      const { data: verifyData, error: verifyError } = await supabase.rpc('verify_password', {
-        user_id: user.id,
-        password: currentPassword,
-      });
-
-      if (verifyError) {
-        console.error('Password verification error:', verifyError);
-        Alert.alert(t('common.error'), t('profile.error_verify_password'));
-        return;
-      }
-
-      if (!verifyData) {
-        Alert.alert(t('common.error'), t('profile.error_password_incorrect'));
-        return;
-      }
-
-      // Update password using pgcrypto
-      const { error: updateError } = await supabase.rpc('update_password', {
-        user_id: user.id,
-        new_password: newPassword,
-      });
-
-      if (updateError) {
-        console.error('Password update error:', updateError);
-        throw updateError;
-      }
-
-      Alert.alert(t('common.success'), t('profile.password_changed'));
-      setShowPasswordChange(false);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setShowCurrentPassword(false);
-      setShowNewPassword(false);
-      setShowConfirmPassword(false);
-    } catch (error: any) {
-      console.error('Error changing password:', error);
-      Alert.alert(t('common.error'), error.message || t('profile.error_change_password'));
-    }
-  };
-
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer} keyboardShouldPersistTaps="handled">
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.contentContainer}
+      keyboardShouldPersistTaps="handled"
+    >
       {/* Profile Header */}
-      <View style={styles.profileHeader}>
+      <View style={[styles.profileHeader, { backgroundColor: colors.card }]}>
         <TouchableOpacity onPress={handlePickImage} style={styles.avatarContainer}>
           {uploading ? (
-            <ActivityIndicator size="large" color={employeeColors.primary} />
+            <ActivityIndicator size="large" color={colors.primary} />
           ) : user?.profilePictureUrl ? (
-            <Image 
-              source={{ uri: user.profilePictureUrl }} 
+            <Image
+              source={{ uri: user.profilePictureUrl }}
               style={styles.avatar}
               key={user.profilePictureUrl} // Force re-render when URL changes
             />
@@ -285,10 +211,10 @@ export default function EmployeeProfileScreen() {
               ios_icon_name="person.circle.fill"
               android_material_icon_name="account-circle"
               size={100}
-              color={employeeColors.primary}
+              color={colors.primary}
             />
           )}
-          <View style={styles.cameraIcon}>
+          <View style={[styles.cameraIcon, { backgroundColor: colors.primary, borderColor: colors.card }]}>
             <IconSymbol
               ios_icon_name="camera.fill"
               android_material_icon_name="camera-alt"
@@ -297,14 +223,14 @@ export default function EmployeeProfileScreen() {
             />
           </View>
         </TouchableOpacity>
-        <Text style={styles.uploadHint}>{t('profile.tap_to_change_photo')}</Text>
-        <Text style={styles.userName}>{user?.name}</Text>
-        <Text style={styles.userRole}>{user?.jobTitle}</Text>
+        <Text style={[styles.uploadHint, { color: colors.textSecondary }]}>{t('profile.tap_to_change_photo')}</Text>
+        <Text style={[styles.userName, { color: colors.text }]}>{user?.name}</Text>
+        <Text style={[styles.userRole, { color: colors.primary }]}>{user?.jobTitle}</Text>
       </View>
 
       {/* Messages Section */}
       <TouchableOpacity
-        style={styles.messagesCard}
+        style={[styles.messagesCard, { backgroundColor: colors.card }]}
         onPress={() => router.push('/messages')}
       >
         <View style={styles.messagesHeader}>
@@ -313,7 +239,7 @@ export default function EmployeeProfileScreen() {
               ios_icon_name="envelope.fill"
               android_material_icon_name="mail"
               size={24}
-              color={employeeColors.primary}
+              color={colors.primary}
             />
             {unreadCount > 0 && (
               <View style={styles.badgePosition}>
@@ -322,8 +248,8 @@ export default function EmployeeProfileScreen() {
             )}
           </View>
           <View style={styles.messagesContent}>
-            <Text style={styles.messagesTitle}>{t('common.messages')}</Text>
-            <Text style={styles.messagesSubtitle}>
+            <Text style={[styles.messagesTitle, { color: colors.text }]}>{t('common.messages')}</Text>
+            <Text style={[styles.messagesSubtitle, { color: colors.textSecondary }]}>
               {unreadCount > 0
                 ? t(unreadCount > 1 ? 'profile.unread_message_other' : 'profile.unread_message_one', { count: unreadCount })
                 : t('profile.no_new_messages')}
@@ -333,23 +259,23 @@ export default function EmployeeProfileScreen() {
             ios_icon_name="chevron.right"
             android_material_icon_name="chevron-right"
             size={24}
-            color={employeeColors.textSecondary}
+            color={colors.textSecondary}
           />
         </View>
       </TouchableOpacity>
 
       {/* Profile Information - Collapsible */}
-      <View style={styles.card}>
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
         <TouchableOpacity
           style={styles.collapsibleHeader}
           onPress={() => setProfileInfoExpanded(!profileInfoExpanded)}
         >
-          <Text style={styles.sectionTitle}>{t('profile.profile_information')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('profile.profile_information')}</Text>
           <IconSymbol
             ios_icon_name={profileInfoExpanded ? "chevron.up" : "chevron.down"}
             android_material_icon_name={profileInfoExpanded ? "expand-less" : "expand-more"}
             size={24}
-            color={employeeColors.text}
+            color={colors.text}
           />
         </TouchableOpacity>
 
@@ -357,52 +283,52 @@ export default function EmployeeProfileScreen() {
           <>
             {/* Username (Read-only) */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>{t('profile.username')}</Text>
-              <View style={[styles.input, styles.inputDisabled]}>
-                <Text style={styles.inputTextDisabled}>{user?.username}</Text>
+              <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('profile.username')}</Text>
+              <View style={[styles.input, styles.inputDisabled, { borderColor: colors.border }]}>
+                <Text style={[styles.inputTextDisabled, { color: colors.textSecondary }]}>{user?.username}</Text>
               </View>
-              <Text style={styles.fieldNote}>{t('profile.username_cannot_change')}</Text>
+              <Text style={[styles.fieldNote, { color: colors.textSecondary }]}>{t('profile.username_cannot_change')}</Text>
             </View>
 
             {/* Full Name (Read-only) */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>{t('profile.full_name')}</Text>
-              <View style={[styles.input, styles.inputDisabled]}>
-                <Text style={styles.inputTextDisabled}>{user?.name}</Text>
+              <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('profile.full_name')}</Text>
+              <View style={[styles.input, styles.inputDisabled, { borderColor: colors.border }]}>
+                <Text style={[styles.inputTextDisabled, { color: colors.textSecondary }]}>{user?.name}</Text>
               </View>
-              <Text style={styles.fieldNote}>{t('profile.name_cannot_change')}</Text>
+              <Text style={[styles.fieldNote, { color: colors.textSecondary }]}>{t('profile.name_cannot_change')}</Text>
             </View>
 
             {/* Email (Editable) */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>{t('profile.email')}</Text>
+              <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('profile.email')}</Text>
               <TextInput
-                style={[styles.input, !isEditing && styles.inputDisabled]}
+                style={[styles.input, { color: colors.text, borderColor: colors.border }, !isEditing && styles.inputDisabled]}
                 value={email}
                 onChangeText={setEmail}
                 editable={isEditing}
                 keyboardType="email-address"
                 autoCapitalize="none"
-                placeholderTextColor={employeeColors.textSecondary}
+                placeholderTextColor={colors.textSecondary}
               />
             </View>
 
             {/* Phone Number (Editable) */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>{t('profile.phone_number')}</Text>
+              <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('profile.phone_number')}</Text>
               <TextInput
-                style={[styles.input, !isEditing && styles.inputDisabled]}
+                style={[styles.input, { color: colors.text, borderColor: colors.border }, !isEditing && styles.inputDisabled]}
                 value={phoneNumber}
                 onChangeText={setPhoneNumber}
                 editable={isEditing}
                 keyboardType="phone-pad"
-                placeholderTextColor={employeeColors.textSecondary}
+                placeholderTextColor={colors.textSecondary}
               />
             </View>
 
             {/* Action Buttons */}
             {!isEditing ? (
-              <TouchableOpacity style={styles.editButton} onPress={() => setIsEditing(true)}>
+              <TouchableOpacity style={[styles.editButton, { backgroundColor: colors.primary }]} onPress={() => setIsEditing(true)}>
                 <IconSymbol
                   ios_icon_name="pencil"
                   android_material_icon_name="edit"
@@ -413,10 +339,10 @@ export default function EmployeeProfileScreen() {
               </TouchableOpacity>
             ) : (
               <View style={styles.buttonRow}>
-                <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+                <TouchableOpacity style={[styles.cancelButton, { backgroundColor: colors.textSecondary }]} onPress={handleCancel}>
                   <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
+                <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary }]} onPress={handleSave} disabled={saving}>
                   {saving ? (
                     <ActivityIndicator color="#FFFFFF" />
                   ) : (
@@ -429,197 +355,34 @@ export default function EmployeeProfileScreen() {
         )}
       </View>
 
-      {/* Notification Preferences - Collapsible */}
-      <View style={styles.card}>
-        <TouchableOpacity
-          style={styles.collapsibleHeader}
-          onPress={() => setNotificationPrefsExpanded(!notificationPrefsExpanded)}
-        >
-          <Text style={styles.sectionTitle}>{t('profile.notification_preferences')}</Text>
-          <IconSymbol
-            ios_icon_name={notificationPrefsExpanded ? "chevron.up" : "chevron.down"}
-            android_material_icon_name={notificationPrefsExpanded ? "expand-less" : "expand-more"}
-            size={24}
-            color={employeeColors.text}
-          />
-        </TouchableOpacity>
-
-        {notificationPrefsExpanded && (
-          <NotificationPreferences variant="employee" />
-        )}
-      </View>
-
-      {/* Language Settings */}
-      <View style={styles.card}>
-        <TouchableOpacity
-          style={styles.collapsibleHeader}
-          onPress={() => setLanguageModalVisible(true)}
-        >
-          <Text style={styles.sectionTitle}>{t('profile.language')}</Text>
-          <View style={styles.languageDisplay}>
-            <Text style={styles.languageValue}>{language === 'en' ? '🇺🇸 English' : '🇲🇽 Español'}</Text>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={24}
-              color={employeeColors.textSecondary}
-            />
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      {/* Password Change */}
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>{t('profile.change_password')}</Text>
-        <Text style={styles.passwordNote}>{t('profile.password_note')}</Text>
-        {!showPasswordChange ? (
-          <TouchableOpacity
-            style={styles.passwordButton}
-            onPress={() => setShowPasswordChange(true)}
-          >
-            <IconSymbol
-              ios_icon_name="key.fill"
-              android_material_icon_name="vpn-key"
-              size={20}
-              color="#FFFFFF"
-            />
-            <Text style={styles.passwordButtonText}>{t('profile.change_password')}</Text>
-          </TouchableOpacity>
-        ) : (
-          <>
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>{t('profile.current_password')}</Text>
-              <View style={styles.passwordInputContainer}>
-                <TextInput
-                  style={styles.passwordInput}
-                  value={currentPassword}
-                  onChangeText={setCurrentPassword}
-                  secureTextEntry={!showCurrentPassword}
-                  placeholder={t('profile.enter_current_password')}
-                  placeholderTextColor={employeeColors.textSecondary}
-                />
-                <TouchableOpacity
-                  style={styles.eyeIcon}
-                  onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-                >
-                  <IconSymbol
-                    ios_icon_name={showCurrentPassword ? "eye.slash.fill" : "eye.fill"}
-                    android_material_icon_name={showCurrentPassword ? "visibility-off" : "visibility"}
-                    size={24}
-                    color={employeeColors.textSecondary}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>{t('profile.new_password')}</Text>
-              <View style={styles.passwordInputContainer}>
-                <TextInput
-                  style={styles.passwordInput}
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  secureTextEntry={!showNewPassword}
-                  placeholder={t('profile.enter_new_password')}
-                  placeholderTextColor={employeeColors.textSecondary}
-                />
-                <TouchableOpacity
-                  style={styles.eyeIcon}
-                  onPress={() => setShowNewPassword(!showNewPassword)}
-                >
-                  <IconSymbol
-                    ios_icon_name={showNewPassword ? "eye.slash.fill" : "eye.fill"}
-                    android_material_icon_name={showNewPassword ? "visibility-off" : "visibility"}
-                    size={24}
-                    color={employeeColors.textSecondary}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>{t('profile.confirm_new_password')}</Text>
-              <View style={styles.passwordInputContainer}>
-                <TextInput
-                  style={styles.passwordInput}
-                  value={confirmPassword}
-                  onChangeText={setConfirmPassword}
-                  secureTextEntry={!showConfirmPassword}
-                  placeholder={t('profile.confirm_new_password_placeholder')}
-                  placeholderTextColor={employeeColors.textSecondary}
-                />
-                <TouchableOpacity
-                  style={styles.eyeIcon}
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                >
-                  <IconSymbol
-                    ios_icon_name={showConfirmPassword ? "eye.slash.fill" : "eye.fill"}
-                    android_material_icon_name={showConfirmPassword ? "visibility-off" : "visibility"}
-                    size={24}
-                    color={employeeColors.textSecondary}
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.buttonRow}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => {
-                  setShowPasswordChange(false);
-                  setCurrentPassword('');
-                  setNewPassword('');
-                  setConfirmPassword('');
-                  setShowCurrentPassword(false);
-                  setShowNewPassword(false);
-                  setShowConfirmPassword(false);
-                }}
-              >
-                <Text style={styles.cancelButtonText}>{t('common.cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.saveButton} onPress={handleChangePassword}>
-                <Text style={styles.saveButtonText}>{t('profile.update_password')}</Text>
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
-      </View>
-
-      {/* Language Picker Modal */}
-      <Modal
-        visible={languageModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setLanguageModalVisible(false)}
+      {/* Settings Card */}
+      <TouchableOpacity
+        style={[styles.messagesCard, { backgroundColor: colors.card }]}
+        onPress={() => router.push('/settings' as any)}
       >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setLanguageModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>{t('profile.select_language')}</Text>
-            <TouchableOpacity
-              style={[styles.languageOption, language === 'en' && styles.languageOptionActive]}
-              onPress={() => { setLanguage('en'); setLanguageModalVisible(false); }}
-            >
-              <Text style={styles.languageOptionText}>🇺🇸 English</Text>
-              {language === 'en' && (
-                <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={20} color={employeeColors.primary} />
-              )}
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.languageOption, language === 'es' && styles.languageOptionActive]}
-              onPress={() => { setLanguage('es'); setLanguageModalVisible(false); }}
-            >
-              <Text style={styles.languageOptionText}>🇲🇽 Español</Text>
-              {language === 'es' && (
-                <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={20} color={employeeColors.primary} />
-              )}
-            </TouchableOpacity>
+        <View style={styles.messagesHeader}>
+          <View style={styles.messagesIconContainer}>
+            <IconSymbol
+              ios_icon_name="gearshape.fill"
+              android_material_icon_name="settings"
+              size={24}
+              color={colors.primary}
+            />
           </View>
-        </TouchableOpacity>
-      </Modal>
+          <View style={styles.messagesContent}>
+            <Text style={[styles.messagesTitle, { color: colors.text }]}>{t('settings.title')}</Text>
+            <Text style={[styles.messagesSubtitle, { color: colors.textSecondary }]}>
+              {t('settings.settings_subtitle')}
+            </Text>
+          </View>
+          <IconSymbol
+            ios_icon_name="chevron.right"
+            android_material_icon_name="chevron-right"
+            size={24}
+            color={colors.textSecondary}
+          />
+        </View>
+      </TouchableOpacity>
     </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -628,7 +391,6 @@ export default function EmployeeProfileScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: employeeColors.background,
   },
   contentContainer: {
     paddingTop: 20,
@@ -637,7 +399,6 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     alignItems: 'center',
-    backgroundColor: employeeColors.card,
     borderRadius: 16,
     padding: 24,
     marginBottom: 20,
@@ -657,34 +418,28 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: employeeColors.primary,
     borderRadius: 16,
     width: 32,
     height: 32,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
-    borderColor: employeeColors.card,
   },
   uploadHint: {
     fontSize: 12,
-    color: employeeColors.textSecondary,
     fontStyle: 'italic',
     marginBottom: 12,
   },
   userName: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: employeeColors.text,
     marginBottom: 4,
   },
   userRole: {
     fontSize: 16,
-    color: employeeColors.primary,
     fontWeight: '600',
   },
   messagesCard: {
-    backgroundColor: employeeColors.card,
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
@@ -710,15 +465,12 @@ const styles = StyleSheet.create({
   messagesTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: employeeColors.text,
     marginBottom: 2,
   },
   messagesSubtitle: {
     fontSize: 14,
-    color: employeeColors.textSecondary,
   },
   card: {
-    backgroundColor: employeeColors.card,
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -734,13 +486,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: employeeColors.text,
-  },
-  passwordNote: {
-    fontSize: 12,
-    color: employeeColors.textSecondary,
-    marginBottom: 12,
-    fontStyle: 'italic',
   },
   fieldContainer: {
     marginBottom: 16,
@@ -748,7 +493,6 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: employeeColors.text,
     marginBottom: 8,
   },
   input: {
@@ -757,46 +501,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: employeeColors.text,
     borderWidth: 1,
-    borderColor: employeeColors.border,
   },
   inputDisabled: {
     backgroundColor: '#E8E8E8',
   },
   inputTextDisabled: {
     fontSize: 16,
-    color: employeeColors.textSecondary,
   },
   fieldNote: {
     fontSize: 12,
-    color: employeeColors.textSecondary,
     marginTop: 4,
     fontStyle: 'italic',
-  },
-  passwordInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: employeeColors.border,
-  },
-  passwordInput: {
-    flex: 1,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: employeeColors.text,
-  },
-  eyeIcon: {
-    paddingHorizontal: 12,
   },
   editButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: employeeColors.primary,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -815,7 +536,6 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     flex: 1,
-    backgroundColor: employeeColors.textSecondary,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -829,7 +549,6 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     flex: 1,
-    backgroundColor: employeeColors.primary,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -840,67 +559,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#FFFFFF',
-  },
-  passwordButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: employeeColors.primary,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  passwordButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-    marginLeft: 8,
-  },
-  languageDisplay: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  languageValue: {
-    fontSize: 16,
-    color: employeeColors.text,
-    fontWeight: '500',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    backgroundColor: employeeColors.card,
-    borderRadius: 16,
-    padding: 24,
-    width: '80%',
-    maxWidth: 320,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: employeeColors.text,
-    marginBottom: 16,
-    textAlign: 'center',
-  },
-  languageOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  languageOptionActive: {
-    backgroundColor: `${employeeColors.primary}20`,
-  },
-  languageOptionText: {
-    fontSize: 16,
-    color: employeeColors.text,
-    fontWeight: '500',
   },
 });

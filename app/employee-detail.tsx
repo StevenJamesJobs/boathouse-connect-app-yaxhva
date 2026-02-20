@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -53,6 +53,8 @@ export default function EmployeeDetailScreen() {
   const { employeeId } = useLocalSearchParams();
   const { user } = useAuth();
   const { t } = useTranslation('employee_detail');
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -302,7 +304,7 @@ export default function EmployeeDetailScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={managerColors.highlight} />
+        <ActivityIndicator size="large" color={colors.highlight} />
       </View>
     );
   }
@@ -323,7 +325,7 @@ export default function EmployeeDetailScreen() {
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
-            color={managerColors.text}
+            color={colors.text}
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('title')}</Text>
@@ -342,7 +344,7 @@ export default function EmployeeDetailScreen() {
         <View style={styles.profileSection}>
           <TouchableOpacity onPress={handlePickImage} style={styles.avatarContainer}>
             {uploading ? (
-              <ActivityIndicator size="large" color={managerColors.highlight} />
+              <ActivityIndicator size="large" color={colors.highlight} />
             ) : employee.profile_picture_url ? (
               <Image source={{ uri: employee.profile_picture_url }} style={styles.avatar} />
             ) : (
@@ -350,7 +352,7 @@ export default function EmployeeDetailScreen() {
                 ios_icon_name="person.circle.fill"
                 android_material_icon_name="account-circle"
                 size={120}
-                color={managerColors.highlight}
+                color={colors.highlight}
               />
             )}
             <View style={styles.cameraIcon}>
@@ -383,7 +385,7 @@ export default function EmployeeDetailScreen() {
               style={styles.formInput}
               value={employee.name}
               onChangeText={(text) => setEmployee({ ...employee, name: text })}
-              placeholderTextColor={managerColors.textSecondary}
+              placeholderTextColor={colors.textSecondary}
             />
           </View>
 
@@ -395,7 +397,7 @@ export default function EmployeeDetailScreen() {
               onChangeText={(text) => setEmployee({ ...employee, email: text })}
               keyboardType="email-address"
               autoCapitalize="none"
-              placeholderTextColor={managerColors.textSecondary}
+              placeholderTextColor={colors.textSecondary}
             />
           </View>
 
@@ -414,7 +416,7 @@ export default function EmployeeDetailScreen() {
                         ios_icon_name="checkmark"
                         android_material_icon_name="check"
                         size={18}
-                        color={managerColors.highlight}
+                        color={colors.highlight}
                       />
                     )}
                   </View>
@@ -431,7 +433,7 @@ export default function EmployeeDetailScreen() {
               value={employee.phone_number}
               onChangeText={(text) => setEmployee({ ...employee, phone_number: text })}
               keyboardType="phone-pad"
-              placeholderTextColor={managerColors.textSecondary}
+              placeholderTextColor={colors.textSecondary}
             />
           </View>
 
@@ -473,7 +475,7 @@ export default function EmployeeDetailScreen() {
             disabled={saving}
           >
             {saving ? (
-              <ActivityIndicator color={managerColors.text} />
+              <ActivityIndicator color={colors.text} />
             ) : (
               <Text style={styles.saveButtonText}>{t('save_changes')}</Text>
             )}
@@ -491,7 +493,7 @@ export default function EmployeeDetailScreen() {
               ios_icon_name="key.fill"
               android_material_icon_name="vpn-key"
               size={20}
-              color={managerColors.text}
+              color={colors.text}
             />
             <Text style={styles.resetButtonText}>{t('reset_password')}</Text>
           </TouchableOpacity>
@@ -519,16 +521,16 @@ export default function EmployeeDetailScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -537,7 +539,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 48,
     paddingBottom: 16,
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
@@ -547,7 +549,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: colors.text,
   },
   deleteButton: {
     padding: 8,
@@ -577,22 +579,22 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
     borderRadius: 20,
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
-    borderColor: managerColors.background,
+    borderColor: colors.background,
   },
   uploadHint: {
     fontSize: 14,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     fontStyle: 'italic',
   },
   card: {
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -602,12 +604,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: colors.text,
     marginBottom: 8,
   },
   sectionDescription: {
     fontSize: 14,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 16,
   },
   formField: {
@@ -616,38 +618,38 @@ const styles = StyleSheet.create({
   formLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.text,
+    color: colors.text,
     marginBottom: 8,
   },
   formInput: {
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: managerColors.text,
+    color: colors.text,
     borderWidth: 1,
-    borderColor: managerColors.border,
+    borderColor: colors.border,
   },
   formInputDisabled: {
     opacity: 0.6,
   },
   formInputTextDisabled: {
     fontSize: 16,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   formNote: {
     fontSize: 12,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 4,
     fontStyle: 'italic',
   },
   jobTitlesContainer: {
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
     borderRadius: 8,
     padding: 12,
     borderWidth: 1,
-    borderColor: managerColors.border,
+    borderColor: colors.border,
   },
   checkboxRow: {
     flexDirection: 'row',
@@ -659,15 +661,15 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: managerColors.text,
+    borderColor: colors.text,
     marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
   },
   checkboxLabel: {
     fontSize: 16,
-    color: managerColors.text,
+    color: colors.text,
   },
   roleSelector: {
     flexDirection: 'row',
@@ -678,25 +680,25 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
     borderWidth: 1,
-    borderColor: managerColors.border,
+    borderColor: colors.border,
     alignItems: 'center',
   },
   roleButtonActive: {
-    backgroundColor: managerColors.highlight,
-    borderColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
+    borderColor: colors.highlight,
   },
   roleButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   roleButtonTextActive: {
-    color: managerColors.text,
+    color: colors.text,
   },
   saveButton: {
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
     borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',
@@ -705,13 +707,13 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: colors.text,
   },
   resetButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -719,7 +721,7 @@ const styles = StyleSheet.create({
   resetButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.text,
+    color: colors.text,
     marginLeft: 8,
   },
   statusRow: {
@@ -730,7 +732,7 @@ const styles = StyleSheet.create({
   statusLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.text,
+    color: colors.text,
   },
   statusBadge: {
     paddingHorizontal: 16,

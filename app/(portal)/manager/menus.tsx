@@ -2,14 +2,15 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import MenuDisplay from '@/components/MenuDisplay';
 
 export default function ManagerMenusScreen() {
+  const colors = useThemeColors();
   const { t } = useTranslation();
   return (
-    <View style={styles.container}>
-      <MenuDisplay colors={managerColors} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <MenuDisplay colors={colors} />
     </View>
   );
 }
@@ -17,6 +18,5 @@ export default function ManagerMenusScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: managerColors.background,
   },
 });

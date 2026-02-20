@@ -14,7 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -53,6 +53,510 @@ interface GuestReview {
 export default function RewardsAndReviewsEditorScreen() {
   const { t } = useTranslation();
   const router = useRouter();
+  const colors = useThemeColors();
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingTop: 48,
+      paddingBottom: 16,
+      backgroundColor: colors.card,
+      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+      elevation: 3,
+    },
+    backButton: {
+      padding: 8,
+      width: 40,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    tabContainer: {
+      flexDirection: 'row',
+      backgroundColor: colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      paddingHorizontal: 16,
+      paddingTop: 8,
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: 12,
+      alignItems: 'center',
+      borderBottomWidth: 3,
+      borderBottomColor: 'transparent',
+    },
+    activeTab: {
+      borderBottomColor: colors.highlight,
+    },
+    tabText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    activeTabText: {
+      color: colors.highlight,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    contentContainer: {
+      paddingTop: 20,
+      paddingHorizontal: 16,
+      paddingBottom: 100,
+    },
+    actionButtonsRow: {
+      flexDirection: 'row',
+      gap: 12,
+      marginBottom: 20,
+    },
+    actionButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 12,
+      paddingVertical: 16,
+      gap: 8,
+      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+      elevation: 3,
+    },
+    rewardButton: {
+      backgroundColor: colors.highlight,
+    },
+    resetButton: {
+      backgroundColor: '#FF9800',
+    },
+    actionButtonText: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    rewardButtonText: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    bucksCard: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 24,
+      alignItems: 'center',
+      marginBottom: 20,
+      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+      elevation: 3,
+    },
+    bucksLabel: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginBottom: 8,
+    },
+    bucksAmount: {
+      fontSize: 48,
+      fontWeight: 'bold',
+      color: colors.highlight,
+    },
+    section: {
+      marginBottom: 24,
+    },
+    sectionTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 12,
+    },
+    leaderboardItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 8,
+      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+      elevation: 3,
+    },
+    leaderboardRank: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.highlight,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    leaderboardRankText: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    leaderboardInfo: {
+      flex: 1,
+    },
+    leaderboardName: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 4,
+    },
+    leaderboardJob: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    leaderboardBucks: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.highlight,
+    },
+    transactionItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 8,
+      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+      elevation: 3,
+    },
+    transactionInfo: {
+      flex: 1,
+      marginRight: 12,
+    },
+    transactionEmployee: {
+      fontSize: 17,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 4,
+    },
+    transactionDescription: {
+      fontSize: 15,
+      color: colors.text,
+      marginBottom: 4,
+    },
+    transactionDate: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    hiddenBadge: {
+      fontSize: 11,
+      color: '#FF9800',
+      fontStyle: 'italic',
+      marginTop: 4,
+    },
+    transactionRight: {
+      alignItems: 'flex-end',
+      gap: 8,
+    },
+    transactionAmount: {
+      fontSize: 18,
+      fontWeight: 'bold',
+    },
+    positiveAmount: {
+      color: '#4CAF50',
+    },
+    negativeAmount: {
+      color: '#F44336',
+    },
+    transactionActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    actionIconButton: {
+      padding: 4,
+    },
+    emptyText: {
+      textAlign: 'center',
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginTop: 20,
+    },
+    reviewCard: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 12,
+      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+      elevation: 3,
+    },
+    reviewHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: 12,
+    },
+    reviewHeaderLeft: {
+      flex: 1,
+    },
+    reviewGuestName: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 8,
+    },
+    starsContainer: {
+      flexDirection: 'row',
+      gap: 4,
+    },
+    reviewActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    reviewText: {
+      fontSize: 14,
+      color: colors.text,
+      lineHeight: 20,
+      marginBottom: 8,
+    },
+    reviewDate: {
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    loadingOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: colors.background,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      maxHeight: '90%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 24,
+      paddingTop: 24,
+      paddingBottom: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.highlight,
+    },
+    modalTitle: {
+      fontSize: 22,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    modalForm: {
+      paddingHorizontal: 24,
+      paddingTop: 16,
+    },
+    formField: {
+      marginBottom: 20,
+    },
+    formLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 8,
+    },
+    formInput: {
+      backgroundColor: colors.card,
+      borderRadius: 8,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: colors.text,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    formInputDisabled: {
+      opacity: 0.6,
+    },
+    formInputTextDisabled: {
+      fontSize: 16,
+      color: colors.textSecondary,
+    },
+    textArea: {
+      minHeight: 100,
+      textAlignVertical: 'top',
+    },
+    formNote: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 4,
+      fontStyle: 'italic',
+    },
+    searchResults: {
+      backgroundColor: colors.card,
+      borderRadius: 8,
+      marginTop: 8,
+      maxHeight: 200,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    searchResultItem: {
+      padding: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    searchResultName: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 4,
+    },
+    searchResultJob: {
+      fontSize: 14,
+      color: colors.textSecondary,
+    },
+    selectedEmployee: {
+      backgroundColor: colors.highlight,
+      borderRadius: 8,
+      padding: 12,
+      marginTop: 8,
+    },
+    selectedEmployeeText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    selectedEmployeeBalance: {
+      fontSize: 13,
+      color: colors.text,
+      marginTop: 4,
+    },
+    toggleContainer: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    toggleOptionButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderRadius: 8,
+      backgroundColor: colors.card,
+      borderWidth: 2,
+      borderColor: colors.border,
+      gap: 8,
+    },
+    toggleOptionButtonActive: {
+      borderWidth: 2,
+    },
+    toggleOptionButtonReward: {
+      backgroundColor: '#4CAF50',
+      borderColor: '#4CAF50',
+    },
+    toggleOptionButtonDeduct: {
+      backgroundColor: '#F44336',
+      borderColor: '#F44336',
+    },
+    toggleOptionText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    toggleOptionTextActive: {
+      color: '#FFFFFF',
+    },
+    amountPreview: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginTop: 8,
+      fontStyle: 'italic',
+    },
+    visibilityToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    toggleButton: {
+      width: 60,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.border,
+      padding: 4,
+      justifyContent: 'center',
+    },
+    toggleButtonActive: {
+      backgroundColor: colors.highlight,
+    },
+    toggleCircle: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: colors.text,
+    },
+    toggleCircleActive: {
+      alignSelf: 'flex-end',
+    },
+    ratingSelector: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    submitButton: {
+      backgroundColor: colors.highlight,
+      borderRadius: 8,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginTop: 8,
+      marginBottom: 24,
+    },
+    submitButtonText: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text,
+    },
+    resetWarning: {
+      backgroundColor: '#FFF3CD',
+      borderRadius: 8,
+      padding: 16,
+      marginBottom: 24,
+      fontSize: 14,
+      color: '#856404',
+      lineHeight: 20,
+    },
+    resetSection: {
+      marginBottom: 24,
+    },
+    resetSectionTitle: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 16,
+    },
+    resetSingleButton: {
+      backgroundColor: '#FF9800',
+    },
+    resetAllButton: {
+      backgroundColor: '#F44336',
+    },
+    resetAllWarning: {
+      fontSize: 14,
+      color: colors.textSecondary,
+      marginBottom: 16,
+      lineHeight: 20,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: 24,
+    },
+  });
+
+
   const { user } = useAuth();
   const { sendNotification } = useNotification();
   const [activeTab, setActiveTab] = useState<'rewards' | 'reviews'>('rewards');
@@ -758,7 +1262,7 @@ export default function RewardsAndReviewsEditorScreen() {
             ios_icon_name={star <= rating ? 'star.fill' : 'star'}
             android_material_icon_name={star <= rating ? 'star' : 'star-border'}
             size={20}
-            color={star <= rating ? '#FFD700' : managerColors.textSecondary}
+            color={star <= rating ? '#FFD700' : colors.textSecondary}
           />
         ))}
       </View>
@@ -778,7 +1282,7 @@ export default function RewardsAndReviewsEditorScreen() {
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
-            color={managerColors.text}
+            color={colors.text}
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('rewards_reviews_editor:title')}</Text>
@@ -819,7 +1323,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   ios_icon_name="gift.fill"
                   android_material_icon_name="card-giftcard"
                   size={24}
-                  color={managerColors.text}
+                  color={colors.text}
                 />
                 <Text style={styles.actionButtonText}>{t('rewards_reviews_editor:reward_bucks_button')}</Text>
               </TouchableOpacity>
@@ -832,7 +1336,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   ios_icon_name="arrow.counterclockwise.circle.fill"
                   android_material_icon_name="refresh"
                   size={24}
-                  color={managerColors.text}
+                  color={colors.text}
                 />
                 <Text style={styles.actionButtonText}>{t('rewards_reviews_editor:reset_bucks_button')}</Text>
               </TouchableOpacity>
@@ -899,7 +1403,7 @@ export default function RewardsAndReviewsEditorScreen() {
                             ios_icon_name="pencil.circle.fill"
                             android_material_icon_name="edit"
                             size={24}
-                            color={managerColors.highlight}
+                            color={colors.highlight}
                           />
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -945,7 +1449,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 ios_icon_name="plus.circle.fill"
                 android_material_icon_name="add-circle"
                 size={24}
-                color={managerColors.text}
+                color={colors.text}
               />
               <Text style={styles.rewardButtonText}>{t('rewards_reviews_editor:add_review_button')}</Text>
             </TouchableOpacity>
@@ -969,7 +1473,7 @@ export default function RewardsAndReviewsEditorScreen() {
                             ios_icon_name="pencil.circle.fill"
                             android_material_icon_name="edit"
                             size={28}
-                            color={managerColors.highlight}
+                            color={colors.highlight}
                           />
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => handleDeleteReview(review.id)}>
@@ -997,7 +1501,7 @@ export default function RewardsAndReviewsEditorScreen() {
       {/* Loading Overlay */}
       {loading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={managerColors.highlight} />
+          <ActivityIndicator size="large" color={colors.highlight} />
         </View>
       )}
 
@@ -1017,7 +1521,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   ios_icon_name="xmark.circle.fill"
                   android_material_icon_name="cancel"
                   size={28}
-                  color={managerColors.textSecondary}
+                  color={colors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
@@ -1031,7 +1535,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   value={searchQuery}
                   onChangeText={setSearchQuery}
                   placeholder={t('rewards_reviews_editor:search_employee_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                 />
                 {filteredEmployees.length > 0 && (
                   <View style={styles.searchResults}>
@@ -1076,7 +1580,7 @@ export default function RewardsAndReviewsEditorScreen() {
                       ios_icon_name="plus.circle.fill"
                       android_material_icon_name="add-circle"
                       size={24}
-                      color={isReward ? '#FFFFFF' : managerColors.textSecondary}
+                      color={isReward ? '#FFFFFF' : colors.textSecondary}
                     />
                     <Text
                       style={[
@@ -1099,7 +1603,7 @@ export default function RewardsAndReviewsEditorScreen() {
                       ios_icon_name="minus.circle.fill"
                       android_material_icon_name="remove-circle"
                       size={24}
-                      color={!isReward ? '#FFFFFF' : managerColors.textSecondary}
+                      color={!isReward ? '#FFFFFF' : colors.textSecondary}
                     />
                     <Text
                       style={[
@@ -1121,7 +1625,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   value={rewardAmount}
                   onChangeText={setRewardAmount}
                   placeholder={t('rewards_reviews_editor:amount_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
                 />
                 {rewardAmount && (
@@ -1143,7 +1647,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   value={rewardDescription}
                   onChangeText={setRewardDescription}
                   placeholder={isReward ? t('rewards_reviews_editor:description_placeholder_reward') : t('rewards_reviews_editor:description_placeholder_deduct')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   multiline
                   numberOfLines={4}
                 />
@@ -1176,7 +1680,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color={managerColors.text} />
+                  <ActivityIndicator color={colors.text} />
                 ) : (
                   <Text style={styles.submitButtonText}>
                     {isReward ? t('rewards_reviews_editor:submit_reward') : t('rewards_reviews_editor:submit_deduction')}
@@ -1205,7 +1709,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   ios_icon_name="xmark.circle.fill"
                   android_material_icon_name="cancel"
                   size={28}
-                  color={managerColors.textSecondary}
+                  color={colors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
@@ -1225,7 +1729,7 @@ export default function RewardsAndReviewsEditorScreen() {
                     value={resetSearchQuery}
                     onChangeText={setResetSearchQuery}
                     placeholder={t('rewards_reviews_editor:search_employee_placeholder')}
-                    placeholderTextColor={managerColors.textSecondary}
+                    placeholderTextColor={colors.textSecondary}
                   />
                   {resetFilteredEmployees.length > 0 && (
                     <View style={styles.searchResults}>
@@ -1265,7 +1769,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   disabled={loading || !resetSelectedEmployee}
                 >
                   {loading ? (
-                    <ActivityIndicator color={managerColors.text} />
+                    <ActivityIndicator color={colors.text} />
                   ) : (
                     <Text style={styles.submitButtonText}>{t('rewards_reviews_editor:reset_selected_button')}</Text>
                   )}
@@ -1288,7 +1792,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   disabled={loading}
                 >
                   {loading ? (
-                    <ActivityIndicator color={managerColors.text} />
+                    <ActivityIndicator color={colors.text} />
                   ) : (
                     <Text style={styles.submitButtonText}>{t('rewards_reviews_editor:reset_all_button')}</Text>
                   )}
@@ -1315,7 +1819,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   ios_icon_name="xmark.circle.fill"
                   android_material_icon_name="cancel"
                   size={28}
-                  color={managerColors.textSecondary}
+                  color={colors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
@@ -1347,7 +1851,7 @@ export default function RewardsAndReviewsEditorScreen() {
                       ios_icon_name="plus.circle.fill"
                       android_material_icon_name="add-circle"
                       size={24}
-                      color={editIsReward ? '#FFFFFF' : managerColors.textSecondary}
+                      color={editIsReward ? '#FFFFFF' : colors.textSecondary}
                     />
                     <Text
                       style={[
@@ -1370,7 +1874,7 @@ export default function RewardsAndReviewsEditorScreen() {
                       ios_icon_name="minus.circle.fill"
                       android_material_icon_name="remove-circle"
                       size={24}
-                      color={!editIsReward ? '#FFFFFF' : managerColors.textSecondary}
+                      color={!editIsReward ? '#FFFFFF' : colors.textSecondary}
                     />
                     <Text
                       style={[
@@ -1392,7 +1896,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   value={editAmount}
                   onChangeText={setEditAmount}
                   placeholder={t('rewards_reviews_editor:amount_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
                 />
                 {editAmount && (
@@ -1414,7 +1918,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   value={editDescription}
                   onChangeText={setEditDescription}
                   placeholder={editIsReward ? t('rewards_reviews_editor:description_placeholder_reward') : t('rewards_reviews_editor:description_placeholder_deduct')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   multiline
                   numberOfLines={4}
                 />
@@ -1426,7 +1930,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color={managerColors.text} />
+                  <ActivityIndicator color={colors.text} />
                 ) : (
                   <Text style={styles.submitButtonText}>{t('rewards_reviews_editor:save_changes')}</Text>
                 )}
@@ -1454,7 +1958,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   ios_icon_name="xmark.circle.fill"
                   android_material_icon_name="cancel"
                   size={28}
-                  color={managerColors.textSecondary}
+                  color={colors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
@@ -1470,7 +1974,7 @@ export default function RewardsAndReviewsEditorScreen() {
                     setReviewForm({ ...reviewForm, guest_name: text })
                   }
                   placeholder={t('rewards_reviews_editor:guest_name_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
 
@@ -1489,7 +1993,7 @@ export default function RewardsAndReviewsEditorScreen() {
                           star <= reviewForm.rating ? 'star' : 'star-border'
                         }
                         size={40}
-                        color={star <= reviewForm.rating ? '#FFD700' : managerColors.textSecondary}
+                        color={star <= reviewForm.rating ? '#FFD700' : colors.textSecondary}
                       />
                     </TouchableOpacity>
                   ))}
@@ -1506,7 +2010,7 @@ export default function RewardsAndReviewsEditorScreen() {
                     setReviewForm({ ...reviewForm, review_text: text })
                   }
                   placeholder={t('rewards_reviews_editor:review_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   multiline
                   numberOfLines={6}
                 />
@@ -1522,7 +2026,7 @@ export default function RewardsAndReviewsEditorScreen() {
                     setReviewForm({ ...reviewForm, review_date: text })
                   }
                   placeholder={t('rewards_reviews_editor:review_date_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
 
@@ -1536,7 +2040,7 @@ export default function RewardsAndReviewsEditorScreen() {
                     setReviewForm({ ...reviewForm, display_order: parseInt(text) || 0 })
                   }
                   placeholder={t('rewards_reviews_editor:display_order_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
                 />
               </View>
@@ -1547,7 +2051,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color={managerColors.text} />
+                  <ActivityIndicator color={colors.text} />
                 ) : (
                   <Text style={styles.submitButtonText}>
                     {editingReview ? t('rewards_reviews_editor:update_review_button') : t('rewards_reviews_editor:add_review_submit')}
@@ -1561,504 +2065,3 @@ export default function RewardsAndReviewsEditorScreen() {
     </KeyboardAvoidingView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: managerColors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 16,
-    backgroundColor: managerColors.card,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  backButton: {
-    padding: 8,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: managerColors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderBottomWidth: 3,
-    borderBottomColor: 'transparent',
-  },
-  activeTab: {
-    borderBottomColor: managerColors.highlight,
-  },
-  tabText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: managerColors.textSecondary,
-  },
-  activeTabText: {
-    color: managerColors.highlight,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingTop: 20,
-    paddingHorizontal: 16,
-    paddingBottom: 100,
-  },
-  actionButtonsRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 20,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 12,
-    paddingVertical: 16,
-    gap: 8,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  rewardButton: {
-    backgroundColor: managerColors.highlight,
-  },
-  resetButton: {
-    backgroundColor: '#FF9800',
-  },
-  actionButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  rewardButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  bucksCard: {
-    backgroundColor: managerColors.card,
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 20,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  bucksLabel: {
-    fontSize: 16,
-    color: managerColors.textSecondary,
-    marginBottom: 8,
-  },
-  bucksAmount: {
-    fontSize: 48,
-    fontWeight: 'bold',
-    color: managerColors.highlight,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    marginBottom: 12,
-  },
-  leaderboardItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  leaderboardRank: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: managerColors.highlight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-  },
-  leaderboardRankText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  leaderboardInfo: {
-    flex: 1,
-  },
-  leaderboardName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    marginBottom: 4,
-  },
-  leaderboardJob: {
-    fontSize: 14,
-    color: managerColors.textSecondary,
-  },
-  leaderboardBucks: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: managerColors.highlight,
-  },
-  transactionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  transactionInfo: {
-    flex: 1,
-    marginRight: 12,
-  },
-  transactionEmployee: {
-    fontSize: 17,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    marginBottom: 4,
-  },
-  transactionDescription: {
-    fontSize: 15,
-    color: managerColors.text,
-    marginBottom: 4,
-  },
-  transactionDate: {
-    fontSize: 12,
-    color: managerColors.textSecondary,
-  },
-  hiddenBadge: {
-    fontSize: 11,
-    color: '#FF9800',
-    fontStyle: 'italic',
-    marginTop: 4,
-  },
-  transactionRight: {
-    alignItems: 'flex-end',
-    gap: 8,
-  },
-  transactionAmount: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  positiveAmount: {
-    color: '#4CAF50',
-  },
-  negativeAmount: {
-    color: '#F44336',
-  },
-  transactionActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionIconButton: {
-    padding: 4,
-  },
-  emptyText: {
-    textAlign: 'center',
-    fontSize: 16,
-    color: managerColors.textSecondary,
-    marginTop: 20,
-  },
-  reviewCard: {
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  reviewHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-  },
-  reviewHeaderLeft: {
-    flex: 1,
-  },
-  reviewGuestName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    marginBottom: 8,
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  reviewActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  reviewText: {
-    fontSize: 14,
-    color: managerColors.text,
-    lineHeight: 20,
-    marginBottom: 8,
-  },
-  reviewDate: {
-    fontSize: 12,
-    color: managerColors.textSecondary,
-  },
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: managerColors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '90%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: managerColors.highlight,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  modalForm: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
-  },
-  formField: {
-    marginBottom: 20,
-  },
-  formLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: managerColors.text,
-    marginBottom: 8,
-  },
-  formInput: {
-    backgroundColor: managerColors.card,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: managerColors.text,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-  },
-  formInputDisabled: {
-    opacity: 0.6,
-  },
-  formInputTextDisabled: {
-    fontSize: 16,
-    color: managerColors.textSecondary,
-  },
-  textArea: {
-    minHeight: 100,
-    textAlignVertical: 'top',
-  },
-  formNote: {
-    fontSize: 12,
-    color: managerColors.textSecondary,
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  searchResults: {
-    backgroundColor: managerColors.card,
-    borderRadius: 8,
-    marginTop: 8,
-    maxHeight: 200,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-  },
-  searchResultItem: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
-  },
-  searchResultName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: managerColors.text,
-    marginBottom: 4,
-  },
-  searchResultJob: {
-    fontSize: 14,
-    color: managerColors.textSecondary,
-  },
-  selectedEmployee: {
-    backgroundColor: managerColors.highlight,
-    borderRadius: 8,
-    padding: 12,
-    marginTop: 8,
-  },
-  selectedEmployeeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: managerColors.text,
-  },
-  selectedEmployeeBalance: {
-    fontSize: 13,
-    color: managerColors.text,
-    marginTop: 4,
-  },
-  toggleContainer: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  toggleOptionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: managerColors.card,
-    borderWidth: 2,
-    borderColor: managerColors.border,
-    gap: 8,
-  },
-  toggleOptionButtonActive: {
-    borderWidth: 2,
-  },
-  toggleOptionButtonReward: {
-    backgroundColor: '#4CAF50',
-    borderColor: '#4CAF50',
-  },
-  toggleOptionButtonDeduct: {
-    backgroundColor: '#F44336',
-    borderColor: '#F44336',
-  },
-  toggleOptionText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: managerColors.textSecondary,
-  },
-  toggleOptionTextActive: {
-    color: '#FFFFFF',
-  },
-  amountPreview: {
-    fontSize: 14,
-    color: managerColors.textSecondary,
-    marginTop: 8,
-    fontStyle: 'italic',
-  },
-  visibilityToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  toggleButton: {
-    width: 60,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: managerColors.border,
-    padding: 4,
-    justifyContent: 'center',
-  },
-  toggleButtonActive: {
-    backgroundColor: managerColors.highlight,
-  },
-  toggleCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: managerColors.text,
-  },
-  toggleCircleActive: {
-    alignSelf: 'flex-end',
-  },
-  ratingSelector: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  submitButton: {
-    backgroundColor: managerColors.highlight,
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  submitButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: managerColors.text,
-  },
-  resetWarning: {
-    backgroundColor: '#FFF3CD',
-    borderRadius: 8,
-    padding: 16,
-    marginBottom: 24,
-    fontSize: 14,
-    color: '#856404',
-    lineHeight: 20,
-  },
-  resetSection: {
-    marginBottom: 24,
-  },
-  resetSectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    marginBottom: 16,
-  },
-  resetSingleButton: {
-    backgroundColor: '#FF9800',
-  },
-  resetAllButton: {
-    backgroundColor: '#F44336',
-  },
-  resetAllWarning: {
-    fontSize: 14,
-    color: managerColors.textSecondary,
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: managerColors.border,
-    marginVertical: 24,
-  },
-});

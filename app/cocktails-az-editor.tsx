@@ -18,7 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
@@ -52,6 +52,7 @@ export default function CocktailsAZEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const colors = useThemeColors();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
   const [loading, setLoading] = useState(false);
@@ -361,21 +362,21 @@ export default function CocktailsAZEditorScreen() {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.card }]}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
-            color={managerColors.text}
+            color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('cocktails_editor.title')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('cocktails_editor.title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -385,28 +386,28 @@ export default function CocktailsAZEditorScreen() {
         <View style={styles.mainContent}>
           <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
             {/* Add Button */}
-            <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
+            <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.highlight }]} onPress={openAddModal}>
               <IconSymbol
                 ios_icon_name="plus.circle.fill"
                 android_material_icon_name="add_circle"
                 size={24}
-                color={managerColors.text}
+                color={colors.text}
               />
-              <Text style={styles.addButtonText}>{t('cocktails_editor.add_cocktail')}</Text>
+              <Text style={[styles.addButtonText, { color: colors.text }]}>{t('cocktails_editor.add_cocktail')}</Text>
             </TouchableOpacity>
 
             {/* Search Box */}
-            <View style={styles.searchContainer}>
+            <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
               <IconSymbol
                 ios_icon_name="magnifyingglass"
                 android_material_icon_name="search"
                 size={20}
-                color={managerColors.textSecondary}
+                color={colors.textSecondary}
               />
               <TextInput
-                style={styles.searchInput}
+                style={[styles.searchInput, { color: colors.text }]}
                 placeholder={t('cocktails_editor.search_placeholder')}
-                placeholderTextColor={managerColors.textSecondary}
+                placeholderTextColor={colors.textSecondary}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
               />
@@ -416,7 +417,7 @@ export default function CocktailsAZEditorScreen() {
                     ios_icon_name="xmark.circle.fill"
                     android_material_icon_name="cancel"
                     size={20}
-                    color={managerColors.textSecondary}
+                    color={colors.textSecondary}
                   />
                 </TouchableOpacity>
               )}
@@ -424,26 +425,26 @@ export default function CocktailsAZEditorScreen() {
 
             {/* Cocktails List - Compact Cards */}
             {filteredCocktails.length === 0 ? (
-              <Text style={styles.emptyText}>{t('cocktails_editor.no_cocktails')}</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('cocktails_editor.no_cocktails')}</Text>
             ) : (
               filteredCocktails.map((cocktail, index) => (
-                <View key={index} style={styles.cocktailCard}>
+                <View key={index} style={[styles.cocktailCard, { backgroundColor: colors.card }]}>
                   <View style={styles.cocktailInfo}>
-                    <Text style={styles.cocktailName}>{cocktail.name}</Text>
-                    <Text style={styles.cocktailAlcoholType}>{cocktail.alcohol_type}</Text>
+                    <Text style={[styles.cocktailName, { color: colors.text }]}>{cocktail.name}</Text>
+                    <Text style={[styles.cocktailAlcoholType, { color: colors.textSecondary }]}>{cocktail.alcohol_type}</Text>
                   </View>
                   <View style={styles.cocktailActions}>
                     <TouchableOpacity
-                      style={styles.editButton}
+                      style={[styles.editButton, { backgroundColor: colors.highlight }]}
                       onPress={() => openEditModal(cocktail)}
                     >
-                      <Text style={styles.buttonText}>{t('common.edit')}</Text>
+                      <Text style={[styles.buttonText, { color: colors.text }]}>{t('common.edit')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.deleteButton}
                       onPress={() => handleDelete(cocktail)}
                     >
-                      <Text style={styles.buttonText}>{t('common.delete')}</Text>
+                      <Text style={[styles.buttonText, { color: colors.text }]}>{t('common.delete')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -453,7 +454,7 @@ export default function CocktailsAZEditorScreen() {
         </View>
 
         {/* Vertical Alphabetical Navigation Bar */}
-        <View style={styles.alphabetNav}>
+        <View style={[styles.alphabetNav, { backgroundColor: colors.card }]}>
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.alphabetNavContent}
@@ -461,14 +462,15 @@ export default function CocktailsAZEditorScreen() {
             <TouchableOpacity
               style={[
                 styles.alphabetButton,
-                selectedLetter === null && styles.alphabetButtonActive,
+                selectedLetter === null && { backgroundColor: colors.primary },
               ]}
               onPress={() => setSelectedLetter(null)}
             >
               <Text
                 style={[
                   styles.alphabetButtonText,
-                  selectedLetter === null && styles.alphabetButtonTextActive,
+                  { color: colors.textSecondary },
+                  selectedLetter === null && { color: colors.text },
                 ]}
               >
                 {t('cocktails_editor.all_letters')}
@@ -479,14 +481,15 @@ export default function CocktailsAZEditorScreen() {
                 key={index}
                 style={[
                   styles.alphabetButton,
-                  selectedLetter === letter && styles.alphabetButtonActive,
+                  selectedLetter === letter && { backgroundColor: colors.primary },
                 ]}
                 onPress={() => setSelectedLetter(letter)}
               >
                 <Text
                   style={[
                     styles.alphabetButtonText,
-                    selectedLetter === letter && styles.alphabetButtonTextActive,
+                    { color: colors.textSecondary },
+                    selectedLetter === letter && { color: colors.text },
                   ]}
                 >
                   {letter}
@@ -500,16 +503,16 @@ export default function CocktailsAZEditorScreen() {
       {/* Loading Overlay */}
       {loading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={managerColors.highlight} />
+          <ActivityIndicator size="large" color={colors.highlight} />
         </View>
       )}
 
       {/* Add/Edit Modal */}
       <Modal visible={showModal} animationType="slide" transparent>
         <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
+          <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.highlight }]}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
                 {editingCocktail ? t('cocktails_editor.modal_edit_title') : t('cocktails_editor.modal_add_title')}
               </Text>
               <TouchableOpacity onPress={closeModal}>
@@ -517,7 +520,7 @@ export default function CocktailsAZEditorScreen() {
                   ios_icon_name="xmark.circle.fill"
                   android_material_icon_name="cancel"
                   size={28}
-                  color={managerColors.textSecondary}
+                  color={colors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
@@ -525,20 +528,20 @@ export default function CocktailsAZEditorScreen() {
             <ScrollView style={styles.modalForm}>
               {/* Name */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('cocktails_editor.cocktail_name_label')}</Text>
+                <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.cocktail_name_label')}</Text>
                 <TextInput
-                  style={styles.formInput}
+                  style={[styles.formInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
                   value={name}
                   onChangeText={setName}
                   placeholder={t('cocktails_editor.cocktail_name_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
 
               {/* Alcohol Type */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('cocktails_editor.alcohol_type_label')}</Text>
-                <View style={styles.picker}>
+                <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.alcohol_type_label')}</Text>
+                <View style={[styles.picker, { backgroundColor: colors.card, borderColor: colors.border }]}>
                   {ALCOHOL_TYPES.map((type, index) => (
                     <TouchableOpacity
                       key={index}
@@ -546,13 +549,13 @@ export default function CocktailsAZEditorScreen() {
                         paddingVertical: 12,
                         paddingHorizontal: 16,
                         backgroundColor:
-                          alcoholType === type ? managerColors.highlight : 'transparent',
+                          alcoholType === type ? colors.highlight : 'transparent',
                       }}
                       onPress={() => setAlcoholType(type)}
                     >
                       <Text
                         style={{
-                          color: managerColors.text,
+                          color: colors.text,
                           fontWeight: alcoholType === type ? '600' : '400',
                         }}
                       >
@@ -565,13 +568,13 @@ export default function CocktailsAZEditorScreen() {
 
               {/* Ingredients */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('cocktails_editor.ingredients_label')}</Text>
+                <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.ingredients_label')}</Text>
                 <TextInput
-                  style={[styles.formInput, styles.textArea]}
+                  style={[styles.formInput, styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
                   value={ingredients}
                   onChangeText={setIngredients}
                   placeholder={t('cocktails_editor.ingredients_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   multiline
                   numberOfLines={4}
                 />
@@ -579,13 +582,13 @@ export default function CocktailsAZEditorScreen() {
 
               {/* Procedure */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('cocktails_editor.procedure_label')}</Text>
+                <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.procedure_label')}</Text>
                 <TextInput
-                  style={[styles.formInput, styles.textArea]}
+                  style={[styles.formInput, styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
                   value={procedure}
                   onChangeText={setProcedure}
                   placeholder={t('cocktails_editor.procedure_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   multiline
                   numberOfLines={4}
                 />
@@ -593,13 +596,13 @@ export default function CocktailsAZEditorScreen() {
 
               {/* Image Upload */}
               <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('cocktails_editor.image_label')}</Text>
+                <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.image_label')}</Text>
                 <TouchableOpacity
-                  style={styles.imagePickerButton}
+                  style={[styles.imagePickerButton, { backgroundColor: colors.highlight }]}
                   onPress={pickImage}
                   disabled={uploadingImage}
                 >
-                  <Text style={styles.imagePickerButtonText}>
+                  <Text style={[styles.imagePickerButtonText, { color: colors.text }]}>
                     {uploadingImage ? t('cocktails_editor.uploading') : t('cocktails_editor.choose_image')}
                   </Text>
                 </TouchableOpacity>
@@ -614,14 +617,14 @@ export default function CocktailsAZEditorScreen() {
 
               {/* Submit Button */}
               <TouchableOpacity
-                style={styles.submitButton}
+                style={[styles.submitButton, { backgroundColor: colors.highlight }]}
                 onPress={handleSave}
                 disabled={loading || uploadingImage}
               >
                 {loading ? (
-                  <ActivityIndicator color={managerColors.text} />
+                  <ActivityIndicator color={colors.text} />
                 ) : (
-                  <Text style={styles.submitButtonText}>
+                  <Text style={[styles.submitButtonText, { color: colors.text }]}>
                     {editingCocktail ? t('cocktails_editor.update_button') : t('cocktails_editor.add_button')}
                   </Text>
                 )}
@@ -637,7 +640,6 @@ export default function CocktailsAZEditorScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: managerColors.background,
   },
   header: {
     flexDirection: 'row',
@@ -646,7 +648,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 48,
     paddingBottom: 16,
-    backgroundColor: managerColors.card,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
@@ -657,7 +658,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: managerColors.text,
   },
   contentContainer: {
     flex: 1,
@@ -675,7 +675,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   addButton: {
-    backgroundColor: managerColors.highlight,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -689,12 +688,10 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: managerColors.text,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: managerColors.card,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -706,11 +703,9 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: managerColors.text,
     padding: 0,
   },
   cocktailCard: {
-    backgroundColor: managerColors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -727,19 +722,16 @@ const styles = StyleSheet.create({
   cocktailName: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: managerColors.text,
     marginBottom: 4,
   },
   cocktailAlcoholType: {
     fontSize: 14,
-    color: managerColors.textSecondary,
   },
   cocktailActions: {
     flexDirection: 'row',
     gap: 8,
   },
   editButton: {
-    backgroundColor: managerColors.highlight,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -757,17 +749,14 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 13,
     fontWeight: '600',
-    color: managerColors.text,
   },
   emptyText: {
     textAlign: 'center',
     fontSize: 16,
-    color: managerColors.textSecondary,
     marginTop: 40,
   },
   alphabetNav: {
     width: 40,
-    backgroundColor: managerColors.card,
     borderTopLeftRadius: 12,
     borderBottomLeftRadius: 12,
     marginRight: 16,
@@ -786,16 +775,9 @@ const styles = StyleSheet.create({
     marginVertical: 2,
     borderRadius: 16,
   },
-  alphabetButtonActive: {
-    backgroundColor: managerColors.primary,
-  },
   alphabetButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: managerColors.textSecondary,
-  },
-  alphabetButtonTextActive: {
-    color: managerColors.text,
   },
   loadingOverlay: {
     position: 'absolute',
@@ -813,7 +795,6 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: managerColors.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
@@ -826,12 +807,10 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: managerColors.highlight,
   },
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: managerColors.text,
   },
   modalForm: {
     paddingHorizontal: 24,
@@ -843,31 +822,24 @@ const styles = StyleSheet.create({
   formLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.text,
     marginBottom: 8,
   },
   formInput: {
-    backgroundColor: managerColors.card,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: managerColors.text,
     borderWidth: 1,
-    borderColor: managerColors.border,
   },
   textArea: {
     minHeight: 100,
     textAlignVertical: 'top',
   },
   picker: {
-    backgroundColor: managerColors.card,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: managerColors.border,
   },
   imagePickerButton: {
-    backgroundColor: managerColors.highlight,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
@@ -876,7 +848,6 @@ const styles = StyleSheet.create({
   imagePickerButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.text,
   },
   thumbnailPreview: {
     width: '100%',
@@ -885,7 +856,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   submitButton: {
-    backgroundColor: managerColors.highlight,
     borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',
@@ -895,6 +865,5 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: managerColors.text,
   },
 });

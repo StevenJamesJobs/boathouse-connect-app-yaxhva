@@ -12,8 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '@/contexts/AuthContext';
-import { managerColors, employeeColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -49,7 +48,6 @@ interface UpcomingEvent {
 
 export default function ViewAllUpcomingEventsScreen() {
   const router = useRouter();
-  const { user } = useAuth();
   const { t } = useTranslation();
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +67,7 @@ export default function ViewAllUpcomingEventsScreen() {
     guideFile?: GuideFile | null;
   } | null>(null);
 
-  const colors = user?.role === 'manager' ? managerColors : employeeColors;
+  const colors = useThemeColors();
 
   useEffect(() => {
     loadEvents();
@@ -184,7 +182,7 @@ export default function ViewAllUpcomingEventsScreen() {
           primary: colors.primary,
           background: colors.background,
           text: colors.text,
-          textSecondary: user?.role === 'manager' ? managerColors.darkSecondaryText : colors.textSecondary,
+          textSecondary: colors.darkSecondaryText,
           card: colors.card,
         }}
         events={events}

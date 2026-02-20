@@ -14,8 +14,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { employeeColors, managerColors } from '@/styles/commonStyles';
-import { useAuth } from '@/contexts/AuthContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 
@@ -35,7 +34,7 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 export default function CocktailsAZScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const colors = useThemeColors();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,9 +42,6 @@ export default function CocktailsAZScreen() {
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
   const [selectedCocktail, setSelectedCocktail] = useState<Cocktail | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  
-  // Use manager colors if user is a manager, otherwise use employee colors
-  const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
   useEffect(() => {
     loadCocktails();

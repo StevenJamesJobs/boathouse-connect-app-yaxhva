@@ -15,7 +15,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,6 +46,7 @@ export default function GuidesAndTrainingEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const colors = useThemeColors();
   const [guides, setGuides] = useState<GuideItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -459,17 +460,17 @@ export default function GuidesAndTrainingEditorScreen() {
   const filteredGuides = guides.filter(g => g.category === selectedCategory);
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.header, { backgroundColor: colors.card }]}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
-            color={managerColors.text}
+            color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('guides_training_editor.title')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('guides_training_editor.title')}</Text>
         <View style={styles.backButton} />
       </View>
 
@@ -485,14 +486,16 @@ export default function GuidesAndTrainingEditorScreen() {
             key={index}
             style={[
               styles.categoryTab,
-              selectedCategory === category && styles.categoryTabActive,
+              { backgroundColor: colors.card },
+              selectedCategory === category && { backgroundColor: colors.highlight },
             ]}
             onPress={() => setSelectedCategory(category)}
           >
             <Text
               style={[
                 styles.categoryTabText,
-                selectedCategory === category && styles.categoryTabTextActive,
+                { color: colors.textSecondary },
+                selectedCategory === category && { color: colors.text },
               ]}
             >
               {category}
@@ -501,20 +504,20 @@ export default function GuidesAndTrainingEditorScreen() {
         ))}
       </ScrollView>
 
-      <TouchableOpacity style={styles.addNewItemButton} onPress={openAddModal}>
+      <TouchableOpacity style={[styles.addNewItemButton, { backgroundColor: colors.highlight }]} onPress={openAddModal}>
         <IconSymbol
           ios_icon_name="plus.circle.fill"
           android_material_icon_name="add-circle"
           size={24}
-          color={managerColors.text}
+          color={colors.text}
         />
-        <Text style={styles.addNewItemButtonText}>{t('guides_training_editor.add_new_guide')}</Text>
+        <Text style={[styles.addNewItemButtonText, { color: colors.text }]}>{t('guides_training_editor.add_new_guide')}</Text>
       </TouchableOpacity>
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={managerColors.highlight} />
-          <Text style={styles.loadingText}>{t('guides_training_editor.loading_guides')}</Text>
+          <ActivityIndicator size="large" color={colors.highlight} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('guides_training_editor.loading_guides')}</Text>
         </View>
       ) : (
         <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
@@ -524,16 +527,16 @@ export default function GuidesAndTrainingEditorScreen() {
                 ios_icon_name="book.fill"
                 android_material_icon_name="menu-book"
                 size={64}
-                color={managerColors.textSecondary}
+                color={colors.textSecondary}
               />
-              <Text style={styles.emptyText}>{t('guides_training_editor.no_guides_in_category')}</Text>
-              <Text style={styles.emptySubtext}>
+              <Text style={[styles.emptyText, { color: colors.text }]}>{t('guides_training_editor.no_guides_in_category')}</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
                 {t('guides_training_editor.tap_to_create')}
               </Text>
             </View>
           ) : (
             filteredGuides.map((guide, index) => (
-              <View key={index} style={styles.guideCard}>
+              <View key={index} style={[styles.guideCard, { backgroundColor: colors.card }]}>
                 <View style={styles.guideLayout}>
                   {guide.thumbnail_url && (
                     <Image
@@ -542,9 +545,9 @@ export default function GuidesAndTrainingEditorScreen() {
                     />
                   )}
                   <View style={styles.guideContent}>
-                    <Text style={styles.guideTitle}>{guide.title}</Text>
+                    <Text style={[styles.guideTitle, { color: colors.text }]}>{guide.title}</Text>
                     {guide.description && (
-                      <Text style={styles.guideDescription} numberOfLines={2}>
+                      <Text style={[styles.guideDescription, { color: colors.textSecondary }]} numberOfLines={2}>
                         {guide.description}
                       </Text>
                     )}
@@ -554,36 +557,36 @@ export default function GuidesAndTrainingEditorScreen() {
                           ios_icon_name="doc.fill"
                           android_material_icon_name="description"
                           size={14}
-                          color={managerColors.textSecondary}
+                          color={colors.textSecondary}
                         />
-                        <Text style={styles.metaText}>{guide.file_name}</Text>
+                        <Text style={[styles.metaText, { color: colors.textSecondary }]}>{guide.file_name}</Text>
                       </View>
                       <View style={styles.metaItem}>
                         <IconSymbol
                           ios_icon_name="clock"
                           android_material_icon_name="schedule"
                           size={14}
-                          color={managerColors.textSecondary}
+                          color={colors.textSecondary}
                         />
-                        <Text style={styles.metaText}>
+                        <Text style={[styles.metaText, { color: colors.textSecondary }]}>
                           {t('guides_training_editor.updated_label', { date: formatDate(guide.updated_at) })}
                         </Text>
                       </View>
                     </View>
                   </View>
                 </View>
-                <View style={styles.guideActions}>
+                <View style={[styles.guideActions, { borderTopColor: colors.border }]}>
                   <TouchableOpacity
-                    style={styles.actionButton}
+                    style={[styles.actionButton, { backgroundColor: colors.background }]}
                     onPress={() => openEditModal(guide)}
                   >
                     <IconSymbol
                       ios_icon_name="pencil"
                       android_material_icon_name="edit"
                       size={20}
-                      color={managerColors.highlight}
+                      color={colors.highlight}
                     />
-                    <Text style={styles.actionButtonText}>{t('common.edit')}</Text>
+                    <Text style={[styles.actionButtonText, { color: colors.highlight }]}>{t('common.edit')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.actionButton, styles.deleteButton]}
@@ -618,9 +621,9 @@ export default function GuidesAndTrainingEditorScreen() {
           style={styles.modalContainer}
           keyboardVerticalOffset={0}
         >
-          <TouchableOpacity 
-            style={styles.modalBackdrop} 
-            activeOpacity={1} 
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
             onPress={closeModal}
           />
           <View style={styles.modalContent}>
@@ -638,8 +641,8 @@ export default function GuidesAndTrainingEditorScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView 
-              style={styles.modalScroll} 
+            <ScrollView
+              style={styles.modalScroll}
               contentContainerStyle={styles.modalScrollContent}
               showsVerticalScrollIndicator={true}
               bounces={false}
@@ -676,7 +679,7 @@ export default function GuidesAndTrainingEditorScreen() {
                     ios_icon_name="doc.fill"
                     android_material_icon_name="description"
                     size={24}
-                    color={managerColors.highlight}
+                    color={colors.highlight}
                   />
                   <Text style={styles.fileUploadText}>
                     {selectedFile ? selectedFile.name : editingGuide ? editingGuide.file_name : t('guides_training_editor.select_file')}
@@ -723,7 +726,7 @@ export default function GuidesAndTrainingEditorScreen() {
                       key={index}
                       style={[
                         styles.optionButton,
-                        formData.category === category && styles.optionButtonActive,
+                        formData.category === category && { backgroundColor: colors.highlight, borderColor: colors.highlight },
                       ]}
                       onPress={() => setFormData({ ...formData, category })}
                     >
@@ -761,7 +764,7 @@ export default function GuidesAndTrainingEditorScreen() {
 
               {/* Save Button */}
               <TouchableOpacity
-                style={styles.saveButton}
+                style={[styles.saveButton, { backgroundColor: colors.highlight }]}
                 onPress={handleSave}
                 disabled={uploadingFile || uploadingThumbnail}
               >
@@ -792,7 +795,6 @@ export default function GuidesAndTrainingEditorScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: managerColors.background,
   },
   header: {
     flexDirection: 'row',
@@ -801,7 +803,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 48 : 60,
     paddingBottom: 12,
-    backgroundColor: managerColors.card,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
@@ -812,7 +813,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: managerColors.text,
   },
   categoryScroll: {
     marginTop: 16,
@@ -826,25 +826,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: managerColors.card,
     marginRight: 8,
-  },
-  categoryTabActive: {
-    backgroundColor: managerColors.highlight,
   },
   categoryTabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.textSecondary,
-  },
-  categoryTabTextActive: {
-    color: managerColors.text,
   },
   addNewItemButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: managerColors.highlight,
     marginHorizontal: 16,
     marginTop: 16,
     paddingVertical: 14,
@@ -857,7 +848,6 @@ const styles = StyleSheet.create({
   addNewItemButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: managerColors.text,
   },
   loadingContainer: {
     flex: 1,
@@ -866,7 +856,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: managerColors.textSecondary,
     marginTop: 12,
   },
   itemsList: {
@@ -886,17 +875,14 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: managerColors.text,
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: managerColors.textSecondary,
     marginTop: 8,
     textAlign: 'center',
   },
   guideCard: {
-    backgroundColor: managerColors.card,
     borderRadius: 16,
     marginBottom: 16,
     overflow: 'hidden',
@@ -920,12 +906,10 @@ const styles = StyleSheet.create({
   guideTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: managerColors.text,
     marginBottom: 6,
   },
   guideDescription: {
     fontSize: 14,
-    color: managerColors.textSecondary,
     marginBottom: 8,
     lineHeight: 20,
   },
@@ -939,21 +923,18 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    color: managerColors.textSecondary,
   },
   guideActions: {
     flexDirection: 'row',
     gap: 12,
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: managerColors.border,
   },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: managerColors.background,
     paddingVertical: 10,
     borderRadius: 8,
     gap: 6,
@@ -964,7 +945,6 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.highlight,
   },
   deleteButtonText: {
     color: '#E74C3C',
@@ -1094,10 +1074,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
-  optionButtonActive: {
-    backgroundColor: managerColors.highlight,
-    borderColor: managerColors.highlight,
-  },
   optionButtonText: {
     fontSize: 14,
     fontWeight: '600',
@@ -1107,7 +1083,6 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
   },
   saveButton: {
-    backgroundColor: managerColors.highlight,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',

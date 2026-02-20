@@ -13,7 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -36,6 +36,244 @@ interface ChecklistCategory {
 export default function OpeningChecklistEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const colors = useThemeColors();
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: colors.card,
+      paddingHorizontal: 16,
+      paddingTop: 48,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    backButton: {
+      padding: 8,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: colors.text,
+      flex: 1,
+      textAlign: 'center',
+    },
+    addButton: {
+      padding: 4,
+    },
+    placeholder: {
+      width: 40,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    scrollView: {
+      flex: 1,
+    },
+    contentContainer: {
+      paddingTop: 20,
+      paddingHorizontal: 16,
+      paddingBottom: 100,
+    },
+    infoCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 20,
+      gap: 12,
+    },
+    infoText: {
+      flex: 1,
+      fontSize: 14,
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    categoryCard: {
+      backgroundColor: colors.card,
+      borderRadius: 12,
+      marginBottom: 12,
+      overflow: 'hidden',
+      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+      elevation: 3,
+    },
+    categoryHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      padding: 16,
+    },
+    categoryHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      gap: 12,
+    },
+    categoryHeaderText: {
+      flex: 1,
+    },
+    categoryTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 2,
+    },
+    categoryItemCount: {
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    categoryActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    actionButton: {
+      padding: 8,
+    },
+    itemsContainer: {
+      paddingBottom: 8,
+    },
+    itemRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    itemText: {
+      flex: 1,
+      fontSize: 15,
+      color: colors.text,
+      lineHeight: 22,
+      marginRight: 12,
+    },
+    itemActions: {
+      flexDirection: 'row',
+      gap: 4,
+    },
+    addItemButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      marginTop: 8,
+      marginHorizontal: 16,
+      borderRadius: 8,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderStyle: 'dashed',
+      gap: 8,
+    },
+    addItemText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.highlight,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 20,
+    },
+    modalContent: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 24,
+      width: '100%',
+      maxWidth: 500,
+      maxHeight: '80%',
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: 'bold',
+      color: colors.text,
+      marginBottom: 20,
+    },
+    label: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text,
+      marginBottom: 8,
+      marginTop: 16,
+    },
+    input: {
+      backgroundColor: colors.background,
+      borderRadius: 8,
+      padding: 12,
+      fontSize: 16,
+      color: colors.text,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    textArea: {
+      minHeight: 80,
+      textAlignVertical: 'top',
+    },
+    categoryPicker: {
+      maxHeight: 200,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    categoryOption: {
+      padding: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    categoryOptionSelected: {
+      backgroundColor: colors.highlight,
+    },
+    categoryOptionText: {
+      fontSize: 15,
+      color: colors.text,
+    },
+    categoryOptionTextSelected: {
+      fontWeight: '600',
+    },
+    modalButtons: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 24,
+    },
+    modalButton: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    cancelButton: {
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    cancelButtonText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+    },
+    saveButton: {
+      backgroundColor: colors.highlight,
+    },
+    saveButtonText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text,
+    },
+  });
+
   const [categories, setCategories] = useState<ChecklistCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -326,14 +564,14 @@ export default function OpeningChecklistEditorScreen() {
               ios_icon_name="chevron.left"
               android_material_icon_name="arrow-back"
               size={24}
-              color={managerColors.text}
+              color={colors.text}
             />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('checklist_editor:opening_checklist_editor')}</Text>
           <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={managerColors.highlight} />
+          <ActivityIndicator size="large" color={colors.highlight} />
         </View>
       </View>
     );
@@ -348,7 +586,7 @@ export default function OpeningChecklistEditorScreen() {
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
-            color={managerColors.text}
+            color={colors.text}
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Opening Checklist Editor</Text>
@@ -357,7 +595,7 @@ export default function OpeningChecklistEditorScreen() {
             ios_icon_name="plus.circle.fill"
             android_material_icon_name="add-circle"
             size={28}
-            color={managerColors.highlight}
+            color={colors.highlight}
           />
         </TouchableOpacity>
       </View>
@@ -369,7 +607,7 @@ export default function OpeningChecklistEditorScreen() {
             ios_icon_name="info.circle.fill"
             android_material_icon_name="info"
             size={24}
-            color={managerColors.highlight}
+            color={colors.highlight}
           />
           <Text style={styles.infoText}>
             {t('checklist_editor:info_opening_hosts')}
@@ -392,7 +630,7 @@ export default function OpeningChecklistEditorScreen() {
                     ios_icon_name={isExpanded ? 'chevron.down' : 'chevron.right'}
                     android_material_icon_name={isExpanded ? 'expand-more' : 'chevron-right'}
                     size={24}
-                    color={managerColors.text}
+                    color={colors.text}
                   />
                   <View style={styles.categoryHeaderText}>
                     <Text style={styles.categoryTitle}>{category.name}</Text>
@@ -410,7 +648,7 @@ export default function OpeningChecklistEditorScreen() {
                       ios_icon_name="pencil"
                       android_material_icon_name="edit"
                       size={20}
-                      color={managerColors.highlight}
+                      color={colors.highlight}
                     />
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -441,7 +679,7 @@ export default function OpeningChecklistEditorScreen() {
                             ios_icon_name="pencil"
                             android_material_icon_name="edit"
                             size={18}
-                            color={managerColors.highlight}
+                            color={colors.highlight}
                           />
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -466,7 +704,7 @@ export default function OpeningChecklistEditorScreen() {
                       ios_icon_name="plus.circle"
                       android_material_icon_name="add-circle-outline"
                       size={20}
-                      color={managerColors.highlight}
+                      color={colors.highlight}
                     />
                     <Text style={styles.addItemText}>{t('checklist_editor:add_item')}</Text>
                   </TouchableOpacity>
@@ -496,7 +734,7 @@ export default function OpeningChecklistEditorScreen() {
             <TextInput
               style={styles.input}
               placeholder={t('checklist_editor:category_name_placeholder_opening')}
-              placeholderTextColor={managerColors.textSecondary}
+              placeholderTextColor={colors.textSecondary}
               value={categoryName}
               onChangeText={setCategoryName}
               autoFocus
@@ -516,7 +754,7 @@ export default function OpeningChecklistEditorScreen() {
                 disabled={saving}
               >
                 {saving ? (
-                  <ActivityIndicator color={managerColors.text} />
+                  <ActivityIndicator color={colors.text} />
                 ) : (
                   <Text style={styles.saveButtonText}>{t('common:save')}</Text>
                 )}
@@ -545,7 +783,7 @@ export default function OpeningChecklistEditorScreen() {
             <TextInput
               style={[styles.input, styles.textArea]}
               placeholder={t('checklist_editor:item_text_placeholder')}
-              placeholderTextColor={managerColors.textSecondary}
+              placeholderTextColor={colors.textSecondary}
               value={itemText}
               onChangeText={setItemText}
               multiline
@@ -590,7 +828,7 @@ export default function OpeningChecklistEditorScreen() {
                 disabled={saving}
               >
                 {saving ? (
-                  <ActivityIndicator color={managerColors.text} />
+                  <ActivityIndicator color={colors.text} />
                 ) : (
                   <Text style={styles.saveButtonText}>{t('common:save')}</Text>
                 )}
@@ -602,239 +840,3 @@ export default function OpeningChecklistEditorScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: managerColors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: managerColors.card,
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    flex: 1,
-    textAlign: 'center',
-  },
-  addButton: {
-    padding: 4,
-  },
-  placeholder: {
-    width: 40,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingTop: 20,
-    paddingHorizontal: 16,
-    paddingBottom: 100,
-  },
-  infoCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    gap: 12,
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 14,
-    color: managerColors.textSecondary,
-    lineHeight: 20,
-  },
-  categoryCard: {
-    backgroundColor: managerColors.card,
-    borderRadius: 12,
-    marginBottom: 12,
-    overflow: 'hidden',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  categoryHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: 16,
-  },
-  categoryHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 12,
-  },
-  categoryHeaderText: {
-    flex: 1,
-  },
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: managerColors.text,
-    marginBottom: 2,
-  },
-  categoryItemCount: {
-    fontSize: 13,
-    color: managerColors.textSecondary,
-  },
-  categoryActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  actionButton: {
-    padding: 8,
-  },
-  itemsContainer: {
-    paddingBottom: 8,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderTopColor: managerColors.border,
-  },
-  itemText: {
-    flex: 1,
-    fontSize: 15,
-    color: managerColors.text,
-    lineHeight: 22,
-    marginRight: 12,
-  },
-  itemActions: {
-    flexDirection: 'row',
-    gap: 4,
-  },
-  addItemButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    marginTop: 8,
-    marginHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: managerColors.background,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-    borderStyle: 'dashed',
-    gap: 8,
-  },
-  addItemText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: managerColors.highlight,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modalContent: {
-    backgroundColor: managerColors.card,
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 500,
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: managerColors.text,
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: managerColors.text,
-    marginBottom: 8,
-    marginTop: 16,
-  },
-  input: {
-    backgroundColor: managerColors.background,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: managerColors.text,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-  },
-  textArea: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  categoryPicker: {
-    maxHeight: 200,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-  },
-  categoryOption: {
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
-  },
-  categoryOptionSelected: {
-    backgroundColor: managerColors.highlight,
-  },
-  categoryOptionText: {
-    fontSize: 15,
-    color: managerColors.text,
-  },
-  categoryOptionTextSelected: {
-    fontWeight: '600',
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: managerColors.background,
-    borderWidth: 1,
-    borderColor: managerColors.border,
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: managerColors.text,
-  },
-  saveButton: {
-    backgroundColor: managerColors.highlight,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: managerColors.text,
-  },
-});

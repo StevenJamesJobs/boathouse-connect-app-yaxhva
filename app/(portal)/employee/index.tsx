@@ -20,7 +20,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import React, { useState, useEffect } from 'react';
-import { employeeColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import WeatherWidget from '@/components/WeatherWidget';
 import { useFocusEffect } from '@react-navigation/native';
 import WeatherDetailModal from '@/components/WeatherDetailModal';
@@ -110,6 +110,7 @@ export default function EmployeePortalScreen() {
   const router = useRouter();
   const params = useLocalSearchParams();
   const { unreadCount } = useUnreadMessages();
+  const colors = useThemeColors();
   const [weeklySpecials, setWeeklySpecials] = useState<MenuItem[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
@@ -123,10 +124,10 @@ export default function EmployeePortalScreen() {
 
   // What's Happening tab state (Announcements / Special Features)
   const [whatsHappeningTab, setWhatsHappeningTab] = useState<'Announcements' | 'Special Features'>('Announcements');
-  
+
   // Weather detail modal state
   const [weatherDetailVisible, setWeatherDetailVisible] = useState(false);
-  
+
   // Detail modal state
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<{
@@ -141,8 +142,8 @@ export default function EmployeePortalScreen() {
     guideFile?: GuideFile | null;
   } | null>(null);
 
-  const headerColor = '#B8D4E0';
-  const contentColor = employeeColors.card;
+  const headerColor = colors.primary;
+  const contentColor = colors.card;
 
   useEffect(() => {
     loadWeeklySpecials();
@@ -234,7 +235,7 @@ export default function EmployeePortalScreen() {
     try {
       setLoadingSpecials(true);
       console.log('Loading weekly specials for employee portal...');
-      
+
       const { data, error } = await supabase
         .from('menu_items')
         .select('*')
@@ -246,7 +247,7 @@ export default function EmployeePortalScreen() {
         console.error('Error loading weekly specials:', error);
         throw error;
       }
-      
+
       console.log('Weekly specials loaded:', data?.length || 0, 'items');
       setWeeklySpecials(data || []);
     } catch (error) {
@@ -260,7 +261,7 @@ export default function EmployeePortalScreen() {
     try {
       setLoadingAnnouncements(true);
       console.log('Loading announcements for employee portal...');
-      
+
       const { data, error } = await supabase
         .from('announcements')
         .select(`
@@ -282,7 +283,7 @@ export default function EmployeePortalScreen() {
         console.error('Error loading announcements:', error);
         throw error;
       }
-      
+
       console.log('Announcements loaded for employee:', data?.length || 0, 'items');
       setAnnouncements(data || []);
     } catch (error) {
@@ -296,7 +297,7 @@ export default function EmployeePortalScreen() {
     try {
       setLoadingEvents(true);
       console.log('Loading upcoming events for employee portal...');
-      
+
       const { data, error } = await supabase
         .from('upcoming_events')
         .select(`
@@ -317,7 +318,7 @@ export default function EmployeePortalScreen() {
         console.error('Error loading upcoming events:', error);
         throw error;
       }
-      
+
       console.log('Upcoming events loaded for employee:', data?.length || 0, 'items');
       setUpcomingEvents(data || []);
     } catch (error) {
@@ -331,7 +332,7 @@ export default function EmployeePortalScreen() {
     try {
       setLoadingFeatures(true);
       console.log('Loading special features for employee portal...');
-      
+
       const { data, error } = await supabase
         .from('special_features')
         .select(`
@@ -353,7 +354,7 @@ export default function EmployeePortalScreen() {
         console.error('Error loading special features:', error);
         throw error;
       }
-      
+
       console.log('Special features loaded for employee:', data?.length || 0, 'items');
       setSpecialFeatures(data || []);
     } catch (error) {
@@ -438,7 +439,7 @@ export default function EmployeePortalScreen() {
       case 'update':
         return '#F39C12';
       default:
-        return employeeColors.textSecondary;
+        return colors.textSecondary;
     }
   };
 
@@ -484,14 +485,14 @@ export default function EmployeePortalScreen() {
   const truncateText = (text: string | null, maxLength: number = 125): string => {
     if (!text) return '';
     if (text.length <= maxLength) return text;
-    
+
     const truncated = text.substring(0, maxLength);
     const lastSpace = truncated.lastIndexOf(' ');
-    
+
     if (lastSpace > 100) {
       return truncated.substring(0, lastSpace) + '...';
     }
-    
+
     return truncated + '...';
   };
 
@@ -499,40 +500,40 @@ export default function EmployeePortalScreen() {
   const unreadText = unreadCount > 0 ? `${unreadCount}` : '0';
 
   return (
-    <GestureHandlerRootView style={styles.container}>
+    <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
+        <View style={[styles.welcomeSection, { backgroundColor: colors.card }]}>
           <View style={styles.welcomeRow}>
-            <View style={styles.profilePictureContainer}>
+            <View style={[styles.profilePictureContainer, { backgroundColor: colors.background, borderColor: colors.primary }]}>
               {profilePictureUrl ? (
                 <Image
                   source={{ uri: profilePictureUrl }}
                   style={styles.profilePicture}
                 />
               ) : (
-                <View style={styles.profilePicturePlaceholder}>
+                <View style={[styles.profilePicturePlaceholder, { backgroundColor: colors.background }]}>
                   <IconSymbol
                     ios_icon_name="person.fill"
                     android_material_icon_name="person"
                     size={32}
-                    color={employeeColors.textSecondary}
+                    color={colors.textSecondary}
                   />
                 </View>
               )}
             </View>
 
             <View style={styles.welcomeTextContainer}>
-              <Text style={styles.welcomeTitle}>Welcome, {user?.name}!</Text>
-              <Text style={styles.jobTitle}>{user?.jobTitle}</Text>
+              <Text style={[styles.welcomeTitle, { color: colors.text }]}>Welcome, {user?.name}!</Text>
+              <Text style={[styles.jobTitle, { color: colors.primary }]}>{user?.jobTitle}</Text>
             </View>
 
             <TouchableOpacity
-              style={styles.compactMessageButton}
+              style={[styles.compactMessageButton, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}
               onPress={() => router.push('/messages')}
               activeOpacity={0.7}
             >
-              <View style={styles.compactMessageIconWrapper}>
+              <View style={[styles.compactMessageIconWrapper, { backgroundColor: colors.primary }]}>
                 <IconSymbol
                   ios_icon_name="envelope.fill"
                   android_material_icon_name="mail"
@@ -541,13 +542,13 @@ export default function EmployeePortalScreen() {
                 />
                 {unreadCount > 0 && (
                   <View style={styles.compactBadgePosition}>
-                    <View style={styles.compactBadge}>
+                    <View style={[styles.compactBadge, { borderColor: colors.card }]}>
                       <Text style={styles.compactBadgeText}>{unreadText}</Text>
                     </View>
                   </View>
                 )}
               </View>
-              <Text style={styles.compactMessageLabel}>{t('common.messages')}</Text>
+              <Text style={[styles.compactMessageLabel, { color: colors.text }]}>{t('common.messages')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -556,14 +557,15 @@ export default function EmployeePortalScreen() {
           title="Weather"
           iconIos="cloud.sun.fill"
           iconAndroid="wb-cloudy"
-          iconColor={employeeColors.primary}
+          iconColor={colors.darkText}
           headerBackgroundColor={headerColor}
-          headerTextColor={employeeColors.text}
+          headerTextColor={colors.darkText}
+          contentBackgroundColor={contentColor}
           defaultExpanded={true}
         >
           <WeatherWidget
-            textColor={employeeColors.text}
-            secondaryTextColor={employeeColors.textSecondary}
+            textColor={colors.text}
+            secondaryTextColor={colors.textSecondary}
             onPress={openWeatherDetail}
           />
         </CollapsibleSection>
@@ -573,29 +575,30 @@ export default function EmployeePortalScreen() {
           title="What's Happening"
           iconIos="megaphone.fill"
           iconAndroid="campaign"
-          iconColor={employeeColors.primary}
+          iconColor={colors.darkText}
           headerBackgroundColor={headerColor}
-          headerTextColor={employeeColors.text}
+          headerTextColor={colors.darkText}
+          contentBackgroundColor={contentColor}
           defaultExpanded={true}
           onViewAll={whatsHappeningTab === 'Special Features' ? () => router.push('/view-all-special-features') : undefined}
         >
           {/* Tabs */}
-          <View style={styles.tabsContainer}>
+          <View style={[styles.tabsContainer, { backgroundColor: colors.background }]}>
             <TouchableOpacity
-              style={[styles.tab, whatsHappeningTab === 'Announcements' && styles.activeTab]}
+              style={[styles.tab, whatsHappeningTab === 'Announcements' && { backgroundColor: colors.primary }]}
               onPress={() => setWhatsHappeningTab('Announcements')}
               activeOpacity={0.7}
             >
-              <Text style={[styles.tabText, whatsHappeningTab === 'Announcements' && styles.activeTabText]}>
+              <Text style={[styles.tabText, { color: colors.textSecondary }, whatsHappeningTab === 'Announcements' && styles.activeTabText]}>
                 {t('employee_home.announcements')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.tab, whatsHappeningTab === 'Special Features' && styles.activeTab]}
+              style={[styles.tab, whatsHappeningTab === 'Special Features' && { backgroundColor: colors.primary }]}
               onPress={() => setWhatsHappeningTab('Special Features')}
               activeOpacity={0.7}
             >
-              <Text style={[styles.tabText, whatsHappeningTab === 'Special Features' && styles.activeTabText]}>
+              <Text style={[styles.tabText, { color: colors.textSecondary }, whatsHappeningTab === 'Special Features' && styles.activeTabText]}>
                 {t('employee_home.special_features')}
               </Text>
             </TouchableOpacity>
@@ -606,19 +609,19 @@ export default function EmployeePortalScreen() {
             <>
               {loadingAnnouncements ? (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={employeeColors.primary} />
-                  <Text style={styles.loadingText}>{t('employee_home.loading')}</Text>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('employee_home.loading')}</Text>
                 </View>
               ) : announcements.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>{t('employee_home.no_announcements')}</Text>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('employee_home.no_announcements')}</Text>
                 </View>
               ) : (
                 <>
                   {announcements.map((announcement, index) => (
                     <TouchableOpacity
                       key={index}
-                      style={styles.announcementItem}
+                      style={[styles.announcementItem, { borderBottomColor: colors.highlight }]}
                       onPress={() => openDetailModal({
                         title: announcement.title,
                         content: announcement.content || announcement.message || '',
@@ -638,7 +641,7 @@ export default function EmployeePortalScreen() {
                           />
                           <View style={styles.announcementSquareContent}>
                             <View style={styles.announcementHeader}>
-                              <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                              <Text style={[styles.announcementTitle, { color: colors.text }]}>{announcement.title}</Text>
                               {announcement.priority && announcement.priority !== 'none' && (
                                 <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
                                   {announcement.priority === 'new' && (
@@ -653,7 +656,7 @@ export default function EmployeePortalScreen() {
                                 </View>
                               )}
                             </View>
-                            <Text style={styles.announcementText} numberOfLines={2}>
+                            <Text style={[styles.announcementText, { color: colors.textSecondary }]} numberOfLines={2}>
                               {announcement.content || announcement.message}
                             </Text>
                           </View>
@@ -667,7 +670,7 @@ export default function EmployeePortalScreen() {
                             />
                           )}
                           <View style={styles.announcementHeader}>
-                            <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                            <Text style={[styles.announcementTitle, { color: colors.text }]}>{announcement.title}</Text>
                             {announcement.priority && announcement.priority !== 'none' && (
                               <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
                                 {announcement.priority === 'new' && (
@@ -682,7 +685,7 @@ export default function EmployeePortalScreen() {
                               </View>
                             )}
                           </View>
-                          <Text style={styles.announcementText}>
+                          <Text style={[styles.announcementText, { color: colors.textSecondary }]}>
                             {truncateText(announcement.content || announcement.message, 125)}
                           </Text>
                         </>
@@ -699,19 +702,19 @@ export default function EmployeePortalScreen() {
             <>
               {loadingFeatures ? (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={employeeColors.primary} />
-                  <Text style={styles.loadingText}>{t('employee_home.loading')}</Text>
+                  <ActivityIndicator size="small" color={colors.primary} />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('employee_home.loading')}</Text>
                 </View>
               ) : specialFeatures.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>{t('employee_home.no_features')}</Text>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('employee_home.no_features')}</Text>
                 </View>
               ) : (
                 <>
                   {specialFeatures.map((feature, index) => (
                     <TouchableOpacity
                       key={index}
-                      style={styles.featureItem}
+                      style={[styles.featureItem, { borderBottomColor: colors.highlight }]}
                       onPress={() => openDetailModal({
                         title: feature.title,
                         content: feature.content || feature.message || '',
@@ -731,14 +734,14 @@ export default function EmployeePortalScreen() {
                             style={styles.featureSquareImage}
                           />
                           <View style={styles.featureSquareContent}>
-                            <Text style={styles.featureTitle}>{feature.title}</Text>
+                            <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>
                             {(feature.content || feature.message) && (
-                              <Text style={styles.featureDescription} numberOfLines={2}>
+                              <Text style={[styles.featureDescription, { color: colors.textSecondary }]} numberOfLines={2}>
                                 {feature.content || feature.message}
                               </Text>
                             )}
                             {feature.start_date_time && (
-                              <Text style={styles.featureTime}>{formatDateTime(feature.start_date_time)}</Text>
+                              <Text style={[styles.featureTime, { color: colors.textSecondary }]}>{formatDateTime(feature.start_date_time)}</Text>
                             )}
                           </View>
                         </View>
@@ -751,14 +754,14 @@ export default function EmployeePortalScreen() {
                             />
                           )}
                           <View style={styles.featureContent}>
-                            <Text style={styles.featureTitle}>{feature.title}</Text>
+                            <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>
                             {(feature.content || feature.message) && (
-                              <Text style={styles.featureDescription}>
+                              <Text style={[styles.featureDescription, { color: colors.textSecondary }]}>
                                 {truncateText(feature.content || feature.message, 125)}
                               </Text>
                             )}
                             {feature.start_date_time && (
-                              <Text style={styles.featureTime}>{formatDateTime(feature.start_date_time)}</Text>
+                              <Text style={[styles.featureTime, { color: colors.textSecondary }]}>{formatDateTime(feature.start_date_time)}</Text>
                             )}
                           </View>
                         </>
@@ -776,9 +779,10 @@ export default function EmployeePortalScreen() {
           title="Upcoming Events"
           iconIos="calendar"
           iconAndroid="event"
-          iconColor={employeeColors.primary}
+          iconColor={colors.darkText}
           headerBackgroundColor={headerColor}
-          headerTextColor={employeeColors.text}
+          headerTextColor={colors.darkText}
+          contentBackgroundColor={contentColor}
           defaultExpanded={true}
           onViewAll={() => router.push('/view-all-upcoming-events')}
         >
@@ -786,12 +790,12 @@ export default function EmployeePortalScreen() {
             events={upcomingEvents}
             loadingEvents={loadingEvents}
             colors={{
-              primary: employeeColors.primary,
-              background: employeeColors.background,
-              text: employeeColors.text,
-              textSecondary: employeeColors.textSecondary,
-              card: employeeColors.card,
-              highlight: employeeColors.highlight,
+              primary: colors.primary,
+              background: colors.background,
+              text: colors.text,
+              textSecondary: colors.textSecondary,
+              card: colors.card,
+              highlight: colors.highlight,
             }}
             onEventPress={openDetailModal}
             maxItems={4}
@@ -803,26 +807,27 @@ export default function EmployeePortalScreen() {
           title="Weekly Specials"
           iconIos="fork.knife"
           iconAndroid="restaurant"
-          iconColor={employeeColors.primary}
+          iconColor={colors.darkText}
           headerBackgroundColor={headerColor}
-          headerTextColor={employeeColors.text}
+          headerTextColor={colors.darkText}
+          contentBackgroundColor={contentColor}
           defaultExpanded={true}
         >
           {loadingSpecials ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={employeeColors.primary} />
-              <Text style={styles.loadingText}>{t('employee_home.loading')}</Text>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('employee_home.loading')}</Text>
             </View>
           ) : weeklySpecials.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>{t('common.no_results')}</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('common.no_results')}</Text>
             </View>
           ) : (
             <>
               {weeklySpecials.map((item, index) => (
                 <TouchableOpacity
                   key={index}
-                  style={styles.specialCard}
+                  style={[styles.specialCard, { backgroundColor: colors.card }]}
                   onPress={() => openDetailModal({
                     title: item.name,
                     content: `${item.description || ''}\n\nPrice: ${formatPrice(item.price)}${item.is_gluten_free ? '\n• Gluten Free' : ''}${item.is_gluten_free_available ? '\n• Gluten Free Available' : ''}${item.is_vegetarian ? '\n• Vegetarian' : ''}${item.is_vegetarian_available ? '\n• Vegetarian Available' : ''}`,
@@ -839,35 +844,35 @@ export default function EmployeePortalScreen() {
                       />
                       <View style={styles.specialSquareContent}>
                         <View style={styles.specialHeader}>
-                          <Text style={styles.specialName}>{item.name}</Text>
-                          <Text style={styles.specialPrice}>{formatPrice(item.price)}</Text>
+                          <Text style={[styles.specialName, { color: colors.text }]}>{item.name}</Text>
+                          <Text style={[styles.specialPrice, { color: colors.primary }]}>{formatPrice(item.price)}</Text>
                         </View>
                         {(item.is_gluten_free || item.is_gluten_free_available || item.is_vegetarian || item.is_vegetarian_available) && (
                           <View style={styles.specialTags}>
                             {item.is_gluten_free && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>GF</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>GF</Text>
                               </View>
                             )}
                             {item.is_gluten_free_available && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>GFA</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>GFA</Text>
                               </View>
                             )}
                             {item.is_vegetarian && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>V</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>V</Text>
                               </View>
                             )}
                             {item.is_vegetarian_available && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>VA</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>VA</Text>
                               </View>
                             )}
                           </View>
                         )}
                         {item.description && (
-                          <Text style={styles.specialDescription} numberOfLines={2}>
+                          <Text style={[styles.specialDescription, { color: colors.textSecondary }]} numberOfLines={2}>
                             {item.description}
                           </Text>
                         )}
@@ -883,34 +888,34 @@ export default function EmployeePortalScreen() {
                       )}
                       <View style={styles.specialContent}>
                         <View style={styles.specialHeader}>
-                          <Text style={styles.specialName}>{item.name}</Text>
-                          <Text style={styles.specialPrice}>{formatPrice(item.price)}</Text>
+                          <Text style={[styles.specialName, { color: colors.text }]}>{item.name}</Text>
+                          <Text style={[styles.specialPrice, { color: colors.primary }]}>{formatPrice(item.price)}</Text>
                         </View>
                         {item.description && (
-                          <Text style={styles.specialDescription}>
+                          <Text style={[styles.specialDescription, { color: colors.textSecondary }]}>
                             {item.description}
                           </Text>
                         )}
                         {(item.is_gluten_free || item.is_gluten_free_available || item.is_vegetarian || item.is_vegetarian_available) && (
                           <View style={styles.specialTags}>
                             {item.is_gluten_free && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>GF</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>GF</Text>
                               </View>
                             )}
                             {item.is_gluten_free_available && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>GFA</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>GFA</Text>
                               </View>
                             )}
                             {item.is_vegetarian && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>V</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>V</Text>
                               </View>
                             )}
                             {item.is_vegetarian_available && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>VA</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>VA</Text>
                               </View>
                             )}
                           </View>
@@ -970,10 +975,10 @@ export default function EmployeePortalScreen() {
           link={selectedItem.link}
           guideFile={selectedItem.guideFile}
           colors={{
-            text: employeeColors.text,
-            textSecondary: employeeColors.textSecondary,
-            card: employeeColors.card,
-            primary: employeeColors.primary,
+            text: colors.text,
+            textSecondary: colors.textSecondary,
+            card: colors.card,
+            primary: colors.primary,
           }}
         />
       )}
@@ -982,11 +987,11 @@ export default function EmployeePortalScreen() {
         visible={weatherDetailVisible}
         onClose={closeWeatherDetail}
         colors={{
-          text: employeeColors.text,
-          textSecondary: employeeColors.textSecondary,
-          card: employeeColors.card,
-          primary: employeeColors.primary,
-          border: employeeColors.highlight,
+          text: colors.text,
+          textSecondary: colors.textSecondary,
+          card: colors.card,
+          primary: colors.primary,
+          border: colors.highlight,
         }}
       />
     </GestureHandlerRootView>
@@ -996,7 +1001,6 @@ export default function EmployeePortalScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: employeeColors.background,
   },
   scrollView: {
     flex: 1,
@@ -1007,7 +1011,6 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   welcomeSection: {
-    backgroundColor: employeeColors.card,
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
@@ -1024,9 +1027,7 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     overflow: 'hidden',
-    backgroundColor: employeeColors.background,
     borderWidth: 2,
-    borderColor: employeeColors.primary,
   },
   profilePicture: {
     width: '100%',
@@ -1038,7 +1039,6 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: employeeColors.background,
   },
   welcomeTextContainer: {
     flex: 1,
@@ -1046,12 +1046,10 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: employeeColors.text,
     marginBottom: 2,
   },
   jobTitle: {
     fontSize: 15,
-    color: employeeColors.primary,
     fontWeight: '600',
   },
   compactMessageButton: {
@@ -1059,10 +1057,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: 'rgba(52, 152, 219, 0.15)',
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#3498DB',
     minWidth: 70,
   },
   compactMessageIconWrapper: {
@@ -1070,11 +1066,10 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#3498DB',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
-    boxShadow: '0px 2px 4px rgba(52, 152, 219, 0.3)',
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.15)',
     elevation: 2,
   },
   compactBadgePosition: {
@@ -1091,7 +1086,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 5,
     borderWidth: 2,
-    borderColor: employeeColors.card,
   },
   compactBadgeText: {
     fontSize: 11,
@@ -1101,13 +1095,11 @@ const styles = StyleSheet.create({
   compactMessageLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: employeeColors.text,
     textAlign: 'center',
   },
   tabsContainer: {
     flexDirection: 'row',
     marginBottom: 16,
-    backgroundColor: employeeColors.background,
     borderRadius: 10,
     padding: 4,
     gap: 4,
@@ -1120,13 +1112,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  activeTab: {
-    backgroundColor: employeeColors.primary,
-  },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: employeeColors.textSecondary,
   },
   activeTabText: {
     color: '#FFFFFF',
@@ -1137,7 +1125,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 12,
-    color: employeeColors.textSecondary,
     marginTop: 8,
   },
   emptyContainer: {
@@ -1146,13 +1133,11 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: employeeColors.textSecondary,
     textAlign: 'center',
   },
   announcementItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: employeeColors.highlight,
   },
   announcementSquareLayout: {
     flexDirection: 'row',
@@ -1184,7 +1169,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: employeeColors.text,
     marginRight: 8,
   },
   priorityBadge: {
@@ -1202,19 +1186,16 @@ const styles = StyleSheet.create({
   },
   announcementText: {
     fontSize: 14,
-    color: employeeColors.textSecondary,
     marginBottom: 4,
     lineHeight: 20,
   },
   announcementDate: {
     fontSize: 12,
-    color: employeeColors.textSecondary,
     fontStyle: 'italic',
   },
   eventItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: employeeColors.highlight,
   },
   eventSquareLayout: {
     flexDirection: 'row',
@@ -1242,24 +1223,20 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: employeeColors.text,
     marginBottom: 4,
   },
   eventDescription: {
     fontSize: 14,
-    color: employeeColors.textSecondary,
     marginBottom: 4,
     lineHeight: 20,
   },
   eventTime: {
     fontSize: 12,
-    color: employeeColors.textSecondary,
     fontStyle: 'italic',
   },
   featureItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: employeeColors.highlight,
   },
   featureSquareLayout: {
     flexDirection: 'row',
@@ -1287,22 +1264,18 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: employeeColors.text,
     marginBottom: 4,
   },
   featureDescription: {
     fontSize: 14,
-    color: employeeColors.textSecondary,
     marginBottom: 4,
     lineHeight: 20,
   },
   featureTime: {
     fontSize: 12,
-    color: employeeColors.textSecondary,
     fontStyle: 'italic',
   },
   specialCard: {
-    backgroundColor: employeeColors.card,
     borderRadius: 12,
     marginBottom: 12,
     overflow: 'hidden',
@@ -1341,17 +1314,14 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: employeeColors.text,
     marginRight: 8,
   },
   specialPrice: {
     fontSize: 16,
     fontWeight: '600',
-    color: employeeColors.primary,
   },
   specialDescription: {
     fontSize: 13,
-    color: employeeColors.textSecondary,
     marginTop: 4,
     lineHeight: 18,
   },
@@ -1362,7 +1332,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   tag: {
-    backgroundColor: employeeColors.highlight,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
@@ -1370,7 +1339,6 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: 10,
     fontWeight: '600',
-    color: employeeColors.text,
   },
   imageModalOverlay: {
     flex: 1,

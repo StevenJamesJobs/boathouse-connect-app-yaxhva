@@ -14,7 +14,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
-import { employeeColors, managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 
@@ -52,7 +52,7 @@ export default function MessagesScreen() {
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
 
-  const colors = user?.role === 'manager' ? managerColors : employeeColors;
+  const colors = useThemeColors();
   const isManager = user?.role === 'manager';
 
   const loadInboxMessages = useCallback(async () => {

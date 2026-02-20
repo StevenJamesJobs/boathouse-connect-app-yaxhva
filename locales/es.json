@@ -997,6 +997,31 @@
     "pick_image_error": "Error al seleccionar imagen",
     "upload_image_error": "Error al subir imagen"
   },
+  "settings": {
+    "title": "Configuración",
+    "appearance": "Apariencia",
+    "appearance_desc": "Tema y preferencias de pantalla",
+    "notification_preferences": "Preferencias de Notificación",
+    "language": "Idioma",
+    "change_password": "Cambiar Contraseña",
+    "settings_subtitle": "Apariencia, Notificaciones, Idioma"
+  },
+  "appearance": {
+    "title": "Apariencia",
+    "light_mode": "Claro",
+    "dark_mode": "Oscuro",
+    "select_theme": "Seleccionar Tema",
+    "preview": "Vista Previa",
+    "current_theme": "Actual",
+    "theme_ocean": "Océano",
+    "theme_classic": "Clásico",
+    "theme_sunset": "Atardecer",
+    "theme_forest": "Bosque",
+    "theme_midnight": "Medianoche",
+    "theme_clean": "Limpio",
+    "theme_ruby": "Rubí",
+    "theme_emerald": "Esmeralda"
+  },
   "rewards_reviews_editor": {
     "title": "Editor de Recompensas y Reseñas",
     "tab_rewards": "Recompensas",

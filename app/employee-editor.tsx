@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 
@@ -52,6 +52,8 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 export default function EmployeeEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation('employee_editor');
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -270,7 +272,7 @@ export default function EmployeeEditorScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={managerColors.highlight} />
+        <ActivityIndicator size="large" color={colors.highlight} />
       </View>
     );
   }
@@ -288,7 +290,7 @@ export default function EmployeeEditorScreen() {
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
-            color={managerColors.text}
+            color={colors.text}
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('title')}</Text>
@@ -297,7 +299,7 @@ export default function EmployeeEditorScreen() {
             ios_icon_name="plus.circle.fill"
             android_material_icon_name="add-circle"
             size={28}
-            color={managerColors.highlight}
+            color={colors.highlight}
           />
         </TouchableOpacity>
       </View>
@@ -308,12 +310,12 @@ export default function EmployeeEditorScreen() {
           ios_icon_name="magnifyingglass"
           android_material_icon_name="search"
           size={20}
-          color={managerColors.textSecondary}
+          color={colors.textSecondary}
         />
         <TextInput
           style={styles.searchInput}
           placeholder={t('search_placeholder')}
-          placeholderTextColor={managerColors.textSecondary}
+          placeholderTextColor={colors.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -323,7 +325,7 @@ export default function EmployeeEditorScreen() {
               ios_icon_name="xmark.circle.fill"
               android_material_icon_name="cancel"
               size={20}
-              color={managerColors.textSecondary}
+              color={colors.textSecondary}
             />
           </TouchableOpacity>
         )}
@@ -341,7 +343,7 @@ export default function EmployeeEditorScreen() {
                 ios_icon_name="checkmark"
                 android_material_icon_name="check"
                 size={16}
-                color={managerColors.text}
+                color={colors.text}
               />
             )}
           </View>
@@ -373,7 +375,7 @@ export default function EmployeeEditorScreen() {
                           ios_icon_name="person.circle.fill"
                           android_material_icon_name="account-circle"
                           size={50}
-                          color={managerColors.highlight}
+                          color={colors.highlight}
                         />
                       )}
                     </View>
@@ -392,7 +394,7 @@ export default function EmployeeEditorScreen() {
                         ios_icon_name="pencil.circle.fill"
                         android_material_icon_name="edit"
                         size={36}
-                        color={managerColors.highlight}
+                        color={colors.highlight}
                       />
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -469,7 +471,7 @@ export default function EmployeeEditorScreen() {
                   ios_icon_name="xmark.circle.fill"
                   android_material_icon_name="cancel"
                   size={28}
-                  color={managerColors.textSecondary}
+                  color={colors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
@@ -482,7 +484,7 @@ export default function EmployeeEditorScreen() {
                   value={newEmployee.username}
                   onChangeText={(text) => setNewEmployee({ ...newEmployee, username: text })}
                   placeholder={t('username_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
 
@@ -493,7 +495,7 @@ export default function EmployeeEditorScreen() {
                   value={newEmployee.name}
                   onChangeText={(text) => setNewEmployee({ ...newEmployee, name: text })}
                   placeholder={t('full_name_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
 
@@ -504,7 +506,7 @@ export default function EmployeeEditorScreen() {
                   value={newEmployee.email}
                   onChangeText={(text) => setNewEmployee({ ...newEmployee, email: text })}
                   placeholder={t('email_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   keyboardType="email-address"
                   autoCapitalize="none"
                 />
@@ -525,7 +527,7 @@ export default function EmployeeEditorScreen() {
                             ios_icon_name="checkmark"
                             android_material_icon_name="check"
                             size={18}
-                            color={managerColors.highlight}
+                            color={colors.highlight}
                           />
                         )}
                       </View>
@@ -542,7 +544,7 @@ export default function EmployeeEditorScreen() {
                   value={newEmployee.phone_number}
                   onChangeText={(text) => setNewEmployee({ ...newEmployee, phone_number: text })}
                   placeholder={t('phone_number_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   keyboardType="phone-pad"
                 />
               </View>
@@ -606,16 +608,16 @@ export default function EmployeeEditorScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -624,7 +626,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 48,
     paddingBottom: 16,
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
@@ -634,7 +636,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: colors.text,
   },
   addButton: {
     padding: 8,
@@ -642,7 +644,7 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     marginHorizontal: 16,
     marginTop: 16,
     paddingHorizontal: 16,
@@ -655,7 +657,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     fontSize: 16,
-    color: managerColors.text,
+    color: colors.text,
   },
   toggleContainer: {
     paddingHorizontal: 16,
@@ -671,19 +673,19 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: managerColors.highlight,
+    borderColor: colors.highlight,
     marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
   },
   toggleCheckboxActive: {
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
   },
   toggleLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.text,
+    color: colors.text,
   },
   contentContainer: {
     flex: 1,
@@ -701,14 +703,14 @@ const styles = StyleSheet.create({
   emptyText: {
     textAlign: 'center',
     fontSize: 16,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 40,
   },
   employeeCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
@@ -738,17 +740,17 @@ const styles = StyleSheet.create({
   employeeName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: colors.text,
     marginBottom: 4,
   },
   employeeRole: {
     fontSize: 14,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 2,
   },
   employeeUsername: {
     fontSize: 12,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   employeeActions: {
     flexDirection: 'row',
@@ -763,7 +765,7 @@ const styles = StyleSheet.create({
   },
   alphabetNav: {
     width: 40,
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     borderTopLeftRadius: 12,
     borderBottomLeftRadius: 12,
     marginRight: 16,
@@ -783,15 +785,15 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   alphabetButtonActive: {
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
   },
   alphabetButtonText: {
     fontSize: 12,
     fontWeight: '600',
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   alphabetButtonTextActive: {
-    color: managerColors.text,
+    color: colors.text,
   },
   modalOverlay: {
     flex: 1,
@@ -799,7 +801,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     maxHeight: '90%',
@@ -812,12 +814,12 @@ const styles = StyleSheet.create({
     paddingTop: 24,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: managerColors.highlight,
+    borderBottomColor: colors.highlight,
   },
   modalTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: colors.text,
   },
   modalForm: {
     paddingHorizontal: 24,
@@ -829,38 +831,38 @@ const styles = StyleSheet.create({
   formLabel: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.text,
+    color: colors.text,
     marginBottom: 8,
   },
   formInput: {
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
-    color: managerColors.text,
+    color: colors.text,
     borderWidth: 1,
-    borderColor: managerColors.border,
+    borderColor: colors.border,
   },
   formInputDisabled: {
     opacity: 0.6,
   },
   formInputTextDisabled: {
     fontSize: 16,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   formNote: {
     fontSize: 12,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 4,
     fontStyle: 'italic',
   },
   jobTitlesContainer: {
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     borderRadius: 8,
     padding: 12,
     borderWidth: 1,
-    borderColor: managerColors.border,
+    borderColor: colors.border,
   },
   checkboxRow: {
     flexDirection: 'row',
@@ -872,14 +874,14 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 4,
     borderWidth: 2,
-    borderColor: managerColors.highlight,
+    borderColor: colors.highlight,
     marginRight: 12,
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxLabel: {
     fontSize: 16,
-    color: managerColors.text,
+    color: colors.text,
   },
   roleSelector: {
     flexDirection: 'row',
@@ -890,25 +892,25 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: managerColors.border,
+    borderColor: colors.border,
     alignItems: 'center',
   },
   roleButtonActive: {
-    backgroundColor: managerColors.highlight,
-    borderColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
+    borderColor: colors.highlight,
   },
   roleButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   roleButtonTextActive: {
-    color: managerColors.text,
+    color: colors.text,
   },
   submitButton: {
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
     borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',
@@ -918,6 +920,6 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: colors.text,
   },
 });

@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
     paddingHorizontal: 8,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(0,0,0,0.08)',
+    borderBottomColor: 'rgba(128,128,128,0.15)',
   },
   headerRow: {
     flexDirection: 'row',

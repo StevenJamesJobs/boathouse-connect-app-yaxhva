@@ -8,13 +8,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { IconSymbol } from './IconSymbol';
-import { managerColors, employeeColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 
 interface NotificationPreferencesProps {
-  variant?: 'manager' | 'employee';
+  variant?: 'manager' | 'employee'; // deprecated, kept for backward compatibility
 }
 
 interface NotificationPreferencesData {
@@ -27,7 +27,7 @@ interface NotificationPreferencesData {
 }
 
 export default function NotificationPreferences({ variant = 'employee' }: NotificationPreferencesProps) {
-  const themeColors = variant === 'manager' ? managerColors : employeeColors;
+  const themeColors = useThemeColors();
   const { user } = useAuth();
   const { t } = useTranslation();
   

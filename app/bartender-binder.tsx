@@ -7,18 +7,15 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { employeeColors, managerColors } from '@/styles/commonStyles';
-import { useAuth } from '@/contexts/AuthContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 export default function BartenderBinderScreen() {
   const router = useRouter();
-  const { user } = useAuth();
   const { t } = useTranslation();
-
-  const colors = user?.role === 'manager' ? managerColors : employeeColors;
+  const colors = useThemeColors();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

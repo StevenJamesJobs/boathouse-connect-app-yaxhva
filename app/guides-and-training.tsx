@@ -17,8 +17,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '@/contexts/AuthContext';
-import { managerColors, employeeColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
@@ -46,7 +45,7 @@ const CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events 
 export default function GuidesAndTrainingScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const colors = useThemeColors();
   const [guides, setGuides] = useState<GuideItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -57,8 +56,6 @@ export default function GuidesAndTrainingScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGuide, setSelectedGuide] = useState<GuideItem | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
-
-  const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
   useEffect(() => {
     loadGuides();

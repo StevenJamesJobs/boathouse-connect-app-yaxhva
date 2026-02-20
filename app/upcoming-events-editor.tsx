@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -54,6 +54,8 @@ const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'E
 
 export default function UpcomingEventsEditorScreen() {
   const { t } = useTranslation();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { user } = useAuth();
   const { sendNotification } = useNotification();
@@ -504,7 +506,7 @@ export default function UpcomingEventsEditorScreen() {
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
-            color={managerColors.text}
+            color={colors.text}
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('upcoming_events_editor:title')}</Text>
@@ -526,7 +528,7 @@ export default function UpcomingEventsEditorScreen() {
           ios_icon_name="plus.circle.fill"
           android_material_icon_name="add-circle"
           size={24}
-          color={events.length >= 25 ? managerColors.textSecondary : managerColors.text}
+          color={events.length >= 25 ? colors.textSecondary : colors.text}
         />
         <Text style={[styles.addNewItemButtonText, events.length >= 25 && styles.addNewItemButtonTextDisabled]}>
           {events.length >= 25 ? t('upcoming_events_editor:limit_reached') : t('upcoming_events_editor:add_button')}
@@ -535,7 +537,7 @@ export default function UpcomingEventsEditorScreen() {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={managerColors.highlight} />
+          <ActivityIndicator size="large" color={colors.highlight} />
           <Text style={styles.loadingText}>{t('upcoming_events_editor:loading')}</Text>
         </View>
       ) : (
@@ -546,7 +548,7 @@ export default function UpcomingEventsEditorScreen() {
                 ios_icon_name="calendar"
                 android_material_icon_name="event"
                 size={64}
-                color={managerColors.textSecondary}
+                color={colors.textSecondary}
               />
               <Text style={styles.emptyText}>{t('upcoming_events_editor:empty_title')}</Text>
               <Text style={styles.emptySubtext}>
@@ -587,7 +589,7 @@ export default function UpcomingEventsEditorScreen() {
                               ios_icon_name="calendar"
                               android_material_icon_name="event"
                               size={14}
-                              color={managerColors.textSecondary}
+                              color={colors.textSecondary}
                             />
                             <Text style={styles.metaText}>
                               {formatDateTime(event.start_date_time)}
@@ -599,7 +601,7 @@ export default function UpcomingEventsEditorScreen() {
                                 ios_icon_name="clock"
                                 android_material_icon_name="schedule"
                                 size={14}
-                                color={managerColors.textSecondary}
+                                color={colors.textSecondary}
                               />
                               <Text style={styles.metaText}>
                                 {t('upcoming_events_editor:ends_label', { datetime: formatDateTime(event.end_date_time) })}
@@ -639,7 +641,7 @@ export default function UpcomingEventsEditorScreen() {
                               ios_icon_name="calendar"
                               android_material_icon_name="event"
                               size={14}
-                              color={managerColors.textSecondary}
+                              color={colors.textSecondary}
                             />
                             <Text style={styles.metaText}>
                               {formatDateTime(event.start_date_time)}
@@ -651,7 +653,7 @@ export default function UpcomingEventsEditorScreen() {
                                 ios_icon_name="clock"
                                 android_material_icon_name="schedule"
                                 size={14}
-                                color={managerColors.textSecondary}
+                                color={colors.textSecondary}
                               />
                               <Text style={styles.metaText}>
                                 {t('upcoming_events_editor:ends_label', { datetime: formatDateTime(event.end_date_time) })}
@@ -671,7 +673,7 @@ export default function UpcomingEventsEditorScreen() {
                         ios_icon_name="pencil"
                         android_material_icon_name="edit"
                         size={20}
-                        color={managerColors.highlight}
+                        color={colors.highlight}
                       />
                       <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
                     </TouchableOpacity>
@@ -885,7 +887,7 @@ export default function UpcomingEventsEditorScreen() {
                         ios_icon_name="doc.fill"
                         android_material_icon_name="description"
                         size={24}
-                        color={managerColors.highlight}
+                        color={colors.highlight}
                       />
                       <View style={styles.selectedFileText}>
                         <Text style={styles.selectedFileTitle}>{selectedGuideFile.title}</Text>
@@ -910,7 +912,7 @@ export default function UpcomingEventsEditorScreen() {
                       ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
                       android_material_icon_name={showFileSection ? "expand-less" : "expand-more"}
                       size={24}
-                      color={managerColors.highlight}
+                      color={colors.highlight}
                     />
                     <Text style={styles.filePickerButtonText}>
                       {showFileSection ? t('upcoming_events_editor:hide_file_selection') : t('upcoming_events_editor:show_file_selection')}
@@ -964,7 +966,7 @@ export default function UpcomingEventsEditorScreen() {
                                   ios_icon_name="doc.fill"
                                   android_material_icon_name="description"
                                   size={24}
-                                  color={managerColors.highlight}
+                                  color={colors.highlight}
                                 />
                                 <View style={styles.fileItemText}>
                                   <Text style={styles.fileItemTitle}>{file.title}</Text>
@@ -1313,10 +1315,10 @@ export default function UpcomingEventsEditorScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -1325,7 +1327,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 48 : 60,
     paddingBottom: 12,
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
@@ -1336,24 +1338,24 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: colors.text,
   },
   subHeader: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
+    borderBottomColor: colors.border,
   },
   headerSubtitle: {
     fontSize: 14,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   addNewItemButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
     marginHorizontal: 16,
     marginTop: 16,
     paddingVertical: 14,
@@ -1364,16 +1366,16 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   addNewItemButtonDisabled: {
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     opacity: 0.6,
   },
   addNewItemButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: colors.text,
   },
   addNewItemButtonTextDisabled: {
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   loadingContainer: {
     flex: 1,
@@ -1382,7 +1384,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 12,
   },
   itemsList: {
@@ -1402,17 +1404,17 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: managerColors.text,
+    color: colors.text,
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 8,
     textAlign: 'center',
   },
   eventCard: {
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     marginBottom: 16,
     overflow: 'hidden',
@@ -1458,11 +1460,11 @@ const styles = StyleSheet.create({
   viewOrderText: {
     fontSize: 10,
     fontWeight: '600',
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   squareMessage: {
     fontSize: 13,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 6,
     lineHeight: 18,
   },
@@ -1477,12 +1479,12 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: colors.text,
     flex: 1,
   },
   eventMessage: {
     fontSize: 14,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 12,
     lineHeight: 20,
   },
@@ -1497,21 +1499,21 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   eventActions: {
     flexDirection: 'row',
     gap: 12,
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: managerColors.border,
+    borderTopColor: colors.border,
   },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
     paddingVertical: 10,
     borderRadius: 8,
     gap: 6,
@@ -1522,7 +1524,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.highlight,
+    color: colors.highlight,
   },
   deleteButtonText: {
     color: '#E74C3C',
@@ -1639,8 +1641,8 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
   },
   shapeOptionActive: {
-    backgroundColor: managerColors.highlight,
-    borderColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
+    borderColor: colors.highlight,
   },
   shapeOptionText: {
     fontSize: 14,
@@ -1683,7 +1685,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: managerColors.highlight,
+    borderColor: colors.highlight,
   },
   selectedFileInfo: {
     flexDirection: 'row',
@@ -1723,7 +1725,7 @@ const styles = StyleSheet.create({
   filePickerButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.highlight,
+    color: colors.highlight,
   },
   fileSelectionSection: {
     marginTop: 12,
@@ -1834,7 +1836,7 @@ const styles = StyleSheet.create({
     color: '#E74C3C',
   },
   saveButton: {
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -1885,7 +1887,7 @@ const styles = StyleSheet.create({
   datePickerDone: {
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.primary,
+    color: colors.primary,
   },
   datePicker: {
     height: 200,

@@ -10,6 +10,7 @@ import {
   UIManager,
 } from 'react-native';
 import { IconSymbol } from './IconSymbol';
+import { useThemeColors } from '@/hooks/useThemeColors';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -38,9 +39,11 @@ export default function CollapsibleSection({
   headerTextColor,
   children,
   defaultExpanded = true,
-  contentBackgroundColor = '#FFFFFF',
+  contentBackgroundColor,
   onViewAll,
 }: CollapsibleSectionProps) {
+  const themeColors = useThemeColors();
+  const resolvedContentBg = contentBackgroundColor ?? themeColors.card;
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   const toggleExpanded = () => {
@@ -85,7 +88,7 @@ export default function CollapsibleSection({
         </View>
       </View>
       {isExpanded && (
-        <View style={[styles.content, { backgroundColor: contentBackgroundColor }]}>
+        <View style={[styles.content, { backgroundColor: resolvedContentBg }]}>
           {children}
         </View>
       )}

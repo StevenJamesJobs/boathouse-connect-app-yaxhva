@@ -9,8 +9,8 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { useAuth } from '@/contexts/AuthContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -38,7 +38,7 @@ export default function BartenderOpeningChecklistScreen() {
   const [loading, setLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
-  const colors = user?.role === 'manager' ? managerColors : employeeColors;
+  const colors = useThemeColors();
 
   useFocusEffect(
     useCallback(() => {

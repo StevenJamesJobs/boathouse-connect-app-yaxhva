@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import CollapsibleSection from '@/components/CollapsibleSection';
-import { managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import React, { useState, useEffect } from 'react';
@@ -105,6 +105,7 @@ interface SpecialFeature {
 }
 
 export default function ManagerPortalScreen() {
+  const colors = useThemeColors();
   const { user } = useAuth();
   const { t } = useTranslation();
   const router = useRouter();
@@ -141,9 +142,8 @@ export default function ManagerPortalScreen() {
     guideFile?: GuideFile | null;
   } | null>(null);
 
-  // Darker header color for sections
-  const headerColor = '#34495E';
-  const contentColor = managerColors.card;
+  const headerColor = colors.primary;
+  const contentColor = colors.card;
 
   useEffect(() => {
     loadWeeklySpecials();
@@ -440,7 +440,7 @@ export default function ManagerPortalScreen() {
       case 'update':
         return '#F39C12';
       default:
-        return managerColors.textSecondary;
+        return colors.textSecondary;
     }
   };
 
@@ -501,40 +501,40 @@ export default function ManagerPortalScreen() {
   const unreadText = unreadCount > 0 ? `${unreadCount}` : '0';
 
   return (
-    <GestureHandlerRootView style={styles.container}>
+    <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {/* Welcome Section */}
-        <View style={styles.welcomeSection}>
+        <View style={[styles.welcomeSection, { backgroundColor: colors.card }]}>
           <View style={styles.welcomeRow}>
-            <View style={styles.profilePictureContainer}>
+            <View style={[styles.profilePictureContainer, { backgroundColor: colors.background, borderColor: colors.highlight }]}>
               {profilePictureUrl ? (
                 <Image
                   source={{ uri: profilePictureUrl }}
                   style={styles.profilePicture}
                 />
               ) : (
-                <View style={styles.profilePicturePlaceholder}>
+                <View style={[styles.profilePicturePlaceholder, { backgroundColor: colors.background }]}>
                   <IconSymbol
                     ios_icon_name="person.fill"
                     android_material_icon_name="person"
                     size={32}
-                    color={managerColors.textSecondary}
+                    color={colors.textSecondary}
                   />
                 </View>
               )}
             </View>
 
             <View style={styles.welcomeTextContainer}>
-              <Text style={styles.welcomeTitle}>Welcome, {user?.name}!</Text>
-              <Text style={styles.jobTitle}>{user?.jobTitle}</Text>
+              <Text style={[styles.welcomeTitle, { color: colors.text }]}>Welcome, {user?.name}!</Text>
+              <Text style={[styles.jobTitle, { color: colors.highlight }]}>{user?.jobTitle}</Text>
             </View>
 
             <TouchableOpacity
-              style={styles.compactMessageButton}
+              style={[styles.compactMessageButton, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}
               onPress={() => router.push('/messages')}
               activeOpacity={0.7}
             >
-              <View style={styles.compactMessageIconWrapper}>
+              <View style={[styles.compactMessageIconWrapper, { backgroundColor: colors.primary }]}>
                 <IconSymbol
                   ios_icon_name="envelope.fill"
                   android_material_icon_name="mail"
@@ -543,13 +543,13 @@ export default function ManagerPortalScreen() {
                 />
                 {unreadCount > 0 && (
                   <View style={styles.compactBadgePosition}>
-                    <View style={styles.compactBadge}>
+                    <View style={[styles.compactBadge, { borderColor: colors.card }]}>
                       <Text style={styles.compactBadgeText}>{unreadText}</Text>
                     </View>
                   </View>
                 )}
               </View>
-              <Text style={styles.compactMessageLabel}>{t('common.messages')}</Text>
+              <Text style={[styles.compactMessageLabel, { color: colors.text }]}>{t('common.messages')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -559,15 +559,15 @@ export default function ManagerPortalScreen() {
           title="Weather"
           iconIos="cloud.sun.fill"
           iconAndroid="wb-cloudy"
-          iconColor={managerColors.accent}
+          iconColor={colors.darkText}
           headerBackgroundColor={headerColor}
-          headerTextColor={managerColors.text}
+          headerTextColor={colors.darkText}
           contentBackgroundColor={contentColor}
           defaultExpanded={true}
         >
           <WeatherWidget
-            textColor={managerColors.text}
-            secondaryTextColor={managerColors.textSecondary}
+            textColor={colors.text}
+            secondaryTextColor={colors.textSecondary}
             onPress={openWeatherDetail}
           />
         </CollapsibleSection>
@@ -577,30 +577,30 @@ export default function ManagerPortalScreen() {
           title="What's Happening"
           iconIos="megaphone.fill"
           iconAndroid="campaign"
-          iconColor={managerColors.accent}
+          iconColor={colors.darkText}
           headerBackgroundColor={headerColor}
-          headerTextColor={managerColors.text}
+          headerTextColor={colors.darkText}
           contentBackgroundColor={contentColor}
           defaultExpanded={true}
           onViewAll={whatsHappeningTab === 'Special Features' ? () => router.push('/view-all-special-features') : undefined}
         >
           {/* Tabs */}
-          <View style={styles.tabsContainer}>
+          <View style={[styles.tabsContainer, { backgroundColor: colors.background }]}>
             <TouchableOpacity
-              style={[styles.tab, whatsHappeningTab === 'Announcements' && styles.activeTab]}
+              style={[styles.tab, whatsHappeningTab === 'Announcements' && { backgroundColor: colors.highlight }]}
               onPress={() => setWhatsHappeningTab('Announcements')}
               activeOpacity={0.7}
             >
-              <Text style={[styles.tabText, whatsHappeningTab === 'Announcements' && styles.activeTabText]}>
+              <Text style={[styles.tabText, { color: colors.textSecondary }, whatsHappeningTab === 'Announcements' && { color: colors.text }]}>
                 {t('manager_home.announcements')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.tab, whatsHappeningTab === 'Special Features' && styles.activeTab]}
+              style={[styles.tab, whatsHappeningTab === 'Special Features' && { backgroundColor: colors.highlight }]}
               onPress={() => setWhatsHappeningTab('Special Features')}
               activeOpacity={0.7}
             >
-              <Text style={[styles.tabText, whatsHappeningTab === 'Special Features' && styles.activeTabText]}>
+              <Text style={[styles.tabText, { color: colors.textSecondary }, whatsHappeningTab === 'Special Features' && { color: colors.text }]}>
                 {t('manager_home.special_features')}
               </Text>
             </TouchableOpacity>
@@ -611,20 +611,20 @@ export default function ManagerPortalScreen() {
             <>
               {loadingAnnouncements ? (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={managerColors.highlight} />
-                  <Text style={styles.loadingText}>{t('manager_home.loading')}</Text>
+                  <ActivityIndicator size="small" color={colors.highlight} />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('manager_home.loading')}</Text>
                 </View>
               ) : announcements.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>{t('manager_home.announcements')}</Text>
-                  <Text style={styles.emptySubtext}>Create announcements in the Announcement Editor</Text>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('manager_home.announcements')}</Text>
+                  <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>Create announcements in the Announcement Editor</Text>
                 </View>
               ) : (
                 <>
                   {announcements.map((announcement, index) => (
                     <TouchableOpacity
                       key={index}
-                      style={styles.announcementItem}
+                      style={[styles.announcementItem, { borderBottomColor: colors.border }]}
                       onPress={() => openDetailModal({
                         title: announcement.title,
                         content: announcement.content || announcement.message || '',
@@ -644,7 +644,7 @@ export default function ManagerPortalScreen() {
                           />
                           <View style={styles.announcementSquareContent}>
                             <View style={styles.announcementHeader}>
-                              <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                              <Text style={[styles.announcementTitle, { color: colors.text }]}>{announcement.title}</Text>
                               {announcement.priority && announcement.priority !== 'none' && (
                                 <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
                                   {announcement.priority === 'new' && (
@@ -659,7 +659,7 @@ export default function ManagerPortalScreen() {
                                 </View>
                               )}
                             </View>
-                            <Text style={styles.announcementText} numberOfLines={2}>
+                            <Text style={[styles.announcementText, { color: colors.textSecondary }]} numberOfLines={2}>
                               {announcement.content || announcement.message}
                             </Text>
                           </View>
@@ -673,7 +673,7 @@ export default function ManagerPortalScreen() {
                             />
                           )}
                           <View style={styles.announcementHeader}>
-                            <Text style={styles.announcementTitle}>{announcement.title}</Text>
+                            <Text style={[styles.announcementTitle, { color: colors.text }]}>{announcement.title}</Text>
                             {announcement.priority && announcement.priority !== 'none' && (
                               <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
                                 {announcement.priority === 'new' && (
@@ -688,7 +688,7 @@ export default function ManagerPortalScreen() {
                               </View>
                             )}
                           </View>
-                          <Text style={styles.announcementText}>
+                          <Text style={[styles.announcementText, { color: colors.textSecondary }]}>
                             {truncateText(announcement.content || announcement.message, 125)}
                           </Text>
                         </>
@@ -705,20 +705,20 @@ export default function ManagerPortalScreen() {
             <>
               {loadingFeatures ? (
                 <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={managerColors.highlight} />
-                  <Text style={styles.loadingText}>Loading features...</Text>
+                  <ActivityIndicator size="small" color={colors.highlight} />
+                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading features...</Text>
                 </View>
               ) : specialFeatures.length === 0 ? (
                 <View style={styles.emptyContainer}>
-                  <Text style={styles.emptyText}>No special features</Text>
-                  <Text style={styles.emptySubtext}>Create features in the Special Features Editor</Text>
+                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No special features</Text>
+                  <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>Create features in the Special Features Editor</Text>
                 </View>
               ) : (
                 <>
                   {specialFeatures.map((feature, index) => (
                     <TouchableOpacity
                       key={index}
-                      style={styles.featureItem}
+                      style={[styles.featureItem, { borderBottomColor: colors.border }]}
                       onPress={() => openDetailModal({
                         title: feature.title,
                         content: feature.content || feature.message || '',
@@ -738,14 +738,14 @@ export default function ManagerPortalScreen() {
                             style={styles.featureSquareImage}
                           />
                           <View style={styles.featureSquareContent}>
-                            <Text style={styles.featureTitle}>{feature.title}</Text>
+                            <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>
                             {(feature.content || feature.message) && (
-                              <Text style={styles.featureDescription} numberOfLines={2}>
+                              <Text style={[styles.featureDescription, { color: colors.textSecondary }]} numberOfLines={2}>
                                 {feature.content || feature.message}
                               </Text>
                             )}
                             {feature.start_date_time && (
-                              <Text style={styles.featureTime}>{formatDateTime(feature.start_date_time)}</Text>
+                              <Text style={[styles.featureTime, { color: colors.textSecondary }]}>{formatDateTime(feature.start_date_time)}</Text>
                             )}
                           </View>
                         </View>
@@ -758,14 +758,14 @@ export default function ManagerPortalScreen() {
                             />
                           )}
                           <View style={styles.featureContent}>
-                            <Text style={styles.featureTitle}>{feature.title}</Text>
+                            <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>
                             {(feature.content || feature.message) && (
-                              <Text style={styles.featureDescription}>
+                              <Text style={[styles.featureDescription, { color: colors.textSecondary }]}>
                                 {truncateText(feature.content || feature.message, 125)}
                               </Text>
                             )}
                             {feature.start_date_time && (
-                              <Text style={styles.featureTime}>{formatDateTime(feature.start_date_time)}</Text>
+                              <Text style={[styles.featureTime, { color: colors.textSecondary }]}>{formatDateTime(feature.start_date_time)}</Text>
                             )}
                           </View>
                         </>
@@ -783,9 +783,9 @@ export default function ManagerPortalScreen() {
           title="Upcoming Events"
           iconIos="calendar"
           iconAndroid="event"
-          iconColor={managerColors.accent}
+          iconColor={colors.darkText}
           headerBackgroundColor={headerColor}
-          headerTextColor={managerColors.text}
+          headerTextColor={colors.darkText}
           contentBackgroundColor={contentColor}
           defaultExpanded={true}
           onViewAll={() => router.push('/view-all-upcoming-events')}
@@ -794,12 +794,12 @@ export default function ManagerPortalScreen() {
             events={upcomingEvents}
             loadingEvents={loadingEvents}
             colors={{
-              primary: managerColors.primary,
-              background: managerColors.background,
-              text: managerColors.text,
-              textSecondary: managerColors.darkSecondaryText,
-              card: managerColors.card,
-              highlight: managerColors.border,
+              primary: colors.primary,
+              background: colors.background,
+              text: colors.text,
+              textSecondary: colors.darkSecondaryText,
+              card: colors.card,
+              highlight: colors.border,
             }}
             onEventPress={openDetailModal}
             maxItems={4}
@@ -811,28 +811,28 @@ export default function ManagerPortalScreen() {
           title="Weekly Specials"
           iconIos="fork.knife"
           iconAndroid="restaurant"
-          iconColor={managerColors.accent}
+          iconColor={colors.darkText}
           headerBackgroundColor={headerColor}
-          headerTextColor={managerColors.text}
+          headerTextColor={colors.darkText}
           contentBackgroundColor={contentColor}
           defaultExpanded={true}
         >
           {loadingSpecials ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={managerColors.highlight} />
-              <Text style={styles.loadingText}>Loading specials...</Text>
+              <ActivityIndicator size="small" color={colors.highlight} />
+              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading specials...</Text>
             </View>
           ) : weeklySpecials.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No weekly specials available</Text>
-              <Text style={styles.emptySubtext}>Add items in the Menu Editor</Text>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No weekly specials available</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>Add items in the Menu Editor</Text>
             </View>
           ) : (
             <>
               {weeklySpecials.map((item, index) => (
                 <TouchableOpacity
                   key={index}
-                  style={styles.specialCard}
+                  style={[styles.specialCard, { backgroundColor: colors.background }]}
                   onPress={() => openDetailModal({
                     title: item.name,
                     content: `${item.description || ''}\n\nPrice: ${formatPrice(item.price)}${item.is_gluten_free ? '\n• Gluten Free' : ''}${item.is_gluten_free_available ? '\n• Gluten Free Available' : ''}${item.is_vegetarian ? '\n• Vegetarian' : ''}${item.is_vegetarian_available ? '\n• Vegetarian Available' : ''}`,
@@ -849,35 +849,35 @@ export default function ManagerPortalScreen() {
                       />
                       <View style={styles.specialSquareContent}>
                         <View style={styles.specialHeader}>
-                          <Text style={styles.specialName}>{item.name}</Text>
-                          <Text style={styles.specialPrice}>{formatPrice(item.price)}</Text>
+                          <Text style={[styles.specialName, { color: colors.text }]}>{item.name}</Text>
+                          <Text style={[styles.specialPrice, { color: colors.highlight }]}>{formatPrice(item.price)}</Text>
                         </View>
                         {(item.is_gluten_free || item.is_gluten_free_available || item.is_vegetarian || item.is_vegetarian_available) && (
                           <View style={styles.specialTags}>
                             {item.is_gluten_free && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>GF</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>GF</Text>
                               </View>
                             )}
                             {item.is_gluten_free_available && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>GFA</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>GFA</Text>
                               </View>
                             )}
                             {item.is_vegetarian && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>V</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>V</Text>
                               </View>
                             )}
                             {item.is_vegetarian_available && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>VA</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>VA</Text>
                               </View>
                             )}
                           </View>
                         )}
                         {item.description && (
-                          <Text style={styles.specialDescription} numberOfLines={2}>
+                          <Text style={[styles.specialDescription, { color: colors.textSecondary }]} numberOfLines={2}>
                             {item.description}
                           </Text>
                         )}
@@ -893,34 +893,34 @@ export default function ManagerPortalScreen() {
                       )}
                       <View style={styles.specialContent}>
                         <View style={styles.specialHeader}>
-                          <Text style={styles.specialName}>{item.name}</Text>
-                          <Text style={styles.specialPrice}>{formatPrice(item.price)}</Text>
+                          <Text style={[styles.specialName, { color: colors.text }]}>{item.name}</Text>
+                          <Text style={[styles.specialPrice, { color: colors.highlight }]}>{formatPrice(item.price)}</Text>
                         </View>
                         {item.description && (
-                          <Text style={styles.specialDescription}>
+                          <Text style={[styles.specialDescription, { color: colors.textSecondary }]}>
                             {item.description}
                           </Text>
                         )}
                         {(item.is_gluten_free || item.is_gluten_free_available || item.is_vegetarian || item.is_vegetarian_available) && (
                           <View style={styles.specialTags}>
                             {item.is_gluten_free && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>GF</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>GF</Text>
                               </View>
                             )}
                             {item.is_gluten_free_available && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>GFA</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>GFA</Text>
                               </View>
                             )}
                             {item.is_vegetarian && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>V</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>V</Text>
                               </View>
                             )}
                             {item.is_vegetarian_available && (
-                              <View style={styles.tag}>
-                                <Text style={styles.tagText}>VA</Text>
+                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                                <Text style={[styles.tagText, { color: colors.text }]}>VA</Text>
                               </View>
                             )}
                           </View>
@@ -982,10 +982,10 @@ export default function ManagerPortalScreen() {
           link={selectedItem.link}
           guideFile={selectedItem.guideFile}
           colors={{
-            text: managerColors.text,
-            textSecondary: managerColors.textSecondary,
-            card: managerColors.card,
-            primary: managerColors.primary,
+            text: colors.text,
+            textSecondary: colors.textSecondary,
+            card: colors.card,
+            primary: colors.primary,
           }}
         />
       )}
@@ -994,11 +994,11 @@ export default function ManagerPortalScreen() {
         visible={weatherDetailVisible}
         onClose={closeWeatherDetail}
         colors={{
-          text: managerColors.text,
-          textSecondary: managerColors.textSecondary,
-          card: managerColors.card,
-          primary: managerColors.primary,
-          border: managerColors.border,
+          text: colors.text,
+          textSecondary: colors.textSecondary,
+          card: colors.card,
+          primary: colors.primary,
+          border: colors.border,
         }}
       />
     </GestureHandlerRootView>
@@ -1008,7 +1008,6 @@ export default function ManagerPortalScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: managerColors.background,
   },
   scrollView: {
     flex: 1,
@@ -1019,7 +1018,6 @@ const styles = StyleSheet.create({
     paddingBottom: 120,
   },
   welcomeSection: {
-    backgroundColor: managerColors.card,
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
@@ -1036,9 +1034,7 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     overflow: 'hidden',
-    backgroundColor: managerColors.background,
     borderWidth: 2,
-    borderColor: managerColors.highlight,
   },
   profilePicture: {
     width: '100%',
@@ -1050,7 +1046,6 @@ const styles = StyleSheet.create({
     height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: managerColors.background,
   },
   welcomeTextContainer: {
     flex: 1,
@@ -1058,12 +1053,10 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: managerColors.text,
     marginBottom: 2,
   },
   jobTitle: {
     fontSize: 15,
-    color: managerColors.highlight,
     fontWeight: '600',
   },
   compactMessageButton: {
@@ -1071,10 +1064,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: 'rgba(52, 152, 219, 0.15)',
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#3498DB',
     minWidth: 70,
   },
   compactMessageIconWrapper: {
@@ -1082,11 +1073,10 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#3498DB',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 4,
-    boxShadow: '0px 2px 4px rgba(52, 152, 219, 0.3)',
+    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.15)',
     elevation: 2,
   },
   compactBadgePosition: {
@@ -1103,7 +1093,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 5,
     borderWidth: 2,
-    borderColor: managerColors.card,
   },
   compactBadgeText: {
     fontSize: 11,
@@ -1113,13 +1102,11 @@ const styles = StyleSheet.create({
   compactMessageLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: managerColors.text,
     textAlign: 'center',
   },
   tabsContainer: {
     flexDirection: 'row',
     marginBottom: 16,
-    backgroundColor: managerColors.background,
     borderRadius: 10,
     padding: 4,
     gap: 4,
@@ -1133,15 +1120,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   activeTab: {
-    backgroundColor: managerColors.highlight,
   },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.textSecondary,
   },
   activeTabText: {
-    color: managerColors.text,
   },
   loadingContainer: {
     paddingVertical: 20,
@@ -1149,7 +1133,6 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 12,
-    color: managerColors.textSecondary,
     marginTop: 8,
   },
   emptyContainer: {
@@ -1158,12 +1141,10 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 14,
-    color: managerColors.textSecondary,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: 12,
-    color: managerColors.textSecondary,
     textAlign: 'center',
     marginTop: 4,
     fontStyle: 'italic',
@@ -1171,7 +1152,6 @@ const styles = StyleSheet.create({
   announcementItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
   },
   announcementSquareLayout: {
     flexDirection: 'row',
@@ -1203,7 +1183,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.text,
     marginRight: 8,
   },
   priorityBadge: {
@@ -1221,19 +1200,16 @@ const styles = StyleSheet.create({
   },
   announcementText: {
     fontSize: 14,
-    color: managerColors.textSecondary,
     marginBottom: 4,
     lineHeight: 20,
   },
   announcementDate: {
     fontSize: 12,
-    color: managerColors.textSecondary,
     fontStyle: 'italic',
   },
   eventItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
   },
   eventSquareLayout: {
     flexDirection: 'row',
@@ -1261,24 +1237,20 @@ const styles = StyleSheet.create({
   eventTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.text,
     marginBottom: 4,
   },
   eventDescription: {
     fontSize: 14,
-    color: managerColors.textSecondary,
     marginBottom: 4,
     lineHeight: 20,
   },
   eventTime: {
     fontSize: 12,
-    color: managerColors.textSecondary,
     fontStyle: 'italic',
   },
   featureItem: {
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
   },
   featureSquareLayout: {
     flexDirection: 'row',
@@ -1306,22 +1278,18 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.text,
     marginBottom: 4,
   },
   featureDescription: {
     fontSize: 14,
-    color: managerColors.textSecondary,
     marginBottom: 4,
     lineHeight: 20,
   },
   featureTime: {
     fontSize: 12,
-    color: managerColors.textSecondary,
     fontStyle: 'italic',
   },
   specialCard: {
-    backgroundColor: managerColors.background,
     borderRadius: 12,
     marginBottom: 12,
     overflow: 'hidden',
@@ -1360,17 +1328,14 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.text,
     marginRight: 8,
   },
   specialPrice: {
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.highlight,
   },
   specialDescription: {
     fontSize: 13,
-    color: managerColors.textSecondary,
     marginTop: 4,
     lineHeight: 18,
   },
@@ -1381,7 +1346,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   tag: {
-    backgroundColor: managerColors.highlight,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
@@ -1389,7 +1353,6 @@ const styles = StyleSheet.create({
   tagText: {
     fontSize: 10,
     fontWeight: '600',
-    color: managerColors.text,
   },
   imageModalOverlay: {
     flex: 1,

@@ -997,6 +997,31 @@
     "pick_image_error": "Failed to pick image",
     "upload_image_error": "Failed to upload image"
   },
+  "settings": {
+    "title": "Settings",
+    "appearance": "Appearance",
+    "appearance_desc": "Theme and display preferences",
+    "notification_preferences": "Notification Preferences",
+    "language": "Language",
+    "change_password": "Change Password",
+    "settings_subtitle": "Appearance, Notifications, Language"
+  },
+  "appearance": {
+    "title": "Appearance",
+    "light_mode": "Light",
+    "dark_mode": "Dark",
+    "select_theme": "Select Theme",
+    "preview": "Preview",
+    "current_theme": "Current",
+    "theme_ocean": "Ocean",
+    "theme_classic": "Classic",
+    "theme_sunset": "Sunset",
+    "theme_forest": "Forest",
+    "theme_midnight": "Midnight",
+    "theme_clean": "Clean",
+    "theme_ruby": "Ruby",
+    "theme_emerald": "Emerald"
+  },
   "rewards_reviews_editor": {
     "title": "Rewards & Reviews Editor",
     "tab_rewards": "Rewards",

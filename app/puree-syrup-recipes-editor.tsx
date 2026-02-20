@@ -18,7 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
@@ -42,6 +42,7 @@ export default function PureeSyrupRecipesEditorScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
+  const colors = useThemeColors();
   const [recipes, setRecipes] = useState<PureeSyrupRecipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -357,71 +358,71 @@ export default function PureeSyrupRecipesEditorScreen() {
   }, {} as Record<string, PureeSyrupRecipe[]>);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.card }]}>
         <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
-            color={managerColors.text}
+            color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('puree_editor:title')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('puree_editor:title')}</Text>
         <View style={styles.backButton} />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
         {/* Add Button */}
-        <TouchableOpacity style={styles.addButton} onPress={openAddModal}>
+        <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.highlight }]} onPress={openAddModal}>
           <IconSymbol
             ios_icon_name="plus.circle.fill"
             android_material_icon_name="add-circle"
             size={24}
-            color={managerColors.text}
+            color={colors.text}
           />
-          <Text style={styles.addButtonText}>{t('puree_editor:add_button')}</Text>
+          <Text style={[styles.addButtonText, { color: colors.text }]}>{t('puree_editor:add_button')}</Text>
         </TouchableOpacity>
 
         {/* Recipes List by Category */}
         {Object.keys(recipesByCategory).length === 0 ? (
-          <Text style={styles.emptyText}>{t('puree_editor:empty_title')}</Text>
+          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('puree_editor:empty_title')}</Text>
         ) : (
           Object.entries(recipesByCategory).map(([cat, categoryRecipes], categoryIndex) => (
             <React.Fragment key={categoryIndex}>
               {/* Category Header */}
-              <Text style={styles.categoryTitle}>{cat}</Text>
-              
+              <Text style={[styles.categoryTitle, { color: colors.text }]}>{cat}</Text>
+
               {/* Horizontal Scrollable Recipe Cards */}
-              <ScrollView 
-                horizontal 
+              <ScrollView
+                horizontal
                 showsHorizontalScrollIndicator={false}
                 style={styles.horizontalScroll}
                 contentContainerStyle={styles.horizontalScrollContent}
               >
                 {categoryRecipes.map((recipe, index) => (
-                  <View key={index} style={styles.recipeCard}>
+                  <View key={index} style={[styles.recipeCard, { backgroundColor: colors.card }]}>
                     <Image
                       source={{ uri: getImageUrl(recipe.thumbnail_url) }}
                       style={styles.recipeThumbnail}
                       resizeMode="cover"
                     />
                     <View style={styles.recipeInfo}>
-                      <Text style={styles.recipeName} numberOfLines={2}>{recipe.name}</Text>
+                      <Text style={[styles.recipeName, { color: colors.text }]} numberOfLines={2}>{recipe.name}</Text>
                     </View>
                     <View style={styles.recipeActions}>
                       <TouchableOpacity
-                        style={styles.editButton}
+                        style={[styles.editButton, { backgroundColor: colors.highlight }]}
                         onPress={() => openEditModal(recipe)}
                       >
-                        <Text style={styles.buttonText}>{t('common:edit')}</Text>
+                        <Text style={[styles.buttonText, { color: colors.text }]}>{t('common:edit')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={styles.deleteButton}
                         onPress={() => handleDelete(recipe)}
                       >
-                        <Text style={styles.buttonText}>{t('common:delete')}</Text>
+                        <Text style={[styles.buttonText, { color: colors.text }]}>{t('common:delete')}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -435,7 +436,7 @@ export default function PureeSyrupRecipesEditorScreen() {
       {/* Loading Overlay */}
       {loading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={managerColors.highlight} />
+          <ActivityIndicator size="large" color={colors.highlight} />
         </View>
       )}
 
@@ -456,12 +457,12 @@ export default function PureeSyrupRecipesEditorScreen() {
                   ios_icon_name="xmark.circle.fill"
                   android_material_icon_name="cancel"
                   size={28}
-                  color={managerColors.textSecondary}
+                  color={colors.textSecondary}
                 />
               </TouchableOpacity>
             </View>
 
-            <ScrollView 
+            <ScrollView
               style={styles.modalForm}
               contentContainerStyle={styles.modalFormContent}
               keyboardShouldPersistTaps="handled"
@@ -471,11 +472,11 @@ export default function PureeSyrupRecipesEditorScreen() {
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>{t('puree_editor:image_label')}</Text>
                 <TouchableOpacity
-                  style={styles.imagePickerButton}
+                  style={[styles.imagePickerButton, { backgroundColor: colors.highlight }]}
                   onPress={pickImage}
                   disabled={uploadingImage}
                 >
-                  <Text style={styles.imagePickerButtonText}>
+                  <Text style={[styles.imagePickerButtonText, { color: colors.text }]}>
                     {thumbnailUrl ? t('puree_editor:change_image_button') : t('puree_editor:pick_image_button')}
                   </Text>
                 </TouchableOpacity>
@@ -497,14 +498,14 @@ export default function PureeSyrupRecipesEditorScreen() {
                       key={index}
                       style={[
                         styles.pickerOption,
-                        category === cat && styles.pickerOptionActive
+                        category === cat && { backgroundColor: colors.highlight }
                       ]}
                       onPress={() => setCategory(cat)}
                     >
                       <Text
                         style={[
                           styles.pickerOptionText,
-                          category === cat && styles.pickerOptionTextActive
+                          category === cat && { color: colors.text, fontWeight: '600' }
                         ]}
                       >
                         {cat}
@@ -522,7 +523,7 @@ export default function PureeSyrupRecipesEditorScreen() {
                   value={name}
                   onChangeText={setName}
                   placeholder={t('puree_editor:name_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                 />
               </View>
 
@@ -536,14 +537,14 @@ export default function PureeSyrupRecipesEditorScreen() {
                       value={ingredient.amount}
                       onChangeText={(value) => updateIngredient(index, 'amount', value)}
                       placeholder={t('puree_editor:amount_placeholder')}
-                      placeholderTextColor={managerColors.textSecondary}
+                      placeholderTextColor={colors.textSecondary}
                     />
                     <TextInput
                       style={[styles.formInput, styles.ingredientName]}
                       value={ingredient.ingredient}
                       onChangeText={(value) => updateIngredient(index, 'ingredient', value)}
                       placeholder={t('puree_editor:ingredient_placeholder')}
-                      placeholderTextColor={managerColors.textSecondary}
+                      placeholderTextColor={colors.textSecondary}
                     />
                     {ingredients.length > 1 && (
                       <TouchableOpacity
@@ -565,9 +566,9 @@ export default function PureeSyrupRecipesEditorScreen() {
                     ios_icon_name="plus.circle.fill"
                     android_material_icon_name="add-circle"
                     size={20}
-                    color={managerColors.highlight}
+                    color={colors.highlight}
                   />
-                  <Text style={styles.addIngredientText}>{t('puree_editor:add_ingredient')}</Text>
+                  <Text style={[styles.addIngredientText, { color: colors.highlight }]}>{t('puree_editor:add_ingredient')}</Text>
                 </TouchableOpacity>
               </View>
 
@@ -579,7 +580,7 @@ export default function PureeSyrupRecipesEditorScreen() {
                   value={procedure}
                   onChangeText={setProcedure}
                   placeholder={t('puree_editor:procedure_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   multiline
                   numberOfLines={4}
                 />
@@ -593,7 +594,7 @@ export default function PureeSyrupRecipesEditorScreen() {
                   value={displayOrder}
                   onChangeText={setDisplayOrder}
                   placeholder={t('puree_editor:display_order_placeholder')}
-                  placeholderTextColor={managerColors.textSecondary}
+                  placeholderTextColor={colors.textSecondary}
                   keyboardType="numeric"
                 />
               </View>
@@ -608,14 +609,14 @@ export default function PureeSyrupRecipesEditorScreen() {
                   <Text style={styles.cancelButtonText}>{t('puree_editor:cancel_button')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={styles.submitButton}
+                  style={[styles.submitButton, { backgroundColor: colors.highlight }]}
                   onPress={handleSave}
                   disabled={loading || uploadingImage}
                 >
                   {loading ? (
-                    <ActivityIndicator color={managerColors.text} />
+                    <ActivityIndicator color={colors.text} />
                   ) : (
-                    <Text style={styles.submitButtonText}>
+                    <Text style={[styles.submitButtonText, { color: colors.text }]}>
                       {editingRecipe ? t('puree_editor:save_button') : t('puree_editor:add_save_button')}
                     </Text>
                   )}
@@ -635,7 +636,6 @@ export default function PureeSyrupRecipesEditorScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: managerColors.background,
   },
   header: {
     flexDirection: 'row',
@@ -644,7 +644,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 48,
     paddingBottom: 16,
-    backgroundColor: managerColors.card,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
@@ -655,7 +654,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: managerColors.text,
   },
   scrollView: {
     flex: 1,
@@ -665,7 +663,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   addButton: {
-    backgroundColor: managerColors.highlight,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -680,12 +677,10 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: managerColors.text,
   },
   categoryTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: managerColors.text,
     marginTop: 16,
     marginBottom: 12,
     marginLeft: 16,
@@ -698,7 +693,6 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   recipeCard: {
-    backgroundColor: managerColors.card,
     borderRadius: 12,
     padding: 12,
     marginRight: 12,
@@ -718,7 +712,6 @@ const styles = StyleSheet.create({
   recipeName: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: managerColors.text,
     marginBottom: 4,
   },
   recipeActions: {
@@ -727,7 +720,6 @@ const styles = StyleSheet.create({
   },
   editButton: {
     flex: 1,
-    backgroundColor: managerColors.highlight,
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -744,12 +736,10 @@ const styles = StyleSheet.create({
   buttonText: {
     fontSize: 13,
     fontWeight: '600',
-    color: managerColors.text,
   },
   emptyText: {
     textAlign: 'center',
     fontSize: 16,
-    color: managerColors.textSecondary,
     marginTop: 40,
     marginHorizontal: 16,
   },
@@ -832,16 +822,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: 'transparent',
   },
-  pickerOptionActive: {
-    backgroundColor: managerColors.highlight,
-  },
   pickerOptionText: {
     color: '#1A1A1A',
     fontWeight: '400',
-  },
-  pickerOptionTextActive: {
-    color: managerColors.text,
-    fontWeight: '600',
   },
   ingredientRow: {
     flexDirection: 'row',
@@ -867,10 +850,8 @@ const styles = StyleSheet.create({
   addIngredientText: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.highlight,
   },
   imagePickerButton: {
-    backgroundColor: managerColors.highlight,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
@@ -879,7 +860,6 @@ const styles = StyleSheet.create({
   imagePickerButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.text,
   },
   thumbnailPreview: {
     width: '100%',
@@ -909,7 +889,6 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     flex: 1,
-    backgroundColor: managerColors.highlight,
     borderRadius: 8,
     paddingVertical: 16,
     alignItems: 'center',
@@ -917,7 +896,6 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: managerColors.text,
   },
   extraBottomPadding: {
     height: 30,

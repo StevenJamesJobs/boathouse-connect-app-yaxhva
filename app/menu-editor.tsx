@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -55,6 +55,8 @@ const SUBCATEGORIES: { [key: string]: string[] } = {
 
 export default function MenuEditorScreen() {
   const { t } = useTranslation();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { user } = useAuth();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -445,7 +447,7 @@ export default function MenuEditorScreen() {
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
-            color={managerColors.text}
+            color={colors.text}
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('menu_editor:title')}</Text>
@@ -458,7 +460,7 @@ export default function MenuEditorScreen() {
           ios_icon_name="plus.circle.fill"
           android_material_icon_name="add-circle"
           size={24}
-          color={managerColors.text}
+          color={colors.text}
         />
         <Text style={styles.addNewItemButtonText}>{t('menu_editor:add_button')}</Text>
       </TouchableOpacity>
@@ -469,12 +471,12 @@ export default function MenuEditorScreen() {
           ios_icon_name="magnifyingglass"
           android_material_icon_name="search"
           size={20}
-          color={managerColors.textSecondary}
+          color={colors.textSecondary}
         />
         <TextInput
           style={styles.searchInput}
           placeholder={t('menu_editor:search_placeholder')}
-          placeholderTextColor={managerColors.textSecondary}
+          placeholderTextColor={colors.textSecondary}
           value={searchQuery}
           onChangeText={setSearchQuery}
         />
@@ -484,7 +486,7 @@ export default function MenuEditorScreen() {
               ios_icon_name="xmark.circle.fill"
               android_material_icon_name="cancel"
               size={20}
-              color={managerColors.textSecondary}
+              color={colors.textSecondary}
             />
           </TouchableOpacity>
         )}
@@ -496,7 +498,7 @@ export default function MenuEditorScreen() {
             ios_icon_name="magnifyingglass"
             android_material_icon_name="search"
             size={16}
-            color={managerColors.highlight}
+            color={colors.highlight}
           />
           <Text style={styles.searchInfoText}>
             {filteredItems.length === 1
@@ -588,7 +590,7 @@ export default function MenuEditorScreen() {
       {/* Menu Items List */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={managerColors.highlight} />
+          <ActivityIndicator size="large" color={colors.highlight} />
         </View>
       ) : (
         <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
@@ -598,7 +600,7 @@ export default function MenuEditorScreen() {
                 ios_icon_name="fork.knife"
                 android_material_icon_name="restaurant-menu"
                 size={64}
-                color={managerColors.textSecondary}
+                color={colors.textSecondary}
               />
               <Text style={styles.emptyText}>
                 {t('menu_editor:empty_title')}
@@ -760,7 +762,7 @@ export default function MenuEditorScreen() {
                       ios_icon_name="pencil"
                       android_material_icon_name="edit"
                       size={20}
-                      color={managerColors.highlight}
+                      color={colors.highlight}
                     />
                     <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
                   </TouchableOpacity>
@@ -1205,10 +1207,10 @@ export default function MenuEditorScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -1217,7 +1219,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: Platform.OS === 'android' ? 48 : 60,
     paddingBottom: 12,
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
@@ -1228,13 +1230,13 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: colors.text,
   },
   addNewItemButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
     marginHorizontal: 16,
     marginTop: 16,
     paddingVertical: 14,
@@ -1247,12 +1249,12 @@ const styles = StyleSheet.create({
   addNewItemButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: colors.text,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     marginHorizontal: 16,
     marginTop: 12,
     paddingHorizontal: 16,
@@ -1265,12 +1267,12 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 12,
     fontSize: 16,
-    color: managerColors.text,
+    color: colors.text,
   },
   searchInfoBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     marginHorizontal: 16,
     marginTop: 8,
     paddingHorizontal: 16,
@@ -1280,7 +1282,7 @@ const styles = StyleSheet.create({
   },
   searchInfoText: {
     fontSize: 14,
-    color: managerColors.highlight,
+    color: colors.highlight,
     fontWeight: '600',
   },
   categoryScroll: {
@@ -1295,19 +1297,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 20,
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     marginRight: 8,
   },
   categoryTabActive: {
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
   },
   categoryTabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   categoryTabTextActive: {
-    color: managerColors.text,
+    color: colors.text,
   },
   subcategoryScroll: {
     marginTop: 12,
@@ -1321,19 +1323,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 16,
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     marginRight: 8,
   },
   subcategoryTabActive: {
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
   },
   subcategoryTabText: {
     fontSize: 12,
     fontWeight: '600',
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   subcategoryTabTextActive: {
-    color: managerColors.text,
+    color: colors.text,
   },
   loadingContainer: {
     flex: 1,
@@ -1357,17 +1359,17 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 18,
     fontWeight: '600',
-    color: managerColors.text,
+    color: colors.text,
     marginTop: 16,
   },
   emptySubtext: {
     fontSize: 14,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 8,
     textAlign: 'center',
   },
   menuItemCard: {
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     marginBottom: 16,
     overflow: 'hidden',
@@ -1398,7 +1400,7 @@ const styles = StyleSheet.create({
   },
   squareDescription: {
     fontSize: 13,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 6,
     lineHeight: 18,
   },
@@ -1420,7 +1422,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 18,
     fontWeight: 'bold',
-    color: managerColors.text,
+    color: colors.text,
     marginRight: 12,
   },
   priceOrderContainer: {
@@ -1430,7 +1432,7 @@ const styles = StyleSheet.create({
   menuItemPrice: {
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.highlight,
+    color: colors.highlight,
   },
   displayOrderBadgeCompact: {
     backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -1441,11 +1443,11 @@ const styles = StyleSheet.create({
   displayOrderTextCompact: {
     fontSize: 11,
     fontWeight: '600',
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   menuItemDescription: {
     fontSize: 14,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 12,
     lineHeight: 20,
   },
@@ -1456,21 +1458,21 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   tag: {
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
   },
   tagAvailability: {
-    backgroundColor: managerColors.primary,
+    backgroundColor: colors.primary,
   },
   tagDietary: {
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
   },
   tagText: {
     fontSize: 12,
     fontWeight: '600',
-    color: managerColors.text,
+    color: colors.text,
   },
   displayOrderBadge: {
     alignSelf: 'flex-start',
@@ -1483,21 +1485,21 @@ const styles = StyleSheet.create({
   displayOrderText: {
     fontSize: 11,
     fontWeight: '600',
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   menuItemActions: {
     flexDirection: 'row',
     gap: 12,
     padding: 12,
     borderTopWidth: 1,
-    borderTopColor: managerColors.border,
+    borderTopColor: colors.border,
   },
   actionButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
     paddingVertical: 10,
     borderRadius: 8,
     gap: 6,
@@ -1508,7 +1510,7 @@ const styles = StyleSheet.create({
   actionButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.highlight,
+    color: colors.highlight,
   },
   deleteButtonText: {
     color: '#E74C3C',
@@ -1626,8 +1628,8 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
   },
   shapeOptionActive: {
-    backgroundColor: managerColors.highlight,
-    borderColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
+    borderColor: colors.highlight,
   },
   shapeOptionText: {
     fontSize: 14,
@@ -1650,8 +1652,8 @@ const styles = StyleSheet.create({
     borderColor: '#E0E0E0',
   },
   optionButtonActive: {
-    backgroundColor: managerColors.highlight,
-    borderColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
+    borderColor: colors.highlight,
   },
   optionButtonText: {
     fontSize: 14,
@@ -1682,8 +1684,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   checkboxBoxChecked: {
-    backgroundColor: managerColors.highlight,
-    borderColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
+    borderColor: colors.highlight,
   },
   checkboxLabel: {
     fontSize: 14,
@@ -1691,7 +1693,7 @@ const styles = StyleSheet.create({
     color: '#1A1A1A',
   },
   saveButton: {
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',

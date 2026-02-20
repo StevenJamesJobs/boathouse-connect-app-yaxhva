@@ -76,9 +76,11 @@ export default function WeatherDetailModal({
       setLoading(true);
       setError(null);
 
-      // Request 7 days to ensure we get enough data for the next 4 days
+      // The free plan only returns 3 days (today + 2 future), so we fetch
+      // the standard forecast first, then make individual calls for extra days
+      // using the `dt` parameter to get 4 future days total.
       const response = await fetch(
-        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=7&aqi=no&alerts=no`
+        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=3&aqi=no&alerts=no`
       );
 
       if (!response.ok) {
@@ -86,7 +88,7 @@ export default function WeatherDetailModal({
       }
 
       const data = await response.json();
-      console.log('Detailed Weather API Response:', data);
+      console.log('Detailed Weather API Response received');
       console.log('Total forecast days received:', data.forecast.forecastday.length);
 
       // Generate detailed forecast for today
@@ -121,41 +123,51 @@ export default function WeatherDetailModal({
 
       detailedForecast += `Sunrise at ${todayAstro.sunrise}, sunset at ${todayAstro.sunset}.`;
 
-      // Get today's date for comparison
-      const todayDate = new Date();
-      todayDate.setHours(0, 0, 0, 0);
-      console.log('Today\'s date (for filtering):', todayDate.toISOString());
+      // Collect forecast days from the initial response (skip today at index 0)
+      const futureDaysFromBatch = data.forecast.forecastday.slice(1); // days 1 and 2
+      console.log('Future days from batch response:', futureDaysFromBatch.length);
 
-      // Filter and get the next 4 days (excluding today)
-      const next4Days: DayForecast[] = data.forecast.forecastday
-        .filter((day: any, index: number) => {
-          // Skip the first day (today)
-          if (index === 0) {
-            console.log(`Skipping day ${index} (today): ${day.date}`);
-            return false;
-          }
-          
-          const dayDate = new Date(day.date + 'T00:00:00');
-          const isAfterToday = dayDate > todayDate;
-          console.log(`Day ${index}: ${day.date} - After today: ${isAfterToday}`);
-          return isAfterToday;
-        })
-        .slice(0, 4) // Take only the first 4 days after filtering
-        .map((day: any, index: number) => {
-          const date = new Date(day.date + 'T00:00:00');
-          const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
-          
-          console.log(`Processing future day ${index + 1}: ${dayOfWeek} ${day.date} - High: ${Math.round(day.day.maxtemp_f)}°F, Low: ${Math.round(day.day.mintemp_f)}°F`);
+      // We need 4 future days total. The batch gives us 2 (days 1-2).
+      // Fetch days 3 and 4 individually using the `dt` parameter.
+      const todayMs = new Date();
+      todayMs.setHours(0, 0, 0, 0);
 
-          return {
-            date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-            dayOfWeek,
-            conditionIcon: `https:${day.day.condition.icon}`,
-            conditionText: day.day.condition.text,
-            highTemp: Math.round(day.day.maxtemp_f),
-            lowTemp: Math.round(day.day.mintemp_f),
-          };
-        });
+      const extraDayPromises: Promise<any>[] = [];
+      for (let offset = 3; offset <= 4; offset++) {
+        const futureDate = new Date(todayMs.getTime() + offset * 86400000);
+        const dateStr = futureDate.toISOString().split('T')[0]; // YYYY-MM-DD
+        console.log(`Fetching extra forecast for day +${offset}: ${dateStr}`);
+        extraDayPromises.push(
+          fetch(
+            `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&dt=${dateStr}&aqi=no&alerts=no`
+          )
+            .then(r => r.ok ? r.json() : null)
+            .then(d => d?.forecast?.forecastday?.[0] ?? null)
+            .catch(() => null)
+        );
+      }
+
+      const extraDays = await Promise.all(extraDayPromises);
+      console.log('Extra days fetched:', extraDays.filter(Boolean).length);
+
+      // Combine all future days: 2 from batch + up to 2 from individual calls
+      const allFutureDays = [...futureDaysFromBatch, ...extraDays.filter(Boolean)].slice(0, 4);
+
+      const next4Days: DayForecast[] = allFutureDays.map((day: any, index: number) => {
+        const date = new Date(day.date + 'T00:00:00');
+        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
+
+        console.log(`Processing future day ${index + 1}: ${dayOfWeek} ${day.date} - High: ${Math.round(day.day.maxtemp_f)}°F, Low: ${Math.round(day.day.mintemp_f)}°F`);
+
+        return {
+          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          dayOfWeek,
+          conditionIcon: `https:${day.day.condition.icon}`,
+          conditionText: day.day.condition.text,
+          highTemp: Math.round(day.day.maxtemp_f),
+          lowTemp: Math.round(day.day.mintemp_f),
+        };
+      });
 
       console.log('Next 4 days processed:', next4Days.length, 'days');
       next4Days.forEach((day, i) => {
@@ -284,7 +296,61 @@ export default function WeatherDetailModal({
                       </Text>
                     </View>
 
-                    {/* Radar Image - North Jersey Area (Adjusted) */}
+                    {/* Extended Forecast - 4 Days */}
+                    <View style={styles.forecastSection}>
+                      <Text style={[styles.forecastTitle, { color: colors.text }]}>Extended Forecast</Text>
+
+                      {weatherData.next4Days.length === 0 ? (
+                        <Text style={[styles.noDataText, { color: colors.textSecondary }]}>
+                          No forecast data available.
+                        </Text>
+                      ) : (
+                        <View style={styles.horizontalForecastContainer}>
+                          {weatherData.next4Days.map((day, index) => (
+                            <View
+                              key={index}
+                              style={[
+                                styles.horizontalDayCard,
+                                { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }
+                              ]}
+                            >
+                              <Text style={[styles.horizontalDayName, { color: colors.text }]}>
+                                {day.dayOfWeek}
+                              </Text>
+                              <Image
+                                source={{ uri: day.conditionIcon }}
+                                style={styles.horizontalIcon}
+                                resizeMode="contain"
+                              />
+                              <View style={styles.horizontalTempRow}>
+                                <IconSymbol
+                                  ios_icon_name="arrow.up"
+                                  android_material_icon_name="arrow_upward"
+                                  size={12}
+                                  color="#E74C3C"
+                                />
+                                <Text style={[styles.horizontalTempText, { color: colors.text }]}>
+                                  {day.highTemp}°
+                                </Text>
+                              </View>
+                              <View style={styles.horizontalTempRow}>
+                                <IconSymbol
+                                  ios_icon_name="arrow.down"
+                                  android_material_icon_name="arrow_downward"
+                                  size={12}
+                                  color="#3498DB"
+                                />
+                                <Text style={[styles.horizontalTempText, { color: colors.textSecondary }]}>
+                                  {day.lowTemp}°
+                                </Text>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+
+                    {/* Radar Image - North Jersey Area */}
                     <View style={styles.radarContainer}>
                       <Text style={[styles.radarTitle, { color: colors.text }]}>
                         Local Radar
@@ -377,67 +443,6 @@ export default function WeatherDetailModal({
                         </View>
                       </View>
                     </View>
-                  </View>
-
-                  {/* Extended Forecast - 4 Days */}
-                  <View style={styles.forecastSection}>
-                    <Text style={[styles.forecastTitle, { color: colors.text }]}>Extended Forecast</Text>
-
-                    {weatherData.next4Days.length === 0 ? (
-                      <Text style={[styles.noDataText, { color: colors.textSecondary }]}>
-                        No forecast data available for the extended forecast.
-                      </Text>
-                    ) : (
-                      <View style={styles.horizontalForecastContainer}>
-                        {weatherData.next4Days.map((day, index) => (
-                          <View
-                            key={index}
-                            style={[
-                              styles.horizontalDayCard,
-                              { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }
-                            ]}
-                          >
-                            {/* Day Name */}
-                            <Text style={[styles.horizontalDayName, { color: colors.text }]}>
-                              {day.dayOfWeek}
-                            </Text>
-
-                            {/* Weather Icon */}
-                            <Image
-                              source={{ uri: day.conditionIcon }}
-                              style={styles.horizontalIcon}
-                              resizeMode="contain"
-                            />
-
-                            {/* High Temperature */}
-                            <View style={styles.horizontalTempRow}>
-                              <IconSymbol
-                                ios_icon_name="arrow.up"
-                                android_material_icon_name="arrow_upward"
-                                size={14}
-                                color="#E74C3C"
-                              />
-                              <Text style={[styles.horizontalTempText, { color: colors.text }]}>
-                                {day.highTemp}°
-                              </Text>
-                            </View>
-
-                            {/* Low Temperature */}
-                            <View style={styles.horizontalTempRow}>
-                              <IconSymbol
-                                ios_icon_name="arrow.down"
-                                android_material_icon_name="arrow_downward"
-                                size={14}
-                                color="#3498DB"
-                              />
-                              <Text style={[styles.horizontalTempText, { color: colors.textSecondary }]}>
-                                {day.lowTemp}°
-                              </Text>
-                            </View>
-                          </View>
-                        ))}
-                      </View>
-                    )}
                   </View>
                 </>
               )}
@@ -605,12 +610,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   forecastSection: {
-    marginTop: 8,
+    marginBottom: 20,
   },
   forecastTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 16,
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 10,
   },
   noDataText: {
     fontSize: 14,
@@ -620,33 +625,33 @@ const styles = StyleSheet.create({
   horizontalForecastContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 8,
+    gap: 6,
   },
   horizontalDayCard: {
     flex: 1,
-    borderRadius: 16,
-    padding: 12,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 4,
     alignItems: 'center',
     borderWidth: 1,
-    gap: 6,
+    gap: 2,
   },
   horizontalDayName: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '700',
     textAlign: 'center',
   },
   horizontalIcon: {
-    width: 48,
-    height: 48,
-    marginVertical: 2,
+    width: 36,
+    height: 36,
   },
   horizontalTempRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 2,
   },
   horizontalTempText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
 });

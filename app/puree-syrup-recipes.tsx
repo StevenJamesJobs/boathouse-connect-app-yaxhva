@@ -14,8 +14,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { employeeColors, managerColors } from '@/styles/commonStyles';
-import { useAuth } from '@/contexts/AuthContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 
@@ -38,15 +37,12 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1587049352846-4a222
 export default function PureeSyrupRecipesScreen() {
   const router = useRouter();
   const { t } = useTranslation();
-  const { user } = useAuth();
+  const colors = useThemeColors();
   const [recipes, setRecipes] = useState<PureeSyrupRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecipe, setSelectedRecipe] = useState<PureeSyrupRecipe | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [scrollY] = useState(new Animated.Value(0));
-  
-  // Use manager colors if user is a manager, otherwise use employee colors
-  const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
   useEffect(() => {
     loadRecipes();

@@ -15,7 +15,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
-import { employeeColors, managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 
@@ -44,7 +44,7 @@ export default function MessageDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [allRecipientIds, setAllRecipientIds] = useState<string[]>([]);
 
-  const colors = user?.role === 'manager' ? managerColors : employeeColors;
+  const colors = useThemeColors();
 
   const loadThread = useCallback(async () => {
     try {

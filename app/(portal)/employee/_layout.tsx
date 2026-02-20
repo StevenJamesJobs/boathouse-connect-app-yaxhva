@@ -1,10 +1,12 @@
 
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { View, Text, TouchableOpacity, StyleSheet, Platform, Image } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
-import { employeeColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { useAppTheme } from '@/contexts/ThemeContext';
+import { hexToRgba } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { BlurView } from 'expo-blur';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
@@ -15,6 +17,7 @@ function EmployeeHeader() {
   const router = useRouter();
   const { logout } = useAuth();
   const { t } = useTranslation();
+  const colors = useThemeColors();
 
   const handleLogout = async () => {
     await logout();
@@ -22,19 +25,23 @@ function EmployeeHeader() {
   };
 
   return (
-    <View style={styles.header}>
-      <Image
-        source={require('@/assets/images/6b42d5c0-d10c-4de7-bf00-803733393db9.jpeg')}
-        style={styles.cornerIcon}
-        resizeMode="contain"
-      />
-      <Text style={styles.headerTitle}>{t('header.employee_portal')}</Text>
+    <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      <View style={styles.cornerBrand}>
+        <IconSymbol
+          ios_icon_name="sailboat.fill"
+          android_material_icon_name="sailing"
+          size={22}
+          color={colors.primary}
+        />
+        <Text style={[styles.cornerBrandText, { color: colors.text }]}>MB Connect</Text>
+      </View>
+      <Text style={[styles.headerTitle, { color: colors.text }]}>{t('header.employee_portal')}</Text>
       <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
         <IconSymbol
           ios_icon_name="rectangle.portrait.and.arrow.right"
           android_material_icon_name="logout"
           size={24}
-          color={employeeColors.text}
+          color={colors.text}
         />
       </TouchableOpacity>
     </View>
@@ -43,10 +50,22 @@ function EmployeeHeader() {
 
 function FloatingTabBar({ state, descriptors, navigation }: any) {
   const { unreadCount } = useUnreadMessages();
-  
+  const colors = useThemeColors();
+  const { mode } = useAppTheme();
+
+  const blurBgColor = Platform.select({
+    ios: hexToRgba(colors.tabBarBackground, 0.60),
+    android: hexToRgba(colors.tabBarBackground, 0.90),
+    web: hexToRgba(colors.tabBarBackground, 0.85),
+  });
+
   return (
     <View style={styles.floatingTabBarContainer}>
-      <BlurView intensity={80} style={styles.blurContainer}>
+      <BlurView
+        intensity={80}
+        tint={mode === 'dark' ? 'dark' : 'light'}
+        style={[styles.blurContainer, { backgroundColor: blurBgColor }]}
+      >
         <View style={styles.tabBarContent}>
           {state.routes.map((route: any, index: number) => {
             const { options } = descriptors[route.key];
@@ -78,7 +97,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
               >
                 <View style={styles.iconContainer}>
                   {options.tabBarIcon && options.tabBarIcon({
-                    color: isFocused ? employeeColors.tabBarActive : employeeColors.tabBarInactive,
+                    color: isFocused ? colors.tabBarActive : colors.tabBarInactive,
                     size: 24,
                   })}
                   {isProfileTab && unreadCount > 0 && (
@@ -90,7 +109,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
                 <Text
                   style={[
                     styles.tabLabel,
-                    { color: isFocused ? employeeColors.tabBarActive : employeeColors.tabBarInactive }
+                    { color: isFocused ? colors.tabBarActive : colors.tabBarInactive }
                   ]}
                   numberOfLines={1}
                 >
@@ -196,23 +215,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: employeeColors.card,
     paddingHorizontal: 20,
     paddingTop: Platform.OS === 'android' ? 48 : 50,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: employeeColors.border,
     boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
     elevation: 4,
   },
-  cornerIcon: {
-    width: 120,
-    height: 40,
+  cornerBrand: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  cornerBrandText: {
+    fontSize: 16,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: employeeColors.text,
   },
   logoutButton: {
     padding: 8,
@@ -231,19 +253,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     borderWidth: 1.5,
     borderColor: 'rgba(255, 255, 255, 0.6)',
-    ...Platform.select({
-      ios: {
-        backgroundColor: 'rgba(111, 193, 247, 0.60)',
-      },
-      android: {
-        backgroundColor: 'rgba(111, 193, 247, 0.90)',
-      },
-      web: {
-        backgroundColor: 'rgba(183, 240, 247, 0.85)',
-        backdropFilter: 'blur(20px)',
-      },
-    }),
-    boxShadow: '0px 8px 32px rgba(13, 71, 161, 0.25), 0px 4px 16px rgba(0, 0, 0, 0.15)',
+    boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.2), 0px 4px 16px rgba(0, 0, 0, 0.15)',
     elevation: 20,
   },
   tabBarContent: {

@@ -7,20 +7,16 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { employeeColors, managerColors } from '@/styles/commonStyles';
-import { useAuth } from '@/contexts/AuthContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 export default function BartenderAssistantScreen() {
   const router = useRouter();
-  const { user } = useAuth();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const [activeTab, setActiveTab] = useState<'encyclopedia' | 'exams'>('encyclopedia');
-
-  // Use manager colors if user is a manager, otherwise use employee colors
-  const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

@@ -1,10 +1,9 @@
 
 import React, { useState, useMemo } from 'react';
-import { employeeColors, managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { IconSymbol } from '@/components/IconSymbol';
-import { useAuth } from '@/contexts/AuthContext';
 import {
   View,
   Text,
@@ -263,11 +262,9 @@ const styles = StyleSheet.create({
 });
 
 export default function CheckOutCalculatorScreen() {
-  const { user } = useAuth();
   const router = useRouter();
   const { t } = useTranslation();
-  const isManager = user?.role === 'manager';
-  const colors = isManager ? managerColors : employeeColors;
+  const colors = useThemeColors();
 
   const [totalShiftSales, setTotalShiftSales] = useState('');
   const [cashInOutTotal, setCashInOutTotal] = useState('');

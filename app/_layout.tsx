@@ -7,7 +7,7 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { SystemBars } from "react-native-edge-to-edge";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { useColorScheme, Alert, Platform, View, Text, StyleSheet } from "react-native";
+import { Alert, Platform, View, Text, StyleSheet } from "react-native";
 import { useNetworkState } from "expo-network";
 import {
   DarkTheme,
@@ -20,6 +20,7 @@ import { WidgetProvider } from "@/contexts/WidgetContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
+import { ThemeProvider as AppThemeProvider, useAppTheme } from "@/contexts/ThemeContext";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -95,8 +96,8 @@ const errorStyles = StyleSheet.create({
 
 function RootLayoutNav() {
   console.log('[RootLayout] Component rendering, Platform:', Platform.OS);
-  
-  const colorScheme = useColorScheme();
+
+  const { mode, colors: themeColors } = useAppTheme();
   const networkState = useNetworkState();
   const segments = useSegments();
   const router = useRouter();
@@ -186,28 +187,16 @@ function RootLayoutNav() {
     return null;
   }
 
-  const CustomDefaultTheme: Theme = {
-    ...DefaultTheme,
-    dark: false,
+  const navigationTheme: Theme = {
+    ...(mode === 'dark' ? DarkTheme : DefaultTheme),
+    dark: mode === 'dark',
     colors: {
-      primary: "rgb(0, 122, 255)",
-      background: "rgb(242, 242, 247)",
-      card: "rgb(255, 255, 255)",
-      text: "rgb(0, 0, 0)",
-      border: "rgb(216, 216, 220)",
-      notification: "rgb(255, 59, 48)",
-    },
-  };
-
-  const CustomDarkTheme: Theme = {
-    ...DarkTheme,
-    colors: {
-      primary: "rgb(10, 132, 255)",
-      background: "rgb(1, 1, 1)",
-      card: "rgb(28, 28, 30)",
-      text: "rgb(255, 255, 255)",
-      border: "rgb(44, 44, 46)",
-      notification: "rgb(255, 69, 58)",
+      primary: themeColors.primary,
+      background: themeColors.background,
+      card: themeColors.card,
+      text: themeColors.text,
+      border: themeColors.border,
+      notification: themeColors.accent,
     },
   };
 
@@ -215,10 +204,8 @@ function RootLayoutNav() {
 
   return (
     <>
-      <StatusBar style="auto" />
-      <ThemeProvider
-        value={colorScheme === "dark" ? CustomDarkTheme : CustomDefaultTheme}
-      >
+      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+      <ThemeProvider value={navigationTheme}>
         <WidgetProvider>
           <NotificationProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
@@ -242,9 +229,11 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <LanguageProvider>
-        <AuthProvider>
-          <RootLayoutNav />
-        </AuthProvider>
+        <AppThemeProvider>
+          <AuthProvider>
+            <RootLayoutNav />
+          </AuthProvider>
+        </AppThemeProvider>
       </LanguageProvider>
     </ErrorBoundary>
   );

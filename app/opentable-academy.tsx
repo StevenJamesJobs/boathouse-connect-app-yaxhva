@@ -9,8 +9,8 @@ import {
   Image,
   Linking,
 } from 'react-native';
-import { employeeColors, managerColors } from '@/styles/commonStyles';
 import { useAuth } from '@/contexts/AuthContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 
@@ -19,9 +19,7 @@ const OPENTABLE_ACADEMY_URL = 'https://opentable.docebosaas.com/academy/learn/si
 export default function OpenTableAcademyScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  
-  // Use manager colors if user is a manager, otherwise use employee colors
-  const colors = user?.role === 'manager' ? managerColors : employeeColors;
+  const colors = useThemeColors();
 
   const handleOpenCourse = async () => {
     console.log('User tapped OpenTable Academy course link');

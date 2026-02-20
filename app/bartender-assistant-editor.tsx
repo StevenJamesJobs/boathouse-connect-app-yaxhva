@@ -7,7 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -15,40 +15,41 @@ import { useTranslation } from 'react-i18next';
 export default function BartenderAssistantEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const [activeTab, setActiveTab] = useState<'encyclopedia' | 'exams'>('encyclopedia');
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="arrow-back"
             size={24}
-            color={managerColors.text}
+            color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('bartender_assistant_editor.title')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('bartender_assistant_editor.title')}</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {/* Tab Selector */}
-        <View style={styles.tabContainer}>
+        <View style={[styles.tabContainer, { backgroundColor: colors.card }]}>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'encyclopedia' && styles.activeTab]}
+            style={[styles.tab, activeTab === 'encyclopedia' && { backgroundColor: colors.highlight }]}
             onPress={() => setActiveTab('encyclopedia')}
           >
-            <Text style={[styles.tabText, activeTab === 'encyclopedia' && styles.activeTabText]}>
+            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'encyclopedia' && { color: colors.text }]}>
               {t('bartender_assistant_editor.tab_encyclopedia')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'exams' && styles.activeTab]}
+            style={[styles.tab, activeTab === 'exams' && { backgroundColor: colors.highlight }]}
             onPress={() => setActiveTab('exams')}
           >
-            <Text style={[styles.tabText, activeTab === 'exams' && styles.activeTabText]}>
+            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'exams' && { color: colors.text }]}>
               {t('bartender_assistant_editor.tab_bar_exams')}
             </Text>
           </TouchableOpacity>
@@ -57,25 +58,25 @@ export default function BartenderAssistantEditorScreen() {
         {activeTab === 'encyclopedia' ? (
           <>
             {/* Checklists Editor Section - MOVED FROM BARTENDER BINDER EDITOR */}
-            <View style={styles.card}>
+            <View style={[styles.card, { backgroundColor: colors.card }]}>
               <View style={styles.cardHeader}>
                 <IconSymbol
                   ios_icon_name="checklist"
                   android_material_icon_name="checklist"
                   size={32}
-                  color={managerColors.highlight}
+                  color={colors.highlight}
                 />
                 <View style={styles.cardHeaderText}>
-                  <Text style={styles.cardTitle}>{t('bartender_assistant_editor.checklists_editor')}</Text>
-                  <Text style={styles.cardDescription}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.checklists_editor')}</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     {t('bartender_assistant_editor.checklists_editor_desc')}
                   </Text>
                 </View>
               </View>
-              
+
               {/* Opening Checklist Editor */}
-              <TouchableOpacity 
-                style={styles.subCardButton}
+              <TouchableOpacity
+                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
                 onPress={() => router.push('/bartender-opening-checklist-editor')}
               >
                 <View style={styles.subCardContent}>
@@ -83,21 +84,21 @@ export default function BartenderAssistantEditorScreen() {
                     ios_icon_name="sunrise.fill"
                     android_material_icon_name="wb-sunny"
                     size={24}
-                    color={managerColors.highlight}
+                    color={colors.highlight}
                   />
-                  <Text style={styles.subCardText}>{t('bartender_assistant_editor.opening_checklist_editor')}</Text>
+                  <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_assistant_editor.opening_checklist_editor')}</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={managerColors.text}
+                  color={colors.text}
                 />
               </TouchableOpacity>
 
               {/* Closing Checklist Editor */}
               <TouchableOpacity
-                style={styles.subCardButton}
+                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
                 onPress={() => router.push('/bartender-closing-checklist-editor')}
               >
                 <View style={styles.subCardContent}>
@@ -105,22 +106,22 @@ export default function BartenderAssistantEditorScreen() {
                     ios_icon_name="moon.fill"
                     android_material_icon_name="nightlight"
                     size={24}
-                    color={managerColors.highlight}
+                    color={colors.highlight}
                   />
-                  <Text style={styles.subCardText}>{t('bartender_assistant_editor.closing_checklist_editor')}</Text>
+                  <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_assistant_editor.closing_checklist_editor')}</Text>
                 </View>
                 <IconSymbol
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={managerColors.text}
+                  color={colors.text}
                 />
               </TouchableOpacity>
             </View>
 
             {/* Libation Recipes Editor */}
-            <TouchableOpacity 
-              style={styles.card}
+            <TouchableOpacity
+              style={[styles.card, { backgroundColor: colors.card }]}
               onPress={() => router.push('/libation-recipes-editor')}
               activeOpacity={0.7}
             >
@@ -129,11 +130,11 @@ export default function BartenderAssistantEditorScreen() {
                   ios_icon_name="wineglass"
                   android_material_icon_name="local-bar"
                   size={28}
-                  color={managerColors.highlight}
+                  color={colors.highlight}
                 />
                 <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>{t('bartender_assistant_editor.libation_recipes_editor')}</Text>
-                  <Text style={styles.cardDescription}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.libation_recipes_editor')}</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     {t('bartender_assistant_editor.libation_recipes_editor_desc')}
                   </Text>
                 </View>
@@ -141,14 +142,14 @@ export default function BartenderAssistantEditorScreen() {
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={managerColors.textSecondary}
+                  color={colors.textSecondary}
                 />
               </View>
             </TouchableOpacity>
 
             {/* Cocktails A-Z Editor */}
-            <TouchableOpacity 
-              style={styles.card}
+            <TouchableOpacity
+              style={[styles.card, { backgroundColor: colors.card }]}
               onPress={() => router.push('/cocktails-az-editor')}
               activeOpacity={0.7}
             >
@@ -157,11 +158,11 @@ export default function BartenderAssistantEditorScreen() {
                   ios_icon_name="list.bullet"
                   android_material_icon_name="format-list-bulleted"
                   size={28}
-                  color={managerColors.highlight}
+                  color={colors.highlight}
                 />
                 <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>{t('bartender_assistant_editor.cocktails_az_editor')}</Text>
-                  <Text style={styles.cardDescription}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.cocktails_az_editor')}</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     {t('bartender_assistant_editor.cocktails_az_editor_desc')}
                   </Text>
                 </View>
@@ -169,14 +170,14 @@ export default function BartenderAssistantEditorScreen() {
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={managerColors.textSecondary}
+                  color={colors.textSecondary}
                 />
               </View>
             </TouchableOpacity>
 
             {/* Purees & Simple Syrups Recipes Editor - NOW MATCHES COCKTAILS A-Z DESIGN */}
-            <TouchableOpacity 
-              style={styles.card}
+            <TouchableOpacity
+              style={[styles.card, { backgroundColor: colors.card }]}
               onPress={() => router.push('/puree-syrup-recipes-editor')}
               activeOpacity={0.7}
             >
@@ -185,11 +186,11 @@ export default function BartenderAssistantEditorScreen() {
                   ios_icon_name="drop.fill"
                   android_material_icon_name="opacity"
                   size={28}
-                  color={managerColors.highlight}
+                  color={colors.highlight}
                 />
                 <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>{t('bartender_assistant_editor.purees_syrups_editor')}</Text>
-                  <Text style={styles.cardDescription}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.purees_syrups_editor')}</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     {t('bartender_assistant_editor.purees_syrups_editor_desc')}
                   </Text>
                 </View>
@@ -197,7 +198,7 @@ export default function BartenderAssistantEditorScreen() {
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={managerColors.textSecondary}
+                  color={colors.textSecondary}
                 />
               </View>
             </TouchableOpacity>
@@ -205,8 +206,8 @@ export default function BartenderAssistantEditorScreen() {
         ) : (
           <>
             {/* Weekly Quiz Editor */}
-            <TouchableOpacity 
-              style={styles.card}
+            <TouchableOpacity
+              style={[styles.card, { backgroundColor: colors.card }]}
               onPress={() => console.log('Weekly Quiz Editor - Coming Soon')}
               activeOpacity={0.7}
             >
@@ -215,11 +216,11 @@ export default function BartenderAssistantEditorScreen() {
                   ios_icon_name="questionmark.circle.fill"
                   android_material_icon_name="quiz"
                   size={28}
-                  color={managerColors.highlight}
+                  color={colors.highlight}
                 />
                 <View style={styles.cardText}>
-                  <Text style={styles.cardTitle}>{t('bartender_assistant_editor.weekly_quiz_editor')}</Text>
-                  <Text style={styles.cardDescription}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.weekly_quiz_editor')}</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     {t('bartender_assistant_editor.weekly_quiz_editor_desc')}
                   </Text>
                 </View>
@@ -227,20 +228,20 @@ export default function BartenderAssistantEditorScreen() {
                   ios_icon_name="chevron.right"
                   android_material_icon_name="chevron-right"
                   size={20}
-                  color={managerColors.textSecondary}
+                  color={colors.textSecondary}
                 />
               </View>
             </TouchableOpacity>
 
             {/* Placeholder for future exam editors */}
-            <View style={styles.infoCard}>
+            <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
               <IconSymbol
                 ios_icon_name="info.circle.fill"
                 android_material_icon_name="info"
                 size={24}
-                color={managerColors.highlight}
+                color={colors.highlight}
               />
-              <Text style={styles.infoText}>
+              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                 {t('bartender_assistant_editor.more_exam_editors_coming')}
               </Text>
             </View>
@@ -254,18 +255,15 @@ export default function BartenderAssistantEditorScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: managerColors.background,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: managerColors.card,
     paddingHorizontal: 16,
     paddingTop: 48,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
   },
   backButton: {
     padding: 8,
@@ -273,7 +271,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: managerColors.text,
   },
   placeholder: {
     width: 40,
@@ -288,7 +285,6 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
-    backgroundColor: managerColors.card,
     borderRadius: 12,
     padding: 4,
     marginBottom: 20,
@@ -301,19 +297,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 8,
   },
-  activeTab: {
-    backgroundColor: managerColors.highlight,
-  },
   tabText: {
     fontSize: 14,
     fontWeight: '600',
-    color: managerColors.textSecondary,
-  },
-  activeTabText: {
-    color: managerColors.text,
   },
   card: {
-    backgroundColor: managerColors.card,
     borderRadius: 12,
     marginBottom: 12,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
@@ -331,12 +319,10 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: managerColors.text,
     marginBottom: 4,
   },
   cardDescription: {
     fontSize: 13,
-    color: managerColors.textSecondary,
     lineHeight: 18,
   },
   cardHeader: {
@@ -353,14 +339,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: managerColors.background,
     borderRadius: 8,
     paddingVertical: 14,
     paddingHorizontal: 16,
     marginHorizontal: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: managerColors.border,
   },
   subCardContent: {
     flexDirection: 'row',
@@ -370,12 +354,10 @@ const styles = StyleSheet.create({
   subCardText: {
     fontSize: 15,
     fontWeight: '600',
-    color: managerColors.text,
   },
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: managerColors.card,
     borderRadius: 12,
     padding: 16,
     marginTop: 8,
@@ -384,7 +366,6 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: 14,
-    color: managerColors.textSecondary,
     fontStyle: 'italic',
   },
 });

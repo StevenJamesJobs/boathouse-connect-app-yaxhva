@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,12 +15,14 @@ import {
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { IconSymbol } from '@/components/IconSymbol';
-import { managerColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
 
 export default function NotificationCenter() {
   const router = useRouter();
   const { t } = useTranslation();
+  const colors = useThemeColors();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const DESTINATION_OPTIONS = [
     { value: '', label: t('notification_center.opens_to_none') },
@@ -144,7 +146,7 @@ export default function NotificationCenter() {
               ios_icon_name="chevron.left"
               android_material_icon_name="arrow-back"
               size={24}
-              color={managerColors.highlight}
+              color={colors.highlight}
             />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
@@ -160,7 +162,7 @@ export default function NotificationCenter() {
                 ios_icon_name="megaphone.fill"
                 android_material_icon_name="campaign"
                 size={48}
-                color={managerColors.highlight}
+                color={colors.highlight}
               />
             </View>
 
@@ -185,7 +187,7 @@ export default function NotificationCenter() {
               <TextInput
                 style={styles.titleInput}
                 placeholder={t('notification_center.title_placeholder')}
-                placeholderTextColor={managerColors.textSecondary}
+                placeholderTextColor={colors.textSecondary}
                 value={title}
                 onChangeText={(text) => {
                   if (text.length <= maxTitleLength) {
@@ -209,7 +211,7 @@ export default function NotificationCenter() {
               <TextInput
                 style={styles.bodyInput}
                 placeholder={t('notification_center.message_placeholder')}
-                placeholderTextColor={managerColors.textSecondary}
+                placeholderTextColor={colors.textSecondary}
                 value={body}
                 onChangeText={(text) => {
                   if (text.length <= maxBodyLength) {
@@ -239,7 +241,7 @@ export default function NotificationCenter() {
               >
                 <Text style={[
                   styles.destinationSelectorText,
-                  !destination && { color: managerColors.textSecondary }
+                  !destination && { color: colors.textSecondary }
                 ]}>
                   {destination
                     ? DESTINATION_OPTIONS.find(d => d.value === destination)?.label
@@ -249,7 +251,7 @@ export default function NotificationCenter() {
                   ios_icon_name="chevron.down"
                   android_material_icon_name="expand-more"
                   size={20}
-                  color={managerColors.textSecondary}
+                  color={colors.textSecondary}
                 />
               </TouchableOpacity>
               <Text style={styles.destinationHint}>
@@ -294,7 +296,7 @@ export default function NotificationCenter() {
                           ios_icon_name="checkmark"
                           android_material_icon_name="check"
                           size={18}
-                          color={managerColors.highlight}
+                          color={colors.highlight}
                         />
                       )}
                     </TouchableOpacity>
@@ -354,7 +356,7 @@ export default function NotificationCenter() {
                 ios_icon_name="info.circle"
                 android_material_icon_name="info"
                 size={16}
-                color={managerColors.textSecondary}
+                color={colors.textSecondary}
               />
               <Text style={styles.infoText}>
                 {t('notification_center.preferences_hint')}
@@ -367,10 +369,10 @@ export default function NotificationCenter() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -380,8 +382,8 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: managerColors.border,
-    backgroundColor: managerColors.card,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.card,
   },
   backButton: {
     padding: 8,
@@ -389,7 +391,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: managerColors.text,
+    color: colors.text,
   },
   content: {
     flex: 1,
@@ -400,7 +402,7 @@ const styles = StyleSheet.create({
   card: {
     borderRadius: 16,
     padding: 24,
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
@@ -416,14 +418,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     textAlign: 'center',
     marginBottom: 8,
-    color: managerColors.text,
+    color: colors.text,
   },
   cardDescription: {
     fontSize: 14,
     lineHeight: 20,
     textAlign: 'center',
     marginBottom: 24,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   inputContainer: {
     marginBottom: 20,
@@ -437,20 +439,20 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 16,
     fontWeight: '600',
-    color: managerColors.text,
+    color: colors.text,
   },
   characterCount: {
     fontSize: 12,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   titleInput: {
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
     fontSize: 16,
-    backgroundColor: managerColors.background,
-    color: managerColors.text,
-    borderColor: managerColors.border,
+    backgroundColor: colors.background,
+    color: colors.text,
+    borderColor: colors.border,
   },
   bodyInput: {
     borderWidth: 1,
@@ -458,9 +460,9 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     minHeight: 100,
-    backgroundColor: managerColors.background,
-    color: managerColors.text,
-    borderColor: managerColors.border,
+    backgroundColor: colors.background,
+    color: colors.text,
+    borderColor: colors.border,
   },
   previewContainer: {
     marginBottom: 20,
@@ -469,23 +471,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginBottom: 8,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   previewCard: {
     borderRadius: 12,
     padding: 16,
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
   },
   previewTitle: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
-    color: managerColors.text,
+    color: colors.text,
   },
   previewBody: {
     fontSize: 14,
     lineHeight: 20,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
   sendButton: {
     flexDirection: 'row',
@@ -495,7 +497,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 12,
     marginBottom: 16,
-    backgroundColor: managerColors.highlight,
+    backgroundColor: colors.highlight,
   },
   sendButtonDisabled: {
     opacity: 0.5,
@@ -512,17 +514,17 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: 12,
     padding: 12,
-    backgroundColor: managerColors.background,
-    borderColor: managerColors.border,
+    backgroundColor: colors.background,
+    borderColor: colors.border,
   },
   destinationSelectorText: {
     fontSize: 16,
-    color: managerColors.text,
+    color: colors.text,
     flex: 1,
   },
   destinationHint: {
     fontSize: 12,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 6,
   },
   pickerOverlay: {
@@ -535,14 +537,14 @@ const styles = StyleSheet.create({
   pickerContainer: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: managerColors.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 20,
   },
   pickerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: managerColors.text,
+    color: colors.text,
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -556,14 +558,14 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   pickerOptionSelected: {
-    backgroundColor: managerColors.background,
+    backgroundColor: colors.background,
   },
   pickerOptionText: {
     fontSize: 16,
-    color: managerColors.text,
+    color: colors.text,
   },
   pickerOptionTextSelected: {
-    color: managerColors.highlight,
+    color: colors.highlight,
     fontWeight: '600',
   },
   infoContainer: {
@@ -575,6 +577,6 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     lineHeight: 18,
-    color: managerColors.textSecondary,
+    color: colors.textSecondary,
   },
 });

@@ -12,8 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useAuth } from '@/contexts/AuthContext';
-import { managerColors, employeeColors } from '@/styles/commonStyles';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -46,8 +45,8 @@ interface SpecialFeature {
 
 export default function ViewAllSpecialFeaturesScreen() {
   const router = useRouter();
-  const { user } = useAuth();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const [features, setFeatures] = useState<SpecialFeature[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -63,8 +62,6 @@ export default function ViewAllSpecialFeaturesScreen() {
     link?: string | null;
     guideFile?: GuideFile | null;
   } | null>(null);
-
-  const colors = user?.role === 'manager' ? managerColors : employeeColors;
 
   useEffect(() => {
     loadFeatures();
