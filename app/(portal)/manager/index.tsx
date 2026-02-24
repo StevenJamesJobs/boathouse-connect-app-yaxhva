@@ -556,7 +556,7 @@ export default function ManagerPortalScreen() {
 
         {/* Weather Section */}
         <CollapsibleSection
-          title="Weather"
+          title={t('manager_home.weather')}
           iconIos="cloud.sun.fill"
           iconAndroid="wb-cloudy"
           iconColor={colors.darkText}
@@ -574,7 +574,7 @@ export default function ManagerPortalScreen() {
 
         {/* What's Happening Section (Announcements + Special Features with Tabs) */}
         <CollapsibleSection
-          title="What's Happening"
+          title={t('manager_home.whats_happening')}
           iconIos="megaphone.fill"
           iconAndroid="campaign"
           iconColor={colors.darkText}
@@ -780,7 +780,7 @@ export default function ManagerPortalScreen() {
 
         {/* Upcoming Events Section with Calendar Strip */}
         <CollapsibleSection
-          title="Upcoming Events"
+          title={t('manager_home.upcoming_events')}
           iconIos="calendar"
           iconAndroid="event"
           iconColor={colors.darkText}
@@ -808,7 +808,7 @@ export default function ManagerPortalScreen() {
 
         {/* Weekly Specials Section */}
         <CollapsibleSection
-          title="Weekly Specials"
+          title={t('manager_home.weekly_specials')}
           iconIos="fork.knife"
           iconAndroid="restaurant"
           iconColor={colors.darkText}

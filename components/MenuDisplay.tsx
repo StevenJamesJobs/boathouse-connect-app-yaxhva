@@ -16,6 +16,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import ContentDetailModal from '@/components/ContentDetailModal';
+import { useTranslation } from 'react-i18next';
 
 interface MenuItem {
   id: string;
@@ -62,6 +63,51 @@ const FILTER_OPTIONS = [
   { key: 'weeklySpecials', label: 'Weekly Specials' },
 ];
 
+// Mapping from English category/subcategory names to i18n translation keys
+const CATEGORY_TRANSLATION_KEYS: { [key: string]: string } = {
+  'Weekly Specials': 'menu_display.weekly_specials',
+  'Lunch': 'menu_display.lunch',
+  'Dinner': 'menu_display.dinner',
+  'Libations': 'menu_display.libations',
+  'Wine': 'menu_display.wine',
+  'Happy Hour': 'menu_display.happy_hour',
+};
+
+const SUBCATEGORY_TRANSLATION_KEYS: { [key: string]: string } = {
+  'Starters': 'menu_display.starters',
+  'Raw Bar': 'menu_display.raw_bar',
+  'Soups': 'menu_display.soups',
+  'Tacos': 'menu_display.tacos',
+  'Salads': 'menu_display.salads',
+  'Burgers': 'menu_display.burgers',
+  'Sandwiches': 'menu_display.sandwiches',
+  'Sides': 'menu_display.sides',
+  'Entrees': 'menu_display.entrees',
+  'Pasta': 'menu_display.pasta',
+  'Signature Cocktails': 'menu_display.signature_cocktails',
+  'Martinis': 'menu_display.martinis',
+  'Sangria': 'menu_display.sangria',
+  'Low ABV': 'menu_display.low_abv',
+  'Zero ABV': 'menu_display.zero_abv',
+  'Draft Beer': 'menu_display.draft_beer',
+  'Bottle & Cans': 'menu_display.bottle_and_cans',
+  'Sparkling': 'menu_display.sparkling',
+  'Rose': 'menu_display.rose',
+  'Chardonnay': 'menu_display.chardonnay',
+  'Pinot Grigio': 'menu_display.pinot_grigio',
+  'Sauvignon Blanc': 'menu_display.sauvignon_blanc',
+  'Interesting Whites': 'menu_display.interesting_whites',
+  'Cabernet Sauvignon': 'menu_display.cabernet_sauvignon',
+  'Pinot Noir': 'menu_display.pinot_noir',
+  'Merlot': 'menu_display.merlot',
+  'Italian Reds': 'menu_display.italian_reds',
+  'Interesting Reds': 'menu_display.interesting_reds',
+  'Appetizers': 'menu_display.appetizers',
+  'Drinks': 'menu_display.drinks',
+  'Spirits': 'menu_display.spirits',
+  'All': 'menu_display.all',
+};
+
 interface MenuDisplayProps {
   colors: {
     background: string;
@@ -75,8 +121,20 @@ interface MenuDisplayProps {
 }
 
 export default function MenuDisplay({ colors }: MenuDisplayProps) {
+  const { t } = useTranslation();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
+
+  // Helper functions to get translated labels while keeping English keys for data operations
+  const getCategoryLabel = (category: string) => {
+    const key = CATEGORY_TRANSLATION_KEYS[category];
+    return key ? t(key) : category;
+  };
+
+  const getSubcategoryLabel = (subcategory: string) => {
+    const key = SUBCATEGORY_TRANSLATION_KEYS[subcategory];
+    return key ? t(key) : subcategory;
+  };
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('Weekly Specials');
@@ -249,6 +307,18 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   };
 
   const getFilterLabel = (filterKey: string) => {
+    // Map filter keys to translation keys
+    const filterTranslationMap: { [key: string]: string } = {
+      'dinner': 'menu_display.dinner',
+      'lunch': 'menu_display.lunch',
+      'wine': 'menu_display.wine',
+      'libations': 'menu_display.libations',
+      'happyHour': 'menu_display.happy_hour',
+      'weeklySpecials': 'menu_display.weekly_specials',
+    };
+    const translationKey = filterTranslationMap[filterKey];
+    if (translationKey) return t(translationKey);
+    // For dietary filters (GF, GFA, V, VA) keep as-is since they're abbreviations
     const option = FILTER_OPTIONS.find(opt => opt.key === filterKey);
     return option ? option.label : filterKey;
   };
@@ -328,7 +398,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
             />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search menu items..."
+              placeholder={t('menu_display.search_placeholder')}
               placeholderTextColor={colors.textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -351,7 +421,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
               size={20}
               color={colors.text}
             />
-            <Text style={styles.filterButtonText}>Filter</Text>
+            <Text style={styles.filterButtonText}>{t('menu_display.filter')}</Text>
             {activeFilters.length > 0 && (
               <View style={styles.filterBadge}>
                 <Text style={styles.filterBadgeText}>{activeFilters.length}</Text>
@@ -382,7 +452,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                 </View>
               ))}
               <TouchableOpacity style={styles.clearAllButton} onPress={clearAllFilters}>
-                <Text style={styles.clearAllButtonText}>Clear All</Text>
+                <Text style={styles.clearAllButtonText}>{t('menu_display.clear_all')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -414,7 +484,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                     selectedCategory === category && styles.categoryTabTextActive,
                   ]}
                 >
-                  {category}
+                  {getCategoryLabel(category)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -444,7 +514,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                     selectedSubcategory === subcategory && styles.subcategoryTabTextActive,
                   ]}
                 >
-                  {subcategory}
+                  {getSubcategoryLabel(subcategory)}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -464,11 +534,11 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
               size={64}
               color={colors.textSecondary}
             />
-            <Text style={styles.emptyText}>No menu items found</Text>
+            <Text style={styles.emptyText}>{t('menu_display.no_items')}</Text>
             <Text style={styles.emptySubtext}>
               {searchQuery || activeFilters.length > 0
-                ? 'Try adjusting your search or filters'
-                : 'Check back later for updates'}
+                ? t('menu_display.adjust_search')
+                : t('menu_display.check_back')}
             </Text>
           </View>
         ) : (
@@ -610,7 +680,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           />
           <View style={styles.filterModalContent}>
             <View style={styles.filterModalHeader}>
-              <Text style={styles.filterModalTitle}>Filter Menu Items</Text>
+              <Text style={styles.filterModalTitle}>{t('menu_display.filter_title')}</Text>
               <TouchableOpacity onPress={closeFilterModal}>
                 <IconSymbol
                   ios_icon_name="xmark.circle.fill"
@@ -659,14 +729,14 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
 
               {activeFilters.length > 0 && (
                 <TouchableOpacity style={styles.clearFiltersButton} onPress={clearAllFilters}>
-                  <Text style={styles.clearFiltersButtonText}>Clear All Filters</Text>
+                  <Text style={styles.clearFiltersButtonText}>{t('menu_display.clear_all_filters')}</Text>
                 </TouchableOpacity>
               )}
             </ScrollView>
 
             <TouchableOpacity style={styles.applyFiltersButton} onPress={closeFilterModal}>
               <Text style={styles.applyFiltersButtonText}>
-                Apply Filters {activeFilters.length > 0 && `(${activeFilters.length})`}
+                {t('menu_display.apply_filters')} {activeFilters.length > 0 && `(${activeFilters.length})`}
               </Text>
             </TouchableOpacity>
           </View>

@@ -5,11 +5,11 @@
     "owner": "stevenjamesjobs",
     "version": "1.6.0",
     "orientation": "portrait",
-    "icon": "./assets/images/winter-app-icon.png",
+    "icon": "./assets/images/MarchStPatricksAppClip.PNG",
     "scheme": "boathouseconnect",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/winter-splash-screen.png",
+      "image": "./assets/images/MarchStPatricksSplashScreen.png",
       "resizeMode": "cover",
       "backgroundColor": "#ffffff"
     },
@@ -25,7 +25,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/winter-app-icon.png",
+        "foregroundImage": "./assets/images/MarchStPatricksAppClip.PNG",
         "backgroundColor": "#ffffff"
       },
       "package": "com.mcloonesboathouse.GPboathouseconnect",
@@ -51,17 +51,19 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#ffffff",
-          "image": "./assets/images/winter-splash-screen.png",
+          "image": "./assets/images/MarchStPatricksSplashScreen.png",
+          "imageResizeMode": "cover",
           "dark": {
             "backgroundColor": "#ffffff",
-            "image": "./assets/images/winter-splash-screen.png"
+            "image": "./assets/images/MarchStPatricksSplashScreen.png",
+            "imageResizeMode": "cover"
           }
         }
       ],
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/winter-app-icon.png",
+          "icon": "./assets/images/MarchStPatricksAppClip.PNG",
           "color": "#ffffff",
           "sounds": [],
           "mode": "production"

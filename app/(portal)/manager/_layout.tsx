@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   },
   tabBarContent: {
     flexDirection: 'row',
-    paddingHorizontal: 12,
+    paddingHorizontal: 6,
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'space-around',
@@ -268,8 +268,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 6,
-    paddingHorizontal: 6,
-    minWidth: 70,
+    paddingHorizontal: 2,
   },
   iconContainer: {
     position: 'relative',

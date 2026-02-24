@@ -554,7 +554,7 @@ export default function EmployeePortalScreen() {
         </View>
 
         <CollapsibleSection
-          title="Weather"
+          title={t('employee_home.weather')}
           iconIos="cloud.sun.fill"
           iconAndroid="wb-cloudy"
           iconColor={colors.darkText}
@@ -572,7 +572,7 @@ export default function EmployeePortalScreen() {
 
         {/* What's Happening Section (Announcements + Special Features with Tabs) */}
         <CollapsibleSection
-          title="What's Happening"
+          title={t('employee_home.whats_happening')}
           iconIos="megaphone.fill"
           iconAndroid="campaign"
           iconColor={colors.darkText}
@@ -776,7 +776,7 @@ export default function EmployeePortalScreen() {
 
         {/* Upcoming Events Section with Calendar Strip */}
         <CollapsibleSection
-          title="Upcoming Events"
+          title={t('employee_home.upcoming_events')}
           iconIos="calendar"
           iconAndroid="event"
           iconColor={colors.darkText}
@@ -804,7 +804,7 @@ export default function EmployeePortalScreen() {
 
         {/* Weekly Specials Section */}
         <CollapsibleSection
-          title="Weekly Specials"
+          title={t('employee_home.weekly_specials')}
           iconIos="fork.knife"
           iconAndroid="restaurant"
           iconColor={colors.darkText}
