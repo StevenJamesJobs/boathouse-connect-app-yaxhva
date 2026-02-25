@@ -8,6 +8,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { getLocalizedField } from '@/utils/translateContent';
 import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
 import { eventFallsOnDate } from '@/utils/dateUtils';
 
@@ -22,7 +23,9 @@ export interface GuideFile {
 export interface UpcomingEvent {
   id: string;
   title: string;
+  title_es?: string | null;
   content: string;
+  content_es?: string | null;
   message: string | null;
   thumbnail_url: string | null;
   thumbnail_shape: string;
@@ -61,6 +64,7 @@ interface UpcomingEventsSectionProps {
     guideFile?: GuideFile | null;
   }) => void;
   maxItems?: number;
+  language?: string;
 }
 
 export default function UpcomingEventsSection({
@@ -69,6 +73,7 @@ export default function UpcomingEventsSection({
   colors,
   onEventPress,
   maxItems,
+  language,
 }: UpcomingEventsSectionProps) {
   const { t } = useTranslation();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -105,8 +110,8 @@ export default function UpcomingEventsSection({
 
   const handleEventPress = (event: UpcomingEvent) => {
     onEventPress({
-      title: event.title,
-      content: event.content || event.message || '',
+      title: getLocalizedField(event, 'title', language || 'en'),
+      content: getLocalizedField(event, 'content', language || 'en') || event.content || event.message || '',
       thumbnailUrl: event.thumbnail_url,
       thumbnailShape: event.thumbnail_shape,
       startDateTime: event.start_date_time,
@@ -145,10 +150,10 @@ export default function UpcomingEventsSection({
             style={styles.eventSquareImage}
           />
           <View style={styles.eventSquareContent}>
-            <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+            <Text style={[styles.eventTitle, { color: colors.text }]}>{getLocalizedField(event, 'title', language || 'en')}</Text>
             {(event.content || event.message) && (
               <Text style={[styles.eventDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                {event.content || event.message}
+                {getLocalizedField(event, 'content', language || 'en') || event.content || event.message}
               </Text>
             )}
             {event.start_date_time && (
@@ -167,10 +172,10 @@ export default function UpcomingEventsSection({
             />
           )}
           <View style={styles.eventContent}>
-            <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+            <Text style={[styles.eventTitle, { color: colors.text }]}>{getLocalizedField(event, 'title', language || 'en')}</Text>
             {(event.content || event.message) && (
               <Text style={[styles.eventDescription, { color: colors.textSecondary }]}>
-                {truncateText(event.content || event.message, 125)}
+                {truncateText(getLocalizedField(event, 'content', language || 'en') || event.content || event.message, 125)}
               </Text>
             )}
             {event.start_date_time && (

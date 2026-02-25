@@ -288,7 +288,11 @@
     "feedback_title": "Enviar Comentarios",
     "feedback_desc": "Comparte comentarios anónimos con la gerencia",
     "bartender_binder": "Carpeta del Barman",
-    "bartender_binder_desc": "Guía de referencia rápida para bartenders"
+    "bartender_binder_desc": "Guía de referencia rápida para bartenders",
+    "server_assistant": "Asistente de Mesero",
+    "server_assistant_desc": "Calculadora de cierre, juegos y exámenes de mesero",
+    "kitchen_assistant": "Asistente de Cocina",
+    "kitchen_assistant_desc": "Recetas, base de conocimiento y exámenes de cocina"
   },
   "employee_rewards": {
     "title": "McLoone's Bucks",
@@ -352,8 +356,12 @@
     "guides_training_editor_desc": "Cargar y gestionar materiales de entrenamiento",
     "bartender_assistant_editor": "Editor del Asistente de Barman",
     "bartender_assistant_editor_desc": "Gestionar recetas de cócteles, base de conocimiento y exámenes de bar",
+    "server_assistant_editor": "Editor del Asistente de Mesero",
+    "server_assistant_editor_desc": "Gestionar herramientas de mesero, juegos y exámenes de mesero",
     "host_assistant_editor": "Editor del Asistente de Anfitrión",
     "host_assistant_editor_desc": "Gestionar recursos de anfitrión y exámenes",
+    "kitchen_assistant_editor": "Editor del Asistente de Cocina",
+    "kitchen_assistant_editor_desc": "Gestionar recetas de cocina, base de conocimiento y exámenes de cocina",
     "rewards_reviews_editor": "Editor de Recompensas y Reseñas",
     "rewards_reviews_editor_desc": "Gestionar recompensas de empleados y reseñas de clientes",
     "menu_editor": "Editor de Menú",
@@ -396,6 +404,32 @@
     "closing_checklist": "Lista de Cierre",
     "weekly_quiz": "Cuestionario Semanal",
     "weekly_quiz_desc": "Pon a prueba tus conocimientos de anfitrión",
+    "more_exams_coming": "¡Se agregarán más secciones de exámenes en el futuro!"
+  },
+  "server_assistant": {
+    "title": "Asistente de Mesero",
+    "encyclopedia": "Enciclopedia",
+    "server_exams": "Exámenes de Mesero",
+    "check_out_calculator": "Calculadora de Cierre",
+    "check_out_calculator_desc": "Calcula tus propinas y el monto a declarar",
+    "menu_memory_game": "Juego de Memoria del Menú",
+    "menu_memory_game_desc": "Pon a prueba tu conocimiento del menú con divertidos desafíos de memoria",
+    "weekly_quiz": "Cuestionario Semanal",
+    "weekly_quiz_desc": "Pon a prueba tus conocimientos de mesero",
+    "more_exams_coming": "¡Se agregarán más secciones de exámenes en el futuro!"
+  },
+  "kitchen_assistant": {
+    "title": "Asistente de Cocina",
+    "encyclopedia": "Enciclopedia",
+    "kitchen_exams": "Exámenes de Cocina",
+    "main_menu_recipes": "Recetas del Menú Principal",
+    "main_menu_recipes_desc": "Explorar recetas del menú del comedor principal",
+    "banquet_recipes": "Recetas de Banquetes",
+    "banquet_recipes_desc": "Explorar recetas para eventos de banquetes",
+    "buffet_recipes": "Recetas de Buffet",
+    "buffet_recipes_desc": "Explorar recetas para servicio de buffet",
+    "weekly_quiz": "Cuestionario Semanal",
+    "weekly_quiz_desc": "Pon a prueba tus conocimientos de cocina",
     "more_exams_coming": "¡Se agregarán más secciones de exámenes en el futuro!"
   },
   "checklist": {
@@ -604,6 +638,32 @@
     "closing_checklist_editor": "Editor de Lista de Cierre",
     "weekly_quiz_editor": "Editor de Cuestionario Semanal",
     "weekly_quiz_editor_desc": "Crear y gestionar cuestionarios semanales de anfitrión",
+    "more_exam_editors_coming": "¡Se agregarán más secciones de editores de exámenes en el futuro!"
+  },
+  "server_assistant_editor": {
+    "title": "Editor del Asistente de Mesero",
+    "tab_encyclopedia": "Enciclopedia",
+    "tab_server_exams": "Exámenes de Mesero",
+    "check_out_calculator": "Calculadora de Cierre",
+    "check_out_calculator_desc": "Herramienta de cálculo de cierre para meseros",
+    "menu_memory_game_editor": "Editor del Juego de Memoria del Menú",
+    "menu_memory_game_editor_desc": "Crear y gestionar contenido del juego de memoria del menú",
+    "weekly_quiz_editor": "Editor de Cuestionario Semanal",
+    "weekly_quiz_editor_desc": "Crear y gestionar cuestionarios semanales de mesero",
+    "more_exam_editors_coming": "¡Se agregarán más secciones de editores de exámenes en el futuro!"
+  },
+  "kitchen_assistant_editor": {
+    "title": "Editor del Asistente de Cocina",
+    "tab_encyclopedia": "Enciclopedia",
+    "tab_kitchen_exams": "Exámenes de Cocina",
+    "main_menu_recipes_editor": "Editor de Recetas del Menú Principal",
+    "main_menu_recipes_editor_desc": "Agregar y gestionar recetas del menú del comedor principal",
+    "banquet_recipes_editor": "Editor de Recetas de Banquetes",
+    "banquet_recipes_editor_desc": "Agregar y gestionar recetas para eventos de banquetes",
+    "buffet_recipes_editor": "Editor de Recetas de Buffet",
+    "buffet_recipes_editor_desc": "Agregar y gestionar recetas para servicio de buffet",
+    "weekly_quiz_editor": "Editor de Cuestionario Semanal",
+    "weekly_quiz_editor_desc": "Crear y gestionar cuestionarios semanales de cocina",
     "more_exam_editors_coming": "¡Se agregarán más secciones de editores de exámenes en el futuro!"
   },
   "guides_training_editor": {
@@ -1003,7 +1063,10 @@
     "save_error": "Error al guardar el próximo evento",
     "delete_error": "Error al eliminar el próximo evento",
     "pick_image_error": "Error al seleccionar imagen",
-    "upload_image_error": "Error al subir imagen"
+    "upload_image_error": "Error al subir imagen",
+    "move_up": "Subir",
+    "move_down": "Bajar",
+    "reorder_hint": "Mantén presionado y arrastra para reordenar, o usa las flechas"
   },
   "menu_editor": {
     "title": "Editor de Menú",
@@ -1178,5 +1241,21 @@
     "review_delete_error": "Error al eliminar la reseña",
     "error_guest_name": "Por favor ingresa el nombre del invitado",
     "error_review_text": "Por favor ingresa el texto de la reseña"
+  },
+  "translation_section": {
+    "spanish_section_title": "Traducción al Español (Opcional)",
+    "auto_translate": "Traducir Automáticamente al Español",
+    "translating": "Traduciendo...",
+    "title_es_label": "Título (Español)",
+    "title_es_placeholder": "Ingrese el título en español",
+    "message_es_label": "Descripción (Español)",
+    "message_es_placeholder": "Ingrese la descripción en español",
+    "name_es_label": "Nombre (Español)",
+    "name_es_placeholder": "Ingrese el nombre en español",
+    "description_es_label": "Descripción (Español)",
+    "description_es_placeholder": "Ingrese la descripción en español",
+    "hint": "El texto traducido automáticamente se puede editar manualmente. Déjelo en blanco para mostrar el inglés.",
+    "no_content_to_translate": "Por favor, ingrese contenido en inglés primero antes de traducir.",
+    "translate_failed": "La traducción automática falló. Puede ingresar el texto en español manualmente."
   }
 }

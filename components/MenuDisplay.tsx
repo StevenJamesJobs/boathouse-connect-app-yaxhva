@@ -17,11 +17,15 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { useTranslation } from 'react-i18next';
+import { getLocalizedField } from '@/utils/translateContent';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface MenuItem {
   id: string;
   name: string;
+  name_es?: string | null;
   description: string | null;
+  description_es?: string | null;
   price: string;
   category: string;
   subcategory: string | null;
@@ -122,6 +126,7 @@ interface MenuDisplayProps {
 
 export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
 
@@ -349,7 +354,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
 
   // Helper function to build detailed description for modal
   const buildDetailedDescription = (item: MenuItem) => {
-    let description = item.description || '';
+    let description = getLocalizedField(item, 'description', language) || item.description || '';
     
     // Add dietary information
     const dietaryInfo = [];
@@ -566,7 +571,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                     />
                     <View style={styles.squareContent}>
                       <View style={styles.squareHeader}>
-                        <Text style={styles.menuItemName}>{item.name}</Text>
+                        <Text style={styles.menuItemName}>{getLocalizedField(item, 'name', language)}</Text>
                         <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
                       </View>
                       {(item.is_gluten_free ||
@@ -598,7 +603,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                       )}
                       {item.description && (
                         <Text style={styles.squareDescription} numberOfLines={2}>
-                          {item.description}
+                          {getLocalizedField(item, 'description', language) || item.description}
                         </Text>
                       )}
                     </View>
@@ -621,12 +626,12 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                     )}
                     <View style={styles.menuItemContent}>
                       <View style={styles.menuItemHeader}>
-                        <Text style={styles.menuItemName}>{item.name}</Text>
+                        <Text style={styles.menuItemName}>{getLocalizedField(item, 'name', language)}</Text>
                         <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
                       </View>
                       {item.description && (
                         <Text style={styles.menuItemDescription} numberOfLines={2}>
-                          {item.description}
+                          {getLocalizedField(item, 'description', language) || item.description}
                         </Text>
                       )}
                       {(item.is_gluten_free ||
@@ -781,7 +786,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         <ContentDetailModal
           visible={detailModalVisible}
           onClose={closeDetailModal}
-          title={`${selectedMenuItem.name} - ${formatPrice(selectedMenuItem.price)}`}
+          title={`${getLocalizedField(selectedMenuItem, 'name', language)} - ${formatPrice(selectedMenuItem.price)}`}
           content={buildDetailedDescription(selectedMenuItem)}
           thumbnailUrl={selectedMenuItem.thumbnail_url}
           thumbnailShape={selectedMenuItem.thumbnail_shape}

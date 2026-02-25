@@ -21,6 +21,8 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import React, { useState, useEffect } from 'react';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { getLocalizedField } from '@/utils/translateContent';
+import { useLanguage } from '@/contexts/LanguageContext';
 import WeatherWidget from '@/components/WeatherWidget';
 import { useFocusEffect } from '@react-navigation/native';
 import WeatherDetailModal from '@/components/WeatherDetailModal';
@@ -30,7 +32,9 @@ import UpcomingEventsSection from '@/components/UpcomingEventsSection';
 interface MenuItem {
   id: string;
   name: string;
+  name_es?: string | null;
   description: string | null;
+  description_es?: string | null;
   price: string;
   category: string;
   subcategory: string | null;
@@ -55,7 +59,9 @@ interface GuideFile {
 interface Announcement {
   id: string;
   title: string;
+  title_es?: string | null;
   content: string;
+  content_es?: string | null;
   message: string | null;
   thumbnail_url: string | null;
   thumbnail_shape: string;
@@ -72,7 +78,9 @@ interface Announcement {
 interface UpcomingEvent {
   id: string;
   title: string;
+  title_es?: string | null;
   content: string;
+  content_es?: string | null;
   message: string | null;
   thumbnail_url: string | null;
   thumbnail_shape: string;
@@ -90,7 +98,9 @@ interface UpcomingEvent {
 interface SpecialFeature {
   id: string;
   title: string;
+  title_es?: string | null;
   content: string;
+  content_es?: string | null;
   message: string | null;
   thumbnail_url: string | null;
   thumbnail_shape: string;
@@ -111,6 +121,7 @@ export default function EmployeePortalScreen() {
   const params = useLocalSearchParams();
   const { unreadCount } = useUnreadMessages();
   const colors = useThemeColors();
+  const { language } = useLanguage();
   const [weeklySpecials, setWeeklySpecials] = useState<MenuItem[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<UpcomingEvent[]>([]);
@@ -177,8 +188,8 @@ export default function EmployeePortalScreen() {
             .single();
           if (data) {
             openDetailModal({
-              title: data.title,
-              content: data.content,
+              title: getLocalizedField(data, 'title', language),
+              content: getLocalizedField(data, 'content', language) || data.content,
               thumbnailUrl: data.thumbnail_url,
               thumbnailShape: data.thumbnail_shape,
               priority: data.priority,
@@ -194,8 +205,8 @@ export default function EmployeePortalScreen() {
             .single();
           if (data) {
             openDetailModal({
-              title: data.title,
-              content: data.content,
+              title: getLocalizedField(data, 'title', language),
+              content: getLocalizedField(data, 'content', language) || data.content,
               thumbnailUrl: data.thumbnail_url,
               thumbnailShape: data.thumbnail_shape,
               startDateTime: data.start_date_time,
@@ -212,8 +223,8 @@ export default function EmployeePortalScreen() {
             .single();
           if (data) {
             openDetailModal({
-              title: data.title,
-              content: data.content,
+              title: getLocalizedField(data, 'title', language),
+              content: getLocalizedField(data, 'content', language) || data.content,
               thumbnailUrl: data.thumbnail_url,
               thumbnailShape: data.thumbnail_shape,
               startDateTime: data.start_date_time,
@@ -623,8 +634,8 @@ export default function EmployeePortalScreen() {
                       key={index}
                       style={[styles.announcementItem, { borderBottomColor: colors.highlight }]}
                       onPress={() => openDetailModal({
-                        title: announcement.title,
-                        content: announcement.content || announcement.message || '',
+                        title: getLocalizedField(announcement, 'title', language),
+                        content: getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message || '',
                         thumbnailUrl: announcement.thumbnail_url,
                         thumbnailShape: announcement.thumbnail_shape,
                         priority: announcement.priority,
@@ -641,7 +652,7 @@ export default function EmployeePortalScreen() {
                           />
                           <View style={styles.announcementSquareContent}>
                             <View style={styles.announcementHeader}>
-                              <Text style={[styles.announcementTitle, { color: colors.text }]}>{announcement.title}</Text>
+                              <Text style={[styles.announcementTitle, { color: colors.text }]}>{getLocalizedField(announcement, 'title', language)}</Text>
                               {announcement.priority && announcement.priority !== 'none' && (
                                 <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
                                   {announcement.priority === 'new' && (
@@ -657,7 +668,7 @@ export default function EmployeePortalScreen() {
                               )}
                             </View>
                             <Text style={[styles.announcementText, { color: colors.textSecondary }]} numberOfLines={2}>
-                              {announcement.content || announcement.message}
+                              {getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message}
                             </Text>
                           </View>
                         </View>
@@ -670,7 +681,7 @@ export default function EmployeePortalScreen() {
                             />
                           )}
                           <View style={styles.announcementHeader}>
-                            <Text style={[styles.announcementTitle, { color: colors.text }]}>{announcement.title}</Text>
+                            <Text style={[styles.announcementTitle, { color: colors.text }]}>{getLocalizedField(announcement, 'title', language)}</Text>
                             {announcement.priority && announcement.priority !== 'none' && (
                               <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
                                 {announcement.priority === 'new' && (
@@ -686,7 +697,7 @@ export default function EmployeePortalScreen() {
                             )}
                           </View>
                           <Text style={[styles.announcementText, { color: colors.textSecondary }]}>
-                            {truncateText(announcement.content || announcement.message, 125)}
+                            {truncateText(getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message, 125)}
                           </Text>
                         </>
                       )}
@@ -716,8 +727,8 @@ export default function EmployeePortalScreen() {
                       key={index}
                       style={[styles.featureItem, { borderBottomColor: colors.highlight }]}
                       onPress={() => openDetailModal({
-                        title: feature.title,
-                        content: feature.content || feature.message || '',
+                        title: getLocalizedField(feature, 'title', language),
+                        content: getLocalizedField(feature, 'content', language) || feature.content || feature.message || '',
                         thumbnailUrl: feature.thumbnail_url,
                         thumbnailShape: feature.thumbnail_shape,
                         startDateTime: feature.start_date_time,
@@ -734,10 +745,10 @@ export default function EmployeePortalScreen() {
                             style={styles.featureSquareImage}
                           />
                           <View style={styles.featureSquareContent}>
-                            <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>
+                            <Text style={[styles.featureTitle, { color: colors.text }]}>{getLocalizedField(feature, 'title', language)}</Text>
                             {(feature.content || feature.message) && (
                               <Text style={[styles.featureDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                                {feature.content || feature.message}
+                                {getLocalizedField(feature, 'content', language) || feature.content || feature.message}
                               </Text>
                             )}
                             {feature.start_date_time && (
@@ -754,10 +765,10 @@ export default function EmployeePortalScreen() {
                             />
                           )}
                           <View style={styles.featureContent}>
-                            <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>
+                            <Text style={[styles.featureTitle, { color: colors.text }]}>{getLocalizedField(feature, 'title', language)}</Text>
                             {(feature.content || feature.message) && (
                               <Text style={[styles.featureDescription, { color: colors.textSecondary }]}>
-                                {truncateText(feature.content || feature.message, 125)}
+                                {truncateText(getLocalizedField(feature, 'content', language) || feature.content || feature.message, 125)}
                               </Text>
                             )}
                             {feature.start_date_time && (
@@ -799,6 +810,7 @@ export default function EmployeePortalScreen() {
             }}
             onEventPress={openDetailModal}
             maxItems={4}
+            language={language}
           />
         </CollapsibleSection>
 
@@ -829,8 +841,8 @@ export default function EmployeePortalScreen() {
                   key={index}
                   style={[styles.specialCard, { backgroundColor: colors.card }]}
                   onPress={() => openDetailModal({
-                    title: item.name,
-                    content: `${item.description || ''}\n\nPrice: ${formatPrice(item.price)}${item.is_gluten_free ? '\n• Gluten Free' : ''}${item.is_gluten_free_available ? '\n• Gluten Free Available' : ''}${item.is_vegetarian ? '\n• Vegetarian' : ''}${item.is_vegetarian_available ? '\n• Vegetarian Available' : ''}`,
+                    title: getLocalizedField(item, 'name', language),
+                    content: `${getLocalizedField(item, 'description', language) || item.description || ''}\n\nPrice: ${formatPrice(item.price)}${item.is_gluten_free ? '\n• Gluten Free' : ''}${item.is_gluten_free_available ? '\n• Gluten Free Available' : ''}${item.is_vegetarian ? '\n• Vegetarian' : ''}${item.is_vegetarian_available ? '\n• Vegetarian Available' : ''}`,
                     thumbnailUrl: item.thumbnail_url,
                     thumbnailShape: item.thumbnail_shape,
                   })}
@@ -844,7 +856,7 @@ export default function EmployeePortalScreen() {
                       />
                       <View style={styles.specialSquareContent}>
                         <View style={styles.specialHeader}>
-                          <Text style={[styles.specialName, { color: colors.text }]}>{item.name}</Text>
+                          <Text style={[styles.specialName, { color: colors.text }]}>{getLocalizedField(item, 'name', language)}</Text>
                           <Text style={[styles.specialPrice, { color: colors.primary }]}>{formatPrice(item.price)}</Text>
                         </View>
                         {(item.is_gluten_free || item.is_gluten_free_available || item.is_vegetarian || item.is_vegetarian_available) && (
@@ -873,7 +885,7 @@ export default function EmployeePortalScreen() {
                         )}
                         {item.description && (
                           <Text style={[styles.specialDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                            {item.description}
+                            {getLocalizedField(item, 'description', language) || item.description}
                           </Text>
                         )}
                       </View>
@@ -888,12 +900,12 @@ export default function EmployeePortalScreen() {
                       )}
                       <View style={styles.specialContent}>
                         <View style={styles.specialHeader}>
-                          <Text style={[styles.specialName, { color: colors.text }]}>{item.name}</Text>
+                          <Text style={[styles.specialName, { color: colors.text }]}>{getLocalizedField(item, 'name', language)}</Text>
                           <Text style={[styles.specialPrice, { color: colors.primary }]}>{formatPrice(item.price)}</Text>
                         </View>
                         {item.description && (
                           <Text style={[styles.specialDescription, { color: colors.textSecondary }]}>
-                            {item.description}
+                            {getLocalizedField(item, 'description', language) || item.description}
                           </Text>
                         )}
                         {(item.is_gluten_free || item.is_gluten_free_available || item.is_vegetarian || item.is_vegetarian_available) && (

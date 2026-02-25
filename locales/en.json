@@ -288,7 +288,11 @@
     "feedback_title": "Submit Feedback",
     "feedback_desc": "Share anonymous feedback with management",
     "bartender_binder": "Bartender Binder",
-    "bartender_binder_desc": "Quick reference guide for bartenders"
+    "bartender_binder_desc": "Quick reference guide for bartenders",
+    "server_assistant": "Server Assistant",
+    "server_assistant_desc": "Check out calculator, games, and server exams",
+    "kitchen_assistant": "Kitchen Assistant",
+    "kitchen_assistant_desc": "Recipes, knowledge base, and kitchen exams"
   },
   "employee_rewards": {
     "title": "McLoone's Bucks",
@@ -352,8 +356,12 @@
     "guides_training_editor_desc": "Upload and manage training materials",
     "bartender_assistant_editor": "Bartender Assistant Editor",
     "bartender_assistant_editor_desc": "Manage cocktail recipes, knowledge base, and bar exams",
+    "server_assistant_editor": "Server Assistant Editor",
+    "server_assistant_editor_desc": "Manage server tools, games, and server exams",
     "host_assistant_editor": "Host Assistant Editor",
     "host_assistant_editor_desc": "Manage hosting resources and host exams",
+    "kitchen_assistant_editor": "Kitchen Assistant Editor",
+    "kitchen_assistant_editor_desc": "Manage kitchen recipes, knowledge base, and kitchen exams",
     "rewards_reviews_editor": "Rewards and Reviews Editor",
     "rewards_reviews_editor_desc": "Manage employee rewards and guest reviews",
     "menu_editor": "Menu Editor",
@@ -396,6 +404,32 @@
     "closing_checklist": "Closing Checklist",
     "weekly_quiz": "Weekly Quiz",
     "weekly_quiz_desc": "Test your hosting knowledge",
+    "more_exams_coming": "More exam sections will be added here in the future!"
+  },
+  "server_assistant": {
+    "title": "Server Assistant",
+    "encyclopedia": "Encyclopedia",
+    "server_exams": "Server Exams",
+    "check_out_calculator": "Check Out Calculator",
+    "check_out_calculator_desc": "Calculate your tip-outs and declare amount",
+    "menu_memory_game": "Menu Memory Game",
+    "menu_memory_game_desc": "Test your menu knowledge with fun memory challenges",
+    "weekly_quiz": "Weekly Quiz",
+    "weekly_quiz_desc": "Test your server knowledge",
+    "more_exams_coming": "More exam sections will be added here in the future!"
+  },
+  "kitchen_assistant": {
+    "title": "Kitchen Assistant",
+    "encyclopedia": "Encyclopedia",
+    "kitchen_exams": "Kitchen Exams",
+    "main_menu_recipes": "Main Menu Recipes",
+    "main_menu_recipes_desc": "Browse recipes from the main dining menu",
+    "banquet_recipes": "Banquet Recipes",
+    "banquet_recipes_desc": "Browse recipes for banquet events",
+    "buffet_recipes": "Buffet Recipes",
+    "buffet_recipes_desc": "Browse recipes for buffet service",
+    "weekly_quiz": "Weekly Quiz",
+    "weekly_quiz_desc": "Test your kitchen knowledge",
     "more_exams_coming": "More exam sections will be added here in the future!"
   },
   "checklist": {
@@ -604,6 +638,32 @@
     "closing_checklist_editor": "Closing Checklist Editor",
     "weekly_quiz_editor": "Weekly Quiz Editor",
     "weekly_quiz_editor_desc": "Create and manage weekly hosting quizzes",
+    "more_exam_editors_coming": "More exam editor sections will be added here in the future!"
+  },
+  "server_assistant_editor": {
+    "title": "Server Assistant Editor",
+    "tab_encyclopedia": "Encyclopedia",
+    "tab_server_exams": "Server Exams",
+    "check_out_calculator": "Check Out Calculator",
+    "check_out_calculator_desc": "Server check out calculation tool",
+    "menu_memory_game_editor": "Menu Memory Game Editor",
+    "menu_memory_game_editor_desc": "Create and manage menu memory game content",
+    "weekly_quiz_editor": "Weekly Quiz Editor",
+    "weekly_quiz_editor_desc": "Create and manage weekly server quizzes",
+    "more_exam_editors_coming": "More exam editor sections will be added here in the future!"
+  },
+  "kitchen_assistant_editor": {
+    "title": "Kitchen Assistant Editor",
+    "tab_encyclopedia": "Encyclopedia",
+    "tab_kitchen_exams": "Kitchen Exams",
+    "main_menu_recipes_editor": "Main Menu Recipes Editor",
+    "main_menu_recipes_editor_desc": "Add and manage main dining menu recipes",
+    "banquet_recipes_editor": "Banquet Recipes Editor",
+    "banquet_recipes_editor_desc": "Add and manage banquet event recipes",
+    "buffet_recipes_editor": "Buffet Recipes Editor",
+    "buffet_recipes_editor_desc": "Add and manage buffet service recipes",
+    "weekly_quiz_editor": "Weekly Quiz Editor",
+    "weekly_quiz_editor_desc": "Create and manage weekly kitchen quizzes",
     "more_exam_editors_coming": "More exam editor sections will be added here in the future!"
   },
   "guides_training_editor": {
@@ -1003,7 +1063,10 @@
     "save_error": "Failed to save upcoming event",
     "delete_error": "Failed to delete upcoming event",
     "pick_image_error": "Failed to pick image",
-    "upload_image_error": "Failed to upload image"
+    "upload_image_error": "Failed to upload image",
+    "move_up": "Move Up",
+    "move_down": "Move Down",
+    "reorder_hint": "Hold and drag to reorder, or use arrows"
   },
   "menu_editor": {
     "title": "Menu Editor",
@@ -1178,5 +1241,21 @@
     "review_delete_error": "Failed to delete review",
     "error_guest_name": "Please enter guest name",
     "error_review_text": "Please enter review text"
+  },
+  "translation_section": {
+    "spanish_section_title": "Spanish Translation (Optional)",
+    "auto_translate": "Auto-Translate to Spanish",
+    "translating": "Translating...",
+    "title_es_label": "Title (Spanish)",
+    "title_es_placeholder": "Enter Spanish title",
+    "message_es_label": "Description (Spanish)",
+    "message_es_placeholder": "Enter Spanish description",
+    "name_es_label": "Name (Spanish)",
+    "name_es_placeholder": "Enter Spanish name",
+    "description_es_label": "Description (Spanish)",
+    "description_es_placeholder": "Enter Spanish description",
+    "hint": "Auto-translated text can be edited manually. Leave blank to show English to Spanish-speaking users.",
+    "no_content_to_translate": "Please enter English content first before translating.",
+    "translate_failed": "Auto-translation failed. You can enter the Spanish text manually."
   }
 }

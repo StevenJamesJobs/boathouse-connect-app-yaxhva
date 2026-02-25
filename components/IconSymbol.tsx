@@ -162,6 +162,16 @@ const ICON_MAP: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   // Download
   'arrow.down.circle': 'download',
   'arrow.down.circle.fill': 'download',
+
+  // Server and kitchen assistants
+  'flame': 'whatshot',
+  'flame.fill': 'whatshot',
+  'gamecontroller': 'sports-esports',
+  'gamecontroller.fill': 'sports-esports',
+  'tray.full.fill': 'room-service',
+  'person.3.fill': 'groups',
+  'book.pages': 'menu-book',
+  'list.clipboard.fill': 'list-alt',
 };
 
 /**

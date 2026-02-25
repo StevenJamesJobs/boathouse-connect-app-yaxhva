@@ -25,6 +25,9 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
+import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { translateTexts, saveTranslations } from '@/utils/translateContent';
 
 interface UpcomingEvent {
   id: string;
@@ -41,6 +44,8 @@ interface UpcomingEvent {
   link: string | null;
   guide_file_id: string | null;
   category: string;
+  title_es?: string | null;
+  content_es?: string | null;
 }
 
 interface GuideFile {
@@ -76,6 +81,8 @@ export default function UpcomingEventsEditorScreen() {
     display_order: 0,
     link: '',
     category: 'Event',
+    title_es: '',
+    message_es: '',
   });
   const [startDateTime, setStartDateTime] = useState<Date | null>(null);
   const [endDateTime, setEndDateTime] = useState<Date | null>(null);
@@ -85,6 +92,8 @@ export default function UpcomingEventsEditorScreen() {
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [showSpanish, setShowSpanish] = useState(false);
+  const [translating, setTranslating] = useState(false);
 
   useEffect(() => {
     loadEvents();
@@ -125,6 +134,25 @@ export default function UpcomingEventsEditorScreen() {
     }
   };
 
+  const resequenceDisplayOrders = async (currentEvents: UpcomingEvent[]) => {
+    // Assign sequential display_orders (0, 1, 2, ...) based on current sort order
+    const updates: Promise<any>[] = [];
+    currentEvents.forEach((event, index) => {
+      if (event.display_order !== index) {
+        updates.push(
+          supabase
+            .from('upcoming_events')
+            .update({ display_order: index })
+            .eq('id', event.id)
+        );
+      }
+    });
+    if (updates.length > 0) {
+      await Promise.all(updates);
+      console.log(`Resequenced ${updates.length} event display orders`);
+    }
+  };
+
   const cleanupExpiredEvents = async () => {
     try {
       const { data, error } = await supabase.rpc('delete_expired_upcoming_events');
@@ -132,6 +160,16 @@ export default function UpcomingEventsEditorScreen() {
         console.error('Error cleaning up expired events:', error);
       } else {
         console.log('Cleaned up expired events:', data);
+        // If events were deleted, reload and resequence to close gaps
+        if (data && data > 0) {
+          const { data: freshEvents } = await supabase
+            .from('upcoming_events')
+            .select('*')
+            .order('display_order', { ascending: true });
+          if (freshEvents) {
+            await resequenceDisplayOrders(freshEvents);
+          }
+        }
       }
     } catch (error) {
       console.error('Error cleaning up expired events:', error);
@@ -237,6 +275,28 @@ export default function UpcomingEventsEditorScreen() {
     }
   };
 
+  const handleAutoTranslate = async () => {
+    if (!formData.title && !formData.message) {
+      Alert.alert(t('common:error'), t('translation_section:no_content_to_translate'));
+      return;
+    }
+    setTranslating(true);
+    try {
+      const results = await translateTexts([formData.title, formData.message]);
+      setFormData(prev => ({
+        ...prev,
+        title_es: results[0] || '',
+        message_es: results[1] || '',
+      }));
+      setShowSpanish(true);
+    } catch (err) {
+      console.error('Auto-translate error:', err);
+      Alert.alert(t('common:error'), t('translation_section:translate_failed'));
+    } finally {
+      setTranslating(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!formData.title || !formData.message) {
       Alert.alert(t('common:error'), t('upcoming_events_editor:error_fill_fields'));
@@ -290,6 +350,14 @@ export default function UpcomingEventsEditorScreen() {
         }
         console.log('Upcoming event updated successfully');
         Alert.alert(t('common:success'), t('upcoming_events_editor:updated_success'));
+
+        // Save Spanish translations
+        if (formData.title_es || formData.message_es) {
+          await saveTranslations('upcoming_events', editingEvent.id, {
+            title_es: formData.title_es,
+            content_es: formData.message_es,
+          });
+        }
       } else {
         console.log('Creating new upcoming event');
         const { error } = await supabase.rpc('create_upcoming_event', {
@@ -330,6 +398,22 @@ export default function UpcomingEventsEditorScreen() {
         }
         
         Alert.alert(t('common:success'), t('upcoming_events_editor:created_success'));
+
+        // Save Spanish translations for newly created item
+        if (formData.title_es || formData.message_es) {
+          const { data: newItem } = await supabase
+            .from('upcoming_events')
+            .select('id')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          if (newItem) {
+            await saveTranslations('upcoming_events', newItem.id, {
+              title_es: formData.title_es,
+              content_es: formData.message_es,
+            });
+          }
+        }
       }
 
       closeModal();
@@ -378,8 +462,13 @@ export default function UpcomingEventsEditorScreen() {
               }
 
               console.log('Upcoming event deleted successfully');
+
+              // Resequence remaining events to close gaps in display_order
+              const remainingEvents = events.filter(e => e.id !== event.id);
+              await resequenceDisplayOrders(remainingEvents);
+
               Alert.alert(t('common:success'), t('upcoming_events_editor:deleted_success'));
-              
+
               await loadEvents();
             } catch (error: any) {
               console.error('Error deleting upcoming event:', error);
@@ -391,6 +480,73 @@ export default function UpcomingEventsEditorScreen() {
     );
   };
 
+  const handleMoveUp = async (index: number) => {
+    if (index <= 0) return;
+    const newEvents = [...events];
+    const currentOrder = newEvents[index].display_order;
+    const aboveOrder = newEvents[index - 1].display_order;
+    // Optimistic local update: swap positions
+    [newEvents[index], newEvents[index - 1]] = [newEvents[index - 1], newEvents[index]];
+    newEvents[index].display_order = currentOrder;
+    newEvents[index - 1].display_order = aboveOrder;
+    setEvents(newEvents);
+    // Persist to Supabase
+    try {
+      await Promise.all([
+        supabase.from('upcoming_events').update({ display_order: aboveOrder }).eq('id', events[index].id),
+        supabase.from('upcoming_events').update({ display_order: currentOrder }).eq('id', events[index - 1].id),
+      ]);
+    } catch (error) {
+      console.error('Error moving event up:', error);
+      await loadEvents(); // Reload on error to restore correct state
+    }
+  };
+
+  const handleMoveDown = async (index: number) => {
+    if (index >= events.length - 1) return;
+    const newEvents = [...events];
+    const currentOrder = newEvents[index].display_order;
+    const belowOrder = newEvents[index + 1].display_order;
+    // Optimistic local update: swap positions
+    [newEvents[index], newEvents[index + 1]] = [newEvents[index + 1], newEvents[index]];
+    newEvents[index].display_order = currentOrder;
+    newEvents[index + 1].display_order = belowOrder;
+    setEvents(newEvents);
+    // Persist to Supabase
+    try {
+      await Promise.all([
+        supabase.from('upcoming_events').update({ display_order: belowOrder }).eq('id', events[index].id),
+        supabase.from('upcoming_events').update({ display_order: currentOrder }).eq('id', events[index + 1].id),
+      ]);
+    } catch (error) {
+      console.error('Error moving event down:', error);
+      await loadEvents(); // Reload on error to restore correct state
+    }
+  };
+
+  const handleDragEnd = async ({ data: reorderedData }: { data: UpcomingEvent[] }) => {
+    // Optimistically update local state
+    const updatedData = reorderedData.map((event, index) => ({
+      ...event,
+      display_order: index,
+    }));
+    setEvents(updatedData);
+    // Persist new display_orders to Supabase
+    try {
+      const updates = reorderedData.map((event, index) =>
+        supabase
+          .from('upcoming_events')
+          .update({ display_order: index })
+          .eq('id', event.id)
+      );
+      await Promise.all(updates);
+      console.log('Drag reorder persisted successfully');
+    } catch (error) {
+      console.error('Error persisting drag reorder:', error);
+      await loadEvents(); // Reload on error to restore correct state
+    }
+  };
+
   const openAddModal = () => {
     setEditingEvent(null);
     setFormData({
@@ -400,6 +556,8 @@ export default function UpcomingEventsEditorScreen() {
       display_order: events.length,
       link: '',
       category: 'Event',
+      title_es: '',
+      message_es: '',
     });
     setStartDateTime(null);
     setEndDateTime(null);
@@ -407,6 +565,7 @@ export default function UpcomingEventsEditorScreen() {
     setSelectedGuideFile(null);
     setFileSearchQuery('');
     setShowFileSection(false);
+    setShowSpanish(false);
     setShowAddModal(true);
   };
 
@@ -419,7 +578,10 @@ export default function UpcomingEventsEditorScreen() {
       display_order: event.display_order,
       link: event.link || '',
       category: event.category || 'Event',
+      title_es: event.title_es || '',
+      message_es: event.content_es || '',
     });
+    setShowSpanish(!!(event.title_es || event.content_es));
     setStartDateTime(event.start_date_time ? new Date(event.start_date_time) : null);
     setEndDateTime(event.end_date_time ? new Date(event.end_date_time) : null);
     setSelectedImageUri(null);
@@ -540,163 +702,211 @@ export default function UpcomingEventsEditorScreen() {
           <ActivityIndicator size="large" color={colors.highlight} />
           <Text style={styles.loadingText}>{t('upcoming_events_editor:loading')}</Text>
         </View>
+      ) : events.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <IconSymbol
+            ios_icon_name="calendar"
+            android_material_icon_name="event"
+            size={64}
+            color={colors.textSecondary}
+          />
+          <Text style={styles.emptyText}>{t('upcoming_events_editor:empty_title')}</Text>
+          <Text style={styles.emptySubtext}>
+            {t('upcoming_events_editor:empty_subtitle')}
+          </Text>
+        </View>
       ) : (
-        <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
-          {events.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <IconSymbol
-                ios_icon_name="calendar"
-                android_material_icon_name="event"
-                size={64}
-                color={colors.textSecondary}
-              />
-              <Text style={styles.emptyText}>{t('upcoming_events_editor:empty_title')}</Text>
-              <Text style={styles.emptySubtext}>
-                {t('upcoming_events_editor:empty_subtitle')}
-              </Text>
-            </View>
-          ) : (
-            events.map((event, index) => {
+        <GestureHandlerRootView style={styles.itemsList}>
+          {events.length > 1 && (
+            <Text style={styles.reorderHint}>{t('upcoming_events_editor:reorder_hint')}</Text>
+          )}
+          <DraggableFlatList
+            data={events}
+            keyExtractor={(item) => item.id}
+            onDragEnd={handleDragEnd}
+            contentContainerStyle={styles.itemsListContent}
+            renderItem={({ item: event, getIndex, drag, isActive }: RenderItemParams<UpcomingEvent>) => {
+              const index = getIndex() ?? 0;
               const displayOrderText = `#${event.display_order}`;
-              
+
               return (
-                <View key={index} style={styles.eventCard}>
-                  {event.thumbnail_shape === 'square' && event.thumbnail_url ? (
-                    <View style={styles.squareLayout}>
-                      <Image
-                        key={getImageUrl(event.thumbnail_url)}
-                        source={{ uri: getImageUrl(event.thumbnail_url) }}
-                        style={styles.squareImage}
+                <ScaleDecorator>
+                  <View style={[styles.eventCard, isActive && styles.eventCardDragging]}>
+                    {/* Drag Handle */}
+                    <TouchableOpacity
+                      onLongPress={drag}
+                      disabled={isActive}
+                      style={styles.dragHandle}
+                    >
+                      <IconSymbol
+                        ios_icon_name="line.3.horizontal.decrease"
+                        android_material_icon_name="drag-indicator"
+                        size={20}
+                        color={colors.textSecondary}
                       />
-                      <View style={styles.squareContent}>
-                        <View style={styles.titleRow}>
-                          <Text style={styles.eventTitle}>{event.title}</Text>
-                          <View style={styles.badgeContainer}>
-                            <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
-                              <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
-                            </View>
-                            <Text style={styles.viewOrderText}>{displayOrderText}</Text>
-                          </View>
-                        </View>
-                        {(event.content || event.message) && (
-                          <Text style={styles.squareMessage} numberOfLines={2}>
-                            {event.content || event.message}
-                          </Text>
-                        )}
-                        <View style={styles.eventMeta}>
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="calendar"
-                              android_material_icon_name="event"
-                              size={14}
-                              color={colors.textSecondary}
-                            />
-                            <Text style={styles.metaText}>
-                              {formatDateTime(event.start_date_time)}
-                            </Text>
-                          </View>
-                          {event.end_date_time && (
-                            <View style={styles.metaItem}>
-                              <IconSymbol
-                                ios_icon_name="clock"
-                                android_material_icon_name="schedule"
-                                size={14}
-                                color={colors.textSecondary}
-                              />
-                              <Text style={styles.metaText}>
-                                {t('upcoming_events_editor:ends_label', { datetime: formatDateTime(event.end_date_time) })}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      </View>
-                    </View>
-                  ) : (
-                    <>
-                      {event.thumbnail_url && (
+                    </TouchableOpacity>
+
+                    {event.thumbnail_shape === 'square' && event.thumbnail_url ? (
+                      <View style={styles.squareLayout}>
                         <Image
                           key={getImageUrl(event.thumbnail_url)}
                           source={{ uri: getImageUrl(event.thumbnail_url) }}
-                          style={styles.bannerImage}
+                          style={styles.squareImage}
                         />
-                      )}
-                      <View style={styles.eventContent}>
-                        <View style={styles.titleRow}>
-                          <Text style={styles.eventTitle}>{event.title}</Text>
-                          <View style={styles.badgeContainer}>
-                            <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
-                              <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
+                        <View style={styles.squareContent}>
+                          <View style={styles.titleRow}>
+                            <Text style={styles.eventTitle}>{event.title}</Text>
+                            <View style={styles.badgeContainer}>
+                              <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
+                                <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
+                              </View>
+                              <Text style={styles.viewOrderText}>{displayOrderText}</Text>
                             </View>
-                            <Text style={styles.viewOrderText}>{displayOrderText}</Text>
                           </View>
-                        </View>
-                        {(event.content || event.message) && (
-                          <Text style={styles.eventMessage}>
-                            {event.content || event.message}
-                          </Text>
-                        )}
-                        <View style={styles.eventMeta}>
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="calendar"
-                              android_material_icon_name="event"
-                              size={14}
-                              color={colors.textSecondary}
-                            />
-                            <Text style={styles.metaText}>
-                              {formatDateTime(event.start_date_time)}
+                          {(event.content || event.message) && (
+                            <Text style={styles.squareMessage} numberOfLines={2}>
+                              {event.content || event.message}
                             </Text>
-                          </View>
-                          {event.end_date_time && (
+                          )}
+                          <View style={styles.eventMeta}>
                             <View style={styles.metaItem}>
                               <IconSymbol
-                                ios_icon_name="clock"
-                                android_material_icon_name="schedule"
+                                ios_icon_name="calendar"
+                                android_material_icon_name="event"
                                 size={14}
                                 color={colors.textSecondary}
                               />
                               <Text style={styles.metaText}>
-                                {t('upcoming_events_editor:ends_label', { datetime: formatDateTime(event.end_date_time) })}
+                                {formatDateTime(event.start_date_time)}
                               </Text>
                             </View>
-                          )}
+                            {event.end_date_time && (
+                              <View style={styles.metaItem}>
+                                <IconSymbol
+                                  ios_icon_name="clock"
+                                  android_material_icon_name="schedule"
+                                  size={14}
+                                  color={colors.textSecondary}
+                                />
+                                <Text style={styles.metaText}>
+                                  {t('upcoming_events_editor:ends_label', { datetime: formatDateTime(event.end_date_time) })}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
                         </View>
                       </View>
-                    </>
-                  )}
-                  <View style={styles.eventActions}>
-                    <TouchableOpacity
-                      style={styles.actionButton}
-                      onPress={() => openEditModal(event)}
-                    >
-                      <IconSymbol
-                        ios_icon_name="pencil"
-                        android_material_icon_name="edit"
-                        size={20}
-                        color={colors.highlight}
-                      />
-                      <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.actionButton, styles.deleteButton]}
-                      onPress={() => handleDelete(event)}
-                    >
-                      <IconSymbol
-                        ios_icon_name="trash"
-                        android_material_icon_name="delete"
-                        size={20}
-                        color="#E74C3C"
-                      />
-                      <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                        {t('common:delete')}
-                      </Text>
-                    </TouchableOpacity>
+                    ) : (
+                      <>
+                        {event.thumbnail_url && (
+                          <Image
+                            key={getImageUrl(event.thumbnail_url)}
+                            source={{ uri: getImageUrl(event.thumbnail_url) }}
+                            style={styles.bannerImage}
+                          />
+                        )}
+                        <View style={styles.eventContent}>
+                          <View style={styles.titleRow}>
+                            <Text style={styles.eventTitle}>{event.title}</Text>
+                            <View style={styles.badgeContainer}>
+                              <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
+                                <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
+                              </View>
+                              <Text style={styles.viewOrderText}>{displayOrderText}</Text>
+                            </View>
+                          </View>
+                          {(event.content || event.message) && (
+                            <Text style={styles.eventMessage}>
+                              {event.content || event.message}
+                            </Text>
+                          )}
+                          <View style={styles.eventMeta}>
+                            <View style={styles.metaItem}>
+                              <IconSymbol
+                                ios_icon_name="calendar"
+                                android_material_icon_name="event"
+                                size={14}
+                                color={colors.textSecondary}
+                              />
+                              <Text style={styles.metaText}>
+                                {formatDateTime(event.start_date_time)}
+                              </Text>
+                            </View>
+                            {event.end_date_time && (
+                              <View style={styles.metaItem}>
+                                <IconSymbol
+                                  ios_icon_name="clock"
+                                  android_material_icon_name="schedule"
+                                  size={14}
+                                  color={colors.textSecondary}
+                                />
+                                <Text style={styles.metaText}>
+                                  {t('upcoming_events_editor:ends_label', { datetime: formatDateTime(event.end_date_time) })}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      </>
+                    )}
+                    <View style={styles.eventActions}>
+                      <TouchableOpacity
+                        style={[styles.arrowButton, index === 0 && styles.arrowButtonDisabled]}
+                        onPress={() => handleMoveUp(index)}
+                        disabled={index === 0}
+                      >
+                        <IconSymbol
+                          ios_icon_name="arrow.up"
+                          android_material_icon_name="arrow-upward"
+                          size={18}
+                          color={index === 0 ? colors.textSecondary : colors.highlight}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.arrowButton, index === events.length - 1 && styles.arrowButtonDisabled]}
+                        onPress={() => handleMoveDown(index)}
+                        disabled={index === events.length - 1}
+                      >
+                        <IconSymbol
+                          ios_icon_name="arrow.down"
+                          android_material_icon_name="arrow-downward"
+                          size={18}
+                          color={index === events.length - 1 ? colors.textSecondary : colors.highlight}
+                        />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.actionButton}
+                        onPress={() => openEditModal(event)}
+                      >
+                        <IconSymbol
+                          ios_icon_name="pencil"
+                          android_material_icon_name="edit"
+                          size={20}
+                          color={colors.highlight}
+                        />
+                        <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.deleteButton]}
+                        onPress={() => handleDelete(event)}
+                      >
+                        <IconSymbol
+                          ios_icon_name="trash"
+                          android_material_icon_name="delete"
+                          size={20}
+                          color="#E74C3C"
+                        />
+                        <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
+                          {t('common:delete')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
+                </ScaleDecorator>
               );
-            })
-          )}
-        </ScrollView>
+            }}
+          />
+        </GestureHandlerRootView>
       )}
 
       {/* Add/Edit Modal */}
@@ -859,6 +1069,62 @@ export default function UpcomingEventsEditorScreen() {
                   multiline
                   numberOfLines={4}
                 />
+              </View>
+
+              {/* Spanish Translation Section */}
+              <View style={styles.formGroup}>
+                <TouchableOpacity
+                  style={styles.spanishSectionHeader}
+                  onPress={() => setShowSpanish(!showSpanish)}
+                >
+                  <Text style={styles.formLabel}>{t('translation_section:spanish_section_title')}</Text>
+                  <IconSymbol
+                    ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
+                    android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
+                    size={20}
+                    color="#666666"
+                  />
+                </TouchableOpacity>
+
+                {showSpanish && (
+                  <View style={styles.spanishFields}>
+                    <TouchableOpacity
+                      style={styles.autoTranslateButton}
+                      onPress={handleAutoTranslate}
+                      disabled={translating}
+                    >
+                      {translating ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.autoTranslateButtonText}>
+                          {t('translation_section:auto_translate')}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <Text style={styles.spanishFieldLabel}>{t('translation_section:title_es_label')}</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('translation_section:title_es_placeholder')}
+                      placeholderTextColor="#999999"
+                      value={formData.title_es}
+                      onChangeText={(text) => setFormData({ ...formData, title_es: text })}
+                    />
+
+                    <Text style={[styles.spanishFieldLabel, { marginTop: 12 }]}>{t('translation_section:message_es_label')}</Text>
+                    <TextInput
+                      style={[styles.input, styles.textArea]}
+                      placeholder={t('translation_section:message_es_placeholder')}
+                      placeholderTextColor="#999999"
+                      value={formData.message_es}
+                      onChangeText={(text) => setFormData({ ...formData, message_es: text })}
+                      multiline
+                      numberOfLines={4}
+                    />
+
+                    <Text style={styles.formHint}>{t('translation_section:hint')}</Text>
+                  </View>
+                )}
               </View>
 
               <View style={styles.formGroup}>
@@ -1421,6 +1687,11 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
+  eventCardDragging: {
+    opacity: 0.9,
+    boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.5)',
+    elevation: 8,
+  },
   squareLayout: {
     flexDirection: 'row',
     padding: 12,
@@ -1503,10 +1774,21 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   eventActions: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 8,
     padding: 12,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+  },
+  arrowButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowButtonDisabled: {
+    opacity: 0.3,
   },
   actionButton: {
     flex: 1,
@@ -1528,6 +1810,55 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   deleteButtonText: {
     color: '#E74C3C',
+  },
+  dragHandle: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    padding: 6,
+    zIndex: 10,
+  },
+  reorderHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  spanishSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  spanishFields: {
+    marginTop: 8,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#D0E8FF',
+  },
+  autoTranslateButton: {
+    backgroundColor: '#3498DB',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  autoTranslateButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  spanishFieldLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#666666',
+    marginBottom: 4,
   },
   modalContainer: {
     flex: 1,

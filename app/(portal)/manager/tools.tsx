@@ -21,18 +21,27 @@ export default function ManagerToolsScreen() {
 
   // Get job titles array from user
   const jobTitles = user?.jobTitles || [];
-  
+
+  // Check if user can see Server Assistant (Server, Lead Server, or Manager)
+  const canSeeServerAssistant = jobTitles.includes('Server') ||
+                                jobTitles.includes('Lead Server') ||
+                                jobTitles.includes('Manager');
+
   // Check if user can see Bar Assistant (Bartender, Manager, Lead Server, or Banquet Captain)
-  const canSeeBarAssistant = jobTitles.includes('Bartender') || 
-                             jobTitles.includes('Manager') || 
-                             jobTitles.includes('Lead Server') || 
+  const canSeeBarAssistant = jobTitles.includes('Bartender') ||
+                             jobTitles.includes('Manager') ||
+                             jobTitles.includes('Lead Server') ||
                              jobTitles.includes('Banquet Captain');
-  
+
   // Check if user can see Host Assistant (Host or Manager)
   const canSeeHostAssistant = jobTitles.includes('Host') || jobTitles.includes('Manager');
-  
-  // Check if user can see Check Outs Calculator (Server or Manager)
-  const canSeeCheckOutCalculator = jobTitles.includes('Server') || jobTitles.includes('Manager');
+
+  // Check if user can see Kitchen Assistant (Busser, Chef, Kitchen, Manager, or Runner)
+  const canSeeKitchenAssistant = jobTitles.includes('Busser') ||
+                                 jobTitles.includes('Chef') ||
+                                 jobTitles.includes('Kitchen') ||
+                                 jobTitles.includes('Manager') ||
+                                 jobTitles.includes('Runner');
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -70,24 +79,24 @@ export default function ManagerToolsScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* 2. Check Out Calculator Section - Only for Servers and Managers */}
-        {canSeeCheckOutCalculator && (
+        {/* 2. Server Assistant Section - For Servers, Lead Servers, and Managers */}
+        {canSeeServerAssistant && (
           <TouchableOpacity
             style={[styles.card, { backgroundColor: colors.card }]}
-            onPress={() => router.push('/check-out-calculator')}
+            onPress={() => router.push('/server-assistant')}
             activeOpacity={0.7}
           >
             <View style={styles.cardContent}>
               <IconSymbol
-                ios_icon_name="clock"
-                android_material_icon_name="calculate"
+                ios_icon_name="tray.full.fill"
+                android_material_icon_name="room-service"
                 size={28}
                 color={colors.highlight}
               />
               <View style={styles.cardText}>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.check_out_calculator')}</Text>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.server_assistant')}</Text>
                 <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                  {t('employee_tools.check_out_calculator_desc')}
+                  {t('employee_tools.server_assistant_desc')}
                 </Text>
               </View>
               <IconSymbol
@@ -148,6 +157,36 @@ export default function ManagerToolsScreen() {
                 <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.host_assistant')}</Text>
                 <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                   {t('employee_tools.host_assistant_desc')}
+                </Text>
+              </View>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </View>
+          </TouchableOpacity>
+        )}
+
+        {/* 5. Kitchen Assistant Section - For Bussers, Chefs, Kitchen, Managers, and Runners */}
+        {canSeeKitchenAssistant && (
+          <TouchableOpacity
+            style={[styles.card, { backgroundColor: colors.card }]}
+            onPress={() => router.push('/kitchen-assistant')}
+            activeOpacity={0.7}
+          >
+            <View style={styles.cardContent}>
+              <IconSymbol
+                ios_icon_name="flame.fill"
+                android_material_icon_name="local-fire-department"
+                size={28}
+                color={colors.highlight}
+              />
+              <View style={styles.cardText}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.kitchen_assistant')}</Text>
+                <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                  {t('employee_tools.kitchen_assistant_desc')}
                 </Text>
               </View>
               <IconSymbol

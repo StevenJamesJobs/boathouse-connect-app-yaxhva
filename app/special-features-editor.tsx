@@ -25,6 +25,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
+import { translateTexts, saveTranslations } from '@/utils/translateContent';
 
 interface SpecialFeature {
   id: string;
@@ -40,6 +41,8 @@ interface SpecialFeature {
   created_at: string;
   link: string | null;
   guide_file_id: string | null;
+  title_es?: string | null;
+  content_es?: string | null;
 }
 
 interface GuideFile {
@@ -74,6 +77,8 @@ export default function SpecialFeaturesEditorScreen() {
     thumbnail_shape: 'square',
     display_order: 0,
     link: '',
+    title_es: '',
+    message_es: '',
   });
   const [startDateTime, setStartDateTime] = useState<Date | null>(null);
   const [endDateTime, setEndDateTime] = useState<Date | null>(null);
@@ -83,6 +88,8 @@ export default function SpecialFeaturesEditorScreen() {
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [showSpanish, setShowSpanish] = useState(false);
+  const [translating, setTranslating] = useState(false);
 
   useEffect(() => {
     loadFeatures();
@@ -235,6 +242,28 @@ export default function SpecialFeaturesEditorScreen() {
     }
   };
 
+  const handleAutoTranslate = async () => {
+    if (!formData.title && !formData.message) {
+      Alert.alert(t('common:error'), t('translation_section:no_content_to_translate'));
+      return;
+    }
+    setTranslating(true);
+    try {
+      const results = await translateTexts([formData.title, formData.message]);
+      setFormData(prev => ({
+        ...prev,
+        title_es: results[0] || '',
+        message_es: results[1] || '',
+      }));
+      setShowSpanish(true);
+    } catch (err) {
+      console.error('Auto-translate error:', err);
+      Alert.alert(t('common:error'), t('translation_section:translate_failed'));
+    } finally {
+      setTranslating(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!formData.title || !formData.message) {
       Alert.alert(t('common:error'), t('special_features_editor:error_fill_fields'));
@@ -287,6 +316,14 @@ export default function SpecialFeaturesEditorScreen() {
         }
         console.log('Special feature updated successfully');
         Alert.alert(t('common:success'), t('special_features_editor:updated_success'));
+
+        // Save Spanish translations
+        if (formData.title_es || formData.message_es) {
+          await saveTranslations('special_features', editingFeature.id, {
+            title_es: formData.title_es,
+            content_es: formData.message_es,
+          });
+        }
       } else {
         console.log('Creating new special feature');
         const { error } = await supabase.rpc('create_special_feature', {
@@ -324,6 +361,22 @@ export default function SpecialFeaturesEditorScreen() {
         }
         
         Alert.alert(t('common:success'), t('special_features_editor:created_success'));
+
+        // Save Spanish translations for newly created item
+        if (formData.title_es || formData.message_es) {
+          const { data: newItem } = await supabase
+            .from('special_features')
+            .select('id')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          if (newItem) {
+            await saveTranslations('special_features', newItem.id, {
+              title_es: formData.title_es,
+              content_es: formData.message_es,
+            });
+          }
+        }
       }
 
       closeModal();
@@ -393,6 +446,8 @@ export default function SpecialFeaturesEditorScreen() {
       thumbnail_shape: 'square',
       display_order: features.length,
       link: '',
+      title_es: '',
+      message_es: '',
     });
     setStartDateTime(null);
     setEndDateTime(null);
@@ -400,6 +455,7 @@ export default function SpecialFeaturesEditorScreen() {
     setSelectedGuideFile(null);
     setFileSearchQuery('');
     setShowFileSection(false);
+    setShowSpanish(false);
     setShowAddModal(true);
   };
 
@@ -411,7 +467,10 @@ export default function SpecialFeaturesEditorScreen() {
       thumbnail_shape: feature.thumbnail_shape,
       display_order: feature.display_order,
       link: feature.link || '',
+      title_es: feature.title_es || '',
+      message_es: feature.content_es || '',
     });
+    setShowSpanish(!!(feature.title_es || feature.content_es));
     setStartDateTime(feature.start_date_time ? new Date(feature.start_date_time) : null);
     setEndDateTime(feature.end_date_time ? new Date(feature.end_date_time) : null);
     setSelectedImageUri(null);
@@ -790,6 +849,62 @@ export default function SpecialFeaturesEditorScreen() {
                   multiline
                   numberOfLines={4}
                 />
+              </View>
+
+              {/* Spanish Translation Section */}
+              <View style={styles.formGroup}>
+                <TouchableOpacity
+                  style={styles.spanishSectionHeader}
+                  onPress={() => setShowSpanish(!showSpanish)}
+                >
+                  <Text style={styles.formLabel}>{t('translation_section:spanish_section_title')}</Text>
+                  <IconSymbol
+                    ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
+                    android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
+                    size={20}
+                    color="#666666"
+                  />
+                </TouchableOpacity>
+
+                {showSpanish && (
+                  <View style={styles.spanishFields}>
+                    <TouchableOpacity
+                      style={styles.autoTranslateButton}
+                      onPress={handleAutoTranslate}
+                      disabled={translating}
+                    >
+                      {translating ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.autoTranslateButtonText}>
+                          {t('translation_section:auto_translate')}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <Text style={styles.spanishFieldLabel}>{t('translation_section:title_es_label')}</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('translation_section:title_es_placeholder')}
+                      placeholderTextColor="#999999"
+                      value={formData.title_es}
+                      onChangeText={(text) => setFormData({ ...formData, title_es: text })}
+                    />
+
+                    <Text style={[styles.spanishFieldLabel, { marginTop: 12 }]}>{t('translation_section:message_es_label')}</Text>
+                    <TextInput
+                      style={[styles.input, styles.textArea]}
+                      placeholder={t('translation_section:message_es_placeholder')}
+                      placeholderTextColor="#999999"
+                      value={formData.message_es}
+                      onChangeText={(text) => setFormData({ ...formData, message_es: text })}
+                      multiline
+                      numberOfLines={4}
+                    />
+
+                    <Text style={styles.formHint}>{t('translation_section:hint')}</Text>
+                  </View>
+                )}
               </View>
 
               <View style={styles.formGroup}>
@@ -1492,6 +1607,39 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: '#666666',
     marginTop: 6,
     fontStyle: 'italic',
+  },
+  spanishSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  spanishFields: {
+    marginTop: 8,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#D0E8FF',
+  },
+  autoTranslateButton: {
+    backgroundColor: '#3498DB',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  autoTranslateButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  spanishFieldLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#666666',
+    marginBottom: 4,
   },
   input: {
     backgroundColor: '#F5F5F5',

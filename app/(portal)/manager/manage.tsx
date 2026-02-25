@@ -168,6 +168,33 @@ export default function ManagerManageScreen() {
               </View>
             </TouchableOpacity>
 
+            {/* Server Assistant Editor */}
+            <TouchableOpacity
+              style={[styles.card, { backgroundColor: colors.card }]}
+              onPress={() => router.push('/server-assistant-editor')}
+            >
+              <View style={styles.cardContent}>
+                <IconSymbol
+                  ios_icon_name="tray.full.fill"
+                  android_material_icon_name="room-service"
+                  size={28}
+                  color={colors.highlight}
+                />
+                <View style={styles.cardTextContainer}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.server_assistant_editor')}</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                    {t('manager_manage.server_assistant_editor_desc')}
+                  </Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={24}
+                  color={colors.textSecondary}
+                />
+              </View>
+            </TouchableOpacity>
+
             {/* Bartender Assistant Editor */}
             <TouchableOpacity
               style={[styles.card, { backgroundColor: colors.card }]}
@@ -197,7 +224,7 @@ export default function ManagerManageScreen() {
 
             {/* Host Assistant Editor */}
             <TouchableOpacity
-              style={[styles.card, styles.lastCard, { backgroundColor: colors.card }]}
+              style={[styles.card, { backgroundColor: colors.card }]}
               onPress={() => router.push('/host-assistant-editor')}
             >
               <View style={styles.cardContent}>
@@ -211,6 +238,33 @@ export default function ManagerManageScreen() {
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.host_assistant_editor')}</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     {t('manager_manage.host_assistant_editor_desc')}
+                  </Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={24}
+                  color={colors.textSecondary}
+                />
+              </View>
+            </TouchableOpacity>
+
+            {/* Kitchen Assistant Editor */}
+            <TouchableOpacity
+              style={[styles.card, styles.lastCard, { backgroundColor: colors.card }]}
+              onPress={() => router.push('/kitchen-assistant-editor')}
+            >
+              <View style={styles.cardContent}>
+                <IconSymbol
+                  ios_icon_name="flame.fill"
+                  android_material_icon_name="local-fire-department"
+                  size={28}
+                  color={colors.highlight}
+                />
+                <View style={styles.cardTextContainer}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.kitchen_assistant_editor')}</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                    {t('manager_manage.kitchen_assistant_editor_desc')}
                   </Text>
                 </View>
                 <IconSymbol

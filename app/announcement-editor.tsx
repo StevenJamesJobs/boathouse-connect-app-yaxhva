@@ -24,6 +24,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
+import { translateTexts, saveTranslations } from '@/utils/translateContent';
 
 interface Announcement {
   id: string;
@@ -39,6 +40,8 @@ interface Announcement {
   created_at: string;
   link: string | null;
   guide_file_id: string | null;
+  title_es?: string | null;
+  content_es?: string | null;
 }
 
 interface GuideFile {
@@ -77,9 +80,13 @@ export default function AnnouncementEditorScreen() {
     thumbnail_shape: 'square',
     display_order: 0,
     link: '',
+    title_es: '',
+    message_es: '',
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [showSpanish, setShowSpanish] = useState(false);
+  const [translating, setTranslating] = useState(false);
 
   useEffect(() => {
     loadAnnouncements();
@@ -218,6 +225,28 @@ export default function AnnouncementEditorScreen() {
     }
   };
 
+  const handleAutoTranslate = async () => {
+    if (!formData.title && !formData.message) {
+      Alert.alert(t('common:error'), t('translation_section:no_content_to_translate'));
+      return;
+    }
+    setTranslating(true);
+    try {
+      const results = await translateTexts([formData.title, formData.message]);
+      setFormData(prev => ({
+        ...prev,
+        title_es: results[0] || '',
+        message_es: results[1] || '',
+      }));
+      setShowSpanish(true);
+    } catch (err) {
+      console.error('Auto-translate error:', err);
+      Alert.alert(t('common:error'), t('translation_section:translate_failed'));
+    } finally {
+      setTranslating(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!formData.title || !formData.message) {
       Alert.alert('Error', t('announcement_editor:error_fill_fields'));
@@ -270,6 +299,14 @@ export default function AnnouncementEditorScreen() {
         }
         console.log('Announcement updated successfully');
         Alert.alert('Success', t('announcement_editor:updated_success'));
+
+        // Save Spanish translations
+        if (formData.title_es || formData.message_es) {
+          await saveTranslations('announcements', editingAnnouncement.id, {
+            title_es: formData.title_es,
+            content_es: formData.message_es,
+          });
+        }
       } else {
         console.log('Creating new announcement');
         const { error } = await supabase.rpc('create_announcement', {
@@ -308,6 +345,22 @@ export default function AnnouncementEditorScreen() {
         }
         
         Alert.alert('Success', t('announcement_editor:created_success'));
+
+        // Save Spanish translations for newly created item
+        if (formData.title_es || formData.message_es) {
+          const { data: newItem } = await supabase
+            .from('announcements')
+            .select('id')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          if (newItem) {
+            await saveTranslations('announcements', newItem.id, {
+              title_es: formData.title_es,
+              content_es: formData.message_es,
+            });
+          }
+        }
       }
 
       closeModal();
@@ -379,11 +432,14 @@ export default function AnnouncementEditorScreen() {
       thumbnail_shape: 'square',
       display_order: announcements.length,
       link: '',
+      title_es: '',
+      message_es: '',
     });
     setSelectedImageUri(null);
     setSelectedGuideFile(null);
     setFileSearchQuery('');
     setShowFileSection(false);
+    setShowSpanish(false);
     setShowAddModal(true);
   };
 
@@ -397,7 +453,10 @@ export default function AnnouncementEditorScreen() {
       thumbnail_shape: announcement.thumbnail_shape,
       display_order: announcement.display_order,
       link: announcement.link || '',
+      title_es: announcement.title_es || '',
+      message_es: announcement.content_es || '',
     });
+    setShowSpanish(!!(announcement.title_es || announcement.content_es));
     setSelectedImageUri(null);
     
     // Load the attached guide file if exists
@@ -798,6 +857,62 @@ export default function AnnouncementEditorScreen() {
                   multiline
                   numberOfLines={4}
                 />
+              </View>
+
+              {/* Spanish Translation Section */}
+              <View style={styles.formGroup}>
+                <TouchableOpacity
+                  style={styles.spanishSectionHeader}
+                  onPress={() => setShowSpanish(!showSpanish)}
+                >
+                  <Text style={styles.formLabel}>{t('translation_section:spanish_section_title')}</Text>
+                  <IconSymbol
+                    ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
+                    android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
+                    size={20}
+                    color="#666666"
+                  />
+                </TouchableOpacity>
+
+                {showSpanish && (
+                  <View style={styles.spanishFields}>
+                    <TouchableOpacity
+                      style={styles.autoTranslateButton}
+                      onPress={handleAutoTranslate}
+                      disabled={translating}
+                    >
+                      {translating ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.autoTranslateButtonText}>
+                          {t('translation_section:auto_translate')}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <Text style={styles.spanishFieldLabel}>{t('translation_section:title_es_label')}</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('translation_section:title_es_placeholder')}
+                      placeholderTextColor="#999999"
+                      value={formData.title_es}
+                      onChangeText={(text) => setFormData({ ...formData, title_es: text })}
+                    />
+
+                    <Text style={[styles.spanishFieldLabel, { marginTop: 12 }]}>{t('translation_section:message_es_label')}</Text>
+                    <TextInput
+                      style={[styles.input, styles.textArea]}
+                      placeholder={t('translation_section:message_es_placeholder')}
+                      placeholderTextColor="#999999"
+                      value={formData.message_es}
+                      onChangeText={(text) => setFormData({ ...formData, message_es: text })}
+                      multiline
+                      numberOfLines={4}
+                    />
+
+                    <Text style={styles.formHint}>{t('translation_section:hint')}</Text>
+                  </View>
+                )}
               </View>
 
               <View style={styles.formGroup}>
@@ -1317,6 +1432,39 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: '#666666',
     marginTop: 6,
     fontStyle: 'italic',
+  },
+  spanishSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  spanishFields: {
+    marginTop: 8,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#D0E8FF',
+  },
+  autoTranslateButton: {
+    backgroundColor: '#3498DB',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  autoTranslateButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  spanishFieldLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#666666',
+    marginBottom: 4,
   },
   input: {
     backgroundColor: '#F5F5F5',
