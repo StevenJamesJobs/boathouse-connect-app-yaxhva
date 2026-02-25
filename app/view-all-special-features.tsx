@@ -17,6 +17,8 @@ import { IconSymbol } from '@/components/IconSymbol';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { getLocalizedField } from '@/utils/translateContent';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface GuideFile {
   id: string;
@@ -29,7 +31,9 @@ interface GuideFile {
 interface SpecialFeature {
   id: string;
   title: string;
+  title_es?: string | null;
   content: string;
+  content_es?: string | null;
   message: string | null;
   thumbnail_url: string | null;
   thumbnail_shape: string;
@@ -46,6 +50,7 @@ interface SpecialFeature {
 export default function ViewAllSpecialFeaturesScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const colors = useThemeColors();
   const [features, setFeatures] = useState<SpecialFeature[]>([]);
   const [loading, setLoading] = useState(true);
@@ -104,8 +109,8 @@ export default function ViewAllSpecialFeaturesScreen() {
 
   const openDetailModal = (feature: SpecialFeature) => {
     setSelectedFeature({
-      title: feature.title,
-      content: feature.content || feature.message || '',
+      title: getLocalizedField(feature, 'title', language),
+      content: getLocalizedField(feature, 'content', language) || feature.content || feature.message || '',
       thumbnailUrl: feature.thumbnail_url,
       thumbnailShape: feature.thumbnail_shape,
       startDateTime: feature.start_date_time,
@@ -194,10 +199,10 @@ export default function ViewAllSpecialFeaturesScreen() {
                   />
                 )}
                 <View style={styles.squareContent}>
-                  <Text style={[styles.featureTitle, { color: colors.text }]}>{feature.title}</Text>
+                  <Text style={[styles.featureTitle, { color: colors.text }]}>{getLocalizedField(feature, 'title', language)}</Text>
                   {(feature.content || feature.message) && (
                     <Text style={[styles.featureMessage, { color: colors.textSecondary }]} numberOfLines={2}>
-                      {feature.content || feature.message}
+                      {getLocalizedField(feature, 'content', language) || feature.content || feature.message}
                     </Text>
                   )}
                   {feature.start_date_time && (

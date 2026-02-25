@@ -19,6 +19,8 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import MonthlyCalendar from '@/components/MonthlyCalendar';
 import { eventFallsOnDate } from '@/utils/dateUtils';
+import { getLocalizedField } from '@/utils/translateContent';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface GuideFile {
   id: string;
@@ -31,7 +33,9 @@ interface GuideFile {
 interface UpcomingEvent {
   id: string;
   title: string;
+  title_es?: string | null;
   content: string;
+  content_es?: string | null;
   message: string | null;
   thumbnail_url: string | null;
   thumbnail_shape: string;
@@ -49,6 +53,7 @@ interface UpcomingEvent {
 export default function ViewAllUpcomingEventsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventsTab, setEventsTab] = useState<'Event' | 'Entertainment'>('Event');
@@ -110,8 +115,8 @@ export default function ViewAllUpcomingEventsScreen() {
 
   const openDetailModal = (event: UpcomingEvent) => {
     setSelectedEvent({
-      title: event.title,
-      content: event.content || event.message || '',
+      title: getLocalizedField(event, 'title', language),
+      content: getLocalizedField(event, 'content', language) || event.content || event.message || '',
       thumbnailUrl: event.thumbnail_url,
       thumbnailShape: event.thumbnail_shape,
       startDateTime: event.start_date_time,
@@ -253,10 +258,10 @@ export default function ViewAllUpcomingEventsScreen() {
                       style={styles.squareImage}
                     />
                     <View style={styles.squareContent}>
-                      <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+                      <Text style={[styles.eventTitle, { color: colors.text }]}>{getLocalizedField(event, 'title', language)}</Text>
                       {(event.content || event.message) && (
                         <Text style={[styles.eventMessage, { color: colors.textSecondary }]} numberOfLines={2}>
-                          {event.content || event.message}
+                          {getLocalizedField(event, 'content', language) || event.content || event.message}
                         </Text>
                       )}
                       {event.start_date_time && (
@@ -311,10 +316,10 @@ export default function ViewAllUpcomingEventsScreen() {
                       />
                     )}
                     <View style={styles.eventContent}>
-                      <Text style={[styles.eventTitle, { color: colors.text }]}>{event.title}</Text>
+                      <Text style={[styles.eventTitle, { color: colors.text }]}>{getLocalizedField(event, 'title', language)}</Text>
                       {(event.content || event.message) && (
                         <Text style={[styles.eventMessage, { color: colors.textSecondary }]}>
-                          {event.content || event.message}
+                          {getLocalizedField(event, 'content', language) || event.content || event.message}
                         </Text>
                       )}
                       {event.start_date_time && (
