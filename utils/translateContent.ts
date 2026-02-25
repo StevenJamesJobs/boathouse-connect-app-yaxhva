@@ -61,7 +61,32 @@ export function getLocalizedField(
 }
 
 /**
- * Saves Spanish translation fields to a Supabase table.
+ * Maps table names to their corresponding translation save RPC function names
+ * and parameter mappings. Using RPCs with SECURITY DEFINER ensures translations
+ * are saved regardless of RLS policies on the tables.
+ */
+const TRANSLATION_RPC_MAP: Record<string, { rpc: string; paramMap: Record<string, string> }> = {
+  announcements: {
+    rpc: 'update_announcement_translations',
+    paramMap: { title_es: 'p_title_es', content_es: 'p_content_es' },
+  },
+  special_features: {
+    rpc: 'update_special_feature_translations',
+    paramMap: { title_es: 'p_title_es', content_es: 'p_content_es' },
+  },
+  upcoming_events: {
+    rpc: 'update_upcoming_event_translations',
+    paramMap: { title_es: 'p_title_es', content_es: 'p_content_es' },
+  },
+  menu_items: {
+    rpc: 'update_menu_item_translations',
+    paramMap: { name_es: 'p_name_es', description_es: 'p_description_es' },
+  },
+};
+
+/**
+ * Saves Spanish translation fields to a Supabase table via RPC.
+ * Uses SECURITY DEFINER RPCs to bypass RLS policies.
  * Called after the main RPC save to avoid modifying existing RPCs.
  *
  * @param table - The Supabase table name (e.g., 'announcements', 'menu_items')
@@ -74,29 +99,20 @@ export async function saveTranslations(
   translations: Record<string, string>
 ): Promise<boolean> {
   try {
-    // Only save non-empty translations
-    const nonEmptyTranslations: Record<string, string | null> = {};
-    let hasContent = false;
-    for (const [key, value] of Object.entries(translations)) {
-      if (value && value.trim()) {
-        nonEmptyTranslations[key] = value;
-        hasContent = true;
-      } else {
-        nonEmptyTranslations[key] = null; // Clear empty translations
-      }
+    const rpcConfig = TRANSLATION_RPC_MAP[table];
+    if (!rpcConfig) {
+      console.error(`No translation RPC configured for table: ${table}`);
+      return false;
     }
 
-    if (!hasContent) {
-      // Still save nulls to clear any previous translations if all fields are empty
-      const { error } = await supabase.from(table).update(nonEmptyTranslations).eq('id', id);
-      if (error) {
-        console.error(`Failed to clear translations for ${table}:`, error);
-        return false;
-      }
-      return true;
+    // Build RPC parameters: always include p_id, map translation fields to RPC params
+    const rpcParams: Record<string, string | null> = { p_id: id };
+    for (const [fieldName, paramName] of Object.entries(rpcConfig.paramMap)) {
+      const value = translations[fieldName];
+      rpcParams[paramName] = value && value.trim() ? value : null;
     }
 
-    const { error } = await supabase.from(table).update(nonEmptyTranslations).eq('id', id);
+    const { error } = await supabase.rpc(rpcConfig.rpc, rpcParams);
 
     if (error) {
       console.error(`Failed to save translations for ${table}:`, error);
