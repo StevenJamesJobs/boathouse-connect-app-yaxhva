@@ -9,6 +9,7 @@
     "scheme": "boathouseconnect",
     "userInterfaceStyle": "automatic",
     "splash": {
+      "image": "./assets/images/splash-placeholder.png",
       "resizeMode": "cover",
       "backgroundColor": "#4A8C3F"
     },
@@ -50,8 +51,12 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#4A8C3F",
+          "image": "./assets/images/splash-placeholder.png",
+          "imageResizeMode": "cover",
           "dark": {
-            "backgroundColor": "#4A8C3F"
+            "backgroundColor": "#4A8C3F",
+            "image": "./assets/images/splash-placeholder.png",
+            "imageResizeMode": "cover"
           }
         }
       ],
