@@ -8,6 +8,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { SystemBars } from "react-native-edge-to-edge";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { Alert, Platform, View, Text, StyleSheet } from "react-native";
+import AnimatedSplash from "@/components/AnimatedSplash";
 import { useNetworkState } from "expo-network";
 import {
   DarkTheme,
@@ -106,24 +107,19 @@ function RootLayoutNav() {
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
-  const [splashReady, setSplashReady] = React.useState(false);
+  const [showSplash, setShowSplash] = React.useState(true);
 
-  // Track when the app started loading
+  // Hide native splash as soon as fonts are loaded (AnimatedSplash takes over visually)
   useEffect(() => {
-    const splashMinDelay = setTimeout(() => {
-      setSplashReady(true);
-    }, 1500); // Minimum 1.5 seconds splash display
-    return () => clearTimeout(splashMinDelay);
-  }, []);
-
-  useEffect(() => {
-    if (loaded && splashReady) {
-      console.log('[RootLayout] Fonts loaded & splash delay complete, hiding splash screen');
-      SplashScreen.hideAsync().catch((error) => {
-        console.log('[RootLayout] Error hiding splash screen:', error);
+    if (loaded) {
+      // Small delay to ensure AnimatedSplash is rendered before native splash hides
+      requestAnimationFrame(() => {
+        SplashScreen.hideAsync().catch((error) => {
+          console.log('[RootLayout] Error hiding splash screen:', error);
+        });
       });
     }
-  }, [loaded, splashReady]);
+  }, [loaded]);
 
   useEffect(() => {
     if (
@@ -182,7 +178,7 @@ function RootLayoutNav() {
     return () => clearTimeout(navigationTimeout);
   }, [isAuthenticated, isLoading, segments, loaded, user?.role, router]);
 
-  if (!loaded || isLoading || !splashReady) {
+  if (!loaded || isLoading) {
     console.log('[RootLayout] Still loading, returning null');
     return null;
   }
@@ -203,7 +199,7 @@ function RootLayoutNav() {
   console.log('[RootLayout] Rendering main navigation');
 
   return (
-    <>
+    <View style={{ flex: 1 }}>
       <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
       <ThemeProvider value={navigationTheme}>
         <WidgetProvider>
@@ -219,7 +215,10 @@ function RootLayoutNav() {
           </NotificationProvider>
         </WidgetProvider>
       </ThemeProvider>
-    </>
+      {showSplash && (
+        <AnimatedSplash onFinish={() => setShowSplash(false)} />
+      )}
+    </View>
   );
 }
 

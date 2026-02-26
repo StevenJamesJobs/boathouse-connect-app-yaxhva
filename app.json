@@ -3,20 +3,19 @@
     "name": "Boathouse Connect",
     "slug": "BoathouseConnect",
     "owner": "stevenjamesjobs",
-    "version": "1.6.1",
+    "version": "1.6.2",
     "orientation": "portrait",
     "icon": "./assets/images/MarchStPatricksAppClip.png",
     "scheme": "boathouseconnect",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/MarchStPatricksSplashScreen.png",
       "resizeMode": "cover",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#4A8C3F"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.stevenjamesjobs.mcloonesboathouseconnect",
-      "buildNumber": "1.6.1",
+      "buildNumber": "1.6.2",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": ["remote-notification"]
@@ -29,7 +28,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.mcloonesboathouse.GPboathouseconnect",
-      "versionCode": 160,
+      "versionCode": 161,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "INTERNET",
@@ -50,13 +49,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#ffffff",
-          "image": "./assets/images/MarchStPatricksSplashScreen.png",
-          "imageResizeMode": "cover",
+          "backgroundColor": "#4A8C3F",
           "dark": {
-            "backgroundColor": "#ffffff",
-            "image": "./assets/images/MarchStPatricksSplashScreen.png",
-            "imageResizeMode": "cover"
+            "backgroundColor": "#4A8C3F"
           }
         }
       ],
