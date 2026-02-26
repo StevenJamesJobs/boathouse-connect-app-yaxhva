@@ -163,6 +163,14 @@ export default function EmployeePortalScreen() {
     loadSpecialFeatures();
   }, []);
 
+  // Reload data when language changes to ensure translated fields are available
+  useEffect(() => {
+    loadWeeklySpecials();
+    loadAnnouncements();
+    loadUpcomingEvents();
+    loadSpecialFeatures();
+  }, [language]);
+
   useFocusEffect(
     React.useCallback(() => {
       console.log('Employee portal screen focused, refreshing data...');
