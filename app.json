@@ -5,7 +5,7 @@
     "owner": "stevenjamesjobs",
     "version": "1.6.1",
     "orientation": "portrait",
-    "icon": "./assets/images/MarchStPatricksAppClip.PNG",
+    "icon": "./assets/images/MarchStPatricksAppClip.png",
     "scheme": "boathouseconnect",
     "userInterfaceStyle": "automatic",
     "splash": {
@@ -25,7 +25,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/MarchStPatricksAppClip.PNG",
+        "foregroundImage": "./assets/images/MarchStPatricksAppClip.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.mcloonesboathouse.GPboathouseconnect",
@@ -63,7 +63,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/MarchStPatricksAppClip.PNG",
+          "icon": "./assets/images/MarchStPatricksAppClip.png",
           "color": "#ffffff",
           "sounds": [],
           "mode": "production"
