@@ -12,6 +12,7 @@ import {
   Image,
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
+import { useTranslation } from 'react-i18next';
 
 interface DayForecast {
   date: string;
@@ -43,6 +44,7 @@ interface WeatherDetailData {
 interface WeatherDetailModalProps {
   visible: boolean;
   onClose: () => void;
+  language?: string;
   colors: {
     text: string;
     textSecondary: string;
@@ -58,8 +60,10 @@ const LOCATION = 'West Orange, NJ'; // Zip code 07003
 export default function WeatherDetailModal({
   visible,
   onClose,
+  language = 'en',
   colors,
 }: WeatherDetailModalProps) {
+  const { t } = useTranslation();
   const [weatherData, setWeatherData] = useState<WeatherDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,18 +73,21 @@ export default function WeatherDetailModal({
       console.log('Weather detail modal opened, fetching fresh data...');
       fetchDetailedWeather();
     }
-  }, [visible]);
+  }, [visible, language]);
 
   const fetchDetailedWeather = async () => {
     try {
       setLoading(true);
       setError(null);
 
+      const langParam = language === 'es' ? 'es' : 'en';
+      const dateLocale = language === 'es' ? 'es-ES' : 'en-US';
+
       // The free plan only returns 3 days (today + 2 future), so we fetch
       // the standard forecast first, then make individual calls for extra days
       // using the `dt` parameter to get 4 future days total.
       const response = await fetch(
-        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=3&aqi=no&alerts=no`
+        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=3&aqi=no&alerts=no&lang=${langParam}`
       );
 
       if (!response.ok) {
@@ -96,32 +103,36 @@ export default function WeatherDetailModal({
       const todayDay = today.day;
       const todayAstro = today.astro;
 
-      let detailedForecast = `Today's forecast: ${todayDay.condition.text}. `;
-      detailedForecast += `High of ${Math.round(todayDay.maxtemp_f)}°F and low of ${Math.round(todayDay.mintemp_f)}°F. `;
+      let parts: string[] = [];
+
+      parts.push(t('weather.forecast_condition', { condition: todayDay.condition.text }));
+      parts.push(t('weather.forecast_high_low', { high: Math.round(todayDay.maxtemp_f), low: Math.round(todayDay.mintemp_f) }));
 
       if (todayDay.daily_chance_of_rain > 30) {
-        detailedForecast += `${todayDay.daily_chance_of_rain}% chance of rain. `;
+        parts.push(t('weather.forecast_rain', { percent: todayDay.daily_chance_of_rain }));
       }
 
       if (todayDay.daily_chance_of_snow > 30) {
-        detailedForecast += `${todayDay.daily_chance_of_snow}% chance of snow. `;
+        parts.push(t('weather.forecast_snow', { percent: todayDay.daily_chance_of_snow }));
       }
 
       if (todayDay.maxwind_mph > 15) {
-        detailedForecast += `Winds up to ${Math.round(todayDay.maxwind_mph)} mph. `;
+        parts.push(t('weather.forecast_wind', { speed: Math.round(todayDay.maxwind_mph) }));
       }
 
-      detailedForecast += `Humidity around ${todayDay.avghumidity}%. `;
+      parts.push(t('weather.forecast_humidity', { humidity: todayDay.avghumidity }));
 
       if (todayDay.uv >= 6) {
-        detailedForecast += `High UV index of ${todayDay.uv} - sun protection recommended. `;
+        parts.push(t('weather.forecast_uv', { uv: todayDay.uv }));
       }
 
       if (todayDay.avgvis_miles < 5) {
-        detailedForecast += `Reduced visibility of ${todayDay.avgvis_miles} miles. `;
+        parts.push(t('weather.forecast_visibility', { vis: todayDay.avgvis_miles }));
       }
 
-      detailedForecast += `Sunrise at ${todayAstro.sunrise}, sunset at ${todayAstro.sunset}.`;
+      parts.push(t('weather.forecast_sun_times', { sunrise: todayAstro.sunrise, sunset: todayAstro.sunset }));
+
+      const detailedForecast = parts.join(' ');
 
       // Collect forecast days from the initial response (skip today at index 0)
       const futureDaysFromBatch = data.forecast.forecastday.slice(1); // days 1 and 2
@@ -139,7 +150,7 @@ export default function WeatherDetailModal({
         console.log(`Fetching extra forecast for day +${offset}: ${dateStr}`);
         extraDayPromises.push(
           fetch(
-            `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&dt=${dateStr}&aqi=no&alerts=no`
+            `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&dt=${dateStr}&aqi=no&alerts=no&lang=${langParam}`
           )
             .then(r => r.ok ? r.json() : null)
             .then(d => d?.forecast?.forecastday?.[0] ?? null)
@@ -155,12 +166,12 @@ export default function WeatherDetailModal({
 
       const next4Days: DayForecast[] = allFutureDays.map((day: any, index: number) => {
         const date = new Date(day.date + 'T00:00:00');
-        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
+        const dayOfWeek = date.toLocaleDateString(dateLocale, { weekday: 'short' });
 
         console.log(`Processing future day ${index + 1}: ${dayOfWeek} ${day.date} - High: ${Math.round(day.day.maxtemp_f)}°F, Low: ${Math.round(day.day.mintemp_f)}°F`);
 
         return {
-          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          date: date.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
           dayOfWeek,
           conditionIcon: `https:${day.day.condition.icon}`,
           conditionText: day.day.condition.text,
@@ -175,12 +186,8 @@ export default function WeatherDetailModal({
       });
 
       // Use North Jersey focused radar from NOAA with timestamp to force refresh
-      // Adjusted to better center on North Jersey area (West Orange, NJ area)
-      // Using NOAA radar station KOKX (New York) which provides better North Jersey coverage
-      // This station is positioned to show more of the North Jersey area
       const timestamp = Date.now();
       const radarImageUrl = `https://radar.weather.gov/ridge/standard/KDIX_loop.gif?t=${timestamp}`;
-      console.log('Radar URL with timestamp (North Jersey focus - KOKX):', radarImageUrl);
 
       const weatherDetail: WeatherDetailData = {
         currentTemp: Math.round(data.current.temp_f),
@@ -203,7 +210,7 @@ export default function WeatherDetailModal({
       setWeatherData(weatherDetail);
     } catch (err) {
       console.error('Error fetching detailed weather:', err);
-      setError('Unable to load weather data');
+      setError(t('weather.error'));
     } finally {
       setLoading(false);
     }
@@ -250,19 +257,19 @@ export default function WeatherDetailModal({
                 <View style={styles.loadingContainer}>
                   <ActivityIndicator size="large" color={colors.primary} />
                   <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-                    Loading detailed weather...
+                    {t('weather.loading_detailed')}
                   </Text>
                 </View>
               ) : error || !weatherData ? (
                 <View style={styles.errorContainer}>
                   <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-                    {error || 'Weather data unavailable'}
+                    {error || t('weather.unavailable')}
                   </Text>
                 </View>
               ) : (
                 <>
                   {/* Title */}
-                  <Text style={[styles.title, { color: colors.text }]}>Weather Details</Text>
+                  <Text style={[styles.title, { color: colors.text }]}>{t('weather.details_title')}</Text>
                   <Text style={[styles.location, { color: colors.textSecondary }]}>West Orange, NJ</Text>
 
                   {/* Current Weather Section */}
@@ -281,7 +288,7 @@ export default function WeatherDetailModal({
                           {weatherData.conditionText}
                         </Text>
                         <Text style={[styles.feelsLike, { color: colors.textSecondary }]}>
-                          Feels like {weatherData.feelsLike}°F
+                          {t('weather.feels_like', { temp: weatherData.feelsLike })}
                         </Text>
                       </View>
                     </View>
@@ -289,7 +296,7 @@ export default function WeatherDetailModal({
                     {/* Today's Detailed Forecast */}
                     <View style={styles.detailedForecastContainer}>
                       <Text style={[styles.detailedForecastTitle, { color: colors.text }]}>
-                        Today&apos;s Detailed Forecast
+                        {t('weather.todays_detailed_forecast')}
                       </Text>
                       <Text style={[styles.detailedForecastText, { color: colors.textSecondary }]}>
                         {weatherData.detailedForecast}
@@ -298,11 +305,11 @@ export default function WeatherDetailModal({
 
                     {/* Extended Forecast - 4 Days */}
                     <View style={styles.forecastSection}>
-                      <Text style={[styles.forecastTitle, { color: colors.text }]}>Extended Forecast</Text>
+                      <Text style={[styles.forecastTitle, { color: colors.text }]}>{t('weather.extended_forecast')}</Text>
 
                       {weatherData.next4Days.length === 0 ? (
                         <Text style={[styles.noDataText, { color: colors.textSecondary }]}>
-                          No forecast data available.
+                          {t('weather.no_forecast')}
                         </Text>
                       ) : (
                         <View style={styles.horizontalForecastContainer}>
@@ -353,10 +360,10 @@ export default function WeatherDetailModal({
                     {/* Radar Image - North Jersey Area */}
                     <View style={styles.radarContainer}>
                       <Text style={[styles.radarTitle, { color: colors.text }]}>
-                        Local Radar
+                        {t('weather.local_radar')}
                       </Text>
                       <Text style={[styles.radarSubtitle, { color: colors.textSecondary }]}>
-                        North Jersey Area
+                        {t('weather.radar_area')}
                       </Text>
                       <View style={[styles.radarImageWrapper, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}>
                         <Image
@@ -378,7 +385,7 @@ export default function WeatherDetailModal({
                             size={18}
                             color={colors.primary}
                           />
-                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Humidity</Text>
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('weather.humidity')}</Text>
                           <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.humidity}%</Text>
                         </View>
 
@@ -389,9 +396,9 @@ export default function WeatherDetailModal({
                             size={18}
                             color={colors.primary}
                           />
-                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Wind</Text>
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('weather.wind')}</Text>
                           <Text style={[styles.detailValue, { color: colors.text }]}>
-                            {weatherData.windSpeed} mph
+                            {t('weather.mph', { speed: weatherData.windSpeed })}
                           </Text>
                         </View>
 
@@ -402,8 +409,8 @@ export default function WeatherDetailModal({
                             size={18}
                             color={colors.primary}
                           />
-                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Visibility</Text>
-                          <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.visibility} mi</Text>
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('weather.visibility')}</Text>
+                          <Text style={[styles.detailValue, { color: colors.text }]}>{t('weather.miles', { vis: weatherData.visibility })}</Text>
                         </View>
                       </View>
 
@@ -416,7 +423,7 @@ export default function WeatherDetailModal({
                             size={18}
                             color={colors.primary}
                           />
-                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>UV Index</Text>
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('weather.uv_index')}</Text>
                           <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.uvIndex}</Text>
                         </View>
 
@@ -427,7 +434,7 @@ export default function WeatherDetailModal({
                             size={18}
                             color={colors.primary}
                           />
-                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Sunrise</Text>
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('weather.sunrise')}</Text>
                           <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.sunrise}</Text>
                         </View>
 
@@ -438,7 +445,7 @@ export default function WeatherDetailModal({
                             size={18}
                             color={colors.primary}
                           />
-                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>Sunset</Text>
+                          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('weather.sunset')}</Text>
                           <Text style={[styles.detailValue, { color: colors.text }]}>{weatherData.sunset}</Text>
                         </View>
                       </View>

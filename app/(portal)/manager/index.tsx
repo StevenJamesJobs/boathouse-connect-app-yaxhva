@@ -587,6 +587,7 @@ export default function ManagerPortalScreen() {
           <WeatherWidget
             textColor={colors.text}
             secondaryTextColor={colors.textSecondary}
+            language={language}
             onPress={openWeatherDetail}
           />
         </CollapsibleSection>
@@ -1013,6 +1014,7 @@ export default function ManagerPortalScreen() {
       <WeatherDetailModal
         visible={weatherDetailVisible}
         onClose={closeWeatherDetail}
+        language={language}
         colors={{
           text: colors.text,
           textSecondary: colors.textSecondary,
