@@ -3,7 +3,7 @@
     "name": "Boathouse Connect",
     "slug": "BoathouseConnect",
     "owner": "stevenjamesjobs",
-    "version": "1.6.2",
+    "version": "1.6.3",
     "orientation": "portrait",
     "icon": "./assets/images/MarchStPatricksAppClip.png",
     "scheme": "boathouseconnect",
@@ -16,10 +16,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.stevenjamesjobs.mcloonesboathouseconnect",
-      "buildNumber": "1.6.2",
+      "buildNumber": "1.6.3",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": ["remote-notification"],
+        "NSPhotoLibraryUsageDescription": "Boathouse Connect needs access to your photo library so you can upload a profile picture, as well as images for menu items, announcements, special features, upcoming events, and recipes."
       },
       "googleServicesFile": "./GoogleService-Info.plist"
     },
@@ -29,7 +30,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.mcloonesboathouse.GPboathouseconnect",
-      "versionCode": 161,
+      "versionCode": 162,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "INTERNET",
@@ -47,6 +48,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Boathouse Connect needs access to your photo library so you can upload a profile picture, as well as images for menu items, announcements, special features, upcoming events, and recipes."
+        }
+      ],
       [
         "expo-splash-screen",
         {
