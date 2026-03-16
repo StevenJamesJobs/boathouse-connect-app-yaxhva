@@ -1,0 +1,70 @@
+# Claude Code worktrees and transcripts (4+ GB)
+.claude/
+
+# Git history
+.git/
+
+# Expo cache
+.expo/
+
+# Build outputs
+dist/
+web-build/
+
+# Natively
+.natively/
+
+# Debug and log files
+*.orig.*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+firebase-debug.log
+chat_history.json
+
+# Docs/notes (not needed for build)
+*.md
+
+# OS files
+.DS_Store
+
+# Credentials (should not be in build archive)
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+.env*.local
+
+# Old seasonal images not used in current build
+assets/images/winter-*.png
+assets/images/MarchStPatricks*.png
+assets/images/MarchStPatricks*.jpg
+assets/images/MarchMadnessAppClip.jpg
+
+# Unused UUID-named images (old splash/icon variants)
+# Keep only the ones actually referenced in code
+assets/images/0f42cd7f-7e5a-4383-a089-6bd85d089c0f.png
+assets/images/2cfd19d8-d132-4847-b03c-d4a42337d0a5.png
+assets/images/52e11377-4f09-41a7-94e8-03f9e87a8ae7.png
+assets/images/555ca235-4dfa-4ff2-9aee-7d0c4923fe4e.png
+assets/images/55de323c-15b7-4bd4-b601-5f84b44f5a12.png
+assets/images/622dac42-01da-4df2-b708-d32e1f9a33c4.png
+assets/images/76138b9b-420e-4cd8-ba7c-133463d35f4e.png
+assets/images/80aae0c5-ca12-4f54-9e7f-bb48b905f32b.png
+assets/images/8ac0eba4-ad76-4822-8802-028d159aeddd.png
+assets/images/94cc6bcc-d1eb-4187-a944-9a3a502e3cbf.png
+assets/images/9a572424-b2cb-42fd-8bb7-34bdf00c05d7.png
+assets/images/9e5ac5f9-f39c-450c-a30c-fcf877bbaeaf.png
+assets/images/bb7e6f69-696a-4231-917c-468cfd9ab9fa.png
+assets/images/d20a5364-b165-4067-b1b2-acf64ec2d635.png
+assets/images/e3bca4d4-97fd-4678-b0c3-b8a9c8446d1d.png
+assets/images/f524cc38-38aa-4c30-ae84-eec29ba26ac6.png
+assets/images/fb73c30d-783d-4350-b493-5cda3acb2e89.png
+
+# Metro health checks
+.metro-health-check*
+
+# TypeScript build info
+*.tsbuildinfo
