@@ -19,6 +19,8 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { fetchContentImagesBatch } from '@/utils/contentImages';
+import FormattedText from '@/components/FormattedText';
 
 interface GuideFile {
   id: string;
@@ -54,7 +56,8 @@ export default function ViewAllSpecialFeaturesScreen() {
   const colors = useThemeColors();
   const [features, setFeatures] = useState<SpecialFeature[]>([]);
   const [loading, setLoading] = useState(true);
-  
+  const [contentImagesMap, setContentImagesMap] = useState<Map<string, string[]>>(new Map());
+
   // Detail modal state
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedFeature, setSelectedFeature] = useState<{
@@ -66,6 +69,7 @@ export default function ViewAllSpecialFeaturesScreen() {
     endDateTime?: string | null;
     link?: string | null;
     guideFile?: GuideFile | null;
+    imageUrls?: string[];
   } | null>(null);
 
   useEffect(() => {
@@ -100,6 +104,13 @@ export default function ViewAllSpecialFeaturesScreen() {
       
       console.log('Special features loaded:', data?.length || 0, 'items');
       setFeatures(data || []);
+
+      // Batch fetch additional content images
+      if (data && data.length > 0) {
+        const ids = data.map((f: SpecialFeature) => f.id);
+        const imagesMap = await fetchContentImagesBatch('special_feature', ids);
+        setContentImagesMap(imagesMap);
+      }
     } catch (error) {
       console.error('Error loading special features:', error);
     } finally {
@@ -108,6 +119,11 @@ export default function ViewAllSpecialFeaturesScreen() {
   };
 
   const openDetailModal = (feature: SpecialFeature) => {
+    const additionalImages = contentImagesMap.get(feature.id) || [];
+    const imageUrls = [
+      ...(feature.thumbnail_url ? [feature.thumbnail_url] : []),
+      ...additionalImages,
+    ];
     setSelectedFeature({
       title: getLocalizedField(feature, 'title', language),
       content: getLocalizedField(feature, 'content', language) || feature.content || feature.message || '',
@@ -117,6 +133,7 @@ export default function ViewAllSpecialFeaturesScreen() {
       endDateTime: feature.end_date_time,
       link: feature.link,
       guideFile: feature.guide_file || null,
+      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
     });
     setDetailModalVisible(true);
   };
@@ -201,9 +218,9 @@ export default function ViewAllSpecialFeaturesScreen() {
                 <View style={styles.squareContent}>
                   <Text style={[styles.featureTitle, { color: colors.text }]}>{getLocalizedField(feature, 'title', language)}</Text>
                   {(feature.content || feature.message) && (
-                    <Text style={[styles.featureMessage, { color: colors.textSecondary }]} numberOfLines={2}>
+                    <FormattedText style={[styles.featureMessage, { color: colors.textSecondary }]} numberOfLines={2}>
                       {getLocalizedField(feature, 'content', language) || feature.content || feature.message}
-                    </Text>
+                    </FormattedText>
                   )}
                   {feature.start_date_time && (
                     <View style={styles.featureMeta}>
@@ -258,6 +275,7 @@ export default function ViewAllSpecialFeaturesScreen() {
           endDateTime={selectedFeature.endDateTime}
           link={selectedFeature.link}
           guideFile={selectedFeature.guideFile}
+          imageUrls={selectedFeature.imageUrls}
           colors={{
             text: colors.text,
             textSecondary: colors.textSecondary,

@@ -21,6 +21,8 @@ import MonthlyCalendar from '@/components/MonthlyCalendar';
 import { eventFallsOnDate } from '@/utils/dateUtils';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { fetchContentImagesBatch } from '@/utils/contentImages';
+import FormattedText from '@/components/FormattedText';
 
 interface GuideFile {
   id: string;
@@ -58,6 +60,7 @@ export default function ViewAllUpcomingEventsScreen() {
   const [loading, setLoading] = useState(true);
   const [eventsTab, setEventsTab] = useState<'Event' | 'Entertainment'>('Event');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [contentImagesMap, setContentImagesMap] = useState<Map<string, string[]>>(new Map());
 
   // Detail modal state
   const [detailModalVisible, setDetailModalVisible] = useState(false);
@@ -70,6 +73,7 @@ export default function ViewAllUpcomingEventsScreen() {
     endDateTime?: string | null;
     link?: string | null;
     guideFile?: GuideFile | null;
+    imageUrls?: string[];
   } | null>(null);
 
   const colors = useThemeColors();
@@ -106,6 +110,13 @@ export default function ViewAllUpcomingEventsScreen() {
 
       console.log('Upcoming events loaded:', data?.length || 0, 'items');
       setEvents(data || []);
+
+      // Batch fetch additional content images
+      if (data && data.length > 0) {
+        const ids = data.map((e: UpcomingEvent) => e.id);
+        const imagesMap = await fetchContentImagesBatch('upcoming_event', ids);
+        setContentImagesMap(imagesMap);
+      }
     } catch (error) {
       console.error('Error loading upcoming events:', error);
     } finally {
@@ -114,6 +125,11 @@ export default function ViewAllUpcomingEventsScreen() {
   };
 
   const openDetailModal = (event: UpcomingEvent) => {
+    const additionalImages = contentImagesMap.get(event.id) || [];
+    const imageUrls = [
+      ...(event.thumbnail_url ? [event.thumbnail_url] : []),
+      ...additionalImages,
+    ];
     setSelectedEvent({
       title: getLocalizedField(event, 'title', language),
       content: getLocalizedField(event, 'content', language) || event.content || event.message || '',
@@ -123,6 +139,7 @@ export default function ViewAllUpcomingEventsScreen() {
       endDateTime: event.end_date_time,
       link: event.link,
       guideFile: event.guide_file || null,
+      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
     });
     setDetailModalVisible(true);
   };
@@ -260,9 +277,9 @@ export default function ViewAllUpcomingEventsScreen() {
                     <View style={styles.squareContent}>
                       <Text style={[styles.eventTitle, { color: colors.text }]}>{getLocalizedField(event, 'title', language)}</Text>
                       {(event.content || event.message) && (
-                        <Text style={[styles.eventMessage, { color: colors.textSecondary }]} numberOfLines={2}>
+                        <FormattedText style={[styles.eventMessage, { color: colors.textSecondary }]} numberOfLines={2}>
                           {getLocalizedField(event, 'content', language) || event.content || event.message}
-                        </Text>
+                        </FormattedText>
                       )}
                       {event.start_date_time && (
                         <View style={styles.eventMeta}>
@@ -318,9 +335,9 @@ export default function ViewAllUpcomingEventsScreen() {
                     <View style={styles.eventContent}>
                       <Text style={[styles.eventTitle, { color: colors.text }]}>{getLocalizedField(event, 'title', language)}</Text>
                       {(event.content || event.message) && (
-                        <Text style={[styles.eventMessage, { color: colors.textSecondary }]}>
+                        <FormattedText style={[styles.eventMessage, { color: colors.textSecondary }]}>
                           {getLocalizedField(event, 'content', language) || event.content || event.message}
-                        </Text>
+                        </FormattedText>
                       )}
                       {event.start_date_time && (
                         <View style={styles.eventMeta}>
@@ -394,6 +411,7 @@ export default function ViewAllUpcomingEventsScreen() {
           endDateTime={selectedEvent.endDateTime}
           link={selectedEvent.link}
           guideFile={selectedEvent.guideFile}
+          imageUrls={selectedEvent.imageUrls}
           colors={{
             text: colors.text,
             textSecondary: colors.textSecondary,

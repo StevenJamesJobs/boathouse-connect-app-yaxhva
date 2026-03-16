@@ -65,7 +65,7 @@ export default function ServerAssistantEditorScreen() {
             >
               <View style={styles.cardContent}>
                 <IconSymbol
-                  ios_icon_name="calculator.fill"
+                  ios_icon_name="dollarsign.circle.fill"
                   android_material_icon_name="calculate"
                   size={28}
                   color={colors.highlight}

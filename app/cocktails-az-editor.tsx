@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,9 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
+import RichTextToolbar from '@/components/RichTextToolbar';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { translateTexts, saveTranslations } from '@/utils/translateContent';
 
 interface Cocktail {
   id: string;
@@ -29,6 +32,7 @@ interface Cocktail {
   alcohol_type: string;
   ingredients: string;
   procedure: string | null;
+  procedure_es?: string | null;
   thumbnail_url: string | null;
   display_order: number;
   is_active: boolean;
@@ -52,6 +56,7 @@ export default function CocktailsAZEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { language } = useLanguage();
   const colors = useThemeColors();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
@@ -68,6 +73,11 @@ export default function CocktailsAZEditorScreen() {
   const [procedure, setProcedure] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const procedureInputRef = useRef<TextInput>(null);
+  const [procedureSelection, setProcedureSelection] = useState({ start: 0, end: 0 });
+  const [procedureEs, setProcedureEs] = useState('');
+  const [showSpanish, setShowSpanish] = useState(false);
+  const [translating, setTranslating] = useState(false);
 
   const filterCocktails = useCallback(() => {
     let filtered = cocktails;
@@ -209,6 +219,24 @@ export default function CocktailsAZEditorScreen() {
     }
   };
 
+  const handleAutoTranslate = async () => {
+    if (!procedure.trim()) {
+      Alert.alert(t('common.error'), 'No procedure text to translate');
+      return;
+    }
+    setTranslating(true);
+    try {
+      const results = await translateTexts([procedure]);
+      setProcedureEs(results[0] || '');
+      setShowSpanish(true);
+    } catch (err) {
+      console.error('Auto-translate error:', err);
+      Alert.alert(t('common.error'), 'Translation failed');
+    } finally {
+      setTranslating(false);
+    }
+  };
+
   const handleSave = async () => {
     try {
       if (!name.trim()) {
@@ -252,6 +280,9 @@ export default function CocktailsAZEditorScreen() {
           throw error;
         }
         console.log('Cocktail updated successfully');
+        if (procedureEs.trim()) {
+          await saveTranslations('cocktails', editingCocktail.id, { procedure_es: procedureEs });
+        }
         Alert.alert(t('common.success'), t('cocktails_editor.cocktail_updated'));
       } else {
         // Insert new cocktail using RPC function (same pattern as profile update)
@@ -271,6 +302,15 @@ export default function CocktailsAZEditorScreen() {
           throw error;
         }
         console.log('Cocktail added successfully');
+        const { data: newItems } = await supabase
+          .from('cocktails')
+          .select('id')
+          .eq('name', name.trim())
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (newItems?.[0] && procedureEs.trim()) {
+          await saveTranslations('cocktails', newItems[0].id, { procedure_es: procedureEs });
+        }
         Alert.alert(t('common.success'), t('cocktails_editor.cocktail_added'));
       }
 
@@ -331,6 +371,7 @@ export default function CocktailsAZEditorScreen() {
     setAlcoholType(cocktail.alcohol_type);
     setIngredients(cocktail.ingredients);
     setProcedure(cocktail.procedure || '');
+    setProcedureEs(cocktail.procedure_es || '');
     setThumbnailUrl(cocktail.thumbnail_url);
     setShowModal(true);
   };
@@ -346,6 +387,8 @@ export default function CocktailsAZEditorScreen() {
     setAlcoholType('');
     setIngredients('');
     setProcedure('');
+    setProcedureEs('');
+    setShowSpanish(false);
     setThumbnailUrl(null);
   };
 
@@ -583,7 +626,16 @@ export default function CocktailsAZEditorScreen() {
               {/* Procedure */}
               <View style={styles.formField}>
                 <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.procedure_label')}</Text>
+                <RichTextToolbar
+                  text={procedure}
+                  onChangeText={setProcedure}
+                  selection={procedureSelection}
+                  onSelectionChange={setProcedureSelection}
+                  textInputRef={procedureInputRef}
+                  accentColor={colors.highlight}
+                />
                 <TextInput
+                  ref={procedureInputRef}
                   style={[styles.formInput, styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
                   value={procedure}
                   onChangeText={setProcedure}
@@ -591,7 +643,43 @@ export default function CocktailsAZEditorScreen() {
                   placeholderTextColor={colors.textSecondary}
                   multiline
                   numberOfLines={4}
+                  onSelectionChange={(e) => setProcedureSelection(e.nativeEvent.selection)}
                 />
+              </View>
+
+              {/* Spanish Procedure Translation */}
+              <View style={styles.formField}>
+                <TouchableOpacity
+                  style={[styles.spanishSectionHeader, { backgroundColor: '#FFF3E0' }]}
+                  onPress={() => setShowSpanish(!showSpanish)}
+                >
+                  <Text style={styles.spanishHeaderText}>
+                    {showSpanish ? '▼' : '▶'} Spanish Translation (Procedure)
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.autoTranslateButton, { backgroundColor: colors.highlight }]}
+                    onPress={handleAutoTranslate}
+                    disabled={translating}
+                  >
+                    <Text style={[styles.autoTranslateButtonText, { color: colors.text }]}>
+                      {translating ? 'Translating...' : 'Auto-Translate'}
+                    </Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+                {showSpanish && (
+                  <View style={styles.spanishFields}>
+                    <Text style={[styles.formLabel, { color: colors.text }]}>Procedure (Spanish)</Text>
+                    <TextInput
+                      style={[styles.formInput, styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
+                      value={procedureEs}
+                      onChangeText={setProcedureEs}
+                      placeholder="Procedimiento en español"
+                      placeholderTextColor={colors.textSecondary}
+                      multiline
+                      numberOfLines={4}
+                    />
+                  </View>
+                )}
               </View>
 
               {/* Image Upload */}
@@ -865,5 +953,29 @@ const styles = StyleSheet.create({
   submitButtonText: {
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  spanishSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+  },
+  spanishHeaderText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#E65100',
+  },
+  autoTranslateButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  autoTranslateButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  spanishFields: {
+    marginTop: 8,
   },
 });

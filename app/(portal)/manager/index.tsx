@@ -28,6 +28,9 @@ import { MessageBadge } from '@/components/MessageBadge';
 import UpcomingEventsSection from '@/components/UpcomingEventsSection';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
+import FormattedText from '@/components/FormattedText';
+import { stripFormattingTags } from '@/components/FormattedText';
+import { fetchContentImagesBatch, ContentType } from '@/utils/contentImages';
 
 interface MenuItem {
   id: string;
@@ -139,6 +142,9 @@ export default function ManagerPortalScreen() {
   // Weather detail modal state
   const [weatherDetailVisible, setWeatherDetailVisible] = useState(false);
   
+  // Content images maps (content_id -> additional image URLs)
+  const [contentImagesMap, setContentImagesMap] = useState<Map<string, string[]>>(new Map());
+
   // Detail modal state
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedItem, setSelectedItem] = useState<{
@@ -146,6 +152,7 @@ export default function ManagerPortalScreen() {
     content: string;
     thumbnailUrl?: string | null;
     thumbnailShape?: string;
+    imageUrls?: string[];
     startDateTime?: string | null;
     endDateTime?: string | null;
     priority?: string;
@@ -195,11 +202,17 @@ export default function ManagerPortalScreen() {
             .eq('id', openAnnouncementId)
             .single();
           if (data) {
+            const imgs = await fetchContentImagesBatch('announcement', [data.id]);
+            const additionalImgs = imgs.get(data.id);
+            const allImgs = additionalImgs && additionalImgs.length > 0
+              ? [data.thumbnail_url, ...additionalImgs].filter(Boolean) as string[]
+              : undefined;
             openDetailModal({
               title: getLocalizedField(data, 'title', language),
               content: getLocalizedField(data, 'content', language) || data.content,
               thumbnailUrl: data.thumbnail_url,
               thumbnailShape: data.thumbnail_shape,
+              imageUrls: allImgs,
               priority: data.priority,
               link: data.link,
               guideFile: data.guide_file,
@@ -212,11 +225,17 @@ export default function ManagerPortalScreen() {
             .eq('id', openEventId)
             .single();
           if (data) {
+            const imgs = await fetchContentImagesBatch('upcoming_event', [data.id]);
+            const additionalImgs = imgs.get(data.id);
+            const allImgs = additionalImgs && additionalImgs.length > 0
+              ? [data.thumbnail_url, ...additionalImgs].filter(Boolean) as string[]
+              : undefined;
             openDetailModal({
               title: getLocalizedField(data, 'title', language),
               content: getLocalizedField(data, 'content', language) || data.content,
               thumbnailUrl: data.thumbnail_url,
               thumbnailShape: data.thumbnail_shape,
+              imageUrls: allImgs,
               startDateTime: data.start_date_time,
               endDateTime: data.end_date_time,
               link: data.link,
@@ -230,11 +249,17 @@ export default function ManagerPortalScreen() {
             .eq('id', openFeatureId)
             .single();
           if (data) {
+            const imgs = await fetchContentImagesBatch('special_feature', [data.id]);
+            const additionalImgs = imgs.get(data.id);
+            const allImgs = additionalImgs && additionalImgs.length > 0
+              ? [data.thumbnail_url, ...additionalImgs].filter(Boolean) as string[]
+              : undefined;
             openDetailModal({
               title: getLocalizedField(data, 'title', language),
               content: getLocalizedField(data, 'content', language) || data.content,
               thumbnailUrl: data.thumbnail_url,
               thumbnailShape: data.thumbnail_shape,
+              imageUrls: allImgs,
               startDateTime: data.start_date_time,
               endDateTime: data.end_date_time,
               link: data.link,
@@ -305,6 +330,16 @@ export default function ManagerPortalScreen() {
       
       console.log('Announcements loaded for manager:', data?.length || 0, 'items');
       setAnnouncements(data || []);
+      // Batch fetch additional images for announcements
+      if (data && data.length > 0) {
+        const ids = data.map((a: any) => a.id);
+        const imagesMap = await fetchContentImagesBatch('announcement', ids);
+        setContentImagesMap(prev => {
+          const newMap = new Map(prev);
+          imagesMap.forEach((urls, id) => newMap.set(id, urls));
+          return newMap;
+        });
+      }
     } catch (error) {
       console.error('Error loading announcements:', error);
     } finally {
@@ -340,6 +375,16 @@ export default function ManagerPortalScreen() {
       
       console.log('Upcoming events loaded for manager:', data?.length || 0, 'items');
       setUpcomingEvents(data || []);
+      // Batch fetch additional images for events
+      if (data && data.length > 0) {
+        const ids = data.map((e: any) => e.id);
+        const imagesMap = await fetchContentImagesBatch('upcoming_event', ids);
+        setContentImagesMap(prev => {
+          const newMap = new Map(prev);
+          imagesMap.forEach((urls, id) => newMap.set(id, urls));
+          return newMap;
+        });
+      }
     } catch (error) {
       console.error('Error loading upcoming events:', error);
     } finally {
@@ -376,6 +421,16 @@ export default function ManagerPortalScreen() {
       
       console.log('Special features loaded for manager:', data?.length || 0, 'items');
       setSpecialFeatures(data || []);
+      // Batch fetch additional images for special features
+      if (data && data.length > 0) {
+        const ids = data.map((f: any) => f.id);
+        const imagesMap = await fetchContentImagesBatch('special_feature', ids);
+        setContentImagesMap(prev => {
+          const newMap = new Map(prev);
+          imagesMap.forEach((urls, id) => newMap.set(id, urls));
+          return newMap;
+        });
+      }
     } catch (error) {
       console.error('Error loading special features:', error);
     } finally {
@@ -405,6 +460,7 @@ export default function ManagerPortalScreen() {
     content: string;
     thumbnailUrl?: string | null;
     thumbnailShape?: string;
+    imageUrls?: string[];
     startDateTime?: string | null;
     endDateTime?: string | null;
     priority?: string;
@@ -432,6 +488,16 @@ export default function ManagerPortalScreen() {
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
     return `${url}?t=${Date.now()}`;
+  };
+
+  // Build combined image array: thumbnail first, then additional images from content_images
+  const buildImageUrls = (id: string, thumbnailUrl: string | null): string[] | undefined => {
+    const additionalImages = contentImagesMap.get(id);
+    if (!additionalImages || additionalImages.length === 0) return undefined;
+    const images: string[] = [];
+    if (thumbnailUrl) images.push(thumbnailUrl);
+    images.push(...additionalImages);
+    return images;
   };
 
   const getProfilePictureUrl = (url: string | null | undefined) => {
@@ -504,15 +570,16 @@ export default function ManagerPortalScreen() {
 
   const truncateText = (text: string | null, maxLength: number = 125): string => {
     if (!text) return '';
-    if (text.length <= maxLength) return text;
-    
-    const truncated = text.substring(0, maxLength);
+    const stripped = stripFormattingTags(text);
+    if (stripped.length <= maxLength) return stripped;
+
+    const truncated = stripped.substring(0, maxLength);
     const lastSpace = truncated.lastIndexOf(' ');
-    
+
     if (lastSpace > 100) {
       return truncated.substring(0, lastSpace) + '...';
     }
-    
+
     return truncated + '...';
   };
 
@@ -650,6 +717,7 @@ export default function ManagerPortalScreen() {
                         content: getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message || '',
                         thumbnailUrl: announcement.thumbnail_url,
                         thumbnailShape: announcement.thumbnail_shape,
+                        imageUrls: buildImageUrls(announcement.id, announcement.thumbnail_url),
                         priority: announcement.priority,
                         link: announcement.link,
                         guideFile: announcement.guide_file || null,
@@ -679,9 +747,9 @@ export default function ManagerPortalScreen() {
                                 </View>
                               )}
                             </View>
-                            <Text style={[styles.announcementText, { color: colors.textSecondary }]} numberOfLines={2}>
+                            <FormattedText style={[styles.announcementText, { color: colors.textSecondary }]} numberOfLines={2}>
                               {getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message}
-                            </Text>
+                            </FormattedText>
                           </View>
                         </View>
                       ) : (
@@ -709,7 +777,7 @@ export default function ManagerPortalScreen() {
                             )}
                           </View>
                           <Text style={[styles.announcementText, { color: colors.textSecondary }]}>
-                            {truncateText(getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message, 125)}
+                            {truncateText(getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message)}
                           </Text>
                         </>
                       )}
@@ -744,6 +812,7 @@ export default function ManagerPortalScreen() {
                         content: getLocalizedField(feature, 'content', language) || feature.content || feature.message || '',
                         thumbnailUrl: feature.thumbnail_url,
                         thumbnailShape: feature.thumbnail_shape,
+                        imageUrls: buildImageUrls(feature.id, feature.thumbnail_url),
                         startDateTime: feature.start_date_time,
                         endDateTime: feature.end_date_time,
                         link: feature.link,
@@ -760,9 +829,9 @@ export default function ManagerPortalScreen() {
                           <View style={styles.featureSquareContent}>
                             <Text style={[styles.featureTitle, { color: colors.text }]}>{getLocalizedField(feature, 'title', language)}</Text>
                             {(feature.content || feature.message) && (
-                              <Text style={[styles.featureDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+                              <FormattedText style={[styles.featureDescription, { color: colors.textSecondary }]} numberOfLines={2}>
                                 {getLocalizedField(feature, 'content', language) || feature.content || feature.message}
-                              </Text>
+                              </FormattedText>
                             )}
                             {feature.start_date_time && (
                               <Text style={[styles.featureTime, { color: colors.textSecondary }]}>{formatDateTime(feature.start_date_time)}</Text>
@@ -781,7 +850,7 @@ export default function ManagerPortalScreen() {
                             <Text style={[styles.featureTitle, { color: colors.text }]}>{getLocalizedField(feature, 'title', language)}</Text>
                             {(feature.content || feature.message) && (
                               <Text style={[styles.featureDescription, { color: colors.textSecondary }]}>
-                                {truncateText(getLocalizedField(feature, 'content', language) || feature.content || feature.message, 125)}
+                                {truncateText(getLocalizedField(feature, 'content', language) || feature.content || feature.message)}
                               </Text>
                             )}
                             {feature.start_date_time && (
@@ -822,6 +891,7 @@ export default function ManagerPortalScreen() {
               highlight: colors.border,
             }}
             onEventPress={openDetailModal}
+            contentImagesMap={contentImagesMap}
             maxItems={4}
             language={language}
           />
@@ -997,6 +1067,7 @@ export default function ManagerPortalScreen() {
           content={selectedItem.content}
           thumbnailUrl={selectedItem.thumbnailUrl}
           thumbnailShape={selectedItem.thumbnailShape}
+          imageUrls={selectedItem.imageUrls}
           startDateTime={selectedItem.startDateTime}
           endDateTime={selectedItem.endDateTime}
           priority={selectedItem.priority}

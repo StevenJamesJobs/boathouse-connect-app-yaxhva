@@ -17,6 +17,9 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import FormattedText from '@/components/FormattedText';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/translateContent';
 
 interface LibationRecipe {
   id: string;
@@ -27,6 +30,7 @@ interface LibationRecipe {
   garnish: string | null;
   ingredients: { amount: string; ingredient: string }[];
   procedure: string | null;
+  procedure_es?: string | null;
   thumbnail_url: string | null;
   display_order: number;
   is_active: boolean;
@@ -47,6 +51,7 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1514362545857-3bc16
 export default function LibationRecipesScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const colors = useThemeColors();
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -355,7 +360,7 @@ export default function LibationRecipesScreen() {
                       />
                       <Text style={styles.sectionTitleRed}>{t('libation_recipes.procedure')}</Text>
                     </View>
-                    <Text style={styles.procedureText}>{selectedRecipe.procedure}</Text>
+                    <FormattedText style={styles.procedureText}>{getLocalizedField(selectedRecipe, 'procedure', language)}</FormattedText>
                   </View>
                 )}
 

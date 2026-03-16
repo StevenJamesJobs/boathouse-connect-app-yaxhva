@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Dimensions, Image } from "react-native";
 
-const splashImage = require("../assets/images/MarchStPatricksSplashScreen.jpg");
+const splashImage = require("../assets/images/MarchMadnessSplashScreen.jpg");
 const { width, height } = Dimensions.get("screen");
 
 interface AnimatedSplashProps {
@@ -40,7 +40,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 999,
     elevation: 999,
-    backgroundColor: "#4A8C3F",
+    backgroundColor: "#1a3a5c",
   },
   image: {
     width,

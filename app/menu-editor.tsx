@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useTranslation } from 'react-i18next';
-import { translateTexts, saveTranslations } from '@/utils/translateContent';
+import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
+import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useLanguage } from '@/contexts/LanguageContext';
+import RichTextToolbar from '@/components/RichTextToolbar';
+import FormattedText from '@/components/FormattedText';
 
 interface MenuItem {
   id: string;
@@ -62,6 +67,7 @@ export default function MenuEditorScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { user } = useAuth();
+  const { language } = useLanguage();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -93,6 +99,8 @@ export default function MenuEditorScreen() {
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [showSpanish, setShowSpanish] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const descriptionInputRef = useRef<TextInput>(null);
+  const [descriptionSelection, setDescriptionSelection] = useState({ start: 0, end: 0 });
 
   useEffect(() => {
     loadMenuItems();
@@ -422,6 +430,87 @@ export default function MenuEditorScreen() {
     );
   };
 
+  const handleMoveUp = async (index: number) => {
+    if (index <= 0) return;
+    const items = [...filteredItems];
+    const currentItem = items[index];
+    const aboveItem = items[index - 1];
+    const currentOrder = currentItem.display_order;
+    const aboveOrder = aboveItem.display_order;
+    // Swap in filteredItems
+    items[index] = { ...aboveItem, display_order: currentOrder };
+    items[index - 1] = { ...currentItem, display_order: aboveOrder };
+    setFilteredItems(items);
+    // Also update in main menuItems array
+    const newMenuItems = [...menuItems];
+    const ci = newMenuItems.findIndex(m => m.id === currentItem.id);
+    const ai = newMenuItems.findIndex(m => m.id === aboveItem.id);
+    if (ci >= 0) newMenuItems[ci] = { ...newMenuItems[ci], display_order: aboveOrder };
+    if (ai >= 0) newMenuItems[ai] = { ...newMenuItems[ai], display_order: currentOrder };
+    setMenuItems(newMenuItems);
+    try {
+      await Promise.all([
+        supabase.from('menu_items').update({ display_order: aboveOrder }).eq('id', currentItem.id),
+        supabase.from('menu_items').update({ display_order: currentOrder }).eq('id', aboveItem.id),
+      ]);
+    } catch (error) {
+      console.error('Error moving menu item up:', error);
+      loadMenuItems();
+    }
+  };
+
+  const handleMoveDown = async (index: number) => {
+    if (index >= filteredItems.length - 1) return;
+    const items = [...filteredItems];
+    const currentItem = items[index];
+    const belowItem = items[index + 1];
+    const currentOrder = currentItem.display_order;
+    const belowOrder = belowItem.display_order;
+    items[index] = { ...belowItem, display_order: currentOrder };
+    items[index + 1] = { ...currentItem, display_order: belowOrder };
+    setFilteredItems(items);
+    const newMenuItems = [...menuItems];
+    const ci = newMenuItems.findIndex(m => m.id === currentItem.id);
+    const bi = newMenuItems.findIndex(m => m.id === belowItem.id);
+    if (ci >= 0) newMenuItems[ci] = { ...newMenuItems[ci], display_order: belowOrder };
+    if (bi >= 0) newMenuItems[bi] = { ...newMenuItems[bi], display_order: currentOrder };
+    setMenuItems(newMenuItems);
+    try {
+      await Promise.all([
+        supabase.from('menu_items').update({ display_order: belowOrder }).eq('id', currentItem.id),
+        supabase.from('menu_items').update({ display_order: currentOrder }).eq('id', belowItem.id),
+      ]);
+    } catch (error) {
+      console.error('Error moving menu item down:', error);
+      loadMenuItems();
+    }
+  };
+
+  const handleDragEnd = async ({ data: reorderedData }: { data: MenuItem[] }) => {
+    const updatedFiltered = reorderedData.map((item, index) => ({
+      ...item,
+      display_order: index,
+    }));
+    setFilteredItems(updatedFiltered);
+    // Update in main menuItems array too
+    const newMenuItems = [...menuItems];
+    updatedFiltered.forEach((item) => {
+      const idx = newMenuItems.findIndex(m => m.id === item.id);
+      if (idx >= 0) newMenuItems[idx] = { ...newMenuItems[idx], display_order: item.display_order };
+    });
+    setMenuItems(newMenuItems);
+    try {
+      const updates = reorderedData.map((item, index) =>
+        supabase.from('menu_items').update({ display_order: index }).eq('id', item.id)
+      );
+      await Promise.all(updates);
+      console.log('Drag reorder persisted successfully');
+    } catch (error) {
+      console.error('Error persisting drag reorder:', error);
+      loadMenuItems();
+    }
+  };
+
   const openAddModal = () => {
     setEditingItem(null);
     setFormData({
@@ -652,45 +741,35 @@ export default function MenuEditorScreen() {
           <ActivityIndicator size="large" color={colors.highlight} />
         </View>
       ) : (
-        <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
-          {filteredItems.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <IconSymbol
-                ios_icon_name="fork.knife"
-                android_material_icon_name="restaurant-menu"
-                size={64}
-                color={colors.textSecondary}
-              />
-              <Text style={styles.emptyText}>
-                {t('menu_editor:empty_title')}
-              </Text>
-              <Text style={styles.emptySubtext}>
-                {searchQuery
-                  ? t('menu_editor:empty_search_subtext')
-                  : t('menu_editor:empty_subtext')
-                }
-              </Text>
-            </View>
-          ) : (
-            filteredItems.map((item, index) => (
-              <View key={index} style={styles.menuItemCard}>
-                {/* Display thumbnail based on shape - Square layout or Banner layout */}
+        <>
+        {filteredItems.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <IconSymbol
+              ios_icon_name="fork.knife"
+              android_material_icon_name="restaurant-menu"
+              size={64}
+              color={colors.textSecondary}
+            />
+            <Text style={styles.emptyText}>
+              {t('menu_editor:empty_title')}
+            </Text>
+            <Text style={styles.emptySubtext}>
+              {searchQuery
+                ? t('menu_editor:empty_search_subtext')
+                : t('menu_editor:empty_subtext')
+              }
+            </Text>
+          </View>
+        ) : searchQuery ? (
+          <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
+            {filteredItems.map((item, index) => (
+              <View key={item.id} style={styles.menuItemCard}>
                 {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
                   <View style={styles.squareLayout}>
-                    <Image
-                      key={getImageUrl(item.thumbnail_url)}
-                      source={{ uri: getImageUrl(item.thumbnail_url) }}
-                      style={styles.squareImage}
-                      onError={(error) => {
-                        console.error('Image load error for item:', item.name, error.nativeEvent);
-                      }}
-                      onLoad={() => {
-                        console.log('Image loaded successfully for item:', item.name);
-                      }}
-                    />
+                    <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.squareImage} />
                     <View style={styles.squareContent}>
                       <View style={styles.squareHeader}>
-                        <Text style={styles.menuItemName}>{item.name}</Text>
+                        <Text style={styles.menuItemName}>{getLocalizedField(item, 'name', language)}</Text>
                         <View style={styles.priceOrderContainer}>
                           <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
                           <View style={styles.displayOrderBadgeCompact}>
@@ -699,67 +778,25 @@ export default function MenuEditorScreen() {
                         </View>
                       </View>
                       {item.description && (
-                        <Text style={styles.squareDescription} numberOfLines={2}>
-                          {item.description}
-                        </Text>
+                        <FormattedText style={styles.squareDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>
                       )}
                       <View style={styles.menuItemTags}>
-                        {item.subcategory && (
-                          <View style={styles.tag}>
-                            <Text style={styles.tagText}>{item.subcategory}</Text>
-                          </View>
-                        )}
-                        {item.available_for_lunch && (
-                          <View style={[styles.tag, styles.tagAvailability]}>
-                            <Text style={styles.tagText}>{t('menu_editor:available_lunch')}</Text>
-                          </View>
-                        )}
-                        {item.available_for_dinner && (
-                          <View style={[styles.tag, styles.tagAvailability]}>
-                            <Text style={styles.tagText}>{t('menu_editor:available_dinner')}</Text>
-                          </View>
-                        )}
-                        {item.is_gluten_free && (
-                          <View style={[styles.tag, styles.tagDietary]}>
-                            <Text style={styles.tagText}>GF</Text>
-                          </View>
-                        )}
-                        {item.is_gluten_free_available && (
-                          <View style={[styles.tag, styles.tagDietary]}>
-                            <Text style={styles.tagText}>GFA</Text>
-                          </View>
-                        )}
-                        {item.is_vegetarian && (
-                          <View style={[styles.tag, styles.tagDietary]}>
-                            <Text style={styles.tagText}>V</Text>
-                          </View>
-                        )}
-                        {item.is_vegetarian_available && (
-                          <View style={[styles.tag, styles.tagDietary]}>
-                            <Text style={styles.tagText}>VA</Text>
-                          </View>
-                        )}
+                        {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
+                        {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_lunch')}</Text></View>}
+                        {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_dinner')}</Text></View>}
+                        {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
+                        {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
+                        {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
+                        {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
                       </View>
                     </View>
                   </View>
                 ) : (
                   <>
-                    {item.thumbnail_url && (
-                      <Image
-                        key={getImageUrl(item.thumbnail_url)}
-                        source={{ uri: getImageUrl(item.thumbnail_url) }}
-                        style={styles.menuItemImageBanner}
-                        onError={(error) => {
-                          console.error('Image load error for item:', item.name, error.nativeEvent);
-                        }}
-                        onLoad={() => {
-                          console.log('Image loaded successfully for item:', item.name);
-                        }}
-                      />
-                    )}
+                    {item.thumbnail_url && <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.menuItemImageBanner} />}
                     <View style={styles.menuItemContent}>
                       <View style={styles.menuItemHeader}>
-                        <Text style={styles.menuItemName}>{item.name}</Text>
+                        <Text style={styles.menuItemName}>{getLocalizedField(item, 'name', language)}</Text>
                         <View style={styles.priceOrderContainer}>
                           <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
                           <View style={styles.displayOrderBadgeCompact}>
@@ -767,83 +804,148 @@ export default function MenuEditorScreen() {
                           </View>
                         </View>
                       </View>
-                      {item.description && (
-                        <Text style={styles.menuItemDescription} numberOfLines={2}>
-                          {item.description}
-                        </Text>
-                      )}
+                      {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
                       <View style={styles.menuItemTags}>
-                        {item.subcategory && (
-                          <View style={styles.tag}>
-                            <Text style={styles.tagText}>{item.subcategory}</Text>
-                          </View>
-                        )}
-                        {item.available_for_lunch && (
-                          <View style={[styles.tag, styles.tagAvailability]}>
-                            <Text style={styles.tagText}>{t('menu_editor:available_lunch')}</Text>
-                          </View>
-                        )}
-                        {item.available_for_dinner && (
-                          <View style={[styles.tag, styles.tagAvailability]}>
-                            <Text style={styles.tagText}>{t('menu_editor:available_dinner')}</Text>
-                          </View>
-                        )}
-                        {item.is_gluten_free && (
-                          <View style={[styles.tag, styles.tagDietary]}>
-                            <Text style={styles.tagText}>GF</Text>
-                          </View>
-                        )}
-                        {item.is_gluten_free_available && (
-                          <View style={[styles.tag, styles.tagDietary]}>
-                            <Text style={styles.tagText}>GFA</Text>
-                          </View>
-                        )}
-                        {item.is_vegetarian && (
-                          <View style={[styles.tag, styles.tagDietary]}>
-                            <Text style={styles.tagText}>V</Text>
-                          </View>
-                        )}
-                        {item.is_vegetarian_available && (
-                          <View style={[styles.tag, styles.tagDietary]}>
-                            <Text style={styles.tagText}>VA</Text>
-                          </View>
-                        )}
+                        {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
+                        {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_lunch')}</Text></View>}
+                        {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_dinner')}</Text></View>}
+                        {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
+                        {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
+                        {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
+                        {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
                       </View>
                     </View>
                   </>
                 )}
                 <View style={styles.menuItemActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => openEditModal(item)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="pencil"
-                      android_material_icon_name="edit"
-                      size={20}
-                      color={colors.highlight}
-                    />
+                  <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}>
+                    <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.highlight} />
                     <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.deleteButton]}
-                    onPress={() => handleDelete(item)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="trash"
-                      android_material_icon_name="delete"
-                      size={20}
-                      color="#E74C3C"
-                    />
-                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                      {t('common:delete')}
-                    </Text>
+                  <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)}>
+                    <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color="#E74C3C" />
+                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>{t('common:delete')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
-            ))
-          )}
-        </ScrollView>
+            ))}
+          </ScrollView>
+        ) : (
+          <View style={styles.itemsList}>
+            {filteredItems.length > 1 && (
+              <Text style={styles.reorderHint}>{t('upcoming_events_editor:reorder_hint')}</Text>
+            )}
+            <DraggableFlatList
+              data={filteredItems}
+              keyExtractor={(item) => item.id}
+              onDragEnd={handleDragEnd}
+              activationDistance={10}
+              contentContainerStyle={styles.itemsListContent}
+              renderItem={({ item, getIndex, drag, isActive }: RenderItemParams<MenuItem>) => {
+                const index = getIndex() ?? 0;
+
+                return (
+                  <ScaleDecorator>
+                    <View style={[styles.menuItemCard, isActive && styles.menuItemCardDragging]}>
+                      {/* Drag Handle */}
+                      <TouchableOpacity
+                        onLongPress={drag}
+                        disabled={isActive}
+                        style={styles.dragHandle}
+                      >
+                        <IconSymbol
+                          ios_icon_name="line.3.horizontal.decrease"
+                          android_material_icon_name="drag-indicator"
+                          size={20}
+                          color="#FFFFFF"
+                        />
+                      </TouchableOpacity>
+
+                      {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
+                        <View style={styles.squareLayout}>
+                          <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.squareImage} />
+                          <View style={styles.squareContent}>
+                            <View style={styles.squareHeader}>
+                              <Text style={styles.menuItemName}>{getLocalizedField(item, 'name', language)}</Text>
+                              <View style={styles.priceOrderContainer}>
+                                <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                                <View style={styles.displayOrderBadgeCompact}>
+                                  <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
+                                </View>
+                              </View>
+                            </View>
+                            {item.description && (
+                              <FormattedText style={styles.squareDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>
+                            )}
+                            <View style={styles.menuItemTags}>
+                              {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
+                              {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_lunch')}</Text></View>}
+                              {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_dinner')}</Text></View>}
+                              {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
+                              {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
+                              {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
+                              {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
+                            </View>
+                          </View>
+                        </View>
+                      ) : (
+                        <>
+                          {item.thumbnail_url && <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.menuItemImageBanner} />}
+                          <View style={styles.menuItemContent}>
+                            <View style={styles.menuItemHeader}>
+                              <Text style={styles.menuItemName}>{getLocalizedField(item, 'name', language)}</Text>
+                              <View style={styles.priceOrderContainer}>
+                                <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                                <View style={styles.displayOrderBadgeCompact}>
+                                  <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
+                                </View>
+                              </View>
+                            </View>
+                            {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
+                            <View style={styles.menuItemTags}>
+                              {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
+                              {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_lunch')}</Text></View>}
+                              {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_dinner')}</Text></View>}
+                              {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
+                              {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
+                              {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
+                              {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
+                            </View>
+                          </View>
+                        </>
+                      )}
+                      <View style={styles.menuItemActions}>
+                        <TouchableOpacity
+                          style={[styles.arrowButton, index === 0 && styles.arrowButtonDisabled]}
+                          onPress={() => handleMoveUp(index)}
+                          disabled={index === 0}
+                        >
+                          <IconSymbol ios_icon_name="arrow.up" android_material_icon_name="arrow-upward" size={18} color={index === 0 ? colors.textSecondary : colors.highlight} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.arrowButton, index === filteredItems.length - 1 && styles.arrowButtonDisabled]}
+                          onPress={() => handleMoveDown(index)}
+                          disabled={index === filteredItems.length - 1}
+                        >
+                          <IconSymbol ios_icon_name="arrow.down" android_material_icon_name="arrow-downward" size={18} color={index === filteredItems.length - 1 ? colors.textSecondary : colors.highlight} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}>
+                          <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.highlight} />
+                          <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)}>
+                          <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color="#E74C3C" />
+                          <Text style={[styles.actionButtonText, styles.deleteButtonText]}>{t('common:delete')}</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  </ScaleDecorator>
+                );
+              }}
+            />
+          </View>
+        )}
+        </>
       )}
 
       {/* Add/Edit Modal */}
@@ -960,7 +1062,16 @@ export default function MenuEditorScreen() {
               {/* Description */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{t('menu_editor:description_label')}</Text>
+                <RichTextToolbar
+                  text={formData.description}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
+                  selection={descriptionSelection}
+                  onSelectionChange={setDescriptionSelection}
+                  textInputRef={descriptionInputRef}
+                  accentColor={colors.highlight}
+                />
                 <TextInput
+                  ref={descriptionInputRef}
                   style={[styles.input, styles.textArea]}
                   placeholder={t('menu_editor:description_placeholder')}
                   placeholderTextColor="#999999"
@@ -968,6 +1079,7 @@ export default function MenuEditorScreen() {
                   onChangeText={(text) => setFormData({ ...formData, description: text })}
                   multiline
                   numberOfLines={4}
+                  onSelectionChange={(e) => setDescriptionSelection(e.nativeEvent.selection)}
                 />
               </View>
 
@@ -1491,6 +1603,10 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
+  menuItemCardDragging: {
+    opacity: 0.9,
+    transform: [{ scale: 1.02 }],
+  },
   // Square layout styles (image on left, content on right)
   squareLayout: {
     flexDirection: 'row',
@@ -1629,6 +1745,35 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   deleteButtonText: {
     color: '#E74C3C',
+  },
+  dragHandle: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    padding: 6,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 14,
+  },
+  reorderHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  arrowButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowButtonDisabled: {
+    opacity: 0.3,
   },
   // Modal styles
   modalContainer: {

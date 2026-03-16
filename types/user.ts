@@ -9,6 +9,7 @@ export interface User {
   phoneNumber: string;
   role: 'employee' | 'manager';
   profilePictureUrl?: string;
+  badgeTitle?: string; // Custom badge title override (e.g., "General Manager")
 }
 
 export interface AuthState {

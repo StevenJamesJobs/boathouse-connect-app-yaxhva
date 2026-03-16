@@ -1066,7 +1066,9 @@
     "upload_image_error": "Failed to upload image",
     "move_up": "Move Up",
     "move_down": "Move Down",
-    "reorder_hint": "Hold and drag to reorder, or use arrows"
+    "reorder_hint": "Hold and drag to reorder, or use arrows",
+    "send_notification_label": "Send Push Notification",
+    "send_notification_hint": "Turn off when adding multiple events to avoid sending repeated notifications. You can send one notification from the Notification Center when done."
   },
   "menu_editor": {
     "title": "Menu Editor",

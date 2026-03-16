@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -25,7 +25,13 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
-import { translateTexts, saveTranslations } from '@/utils/translateContent';
+import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
+import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { fetchContentImages, saveContentImages, uploadImageToStorage, deleteContentImages } from '@/utils/contentImages';
+import RichTextToolbar from '@/components/RichTextToolbar';
+import FormattedText from '@/components/FormattedText';
 
 interface SpecialFeature {
   id: string;
@@ -61,6 +67,7 @@ export default function SpecialFeaturesEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { sendNotification } = useNotification();
+  const { language } = useLanguage();
   const [features, setFeatures] = useState<SpecialFeature[]>([]);
   const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,8 +95,13 @@ export default function SpecialFeaturesEditorScreen() {
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  // Additional images state
+  const [additionalImageUrls, setAdditionalImageUrls] = useState<string[]>([]);
+  const [newAdditionalImageUris, setNewAdditionalImageUris] = useState<string[]>([]);
   const [showSpanish, setShowSpanish] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const contentInputRef = useRef<TextInput>(null);
+  const [contentSelection, setContentSelection] = useState({ start: 0, end: 0 });
 
   useEffect(() => {
     loadFeatures();
@@ -183,6 +195,30 @@ export default function SpecialFeaturesEditorScreen() {
     } catch (error) {
       console.error('Error picking image:', error);
       Alert.alert(t('common:error'), t('special_features_editor:pick_image_error'));
+    }
+  };
+
+  const pickAdditionalImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: formData.thumbnail_shape === 'square' ? [1, 1] : [16, 9],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]) {
+        setNewAdditionalImageUris(prev => [...prev, result.assets[0].uri]);
+      }
+    } catch (error) {
+      console.error('Error picking additional image:', error);
+    }
+  };
+
+  const removeAdditionalImage = (index: number, isNew: boolean) => {
+    if (isNew) {
+      setNewAdditionalImageUris(prev => prev.filter((_, i) => i !== index));
+    } else {
+      setAdditionalImageUrls(prev => prev.filter((_, i) => i !== index));
     }
   };
 
@@ -324,6 +360,19 @@ export default function SpecialFeaturesEditorScreen() {
             content_es: formData.message_es,
           });
         }
+
+        // Upload new additional images and save all to content_images
+        const uploadedNewUrls: string[] = [];
+        for (const uri of newAdditionalImageUris) {
+          const url = await uploadImageToStorage(uri, 'special_feature', (u) =>
+            FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
+          );
+          if (url) uploadedNewUrls.push(url);
+        }
+        const allAdditionalUrls = [...additionalImageUrls, ...uploadedNewUrls];
+        if (allAdditionalUrls.length > 0 || additionalImageUrls.length > 0) {
+          await saveContentImages('special_feature', editingFeature.id, allAdditionalUrls);
+        }
       } else {
         console.log('Creating new special feature');
         const { error } = await supabase.rpc('create_special_feature', {
@@ -377,6 +426,28 @@ export default function SpecialFeaturesEditorScreen() {
             });
           }
         }
+
+        // Upload and save additional images for newly created item
+        if (newAdditionalImageUris.length > 0) {
+          const { data: newItem } = await supabase
+            .from('special_features')
+            .select('id')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          if (newItem && newAdditionalImageUris.length > 0) {
+            const uploadedNewUrls: string[] = [];
+            for (const uri of newAdditionalImageUris) {
+              const url = await uploadImageToStorage(uri, 'special_feature', (u) =>
+                FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
+              );
+              if (url) uploadedNewUrls.push(url);
+            }
+            if (uploadedNewUrls.length > 0) {
+              await saveContentImages('special_feature', newItem.id, uploadedNewUrls);
+            }
+          }
+        }
       }
 
       closeModal();
@@ -424,6 +495,9 @@ export default function SpecialFeaturesEditorScreen() {
                 }
               }
 
+              // Clean up additional images
+              await deleteContentImages('special_feature', feature.id);
+
               console.log('Special feature deleted successfully');
               Alert.alert(t('common:success'), t('special_features_editor:deleted_success'));
               
@@ -436,6 +510,67 @@ export default function SpecialFeaturesEditorScreen() {
         },
       ]
     );
+  };
+
+  const handleMoveUp = async (index: number) => {
+    if (index <= 0) return;
+    const newFeatures = [...features];
+    const currentOrder = newFeatures[index].display_order;
+    const aboveOrder = newFeatures[index - 1].display_order;
+    [newFeatures[index], newFeatures[index - 1]] = [newFeatures[index - 1], newFeatures[index]];
+    newFeatures[index].display_order = currentOrder;
+    newFeatures[index - 1].display_order = aboveOrder;
+    setFeatures(newFeatures);
+    try {
+      await Promise.all([
+        supabase.from('special_features').update({ display_order: aboveOrder }).eq('id', features[index].id),
+        supabase.from('special_features').update({ display_order: currentOrder }).eq('id', features[index - 1].id),
+      ]);
+    } catch (error) {
+      console.error('Error moving feature up:', error);
+      await loadFeatures();
+    }
+  };
+
+  const handleMoveDown = async (index: number) => {
+    if (index >= features.length - 1) return;
+    const newFeatures = [...features];
+    const currentOrder = newFeatures[index].display_order;
+    const belowOrder = newFeatures[index + 1].display_order;
+    [newFeatures[index], newFeatures[index + 1]] = [newFeatures[index + 1], newFeatures[index]];
+    newFeatures[index].display_order = currentOrder;
+    newFeatures[index + 1].display_order = belowOrder;
+    setFeatures(newFeatures);
+    try {
+      await Promise.all([
+        supabase.from('special_features').update({ display_order: belowOrder }).eq('id', features[index].id),
+        supabase.from('special_features').update({ display_order: currentOrder }).eq('id', features[index + 1].id),
+      ]);
+    } catch (error) {
+      console.error('Error moving feature down:', error);
+      await loadFeatures();
+    }
+  };
+
+  const handleDragEnd = async ({ data: reorderedData }: { data: SpecialFeature[] }) => {
+    const updatedData = reorderedData.map((item, index) => ({
+      ...item,
+      display_order: index,
+    }));
+    setFeatures(updatedData);
+    try {
+      const updates = reorderedData.map((item, index) =>
+        supabase
+          .from('special_features')
+          .update({ display_order: index })
+          .eq('id', item.id)
+      );
+      await Promise.all(updates);
+      console.log('Drag reorder persisted successfully');
+    } catch (error) {
+      console.error('Error persisting drag reorder:', error);
+      await loadFeatures();
+    }
   };
 
   const openAddModal = () => {
@@ -452,6 +587,8 @@ export default function SpecialFeaturesEditorScreen() {
     setStartDateTime(null);
     setEndDateTime(null);
     setSelectedImageUri(null);
+    setAdditionalImageUrls([]);
+    setNewAdditionalImageUris([]);
     setSelectedGuideFile(null);
     setFileSearchQuery('');
     setShowFileSection(false);
@@ -474,7 +611,10 @@ export default function SpecialFeaturesEditorScreen() {
     setStartDateTime(feature.start_date_time ? new Date(feature.start_date_time) : null);
     setEndDateTime(feature.end_date_time ? new Date(feature.end_date_time) : null);
     setSelectedImageUri(null);
-    
+    setNewAdditionalImageUris([]);
+    const existingImages = await fetchContentImages('special_feature', feature.id);
+    setAdditionalImageUrls(existingImages);
+
     // Load the attached guide file if exists
     if (feature.guide_file_id) {
       const guideFile = guideFiles.find(g => g.id === feature.guide_file_id);
@@ -492,6 +632,8 @@ export default function SpecialFeaturesEditorScreen() {
     setShowAddModal(false);
     setEditingFeature(null);
     setSelectedImageUri(null);
+    setAdditionalImageUrls([]);
+    setNewAdditionalImageUris([]);
     setSelectedGuideFile(null);
     setStartDateTime(null);
     setEndDateTime(null);
@@ -587,147 +729,143 @@ export default function SpecialFeaturesEditorScreen() {
           <ActivityIndicator size="large" color={colors.highlight} />
           <Text style={styles.loadingText}>{t('special_features_editor:loading')}</Text>
         </View>
+      ) : features.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <IconSymbol
+            ios_icon_name="star.fill"
+            android_material_icon_name="star"
+            size={64}
+            color={colors.textSecondary}
+          />
+          <Text style={styles.emptyText}>{t('special_features_editor:empty_title')}</Text>
+          <Text style={styles.emptySubtext}>
+            {t('special_features_editor:empty_subtitle')}
+          </Text>
+        </View>
       ) : (
-        <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
-          {features.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <IconSymbol
-                ios_icon_name="star.fill"
-                android_material_icon_name="star"
-                size={64}
-                color={colors.textSecondary}
-              />
-              <Text style={styles.emptyText}>{t('special_features_editor:empty_title')}</Text>
-              <Text style={styles.emptySubtext}>
-                {t('special_features_editor:empty_subtitle')}
-              </Text>
-            </View>
-          ) : (
-            features.map((feature, index) => (
-              <View key={index} style={styles.featureCard}>
-                {feature.thumbnail_shape === 'square' && feature.thumbnail_url ? (
-                  <View style={styles.squareLayout}>
-                    <Image
-                      key={getImageUrl(feature.thumbnail_url)}
-                      source={{ uri: getImageUrl(feature.thumbnail_url) }}
-                      style={styles.squareImage}
-                    />
-                    <View style={styles.squareContent}>
-                      <Text style={styles.featureTitle}>{feature.title}</Text>
-                      {(feature.content || feature.message) && (
-                        <Text style={styles.squareMessage} numberOfLines={2}>
-                          {feature.content || feature.message}
-                        </Text>
-                      )}
-                      <View style={styles.featureMeta}>
-                        {feature.start_date_time && (
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="calendar"
-                              android_material_icon_name="event"
-                              size={14}
-                              color={colors.textSecondary}
-                            />
-                            <Text style={styles.metaText}>
-                              {formatDateTime(feature.start_date_time)}
-                            </Text>
+        <View style={styles.itemsList}>
+          {features.length > 1 && (
+            <Text style={styles.reorderHint}>{t('upcoming_events_editor:reorder_hint')}</Text>
+          )}
+          <DraggableFlatList
+            data={features}
+            keyExtractor={(item) => item.id}
+            onDragEnd={handleDragEnd}
+            activationDistance={10}
+            contentContainerStyle={styles.itemsListContent}
+            renderItem={({ item: feature, getIndex, drag, isActive }: RenderItemParams<SpecialFeature>) => {
+              const index = getIndex() ?? 0;
+
+              return (
+                <ScaleDecorator>
+                  <View style={[styles.featureCard, isActive && styles.featureCardDragging]}>
+                    {/* Drag Handle */}
+                    <TouchableOpacity
+                      onLongPress={drag}
+                      disabled={isActive}
+                      style={styles.dragHandle}
+                    >
+                      <IconSymbol
+                        ios_icon_name="line.3.horizontal.decrease"
+                        android_material_icon_name="drag-indicator"
+                        size={20}
+                        color="#FFFFFF"
+                      />
+                    </TouchableOpacity>
+
+                    {feature.thumbnail_shape === 'square' && feature.thumbnail_url ? (
+                      <View style={styles.squareLayout}>
+                        <Image
+                          key={getImageUrl(feature.thumbnail_url)}
+                          source={{ uri: getImageUrl(feature.thumbnail_url) }}
+                          style={styles.squareImage}
+                        />
+                        <View style={styles.squareContent}>
+                          <Text style={styles.featureTitle}>{getLocalizedField(feature, 'title', language)}</Text>
+                          {(feature.content || feature.message) && (
+                            <FormattedText style={styles.squareMessage} numberOfLines={2}>
+                              {getLocalizedField(feature, 'content', language) || feature.message}
+                            </FormattedText>
+                          )}
+                          <View style={styles.featureMeta}>
+                            {feature.start_date_time && (
+                              <View style={styles.metaItem}>
+                                <IconSymbol ios_icon_name="calendar" android_material_icon_name="event" size={14} color={colors.textSecondary} />
+                                <Text style={styles.metaText}>{formatDateTime(feature.start_date_time)}</Text>
+                              </View>
+                            )}
+                            {feature.end_date_time && (
+                              <View style={styles.metaItem}>
+                                <IconSymbol ios_icon_name="clock" android_material_icon_name="schedule" size={14} color={colors.textSecondary} />
+                                <Text style={styles.metaText}>{t('special_features_editor:ends_label', { datetime: formatDateTime(feature.end_date_time) })}</Text>
+                              </View>
+                            )}
                           </View>
-                        )}
-                        {feature.end_date_time && (
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="clock"
-                              android_material_icon_name="schedule"
-                              size={14}
-                              color={colors.textSecondary}
-                            />
-                            <Text style={styles.metaText}>
-                              {t('special_features_editor:ends_label', { datetime: formatDateTime(feature.end_date_time) })}
-                            </Text>
-                          </View>
-                        )}
+                        </View>
                       </View>
+                    ) : (
+                      <>
+                        {feature.thumbnail_url && (
+                          <Image
+                            key={getImageUrl(feature.thumbnail_url)}
+                            source={{ uri: getImageUrl(feature.thumbnail_url) }}
+                            style={styles.bannerImage}
+                          />
+                        )}
+                        <View style={styles.featureContent}>
+                          <Text style={styles.featureTitle}>{getLocalizedField(feature, 'title', language)}</Text>
+                          {(feature.content || feature.message) && (
+                            <FormattedText style={styles.featureMessage}>
+                              {getLocalizedField(feature, 'content', language) || feature.message}
+                            </FormattedText>
+                          )}
+                          <View style={styles.featureMeta}>
+                            {feature.start_date_time && (
+                              <View style={styles.metaItem}>
+                                <IconSymbol ios_icon_name="calendar" android_material_icon_name="event" size={14} color={colors.textSecondary} />
+                                <Text style={styles.metaText}>{formatDateTime(feature.start_date_time)}</Text>
+                              </View>
+                            )}
+                            {feature.end_date_time && (
+                              <View style={styles.metaItem}>
+                                <IconSymbol ios_icon_name="clock" android_material_icon_name="schedule" size={14} color={colors.textSecondary} />
+                                <Text style={styles.metaText}>{t('special_features_editor:ends_label', { datetime: formatDateTime(feature.end_date_time) })}</Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      </>
+                    )}
+                    <View style={styles.featureActions}>
+                      <TouchableOpacity
+                        style={[styles.arrowButton, index === 0 && styles.arrowButtonDisabled]}
+                        onPress={() => handleMoveUp(index)}
+                        disabled={index === 0}
+                      >
+                        <IconSymbol ios_icon_name="arrow.up" android_material_icon_name="arrow-upward" size={18} color={index === 0 ? colors.textSecondary : colors.highlight} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.arrowButton, index === features.length - 1 && styles.arrowButtonDisabled]}
+                        onPress={() => handleMoveDown(index)}
+                        disabled={index === features.length - 1}
+                      >
+                        <IconSymbol ios_icon_name="arrow.down" android_material_icon_name="arrow-downward" size={18} color={index === features.length - 1 ? colors.textSecondary : colors.highlight} />
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(feature)}>
+                        <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.highlight} />
+                        <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(feature)}>
+                        <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color="#E74C3C" />
+                        <Text style={[styles.actionButtonText, styles.deleteButtonText]}>{t('common:delete')}</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
-                ) : (
-                  <>
-                    {feature.thumbnail_url && (
-                      <Image
-                        key={getImageUrl(feature.thumbnail_url)}
-                        source={{ uri: getImageUrl(feature.thumbnail_url) }}
-                        style={styles.bannerImage}
-                      />
-                    )}
-                    <View style={styles.featureContent}>
-                      <Text style={styles.featureTitle}>{feature.title}</Text>
-                      {(feature.content || feature.message) && (
-                        <Text style={styles.featureMessage}>
-                          {feature.content || feature.message}
-                        </Text>
-                      )}
-                      <View style={styles.featureMeta}>
-                        {feature.start_date_time && (
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="calendar"
-                              android_material_icon_name="event"
-                              size={14}
-                              color={colors.textSecondary}
-                            />
-                            <Text style={styles.metaText}>
-                              {formatDateTime(feature.start_date_time)}
-                            </Text>
-                          </View>
-                        )}
-                        {feature.end_date_time && (
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="clock"
-                              android_material_icon_name="schedule"
-                              size={14}
-                              color={colors.textSecondary}
-                            />
-                            <Text style={styles.metaText}>
-                              {t('special_features_editor:ends_label', { datetime: formatDateTime(feature.end_date_time) })}
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                  </>
-                )}
-                <View style={styles.featureActions}>
-                  <TouchableOpacity
-                    style={styles.actionButton}
-                    onPress={() => openEditModal(feature)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="pencil"
-                      android_material_icon_name="edit"
-                      size={20}
-                      color={colors.highlight}
-                    />
-                    <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.deleteButton]}
-                    onPress={() => handleDelete(feature)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="trash"
-                      android_material_icon_name="delete"
-                      size={20}
-                      color="#E74C3C"
-                    />
-                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                      {t('common:delete')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
-          )}
-        </ScrollView>
+                </ScaleDecorator>
+              );
+            }}
+          />
+        </View>
       )}
 
       {/* Add/Edit Modal */}
@@ -827,6 +965,37 @@ export default function SpecialFeaturesEditorScreen() {
                 </View>
               </View>
 
+              {/* Additional Images Section */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Additional Images</Text>
+                <Text style={styles.formHint}>Add more images for a swipeable carousel in the detail view</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.additionalImagesScroll}>
+                  {additionalImageUrls.map((url, index) => (
+                    <View key={`existing-${index}`} style={styles.additionalImageContainer}>
+                      <Image source={{ uri: getImageUrl(url) || url }} style={styles.additionalImageThumb} />
+                      <TouchableOpacity style={styles.removeImageButton} onPress={() => removeAdditionalImage(index, false)}>
+                        <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {newAdditionalImageUris.map((uri, index) => (
+                    <View key={`new-${index}`} style={styles.additionalImageContainer}>
+                      <Image source={{ uri }} style={styles.additionalImageThumb} />
+                      <TouchableOpacity style={styles.removeImageButton} onPress={() => removeAdditionalImage(index, true)}>
+                        <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
+                      </TouchableOpacity>
+                      <View style={styles.newImageBadge}>
+                        <Text style={styles.newImageBadgeText}>NEW</Text>
+                      </View>
+                    </View>
+                  ))}
+                  <TouchableOpacity style={styles.addImageButton} onPress={pickAdditionalImage}>
+                    <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={32} color="#D4A843" />
+                    <Text style={styles.addImageText}>Add</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </View>
+
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{t('special_features_editor:feature_title_label')}</Text>
                 <TextInput
@@ -840,7 +1009,16 @@ export default function SpecialFeaturesEditorScreen() {
 
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{t('special_features_editor:description_label')}</Text>
+                <RichTextToolbar
+                  text={formData.message}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, message: text }))}
+                  selection={contentSelection}
+                  onSelectionChange={setContentSelection}
+                  textInputRef={contentInputRef}
+                  accentColor={colors.highlight}
+                />
                 <TextInput
+                  ref={contentInputRef}
                   style={[styles.input, styles.textArea]}
                   placeholder={t('special_features_editor:description_placeholder')}
                   placeholderTextColor="#999999"
@@ -848,6 +1026,7 @@ export default function SpecialFeaturesEditorScreen() {
                   onChangeText={(text) => setFormData({ ...formData, message: text })}
                   multiline
                   numberOfLines={4}
+                  onSelectionChange={(e) => setContentSelection(e.nativeEvent.selection)}
                 />
               </View>
 
@@ -1467,6 +1646,10 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
+  featureCardDragging: {
+    opacity: 0.9,
+    transform: [{ scale: 1.02 }],
+  },
   squareLayout: {
     flexDirection: 'row',
     padding: 12,
@@ -1548,6 +1731,35 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   deleteButtonText: {
     color: '#E74C3C',
+  },
+  dragHandle: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    padding: 6,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 14,
+  },
+  reorderHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  arrowButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowButtonDisabled: {
+    opacity: 0.3,
   },
   modalContainer: {
     flex: 1,
@@ -1919,5 +2131,56 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   datePicker: {
     height: 200,
+  },
+  additionalImagesScroll: {
+    marginTop: 10,
+  },
+  additionalImageContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  additionalImageThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    backgroundColor: '#F5F5F5',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 11,
+    zIndex: 10,
+  },
+  newImageBadge: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    backgroundColor: '#4CAF50',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  newImageBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: 'bold',
+  },
+  addImageButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FAFAFA',
+  },
+  addImageText: {
+    fontSize: 11,
+    color: '#999999',
+    marginTop: 2,
   },
 });

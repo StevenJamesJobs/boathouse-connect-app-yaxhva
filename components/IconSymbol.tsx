@@ -109,9 +109,11 @@ const ICON_MAP: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   'book': 'menu-book',
   'book.fill': 'menu-book',
   
-  // Calculator
+  // Calculator / Checkout
   'calculator': 'calculate',
   'calculator.fill': 'calculate',
+  'dollarsign.circle': 'calculate',
+  'dollarsign.circle.fill': 'calculate',
   
   // Feedback
   'feedback': 'feedback',

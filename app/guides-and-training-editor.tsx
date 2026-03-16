@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,10 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
+import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
 
 interface GuideItem {
   id: string;
@@ -38,6 +42,8 @@ interface GuideItem {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  title_es?: string | null;
+  description_es?: string | null;
 }
 
 const CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
@@ -47,6 +53,7 @@ export default function GuidesAndTrainingEditorScreen() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const colors = useThemeColors();
+  const { language } = useLanguage();
   const [guides, setGuides] = useState<GuideItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -59,8 +66,12 @@ export default function GuidesAndTrainingEditorScreen() {
     description: '',
     category: 'Employee HandBooks',
     display_order: 0,
+    title_es: '',
+    description_es: '',
   });
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [showSpanish, setShowSpanish] = useState(false);
+  const [translating, setTranslating] = useState(false);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [selectedThumbnailUri, setSelectedThumbnailUri] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<{
@@ -259,6 +270,28 @@ export default function GuidesAndTrainingEditorScreen() {
     }
   };
 
+  const handleAutoTranslate = async () => {
+    if (!formData.title && !formData.description) {
+      Alert.alert(t('common.error'), t('translation_section.no_content_to_translate'));
+      return;
+    }
+    setTranslating(true);
+    try {
+      const results = await translateTexts([formData.title, formData.description]);
+      setFormData(prev => ({
+        ...prev,
+        title_es: results[0] || '',
+        description_es: results[1] || '',
+      }));
+      setShowSpanish(true);
+    } catch (err) {
+      console.error('Auto-translate error:', err);
+      Alert.alert(t('common.error'), t('translation_section.translate_failed'));
+    } finally {
+      setTranslating(false);
+    }
+  };
+
   const handleSave = async () => {
     if (!formData.title) {
       Alert.alert(t('common.error'), t('guides_training_editor.error_no_title'));
@@ -330,6 +363,14 @@ export default function GuidesAndTrainingEditorScreen() {
           throw error;
         }
         Alert.alert(t('common.success'), t('guides_training_editor.guide_updated'));
+
+        // Save Spanish translations
+        if (formData.title_es || formData.description_es) {
+          await saveTranslations('guides_and_training', editingGuide.id, {
+            title_es: formData.title_es,
+            description_es: formData.description_es,
+          });
+        }
       } else {
         console.log('Creating new guide');
         const { error } = await supabase
@@ -351,6 +392,22 @@ export default function GuidesAndTrainingEditorScreen() {
           throw error;
         }
         Alert.alert(t('common.success'), t('guides_training_editor.guide_created'));
+
+        // Save Spanish translations for newly created item
+        if (formData.title_es || formData.description_es) {
+          const { data: newItem } = await supabase
+            .from('guides_and_training')
+            .select('id')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          if (newItem) {
+            await saveTranslations('guides_and_training', newItem.id, {
+              title_es: formData.title_es,
+              description_es: formData.description_es,
+            });
+          }
+        }
       }
 
       closeModal();
@@ -406,6 +463,77 @@ export default function GuidesAndTrainingEditorScreen() {
     );
   };
 
+  const handleMoveUp = async (index: number) => {
+    const categoryGuides = filteredGuides;
+    if (index <= 0) return;
+    const newGuides = [...guides];
+    const currentItem = categoryGuides[index];
+    const aboveItem = categoryGuides[index - 1];
+    const currentOrder = currentItem.display_order;
+    const aboveOrder = aboveItem.display_order;
+    // Update in the full guides array
+    const currentIdx = newGuides.findIndex(g => g.id === currentItem.id);
+    const aboveIdx = newGuides.findIndex(g => g.id === aboveItem.id);
+    if (currentIdx >= 0) newGuides[currentIdx] = { ...newGuides[currentIdx], display_order: aboveOrder };
+    if (aboveIdx >= 0) newGuides[aboveIdx] = { ...newGuides[aboveIdx], display_order: currentOrder };
+    setGuides(newGuides);
+    try {
+      await Promise.all([
+        supabase.from('guides_and_training').update({ display_order: aboveOrder }).eq('id', currentItem.id),
+        supabase.from('guides_and_training').update({ display_order: currentOrder }).eq('id', aboveItem.id),
+      ]);
+    } catch (error) {
+      console.error('Error moving guide up:', error);
+      await loadGuides();
+    }
+  };
+
+  const handleMoveDown = async (index: number) => {
+    const categoryGuides = filteredGuides;
+    if (index >= categoryGuides.length - 1) return;
+    const newGuides = [...guides];
+    const currentItem = categoryGuides[index];
+    const belowItem = categoryGuides[index + 1];
+    const currentOrder = currentItem.display_order;
+    const belowOrder = belowItem.display_order;
+    const currentIdx = newGuides.findIndex(g => g.id === currentItem.id);
+    const belowIdx = newGuides.findIndex(g => g.id === belowItem.id);
+    if (currentIdx >= 0) newGuides[currentIdx] = { ...newGuides[currentIdx], display_order: belowOrder };
+    if (belowIdx >= 0) newGuides[belowIdx] = { ...newGuides[belowIdx], display_order: currentOrder };
+    setGuides(newGuides);
+    try {
+      await Promise.all([
+        supabase.from('guides_and_training').update({ display_order: belowOrder }).eq('id', currentItem.id),
+        supabase.from('guides_and_training').update({ display_order: currentOrder }).eq('id', belowItem.id),
+      ]);
+    } catch (error) {
+      console.error('Error moving guide down:', error);
+      await loadGuides();
+    }
+  };
+
+  const handleDragEnd = async ({ data: reorderedData }: { data: GuideItem[] }) => {
+    // Update the full guides array with new display_orders for this category
+    const newGuides = [...guides];
+    reorderedData.forEach((item, newIndex) => {
+      const idx = newGuides.findIndex(g => g.id === item.id);
+      if (idx >= 0) {
+        newGuides[idx] = { ...newGuides[idx], display_order: newIndex };
+      }
+    });
+    setGuides(newGuides);
+    try {
+      const updates = reorderedData.map((item, index) =>
+        supabase.from('guides_and_training').update({ display_order: index }).eq('id', item.id)
+      );
+      await Promise.all(updates);
+      console.log('Drag reorder persisted successfully');
+    } catch (error) {
+      console.error('Error persisting drag reorder:', error);
+      await loadGuides();
+    }
+  };
+
   const openAddModal = () => {
     setEditingGuide(null);
     setFormData({
@@ -413,9 +541,12 @@ export default function GuidesAndTrainingEditorScreen() {
       description: '',
       category: selectedCategory,
       display_order: guides.filter(g => g.category === selectedCategory).length,
+      title_es: '',
+      description_es: '',
     });
     setSelectedThumbnailUri(null);
     setSelectedFile(null);
+    setShowSpanish(false);
     setShowAddModal(true);
   };
 
@@ -426,7 +557,10 @@ export default function GuidesAndTrainingEditorScreen() {
       description: guide.description || '',
       category: guide.category,
       display_order: guide.display_order,
+      title_es: guide.title_es || '',
+      description_es: guide.description_es || '',
     });
+    setShowSpanish(!!(guide.title_es || guide.description_es));
     setSelectedThumbnailUri(null);
     setSelectedFile(null);
     setShowAddModal(true);
@@ -519,94 +653,116 @@ export default function GuidesAndTrainingEditorScreen() {
           <ActivityIndicator size="large" color={colors.highlight} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('guides_training_editor.loading_guides')}</Text>
         </View>
+      ) : filteredGuides.length === 0 ? (
+        <View style={styles.emptyContainer}>
+          <IconSymbol
+            ios_icon_name="book.fill"
+            android_material_icon_name="menu-book"
+            size={64}
+            color={colors.textSecondary}
+          />
+          <Text style={[styles.emptyText, { color: colors.text }]}>{t('guides_training_editor.no_guides_in_category')}</Text>
+          <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+            {t('guides_training_editor.tap_to_create')}
+          </Text>
+        </View>
       ) : (
-        <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
-          {filteredGuides.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <IconSymbol
-                ios_icon_name="book.fill"
-                android_material_icon_name="menu-book"
-                size={64}
-                color={colors.textSecondary}
-              />
-              <Text style={[styles.emptyText, { color: colors.text }]}>{t('guides_training_editor.no_guides_in_category')}</Text>
-              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                {t('guides_training_editor.tap_to_create')}
-              </Text>
-            </View>
-          ) : (
-            filteredGuides.map((guide, index) => (
-              <View key={index} style={[styles.guideCard, { backgroundColor: colors.card }]}>
-                <View style={styles.guideLayout}>
-                  {guide.thumbnail_url && (
-                    <Image
-                      source={{ uri: getImageUrl(guide.thumbnail_url) }}
-                      style={styles.guideThumbnail}
-                    />
-                  )}
-                  <View style={styles.guideContent}>
-                    <Text style={[styles.guideTitle, { color: colors.text }]}>{guide.title}</Text>
-                    {guide.description && (
-                      <Text style={[styles.guideDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                        {guide.description}
-                      </Text>
-                    )}
-                    <View style={styles.guideMeta}>
-                      <View style={styles.metaItem}>
-                        <IconSymbol
-                          ios_icon_name="doc.fill"
-                          android_material_icon_name="description"
-                          size={14}
-                          color={colors.textSecondary}
+        <View style={styles.itemsList}>
+          {filteredGuides.length > 1 && (
+            <Text style={[styles.reorderHint, { color: colors.textSecondary }]}>{t('upcoming_events_editor.reorder_hint')}</Text>
+          )}
+          <DraggableFlatList
+            data={filteredGuides}
+            keyExtractor={(item) => item.id}
+            onDragEnd={handleDragEnd}
+            activationDistance={10}
+            contentContainerStyle={styles.itemsListContent}
+            renderItem={({ item: guide, getIndex, drag, isActive }: RenderItemParams<GuideItem>) => {
+              const index = getIndex() ?? 0;
+
+              return (
+                <ScaleDecorator>
+                  <View style={[styles.guideCard, { backgroundColor: colors.card }, isActive && styles.guideCardDragging]}>
+                    {/* Drag Handle */}
+                    <TouchableOpacity
+                      onLongPress={drag}
+                      disabled={isActive}
+                      style={styles.dragHandle}
+                    >
+                      <IconSymbol
+                        ios_icon_name="line.3.horizontal.decrease"
+                        android_material_icon_name="drag-indicator"
+                        size={20}
+                        color="#FFFFFF"
+                      />
+                    </TouchableOpacity>
+
+                    <View style={styles.guideLayout}>
+                      {guide.thumbnail_url && (
+                        <Image
+                          source={{ uri: getImageUrl(guide.thumbnail_url) }}
+                          style={styles.guideThumbnail}
                         />
-                        <Text style={[styles.metaText, { color: colors.textSecondary }]}>{guide.file_name}</Text>
-                      </View>
-                      <View style={styles.metaItem}>
-                        <IconSymbol
-                          ios_icon_name="clock"
-                          android_material_icon_name="schedule"
-                          size={14}
-                          color={colors.textSecondary}
-                        />
-                        <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                          {t('guides_training_editor.updated_label', { date: formatDate(guide.updated_at) })}
-                        </Text>
+                      )}
+                      <View style={styles.guideContent}>
+                        <Text style={[styles.guideTitle, { color: colors.text }]}>{getLocalizedField(guide, 'title', language)}</Text>
+                        {guide.description && (
+                          <Text style={[styles.guideDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+                            {getLocalizedField(guide, 'description', language)}
+                          </Text>
+                        )}
+                        <View style={styles.guideMeta}>
+                          <View style={styles.metaItem}>
+                            <IconSymbol ios_icon_name="doc.fill" android_material_icon_name="description" size={14} color={colors.textSecondary} />
+                            <Text style={[styles.metaText, { color: colors.textSecondary }]}>{guide.file_name}</Text>
+                          </View>
+                          <View style={styles.metaItem}>
+                            <IconSymbol ios_icon_name="clock" android_material_icon_name="schedule" size={14} color={colors.textSecondary} />
+                            <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                              {t('guides_training_editor.updated_label', { date: formatDate(guide.updated_at) })}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     </View>
+                    <View style={[styles.guideActions, { borderTopColor: colors.border }]}>
+                      <TouchableOpacity
+                        style={[styles.arrowButton, { backgroundColor: colors.background }, index === 0 && styles.arrowButtonDisabled]}
+                        onPress={() => handleMoveUp(index)}
+                        disabled={index === 0}
+                      >
+                        <IconSymbol ios_icon_name="arrow.up" android_material_icon_name="arrow-upward" size={18} color={index === 0 ? colors.textSecondary : colors.highlight} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.arrowButton, { backgroundColor: colors.background }, index === filteredGuides.length - 1 && styles.arrowButtonDisabled]}
+                        onPress={() => handleMoveDown(index)}
+                        disabled={index === filteredGuides.length - 1}
+                      >
+                        <IconSymbol ios_icon_name="arrow.down" android_material_icon_name="arrow-downward" size={18} color={index === filteredGuides.length - 1 ? colors.textSecondary : colors.highlight} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionButton, { backgroundColor: colors.background }]}
+                        onPress={() => openEditModal(guide)}
+                      >
+                        <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.highlight} />
+                        <Text style={[styles.actionButtonText, { color: colors.highlight }]}>{t('common.edit')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.actionButton, styles.deleteButton]}
+                        onPress={() => handleDelete(guide)}
+                      >
+                        <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color="#E74C3C" />
+                        <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
+                          {t('common.delete')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                </View>
-                <View style={[styles.guideActions, { borderTopColor: colors.border }]}>
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: colors.background }]}
-                    onPress={() => openEditModal(guide)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="pencil"
-                      android_material_icon_name="edit"
-                      size={20}
-                      color={colors.highlight}
-                    />
-                    <Text style={[styles.actionButtonText, { color: colors.highlight }]}>{t('common.edit')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.actionButton, styles.deleteButton]}
-                    onPress={() => handleDelete(guide)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="trash"
-                      android_material_icon_name="delete"
-                      size={20}
-                      color="#E74C3C"
-                    />
-                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                      {t('common.delete')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            ))
-          )}
-        </ScrollView>
+                </ScaleDecorator>
+              );
+            }}
+          />
+        </View>
       )}
 
       {/* Add/Edit Modal */}
@@ -711,6 +867,60 @@ export default function GuidesAndTrainingEditorScreen() {
                   multiline
                   numberOfLines={4}
                 />
+              </View>
+
+              {/* Spanish Translation Section */}
+              <View style={styles.formGroup}>
+                <TouchableOpacity
+                  style={styles.spanishSectionHeader}
+                  onPress={() => setShowSpanish(!showSpanish)}
+                >
+                  <Text style={styles.formLabel}>{t('translation_section.spanish_section_title')}</Text>
+                  <IconSymbol
+                    ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
+                    android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
+                    size={20}
+                    color="#666666"
+                  />
+                </TouchableOpacity>
+
+                {showSpanish && (
+                  <View style={styles.spanishFields}>
+                    <TouchableOpacity
+                      style={styles.autoTranslateButton}
+                      onPress={handleAutoTranslate}
+                      disabled={translating}
+                    >
+                      {translating ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.autoTranslateButtonText}>
+                          {t('translation_section.auto_translate')}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+
+                    <Text style={styles.spanishFieldLabel}>{t('translation_section.title_es_label')}</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('translation_section.title_es_placeholder')}
+                      placeholderTextColor="#999999"
+                      value={formData.title_es}
+                      onChangeText={(text) => setFormData({ ...formData, title_es: text })}
+                    />
+
+                    <Text style={[styles.spanishFieldLabel, { marginTop: 12 }]}>{t('translation_section.description_es_label')}</Text>
+                    <TextInput
+                      style={[styles.input, styles.textArea]}
+                      placeholder={t('translation_section.description_es_placeholder')}
+                      placeholderTextColor="#999999"
+                      value={formData.description_es}
+                      onChangeText={(text) => setFormData({ ...formData, description_es: text })}
+                      multiline
+                      numberOfLines={4}
+                    />
+                  </View>
+                )}
               </View>
 
               {/* Category */}
@@ -889,6 +1099,10 @@ const styles = StyleSheet.create({
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
+  guideCardDragging: {
+    opacity: 0.9,
+    transform: [{ scale: 1.02 }],
+  },
   guideLayout: {
     flexDirection: 'row',
     padding: 16,
@@ -938,6 +1152,33 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
     gap: 6,
+  },
+  dragHandle: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    padding: 6,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 14,
+  },
+  reorderHint: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  arrowButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  arrowButtonDisabled: {
+    opacity: 0.3,
   },
   deleteButton: {
     backgroundColor: '#2C1F1F',
@@ -1106,5 +1347,47 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#666666',
+  },
+  spanishSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#FFF8E1',
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FFE082',
+  },
+  spanishFields: {
+    backgroundColor: '#FFFDE7',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#FFF59D',
+  },
+  autoTranslateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4CAF50',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    gap: 8,
+  },
+  autoTranslateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  spanishFieldLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#5D4037',
+    marginBottom: 6,
   },
 });

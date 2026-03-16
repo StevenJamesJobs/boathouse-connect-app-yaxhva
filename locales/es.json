@@ -1066,7 +1066,9 @@
     "upload_image_error": "Error al subir imagen",
     "move_up": "Subir",
     "move_down": "Bajar",
-    "reorder_hint": "Mantén presionado y arrastra para reordenar, o usa las flechas"
+    "reorder_hint": "Mantén presionado y arrastra para reordenar, o usa las flechas",
+    "send_notification_label": "Enviar Notificación Push",
+    "send_notification_hint": "Desactiva al agregar varios eventos para evitar enviar notificaciones repetidas. Puedes enviar una notificación desde el Centro de Notificaciones cuando termines."
   },
   "menu_editor": {
     "title": "Editor de Menú",

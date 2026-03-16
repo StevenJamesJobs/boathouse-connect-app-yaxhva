@@ -17,6 +17,9 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import FormattedText from '@/components/FormattedText';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/translateContent';
 
 interface Cocktail {
   id: string;
@@ -24,6 +27,7 @@ interface Cocktail {
   alcohol_type: string;
   ingredients: string;
   procedure: string;
+  procedure_es?: string | null;
   thumbnail_url: string | null;
   display_order: number;
   is_active: boolean;
@@ -34,6 +38,7 @@ const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 export default function CocktailsAZScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const colors = useThemeColors();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
@@ -301,7 +306,7 @@ export default function CocktailsAZScreen() {
 
               <View style={styles.detailSection}>
                 <Text style={styles.detailLabel}>{t('cocktails.procedure')}</Text>
-                <Text style={styles.detailText}>{selectedCocktail?.procedure}</Text>
+                <FormattedText style={styles.detailText}>{getLocalizedField(selectedCocktail || {}, 'procedure', language)}</FormattedText>
               </View>
             </ScrollView>
           </View>

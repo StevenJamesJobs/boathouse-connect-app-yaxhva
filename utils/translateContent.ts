@@ -82,6 +82,22 @@ const TRANSLATION_RPC_MAP: Record<string, { rpc: string; paramMap: Record<string
     rpc: 'update_menu_item_translations',
     paramMap: { name_es: 'p_name_es', description_es: 'p_description_es' },
   },
+  guides_and_training: {
+    rpc: 'update_guide_translations',
+    paramMap: { title_es: 'p_title_es', description_es: 'p_description_es' },
+  },
+  libation_recipes: {
+    rpc: 'update_libation_recipe_translations',
+    paramMap: { procedure_es: 'p_procedure_es' },
+  },
+  cocktails: {
+    rpc: 'update_cocktail_translations',
+    paramMap: { procedure_es: 'p_procedure_es' },
+  },
+  puree_syrup_recipes: {
+    rpc: 'update_puree_syrup_recipe_translations',
+    paramMap: { procedure_es: 'p_procedure_es' },
+  },
 };
 
 /**

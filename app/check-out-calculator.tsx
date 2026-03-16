@@ -403,7 +403,7 @@ export default function CheckOutCalculatorScreen() {
         {/* Header */}
         <View style={styles.calculatorHeader}>
           <IconSymbol
-            ios_icon_name="calculator.fill"
+            ios_icon_name="dollarsign.circle.fill"
             android_material_icon_name="calculate"
             size={32}
             color={colors.primary}

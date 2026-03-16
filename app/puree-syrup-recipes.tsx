@@ -17,6 +17,9 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import FormattedText from '@/components/FormattedText';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/translateContent';
 
 interface PureeSyrupRecipe {
   id: string;
@@ -24,6 +27,7 @@ interface PureeSyrupRecipe {
   category: string;
   ingredients: { amount: string; ingredient: string }[];
   procedure: string | null;
+  procedure_es?: string | null;
   thumbnail_url: string | null;
   display_order: number;
   is_active: boolean;
@@ -37,6 +41,7 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1587049352846-4a222
 export default function PureeSyrupRecipesScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const colors = useThemeColors();
   const [recipes, setRecipes] = useState<PureeSyrupRecipe[]>([]);
   const [loading, setLoading] = useState(true);
@@ -315,7 +320,7 @@ export default function PureeSyrupRecipesScreen() {
                       />
                       <Text style={styles.sectionTitleRed}>{t('purees_syrups.procedure')}</Text>
                     </View>
-                    <Text style={styles.procedureText}>{selectedRecipe.procedure}</Text>
+                    <FormattedText style={styles.procedureText}>{getLocalizedField(selectedRecipe, 'procedure', language)}</FormattedText>
                   </View>
                 )}
 

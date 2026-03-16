@@ -19,6 +19,7 @@ export interface Database {
           job_title: string
           phone_number: string | null
           role: 'employee' | 'manager'
+          badge_title: string | null
           created_at: string
           updated_at: string
         }
@@ -30,6 +31,7 @@ export interface Database {
           job_title: string
           phone_number?: string | null
           role: 'employee' | 'manager'
+          badge_title?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -41,6 +43,7 @@ export interface Database {
           job_title?: string
           phone_number?: string | null
           role?: 'employee' | 'manager'
+          badge_title?: string | null
           created_at?: string
           updated_at?: string
         }

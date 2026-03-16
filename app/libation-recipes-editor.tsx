@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -22,6 +22,9 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { translateTexts, saveTranslations } from '@/utils/translateContent';
+import RichTextToolbar from '@/components/RichTextToolbar';
 
 interface LibationRecipe {
   id: string;
@@ -32,6 +35,7 @@ interface LibationRecipe {
   garnish: string | null;
   ingredients: { amount: string; ingredient: string }[];
   procedure: string | null;
+  procedure_es?: string | null;
   thumbnail_url: string | null;
   display_order: number;
   is_active: boolean;
@@ -53,6 +57,9 @@ export default function LibationRecipesEditorScreen() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const colors = useThemeColors();
+  const { language } = useLanguage();
+  const procedureInputRef = useRef<TextInput>(null);
+  const [procedureSelection, setProcedureSelection] = useState({ start: 0, end: 0 });
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -71,6 +78,9 @@ export default function LibationRecipesEditorScreen() {
   const [displayOrder, setDisplayOrder] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [procedureEs, setProcedureEs] = useState('');
+  const [showSpanish, setShowSpanish] = useState(false);
+  const [translating, setTranslating] = useState(false);
 
   const loadRecipes = useCallback(async () => {
     try {
@@ -185,6 +195,24 @@ export default function LibationRecipesEditorScreen() {
     }
   };
 
+  const handleAutoTranslate = async () => {
+    if (!procedure.trim()) {
+      Alert.alert(t('common.error'), 'No procedure text to translate');
+      return;
+    }
+    setTranslating(true);
+    try {
+      const results = await translateTexts([procedure]);
+      setProcedureEs(results[0] || '');
+      setShowSpanish(true);
+    } catch (err) {
+      console.error('Auto-translate error:', err);
+      Alert.alert(t('common.error'), 'Translation failed');
+    } finally {
+      setTranslating(false);
+    }
+  };
+
   const handleSave = async () => {
     try {
       if (!name.trim()) {
@@ -241,6 +269,9 @@ export default function LibationRecipesEditorScreen() {
           throw error;
         }
         console.log('Libation recipe updated successfully');
+        if (procedureEs.trim()) {
+          await saveTranslations('libation_recipes', editingRecipe.id, { procedure_es: procedureEs });
+        }
         Alert.alert(t('common.success'), t('libation_editor.recipe_updated'));
       } else {
         // Insert new recipe using RPC function (same pattern as cocktails editor)
@@ -263,6 +294,16 @@ export default function LibationRecipesEditorScreen() {
           throw error;
         }
         console.log('Libation recipe added successfully');
+        // Fetch newly created recipe to save translations
+        const { data: newRecipes } = await supabase
+          .from('libation_recipes')
+          .select('id')
+          .eq('name', name.trim())
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (newRecipes?.[0] && procedureEs.trim()) {
+          await saveTranslations('libation_recipes', newRecipes[0].id, { procedure_es: procedureEs });
+        }
         Alert.alert(t('common.success'), t('libation_editor.recipe_added'));
       }
 
@@ -330,6 +371,7 @@ export default function LibationRecipesEditorScreen() {
         : [{ amount: '', ingredient: '' }]
     );
     setProcedure(recipe.procedure || '');
+    setProcedureEs(recipe.procedure_es || '');
     setDisplayOrder(recipe.display_order.toString());
     setThumbnailUrl(recipe.thumbnail_url);
     setShowModal(true);
@@ -349,6 +391,8 @@ export default function LibationRecipesEditorScreen() {
     setGarnish('');
     setIngredients([{ amount: '', ingredient: '' }]);
     setProcedure('');
+    setProcedureEs('');
+    setShowSpanish(false);
     setDisplayOrder('');
     setThumbnailUrl(null);
   };
@@ -643,7 +687,16 @@ export default function LibationRecipesEditorScreen() {
               {/* Procedure */}
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>Procedure</Text>
+                <RichTextToolbar
+                  text={procedure}
+                  onChangeText={setProcedure}
+                  selection={procedureSelection}
+                  onSelectionChange={setProcedureSelection}
+                  textInputRef={procedureInputRef}
+                  accentColor={colors.highlight}
+                />
                 <TextInput
+                  ref={procedureInputRef}
                   style={[styles.formInput, styles.textArea]}
                   value={procedure}
                   onChangeText={setProcedure}
@@ -651,7 +704,43 @@ export default function LibationRecipesEditorScreen() {
                   placeholderTextColor={colors.textSecondary}
                   multiline
                   numberOfLines={4}
+                  onSelectionChange={(e) => setProcedureSelection(e.nativeEvent.selection)}
                 />
+              </View>
+
+              {/* Spanish Procedure Translation */}
+              <View style={styles.formField}>
+                <TouchableOpacity
+                  style={[styles.spanishSectionHeader, { backgroundColor: '#FFF3E0' }]}
+                  onPress={() => setShowSpanish(!showSpanish)}
+                >
+                  <Text style={styles.spanishHeaderText}>
+                    {showSpanish ? '▼' : '▶'} Spanish Translation (Procedure)
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.autoTranslateButton, { backgroundColor: colors.highlight }]}
+                    onPress={handleAutoTranslate}
+                    disabled={translating}
+                  >
+                    <Text style={[styles.autoTranslateButtonText, { color: colors.text }]}>
+                      {translating ? 'Translating...' : 'Auto-Translate'}
+                    </Text>
+                  </TouchableOpacity>
+                </TouchableOpacity>
+                {showSpanish && (
+                  <View style={styles.spanishFields}>
+                    <Text style={styles.formLabel}>Procedure (Spanish)</Text>
+                    <TextInput
+                      style={[styles.formInput, styles.textArea]}
+                      value={procedureEs}
+                      onChangeText={setProcedureEs}
+                      placeholder="Procedimiento en español"
+                      placeholderTextColor={colors.textSecondary}
+                      multiline
+                      numberOfLines={4}
+                    />
+                  </View>
+                )}
               </View>
 
               {/* Display Order */}
@@ -970,5 +1059,29 @@ const styles = StyleSheet.create({
   },
   extraBottomPadding: {
     height: 30,
+  },
+  spanishSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+  },
+  spanishHeaderText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#E65100',
+  },
+  autoTranslateButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  autoTranslateButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  spanishFields: {
+    marginTop: 8,
   },
 });

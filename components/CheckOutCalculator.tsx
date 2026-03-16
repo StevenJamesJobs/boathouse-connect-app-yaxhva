@@ -111,7 +111,7 @@ export default function CheckOutCalculator({ colors }: CheckOutCalculatorProps) 
       {/* Header */}
       <View style={styles.header}>
         <IconSymbol
-          ios_icon_name="calculator.fill"
+          ios_icon_name="dollarsign.circle.fill"
           android_material_icon_name="calculate"
           size={32}
           color={colors.primary}

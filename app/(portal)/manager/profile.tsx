@@ -229,7 +229,7 @@ export default function ManagerProfileScreen() {
             size={16}
             color={colors.text}
           />
-          <Text style={[styles.managerBadgeText, { color: colors.text }]}>{t('profile.manager_badge')}</Text>
+          <Text style={[styles.managerBadgeText, { color: colors.text }]}>{user?.badgeTitle || t('profile.manager_badge')}</Text>
         </View>
       </View>
 

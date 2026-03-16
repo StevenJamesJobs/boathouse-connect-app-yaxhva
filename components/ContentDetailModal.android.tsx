@@ -13,6 +13,8 @@ import {
 import { IconSymbol } from '@/components/IconSymbol';
 import * as WebBrowser from 'expo-web-browser';
 import * as Sharing from 'expo-sharing';
+import ImageCarousel from '@/components/ImageCarousel';
+import FormattedText from '@/components/FormattedText';
 
 interface GuideFile {
   id: string;
@@ -29,6 +31,7 @@ interface ContentDetailModalProps {
   content: string;
   thumbnailUrl?: string | null;
   thumbnailShape?: string;
+  imageUrls?: string[];
   startDateTime?: string | null;
   endDateTime?: string | null;
   priority?: string;
@@ -52,6 +55,7 @@ export default function ContentDetailModal({
   content,
   thumbnailUrl,
   thumbnailShape,
+  imageUrls,
   startDateTime,
   endDateTime,
   priority,
@@ -64,6 +68,7 @@ export default function ContentDetailModal({
     title,
     hasThumbnail: !!thumbnailUrl,
     thumbnailShape,
+    imageCount: imageUrls?.length || 0,
   });
 
   const formatDateTime = (dateTime: string | null) => {
@@ -171,6 +176,16 @@ export default function ContentDetailModal({
   const priorityUpperCase = priority ? getPriorityLabel(priority).toUpperCase() : '';
   const imageUrl = getImageUrl(thumbnailUrl || null);
 
+  // Build combined image array: additional images first (if provided), otherwise just the thumbnail
+  const allImages: string[] = [];
+  if (imageUrls && imageUrls.length > 0) {
+    // Use the additional images array (which may include the thumbnail as first item)
+    allImages.push(...imageUrls.map(url => getImageUrl(url) || url));
+  } else if (imageUrl) {
+    // Fallback to single thumbnail
+    allImages.push(imageUrl);
+  }
+
   return (
     <Modal
       visible={visible}
@@ -202,15 +217,10 @@ export default function ContentDetailModal({
             contentContainerStyle={styles.modalScrollContent}
             showsVerticalScrollIndicator={true}
           >
-            {imageUrl && (
-              <Image
-                source={{ uri: imageUrl }}
-                style={
-                  thumbnailShape === 'square'
-                    ? styles.squareImage
-                    : styles.bannerImage
-                }
-                resizeMode="cover"
+            {allImages.length > 0 && (
+              <ImageCarousel
+                images={allImages}
+                thumbnailShape={thumbnailShape}
               />
             )}
 
@@ -316,7 +326,7 @@ export default function ContentDetailModal({
             )}
 
             <View style={styles.detailSection}>
-              <Text style={[styles.detailText, { color: colors.textSecondary }]}>{content}</Text>
+              <FormattedText style={[styles.detailText, { color: colors.textSecondary }]}>{content}</FormattedText>
             </View>
           </ScrollView>
         </View>

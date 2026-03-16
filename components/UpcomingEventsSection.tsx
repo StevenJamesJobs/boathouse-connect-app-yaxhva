@@ -11,6 +11,8 @@ import { useTranslation } from 'react-i18next';
 import { getLocalizedField } from '@/utils/translateContent';
 import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
 import { eventFallsOnDate } from '@/utils/dateUtils';
+import FormattedText from '@/components/FormattedText';
+import { stripFormattingTags } from '@/components/FormattedText';
 
 export interface GuideFile {
   id: string;
@@ -58,11 +60,13 @@ interface UpcomingEventsSectionProps {
     content: string;
     thumbnailUrl?: string | null;
     thumbnailShape?: string;
+    imageUrls?: string[];
     startDateTime?: string | null;
     endDateTime?: string | null;
     link?: string | null;
     guideFile?: GuideFile | null;
   }) => void;
+  contentImagesMap?: Map<string, string[]>;
   maxItems?: number;
   language?: string;
 }
@@ -72,6 +76,7 @@ export default function UpcomingEventsSection({
   loadingEvents,
   colors,
   onEventPress,
+  contentImagesMap,
   maxItems,
   language,
 }: UpcomingEventsSectionProps) {
@@ -99,8 +104,9 @@ export default function UpcomingEventsSection({
 
   const truncateText = (text: string | null, maxLength: number = 125): string => {
     if (!text) return '';
-    if (text.length <= maxLength) return text;
-    const truncated = text.substring(0, maxLength);
+    const stripped = stripFormattingTags(text);
+    if (stripped.length <= maxLength) return stripped;
+    const truncated = stripped.substring(0, maxLength);
     const lastSpace = truncated.lastIndexOf(' ');
     if (lastSpace > 100) {
       return truncated.substring(0, lastSpace) + '...';
@@ -109,11 +115,21 @@ export default function UpcomingEventsSection({
   };
 
   const handleEventPress = (event: UpcomingEvent) => {
+    // Build imageUrls: thumbnail + additional images from contentImagesMap
+    const additionalImages = contentImagesMap?.get(event.id);
+    let imageUrls: string[] | undefined;
+    if (additionalImages && additionalImages.length > 0) {
+      imageUrls = [];
+      if (event.thumbnail_url) imageUrls.push(event.thumbnail_url);
+      imageUrls.push(...additionalImages);
+    }
+
     onEventPress({
       title: getLocalizedField(event, 'title', language || 'en'),
       content: getLocalizedField(event, 'content', language || 'en') || event.content || event.message || '',
       thumbnailUrl: event.thumbnail_url,
       thumbnailShape: event.thumbnail_shape,
+      imageUrls,
       startDateTime: event.start_date_time,
       endDateTime: event.end_date_time,
       link: event.link,
@@ -152,9 +168,9 @@ export default function UpcomingEventsSection({
           <View style={styles.eventSquareContent}>
             <Text style={[styles.eventTitle, { color: colors.text }]}>{getLocalizedField(event, 'title', language || 'en')}</Text>
             {(event.content || event.message) && (
-              <Text style={[styles.eventDescription, { color: colors.textSecondary }]} numberOfLines={2}>
+              <FormattedText style={[styles.eventDescription, { color: colors.textSecondary }]} numberOfLines={2}>
                 {getLocalizedField(event, 'content', language || 'en') || event.content || event.message}
-              </Text>
+              </FormattedText>
             )}
             {event.start_date_time && (
               <Text style={[styles.eventTime, { color: colors.textSecondary }]}>
@@ -175,7 +191,7 @@ export default function UpcomingEventsSection({
             <Text style={[styles.eventTitle, { color: colors.text }]}>{getLocalizedField(event, 'title', language || 'en')}</Text>
             {(event.content || event.message) && (
               <Text style={[styles.eventDescription, { color: colors.textSecondary }]}>
-                {truncateText(getLocalizedField(event, 'content', language || 'en') || event.content || event.message, 125)}
+                {truncateText(getLocalizedField(event, 'content', language || 'en') || event.content || event.message)}
               </Text>
             )}
             {event.start_date_time && (

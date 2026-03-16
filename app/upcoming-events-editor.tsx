@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
+  Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -27,7 +28,11 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { translateTexts, saveTranslations } from '@/utils/translateContent';
+import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { fetchContentImages, saveContentImages, uploadImageToStorage, deleteContentImages } from '@/utils/contentImages';
+import RichTextToolbar from '@/components/RichTextToolbar';
+import FormattedText from '@/components/FormattedText';
 
 interface UpcomingEvent {
   id: string;
@@ -64,6 +69,7 @@ export default function UpcomingEventsEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { sendNotification } = useNotification();
+  const { language } = useLanguage();
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,8 +98,14 @@ export default function UpcomingEventsEditorScreen() {
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  // Additional images state
+  const [additionalImageUrls, setAdditionalImageUrls] = useState<string[]>([]);
+  const [newAdditionalImageUris, setNewAdditionalImageUris] = useState<string[]>([]);
   const [showSpanish, setShowSpanish] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const [shouldSendNotification, setShouldSendNotification] = useState(true);
+  const contentInputRef = useRef<TextInput>(null);
+  const [contentSelection, setContentSelection] = useState({ start: 0, end: 0 });
 
   useEffect(() => {
     loadEvents();
@@ -216,6 +228,30 @@ export default function UpcomingEventsEditorScreen() {
     } catch (error) {
       console.error('Error picking image:', error);
       Alert.alert(t('common:error'), t('upcoming_events_editor:pick_image_error'));
+    }
+  };
+
+  const pickAdditionalImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: formData.thumbnail_shape === 'square' ? [1, 1] : [16, 9],
+        quality: 0.8,
+      });
+      if (!result.canceled && result.assets[0]) {
+        setNewAdditionalImageUris(prev => [...prev, result.assets[0].uri]);
+      }
+    } catch (error) {
+      console.error('Error picking additional image:', error);
+    }
+  };
+
+  const removeAdditionalImage = (index: number, isNew: boolean) => {
+    if (isNew) {
+      setNewAdditionalImageUris(prev => prev.filter((_, i) => i !== index));
+    } else {
+      setAdditionalImageUrls(prev => prev.filter((_, i) => i !== index));
     }
   };
 
@@ -358,6 +394,19 @@ export default function UpcomingEventsEditorScreen() {
             content_es: formData.message_es,
           });
         }
+
+        // Upload new additional images and save all to content_images
+        const uploadedNewUrls: string[] = [];
+        for (const uri of newAdditionalImageUris) {
+          const url = await uploadImageToStorage(uri, 'upcoming_event', (u) =>
+            FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
+          );
+          if (url) uploadedNewUrls.push(url);
+        }
+        const allAdditionalUrls = [...additionalImageUrls, ...uploadedNewUrls];
+        if (allAdditionalUrls.length > 0 || additionalImageUrls.length > 0) {
+          await saveContentImages('upcoming_event', editingEvent.id, allAdditionalUrls);
+        }
       } else {
         console.log('Creating new upcoming event');
         const { error } = await supabase.rpc('create_upcoming_event', {
@@ -380,21 +429,23 @@ export default function UpcomingEventsEditorScreen() {
         }
         console.log('Upcoming event created successfully');
         
-        // Send push notification for new events only
-        try {
-          await sendNotification({
-            notificationType: 'event',
-            title: '📅 New Event',
-            body: formData.title,
-            data: {
-              eventId: null, // Will be set by the database
-              category: formData.category,
-              startDateTime: startDateTime?.toISOString() || null,
-            },
-          });
-        } catch (notificationError) {
-          // Silent fail - don't block event creation
-          console.error('Failed to send push notification:', notificationError);
+        // Send push notification for new events only (if toggle is enabled)
+        if (shouldSendNotification) {
+          try {
+            await sendNotification({
+              notificationType: 'event',
+              title: '📅 New Event',
+              body: formData.title,
+              data: {
+                eventId: null, // Will be set by the database
+                category: formData.category,
+                startDateTime: startDateTime?.toISOString() || null,
+              },
+            });
+          } catch (notificationError) {
+            // Silent fail - don't block event creation
+            console.error('Failed to send push notification:', notificationError);
+          }
         }
         
         Alert.alert(t('common:success'), t('upcoming_events_editor:created_success'));
@@ -412,6 +463,20 @@ export default function UpcomingEventsEditorScreen() {
               title_es: formData.title_es,
               content_es: formData.message_es,
             });
+
+            // Upload and save additional images for newly created item
+            if (newAdditionalImageUris.length > 0) {
+              const uploadedNewUrls: string[] = [];
+              for (const uri of newAdditionalImageUris) {
+                const url = await uploadImageToStorage(uri, 'upcoming_event', (u) =>
+                  FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
+                );
+                if (url) uploadedNewUrls.push(url);
+              }
+              if (uploadedNewUrls.length > 0) {
+                await saveContentImages('upcoming_event', newItem.id, uploadedNewUrls);
+              }
+            }
           }
         }
       }
@@ -460,6 +525,9 @@ export default function UpcomingEventsEditorScreen() {
                     .remove([fileName]);
                 }
               }
+
+              // Clean up additional images
+              await deleteContentImages('upcoming_event', event.id);
 
               console.log('Upcoming event deleted successfully');
 
@@ -562,10 +630,13 @@ export default function UpcomingEventsEditorScreen() {
     setStartDateTime(null);
     setEndDateTime(null);
     setSelectedImageUri(null);
+    setAdditionalImageUrls([]);
+    setNewAdditionalImageUris([]);
     setSelectedGuideFile(null);
     setFileSearchQuery('');
     setShowFileSection(false);
     setShowSpanish(false);
+    setShouldSendNotification(true);
     setShowAddModal(true);
   };
 
@@ -585,7 +656,10 @@ export default function UpcomingEventsEditorScreen() {
     setStartDateTime(event.start_date_time ? new Date(event.start_date_time) : null);
     setEndDateTime(event.end_date_time ? new Date(event.end_date_time) : null);
     setSelectedImageUri(null);
-    
+    setNewAdditionalImageUris([]);
+    const existingImages = await fetchContentImages('upcoming_event', event.id);
+    setAdditionalImageUrls(existingImages);
+
     // Load the attached guide file if exists
     if (event.guide_file_id) {
       const guideFile = guideFiles.find(g => g.id === event.guide_file_id);
@@ -603,6 +677,8 @@ export default function UpcomingEventsEditorScreen() {
     setShowAddModal(false);
     setEditingEvent(null);
     setSelectedImageUri(null);
+    setAdditionalImageUrls([]);
+    setNewAdditionalImageUris([]);
     setSelectedGuideFile(null);
     setStartDateTime(null);
     setEndDateTime(null);
@@ -716,7 +792,7 @@ export default function UpcomingEventsEditorScreen() {
           </Text>
         </View>
       ) : (
-        <GestureHandlerRootView style={styles.itemsList}>
+        <View style={styles.itemsList}>
           {events.length > 1 && (
             <Text style={styles.reorderHint}>{t('upcoming_events_editor:reorder_hint')}</Text>
           )}
@@ -724,6 +800,7 @@ export default function UpcomingEventsEditorScreen() {
             data={events}
             keyExtractor={(item) => item.id}
             onDragEnd={handleDragEnd}
+            activationDistance={10}
             contentContainerStyle={styles.itemsListContent}
             renderItem={({ item: event, getIndex, drag, isActive }: RenderItemParams<UpcomingEvent>) => {
               const index = getIndex() ?? 0;
@@ -755,7 +832,7 @@ export default function UpcomingEventsEditorScreen() {
                         />
                         <View style={styles.squareContent}>
                           <View style={styles.titleRow}>
-                            <Text style={styles.eventTitle}>{event.title}</Text>
+                            <Text style={styles.eventTitle}>{getLocalizedField(event, 'title', language)}</Text>
                             <View style={styles.badgeContainer}>
                               <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
                                 <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
@@ -764,9 +841,9 @@ export default function UpcomingEventsEditorScreen() {
                             </View>
                           </View>
                           {(event.content || event.message) && (
-                            <Text style={styles.squareMessage} numberOfLines={2}>
-                              {event.content || event.message}
-                            </Text>
+                            <FormattedText style={styles.squareMessage} numberOfLines={2}>
+                              {getLocalizedField(event, 'content', language) || event.message}
+                            </FormattedText>
                           )}
                           <View style={styles.eventMeta}>
                             <View style={styles.metaItem}>
@@ -807,7 +884,7 @@ export default function UpcomingEventsEditorScreen() {
                         )}
                         <View style={styles.eventContent}>
                           <View style={styles.titleRow}>
-                            <Text style={styles.eventTitle}>{event.title}</Text>
+                            <Text style={styles.eventTitle}>{getLocalizedField(event, 'title', language)}</Text>
                             <View style={styles.badgeContainer}>
                               <View style={[styles.categoryBadge, { backgroundColor: getCategoryBadgeColor(event.category || 'Event') }]}>
                                 <Text style={styles.categoryBadgeText}>{event.category || 'Event'}</Text>
@@ -816,9 +893,9 @@ export default function UpcomingEventsEditorScreen() {
                             </View>
                           </View>
                           {(event.content || event.message) && (
-                            <Text style={styles.eventMessage}>
-                              {event.content || event.message}
-                            </Text>
+                            <FormattedText style={styles.eventMessage}>
+                              {getLocalizedField(event, 'content', language) || event.message}
+                            </FormattedText>
                           )}
                           <View style={styles.eventMeta}>
                             <View style={styles.metaItem}>
@@ -906,7 +983,7 @@ export default function UpcomingEventsEditorScreen() {
               );
             }}
           />
-        </GestureHandlerRootView>
+        </View>
       )}
 
       {/* Add/Edit Modal */}
@@ -1006,6 +1083,37 @@ export default function UpcomingEventsEditorScreen() {
                 </View>
               </View>
 
+              {/* Additional Images Section */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>Additional Images</Text>
+                <Text style={styles.formHint}>Add more images for a swipeable carousel in the detail view</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.additionalImagesScroll}>
+                  {additionalImageUrls.map((url, index) => (
+                    <View key={`existing-${index}`} style={styles.additionalImageContainer}>
+                      <Image source={{ uri: getImageUrl(url) || url }} style={styles.additionalImageThumb} />
+                      <TouchableOpacity style={styles.removeImageButton} onPress={() => removeAdditionalImage(index, false)}>
+                        <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                  {newAdditionalImageUris.map((uri, index) => (
+                    <View key={`new-${index}`} style={styles.additionalImageContainer}>
+                      <Image source={{ uri }} style={styles.additionalImageThumb} />
+                      <TouchableOpacity style={styles.removeImageButton} onPress={() => removeAdditionalImage(index, true)}>
+                        <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
+                      </TouchableOpacity>
+                      <View style={styles.newImageBadge}>
+                        <Text style={styles.newImageBadgeText}>NEW</Text>
+                      </View>
+                    </View>
+                  ))}
+                  <TouchableOpacity style={styles.addImageButton} onPress={pickAdditionalImage}>
+                    <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={32} color="#D4A843" />
+                    <Text style={styles.addImageText}>Add</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              </View>
+
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{t('upcoming_events_editor:event_title_label')}</Text>
                 <TextInput
@@ -1060,7 +1168,16 @@ export default function UpcomingEventsEditorScreen() {
 
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{t('upcoming_events_editor:description_label')}</Text>
+                <RichTextToolbar
+                  text={formData.message}
+                  onChangeText={(text) => setFormData(prev => ({ ...prev, message: text }))}
+                  selection={contentSelection}
+                  onSelectionChange={setContentSelection}
+                  textInputRef={contentInputRef}
+                  accentColor={colors.highlight}
+                />
                 <TextInput
+                  ref={contentInputRef}
                   style={[styles.input, styles.textArea]}
                   placeholder={t('upcoming_events_editor:description_placeholder')}
                   placeholderTextColor="#999999"
@@ -1068,6 +1185,7 @@ export default function UpcomingEventsEditorScreen() {
                   onChangeText={(text) => setFormData({ ...formData, message: text })}
                   multiline
                   numberOfLines={4}
+                  onSelectionChange={(e) => setContentSelection(e.nativeEvent.selection)}
                 />
               </View>
 
@@ -1370,6 +1488,25 @@ export default function UpcomingEventsEditorScreen() {
                   {t('upcoming_events_editor:display_order_hint')}
                 </Text>
               </View>
+
+              {!editingEvent && (
+                <View style={styles.notificationToggleContainer}>
+                  <View style={styles.notificationToggleTextContainer}>
+                    <Text style={styles.notificationToggleLabel}>
+                      {t('upcoming_events_editor:send_notification_label')}
+                    </Text>
+                    <Text style={styles.notificationToggleHint}>
+                      {t('upcoming_events_editor:send_notification_hint')}
+                    </Text>
+                  </View>
+                  <Switch
+                    value={shouldSendNotification}
+                    onValueChange={setShouldSendNotification}
+                    trackColor={{ false: '#767577', true: colors.primary }}
+                    thumbColor="#f4f3f4"
+                  />
+                </View>
+              )}
 
               <TouchableOpacity
                 style={styles.saveButton}
@@ -1813,10 +1950,12 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   dragHandle: {
     position: 'absolute',
-    top: 6,
-    right: 6,
+    top: 8,
+    left: 8,
     padding: 6,
     zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 14,
   },
   reorderHint: {
     fontSize: 12,
@@ -2166,6 +2305,31 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontWeight: '600',
     color: '#E74C3C',
   },
+  notificationToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  notificationToggleTextContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  notificationToggleLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  notificationToggleHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
+  },
   saveButton: {
     backgroundColor: colors.highlight,
     borderRadius: 12,
@@ -2222,5 +2386,56 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   datePicker: {
     height: 200,
+  },
+  additionalImagesScroll: {
+    marginTop: 10,
+  },
+  additionalImageContainer: {
+    position: 'relative',
+    marginRight: 12,
+  },
+  additionalImageThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    backgroundColor: '#F5F5F5',
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 11,
+    zIndex: 10,
+  },
+  newImageBadge: {
+    position: 'absolute',
+    bottom: 4,
+    left: 4,
+    backgroundColor: '#4CAF50',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+  },
+  newImageBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: 'bold',
+  },
+  addImageButton: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FAFAFA',
+  },
+  addImageText: {
+    fontSize: 11,
+    color: '#999999',
+    marginTop: 2,
   },
 });
