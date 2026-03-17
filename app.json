@@ -3,7 +3,7 @@
     "name": "Boathouse Connect",
     "slug": "BoathouseConnect",
     "owner": "stevenjamesjobs",
-    "version": "1.6.4",
+    "version": "1.6.5",
     "orientation": "portrait",
     "icon": "./assets/images/MarchMadnessAppClip.png",
     "scheme": "boathouseconnect",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.stevenjamesjobs.mcloonesboathouseconnect",
-      "buildNumber": "1.6.4",
+      "buildNumber": "1.6.5",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": ["remote-notification"],
@@ -30,7 +30,7 @@
         "backgroundColor": "#ffffff"
       },
       "package": "com.mcloonesboathouse.GPboathouseconnect",
-      "versionCode": 164,
+      "versionCode": 170,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "INTERNET",

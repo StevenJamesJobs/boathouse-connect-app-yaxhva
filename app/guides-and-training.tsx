@@ -24,6 +24,8 @@ import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import ContentDetailModal from '@/components/ContentDetailModal';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/translateContent';
 
 interface GuideItem {
   id: string;
@@ -38,6 +40,8 @@ interface GuideItem {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  title_es?: string | null;
+  description_es?: string | null;
 }
 
 const CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
@@ -45,6 +49,7 @@ const CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events 
 export default function GuidesAndTrainingScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const colors = useThemeColors();
   const [guides, setGuides] = useState<GuideItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -268,11 +273,13 @@ export default function GuidesAndTrainingScreen() {
     const query = searchQuery.toLowerCase().trim();
     
     return guidesToFilter.filter(guide => {
-      // Search by title (name)
-      const titleMatch = guide.title.toLowerCase().includes(query);
-      
-      // Search by description (keywords)
-      const descriptionMatch = guide.description?.toLowerCase().includes(query) || false;
+      // Search by title (name) - check both English and localized
+      const localizedTitle = getLocalizedField(guide, 'title', language);
+      const titleMatch = guide.title.toLowerCase().includes(query) || localizedTitle.toLowerCase().includes(query);
+
+      // Search by description (keywords) - check both English and localized
+      const localizedDesc = getLocalizedField(guide, 'description', language);
+      const descriptionMatch = guide.description?.toLowerCase().includes(query) || localizedDesc?.toLowerCase().includes(query) || false;
       
       // Search by date
       const createdDate = formatDate(guide.created_at).toLowerCase();
@@ -367,10 +374,10 @@ export default function GuidesAndTrainingScreen() {
                         {guide.category}
                       </Text>
                     </View>
-                    <Text style={[styles.guideTitle, { color: colors.text }]}>{guide.title}</Text>
-                    {guide.description && (
+                    <Text style={[styles.guideTitle, { color: colors.text }]}>{getLocalizedField(guide, 'title', language)}</Text>
+                    {(guide.description || (language === 'es' && guide.description_es)) && (
                       <Text style={[styles.guideDescription, { color: colors.textSecondary }]}>
-                        {guide.description}
+                        {getLocalizedField(guide, 'description', language)}
                       </Text>
                     )}
                     <View style={styles.guideMeta}>
@@ -457,10 +464,10 @@ export default function GuidesAndTrainingScreen() {
                           </TouchableOpacity>
                         )}
                         <View style={styles.guideContent}>
-                          <Text style={[styles.guideTitle, { color: colors.text }]}>{guide.title}</Text>
-                          {guide.description && (
+                          <Text style={[styles.guideTitle, { color: colors.text }]}>{getLocalizedField(guide, 'title', language)}</Text>
+                          {(guide.description || (language === 'es' && guide.description_es)) && (
                             <Text style={[styles.guideDescription, { color: colors.textSecondary }]}>
-                              {guide.description}
+                              {getLocalizedField(guide, 'description', language)}
                             </Text>
                           )}
                           <View style={styles.guideMeta}>
@@ -570,12 +577,12 @@ export default function GuidesAndTrainingScreen() {
         <ContentDetailModal
           visible={detailModalVisible}
           onClose={closeDetailModal}
-          title={selectedGuide.title}
-          content={selectedGuide.description || 'No description available'}
+          title={getLocalizedField(selectedGuide, 'title', language)}
+          content={getLocalizedField(selectedGuide, 'description', language) || 'No description available'}
           thumbnailUrl={selectedGuide.thumbnail_url}
           guideFile={{
             id: selectedGuide.id,
-            title: selectedGuide.title,
+            title: getLocalizedField(selectedGuide, 'title', language),
             file_url: selectedGuide.file_url,
             file_name: selectedGuide.file_name,
             file_type: selectedGuide.file_type,
