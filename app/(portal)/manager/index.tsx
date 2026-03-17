@@ -13,24 +13,29 @@ import {
   ActivityIndicator,
   Modal,
   Dimensions,
+  FlatList,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import CollapsibleSection from '@/components/CollapsibleSection';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import WeatherWidget from '@/components/WeatherWidget';
 import { useFocusEffect } from '@react-navigation/native';
 import WeatherDetailModal from '@/components/WeatherDetailModal';
-import { MessageBadge } from '@/components/MessageBadge';
 import UpcomingEventsSection from '@/components/UpcomingEventsSection';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
 import FormattedText from '@/components/FormattedText';
 import { stripFormattingTags } from '@/components/FormattedText';
 import { fetchContentImagesBatch, ContentType } from '@/utils/contentImages';
+import WelcomeHeader from '@/components/WelcomeHeader';
+import NotificationDropdown from '@/components/NotificationDropdown';
+import ConnectBar, { ConnectBarTab } from '@/components/ConnectBar';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface MenuItem {
   id: string;
@@ -138,10 +143,18 @@ export default function ManagerPortalScreen() {
 
   // What's Happening tab state (Announcements / Special Features)
   const [whatsHappeningTab, setWhatsHappeningTab] = useState<'Announcements' | 'Special Features'>('Announcements');
-  
+
+  // ConnectBar active tab
+  const [activeSection, setActiveSection] = useState<ConnectBarTab>('today');
+  const sectionListRef = useRef<FlatList>(null);
+  const isScrollingRef = useRef(false);
+
   // Weather detail modal state
   const [weatherDetailVisible, setWeatherDetailVisible] = useState(false);
-  
+
+  // Notification dropdown state
+  const [notificationVisible, setNotificationVisible] = useState(false);
+
   // Content images maps (content_id -> additional image URLs)
   const [contentImagesMap, setContentImagesMap] = useState<Map<string, string[]>>(new Map());
 
@@ -160,8 +173,7 @@ export default function ManagerPortalScreen() {
     guideFile?: GuideFile | null;
   } | null>(null);
 
-  const headerColor = colors.primary;
-  const contentColor = colors.card;
+  const SECTIONS: ConnectBarTab[] = ['today', 'events', 'specials'];
 
   useEffect(() => {
     loadWeeklySpecials();
@@ -170,7 +182,7 @@ export default function ManagerPortalScreen() {
     loadSpecialFeatures();
   }, []);
 
-  // Reload data when language changes to ensure translated fields are available
+  // Reload data when language changes
   useEffect(() => {
     loadWeeklySpecials();
     loadAnnouncements();
@@ -180,7 +192,6 @@ export default function ManagerPortalScreen() {
 
   useFocusEffect(
     React.useCallback(() => {
-      console.log('Manager portal screen focused, refreshing data...');
       loadWeeklySpecials();
       loadAnnouncements();
       loadUpcomingEvents();
@@ -278,8 +289,6 @@ export default function ManagerPortalScreen() {
   const loadWeeklySpecials = async () => {
     try {
       setLoadingSpecials(true);
-      console.log('Loading weekly specials for manager portal...');
-      
       const { data, error } = await supabase
         .from('menu_items')
         .select('*')
@@ -287,12 +296,7 @@ export default function ManagerPortalScreen() {
         .eq('is_active', true)
         .order('display_order', { ascending: true });
 
-      if (error) {
-        console.error('Error loading weekly specials:', error);
-        throw error;
-      }
-      
-      console.log('Weekly specials loaded:', data?.length || 0, 'items');
+      if (error) throw error;
       setWeeklySpecials(data || []);
     } catch (error) {
       console.error('Error loading weekly specials:', error);
@@ -304,18 +308,12 @@ export default function ManagerPortalScreen() {
   const loadAnnouncements = async () => {
     try {
       setLoadingAnnouncements(true);
-      console.log('Loading announcements for manager portal...');
-      
       const { data, error } = await supabase
         .from('announcements')
         .select(`
           *,
           guide_file:guides_and_training!announcements_guide_file_id_fkey(
-            id,
-            title,
-            file_url,
-            file_name,
-            file_type
+            id, title, file_url, file_name, file_type
           )
         `)
         .eq('is_active', true)
@@ -323,14 +321,8 @@ export default function ManagerPortalScreen() {
         .order('display_order', { ascending: true })
         .limit(4);
 
-      if (error) {
-        console.error('Error loading announcements:', error);
-        throw error;
-      }
-      
-      console.log('Announcements loaded for manager:', data?.length || 0, 'items');
+      if (error) throw error;
       setAnnouncements(data || []);
-      // Batch fetch additional images for announcements
       if (data && data.length > 0) {
         const ids = data.map((a: any) => a.id);
         const imagesMap = await fetchContentImagesBatch('announcement', ids);
@@ -350,32 +342,20 @@ export default function ManagerPortalScreen() {
   const loadUpcomingEvents = async () => {
     try {
       setLoadingEvents(true);
-      console.log('Loading upcoming events for manager portal...');
-      
       const { data, error } = await supabase
         .from('upcoming_events')
         .select(`
           *,
           guide_file:guides_and_training!upcoming_events_guide_file_id_fkey(
-            id,
-            title,
-            file_url,
-            file_name,
-            file_type
+            id, title, file_url, file_name, file_type
           )
         `)
         .eq('is_active', true)
         .order('display_order', { ascending: true })
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error loading upcoming events:', error);
-        throw error;
-      }
-      
-      console.log('Upcoming events loaded for manager:', data?.length || 0, 'items');
+      if (error) throw error;
       setUpcomingEvents(data || []);
-      // Batch fetch additional images for events
       if (data && data.length > 0) {
         const ids = data.map((e: any) => e.id);
         const imagesMap = await fetchContentImagesBatch('upcoming_event', ids);
@@ -395,18 +375,12 @@ export default function ManagerPortalScreen() {
   const loadSpecialFeatures = async () => {
     try {
       setLoadingFeatures(true);
-      console.log('Loading special features for manager portal...');
-      
       const { data, error } = await supabase
         .from('special_features')
         .select(`
           *,
           guide_file:guides_and_training!special_features_guide_file_id_fkey(
-            id,
-            title,
-            file_url,
-            file_name,
-            file_type
+            id, title, file_url, file_name, file_type
           )
         `)
         .eq('is_active', true)
@@ -414,14 +388,8 @@ export default function ManagerPortalScreen() {
         .order('created_at', { ascending: false })
         .limit(4);
 
-      if (error) {
-        console.error('Error loading special features:', error);
-        throw error;
-      }
-      
-      console.log('Special features loaded for manager:', data?.length || 0, 'items');
+      if (error) throw error;
       setSpecialFeatures(data || []);
-      // Batch fetch additional images for special features
       if (data && data.length > 0) {
         const ids = data.map((f: any) => f.id);
         const imagesMap = await fetchContentImagesBatch('special_feature', ids);
@@ -438,23 +406,6 @@ export default function ManagerPortalScreen() {
     }
   };
 
-  const openImageModal = (imageUrl: string) => {
-    setSelectedImage(imageUrl);
-    setImageModalVisible(true);
-  };
-
-  const closeImageModal = () => {
-    setImageModalVisible(false);
-    setSelectedImage(null);
-  };
-
-  const handleSwipeGesture = (event: any) => {
-    const { translationY } = event.nativeEvent;
-    if (translationY > 100) {
-      closeImageModal();
-    }
-  };
-
   const openDetailModal = (item: {
     title: string;
     content: string;
@@ -467,7 +418,6 @@ export default function ManagerPortalScreen() {
     link?: string | null;
     guideFile?: GuideFile | null;
   }) => {
-    console.log('Opening detail modal with item:', JSON.stringify(item, null, 2));
     setSelectedItem(item);
     setDetailModalVisible(true);
   };
@@ -477,20 +427,14 @@ export default function ManagerPortalScreen() {
     setSelectedItem(null);
   };
 
-  const openWeatherDetail = () => {
-    setWeatherDetailVisible(true);
-  };
-
-  const closeWeatherDetail = () => {
-    setWeatherDetailVisible(false);
-  };
+  const openWeatherDetail = () => setWeatherDetailVisible(true);
+  const closeWeatherDetail = () => setWeatherDetailVisible(false);
 
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
     return `${url}?t=${Date.now()}`;
   };
 
-  // Build combined image array: thumbnail first, then additional images from content_images
   const buildImageUrls = (id: string, thumbnailUrl: string | null): string[] | undefined => {
     const additionalImages = contentImagesMap.get(id);
     if (!additionalImages || additionalImages.length === 0) return undefined;
@@ -500,59 +444,37 @@ export default function ManagerPortalScreen() {
     return images;
   };
 
-  const getProfilePictureUrl = (url: string | null | undefined) => {
-    if (!url) return null;
-    if (url.startsWith('http')) {
-      return url;
-    }
-    const supabaseUrl = 'https://xvbajqukbakcvdrkcioi.supabase.co';
-    return `${supabaseUrl}/storage/v1/object/public/profile-pictures/${url}`;
-  };
-
   const formatPrice = (price: string) => {
-    if (price.includes('$')) {
-      return price;
-    }
+    if (price.includes('$')) return price;
     return `$${price}`;
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'new':
-        return '#3498DB';
-      case 'important':
-        return '#E74C3C';
-      case 'update':
-        return '#F39C12';
-      default:
-        return colors.textSecondary;
+      case 'new': return '#3498DB';
+      case 'important': return '#E74C3C';
+      case 'update': return '#F39C12';
+      default: return colors.textSecondary;
     }
   };
 
   const getPriorityLabel = (priority: string) => {
     switch (priority) {
-      case 'new':
-        return 'New';
-      case 'important':
-        return 'Important';
-      case 'update':
-        return 'Update';
-      default:
-        return priority.charAt(0).toUpperCase() + priority.slice(1);
+      case 'new': return 'New';
+      case 'important': return 'Important';
+      case 'update': return 'Update';
+      default: return priority.charAt(0).toUpperCase() + priority.slice(1);
     }
   };
 
-  const getTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-    if (diffDays === 1) return 'Yesterday';
-    return `${diffDays} days ago`;
+  const truncateText = (text: string | null, maxLength: number = 125): string => {
+    if (!text) return '';
+    const stripped = stripFormattingTags(text);
+    if (stripped.length <= maxLength) return stripped;
+    const truncated = stripped.substring(0, maxLength);
+    const lastSpace = truncated.lastIndexOf(' ');
+    if (lastSpace > 100) return truncated.substring(0, lastSpace) + '...';
+    return truncated + '...';
   };
 
   const formatDateTime = (dateTime: string | null) => {
@@ -568,317 +490,226 @@ export default function ManagerPortalScreen() {
     });
   };
 
-  const truncateText = (text: string | null, maxLength: number = 125): string => {
-    if (!text) return '';
-    const stripped = stripFormattingTags(text);
-    if (stripped.length <= maxLength) return stripped;
-
-    const truncated = stripped.substring(0, maxLength);
-    const lastSpace = truncated.lastIndexOf(' ');
-
-    if (lastSpace > 100) {
-      return truncated.substring(0, lastSpace) + '...';
+  // Handle section swipe
+  const handleSectionScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const pageIndex = Math.round(offsetX / SCREEN_WIDTH);
+    const newTab = SECTIONS[pageIndex];
+    if (newTab && newTab !== activeSection) {
+      setActiveSection(newTab);
     }
+  }, [activeSection]);
 
-    return truncated + '...';
-  };
+  // Handle ConnectBar tab press
+  const handleTabChange = useCallback((tab: ConnectBarTab) => {
+    setActiveSection(tab);
+    const index = SECTIONS.indexOf(tab);
+    sectionListRef.current?.scrollToIndex({ index, animated: true });
+  }, []);
 
-  const profilePictureUrl = getProfilePictureUrl(user?.profilePictureUrl);
-  const unreadText = unreadCount > 0 ? `${unreadCount}` : '0';
+  // ===== RENDER CARD COMPONENTS =====
 
-  return (
-    <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Welcome Section */}
-        <View style={[styles.welcomeSection, { backgroundColor: colors.card }]}>
-          <View style={styles.welcomeRow}>
-            <View style={[styles.profilePictureContainer, { backgroundColor: colors.background, borderColor: colors.highlight }]}>
-              {profilePictureUrl ? (
-                <Image
-                  source={{ uri: profilePictureUrl }}
-                  style={styles.profilePicture}
-                />
-              ) : (
-                <View style={[styles.profilePicturePlaceholder, { backgroundColor: colors.background }]}>
-                  <IconSymbol
-                    ios_icon_name="person.fill"
-                    android_material_icon_name="person"
-                    size={32}
-                    color={colors.textSecondary}
-                  />
-                </View>
-              )}
-            </View>
-
-            <View style={styles.welcomeTextContainer}>
-              <Text style={[styles.welcomeTitle, { color: colors.text }]}>Welcome, {user?.name}!</Text>
-              <Text style={[styles.jobTitle, { color: colors.highlight }]}>{user?.jobTitle}</Text>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.compactMessageButton, { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}
-              onPress={() => router.push('/messages')}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.compactMessageIconWrapper, { backgroundColor: colors.primary }]}>
-                <IconSymbol
-                  ios_icon_name="envelope.fill"
-                  android_material_icon_name="mail"
-                  size={20}
-                  color="#FFFFFF"
-                />
-                {unreadCount > 0 && (
-                  <View style={styles.compactBadgePosition}>
-                    <View style={[styles.compactBadge, { borderColor: colors.card }]}>
-                      <Text style={styles.compactBadgeText}>{unreadText}</Text>
-                    </View>
-                  </View>
-                )}
+  const renderAnnouncementCard = (announcement: Announcement, index: number) => (
+    <TouchableOpacity
+      key={announcement.id}
+      style={[styles.card, { backgroundColor: colors.card, borderLeftColor: getPriorityColor(announcement.priority) }]}
+      onPress={() => openDetailModal({
+        title: getLocalizedField(announcement, 'title', language),
+        content: getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message || '',
+        thumbnailUrl: announcement.thumbnail_url,
+        thumbnailShape: announcement.thumbnail_shape,
+        imageUrls: buildImageUrls(announcement.id, announcement.thumbnail_url),
+        priority: announcement.priority,
+        link: announcement.link,
+        guideFile: announcement.guide_file || null,
+      })}
+      activeOpacity={0.7}
+    >
+      <View style={styles.cardRow}>
+        {announcement.thumbnail_url && (
+          <Image
+            source={{ uri: getImageUrl(announcement.thumbnail_url)! }}
+            style={styles.cardImage}
+          />
+        )}
+        <View style={styles.cardContent}>
+          <View style={styles.cardTitleRow}>
+            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+              {getLocalizedField(announcement, 'title', language)}
+            </Text>
+            {announcement.priority && announcement.priority !== 'none' && (
+              <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
+                <Text style={styles.priorityText}>{getPriorityLabel(announcement.priority).toUpperCase()}</Text>
               </View>
-              <Text style={[styles.compactMessageLabel, { color: colors.text }]}>{t('common.messages')}</Text>
-            </TouchableOpacity>
+            )}
           </View>
+          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+            {truncateText(getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message)}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderFeatureCard = (feature: SpecialFeature, index: number) => (
+    <TouchableOpacity
+      key={feature.id}
+      style={[styles.card, { backgroundColor: colors.card, borderLeftColor: '#FF9800' }]}
+      onPress={() => openDetailModal({
+        title: getLocalizedField(feature, 'title', language),
+        content: getLocalizedField(feature, 'content', language) || feature.content || feature.message || '',
+        thumbnailUrl: feature.thumbnail_url,
+        thumbnailShape: feature.thumbnail_shape,
+        imageUrls: buildImageUrls(feature.id, feature.thumbnail_url),
+        startDateTime: feature.start_date_time,
+        endDateTime: feature.end_date_time,
+        link: feature.link,
+        guideFile: feature.guide_file || null,
+      })}
+      activeOpacity={0.7}
+    >
+      <View style={styles.cardRow}>
+        {feature.thumbnail_url && (
+          <Image
+            source={{ uri: getImageUrl(feature.thumbnail_url)! }}
+            style={styles.cardImage}
+          />
+        )}
+        <View style={styles.cardContent}>
+          <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+            {getLocalizedField(feature, 'title', language)}
+          </Text>
+          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+            {truncateText(getLocalizedField(feature, 'content', language) || feature.content || feature.message)}
+          </Text>
+          {feature.start_date_time && (
+            <Text style={[styles.cardDate, { color: colors.textSecondary }]}>
+              {formatDateTime(feature.start_date_time)}
+            </Text>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderSpecialCard = (item: MenuItem, index: number) => (
+    <TouchableOpacity
+      key={item.id}
+      style={[styles.card, { backgroundColor: colors.card, borderLeftColor: '#F44336' }]}
+      onPress={() => openDetailModal({
+        title: getLocalizedField(item, 'name', language),
+        content: `${getLocalizedField(item, 'description', language) || item.description || ''}\n\nPrice: ${formatPrice(item.price)}${item.is_gluten_free ? '\n• Gluten Free' : ''}${item.is_gluten_free_available ? '\n• Gluten Free Available' : ''}${item.is_vegetarian ? '\n• Vegetarian' : ''}${item.is_vegetarian_available ? '\n• Vegetarian Available' : ''}`,
+        thumbnailUrl: item.thumbnail_url,
+        thumbnailShape: item.thumbnail_shape,
+      })}
+      activeOpacity={0.7}
+    >
+      <View style={styles.cardRow}>
+        {item.thumbnail_url && (
+          <Image
+            source={{ uri: getImageUrl(item.thumbnail_url)! }}
+            style={styles.cardImage}
+          />
+        )}
+        <View style={styles.cardContent}>
+          <View style={styles.cardTitleRow}>
+            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+              {getLocalizedField(item, 'name', language)}
+            </Text>
+            <Text style={[styles.priceText, { color: colors.primary }]}>
+              {formatPrice(item.price)}
+            </Text>
+          </View>
+          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+            {getLocalizedField(item, 'description', language) || item.description}
+          </Text>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  // ===== SECTION RENDERERS =====
+
+  const renderTodaySection = () => (
+    <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
+      <ScrollView
+        style={styles.sectionScroll}
+        contentContainerStyle={styles.sectionContent}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+      >
+        {/* Sub-tabs: Announcements / Special Features */}
+        <View style={[styles.subTabsContainer, { backgroundColor: colors.background }]}>
+          <TouchableOpacity
+            style={[styles.subTab, whatsHappeningTab === 'Announcements' && { backgroundColor: colors.primary }]}
+            onPress={() => setWhatsHappeningTab('Announcements')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Announcements' && { color: '#FFFFFF' }]}>
+              {t('manager_home.announcements')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.subTab, whatsHappeningTab === 'Special Features' && { backgroundColor: colors.primary }]}
+            onPress={() => setWhatsHappeningTab('Special Features')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Special Features' && { color: '#FFFFFF' }]}>
+              {t('manager_home.special_features')}
+            </Text>
+          </TouchableOpacity>
         </View>
 
-        {/* Weather Section */}
-        <CollapsibleSection
-          title={t('manager_home.weather')}
-          iconIos="cloud.sun.fill"
-          iconAndroid="wb-cloudy"
-          iconColor={colors.darkText}
-          headerBackgroundColor={headerColor}
-          headerTextColor={colors.darkText}
-          contentBackgroundColor={contentColor}
-          defaultExpanded={true}
-        >
-          <WeatherWidget
-            textColor={colors.text}
-            secondaryTextColor={colors.textSecondary}
-            language={language}
-            onPress={openWeatherDetail}
-          />
-        </CollapsibleSection>
+        {/* Announcements */}
+        {whatsHappeningTab === 'Announcements' && (
+          <>
+            {loadingAnnouncements ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : announcements.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  {t('manager_home.no_announcements', 'No announcements')}
+                </Text>
+              </View>
+            ) : (
+              announcements.map((a, i) => renderAnnouncementCard(a, i))
+            )}
+          </>
+        )}
 
-        {/* What's Happening Section (Announcements + Special Features with Tabs) */}
-        <CollapsibleSection
-          title={t('manager_home.whats_happening')}
-          iconIos="megaphone.fill"
-          iconAndroid="campaign"
-          iconColor={colors.darkText}
-          headerBackgroundColor={headerColor}
-          headerTextColor={colors.darkText}
-          contentBackgroundColor={contentColor}
-          defaultExpanded={true}
-          onViewAll={whatsHappeningTab === 'Special Features' ? () => router.push('/view-all-special-features') : undefined}
-        >
-          {/* Tabs */}
-          <View style={[styles.tabsContainer, { backgroundColor: colors.background }]}>
-            <TouchableOpacity
-              style={[styles.tab, whatsHappeningTab === 'Announcements' && { backgroundColor: colors.highlight }]}
-              onPress={() => setWhatsHappeningTab('Announcements')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabText, { color: colors.textSecondary }, whatsHappeningTab === 'Announcements' && { color: colors.text }]}>
-                {t('manager_home.announcements')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, whatsHappeningTab === 'Special Features' && { backgroundColor: colors.highlight }]}
-              onPress={() => setWhatsHappeningTab('Special Features')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.tabText, { color: colors.textSecondary }, whatsHappeningTab === 'Special Features' && { color: colors.text }]}>
-                {t('manager_home.special_features')}
-              </Text>
-            </TouchableOpacity>
-          </View>
+        {/* Special Features */}
+        {whatsHappeningTab === 'Special Features' && (
+          <>
+            {loadingFeatures ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="small" color={colors.primary} />
+              </View>
+            ) : specialFeatures.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                  {t('manager_home.no_features', 'No special features')}
+                </Text>
+              </View>
+            ) : (
+              specialFeatures.map((f, i) => renderFeatureCard(f, i))
+            )}
+          </>
+        )}
+      </ScrollView>
+    </View>
+  );
 
-          {/* Announcements Tab Content */}
-          {whatsHappeningTab === 'Announcements' && (
-            <>
-              {loadingAnnouncements ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={colors.highlight} />
-                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('manager_home.loading')}</Text>
-                </View>
-              ) : announcements.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>{t('manager_home.announcements')}</Text>
-                  <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>Create announcements in the Announcement Editor</Text>
-                </View>
-              ) : (
-                <>
-                  {announcements.map((announcement, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={[styles.announcementItem, { borderBottomColor: colors.border }]}
-                      onPress={() => openDetailModal({
-                        title: getLocalizedField(announcement, 'title', language),
-                        content: getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message || '',
-                        thumbnailUrl: announcement.thumbnail_url,
-                        thumbnailShape: announcement.thumbnail_shape,
-                        imageUrls: buildImageUrls(announcement.id, announcement.thumbnail_url),
-                        priority: announcement.priority,
-                        link: announcement.link,
-                        guideFile: announcement.guide_file || null,
-                      })}
-                      activeOpacity={0.7}
-                    >
-                      {announcement.thumbnail_shape === 'square' && announcement.thumbnail_url ? (
-                        <View style={styles.announcementSquareLayout}>
-                          <Image
-                            source={{ uri: getImageUrl(announcement.thumbnail_url) }}
-                            style={styles.announcementSquareImage}
-                          />
-                          <View style={styles.announcementSquareContent}>
-                            <View style={styles.announcementHeader}>
-                              <Text style={[styles.announcementTitle, { color: colors.text }]}>{getLocalizedField(announcement, 'title', language)}</Text>
-                              {announcement.priority && announcement.priority !== 'none' && (
-                                <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
-                                  {announcement.priority === 'new' && (
-                                    <IconSymbol
-                                      ios_icon_name="star.fill"
-                                      android_material_icon_name="star"
-                                      size={9}
-                                      color="#FFFFFF"
-                                    />
-                                  )}
-                                  <Text style={styles.priorityText}>{getPriorityLabel(announcement.priority).toUpperCase()}</Text>
-                                </View>
-                              )}
-                            </View>
-                            <FormattedText style={[styles.announcementText, { color: colors.textSecondary }]} numberOfLines={2}>
-                              {getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message}
-                            </FormattedText>
-                          </View>
-                        </View>
-                      ) : (
-                        <>
-                          {announcement.thumbnail_url && (
-                            <Image
-                              source={{ uri: getImageUrl(announcement.thumbnail_url) }}
-                              style={styles.announcementBannerImage}
-                            />
-                          )}
-                          <View style={styles.announcementHeader}>
-                            <Text style={[styles.announcementTitle, { color: colors.text }]}>{getLocalizedField(announcement, 'title', language)}</Text>
-                            {announcement.priority && announcement.priority !== 'none' && (
-                              <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
-                                {announcement.priority === 'new' && (
-                                  <IconSymbol
-                                    ios_icon_name="star.fill"
-                                    android_material_icon_name="star"
-                                    size={9}
-                                    color="#FFFFFF"
-                                  />
-                                )}
-                                <Text style={styles.priorityText}>{getPriorityLabel(announcement.priority).toUpperCase()}</Text>
-                              </View>
-                            )}
-                          </View>
-                          <Text style={[styles.announcementText, { color: colors.textSecondary }]}>
-                            {truncateText(getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message)}
-                          </Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </>
-              )}
-            </>
-          )}
-
-          {/* Special Features Tab Content */}
-          {whatsHappeningTab === 'Special Features' && (
-            <>
-              {loadingFeatures ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={colors.highlight} />
-                  <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading features...</Text>
-                </View>
-              ) : specialFeatures.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No special features</Text>
-                  <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>Create features in the Special Features Editor</Text>
-                </View>
-              ) : (
-                <>
-                  {specialFeatures.map((feature, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={[styles.featureItem, { borderBottomColor: colors.border }]}
-                      onPress={() => openDetailModal({
-                        title: getLocalizedField(feature, 'title', language),
-                        content: getLocalizedField(feature, 'content', language) || feature.content || feature.message || '',
-                        thumbnailUrl: feature.thumbnail_url,
-                        thumbnailShape: feature.thumbnail_shape,
-                        imageUrls: buildImageUrls(feature.id, feature.thumbnail_url),
-                        startDateTime: feature.start_date_time,
-                        endDateTime: feature.end_date_time,
-                        link: feature.link,
-                        guideFile: feature.guide_file || null,
-                      })}
-                      activeOpacity={0.7}
-                    >
-                      {feature.thumbnail_shape === 'square' && feature.thumbnail_url ? (
-                        <View style={styles.featureSquareLayout}>
-                          <Image
-                            source={{ uri: getImageUrl(feature.thumbnail_url) }}
-                            style={styles.featureSquareImage}
-                          />
-                          <View style={styles.featureSquareContent}>
-                            <Text style={[styles.featureTitle, { color: colors.text }]}>{getLocalizedField(feature, 'title', language)}</Text>
-                            {(feature.content || feature.message) && (
-                              <FormattedText style={[styles.featureDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                                {getLocalizedField(feature, 'content', language) || feature.content || feature.message}
-                              </FormattedText>
-                            )}
-                            {feature.start_date_time && (
-                              <Text style={[styles.featureTime, { color: colors.textSecondary }]}>{formatDateTime(feature.start_date_time)}</Text>
-                            )}
-                          </View>
-                        </View>
-                      ) : (
-                        <>
-                          {feature.thumbnail_url && (
-                            <Image
-                              source={{ uri: getImageUrl(feature.thumbnail_url) }}
-                              style={styles.featureBannerImage}
-                            />
-                          )}
-                          <View style={styles.featureContent}>
-                            <Text style={[styles.featureTitle, { color: colors.text }]}>{getLocalizedField(feature, 'title', language)}</Text>
-                            {(feature.content || feature.message) && (
-                              <Text style={[styles.featureDescription, { color: colors.textSecondary }]}>
-                                {truncateText(getLocalizedField(feature, 'content', language) || feature.content || feature.message)}
-                              </Text>
-                            )}
-                            {feature.start_date_time && (
-                              <Text style={[styles.featureTime, { color: colors.textSecondary }]}>{formatDateTime(feature.start_date_time)}</Text>
-                            )}
-                          </View>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </>
-              )}
-            </>
-          )}
-        </CollapsibleSection>
-
-        {/* Upcoming Events Section with Calendar Strip */}
-        <CollapsibleSection
-          title={t('manager_home.upcoming_events')}
-          iconIos="calendar"
-          iconAndroid="event"
-          iconColor={colors.darkText}
-          headerBackgroundColor={headerColor}
-          headerTextColor={colors.darkText}
-          contentBackgroundColor={contentColor}
-          defaultExpanded={true}
-          onViewAll={() => router.push('/view-all-upcoming-events')}
-        >
+  const renderEventsSection = () => (
+    <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
+      <ScrollView
+        style={styles.sectionScroll}
+        contentContainerStyle={styles.sectionContent}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
+      >
+        <View style={[styles.eventsContainer, { backgroundColor: colors.card, borderRadius: 12 }]}>
           <UpcomingEventsSection
             events={upcomingEvents}
             loadingEvents={loadingEvents}
@@ -895,168 +726,89 @@ export default function ManagerPortalScreen() {
             maxItems={4}
             language={language}
           />
-        </CollapsibleSection>
-
-        {/* Weekly Specials Section */}
-        <CollapsibleSection
-          title={t('manager_home.weekly_specials')}
-          iconIos="fork.knife"
-          iconAndroid="restaurant"
-          iconColor={colors.darkText}
-          headerBackgroundColor={headerColor}
-          headerTextColor={colors.darkText}
-          contentBackgroundColor={contentColor}
-          defaultExpanded={true}
-        >
-          {loadingSpecials ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color={colors.highlight} />
-              <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading specials...</Text>
-            </View>
-          ) : weeklySpecials.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No weekly specials available</Text>
-              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>Add items in the Menu Editor</Text>
-            </View>
-          ) : (
-            <>
-              {weeklySpecials.map((item, index) => (
-                <TouchableOpacity
-                  key={index}
-                  style={[styles.specialCard, { backgroundColor: colors.background }]}
-                  onPress={() => openDetailModal({
-                    title: getLocalizedField(item, 'name', language),
-                    content: `${getLocalizedField(item, 'description', language) || item.description || ''}\n\nPrice: ${formatPrice(item.price)}${item.is_gluten_free ? '\n• Gluten Free' : ''}${item.is_gluten_free_available ? '\n• Gluten Free Available' : ''}${item.is_vegetarian ? '\n• Vegetarian' : ''}${item.is_vegetarian_available ? '\n• Vegetarian Available' : ''}`,
-                    thumbnailUrl: item.thumbnail_url,
-                    thumbnailShape: item.thumbnail_shape,
-                  })}
-                  activeOpacity={0.7}
-                >
-                  {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
-                    <View style={styles.specialSquareLayout}>
-                      <Image
-                        source={{ uri: getImageUrl(item.thumbnail_url) }}
-                        style={styles.specialSquareImage}
-                      />
-                      <View style={styles.specialSquareContent}>
-                        <View style={styles.specialHeader}>
-                          <Text style={[styles.specialName, { color: colors.text }]}>{getLocalizedField(item, 'name', language)}</Text>
-                          <Text style={[styles.specialPrice, { color: colors.highlight }]}>{formatPrice(item.price)}</Text>
-                        </View>
-                        {(item.is_gluten_free || item.is_gluten_free_available || item.is_vegetarian || item.is_vegetarian_available) && (
-                          <View style={styles.specialTags}>
-                            {item.is_gluten_free && (
-                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
-                                <Text style={[styles.tagText, { color: colors.text }]}>GF</Text>
-                              </View>
-                            )}
-                            {item.is_gluten_free_available && (
-                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
-                                <Text style={[styles.tagText, { color: colors.text }]}>GFA</Text>
-                              </View>
-                            )}
-                            {item.is_vegetarian && (
-                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
-                                <Text style={[styles.tagText, { color: colors.text }]}>V</Text>
-                              </View>
-                            )}
-                            {item.is_vegetarian_available && (
-                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
-                                <Text style={[styles.tagText, { color: colors.text }]}>VA</Text>
-                              </View>
-                            )}
-                          </View>
-                        )}
-                        {(item.description || getLocalizedField(item, 'description', language)) && (
-                          <Text style={[styles.specialDescription, { color: colors.textSecondary }]} numberOfLines={2}>
-                            {getLocalizedField(item, 'description', language) || item.description}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  ) : (
-                    <>
-                      {item.thumbnail_url && (
-                        <Image
-                          source={{ uri: getImageUrl(item.thumbnail_url) }}
-                          style={styles.specialBannerImage}
-                        />
-                      )}
-                      <View style={styles.specialContent}>
-                        <View style={styles.specialHeader}>
-                          <Text style={[styles.specialName, { color: colors.text }]}>{getLocalizedField(item, 'name', language)}</Text>
-                          <Text style={[styles.specialPrice, { color: colors.highlight }]}>{formatPrice(item.price)}</Text>
-                        </View>
-                        {(item.description || getLocalizedField(item, 'description', language)) && (
-                          <Text style={[styles.specialDescription, { color: colors.textSecondary }]}>
-                            {getLocalizedField(item, 'description', language) || item.description}
-                          </Text>
-                        )}
-                        {(item.is_gluten_free || item.is_gluten_free_available || item.is_vegetarian || item.is_vegetarian_available) && (
-                          <View style={styles.specialTags}>
-                            {item.is_gluten_free && (
-                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
-                                <Text style={[styles.tagText, { color: colors.text }]}>GF</Text>
-                              </View>
-                            )}
-                            {item.is_gluten_free_available && (
-                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
-                                <Text style={[styles.tagText, { color: colors.text }]}>GFA</Text>
-                              </View>
-                            )}
-                            {item.is_vegetarian && (
-                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
-                                <Text style={[styles.tagText, { color: colors.text }]}>V</Text>
-                              </View>
-                            )}
-                            {item.is_vegetarian_available && (
-                              <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
-                                <Text style={[styles.tagText, { color: colors.text }]}>VA</Text>
-                              </View>
-                            )}
-                          </View>
-                        )}
-                      </View>
-                    </>
-                  )}
-                </TouchableOpacity>
-              ))}
-            </>
-          )}
-        </CollapsibleSection>
+        </View>
       </ScrollView>
+    </View>
+  );
 
-      {/* Image Modal */}
-      <Modal
-        visible={imageModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={closeImageModal}
+  const renderSpecialsSection = () => (
+    <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
+      <ScrollView
+        style={styles.sectionScroll}
+        contentContainerStyle={styles.sectionContent}
+        showsVerticalScrollIndicator={false}
+        nestedScrollEnabled
       >
-        <PanGestureHandler onGestureEvent={handleSwipeGesture}>
-          <View style={styles.imageModalOverlay}>
-            <TouchableOpacity
-              style={styles.imageModalCloseButton}
-              onPress={closeImageModal}
-            >
-              <IconSymbol
-                ios_icon_name="xmark.circle.fill"
-                android_material_icon_name="cancel"
-                size={36}
-                color="#FFFFFF"
-              />
-            </TouchableOpacity>
-            {selectedImage && (
-              <Image
-                source={{ uri: getImageUrl(selectedImage) }}
-                style={styles.fullImage}
-                resizeMode="contain"
-              />
-            )}
-            <Text style={styles.swipeHint}>Swipe down to close</Text>
+        {loadingSpecials ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={colors.primary} />
           </View>
-        </PanGestureHandler>
-      </Modal>
+        ) : weeklySpecials.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              {t('manager_home.no_specials', 'No weekly specials')}
+            </Text>
+          </View>
+        ) : (
+          weeklySpecials.map((s, i) => renderSpecialCard(s, i))
+        )}
+      </ScrollView>
+    </View>
+  );
+
+  const renderSection = ({ item }: { item: ConnectBarTab }) => {
+    switch (item) {
+      case 'today': return renderTodaySection();
+      case 'events': return renderEventsSection();
+      case 'specials': return renderSpecialsSection();
+      default: return null;
+    }
+  };
+
+  return (
+    <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.headerArea}>
+        {/* Welcome Header */}
+        <View style={styles.headerPadding}>
+          <WelcomeHeader
+            onWeatherPress={openWeatherDetail}
+            onNotificationPress={() => setNotificationVisible(true)}
+          />
+
+          {/* Connect Bar */}
+          <ConnectBar
+            activeTab={activeSection}
+            onTabChange={handleTabChange}
+          />
+        </View>
+      </View>
+
+      {/* Horizontal Swipeable Sections */}
+      <FlatList
+        ref={sectionListRef}
+        data={SECTIONS}
+        renderItem={renderSection}
+        keyExtractor={(item) => item}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handleSectionScroll}
+        scrollEventThrottle={16}
+        bounces={false}
+        getItemLayout={(_, index) => ({
+          length: SCREEN_WIDTH,
+          offset: SCREEN_WIDTH * index,
+          index,
+        })}
+      />
+
+      {/* Notification Dropdown */}
+      <NotificationDropdown
+        visible={notificationVisible}
+        onClose={() => setNotificationVisible(false)}
+        onItemPress={openDetailModal}
+        visibility="managers"
+      />
 
       {/* Content Detail Modal */}
       {selectedItem && (
@@ -1102,181 +854,85 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
+  headerArea: {
+    zIndex: 10,
+  },
+  headerPadding: {
+    paddingTop: 12,
+    paddingHorizontal: 16,
+  },
+  sectionPage: {
     flex: 1,
   },
-  contentContainer: {
-    paddingTop: 20,
+  sectionScroll: {
+    flex: 1,
+  },
+  sectionContent: {
     paddingHorizontal: 16,
+    paddingTop: 8,
     paddingBottom: 120,
   },
-  welcomeSection: {
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  welcomeRow: {
+  subTabsContainer: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-  },
-  profilePictureContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    overflow: 'hidden',
-    borderWidth: 2,
-  },
-  profilePicture: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  profilePicturePlaceholder: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  welcomeTextContainer: {
-    flex: 1,
-  },
-  welcomeTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  jobTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  compactMessageButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    minWidth: 70,
-  },
-  compactMessageIconWrapper: {
-    position: 'relative',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.15)',
-    elevation: 2,
-  },
-  compactBadgePosition: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-  },
-  compactBadge: {
-    backgroundColor: '#E74C3C',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 5,
-    borderWidth: 2,
-  },
-  compactBadgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  compactMessageLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  tabsContainer: {
-    flexDirection: 'row',
-    marginBottom: 16,
+    marginBottom: 12,
     borderRadius: 10,
     padding: 4,
     gap: 4,
   },
-  tab: {
+  subTab: {
     flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  activeTab: {
-  },
-  tabText: {
+  subTabText: {
     fontSize: 14,
     fontWeight: '600',
   },
-  activeTabText: {
+  card: {
+    borderRadius: 12,
+    marginBottom: 10,
+    padding: 12,
+    borderLeftWidth: 4,
+    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.08)',
+    elevation: 2,
   },
-  loadingContainer: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  loadingText: {
-    fontSize: 12,
-    marginTop: 8,
-  },
-  emptyContainer: {
-    paddingVertical: 20,
-    alignItems: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    fontSize: 12,
-    textAlign: 'center',
-    marginTop: 4,
-    fontStyle: 'italic',
-  },
-  announcementItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  announcementSquareLayout: {
+  cardRow: {
     flexDirection: 'row',
     gap: 12,
   },
-  announcementSquareImage: {
+  cardImage: {
     width: 80,
     height: 80,
-    borderRadius: 8,
+    borderRadius: 10,
     resizeMode: 'cover',
   },
-  announcementSquareContent: {
+  cardContent: {
     flex: 1,
+    justifyContent: 'center',
   },
-  announcementBannerImage: {
-    width: '100%',
-    height: 120,
-    borderRadius: 8,
-    resizeMode: 'cover',
-    marginBottom: 8,
-  },
-  announcementHeader: {
+  cardTitleRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
     marginBottom: 4,
+    gap: 8,
   },
-  announcementTitle: {
+  cardTitle: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    marginRight: 8,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  cardDate: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   priorityBadge: {
     flexDirection: 'row',
@@ -1291,183 +947,23 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
-  announcementText: {
-    fontSize: 14,
-    marginBottom: 4,
-    lineHeight: 20,
-  },
-  announcementDate: {
-    fontSize: 12,
-    fontStyle: 'italic',
-  },
-  eventItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  eventSquareLayout: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  eventSquareImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    resizeMode: 'cover',
-  },
-  eventSquareContent: {
-    flex: 1,
-  },
-  eventBannerImage: {
-    width: '100%',
-    height: 120,
-    borderRadius: 8,
-    resizeMode: 'cover',
-    marginBottom: 8,
-  },
-  eventContent: {
-    marginTop: 8,
-  },
-  eventTitle: {
+  priceText: {
     fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+    fontWeight: '700',
   },
-  eventDescription: {
-    fontSize: 14,
-    marginBottom: 4,
-    lineHeight: 20,
-  },
-  eventTime: {
-    fontSize: 12,
-    fontStyle: 'italic',
-  },
-  featureItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-  },
-  featureSquareLayout: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  featureSquareImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    resizeMode: 'cover',
-  },
-  featureSquareContent: {
-    flex: 1,
-  },
-  featureBannerImage: {
-    width: '100%',
-    height: 120,
-    borderRadius: 8,
-    resizeMode: 'cover',
-    marginBottom: 8,
-  },
-  featureContent: {
-    marginTop: 8,
-  },
-  featureTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  featureDescription: {
-    fontSize: 14,
-    marginBottom: 4,
-    lineHeight: 20,
-  },
-  featureTime: {
-    fontSize: 12,
-    fontStyle: 'italic',
-  },
-  specialCard: {
-    borderRadius: 12,
-    marginBottom: 12,
-    overflow: 'hidden',
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.2)',
-    elevation: 2,
-  },
-  specialSquareLayout: {
-    flexDirection: 'row',
-    padding: 12,
-    gap: 12,
-  },
-  specialSquareImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    resizeMode: 'cover',
-  },
-  specialSquareContent: {
-    flex: 1,
-  },
-  specialBannerImage: {
-    width: '100%',
-    height: 140,
-    resizeMode: 'cover',
-  },
-  specialContent: {
+  eventsContainer: {
     padding: 12,
   },
-  specialHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 6,
-  },
-  specialName: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  specialPrice: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  specialDescription: {
-    fontSize: 13,
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  specialTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 6,
-  },
-  tag: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 8,
-  },
-  tagText: {
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  imageModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.95)',
-    justifyContent: 'center',
+  loadingContainer: {
+    paddingVertical: 40,
     alignItems: 'center',
   },
-  imageModalCloseButton: {
-    position: 'absolute',
-    top: 60,
-    right: 20,
-    zIndex: 10,
+  emptyContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
   },
-  fullImage: {
-    width: Dimensions.get('window').width,
-    height: Dimensions.get('window').height * 0.8,
-  },
-  swipeHint: {
-    position: 'absolute',
-    bottom: 40,
+  emptyText: {
     fontSize: 14,
-    color: '#FFFFFF',
-    opacity: 0.7,
+    textAlign: 'center',
   },
 });

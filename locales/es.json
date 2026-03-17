@@ -303,6 +303,16 @@
     "no_history": "Sin historial de recompensas aún",
     "earn_bucks": "¡Gana McLoone's Bucks brindando un excelente servicio!"
   },
+  "connect_bar": {
+    "today": "Hoy",
+    "events": "Eventos",
+    "specials": "Especiales"
+  },
+  "notifications": {
+    "title": "Notificaciones",
+    "empty": "Sin notificaciones",
+    "just_now": "Ahora"
+  },
   "manager_home": {
     "good_morning": "Buenos Días",
     "good_afternoon": "Buenas Tardes",
