@@ -99,7 +99,7 @@ export default function WelcomeHeader({
         <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
           {user?.name}
         </Text>
-        <View style={[styles.jobTitleBadge, { backgroundColor: '#2E7D32' }]}>
+        <View style={[styles.jobTitleBadge, { backgroundColor: colors.primary }]}>
           <Text style={styles.jobTitleText} numberOfLines={1}>
             {user?.jobTitle}
           </Text>

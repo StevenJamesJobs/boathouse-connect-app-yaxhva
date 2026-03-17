@@ -25,7 +25,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import { useFocusEffect } from '@react-navigation/native';
 import WeatherDetailModal from '@/components/WeatherDetailModal';
-import UpcomingEventsSection from '@/components/UpcomingEventsSection';
+
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
 import FormattedText from '@/components/FormattedText';
@@ -34,6 +34,8 @@ import { fetchContentImagesBatch, ContentType } from '@/utils/contentImages';
 import WelcomeHeader from '@/components/WelcomeHeader';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import ConnectBar, { ConnectBarTab } from '@/components/ConnectBar';
+import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
+import { eventFallsOnDate } from '@/utils/dateUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -148,6 +150,10 @@ export default function EmployeePortalScreen() {
   const [activeSection, setActiveSection] = useState<ConnectBarTab>('today');
   const sectionListRef = useRef<FlatList>(null);
   const isScrollingRef = useRef(false);
+
+  // Events section state (calendar + tabs - managed here for sticky layout)
+  const [eventsSelectedDate, setEventsSelectedDate] = useState<Date | null>(null);
+  const [eventsTab, setEventsTab] = useState<'Event' | 'Entertainment'>('Event');
 
   // Weather detail modal state
   const [weatherDetailVisible, setWeatherDetailVisible] = useState(false);
@@ -490,6 +496,68 @@ export default function EmployeePortalScreen() {
     });
   };
 
+  // Compute filtered events for the Events section
+  const eventsDisplayList = (() => {
+    if (eventsSelectedDate !== null) {
+      return upcomingEvents.filter(event =>
+        eventFallsOnDate(event.start_date_time, event.end_date_time, eventsSelectedDate)
+      );
+    }
+    const filtered = upcomingEvents.filter(event => event.category === eventsTab);
+    return filtered.slice(0, 4);
+  })();
+
+  const renderEventCard = (event: UpcomingEvent, index: number) => {
+    const additionalImages = contentImagesMap.get(event.id);
+    let imageUrls: string[] | undefined;
+    if (additionalImages && additionalImages.length > 0) {
+      imageUrls = [];
+      if (event.thumbnail_url) imageUrls.push(event.thumbnail_url);
+      imageUrls.push(...additionalImages);
+    }
+
+    return (
+      <TouchableOpacity
+        key={event.id}
+        style={[styles.card, { backgroundColor: colors.card, borderLeftColor: '#4CAF50' }]}
+        onPress={() => openDetailModal({
+          title: getLocalizedField(event, 'title', language),
+          content: getLocalizedField(event, 'content', language) || event.content || event.message || '',
+          thumbnailUrl: event.thumbnail_url,
+          thumbnailShape: event.thumbnail_shape,
+          imageUrls,
+          startDateTime: event.start_date_time,
+          endDateTime: event.end_date_time,
+          link: event.link,
+          guideFile: event.guide_file || null,
+        })}
+        activeOpacity={0.7}
+      >
+        <View style={styles.cardRow}>
+          {event.thumbnail_url && (
+            <Image
+              source={{ uri: getImageUrl(event.thumbnail_url)! }}
+              style={styles.cardImage}
+            />
+          )}
+          <View style={styles.cardContent}>
+            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+              {getLocalizedField(event, 'title', language)}
+            </Text>
+            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+              {truncateText(getLocalizedField(event, 'content', language) || event.content || event.message)}
+            </Text>
+            {event.start_date_time && (
+              <Text style={[styles.cardDate, { color: colors.textSecondary }]}>
+                {formatDateTime(event.start_date_time)}
+              </Text>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   // Handle section swipe
   const handleSectionScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
@@ -682,6 +750,22 @@ export default function EmployeePortalScreen() {
         {/* Special Features */}
         {whatsHappeningTab === 'Special Features' && (
           <>
+            {/* View All link */}
+            <TouchableOpacity
+              style={styles.viewAllRow}
+              onPress={() => router.push('/view-all-special-features')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.viewAllText, { color: colors.primary }]}>
+                {t('manager_home.view_all', 'View All')}
+              </Text>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={16}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
             {loadingFeatures ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="small" color={colors.primary} />
@@ -703,30 +787,86 @@ export default function EmployeePortalScreen() {
 
   const renderEventsSection = () => (
     <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
+      {/* Sticky: Calendar strip + View All + Event/Entertainment tabs */}
+      <View
+        style={styles.eventsStickyHeader}
+        onStartShouldSetResponderCapture={() => true}
+      >
+        <WeeklyCalendarStrip
+          selectedDate={eventsSelectedDate}
+          onSelectDate={setEventsSelectedDate}
+          colors={{
+            primary: colors.primary,
+            background: colors.background,
+            text: colors.text,
+            textSecondary: colors.darkSecondaryText,
+            card: colors.card,
+          }}
+          events={upcomingEvents}
+        />
+
+        {/* View All row */}
+        <TouchableOpacity
+          style={[styles.viewAllRow, { paddingHorizontal: 16 }]}
+          onPress={() => router.push('/view-all-upcoming-events')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.viewAllText, { color: colors.primary }]}>
+            {t('manager_home.view_all', 'View All')}
+          </Text>
+          <IconSymbol
+            ios_icon_name="chevron.right"
+            android_material_icon_name="chevron-right"
+            size={16}
+            color={colors.primary}
+          />
+        </TouchableOpacity>
+
+        {/* Events / Entertainment tabs */}
+        {eventsSelectedDate === null && (
+          <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginHorizontal: 16 }]}>
+            <TouchableOpacity
+              style={[styles.subTab, eventsTab === 'Event' && { backgroundColor: colors.primary }]}
+              onPress={() => setEventsTab('Event')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Event' && { color: '#FFFFFF' }]}>
+                {t('upcoming_events.events', 'Events')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.subTab, eventsTab === 'Entertainment' && { backgroundColor: colors.primary }]}
+              onPress={() => setEventsTab('Entertainment')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && { color: '#FFFFFF' }]}>
+                {t('upcoming_events.entertainment', 'Entertainment')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+
+      {/* Scrollable event cards only */}
       <ScrollView
         style={styles.sectionScroll}
         contentContainerStyle={styles.sectionContent}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
       >
-        <View style={[styles.eventsContainer, { backgroundColor: colors.card, borderRadius: 12 }]}>
-          <UpcomingEventsSection
-            events={upcomingEvents}
-            loadingEvents={loadingEvents}
-            colors={{
-              primary: colors.primary,
-              background: colors.background,
-              text: colors.text,
-              textSecondary: colors.darkSecondaryText,
-              card: colors.card,
-              highlight: colors.border,
-            }}
-            onEventPress={openDetailModal}
-            contentImagesMap={contentImagesMap}
-            maxItems={4}
-            language={language}
-          />
-        </View>
+        {loadingEvents ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : eventsDisplayList.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              {t('employee_home.no_events', 'No events')}
+            </Text>
+          </View>
+        ) : (
+          eventsDisplayList.map((event, index) => renderEventCard(event, index))
+        )}
       </ScrollView>
     </View>
   );
@@ -953,6 +1093,21 @@ const styles = StyleSheet.create({
   },
   eventsContainer: {
     padding: 12,
+  },
+  eventsStickyHeader: {
+    backgroundColor: 'transparent',
+    zIndex: 5,
+  },
+  viewAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingVertical: 8,
+    gap: 4,
+  },
+  viewAllText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   loadingContainer: {
     paddingVertical: 40,
