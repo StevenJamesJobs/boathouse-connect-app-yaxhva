@@ -97,12 +97,18 @@ serve(async (req) => {
 
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+  // Parse request body early so upload_id is available in error handler
+  let file_url = '';
+  let upload_id = '';
+
   try {
+    const body = (await req.json()) as ParseRequest;
+    file_url = body.file_url || '';
+    upload_id = body.upload_id || '';
+
     if (!anthropicApiKey) {
       throw new Error('ANTHROPIC_API_KEY not configured');
     }
-
-    const { file_url, upload_id } = (await req.json()) as ParseRequest;
 
     if (!file_url || !upload_id) {
       throw new Error('Missing required fields: file_url and upload_id');
@@ -315,9 +321,8 @@ serve(async (req) => {
     console.error('Schedule parse error:', error);
 
     // Update upload status to failed
-    try {
-      const { upload_id } = await req.clone().json();
-      if (upload_id) {
+    if (upload_id) {
+      try {
         await supabase
           .from('schedule_uploads')
           .update({
@@ -326,9 +331,9 @@ serve(async (req) => {
             updated_at: new Date().toISOString(),
           })
           .eq('id', upload_id);
+      } catch (_) {
+        console.error('Failed to update upload status:', _);
       }
-    } catch (_) {
-      // Ignore cleanup errors
     }
 
     return new Response(
