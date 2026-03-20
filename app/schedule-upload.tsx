@@ -18,7 +18,6 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
-import { decode } from 'base-64';
 
 interface ScheduleUpload {
   id: string;
@@ -118,8 +117,8 @@ export default function ScheduleUploadScreen() {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Convert base64 to byte array
-      const binaryString = decode(base64);
+      // Convert base64 to byte array using atob (available in Hermes)
+      const binaryString = atob(base64);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
         bytes[i] = binaryString.charCodeAt(i);
