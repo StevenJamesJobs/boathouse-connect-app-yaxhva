@@ -35,6 +35,7 @@ import WelcomeHeader from '@/components/WelcomeHeader';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import ConnectBar, { ConnectBarTab } from '@/components/ConnectBar';
 import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
+import UpcomingShiftsCard from '@/components/UpcomingShiftsCard';
 import { eventFallsOnDate } from '@/utils/dateUtils';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -706,6 +707,18 @@ export default function EmployeePortalScreen() {
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
       >
+        {/* Upcoming Shifts Card */}
+        <UpcomingShiftsCard
+          userId={user?.id}
+          colors={{
+            primary: colors.primary,
+            background: colors.background,
+            text: colors.text,
+            textSecondary: colors.darkSecondaryText,
+            card: colors.card,
+          }}
+        />
+
         {/* Sub-tabs card: Announcements / Special Features */}
         <View style={[styles.todayTabsCard, { backgroundColor: colors.card }]}>
           <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginBottom: 0 }]}>

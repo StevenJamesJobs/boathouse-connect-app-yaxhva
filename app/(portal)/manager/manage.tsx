@@ -359,6 +359,33 @@ export default function ManagerManageScreen() {
               </View>
             </TouchableOpacity>
 
+            {/* Staff Schedules */}
+            <TouchableOpacity
+              style={[styles.card, { backgroundColor: colors.card }]}
+              onPress={() => router.push('/schedule-upload')}
+            >
+              <View style={styles.cardContent}>
+                <IconSymbol
+                  ios_icon_name="calendar"
+                  android_material_icon_name="schedule"
+                  size={28}
+                  color={colors.highlight}
+                />
+                <View style={styles.cardTextContainer}>
+                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.schedules', 'Staff Schedules')}</Text>
+                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                    {t('manager_manage.schedules_desc', 'Upload & manage staff schedules')}
+                  </Text>
+                </View>
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={24}
+                  color={colors.textSecondary}
+                />
+              </View>
+            </TouchableOpacity>
+
             {/* Notification Center */}
             <TouchableOpacity
               style={[styles.card, styles.lastCard, { backgroundColor: colors.card }]}

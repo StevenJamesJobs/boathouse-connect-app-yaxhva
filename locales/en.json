@@ -376,6 +376,8 @@
     "rewards_reviews_editor_desc": "Manage employee rewards and guest reviews",
     "menu_editor": "Menu Editor",
     "menu_editor_desc": "Create, edit, and manage menu items",
+    "schedules": "Staff Schedules",
+    "schedules_desc": "Upload & manage staff schedules",
     "employee_management_desc": "Add, edit, and manage employee accounts",
     "employees": "Employees",
     "announcements": "Announcements",
@@ -1303,5 +1305,44 @@
     "forecast_uv": "High UV index of {{uv}} - sun protection recommended.",
     "forecast_visibility": "Reduced visibility of {{vis}} miles.",
     "forecast_sun_times": "Sunrise at {{sunrise}}, sunset at {{sunset}}."
+  },
+  "schedule_upload": {
+    "title": "Staff Schedules",
+    "upload_button": "Upload Schedule PDF",
+    "upload_desc": "Import from HotSchedules export",
+    "uploading": "Uploading...",
+    "processing_message": "AI is reading your schedule PDF... This may take 15-30 seconds.",
+    "processing_short": "Processing...",
+    "history": "Upload History",
+    "no_uploads": "No Schedules Yet",
+    "no_uploads_desc": "Upload a HotSchedules PDF to get started. Shifts will be automatically parsed and assigned to employees.",
+    "success_title": "Schedule Processed!",
+    "success_message": "Parsed {{count}} shifts. {{unmatched}} employees could not be matched.",
+    "error_title": "Processing Failed",
+    "error_generic": "An error occurred while processing the schedule.",
+    "delete_title": "Delete Schedule",
+    "delete_message": "This will remove all shifts from this upload. Are you sure?",
+    "status_completed": "Completed",
+    "status_processing": "Processing...",
+    "status_failed": "Failed",
+    "status_replaced": "Replaced",
+    "shifts": "shifts",
+    "unmatched": "unmatched",
+    "unmatched_employees": "Unmatched Employees:"
+  },
+  "upcoming_shifts": {
+    "your_next_shifts": "Your Next Shifts",
+    "full_schedule": "Full Schedule",
+    "no_shifts": "No upcoming shifts"
+  },
+  "my_schedule": {
+    "title": "My Schedule",
+    "today": "Today",
+    "tomorrow": "Tomorrow",
+    "no_schedule": "No Upcoming Shifts",
+    "no_schedule_desc": "Your schedule hasn't been uploaded yet. Check back soon!",
+    "opener": "Opener",
+    "closer": "Closer",
+    "training": "Training"
   }
 }

@@ -376,6 +376,8 @@
     "rewards_reviews_editor_desc": "Gestionar recompensas de empleados y reseñas de clientes",
     "menu_editor": "Editor de Menú",
     "menu_editor_desc": "Crear, editar y gestionar elementos del menú",
+    "schedules": "Horarios del Personal",
+    "schedules_desc": "Subir y gestionar horarios del personal",
     "employee_management_desc": "Agregar, editar y gestionar cuentas de empleados",
     "employees": "Empleados",
     "announcements": "Anuncios",
@@ -1303,5 +1305,44 @@
     "forecast_uv": "Índice UV alto de {{uv}} - se recomienda protección solar.",
     "forecast_visibility": "Visibilidad reducida de {{vis}} millas.",
     "forecast_sun_times": "Amanecer a las {{sunrise}}, atardecer a las {{sunset}}."
+  },
+  "schedule_upload": {
+    "title": "Horarios del Personal",
+    "upload_button": "Subir PDF de Horarios",
+    "upload_desc": "Importar desde exportación de HotSchedules",
+    "uploading": "Subiendo...",
+    "processing_message": "La IA está leyendo tu PDF de horarios... Esto puede tardar 15-30 segundos.",
+    "processing_short": "Procesando...",
+    "history": "Historial de Subidas",
+    "no_uploads": "Sin Horarios Aún",
+    "no_uploads_desc": "Sube un PDF de HotSchedules para comenzar. Los turnos se analizarán y asignarán automáticamente a los empleados.",
+    "success_title": "¡Horario Procesado!",
+    "success_message": "Se analizaron {{count}} turnos. {{unmatched}} empleados no pudieron ser emparejados.",
+    "error_title": "Procesamiento Fallido",
+    "error_generic": "Ocurrió un error al procesar el horario.",
+    "delete_title": "Eliminar Horario",
+    "delete_message": "Esto eliminará todos los turnos de esta subida. ¿Estás seguro?",
+    "status_completed": "Completado",
+    "status_processing": "Procesando...",
+    "status_failed": "Fallido",
+    "status_replaced": "Reemplazado",
+    "shifts": "turnos",
+    "unmatched": "sin emparejar",
+    "unmatched_employees": "Empleados Sin Emparejar:"
+  },
+  "upcoming_shifts": {
+    "your_next_shifts": "Tus Próximos Turnos",
+    "full_schedule": "Horario Completo",
+    "no_shifts": "Sin turnos próximos"
+  },
+  "my_schedule": {
+    "title": "Mi Horario",
+    "today": "Hoy",
+    "tomorrow": "Mañana",
+    "no_schedule": "Sin Turnos Próximos",
+    "no_schedule_desc": "Tu horario aún no ha sido subido. ¡Vuelve pronto!",
+    "opener": "Apertura",
+    "closer": "Cierre",
+    "training": "Entrenamiento"
   }
 }
