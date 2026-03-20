@@ -706,26 +706,28 @@ export default function EmployeePortalScreen() {
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
       >
-        {/* Sub-tabs: Announcements / Special Features */}
-        <View style={[styles.subTabsContainer, { backgroundColor: colors.background }]}>
-          <TouchableOpacity
-            style={[styles.subTab, whatsHappeningTab === 'Announcements' && { backgroundColor: colors.primary }]}
-            onPress={() => setWhatsHappeningTab('Announcements')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Announcements' && { color: '#FFFFFF' }]}>
-              {t('manager_home.announcements')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.subTab, whatsHappeningTab === 'Special Features' && { backgroundColor: colors.primary }]}
-            onPress={() => setWhatsHappeningTab('Special Features')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Special Features' && { color: '#FFFFFF' }]}>
-              {t('manager_home.special_features')}
-            </Text>
-          </TouchableOpacity>
+        {/* Sub-tabs card: Announcements / Special Features */}
+        <View style={[styles.todayTabsCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginBottom: 0 }]}>
+            <TouchableOpacity
+              style={[styles.subTab, whatsHappeningTab === 'Announcements' && { backgroundColor: colors.primary }]}
+              onPress={() => setWhatsHappeningTab('Announcements')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Announcements' && { color: '#FFFFFF' }]}>
+                {t('manager_home.announcements')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.subTab, whatsHappeningTab === 'Special Features' && { backgroundColor: colors.primary }]}
+              onPress={() => setWhatsHappeningTab('Special Features')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Special Features' && { color: '#FFFFFF' }]}>
+                {t('manager_home.special_features')}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Announcements */}
@@ -1072,6 +1074,17 @@ const styles = StyleSheet.create({
   },
   eventsContainer: {
     padding: 12,
+  },
+  todayTabsCard: {
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    padding: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   eventsStickyHeader: {
     backgroundColor: 'transparent',
