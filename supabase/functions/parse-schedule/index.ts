@@ -129,19 +129,27 @@ serve(async (req) => {
     }
 
     const pdfArrayBuffer = await pdfResponse.arrayBuffer();
-    const pdfBase64 = btoa(
-      String.fromCharCode(...new Uint8Array(pdfArrayBuffer))
-    );
+    const pdfBytes = new Uint8Array(pdfArrayBuffer);
 
-    console.log(`PDF fetched, size: ${pdfArrayBuffer.byteLength} bytes`);
+    // Convert to base64 in chunks to avoid call stack overflow
+    let pdfBase64 = '';
+    const CHUNK = 8192;
+    for (let i = 0; i < pdfBytes.length; i += CHUNK) {
+      const slice = pdfBytes.subarray(i, Math.min(i + CHUNK, pdfBytes.length));
+      pdfBase64 += String.fromCharCode(...slice);
+    }
+    pdfBase64 = btoa(pdfBase64);
 
-    // Send to Claude API with native PDF support
+    console.log(`PDF fetched, size: ${pdfArrayBuffer.byteLength} bytes, base64 length: ${pdfBase64.length}`);
+
+    // Send to Claude API with PDF support via beta header
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': anthropicApiKey,
-        'anthropic-version': '2024-10-22',
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'pdfs-2024-09-25',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
@@ -171,7 +179,7 @@ serve(async (req) => {
     if (!claudeResponse.ok) {
       const errorText = await claudeResponse.text();
       console.error('Claude API error:', claudeResponse.status, errorText);
-      throw new Error(`Claude API error: ${claudeResponse.status}`);
+      throw new Error(`Claude API error: ${claudeResponse.status} - ${errorText.substring(0, 200)}`);
     }
 
     const claudeData = await claudeResponse.json();
