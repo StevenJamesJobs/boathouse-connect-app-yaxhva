@@ -1,7 +1,7 @@
 -- Schedule uploads tracking table
 CREATE TABLE IF NOT EXISTS schedule_uploads (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  uploaded_by TEXT NOT NULL REFERENCES users(id),
+  uploaded_by UUID NOT NULL REFERENCES users(id),
   file_url TEXT NOT NULL,
   file_name TEXT NOT NULL,
   week_start DATE NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS schedule_uploads (
 CREATE TABLE IF NOT EXISTS staff_schedules (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   upload_id UUID NOT NULL REFERENCES schedule_uploads(id) ON DELETE CASCADE,
-  user_id TEXT REFERENCES users(id),
+  user_id UUID REFERENCES users(id),
   employee_name TEXT NOT NULL,
   shift_date DATE NOT NULL,
   start_time TIME NOT NULL,
