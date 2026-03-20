@@ -1328,7 +1328,8 @@
     "status_replaced": "Replaced",
     "shifts": "shifts",
     "unmatched": "unmatched",
-    "unmatched_employees": "Unmatched Employees:"
+    "unmatched_employees": "Unmatched Employees:",
+    "review_edit": "Review & Edit Shifts"
   },
   "upcoming_shifts": {
     "your_next_shifts": "Your Next Shifts",

@@ -1328,7 +1328,8 @@
     "status_replaced": "Reemplazado",
     "shifts": "turnos",
     "unmatched": "sin emparejar",
-    "unmatched_employees": "Empleados Sin Emparejar:"
+    "unmatched_employees": "Empleados Sin Emparejar:",
+    "review_edit": "Revisar y Editar Turnos"
   },
   "upcoming_shifts": {
     "your_next_shifts": "Tus Próximos Turnos",

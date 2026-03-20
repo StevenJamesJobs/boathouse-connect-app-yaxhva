@@ -331,8 +331,9 @@ export default function ScheduleUploadScreen() {
             <TouchableOpacity
               key={upload.id}
               style={[styles.uploadHistoryCard, { backgroundColor: colors.card }]}
+              onPress={() => upload.status === 'completed' ? router.push({ pathname: '/schedule-review', params: { upload_id: upload.id } }) : null}
               onLongPress={() => handleDeleteUpload(upload)}
-              activeOpacity={0.8}
+              activeOpacity={upload.status === 'completed' ? 0.7 : 0.8}
             >
               <View style={styles.uploadHistoryHeader}>
                 <View style={styles.weekRange}>
@@ -400,6 +401,20 @@ export default function ScheduleUploadScreen() {
                     ))}
                   </View>
                 )}
+
+              {upload.status === 'completed' && (
+                <View style={[styles.reviewRow, { borderTopColor: colors.border }]}>
+                  <Text style={[styles.reviewText, { color: colors.primary }]}>
+                    {t('schedule_upload.review_edit', 'Review & Edit Shifts')}
+                  </Text>
+                  <IconSymbol
+                    ios_icon_name="chevron.right"
+                    android_material_icon_name="chevron-right"
+                    size={14}
+                    color={colors.primary}
+                  />
+                </View>
+              )}
 
               {upload.status === 'failed' && upload.error_message && (
                 <View style={[styles.errorSection, { borderTopColor: colors.border }]}>
@@ -623,5 +638,17 @@ const styles = StyleSheet.create({
   processingSmallText: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  reviewRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  reviewText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

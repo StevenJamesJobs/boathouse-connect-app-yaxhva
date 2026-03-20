@@ -7,7 +7,11 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SCHEDULE_PARSE_PROMPT = `You are parsing a HotSchedules Weekly Roster Report PDF for McLoone's Boathouse restaurant.
+function buildSchedulePrompt(employeeNames: string[]): string {
+  const nameList = employeeNames.map((n) => `  - ${n}`).join('\n');
+  return `You are parsing a HotSchedules Weekly Roster Report PDF for McLoone's Boathouse restaurant.
+
+IMPORTANT: This PDF uses a calendar-grid visual layout. The underlying text layer may be garbled or incorrect. You MUST read employee names from the VISUAL rendering of the PDF (what a human would see), NOT from any hidden text layer. Look at the actual printed text in the leftmost column of each row.
 
 The PDF is a calendar-grid layout with:
 - Column headers: Employee name column, then one column per day of the week (typically Thursday through Wednesday)
@@ -17,6 +21,13 @@ The PDF is a calendar-grid layout with:
 - Empty cells mean the employee is off that day
 - The report header shows the restaurant name and the date range for the week
 
+KNOWN EMPLOYEE NAMES — These are the actual staff members. When you read a name from the PDF, match it to the closest name from this list. The PDF names may have slight visual artifacts, OCR-like errors, or formatting differences, but they should correspond to someone on this list. If a PDF name is clearly a variant/misspelling of a known employee, use the KNOWN employee name instead.
+
+Known employees:
+${nameList}
+
+If a name in the PDF does NOT reasonably match anyone on the known list (e.g., a brand new hire not yet in the system), use the name exactly as shown in the PDF.
+
 Extract ALL shifts from ALL pages. Return ONLY valid JSON (no markdown, no explanation) with this exact structure:
 
 {
@@ -24,7 +35,7 @@ Extract ALL shifts from ALL pages. Return ONLY valid JSON (no markdown, no expla
   "week_end": "YYYY-MM-DD",
   "shifts": [
     {
-      "employee_name": "Full Name as shown",
+      "employee_name": "Full Name (use known employee name if matched)",
       "nickname": "Nickname from brackets or null",
       "date": "YYYY-MM-DD",
       "start_time": "HH:MM",
@@ -49,22 +60,34 @@ Rules:
 - Double shifts in one cell = two separate shift entries for that employee on that date
 - Return ALL employees from ALL pages — do not skip anyone
 - The employee_name should be the full name WITHOUT the bracket nickname portion
+- CRITICAL: Match PDF names to the known employee list above whenever possible. Use the known spelling, not the PDF's potentially garbled version.
 - Return ONLY the JSON object, nothing else`;
+}
 
 interface ParseRequest {
   file_url: string;
   upload_id: string;
 }
 
+// Normalize unicode quotes/apostrophes and special chars for comparison
+function normalizeStr(s: string): string {
+  return s
+    .toLowerCase()
+    .trim()
+    .replace(/[\u2018\u2019\u201A\u201B\u0060\u00B4]/g, "'") // smart quotes → straight apostrophe
+    .replace(/[\u201C\u201D\u201E\u201F]/g, '"') // smart double quotes
+    .replace(/\s+/g, ' '); // normalize whitespace
+}
+
 function matchEmployee(
   pdfName: string,
   users: Array<{ id: string; name: string; username: string }>
 ): string | null {
-  const normalizedPdf = pdfName.toLowerCase().trim();
+  const normalizedPdf = normalizeStr(pdfName);
 
-  // Exact match (case-insensitive)
+  // Exact match (case-insensitive, unicode-normalized)
   const exact = users.find(
-    (u) => u.name && u.name.toLowerCase().trim() === normalizedPdf
+    (u) => u.name && normalizeStr(u.name) === normalizedPdf
   );
   if (exact) return exact.id;
 
@@ -76,7 +99,7 @@ function matchEmployee(
 
     const partial = users.find((u) => {
       if (!u.name) return false;
-      const parts = u.name.toLowerCase().trim().split(/\s+/);
+      const parts = normalizeStr(u.name).split(/\s+/);
       if (parts.length < 2) return false;
       return parts[0] === pdfFirst && parts[parts.length - 1] === pdfLast;
     });
@@ -142,6 +165,24 @@ serve(async (req) => {
 
     console.log(`PDF fetched, size: ${pdfArrayBuffer.byteLength} bytes, base64 length: ${pdfBase64.length}`);
 
+    // Fetch all users BEFORE calling Claude so we can include names in the prompt
+    const { data: users, error: usersError } = await supabase
+      .from('users')
+      .select('id, name, username');
+
+    if (usersError) {
+      console.error('Error fetching users:', usersError);
+      throw new Error('Failed to fetch users for matching');
+    }
+
+    // Build prompt with known employee names for better matching
+    const employeeNames = (users || [])
+      .filter((u: { name: string }) => u.name && u.name.trim())
+      .map((u: { name: string }) => u.name.trim());
+    const prompt = buildSchedulePrompt(employeeNames);
+
+    console.log(`Sending to Claude with ${employeeNames.length} known employee names`);
+
     // Send to Claude API with PDF support via beta header
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -168,7 +209,7 @@ serve(async (req) => {
               },
               {
                 type: 'text',
-                text: SCHEDULE_PARSE_PROMPT,
+                text: prompt,
               },
             ],
           },
@@ -209,17 +250,7 @@ serve(async (req) => {
 
     console.log(`Parsed ${shifts.length} shifts for week ${week_start} to ${week_end}`);
 
-    // Fetch all users for matching
-    const { data: users, error: usersError } = await supabase
-      .from('users')
-      .select('id, name, username');
-
-    if (usersError) {
-      console.error('Error fetching users:', usersError);
-      throw new Error('Failed to fetch users for matching');
-    }
-
-    // Match employees and prepare shift records
+    // Match employees and prepare shift records (users already fetched above)
     const unmatchedEmployees = new Set<string>();
     const matchedShifts: Array<{
       upload_id: string;
