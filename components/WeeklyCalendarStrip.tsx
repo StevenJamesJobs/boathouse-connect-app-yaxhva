@@ -37,6 +37,7 @@ interface WeeklyCalendarStripProps {
   };
   events: UpcomingEvent[];
   onViewAll?: () => void;
+  children?: React.ReactNode;
 }
 
 export default function WeeklyCalendarStrip({
@@ -45,6 +46,7 @@ export default function WeeklyCalendarStrip({
   colors,
   events,
   onViewAll,
+  children,
 }: WeeklyCalendarStripProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language || 'en';
@@ -215,6 +217,9 @@ export default function WeeklyCalendarStrip({
           />
         </TouchableOpacity>
       </View>
+
+      {/* Nested content (e.g. Events/Entertainment tabs) */}
+      {children}
     </View>
   );
 }

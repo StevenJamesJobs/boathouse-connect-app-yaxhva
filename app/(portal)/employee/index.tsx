@@ -801,29 +801,29 @@ export default function EmployeePortalScreen() {
           }}
           events={upcomingEvents}
           onViewAll={() => router.push('/view-all-upcoming-events')}
-        />
-
-        {/* Events / Entertainment tabs — always visible */}
-        <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginHorizontal: 16, marginTop: 8 }]}>
-          <TouchableOpacity
-            style={[styles.subTab, eventsTab === 'Event' && { backgroundColor: colors.primary }]}
-            onPress={() => setEventsTab('Event')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Event' && { color: '#FFFFFF' }]}>
-              {t('upcoming_events.events', 'Events')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.subTab, eventsTab === 'Entertainment' && { backgroundColor: colors.primary }]}
-            onPress={() => setEventsTab('Entertainment')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && { color: '#FFFFFF' }]}>
-              {t('upcoming_events.entertainment', 'Entertainment')}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        >
+          {/* Events / Entertainment tabs — nested inside calendar card */}
+          <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginTop: 8 }]}>
+            <TouchableOpacity
+              style={[styles.subTab, eventsTab === 'Event' && { backgroundColor: colors.primary }]}
+              onPress={() => setEventsTab('Event')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Event' && { color: '#FFFFFF' }]}>
+                {t('upcoming_events.events', 'Events')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.subTab, eventsTab === 'Entertainment' && { backgroundColor: colors.primary }]}
+              onPress={() => setEventsTab('Entertainment')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && { color: '#FFFFFF' }]}>
+                {t('upcoming_events.entertainment', 'Entertainment')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </WeeklyCalendarStrip>
       </View>
 
       {/* Scrollable event cards only */}
