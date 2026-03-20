@@ -6,14 +6,8 @@ import {
   StyleSheet,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  runOnJS,
-} from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
+import { IconSymbol } from '@/components/IconSymbol';
 import {
   getWeekStartDate,
   getWeekDays,
@@ -57,9 +51,6 @@ export default function WeeklyCalendarStrip({
     getWeekStartDate(new Date())
   );
 
-  const translateX = useSharedValue(0);
-  const SWIPE_THRESHOLD = 50;
-
   const weekDays = getWeekDays(currentWeekStart);
 
   const goToNextWeek = useCallback(() => {
@@ -72,28 +63,8 @@ export default function WeeklyCalendarStrip({
     setCurrentWeekStart(prev => addWeeks(prev, -1));
   }, []);
 
-  const panGesture = Gesture.Pan()
-    .activeOffsetX([-20, 20])
-    .failOffsetY([-10, 10])
-    .onUpdate((event) => {
-      translateX.value = event.translationX;
-    })
-    .onEnd((event) => {
-      if (event.translationX < -SWIPE_THRESHOLD) {
-        runOnJS(goToNextWeek)();
-      } else if (event.translationX > SWIPE_THRESHOLD) {
-        runOnJS(goToPrevWeek)();
-      }
-      translateX.value = withTiming(0, { duration: 200 });
-    });
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: translateX.value }],
-  }));
-
   const handleDatePress = (day: Date) => {
     if (selectedDate && isSameDay(selectedDate, day)) {
-      // Tapping the already-selected date deselects it
       onSelectDate(null);
     } else {
       onSelectDate(day);
@@ -110,7 +81,6 @@ export default function WeeklyCalendarStrip({
     );
   };
 
-  // Use the middle day of the week for the month/year label
   const monthLabelDate = weekDays[3];
 
   return (
@@ -133,9 +103,23 @@ export default function WeeklyCalendarStrip({
         )}
       </View>
 
-      {/* Week strip with swipe gesture */}
-      <GestureDetector gesture={panGesture}>
-        <Animated.View style={[styles.weekRow, animatedStyle]}>
+      {/* Week strip with arrow navigation */}
+      <View style={styles.weekRowWithArrows}>
+        <TouchableOpacity
+          onPress={goToPrevWeek}
+          style={styles.arrowButton}
+          activeOpacity={0.6}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <IconSymbol
+            ios_icon_name="chevron.left"
+            android_material_icon_name="chevron-left"
+            size={18}
+            color={colors.primary}
+          />
+        </TouchableOpacity>
+
+        <View style={styles.weekRow}>
           {weekDays.map((day, index) => {
             const today = isToday(day);
             const selected = selectedDate !== null && isSameDay(selectedDate, day);
@@ -194,8 +178,22 @@ export default function WeeklyCalendarStrip({
               </TouchableOpacity>
             );
           })}
-        </Animated.View>
-      </GestureDetector>
+        </View>
+
+        <TouchableOpacity
+          onPress={goToNextWeek}
+          style={styles.arrowButton}
+          activeOpacity={0.6}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <IconSymbol
+            ios_icon_name="chevron.right"
+            android_material_icon_name="chevron-right"
+            size={18}
+            color={colors.primary}
+          />
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -205,8 +203,15 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 4,
     paddingHorizontal: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(128,128,128,0.15)',
+    borderRadius: 12,
+    marginHorizontal: 16,
+    marginTop: 8,
+    // Subtle shadow for card look
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 2,
   },
   headerRow: {
     flexDirection: 'row',
@@ -228,7 +233,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
   },
+  weekRowWithArrows: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  arrowButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   weekRow: {
+    flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
@@ -256,7 +272,10 @@ const styles = StyleSheet.create({
   },
   selectedCircle: {
     elevation: 2,
-    boxShadow: '0px 1px 3px rgba(0,0,0,0.2)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   },
   dayNumber: {
     fontSize: 15,
