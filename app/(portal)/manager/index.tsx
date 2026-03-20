@@ -800,6 +800,7 @@ export default function ManagerPortalScreen() {
             card: colors.card,
           }}
           events={upcomingEvents}
+          onViewAll={() => router.push('/view-all-upcoming-events')}
         />
 
         {/* Events / Entertainment tabs — always visible */}
@@ -823,23 +824,6 @@ export default function ManagerPortalScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-
-        {/* View All row — below tabs */}
-        <TouchableOpacity
-          style={[styles.viewAllRow, { paddingHorizontal: 16 }]}
-          onPress={() => router.push('/view-all-upcoming-events')}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.viewAllText, { color: colors.primary }]}>
-            {t('manager_home.view_all', 'View All')}
-          </Text>
-          <IconSymbol
-            ios_icon_name="chevron.right"
-            android_material_icon_name="chevron-right"
-            size={16}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
       </View>
 
       {/* Scrollable event cards only */}

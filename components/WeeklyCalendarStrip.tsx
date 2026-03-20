@@ -36,6 +36,7 @@ interface WeeklyCalendarStripProps {
     card: string;
   };
   events: UpcomingEvent[];
+  onViewAll?: () => void;
 }
 
 export default function WeeklyCalendarStrip({
@@ -43,6 +44,7 @@ export default function WeeklyCalendarStrip({
   onSelectDate,
   colors,
   events,
+  onViewAll,
 }: WeeklyCalendarStripProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language || 'en';
@@ -90,17 +92,36 @@ export default function WeeklyCalendarStrip({
         <Text style={[styles.monthLabel, { color: colors.text }]}>
           {formatMonthYear(monthLabelDate, locale)}
         </Text>
-        {selectedDate !== null && (
-          <TouchableOpacity
-            style={[styles.viewTopButton, { backgroundColor: colors.primary + '18' }]}
-            onPress={handleViewTopEvents}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.viewTopButtonText, { color: colors.primary }]}>
-              {t('upcoming_events.view_top_events')}
-            </Text>
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerRight}>
+          {selectedDate !== null && (
+            <TouchableOpacity
+              style={[styles.viewTopButton, { backgroundColor: colors.primary + '18' }]}
+              onPress={handleViewTopEvents}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.viewTopButtonText, { color: colors.primary }]}>
+                {t('upcoming_events.view_top_events')}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {onViewAll && (
+            <TouchableOpacity
+              style={styles.viewAllButton}
+              onPress={onViewAll}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.viewAllText, { color: colors.primary }]}>
+                {t('manager_home.view_all', 'View All')}
+              </Text>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={14}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Week strip with arrow navigation */}
@@ -231,6 +252,20 @@ const styles = StyleSheet.create({
   },
   viewTopButtonText: {
     fontSize: 12,
+    fontWeight: '600',
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  viewAllText: {
+    fontSize: 13,
     fontWeight: '600',
   },
   weekRowWithArrows: {
