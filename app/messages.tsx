@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,13 +10,17 @@ import {
   Alert,
   RefreshControl,
   Image,
+  Animated,
+  Dimensions,
 } from 'react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { refreshAllUnreadCounts } from '@/hooks/useUnreadMessages';
 
 interface Message {
   id: string;
@@ -40,15 +44,13 @@ export default function MessagesScreen() {
   const { user } = useAuth();
   const router = useRouter();
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'inbox' | 'sent' | 'feedback'>('inbox');
+  const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
   const [inboxMessages, setInboxMessages] = useState<Message[]>([]);
   const [sentMessages, setSentMessages] = useState<Message[]>([]);
-  const [feedbackMessages, setFeedbackMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [inboxCount, setInboxCount] = useState(0);
-  const [feedbackCount, setFeedbackCount] = useState(0);
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
 
@@ -249,66 +251,6 @@ export default function MessagesScreen() {
     setSentMessages(messages);
   }, [user?.id, user?.name, user?.jobTitle, user?.profilePictureUrl]);
 
-  const loadFeedbackMessages = useCallback(async () => {
-    if (!user?.id || !isManager) return;
-
-    console.log('Loading feedback messages...');
-
-    const { data, error } = await supabase
-      .from('message_recipients')
-      .select(`
-        id,
-        is_read,
-        created_at,
-        recipient_id,
-        message:messages (
-          id,
-          sender_id,
-          subject,
-          body,
-          parent_message_id,
-          thread_id,
-          created_at,
-          sender:users!messages_sender_id_fkey (
-            name,
-            job_title,
-            profile_picture_url
-          )
-        )
-      `)
-      .eq('recipient_id', user.id)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Error loading feedback:', error);
-      throw error;
-    }
-
-    // Filter only feedback messages
-    const feedbackMsgs: Message[] = (data || [])
-      .filter((item: any) => item.message)
-      .filter((item: any) => item.message.subject?.startsWith('[FEEDBACK]'))
-      .map((item: any) => ({
-        id: item.message.id,
-        sender_id: item.message.sender_id,
-        subject: item.message.subject?.replace('[FEEDBACK] ', ''),
-        body: item.message.body,
-        parent_message_id: item.message.parent_message_id,
-        thread_id: item.message.thread_id,
-        created_at: item.message.created_at,
-        sender_name: item.message.sender?.name || 'Unknown',
-        sender_job_title: item.message.sender?.job_title || '',
-        sender_profile_picture: item.message.sender?.profile_picture_url || null,
-        is_read: item.is_read,
-        recipient_count: 1,
-        recipient_id: item.recipient_id,
-      }));
-
-    console.log('Feedback messages loaded:', feedbackMsgs.length);
-    setFeedbackMessages(feedbackMsgs);
-  }, [user?.id, isManager]);
-
   const loadUnreadCount = useCallback(async () => {
     if (!user?.id) return;
 
@@ -336,27 +278,6 @@ export default function MessagesScreen() {
     }
   }, [user?.id]);
 
-  const loadFeedbackCount = useCallback(async () => {
-    if (!user?.id || !isManager) return;
-
-    const { data, error } = await supabase
-      .from('message_recipients')
-      .select(`
-        message:messages (
-          subject
-        )
-      `)
-      .eq('recipient_id', user.id)
-      .eq('is_deleted', false);
-
-    if (!error && data) {
-      const feedbackCount = data.filter(
-        (item: any) => item.message?.subject?.startsWith('[FEEDBACK]')
-      ).length;
-      setFeedbackCount(feedbackCount);
-    }
-  }, [user?.id, isManager]);
-
   const loadMessages = useCallback(async () => {
     if (!user?.id) return;
 
@@ -367,8 +288,6 @@ export default function MessagesScreen() {
         await loadInboxMessages();
       } else if (activeTab === 'sent') {
         await loadSentMessages();
-      } else if (activeTab === 'feedback' && isManager) {
-        await loadFeedbackMessages();
       }
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -376,7 +295,7 @@ export default function MessagesScreen() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, activeTab, isManager, loadInboxMessages, loadSentMessages, loadFeedbackMessages]);
+  }, [user?.id, activeTab, loadInboxMessages, loadSentMessages]);
 
   // Refresh when screen comes into focus
   useFocusEffect(
@@ -385,29 +304,20 @@ export default function MessagesScreen() {
       loadMessages();
       loadUnreadCount();
       loadInboxCount();
-      if (isManager) {
-        loadFeedbackCount();
-      }
-    }, [loadMessages, loadUnreadCount, loadInboxCount, loadFeedbackCount, isManager])
+    }, [loadMessages, loadUnreadCount, loadInboxCount])
   );
 
   useEffect(() => {
     loadMessages();
     loadUnreadCount();
     loadInboxCount();
-    if (isManager) {
-      loadFeedbackCount();
-    }
-  }, [loadMessages, loadUnreadCount, loadInboxCount, loadFeedbackCount, isManager]);
+  }, [loadMessages, loadUnreadCount, loadInboxCount]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadMessages();
     await loadUnreadCount();
     await loadInboxCount();
-    if (isManager) {
-      await loadFeedbackCount();
-    }
     setRefreshing(false);
   };
 
@@ -449,7 +359,7 @@ export default function MessagesScreen() {
       
       // For each selected message, mark the entire thread as read
       for (const messageId of messageIds) {
-        const message = inboxMessages.find(m => m.id === messageId) || feedbackMessages.find(m => m.id === messageId);
+        const message = inboxMessages.find(m => m.id === messageId);
         if (!message) continue;
         
         const threadId = message.thread_id || message.id;
@@ -472,6 +382,8 @@ export default function MessagesScreen() {
 
       await loadMessages();
       await loadUnreadCount();
+      // Immediately refresh badge counts on tab bar + WelcomeHeader
+      refreshAllUnreadCounts();
       setSelectionMode(false);
       setSelectedMessages(new Set());
       Alert.alert(t('common.success'), t('messages.marked_as_read_success', { count: messageIds.length }));
@@ -484,7 +396,7 @@ export default function MessagesScreen() {
   const handleBatchDelete = async () => {
     if (selectedMessages.size === 0) return;
 
-    const messageType = activeTab === 'feedback' ? 'feedback' : 'message';
+    const messageType = 'message';
     const count = selectedMessages.size;
     
     Alert.alert(
@@ -499,7 +411,7 @@ export default function MessagesScreen() {
             try {
               const messageIds = Array.from(selectedMessages);
 
-              if (activeTab === 'inbox' || activeTab === 'feedback') {
+              if (activeTab === 'inbox') {
                 await supabase
                   .from('message_recipients')
                   .update({ is_deleted: true, deleted_at: new Date().toISOString() })
@@ -517,9 +429,8 @@ export default function MessagesScreen() {
               await loadMessages();
               await loadUnreadCount();
               await loadInboxCount();
-              if (isManager) {
-                await loadFeedbackCount();
-              }
+              // Immediately refresh badge counts on tab bar + WelcomeHeader
+              refreshAllUnreadCounts();
               setSelectionMode(false);
               setSelectedMessages(new Set());
               Alert.alert(t('common.success'), t('messages.deleted_success', { count, type: messageType }));
@@ -556,6 +467,8 @@ export default function MessagesScreen() {
 
       await loadMessages();
       await loadUnreadCount();
+      // Immediately refresh badge counts on tab bar + WelcomeHeader
+      refreshAllUnreadCounts();
     } catch (error) {
       console.error('Error marking as read:', error);
       Alert.alert(t('common.error'), t('messages.error_mark_read'));
@@ -563,12 +476,12 @@ export default function MessagesScreen() {
   };
 
   const handleDeleteMessage = async (message: Message) => {
-    const messageType = activeTab === 'feedback' ? 'feedback' : 'message';
+    const messageType = 'message';
     const count = 1;
 
     Alert.alert(
       t('messages.delete_confirm_title', { count, type: messageType }),
-      activeTab === 'inbox' || activeTab === 'feedback'
+      activeTab === 'inbox'
         ? t('messages.delete_inbox_confirm', { type: messageType })
         : t('messages.delete_sent_confirm'),
       [
@@ -578,7 +491,7 @@ export default function MessagesScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (activeTab === 'inbox' || activeTab === 'feedback') {
+              if (activeTab === 'inbox') {
                 await supabase
                   .from('message_recipients')
                   .update({ is_deleted: true, deleted_at: new Date().toISOString() })
@@ -606,9 +519,8 @@ export default function MessagesScreen() {
               await loadMessages();
               await loadUnreadCount();
               await loadInboxCount();
-              if (isManager) {
-                await loadFeedbackCount();
-              }
+              // Immediately refresh badge counts on tab bar + WelcomeHeader
+              refreshAllUnreadCounts();
               Alert.alert(t('common.success'), t('messages.deleted_success', { count, type: messageType }));
             } catch (error) {
               console.error('Error deleting message:', error);
@@ -669,7 +581,7 @@ export default function MessagesScreen() {
     return null;
   };
 
-  const messages = activeTab === 'inbox' ? inboxMessages : activeTab === 'sent' ? sentMessages : feedbackMessages;
+  const messages = activeTab === 'inbox' ? inboxMessages : sentMessages;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -715,7 +627,7 @@ export default function MessagesScreen() {
       {/* Selection Mode Actions */}
       {selectionMode && (
         <View style={[styles.selectionActions, { backgroundColor: colors.card }]}>
-          {(activeTab === 'inbox' || activeTab === 'feedback') && (
+          {(activeTab === 'inbox') && (
             <TouchableOpacity
               style={[styles.selectionButton, { backgroundColor: '#3498DB' }]}
               onPress={handleBatchMarkAsRead}
@@ -786,33 +698,10 @@ export default function MessagesScreen() {
             {t('messages.sent')}
           </Text>
         </TouchableOpacity>
-        {isManager && (
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              activeTab === 'feedback' && { borderBottomColor: colors.primary || colors.highlight },
-            ]}
-            onPress={() => setActiveTab('feedback')}
-          >
-            <Text
-              style={[
-                styles.tabText,
-                { color: activeTab === 'feedback' ? colors.text : colors.textSecondary },
-              ]}
-            >
-              {t('messages.feedback')}
-            </Text>
-            {feedbackCount > 0 && (
-              <View style={[styles.badge, { backgroundColor: '#3498DB' }]}>
-                <Text style={styles.badgeText}>{feedbackCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        )}
       </View>
 
       {/* Compose Button */}
-      {activeTab !== 'feedback' && !selectionMode && (
+      {!selectionMode && (
         <TouchableOpacity
           style={[styles.composeButton, { backgroundColor: colors.primary || colors.highlight }]}
           onPress={() => router.push('/compose-message')}
@@ -841,29 +730,22 @@ export default function MessagesScreen() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary || colors.highlight} />
             <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-              {activeTab === 'feedback' ? t('messages.loading_feedback') : t('messages.loading_messages')}
+              {t('messages.loading_messages')}
             </Text>
           </View>
         ) : messages.length === 0 ? (
           <View style={styles.emptyContainer}>
             <IconSymbol
-              ios_icon_name={activeTab === 'feedback' ? 'bubble.left.and.bubble.right' : activeTab === 'inbox' ? 'tray' : 'paperplane'}
-              android_material_icon_name={activeTab === 'feedback' ? 'feedback' : activeTab === 'inbox' ? 'inbox' : 'send'}
+              ios_icon_name={activeTab === 'inbox' ? 'tray' : 'paperplane'}
+              android_material_icon_name={activeTab === 'inbox' ? 'inbox' : 'send'}
               size={64}
               color={colors.textSecondary}
             />
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {activeTab === 'feedback'
-                ? t('messages.no_feedback')
-                : activeTab === 'inbox'
+              {activeTab === 'inbox'
                 ? t('messages.no_inbox_messages')
                 : t('messages.no_sent_messages')}
             </Text>
-            {activeTab === 'feedback' && (
-              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                {t('messages.feedback_hint')}
-              </Text>
-            )}
           </View>
         ) : (
           <>
@@ -890,7 +772,7 @@ export default function MessagesScreen() {
   );
 }
 
-// Message Card Component (removed swipe functionality)
+// Compact Message Card with Swipe-to-Delete
 function MessageCard({
   message,
   colors,
@@ -917,12 +799,58 @@ function MessageCard({
   formatDate: (date: string) => string;
 }) {
   const { t } = useTranslation();
-  return (
+  const swipeableRef = useRef<Swipeable>(null);
+
+  const renderRightActions = (progress: Animated.AnimatedInterpolation<number>) => {
+    const translateX = progress.interpolate({
+      inputRange: [0, 1],
+      outputRange: [120, 0],
+    });
+
+    return (
+      <Animated.View style={[styles.swipeActionsContainer, { transform: [{ translateX }] }]}>
+        {(activeTab === 'inbox') && !message.is_read && (
+          <TouchableOpacity
+            style={[styles.swipeAction, styles.swipeActionRead]}
+            onPress={() => {
+              swipeableRef.current?.close();
+              onMarkAsRead();
+            }}
+          >
+            <IconSymbol
+              ios_icon_name="checkmark.circle.fill"
+              android_material_icon_name="check-circle"
+              size={22}
+              color="#FFFFFF"
+            />
+            <Text style={styles.swipeActionText}>Read</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[styles.swipeAction, styles.swipeActionDelete]}
+          onPress={() => {
+            swipeableRef.current?.close();
+            onDelete();
+          }}
+        >
+          <IconSymbol
+            ios_icon_name="trash.fill"
+            android_material_icon_name="delete"
+            size={22}
+            color="#FFFFFF"
+          />
+          <Text style={styles.swipeActionText}>Delete</Text>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  const cardContent = (
     <TouchableOpacity
       style={[
         styles.messageItem,
         { backgroundColor: colors.card },
-        !message.is_read && (activeTab === 'inbox' || activeTab === 'feedback') && styles.unreadMessage,
+        !message.is_read && (activeTab === 'inbox') && styles.unreadMessage,
         selectionMode && isSelected && styles.selectedMessage,
       ]}
       onPress={onPress}
@@ -941,7 +869,7 @@ function MessageCard({
               <IconSymbol
                 ios_icon_name="checkmark"
                 android_material_icon_name="check"
-                size={16}
+                size={14}
                 color="#FFFFFF"
               />
             )}
@@ -963,61 +891,52 @@ function MessageCard({
             </Text>
           </View>
         )}
+        {/* Unread dot on profile picture */}
+        {!message.is_read && (activeTab === 'inbox') && (
+          <View style={styles.unreadDot} />
+        )}
       </View>
 
-      {/* Message Content */}
+      {/* Message Content — compact single-column layout */}
       <View style={styles.messageContent}>
         <View style={styles.messageHeader}>
-          <View style={styles.messageHeaderLeft}>
-            {!message.is_read && (activeTab === 'inbox' || activeTab === 'feedback') && (
-              <View style={styles.unreadDot} />
-            )}
-            <Text style={[styles.messageSender, { color: colors.text }]} numberOfLines={1}>
-              {activeTab === 'sent'
-                ? t('messages.recipients', { count: message.recipient_count })
-                : message.sender_name}
-            </Text>
-          </View>
+          <Text style={[styles.messageSender, { color: colors.text }]} numberOfLines={1}>
+            {activeTab === 'sent'
+              ? t('messages.recipients', { count: message.recipient_count })
+              : message.sender_name}
+          </Text>
           <Text style={[styles.messageDate, { color: colors.textSecondary }]}>
             {formatDate(message.created_at)}
           </Text>
         </View>
-        
-        {/* Show recipients for inbox messages with multiple recipients */}
-        {(activeTab === 'inbox' || activeTab === 'feedback') && message.recipient_names && message.recipient_names.length > 1 && (
-          <Text style={[styles.recipientsText, { color: colors.textSecondary }]} numberOfLines={1}>
-            To: {message.recipient_names.join(', ')}
-          </Text>
-        )}
-        
-        {/* Show recipients for sent messages */}
-        {activeTab === 'sent' && message.recipient_names && message.recipient_names.length > 0 && (
-          <Text style={[styles.recipientsText, { color: colors.textSecondary }]} numberOfLines={1}>
+
+        {/* Job title or recipient names — single line */}
+        {activeTab === 'sent' && message.recipient_names && message.recipient_names.length > 0 ? (
+          <Text style={[styles.messageMetaLine, { color: colors.textSecondary }]} numberOfLines={1}>
             {message.recipient_names.join(', ')}
           </Text>
-        )}
-        
-        {activeTab !== 'sent' && message.sender_job_title ? (
-          <Text style={[styles.messageJobTitle, { color: colors.textSecondary }]} numberOfLines={1}>
+        ) : activeTab !== 'sent' && message.sender_job_title ? (
+          <Text style={[styles.messageMetaLine, { color: colors.textSecondary }]} numberOfLines={1}>
             {message.sender_job_title}
           </Text>
         ) : null}
+
         {message.subject && (
           <Text style={[styles.messageSubject, { color: colors.text }]} numberOfLines={1}>
             {message.subject}
           </Text>
         )}
-        <Text style={[styles.messageBody, { color: colors.textSecondary }]} numberOfLines={2}>
+        <Text style={[styles.messageBody, { color: colors.textSecondary }]} numberOfLines={1}>
           {message.body}
         </Text>
 
-        {/* Reply count indicator */}
-        {message.reply_count && message.reply_count > 0 && (
+        {/* Reply count — inline with bottom row */}
+        {message.reply_count != null && message.reply_count > 0 && (
           <View style={styles.replyCountContainer}>
             <IconSymbol
               ios_icon_name="bubble.left.and.bubble.right"
               android_material_icon_name="forum"
-              size={14}
+              size={12}
               color={colors.primary || colors.highlight}
             />
             <Text style={[styles.replyCountText, { color: colors.primary || colors.highlight }]}>
@@ -1025,46 +944,24 @@ function MessageCard({
             </Text>
           </View>
         )}
-
-        {/* Action Buttons Inside Card */}
-        {!selectionMode && (
-          <View style={styles.inlineActions}>
-            {(activeTab === 'inbox' || activeTab === 'feedback') && !message.is_read && (
-              <TouchableOpacity
-                style={[styles.inlineActionButton, { backgroundColor: '#3498DB' }]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  onMarkAsRead();
-                }}
-              >
-                <IconSymbol
-                  ios_icon_name="checkmark.circle"
-                  android_material_icon_name="check-circle"
-                  size={14}
-                  color="#FFFFFF"
-                />
-                <Text style={styles.inlineActionText}>{t('messages.mark_as_read')}</Text>
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity
-              style={[styles.inlineActionButton, { backgroundColor: '#E74C3C' }]}
-              onPress={(e) => {
-                e.stopPropagation();
-                onDelete();
-              }}
-            >
-              <IconSymbol
-                ios_icon_name="trash"
-                android_material_icon_name="delete"
-                size={14}
-                color="#FFFFFF"
-              />
-              <Text style={styles.inlineActionText}>{t('common.delete')}</Text>
-            </TouchableOpacity>
-          </View>
-        )}
       </View>
     </TouchableOpacity>
+  );
+
+  // Wrap in Swipeable when not in selection mode
+  if (selectionMode) {
+    return cardContent;
+  }
+
+  return (
+    <Swipeable
+      ref={swipeableRef}
+      renderRightActions={renderRightActions}
+      overshootRight={false}
+      friction={2}
+    >
+      {cardContent}
+    </Swipeable>
   );
 }
 
@@ -1201,15 +1098,16 @@ const styles = StyleSheet.create({
   },
   messageItem: {
     flexDirection: 'row',
-    padding: 12,
+    padding: 10,
     borderRadius: 12,
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
-    elevation: 2,
-    gap: 12,
-    marginBottom: 12,
+    boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.08)',
+    elevation: 1,
+    gap: 10,
+    marginBottom: 8,
+    alignItems: 'center',
   },
   unreadMessage: {
-    borderLeftWidth: 4,
+    borderLeftWidth: 3,
     borderLeftColor: '#3498DB',
   },
   selectedMessage: {
@@ -1219,35 +1117,47 @@ const styles = StyleSheet.create({
   checkboxContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    width: 24,
+    width: 22,
   },
   checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 2,
     justifyContent: 'center',
     alignItems: 'center',
   },
   profilePictureContainer: {
-    width: 50,
-    height: 50,
+    width: 44,
+    height: 44,
+    position: 'relative',
   },
   profilePicture: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   profilePicturePlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
   profilePicturePlaceholderText: {
-    fontSize: 20,
+    fontSize: 17,
     fontWeight: 'bold',
+  },
+  unreadDot: {
+    position: 'absolute',
+    top: -1,
+    right: -1,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#3498DB',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   messageContent: {
     flex: 1,
@@ -1256,73 +1166,69 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
-  },
-  messageHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: 8,
-  },
-  unreadDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#3498DB',
+    marginBottom: 1,
   },
   messageSender: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     flex: 1,
+    marginRight: 8,
   },
   messageDate: {
-    fontSize: 12,
+    fontSize: 11,
   },
-  recipientsText: {
+  messageMetaLine: {
     fontSize: 12,
-    marginBottom: 2,
+    marginBottom: 1,
     fontStyle: 'italic',
   },
-  messageJobTitle: {
-    fontSize: 12,
-    marginBottom: 4,
-  },
   messageSubject: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginBottom: 4,
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: 1,
   },
   messageBody: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 8,
+    fontSize: 13,
+    lineHeight: 17,
   },
   replyCountContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginBottom: 8,
+    marginTop: 3,
   },
   replyCountText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
   },
-  inlineActions: {
+  // Swipe action styles
+  swipeActionsContainer: {
     flexDirection: 'row',
-    gap: 8,
-    marginTop: 4,
+    marginBottom: 8,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginLeft: 4,
   },
-  inlineActionButton: {
-    flexDirection: 'row',
+  swipeAction: {
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 4,
+    width: 56,
+    paddingVertical: 8,
   },
-  inlineActionText: {
-    fontSize: 12,
+  swipeActionRead: {
+    backgroundColor: '#3498DB',
+    borderTopLeftRadius: 12,
+    borderBottomLeftRadius: 12,
+  },
+  swipeActionDelete: {
+    backgroundColor: '#E74C3C',
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+  },
+  swipeActionText: {
+    fontSize: 10,
     fontWeight: '600',
     color: '#FFFFFF',
+    marginTop: 2,
   },
 });

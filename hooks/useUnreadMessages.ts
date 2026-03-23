@@ -4,6 +4,19 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { AppState, AppStateStatus } from 'react-native';
 
+// Global event system so any screen can trigger an immediate refresh
+// across ALL instances of useUnreadMessages (tab bar, WelcomeHeader, etc.)
+type Listener = () => void;
+const listeners = new Set<Listener>();
+
+/**
+ * Call this from ANY screen after marking messages as read, deleting, etc.
+ * All useUnreadMessages hook instances will immediately re-fetch.
+ */
+export function refreshAllUnreadCounts() {
+  listeners.forEach(fn => fn());
+}
+
 export function useUnreadMessages() {
   const { user } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
@@ -22,6 +35,7 @@ export function useUnreadMessages() {
       });
 
       if (!error && data !== null) {
+        console.log('Unread count:', data);
         setUnreadCount(data);
       }
     } catch (error) {
@@ -34,9 +48,12 @@ export function useUnreadMessages() {
   useEffect(() => {
     loadUnreadCount();
 
+    // Register this instance to listen for global refresh events
+    listeners.add(loadUnreadCount);
+
     // Set up real-time subscription for new messages
     const channel = supabase
-      .channel('message_updates')
+      .channel(`message_updates_${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
@@ -55,19 +72,19 @@ export function useUnreadMessages() {
     // Refresh when app comes to foreground
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
       if (nextAppState === 'active') {
-        console.log('App became active, refreshing unread count...');
         loadUnreadCount();
       }
     });
 
-    // Refresh every 30 seconds when app is active
+    // Reduced polling interval: 15 seconds instead of 30
     const interval = setInterval(() => {
       if (AppState.currentState === 'active') {
         loadUnreadCount();
       }
-    }, 30000);
+    }, 15000);
 
     return () => {
+      listeners.delete(loadUnreadCount);
       supabase.removeChannel(channel);
       subscription.remove();
       clearInterval(interval);

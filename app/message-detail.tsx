@@ -12,12 +12,14 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { refreshAllUnreadCounts } from '@/hooks/useUnreadMessages';
 
 interface MessageThread {
   id: string;
@@ -45,6 +47,7 @@ export default function MessageDetailScreen() {
   const [allRecipientIds, setAllRecipientIds] = useState<string[]>([]);
 
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
 
   const loadThread = useCallback(async () => {
     try {
@@ -167,6 +170,8 @@ export default function MessageDetailScreen() {
       }
 
       console.log('Successfully marked thread as read');
+      // Immediately refresh all badge counts across the app
+      refreshAllUnreadCounts();
     } catch (error) {
       console.error('Error in markThreadAsRead:', error);
     }
@@ -302,91 +307,114 @@ export default function MessageDetailScreen() {
           />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>Message</Text>
-        <TouchableOpacity onPress={handleDelete} style={styles.deleteButton}>
-          <IconSymbol
-            ios_icon_name="trash"
-            android_material_icon_name="delete"
-            size={24}
-            color="#E74C3C"
-          />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={handleReply} style={styles.headerActionButton}>
+            <IconSymbol
+              ios_icon_name="arrowshape.turn.up.left.fill"
+              android_material_icon_name="reply"
+              size={22}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDelete} style={styles.headerActionButton}>
+            <IconSymbol
+              ios_icon_name="trash"
+              android_material_icon_name="delete"
+              size={22}
+              color="#E74C3C"
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
-      {/* Messages Thread */}
+      {/* Messages Thread — iMessage-style bubbles */}
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {messages.map((message, index) => (
-          <View key={index} style={styles.messageContainer}>
-            <View 
+        {/* Subject header card — shown once at top */}
+        {messages.length > 0 && messages[0].subject && (
+          <View style={[styles.subjectCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.subjectText, { color: colors.text }]}>
+              {messages[0].subject}
+            </Text>
+            {messages[0].recipient_names && messages[0].recipient_names.length > 0 && (
+              <Text style={[styles.subjectRecipients, { color: colors.textSecondary }]}>
+                {t('to', { names: messages[0].recipient_names.join(', ') })}
+              </Text>
+            )}
+          </View>
+        )}
+
+        {messages.map((message, index) => {
+          const isMe = message.is_current_user;
+          const showSenderInfo = !isMe || (messages.length > 2);
+          const prevMessage = index > 0 ? messages[index - 1] : null;
+          const sameSenderAsPrev = prevMessage && prevMessage.sender_id === message.sender_id;
+
+          return (
+            <View
+              key={index}
               style={[
-                styles.messageCard, 
-                { 
-                  backgroundColor: message.is_current_user 
-                    ? (user?.role === 'manager' ? '#4A5F7A' : '#A8D5E2')
-                    : colors.card 
-                }
+                styles.bubbleRow,
+                isMe ? styles.bubbleRowRight : styles.bubbleRowLeft,
+                sameSenderAsPrev ? styles.bubbleRowGrouped : styles.bubbleRowSpaced,
               ]}
             >
-              <View style={styles.messageHeader}>
-                {/* Profile Picture */}
-                <View style={styles.profilePictureContainer}>
-                  {message.sender_profile_picture ? (
-                    <Image
-                      source={{ uri: message.sender_profile_picture }}
-                      style={styles.profilePicture}
-                    />
+              {/* Small profile pic for other users (hidden if same sender consecutive) */}
+              {!isMe && (
+                <View style={styles.bubbleAvatarContainer}>
+                  {!sameSenderAsPrev ? (
+                    message.sender_profile_picture ? (
+                      <Image source={{ uri: message.sender_profile_picture }} style={styles.bubbleAvatar} />
+                    ) : (
+                      <View style={[styles.bubbleAvatarPlaceholder, { backgroundColor: colors.highlight }]}>
+                        <Text style={[styles.bubbleAvatarText, { color: colors.text }]}>
+                          {message.sender_name.charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+                    )
                   ) : (
-                    <View style={[styles.profilePicturePlaceholder, { backgroundColor: colors.highlight }]}>
-                      <Text style={[styles.profilePicturePlaceholderText, { color: colors.text }]}>
-                        {message.sender_name.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
+                    <View style={styles.bubbleAvatarSpacer} />
                   )}
                 </View>
+              )}
 
-                <View style={styles.senderInfo}>
-                  <Text style={[styles.senderName, { color: message.is_current_user ? '#FFFFFF' : colors.text }]}>
-                    {message.is_current_user ? t('you') : message.sender_name}
+              <View style={[styles.bubbleContent, isMe ? styles.bubbleContentRight : styles.bubbleContentLeft]}>
+                {/* Sender name for group chats or other users — only if not consecutive */}
+                {!isMe && !sameSenderAsPrev && (
+                  <Text style={[styles.bubbleSenderName, { color: colors.textSecondary }]}>
+                    {message.sender_name}
                   </Text>
-                  <Text style={[styles.senderJobTitle, { color: message.is_current_user ? 'rgba(255, 255, 255, 0.8)' : colors.textSecondary }]}>
-                    {message.sender_job_title}
+                )}
+
+                <View
+                  style={[
+                    styles.bubble,
+                    isMe
+                      ? [styles.bubbleRight, { backgroundColor: '#1976D2' }]
+                      : [styles.bubbleLeft, { backgroundColor: colors.card }],
+                  ]}
+                >
+                  <Text style={[styles.bubbleText, { color: isMe ? '#FFFFFF' : colors.text }]}>
+                    {message.body}
                   </Text>
                 </View>
-                <Text style={[styles.messageDate, { color: message.is_current_user ? 'rgba(255, 255, 255, 0.8)' : colors.textSecondary }]}>
+
+                <Text
+                  style={[
+                    styles.bubbleTime,
+                    { color: colors.textSecondary },
+                    isMe ? styles.bubbleTimeRight : styles.bubbleTimeLeft,
+                  ]}
+                >
                   {formatDateTime(message.created_at)}
                 </Text>
               </View>
-              
-              {/* Show recipients for the first message if multiple recipients */}
-              {index === 0 && message.recipient_names && message.recipient_names.length > 0 && (
-                <View style={styles.recipientsSection}>
-                  <Text style={[styles.recipientsLabel, { color: message.is_current_user ? 'rgba(255, 255, 255, 0.9)' : colors.textSecondary }]}>
-                    {t('to', { names: message.recipient_names.join(', ') })}
-                  </Text>
-                </View>
-              )}
-              
-              {index === 0 && message.subject && (
-                <Text style={[styles.messageSubject, { color: message.is_current_user ? '#FFFFFF' : colors.text }]}>
-                  {message.subject}
-                </Text>
-              )}
-              
-              <Text style={[styles.messageBody, { color: message.is_current_user ? '#FFFFFF' : colors.text }]}>
-                {message.body}
-              </Text>
             </View>
-
-            {index < messages.length - 1 && (
-              <View style={styles.threadConnector}>
-                <View style={[styles.threadLine, { backgroundColor: colors.border }]} />
-              </View>
-            )}
-          </View>
-        ))}
+          );
+        })}
       </ScrollView>
 
-      {/* Reply Section */}
-      <View style={[styles.replyButtonContainer, { backgroundColor: colors.card }]}>
+      {/* Reply Section — compact with safe area padding for Android dock bar */}
+      <View style={[styles.replyButtonContainer, { backgroundColor: colors.card, paddingBottom: Math.max(12, insets.bottom + 4) }]}>
         <View style={styles.replyButtonRow}>
           <TouchableOpacity
             style={[styles.replyButton, { backgroundColor: colors.primary || colors.highlight }]}
@@ -395,26 +423,26 @@ export default function MessageDetailScreen() {
             <IconSymbol
               ios_icon_name="arrowshape.turn.up.left.fill"
               android_material_icon_name="reply"
-              size={20}
-              color={user?.role === 'manager' ? colors.text : '#FFFFFF'}
+              size={18}
+              color="#FFFFFF"
             />
-            <Text style={[styles.replyButtonText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
+            <Text style={[styles.replyButtonText, { color: '#FFFFFF' }]}>
               {t('reply')}
             </Text>
           </TouchableOpacity>
-          
+
           {allRecipientIds.length > 1 && (
             <TouchableOpacity
-              style={[styles.replyAllButton, { backgroundColor: colors.highlight, opacity: 0.9 }]}
+              style={[styles.replyAllButton, { backgroundColor: colors.highlight }]}
               onPress={handleReplyAll}
             >
               <IconSymbol
                 ios_icon_name="arrowshape.turn.up.left.2.fill"
                 android_material_icon_name="reply-all"
-                size={20}
-                color={user?.role === 'manager' ? colors.text : '#FFFFFF'}
+                size={18}
+                color={colors.text}
               />
-              <Text style={[styles.replyButtonText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
+              <Text style={[styles.replyButtonText, { color: colors.text }]}>
                 {t('reply_all')}
               </Text>
             </TouchableOpacity>
@@ -449,7 +477,12 @@ const styles = StyleSheet.create({
   headerRight: {
     width: 40,
   },
-  deleteButton: {
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  headerActionButton: {
     padding: 8,
   },
   loadingContainer: {
@@ -461,114 +494,147 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
-    paddingBottom: 100,
+    paddingHorizontal: 12,
+    paddingTop: 12,
+    paddingBottom: 20,
   },
-  messageContainer: {
-    marginBottom: 8,
-  },
-  messageCard: {
-    padding: 16,
+  // Subject header card
+  subjectCard: {
+    padding: 12,
     borderRadius: 12,
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
-    elevation: 2,
-  },
-  messageHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     marginBottom: 12,
-    gap: 12,
+    boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.08)',
+    elevation: 1,
   },
-  profilePictureContainer: {
-    width: 40,
-    height: 40,
+  subjectText: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
   },
-  profilePicture: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  subjectRecipients: {
+    fontSize: 12,
+    fontStyle: 'italic',
   },
-  profilePicturePlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  // iMessage-style bubble layout
+  bubbleRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 4,
+  },
+  bubbleRowLeft: {
+    flexDirection: 'row',
+    justifyContent: 'flex-start',
+  },
+  bubbleRowRight: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+  },
+  bubbleRowSpaced: {
+    marginTop: 12,
+  },
+  bubbleRowGrouped: {
+    marginTop: 3,
+  },
+  bubbleAvatarContainer: {
+    width: 28,
+    marginRight: 6,
+    alignSelf: 'flex-end',
+    marginBottom: 16,
+  },
+  bubbleAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+  },
+  bubbleAvatarPlaceholder: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  profilePicturePlaceholderText: {
-    fontSize: 16,
+  bubbleAvatarText: {
+    fontSize: 12,
     fontWeight: 'bold',
   },
-  senderInfo: {
-    flex: 1,
+  bubbleAvatarSpacer: {
+    width: 28,
+    height: 28,
   },
-  senderName: {
-    fontSize: 16,
+  bubbleContent: {
+    maxWidth: '75%',
+  },
+  bubbleContentLeft: {
+    alignItems: 'flex-start',
+  },
+  bubbleContentRight: {
+    alignItems: 'flex-end',
+  },
+  bubbleSenderName: {
+    fontSize: 11,
     fontWeight: '600',
     marginBottom: 2,
+    marginLeft: 8,
   },
-  senderJobTitle: {
-    fontSize: 13,
-  },
-  messageDate: {
-    fontSize: 12,
-  },
-  recipientsSection: {
-    marginBottom: 8,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
-  },
-  recipientsLabel: {
-    fontSize: 13,
-    fontStyle: 'italic',
-  },
-  messageSubject: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  messageBody: {
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  threadConnector: {
-    alignItems: 'center',
+  bubble: {
+    paddingHorizontal: 14,
     paddingVertical: 8,
+    boxShadow: '0px 1px 2px rgba(0, 0, 0, 0.06)',
+    elevation: 1,
   },
-  threadLine: {
-    width: 2,
-    height: 20,
+  bubbleLeft: {
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
   },
+  bubbleRight: {
+    borderRadius: 18,
+    borderBottomRightRadius: 4,
+  },
+  bubbleText: {
+    fontSize: 15,
+    lineHeight: 20,
+  },
+  bubbleTime: {
+    fontSize: 10,
+    marginTop: 2,
+    marginHorizontal: 8,
+  },
+  bubbleTimeLeft: {
+    textAlign: 'left',
+  },
+  bubbleTimeRight: {
+    textAlign: 'right',
+  },
+  // Reply buttons — compact
   replyButtonContainer: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderTopWidth: 1,
     borderTopColor: 'rgba(0, 0, 0, 0.1)',
   },
   replyButtonRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   replyButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
   },
   replyAllButton: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    gap: 6,
   },
   replyButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
   },
 });
