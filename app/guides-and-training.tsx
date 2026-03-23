@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   Linking,
   Alert,
   TextInput,
+  FlatList,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -44,6 +45,7 @@ interface GuideItem {
   description_es?: string | null;
 }
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
 const CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
 
 export default function GuidesAndTrainingScreen() {
@@ -55,12 +57,28 @@ export default function GuidesAndTrainingScreen() {
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('Employee HandBooks');
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const [downloadingFile, setDownloadingFile] = useState<string | null>(null);
   const [viewingFile, setViewingFile] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGuide, setSelectedGuide] = useState<GuideItem | null>(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
+
+  const pagerRef = useRef<FlatList>(null);
+  const categoryScrollRef = useRef<ScrollView>(null);
+  const categoryLayoutsRef = useRef<{ [key: string]: { x: number; width: number } }>({});
+
+  // Derive selected category from page index
+  const selectedCategory = CATEGORIES[currentPageIndex] || CATEGORIES[0];
+
+  // Auto-scroll category pills to center the active one
+  useEffect(() => {
+    const layout = categoryLayoutsRef.current[selectedCategory];
+    if (layout && categoryScrollRef.current) {
+      const scrollToX = Math.max(0, layout.x - (SCREEN_WIDTH / 2) + (layout.width / 2));
+      categoryScrollRef.current.scrollTo({ x: scrollToX, animated: true });
+    }
+  }, [selectedCategory]);
 
   useEffect(() => {
     loadGuides();
@@ -69,8 +87,6 @@ export default function GuidesAndTrainingScreen() {
   const loadGuides = async () => {
     try {
       setLoading(true);
-      console.log('Loading guides and training items...');
-      
       const { data, error } = await supabase
         .from('guides_and_training')
         .select('*')
@@ -78,12 +94,7 @@ export default function GuidesAndTrainingScreen() {
         .order('category', { ascending: true })
         .order('display_order', { ascending: true });
 
-      if (error) {
-        console.error('Error loading guides:', error);
-        throw error;
-      }
-      
-      console.log('Guides loaded:', data?.length || 0, 'items');
+      if (error) throw error;
       setGuides(data || []);
     } catch (error) {
       console.error('Error loading guides:', error);
@@ -126,8 +137,6 @@ export default function GuidesAndTrainingScreen() {
   const handleViewFile = async (guide: GuideItem) => {
     try {
       setViewingFile(guide.id);
-      console.log('Opening file:', guide.file_name);
-
       const canOpen = await Linking.canOpenURL(guide.file_url);
       if (canOpen) {
         await Linking.openURL(guide.file_url);
@@ -145,7 +154,6 @@ export default function GuidesAndTrainingScreen() {
   const handleDownloadFile = async (guide: GuideItem) => {
     try {
       setDownloadingFile(guide.id);
-      console.log('Starting download for:', guide.file_name);
 
       if (Platform.OS === 'web') {
         const link = document.createElement('a');
@@ -160,9 +168,6 @@ export default function GuidesAndTrainingScreen() {
         return;
       }
 
-      console.log('Downloading from URL:', guide.file_url);
-
-      // Use the stable expo-file-system downloadAsync API
       const fileExtension = guide.file_name.includes('.')
         ? guide.file_name.substring(guide.file_name.lastIndexOf('.'))
         : '';
@@ -174,48 +179,26 @@ export default function GuidesAndTrainingScreen() {
       const randomString = Math.random().toString(36).substring(2, 8);
       const uniqueFileName = `${fileNameWithoutExt}_${timestamp}_${randomString}${fileExtension}`;
 
-      console.log('Generated unique filename:', uniqueFileName);
-
-      // Ensure downloads directory exists
       const downloadsDir = `${FileSystem.cacheDirectory}downloads/`;
       const dirInfo = await FileSystem.getInfoAsync(downloadsDir);
       if (!dirInfo.exists) {
-        console.log('Creating downloads directory...');
         await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
       }
 
       const destinationUri = `${downloadsDir}${uniqueFileName}`;
-      console.log('Destination file path:', destinationUri);
-
-      console.log('Starting file download...');
-      const downloadResult = await FileSystem.downloadAsync(
-        guide.file_url,
-        destinationUri
-      );
-      console.log('File downloaded successfully to:', downloadResult.uri);
-      console.log('Download status:', downloadResult.status);
+      const downloadResult = await FileSystem.downloadAsync(guide.file_url, destinationUri);
 
       if (downloadResult.status !== 200) {
         throw new Error(`Download failed with status ${downloadResult.status}`);
       }
 
-      // Verify downloaded file
       const fileInfo = await FileSystem.getInfoAsync(downloadResult.uri);
-      console.log('Downloaded file info:', fileInfo);
-
-      if (!fileInfo.exists) {
-        throw new Error('Downloaded file does not exist after download');
+      if (!fileInfo.exists || fileInfo.size === 0) {
+        throw new Error('Downloaded file is empty or does not exist');
       }
-
-      if (fileInfo.size === 0) {
-        throw new Error('Downloaded file is empty');
-      }
-
-      console.log('Downloaded file size:', fileInfo.size, 'bytes');
 
       const isAvailable = await Sharing.isAvailableAsync();
       if (isAvailable) {
-        console.log('Opening share dialog...');
         await Sharing.shareAsync(downloadResult.uri, {
           mimeType: guide.file_type || 'application/octet-stream',
           dialogTitle: `Save ${guide.file_name}`,
@@ -228,13 +211,7 @@ export default function GuidesAndTrainingScreen() {
         );
       }
     } catch (error: any) {
-      console.error('ERROR Failed to download file:', error);
-      console.error('Error details:', {
-        code: error.code,
-        message: error.message,
-        stack: error.stack,
-      });
-
+      console.error('Failed to download file:', error);
       let errorMessage = 'Failed to download file. Please try again.';
       if (error.message?.includes('network') || error.message?.includes('Network')) {
         errorMessage = 'Network error. Please check your connection and try again.';
@@ -243,7 +220,6 @@ export default function GuidesAndTrainingScreen() {
       } else if (error.message) {
         errorMessage = error.message;
       }
-
       Alert.alert('Download Error', errorMessage);
     } finally {
       setDownloadingFile(null);
@@ -265,33 +241,162 @@ export default function GuidesAndTrainingScreen() {
   };
 
   // Filter guides based on search query
-  const filterGuides = (guidesToFilter: GuideItem[]) => {
-    if (!searchQuery.trim()) {
-      return guidesToFilter;
-    }
+  const filterGuides = useCallback((guidesToFilter: GuideItem[]) => {
+    if (!searchQuery.trim()) return guidesToFilter;
 
     const query = searchQuery.toLowerCase().trim();
-    
     return guidesToFilter.filter(guide => {
-      // Search by title (name) - check both English and localized
       const localizedTitle = getLocalizedField(guide, 'title', language);
       const titleMatch = guide.title.toLowerCase().includes(query) || localizedTitle.toLowerCase().includes(query);
-
-      // Search by description (keywords) - check both English and localized
       const localizedDesc = getLocalizedField(guide, 'description', language);
       const descriptionMatch = guide.description?.toLowerCase().includes(query) || localizedDesc?.toLowerCase().includes(query) || false;
-      
-      // Search by date
       const createdDate = formatDate(guide.created_at).toLowerCase();
       const updatedDate = formatDate(guide.updated_at).toLowerCase();
       const dateMatch = createdDate.includes(query) || updatedDate.includes(query);
-      
       return titleMatch || descriptionMatch || dateMatch;
     });
+  }, [searchQuery, language]);
+
+  const isSearchMode = searchQuery.trim().length > 0;
+  const searchResults = isSearchMode ? filterGuides(guides) : [];
+
+  // Navigate to a category page
+  const navigateToCategory = (category: string) => {
+    const index = CATEGORIES.indexOf(category);
+    if (index >= 0) {
+      setCurrentPageIndex(index);
+      pagerRef.current?.scrollToIndex({ index, animated: true });
+    }
   };
 
-  const filteredGuides = filterGuides(guides.filter(g => g.category === selectedCategory));
-  const searchResults = searchQuery.trim() ? filterGuides(guides) : [];
+  // Handle swipe end
+  const onMomentumScrollEnd = (event: any) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const newIndex = Math.round(offsetX / SCREEN_WIDTH);
+    if (newIndex >= 0 && newIndex < CATEGORIES.length && newIndex !== currentPageIndex) {
+      setCurrentPageIndex(newIndex);
+    }
+  };
+
+  // Render a guide card
+  const renderGuideCard = (guide: GuideItem, showCategoryBadge: boolean = false) => (
+    <View key={guide.id} style={[styles.guideCard, { backgroundColor: colors.card }]}>
+      <TouchableOpacity onPress={() => handleGuidePress(guide)}>
+        <View style={styles.guideLayout}>
+          {guide.thumbnail_url && (
+            <TouchableOpacity onPress={() => openImageModal(guide.thumbnail_url!)}>
+              <Image
+                source={{ uri: getImageUrl(guide.thumbnail_url) }}
+                style={styles.guideThumbnail}
+              />
+            </TouchableOpacity>
+          )}
+          <View style={styles.guideContent}>
+            {showCategoryBadge && (
+              <View style={styles.categoryBadge}>
+                <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>
+                  {guide.category}
+                </Text>
+              </View>
+            )}
+            <Text style={[styles.guideTitle, { color: colors.text }]}>{getLocalizedField(guide, 'title', language)}</Text>
+            {(guide.description || (language === 'es' && guide.description_es)) && (
+              <Text style={[styles.guideDescription, { color: colors.textSecondary }]}>
+                {getLocalizedField(guide, 'description', language)}
+              </Text>
+            )}
+            <View style={styles.guideMeta}>
+              <View style={styles.metaItem}>
+                <IconSymbol
+                  ios_icon_name="clock"
+                  android_material_icon_name="schedule"
+                  size={14}
+                  color={colors.textSecondary}
+                />
+                <Text style={[styles.metaText, { color: colors.textSecondary }]}>
+                  Updated: {formatDate(guide.updated_at)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+
+      <View style={styles.actionButtonsContainer}>
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: colors.accent || colors.primary }]}
+          onPress={() => handleViewFile(guide)}
+          disabled={viewingFile === guide.id}
+        >
+          {viewingFile === guide.id ? (
+            <ActivityIndicator size="small" color={colors.text} />
+          ) : (
+            <>
+              <IconSymbol
+                ios_icon_name="eye.fill"
+                android_material_icon_name="visibility"
+                size={18}
+                color={colors.text}
+              />
+              <Text style={[styles.actionButtonText, { color: colors.text }]}>View</Text>
+            </>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.actionButton, styles.downloadButton, { backgroundColor: colors.card, borderColor: colors.accent || colors.primary }]}
+          onPress={() => handleDownloadFile(guide)}
+          disabled={downloadingFile === guide.id}
+        >
+          {downloadingFile === guide.id ? (
+            <ActivityIndicator size="small" color={colors.accent || colors.primary} />
+          ) : (
+            <>
+              <IconSymbol
+                ios_icon_name="arrow.down.circle.fill"
+                android_material_icon_name="download"
+                size={18}
+                color={colors.accent || colors.primary}
+              />
+              <Text style={[styles.actionButtonText, { color: colors.accent || colors.primary }]}>Download</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  // Render a page for the horizontal pager
+  const renderPage = ({ item: category }: { item: string }) => {
+    const categoryGuides = filterGuides(guides.filter(g => g.category === category));
+
+    return (
+      <View style={{ width: SCREEN_WIDTH }}>
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {categoryGuides.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <IconSymbol
+                ios_icon_name="book.fill"
+                android_material_icon_name="menu_book"
+                size={64}
+                color={colors.textSecondary}
+              />
+              <Text style={[styles.emptyText, { color: colors.text }]}>{t('guides_training.no_guides_in_category')}</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                Check back later for new materials
+              </Text>
+            </View>
+          ) : (
+            categoryGuides.map(guide => renderGuideCard(guide))
+          )}
+        </ScrollView>
+      </View>
+    );
+  };
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -335,8 +440,8 @@ export default function GuidesAndTrainingScreen() {
         )}
       </View>
 
-      {/* Show search results if searching, otherwise show category tabs */}
-      {searchQuery.trim() ? (
+      {isSearchMode ? (
+        /* Search mode: flat results */
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
           <Text style={[styles.searchResultsHeader, { color: colors.text }]}>
             Search Results ({searchResults.length})
@@ -355,53 +460,14 @@ export default function GuidesAndTrainingScreen() {
               </Text>
             </View>
           ) : (
-            searchResults.map((guide, index) => (
-              <TouchableOpacity
-                key={index}
-                style={[styles.guideCard, { backgroundColor: colors.card }]}
-                onPress={() => handleGuidePress(guide)}
-              >
-                <View style={styles.guideLayout}>
-                  {guide.thumbnail_url && (
-                    <Image
-                      source={{ uri: getImageUrl(guide.thumbnail_url) }}
-                      style={styles.guideThumbnail}
-                    />
-                  )}
-                  <View style={styles.guideContent}>
-                    <View style={styles.categoryBadge}>
-                      <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>
-                        {guide.category}
-                      </Text>
-                    </View>
-                    <Text style={[styles.guideTitle, { color: colors.text }]}>{getLocalizedField(guide, 'title', language)}</Text>
-                    {(guide.description || (language === 'es' && guide.description_es)) && (
-                      <Text style={[styles.guideDescription, { color: colors.textSecondary }]}>
-                        {getLocalizedField(guide, 'description', language)}
-                      </Text>
-                    )}
-                    <View style={styles.guideMeta}>
-                      <View style={styles.metaItem}>
-                        <IconSymbol
-                          ios_icon_name="clock"
-                          android_material_icon_name="schedule"
-                          size={14}
-                          color={colors.textSecondary}
-                        />
-                        <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                          Updated: {formatDate(guide.updated_at)}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))
+            searchResults.map(guide => renderGuideCard(guide, true))
           )}
         </ScrollView>
       ) : (
         <>
+          {/* Category Tabs */}
           <ScrollView
+            ref={categoryScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.categoryScroll}
@@ -415,7 +481,13 @@ export default function GuidesAndTrainingScreen() {
                   { backgroundColor: colors.card },
                   selectedCategory === category && { backgroundColor: colors.accent || colors.primary },
                 ]}
-                onPress={() => setSelectedCategory(category)}
+                onPress={() => navigateToCategory(category)}
+                onLayout={(e) => {
+                  categoryLayoutsRef.current[category] = {
+                    x: e.nativeEvent.layout.x,
+                    width: e.nativeEvent.layout.width,
+                  };
+                }}
               >
                 <Text
                   style={[
@@ -430,112 +502,30 @@ export default function GuidesAndTrainingScreen() {
             ))}
           </ScrollView>
 
+          {/* Main content: horizontal swipe pager */}
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.primary} />
               <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('guides_training.loading')}</Text>
             </View>
           ) : (
-            <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-              {filteredGuides.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                  <IconSymbol
-                    ios_icon_name="book.fill"
-                    android_material_icon_name="menu_book"
-                    size={64}
-                    color={colors.textSecondary}
-                  />
-                  <Text style={[styles.emptyText, { color: colors.text }]}>{t('guides_training.no_guides_in_category')}</Text>
-                  <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                    Check back later for new materials
-                  </Text>
-                </View>
-              ) : (
-                filteredGuides.map((guide, index) => (
-                  <View key={index} style={[styles.guideCard, { backgroundColor: colors.card }]}>
-                    <TouchableOpacity onPress={() => handleGuidePress(guide)}>
-                      <View style={styles.guideLayout}>
-                        {guide.thumbnail_url && (
-                          <TouchableOpacity onPress={() => openImageModal(guide.thumbnail_url!)}>
-                            <Image
-                              source={{ uri: getImageUrl(guide.thumbnail_url) }}
-                              style={styles.guideThumbnail}
-                            />
-                          </TouchableOpacity>
-                        )}
-                        <View style={styles.guideContent}>
-                          <Text style={[styles.guideTitle, { color: colors.text }]}>{getLocalizedField(guide, 'title', language)}</Text>
-                          {(guide.description || (language === 'es' && guide.description_es)) && (
-                            <Text style={[styles.guideDescription, { color: colors.textSecondary }]}>
-                              {getLocalizedField(guide, 'description', language)}
-                            </Text>
-                          )}
-                          <View style={styles.guideMeta}>
-                            <View style={styles.metaItem}>
-                              <IconSymbol
-                                ios_icon_name="clock"
-                                android_material_icon_name="schedule"
-                                size={14}
-                                color={colors.textSecondary}
-                              />
-                              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                                Updated: {formatDate(guide.updated_at)}
-                              </Text>
-                            </View>
-                          </View>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                    
-                    <View style={styles.actionButtonsContainer}>
-                      <TouchableOpacity
-                        style={[styles.actionButton, { backgroundColor: colors.accent || colors.primary }]}
-                        onPress={() => handleViewFile(guide)}
-                        disabled={viewingFile === guide.id}
-                      >
-                        {viewingFile === guide.id ? (
-                          <ActivityIndicator size="small" color={colors.text} />
-                        ) : (
-                          <>
-                            <IconSymbol
-                              ios_icon_name="eye.fill"
-                              android_material_icon_name="visibility"
-                              size={18}
-                              color={colors.text}
-                            />
-                            <Text style={[styles.actionButtonText, { color: colors.text }]}>
-                              View
-                            </Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.downloadButton, { backgroundColor: colors.card, borderColor: colors.accent || colors.primary }]}
-                        onPress={() => handleDownloadFile(guide)}
-                        disabled={downloadingFile === guide.id}
-                      >
-                        {downloadingFile === guide.id ? (
-                          <ActivityIndicator size="small" color={colors.accent || colors.primary} />
-                        ) : (
-                          <>
-                            <IconSymbol
-                              ios_icon_name="arrow.down.circle.fill"
-                              android_material_icon_name="download"
-                              size={18}
-                              color={colors.accent || colors.primary}
-                            />
-                            <Text style={[styles.actionButtonText, { color: colors.accent || colors.primary }]}>
-                              Download
-                            </Text>
-                          </>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))
-              )}
-            </ScrollView>
+            <FlatList
+              ref={pagerRef}
+              data={CATEGORIES}
+              renderItem={renderPage}
+              keyExtractor={(item) => item}
+              horizontal
+              pagingEnabled
+              bounces={false}
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={onMomentumScrollEnd}
+              getItemLayout={(_, index) => ({
+                length: SCREEN_WIDTH,
+                offset: SCREEN_WIDTH * index,
+                index,
+              })}
+              initialScrollIndex={0}
+            />
           )}
         </>
       )}
@@ -645,6 +635,7 @@ const styles = StyleSheet.create({
   categoryScroll: {
     marginTop: 16,
     maxHeight: 50,
+    marginBottom: 8,
   },
   categoryScrollContent: {
     paddingHorizontal: 16,

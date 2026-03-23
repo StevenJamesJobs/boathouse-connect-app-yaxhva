@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Dimensions,
   TextInput,
+  FlatList,
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -41,9 +42,10 @@ interface MenuItem {
   is_active: boolean;
 }
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
 const CATEGORIES = ['Weekly Specials', 'Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
 
-// Updated subcategories with "All" moved to the end
 const SUBCATEGORIES: { [key: string]: string[] } = {
   'Weekly Specials': [],
   Lunch: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Burgers', 'Sandwiches', 'Sides', 'All'],
@@ -52,6 +54,34 @@ const SUBCATEGORIES: { [key: string]: string[] } = {
   Wine: ['Sparkling', 'Rose', 'Chardonnay', 'Pinot Grigio', 'Sauvignon Blanc', 'Interesting Whites', 'Cabernet Sauvignon', 'Pinot Noir', 'Merlot', 'Italian Reds', 'Interesting Reds', 'All'],
   'Happy Hour': ['Appetizers', 'Drinks', 'Spirits', 'All'],
 };
+
+// Border-left accent colors by category
+const CATEGORY_COLORS: { [key: string]: string } = {
+  'Weekly Specials': '#F44336',
+  'Lunch': '#4CAF50',
+  'Dinner': '#1976D2',
+  'Libations': '#9C27B0',
+  'Wine': '#E91E63',
+  'Happy Hour': '#FF9800',
+};
+
+// Build flat page sequence for swipe navigation
+interface PageConfig {
+  category: string;
+  subcategory: string | null;
+}
+
+const PAGES: PageConfig[] = [];
+for (const category of CATEGORIES) {
+  const subs = SUBCATEGORIES[category];
+  if (subs.length === 0) {
+    PAGES.push({ category, subcategory: null });
+  } else {
+    for (const sub of subs) {
+      PAGES.push({ category, subcategory: sub });
+    }
+  }
+}
 
 // Filter options
 const FILTER_OPTIONS = [
@@ -128,9 +158,69 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
+  const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
-  // Helper functions to get translated labels while keeping English keys for data operations
+  const pagerRef = useRef<FlatList>(null);
+  const categoryScrollRef = useRef<ScrollView>(null);
+  const subcategoryScrollRef = useRef<ScrollView>(null);
+  const categoryLayoutsRef = useRef<{ [key: string]: { x: number; width: number } }>({});
+  const subcategoryLayoutsRef = useRef<{ [key: string]: { x: number; width: number } }>({});
+
+  // Derive selected category/subcategory from page index
+  const currentPage = PAGES[currentPageIndex];
+  const selectedCategory = currentPage?.category || 'Weekly Specials';
+  const selectedSubcategory = currentPage?.subcategory || null;
+
+  // Auto-scroll category pills to center the active one
+  useEffect(() => {
+    const layout = categoryLayoutsRef.current[selectedCategory];
+    if (layout && categoryScrollRef.current) {
+      const scrollToX = Math.max(0, layout.x - (SCREEN_WIDTH / 2) + (layout.width / 2));
+      categoryScrollRef.current.scrollTo({ x: scrollToX, animated: true });
+    }
+  }, [selectedCategory]);
+
+  // Auto-scroll subcategory pills to center the active one
+  const prevCategoryRef = useRef(selectedCategory);
+  useEffect(() => {
+    if (!selectedSubcategory || !subcategoryScrollRef.current) return;
+
+    const categoryChanged = prevCategoryRef.current !== selectedCategory;
+    prevCategoryRef.current = selectedCategory;
+
+    if (categoryChanged) {
+      // Category just changed — new pills are rendering, layouts aren't measured yet.
+      // Scroll to start immediately (first subcategory is always at x=0),
+      // then try to center after a short delay once onLayout has fired.
+      subcategoryLayoutsRef.current = {};
+      subcategoryScrollRef.current.scrollTo({ x: 0, animated: true });
+      setTimeout(() => {
+        const layoutKey = `${selectedCategory}_${selectedSubcategory}`;
+        const layout = subcategoryLayoutsRef.current[layoutKey];
+        if (layout && subcategoryScrollRef.current) {
+          const scrollToX = Math.max(0, layout.x - (SCREEN_WIDTH / 2) + (layout.width / 2));
+          subcategoryScrollRef.current.scrollTo({ x: scrollToX, animated: true });
+        }
+      }, 100);
+    } else {
+      // Same category, just subcategory changed — layouts are already measured
+      const layoutKey = `${selectedCategory}_${selectedSubcategory}`;
+      const layout = subcategoryLayoutsRef.current[layoutKey];
+      if (layout) {
+        const scrollToX = Math.max(0, layout.x - (SCREEN_WIDTH / 2) + (layout.width / 2));
+        subcategoryScrollRef.current.scrollTo({ x: scrollToX, animated: true });
+      }
+    }
+  }, [selectedCategory, selectedSubcategory]);
+
   const getCategoryLabel = (category: string) => {
     const key = CATEGORY_TRANSLATION_KEYS[category];
     return key ? t(key) : category;
@@ -140,25 +230,38 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     const key = SUBCATEGORY_TRANSLATION_KEYS[subcategory];
     return key ? t(key) : subcategory;
   };
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('Weekly Specials');
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [imageModalVisible, setImageModalVisible] = useState(false);
-  const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
-  const [detailModalVisible, setDetailModalVisible] = useState(false);
-  const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<string[]>([]);
 
   useEffect(() => {
     loadMenuItems();
   }, []);
 
-  const filterItems = useCallback(() => {
+  // Filter items for a given page
+  const getItemsForPage = useCallback((page: PageConfig): MenuItem[] => {
     let filtered = menuItems;
 
-    // Apply search query FIRST - search through ALL menu items, not just filtered ones
+    // Filter by category
+    if (page.category === 'Weekly Specials') {
+      filtered = filtered.filter(item => item.category === 'Weekly Specials');
+    } else if (page.category === 'Lunch') {
+      filtered = filtered.filter(item => item.available_for_lunch);
+    } else if (page.category === 'Dinner') {
+      filtered = filtered.filter(item => item.available_for_dinner);
+    } else {
+      filtered = filtered.filter(item => item.category === page.category);
+    }
+
+    // Filter by subcategory if not null and not "All"
+    if (page.subcategory && page.subcategory !== 'All') {
+      filtered = filtered.filter(item => item.subcategory === page.subcategory);
+    }
+
+    return filtered;
+  }, [menuItems]);
+
+  // Get filtered items for search/filter mode
+  const getSearchFilteredItems = useCallback(() => {
+    let filtered = menuItems;
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = menuItems.filter(
@@ -167,7 +270,6 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           (item.description && item.description.toLowerCase().includes(query)) ||
           (item.category && item.category.toLowerCase().includes(query)) ||
           (item.subcategory && item.subcategory.toLowerCase().includes(query)) ||
-          // Also search in dietary options
           (item.is_gluten_free && 'gluten free'.includes(query)) ||
           (item.is_gluten_free_available && 'gluten free available'.includes(query)) ||
           (item.is_vegetarian && 'vegetarian'.includes(query)) ||
@@ -179,72 +281,30 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
       );
     }
 
-    // Apply active filters
     if (activeFilters.length > 0) {
       filtered = filtered.filter(item => {
         return activeFilters.every(filter => {
           switch (filter) {
-            case 'dinner':
-              return item.available_for_dinner;
-            case 'lunch':
-              return item.available_for_lunch;
-            case 'gf':
-              return item.is_gluten_free;
-            case 'gfa':
-              return item.is_gluten_free_available;
-            case 'v':
-              return item.is_vegetarian;
-            case 'va':
-              return item.is_vegetarian_available;
-            case 'wine':
-              return item.category === 'Wine';
-            case 'libations':
-              return item.category === 'Libations';
-            case 'happyHour':
-              return item.category === 'Happy Hour';
-            case 'weeklySpecials':
-              return item.category === 'Weekly Specials';
-            default:
-              return true;
+            case 'dinner': return item.available_for_dinner;
+            case 'lunch': return item.available_for_lunch;
+            case 'gf': return item.is_gluten_free;
+            case 'gfa': return item.is_gluten_free_available;
+            case 'v': return item.is_vegetarian;
+            case 'va': return item.is_vegetarian_available;
+            case 'wine': return item.category === 'Wine';
+            case 'libations': return item.category === 'Libations';
+            case 'happyHour': return item.category === 'Happy Hour';
+            case 'weeklySpecials': return item.category === 'Weekly Specials';
+            default: return true;
           }
         });
       });
-    } else if (!searchQuery.trim()) {
-      // Only apply category/subcategory filters if no search query and no active filters
-      // Filter by category
-      if (selectedCategory === 'Weekly Specials') {
-        filtered = filtered.filter(item => item.category === 'Weekly Specials');
-      } else if (selectedCategory === 'Lunch') {
-        filtered = filtered.filter(item => item.available_for_lunch);
-      } else if (selectedCategory === 'Dinner') {
-        filtered = filtered.filter(item => item.available_for_dinner);
-      } else {
-        // For other categories (Libations, Wine, Happy Hour), use the category field
-        filtered = filtered.filter(item => item.category === selectedCategory);
-      }
-
-      // Filter by subcategory if selected and not "All"
-      if (selectedSubcategory && selectedSubcategory !== 'All') {
-        filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
-      }
     }
 
-    setFilteredItems(filtered);
-  }, [menuItems, searchQuery, selectedCategory, selectedSubcategory, activeFilters]);
+    return filtered;
+  }, [menuItems, searchQuery, activeFilters]);
 
-  useEffect(() => {
-    filterItems();
-  }, [filterItems]);
-
-  // Set the default subcategory when category changes
-  useEffect(() => {
-    if (SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0) {
-      // Set to the first subcategory (which is now the proper starting one, not "All")
-      setSelectedSubcategory(SUBCATEGORIES[selectedCategory][0]);
-    } else {
-      setSelectedSubcategory(null);
-    }
-  }, [selectedCategory]);
+  const isSearchOrFilterMode = searchQuery.trim().length > 0 || activeFilters.length > 0;
 
   const loadMenuItems = async () => {
     try {
@@ -256,23 +316,12 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         .order('display_order', { ascending: true });
 
       if (error) throw error;
-      console.log('Loaded menu items for display:', data);
       setMenuItems(data || []);
     } catch (error) {
       console.error('Error loading menu items:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  const openImageModal = (imageUrl: string) => {
-    setSelectedImage(imageUrl);
-    setImageModalVisible(true);
-  };
-
-  const closeImageModal = () => {
-    setImageModalVisible(false);
-    setSelectedImage(null);
   };
 
   const openDetailModal = (item: MenuItem) => {
@@ -285,34 +334,22 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     setSelectedMenuItem(null);
   };
 
-  const openFilterModal = () => {
-    setFilterModalVisible(true);
-  };
-
-  const closeFilterModal = () => {
-    setFilterModalVisible(false);
-  };
+  const openFilterModal = () => setFilterModalVisible(true);
+  const closeFilterModal = () => setFilterModalVisible(false);
 
   const toggleFilter = (filterKey: string) => {
-    setActiveFilters(prev => {
-      if (prev.includes(filterKey)) {
-        return prev.filter(f => f !== filterKey);
-      } else {
-        return [...prev, filterKey];
-      }
-    });
+    setActiveFilters(prev =>
+      prev.includes(filterKey) ? prev.filter(f => f !== filterKey) : [...prev, filterKey]
+    );
   };
 
   const removeFilter = (filterKey: string) => {
     setActiveFilters(prev => prev.filter(f => f !== filterKey));
   };
 
-  const clearAllFilters = () => {
-    setActiveFilters([]);
-  };
+  const clearAllFilters = () => setActiveFilters([]);
 
   const getFilterLabel = (filterKey: string) => {
-    // Map filter keys to translation keys
     const filterTranslationMap: { [key: string]: string } = {
       'dinner': 'menu_display.dinner',
       'lunch': 'menu_display.lunch',
@@ -323,75 +360,174 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
     };
     const translationKey = filterTranslationMap[filterKey];
     if (translationKey) return t(translationKey);
-    // For dietary filters (GF, GFA, V, VA) keep as-is since they're abbreviations
     const option = FILTER_OPTIONS.find(opt => opt.key === filterKey);
     return option ? option.label : filterKey;
   };
 
-  const handleSwipeGesture = (event: any) => {
-    const { translationY } = event.nativeEvent;
-    if (translationY > 100) {
-      closeImageModal();
-    }
-  };
-
-  // Helper function to get image URL with cache busting
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
-    // Add timestamp to force reload and bypass cache
     return `${url}?t=${Date.now()}`;
   };
 
-  // Helper function to format price with $ sign
   const formatPrice = (price: string) => {
-    // If price already has $, return as is
-    if (price.includes('$')) {
-      return price;
-    }
-    // Otherwise add $ at the beginning
+    if (price.includes('$')) return price;
     return `$${price}`;
   };
 
-  // Helper function to build detailed description for modal
   const buildDetailedDescription = (item: MenuItem) => {
     let description = getLocalizedField(item, 'description', language) || item.description || '';
-    
-    // Add dietary information
+
     const dietaryInfo = [];
     if (item.is_gluten_free) dietaryInfo.push('Gluten Free');
     if (item.is_gluten_free_available) dietaryInfo.push('Gluten Free Available');
     if (item.is_vegetarian) dietaryInfo.push('Vegetarian');
     if (item.is_vegetarian_available) dietaryInfo.push('Vegetarian Available');
-    
+
     if (dietaryInfo.length > 0) {
       description += `\n\nDietary Options: ${dietaryInfo.join(', ')}`;
     }
-    
-    // Add availability information
+
     const availability = [];
     if (item.available_for_lunch) availability.push('Lunch');
     if (item.available_for_dinner) availability.push('Dinner');
-    
+
     if (availability.length > 0) {
       description += `\n\nAvailable for: ${availability.join(', ')}`;
     }
-    
-    // Add category and subcategory
-    if (item.category) {
-      description += `\n\nCategory: ${item.category}`;
-    }
-    if (item.subcategory) {
-      description += `\nSubcategory: ${item.subcategory}`;
-    }
-    
+
+    if (item.category) description += `\n\nCategory: ${item.category}`;
+    if (item.subcategory) description += `\nSubcategory: ${item.subcategory}`;
+
     return description;
+  };
+
+  // Navigate to a specific page by category/subcategory
+  const navigateToPage = (category: string, subcategory?: string | null) => {
+    let targetIndex: number;
+    if (subcategory) {
+      targetIndex = PAGES.findIndex(p => p.category === category && p.subcategory === subcategory);
+    } else {
+      targetIndex = PAGES.findIndex(p => p.category === category);
+    }
+    if (targetIndex >= 0) {
+      setCurrentPageIndex(targetIndex);
+      pagerRef.current?.scrollToIndex({ index: targetIndex, animated: true });
+    }
+  };
+
+  // Handle swipe end — sync page index
+  const onMomentumScrollEnd = (event: any) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const newIndex = Math.round(offsetX / SCREEN_WIDTH);
+    if (newIndex >= 0 && newIndex < PAGES.length && newIndex !== currentPageIndex) {
+      setCurrentPageIndex(newIndex);
+    }
+  };
+
+  // Render a single menu item card (compact style matching Welcome page)
+  const renderMenuCard = (item: MenuItem, categoryColor: string) => (
+    <TouchableOpacity
+      key={item.id}
+      style={[
+        styles.menuItemCard,
+        {
+          backgroundColor: colors.card,
+          borderLeftColor: categoryColor,
+        },
+      ]}
+      onPress={() => openDetailModal(item)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.cardRow}>
+        {item.thumbnail_url && (
+          <Image
+            source={{ uri: getImageUrl(item.thumbnail_url)! }}
+            style={styles.cardImage}
+          />
+        )}
+        <View style={styles.cardContent}>
+          <View style={styles.cardTitleRow}>
+            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+              {getLocalizedField(item, 'name', language)}
+            </Text>
+            <Text style={[styles.cardPrice, { color: colors.primary }]}>
+              {formatPrice(item.price)}
+            </Text>
+          </View>
+          {(item.is_gluten_free || item.is_gluten_free_available ||
+            item.is_vegetarian || item.is_vegetarian_available) && (
+            <View style={styles.tagsRow}>
+              {item.is_gluten_free && (
+                <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                  <Text style={[styles.tagText, { color: colors.text }]}>GF</Text>
+                </View>
+              )}
+              {item.is_gluten_free_available && (
+                <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                  <Text style={[styles.tagText, { color: colors.text }]}>GFA</Text>
+                </View>
+              )}
+              {item.is_vegetarian && (
+                <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                  <Text style={[styles.tagText, { color: colors.text }]}>V</Text>
+                </View>
+              )}
+              {item.is_vegetarian_available && (
+                <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
+                  <Text style={[styles.tagText, { color: colors.text }]}>VA</Text>
+                </View>
+              )}
+            </View>
+          )}
+          {item.description && (
+            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
+              {getLocalizedField(item, 'description', language) || item.description}
+            </Text>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  // Render a single page of menu items (for swipe pager)
+  const renderPage = ({ item: page, index }: { item: PageConfig; index: number }) => {
+    const pageItems = getItemsForPage(page);
+    const categoryColor = CATEGORY_COLORS[page.category] || colors.primary;
+
+    return (
+      <View style={{ width: SCREEN_WIDTH }}>
+        <ScrollView
+          style={styles.pageScrollView}
+          contentContainerStyle={styles.pageContentContainer}
+          showsVerticalScrollIndicator={false}
+        >
+          {pageItems.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <IconSymbol
+                ios_icon_name="fork.knife"
+                android_material_icon_name="restaurant-menu"
+                size={64}
+                color={colors.textSecondary}
+              />
+              <Text style={[styles.emptyText, { color: colors.text }]}>{t('menu_display.no_items')}</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                {t('menu_display.check_back')}
+              </Text>
+            </View>
+          ) : (
+            pageItems.map(item => renderMenuCard(item, categoryColor))
+          )}
+        </ScrollView>
+      </View>
+    );
   };
 
   const styles = createStyles(colors);
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+      {/* Fixed Header Area: Search + Filter + Category/Subcategory pills */}
+      <View style={styles.headerArea}>
         {/* Search Bar and Filter Button */}
         <View style={styles.searchFilterContainer}>
           <View style={styles.searchContainer}>
@@ -402,7 +538,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
               color={colors.textSecondary}
             />
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, { color: colors.text }]}
               placeholder={t('menu_display.search_placeholder')}
               placeholderTextColor={colors.textSecondary}
               value={searchQuery}
@@ -419,16 +555,16 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
               </TouchableOpacity>
             )}
           </View>
-          <TouchableOpacity style={styles.filterButton} onPress={openFilterModal}>
+          <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.card }]} onPress={openFilterModal}>
             <IconSymbol
               ios_icon_name="line.3.horizontal.decrease.circle"
               android_material_icon_name="filter-list"
               size={20}
               color={colors.text}
             />
-            <Text style={styles.filterButtonText}>{t('menu_display.filter')}</Text>
+            <Text style={[styles.filterButtonText, { color: colors.text }]}>{t('menu_display.filter')}</Text>
             {activeFilters.length > 0 && (
-              <View style={styles.filterBadge}>
+              <View style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
                 <Text style={styles.filterBadgeText}>{activeFilters.length}</Text>
               </View>
             )}
@@ -444,8 +580,8 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
               contentContainerStyle={styles.activeFiltersContent}
             >
               {activeFilters.map((filter, index) => (
-                <View key={index} style={styles.activeFilterChip}>
-                  <Text style={styles.activeFilterChipText}>{getFilterLabel(filter)}</Text>
+                <View key={index} style={[styles.activeFilterChip, { backgroundColor: colors.highlight }]}>
+                  <Text style={[styles.activeFilterChipText, { color: colors.text }]}>{getFilterLabel(filter)}</Text>
                   <TouchableOpacity onPress={() => removeFilter(filter)}>
                     <IconSymbol
                       ios_icon_name="xmark"
@@ -456,16 +592,20 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                   </TouchableOpacity>
                 </View>
               ))}
-              <TouchableOpacity style={styles.clearAllButton} onPress={clearAllFilters}>
-                <Text style={styles.clearAllButtonText}>{t('menu_display.clear_all')}</Text>
+              <TouchableOpacity
+                style={[styles.clearAllButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+                onPress={clearAllFilters}
+              >
+                <Text style={[styles.clearAllButtonText, { color: colors.textSecondary }]}>{t('menu_display.clear_all')}</Text>
               </TouchableOpacity>
             </ScrollView>
           </View>
         )}
 
-        {/* Category Tabs - Only show if no active filters and no search query */}
-        {activeFilters.length === 0 && !searchQuery.trim() && (
+        {/* Category Tabs — only in normal mode */}
+        {!isSearchOrFilterMode && (
           <ScrollView
+            ref={categoryScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.categoryScroll}
@@ -476,17 +616,22 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                 key={index}
                 style={[
                   styles.categoryTab,
-                  selectedCategory === category && styles.categoryTabActive,
+                  { backgroundColor: colors.card },
+                  selectedCategory === category && { backgroundColor: colors.primary },
                 ]}
-                onPress={() => {
-                  setSelectedCategory(category);
-                  // selectedSubcategory will be set by the useEffect
+                onPress={() => navigateToPage(category)}
+                onLayout={(e) => {
+                  categoryLayoutsRef.current[category] = {
+                    x: e.nativeEvent.layout.x,
+                    width: e.nativeEvent.layout.width,
+                  };
                 }}
               >
                 <Text
                   style={[
                     styles.categoryTabText,
-                    selectedCategory === category && styles.categoryTabTextActive,
+                    { color: colors.textSecondary },
+                    selectedCategory === category && { color: '#FFFFFF' },
                   ]}
                 >
                   {getCategoryLabel(category)}
@@ -496,9 +641,10 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
           </ScrollView>
         )}
 
-        {/* Subcategory Tabs - Only show if no active filters and no search query */}
-        {activeFilters.length === 0 && !searchQuery.trim() && SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
+        {/* Subcategory Tabs — only in normal mode and when category has subcategories */}
+        {!isSearchOrFilterMode && SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
           <ScrollView
+            ref={subcategoryScrollRef}
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.subcategoryScroll}
@@ -509,14 +655,22 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                 key={index}
                 style={[
                   styles.subcategoryTab,
-                  selectedSubcategory === subcategory && styles.subcategoryTabActive,
+                  { backgroundColor: colors.card },
+                  selectedSubcategory === subcategory && { backgroundColor: colors.highlight },
                 ]}
-                onPress={() => setSelectedSubcategory(subcategory)}
+                onPress={() => navigateToPage(selectedCategory, subcategory)}
+                onLayout={(e) => {
+                  subcategoryLayoutsRef.current[`${selectedCategory}_${subcategory}`] = {
+                    x: e.nativeEvent.layout.x,
+                    width: e.nativeEvent.layout.width,
+                  };
+                }}
               >
                 <Text
                   style={[
                     styles.subcategoryTabText,
-                    selectedSubcategory === subcategory && styles.subcategoryTabTextActive,
+                    { color: colors.textSecondary },
+                    selectedSubcategory === subcategory && { color: colors.text },
                   ]}
                 >
                   {getSubcategoryLabel(subcategory)}
@@ -525,150 +679,55 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
             ))}
           </ScrollView>
         )}
+      </View>
 
-        {/* Menu Items */}
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : filteredItems.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <IconSymbol
-              ios_icon_name="fork.knife"
-              android_material_icon_name="restaurant-menu"
-              size={64}
-              color={colors.textSecondary}
-            />
-            <Text style={styles.emptyText}>{t('menu_display.no_items')}</Text>
-            <Text style={styles.emptySubtext}>
-              {searchQuery || activeFilters.length > 0
-                ? t('menu_display.adjust_search')
-                : t('menu_display.check_back')}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.menuItemsContainer}>
-            {filteredItems.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.menuItemCard}
-                onPress={() => openDetailModal(item)}
-                activeOpacity={0.7}
-              >
-                {/* Square Layout: Image on left, content on right */}
-                {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
-                  <View style={styles.squareLayout}>
-                    <Image
-                      key={getImageUrl(item.thumbnail_url)}
-                      source={{ uri: getImageUrl(item.thumbnail_url) }}
-                      style={styles.squareImage}
-                      onError={(error) => {
-                        console.error('Image load error for item:', item.name, error.nativeEvent);
-                      }}
-                      onLoad={() => {
-                        console.log('Image loaded successfully for item:', item.name);
-                      }}
-                    />
-                    <View style={styles.squareContent}>
-                      <View style={styles.squareHeader}>
-                        <Text style={styles.menuItemName}>{getLocalizedField(item, 'name', language)}</Text>
-                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
-                      </View>
-                      {(item.is_gluten_free ||
-                        item.is_gluten_free_available ||
-                        item.is_vegetarian ||
-                        item.is_vegetarian_available) && (
-                        <View style={styles.menuItemTags}>
-                          {item.is_gluten_free && (
-                            <View style={styles.tag}>
-                              <Text style={styles.tagText}>GF</Text>
-                            </View>
-                          )}
-                          {item.is_gluten_free_available && (
-                            <View style={styles.tag}>
-                              <Text style={styles.tagText}>GFA</Text>
-                            </View>
-                          )}
-                          {item.is_vegetarian && (
-                            <View style={styles.tag}>
-                              <Text style={styles.tagText}>V</Text>
-                            </View>
-                          )}
-                          {item.is_vegetarian_available && (
-                            <View style={styles.tag}>
-                              <Text style={styles.tagText}>VA</Text>
-                            </View>
-                          )}
-                        </View>
-                      )}
-                      {item.description && (
-                        <Text style={styles.squareDescription} numberOfLines={2}>
-                          {getLocalizedField(item, 'description', language) || item.description}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                ) : (
-                  /* Banner Layout: Image on top, content below */
-                  <>
-                    {item.thumbnail_url && (
-                      <Image
-                        key={getImageUrl(item.thumbnail_url)}
-                        source={{ uri: getImageUrl(item.thumbnail_url) }}
-                        style={styles.bannerImage}
-                        onError={(error) => {
-                          console.error('Image load error for item:', item.name, error.nativeEvent);
-                        }}
-                        onLoad={() => {
-                          console.log('Image loaded successfully for item:', item.name);
-                        }}
-                      />
-                    )}
-                    <View style={styles.menuItemContent}>
-                      <View style={styles.menuItemHeader}>
-                        <Text style={styles.menuItemName}>{getLocalizedField(item, 'name', language)}</Text>
-                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
-                      </View>
-                      {item.description && (
-                        <Text style={styles.menuItemDescription} numberOfLines={2}>
-                          {getLocalizedField(item, 'description', language) || item.description}
-                        </Text>
-                      )}
-                      {(item.is_gluten_free ||
-                        item.is_gluten_free_available ||
-                        item.is_vegetarian ||
-                        item.is_vegetarian_available) && (
-                        <View style={styles.menuItemTags}>
-                          {item.is_gluten_free && (
-                            <View style={styles.tag}>
-                              <Text style={styles.tagText}>GF</Text>
-                            </View>
-                          )}
-                          {item.is_gluten_free_available && (
-                            <View style={styles.tag}>
-                              <Text style={styles.tagText}>GFA</Text>
-                            </View>
-                          )}
-                          {item.is_vegetarian && (
-                            <View style={styles.tag}>
-                              <Text style={styles.tagText}>V</Text>
-                            </View>
-                          )}
-                          {item.is_vegetarian_available && (
-                            <View style={styles.tag}>
-                              <Text style={styles.tagText}>VA</Text>
-                            </View>
-                          )}
-                        </View>
-                      )}
-                    </View>
-                  </>
-                )}
-              </TouchableOpacity>
-            ))}
-          </View>
-        )}
-      </ScrollView>
+      {/* Main Content Area */}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : isSearchOrFilterMode ? (
+        /* Search/Filter mode: flat scrollable list */
+        <ScrollView style={styles.pageScrollView} contentContainerStyle={styles.pageContentContainer}>
+          {getSearchFilteredItems().length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <IconSymbol
+                ios_icon_name="fork.knife"
+                android_material_icon_name="restaurant-menu"
+                size={64}
+                color={colors.textSecondary}
+              />
+              <Text style={[styles.emptyText, { color: colors.text }]}>{t('menu_display.no_items')}</Text>
+              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                {t('menu_display.adjust_search')}
+              </Text>
+            </View>
+          ) : (
+            getSearchFilteredItems().map(item =>
+              renderMenuCard(item, CATEGORY_COLORS[item.category] || colors.primary)
+            )
+          )}
+        </ScrollView>
+      ) : (
+        /* Normal mode: horizontal swipe pager */
+        <FlatList
+          ref={pagerRef}
+          data={PAGES}
+          renderItem={renderPage}
+          keyExtractor={(_, index) => `page-${index}`}
+          horizontal
+          pagingEnabled
+          bounces={false}
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={onMomentumScrollEnd}
+          getItemLayout={(_, index) => ({
+            length: SCREEN_WIDTH,
+            offset: SCREEN_WIDTH * index,
+            index,
+          })}
+          initialScrollIndex={0}
+        />
+      )}
 
       {/* Filter Modal */}
       <Modal
@@ -678,14 +737,14 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
         onRequestClose={closeFilterModal}
       >
         <View style={styles.filterModalContainer}>
-          <TouchableOpacity 
-            style={styles.filterModalBackdrop} 
-            activeOpacity={1} 
+          <TouchableOpacity
+            style={styles.filterModalBackdrop}
+            activeOpacity={1}
             onPress={closeFilterModal}
           />
-          <View style={styles.filterModalContent}>
-            <View style={styles.filterModalHeader}>
-              <Text style={styles.filterModalTitle}>{t('menu_display.filter_title')}</Text>
+          <View style={[styles.filterModalContent, { backgroundColor: colors.card }]}>
+            <View style={[styles.filterModalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.filterModalTitle, { color: colors.text }]}>{t('menu_display.filter_title')}</Text>
               <TouchableOpacity onPress={closeFilterModal}>
                 <IconSymbol
                   ios_icon_name="xmark.circle.fill"
@@ -702,14 +761,16 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                   key={index}
                   style={[
                     styles.filterOption,
-                    activeFilters.includes(option.key) && styles.filterOptionActive,
+                    { backgroundColor: colors.background },
+                    activeFilters.includes(option.key) && { backgroundColor: colors.highlight },
                   ]}
                   onPress={() => toggleFilter(option.key)}
                 >
                   <View
                     style={[
                       styles.filterCheckbox,
-                      activeFilters.includes(option.key) && styles.filterCheckboxActive,
+                      { borderColor: colors.border, backgroundColor: colors.card },
+                      activeFilters.includes(option.key) && { backgroundColor: colors.primary, borderColor: colors.primary },
                     ]}
                   >
                     {activeFilters.includes(option.key) && (
@@ -724,6 +785,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
                   <Text
                     style={[
                       styles.filterOptionText,
+                      { color: colors.text },
                       activeFilters.includes(option.key) && styles.filterOptionTextActive,
                     ]}
                   >
@@ -733,52 +795,24 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
               ))}
 
               {activeFilters.length > 0 && (
-                <TouchableOpacity style={styles.clearFiltersButton} onPress={clearAllFilters}>
-                  <Text style={styles.clearFiltersButtonText}>{t('menu_display.clear_all_filters')}</Text>
+                <TouchableOpacity
+                  style={[styles.clearFiltersButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  onPress={clearAllFilters}
+                >
+                  <Text style={[styles.clearFiltersButtonText, { color: colors.textSecondary }]}>
+                    {t('menu_display.clear_all_filters')}
+                  </Text>
                 </TouchableOpacity>
               )}
             </ScrollView>
 
-            <TouchableOpacity style={styles.applyFiltersButton} onPress={closeFilterModal}>
+            <TouchableOpacity style={[styles.applyFiltersButton, { backgroundColor: colors.primary }]} onPress={closeFilterModal}>
               <Text style={styles.applyFiltersButtonText}>
                 {t('menu_display.apply_filters')} {activeFilters.length > 0 && `(${activeFilters.length})`}
               </Text>
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
-
-      {/* Image Modal (kept for backward compatibility if needed) */}
-      <Modal
-        visible={imageModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={closeImageModal}
-      >
-        <PanGestureHandler onGestureEvent={handleSwipeGesture}>
-          <View style={styles.imageModalOverlay}>
-            <TouchableOpacity
-              style={styles.imageModalCloseButton}
-              onPress={closeImageModal}
-            >
-              <IconSymbol
-                ios_icon_name="xmark.circle.fill"
-                android_material_icon_name="cancel"
-                size={36}
-                color="#FFFFFF"
-              />
-            </TouchableOpacity>
-            {selectedImage && (
-              <Image
-                source={{ uri: getImageUrl(selectedImage) }}
-                style={styles.fullImage}
-                resizeMode="contain"
-                key={getImageUrl(selectedImage)}
-              />
-            )}
-            <Text style={styles.swipeHint}>Swipe down to close</Text>
-          </View>
-        </PanGestureHandler>
       </Modal>
 
       {/* Content Detail Modal for Menu Items */}
@@ -803,13 +837,10 @@ const createStyles = (colors: any) =>
       flex: 1,
       backgroundColor: colors.background,
     },
-    scrollView: {
-      flex: 1,
-    },
-    contentContainer: {
+    headerArea: {
       paddingTop: 20,
-      paddingBottom: 100,
     },
+    // Search & Filter
     searchFilterContainer: {
       flexDirection: 'row',
       paddingHorizontal: 16,
@@ -831,12 +862,10 @@ const createStyles = (colors: any) =>
       flex: 1,
       marginLeft: 8,
       fontSize: 15,
-      color: colors.text,
     },
     filterButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.card,
       paddingHorizontal: 12,
       paddingVertical: 10,
       borderRadius: 12,
@@ -847,10 +876,8 @@ const createStyles = (colors: any) =>
     filterButtonText: {
       fontSize: 14,
       fontWeight: '600',
-      color: colors.text,
     },
     filterBadge: {
-      backgroundColor: colors.primary,
       borderRadius: 10,
       width: 20,
       height: 20,
@@ -863,6 +890,7 @@ const createStyles = (colors: any) =>
       fontWeight: 'bold',
       color: '#FFFFFF',
     },
+    // Active filters
     activeFiltersContainer: {
       paddingHorizontal: 16,
       marginBottom: 12,
@@ -874,7 +902,6 @@ const createStyles = (colors: any) =>
     activeFilterChip: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.highlight,
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 16,
@@ -883,22 +910,19 @@ const createStyles = (colors: any) =>
     activeFilterChipText: {
       fontSize: 13,
       fontWeight: '600',
-      color: colors.text,
     },
     clearAllButton: {
-      backgroundColor: colors.card,
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 16,
       justifyContent: 'center',
       borderWidth: 1,
-      borderColor: colors.border,
     },
     clearAllButtonText: {
       fontSize: 13,
       fontWeight: '600',
-      color: colors.textSecondary,
     },
+    // Category tabs
     categoryScroll: {
       maxHeight: 50,
       marginBottom: 12,
@@ -911,25 +935,18 @@ const createStyles = (colors: any) =>
       paddingHorizontal: 20,
       paddingVertical: 10,
       borderRadius: 20,
-      backgroundColor: colors.card,
       marginRight: 8,
       boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
       elevation: 2,
     },
-    categoryTabActive: {
-      backgroundColor: colors.primary,
-    },
     categoryTabText: {
       fontSize: 14,
       fontWeight: '600',
-      color: colors.textSecondary,
     },
-    categoryTabTextActive: {
-      color: '#FFFFFF',
-    },
+    // Subcategory tabs
     subcategoryScroll: {
       maxHeight: 40,
-      marginBottom: 16,
+      marginBottom: 8,
     },
     subcategoryScrollContent: {
       paddingHorizontal: 16,
@@ -939,22 +956,82 @@ const createStyles = (colors: any) =>
       paddingHorizontal: 16,
       paddingVertical: 8,
       borderRadius: 16,
-      backgroundColor: colors.card,
       marginRight: 8,
       boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)',
       elevation: 1,
     },
-    subcategoryTabActive: {
-      backgroundColor: colors.highlight,
-    },
     subcategoryTabText: {
       fontSize: 12,
       fontWeight: '600',
-      color: colors.textSecondary,
     },
-    subcategoryTabTextActive: {
-      color: colors.text,
+    // Page content
+    pageScrollView: {
+      flex: 1,
     },
+    pageContentContainer: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 100,
+    },
+    // Compact menu item card (matches Welcome page style)
+    menuItemCard: {
+      borderRadius: 12,
+      marginBottom: 10,
+      padding: 12,
+      borderLeftWidth: 4,
+      boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.08)',
+      elevation: 2,
+    },
+    cardRow: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    cardImage: {
+      width: 80,
+      height: 80,
+      borderRadius: 10,
+      resizeMode: 'cover',
+    },
+    cardContent: {
+      flex: 1,
+      justifyContent: 'center',
+    },
+    cardTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 4,
+      gap: 8,
+    },
+    cardTitle: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    cardPrice: {
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    cardSubtitle: {
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    tagsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 4,
+      marginBottom: 4,
+    },
+    tag: {
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderRadius: 10,
+    },
+    tagText: {
+      fontSize: 10,
+      fontWeight: '600',
+    },
+    // Loading & empty states
     loadingContainer: {
       flex: 1,
       justifyContent: 'center',
@@ -971,106 +1048,15 @@ const createStyles = (colors: any) =>
     emptyText: {
       fontSize: 18,
       fontWeight: '600',
-      color: colors.text,
       marginTop: 16,
       textAlign: 'center',
     },
     emptySubtext: {
       fontSize: 14,
-      color: colors.textSecondary,
       marginTop: 8,
       textAlign: 'center',
     },
-    menuItemsContainer: {
-      paddingHorizontal: 16,
-    },
-    menuItemCard: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      marginBottom: 16,
-      overflow: 'hidden',
-      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-      elevation: 3,
-    },
-    // Square layout styles (image on left, content on right)
-    squareLayout: {
-      flexDirection: 'row',
-      padding: 12,
-      gap: 12,
-    },
-    squareImage: {
-      width: 100,
-      height: 100,
-      borderRadius: 12,
-      resizeMode: 'cover',
-    },
-    squareContent: {
-      flex: 1,
-      justifyContent: 'flex-start',
-    },
-    squareHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: 6,
-    },
-    squareDescription: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      marginTop: 6,
-      lineHeight: 18,
-    },
-    // Banner layout styles (image on top, content below)
-    bannerImage: {
-      width: '100%',
-      height: 200,
-      resizeMode: 'cover',
-    },
-    menuItemContent: {
-      padding: 16,
-    },
-    menuItemHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: 8,
-    },
-    menuItemName: {
-      flex: 1,
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginRight: 12,
-    },
-    menuItemPrice: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.primary,
-    },
-    menuItemDescription: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      marginBottom: 12,
-      lineHeight: 20,
-    },
-    menuItemTags: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 6,
-      marginBottom: 6,
-    },
-    tag: {
-      backgroundColor: colors.highlight,
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 10,
-    },
-    tagText: {
-      fontSize: 11,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    // Filter Modal Styles
+    // Filter Modal
     filterModalContainer: {
       flex: 1,
       justifyContent: 'flex-end',
@@ -1084,7 +1070,6 @@ const createStyles = (colors: any) =>
       backgroundColor: 'rgba(0, 0, 0, 0.5)',
     },
     filterModalContent: {
-      backgroundColor: colors.card,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       height: '70%',
@@ -1099,12 +1084,10 @@ const createStyles = (colors: any) =>
       paddingTop: 20,
       paddingBottom: 16,
       borderBottomWidth: 1,
-      borderBottomColor: colors.border,
     },
     filterModalTitle: {
       fontSize: 20,
       fontWeight: 'bold',
-      color: colors.text,
     },
     filterModalScroll: {
       flex: 1,
@@ -1118,52 +1101,37 @@ const createStyles = (colors: any) =>
       alignItems: 'center',
       paddingVertical: 14,
       paddingHorizontal: 16,
-      backgroundColor: colors.background,
       borderRadius: 12,
       marginBottom: 10,
       gap: 12,
-    },
-    filterOptionActive: {
-      backgroundColor: colors.highlight,
     },
     filterCheckbox: {
       width: 24,
       height: 24,
       borderRadius: 6,
       borderWidth: 2,
-      borderColor: colors.border,
-      backgroundColor: colors.card,
       justifyContent: 'center',
       alignItems: 'center',
-    },
-    filterCheckboxActive: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
     },
     filterOptionText: {
       fontSize: 16,
       fontWeight: '500',
-      color: colors.text,
     },
     filterOptionTextActive: {
       fontWeight: '600',
     },
     clearFiltersButton: {
-      backgroundColor: colors.background,
       borderRadius: 12,
       paddingVertical: 14,
       alignItems: 'center',
       marginTop: 10,
       borderWidth: 1,
-      borderColor: colors.border,
     },
     clearFiltersButtonText: {
       fontSize: 15,
       fontWeight: '600',
-      color: colors.textSecondary,
     },
     applyFiltersButton: {
-      backgroundColor: colors.primary,
       marginHorizontal: 20,
       marginVertical: 16,
       borderRadius: 12,
@@ -1174,28 +1142,5 @@ const createStyles = (colors: any) =>
       fontSize: 16,
       fontWeight: 'bold',
       color: '#FFFFFF',
-    },
-    imageModalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.95)',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    imageModalCloseButton: {
-      position: 'absolute',
-      top: 60,
-      right: 20,
-      zIndex: 10,
-    },
-    fullImage: {
-      width: Dimensions.get('window').width,
-      height: Dimensions.get('window').height * 0.8,
-    },
-    swipeHint: {
-      position: 'absolute',
-      bottom: 40,
-      fontSize: 14,
-      color: '#FFFFFF',
-      opacity: 0.7,
     },
   });

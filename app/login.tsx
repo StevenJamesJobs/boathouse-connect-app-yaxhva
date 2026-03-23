@@ -260,6 +260,11 @@ export default function LoginScreen() {
               <Text style={styles.loginButtonText}>{t('login.sign_in')}</Text>
             )}
           </TouchableOpacity>
+
+          {/* Forgot Password */}
+          <Text style={styles.forgotPasswordText}>
+            {t('login.forgot_password')}
+          </Text>
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -348,5 +353,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
+  },
+  forgotPasswordText: {
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 14,
+    color: splashColors.textSecondary,
+    fontStyle: 'italic',
   },
 });

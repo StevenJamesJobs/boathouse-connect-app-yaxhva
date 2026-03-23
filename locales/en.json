@@ -28,7 +28,8 @@
     "error_empty_fields": "Please enter both username and password",
     "error_invalid": "Invalid username or password. Please try again.",
     "error_login_failed": "Login Failed",
-    "error_generic": "An error occurred during login. Please try again."
+    "error_generic": "An error occurred during login. Please try again.",
+    "forgot_password": "Forgot your password? Contact your manager to have it reset."
   },
   "tabs": {
     "welcome": "Welcome",

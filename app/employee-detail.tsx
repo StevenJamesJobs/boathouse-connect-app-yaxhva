@@ -185,8 +185,11 @@ export default function EmployeeDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Note: In a real app, you'd need to implement password reset via Supabase Auth
-              // For now, we'll just show a success message
+              const { error } = await supabase.rpc('update_password', {
+                user_id: employee.id,
+                new_password: 'boathouseconnect',
+              });
+              if (error) throw error;
               Alert.alert(
                 t('common:success'),
                 t('reset_password_success')

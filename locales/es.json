@@ -28,7 +28,8 @@
     "error_empty_fields": "Por favor ingresa tu usuario y contraseña",
     "error_invalid": "Usuario o contraseña incorrectos. Por favor intenta de nuevo.",
     "error_login_failed": "Error al Iniciar Sesión",
-    "error_generic": "Ocurrió un error al iniciar sesión. Por favor intenta de nuevo."
+    "error_generic": "Ocurrió un error al iniciar sesión. Por favor intenta de nuevo.",
+    "forgot_password": "¿Olvidaste tu contraseña? Contacta a tu gerente para restablecerla."
   },
   "tabs": {
     "welcome": "Bienvenido",
