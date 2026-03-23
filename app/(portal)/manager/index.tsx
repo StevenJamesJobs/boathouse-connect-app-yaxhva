@@ -710,6 +710,7 @@ export default function ManagerPortalScreen() {
         {/* Upcoming Shifts Card */}
         <UpcomingShiftsCard
           userId={user?.id}
+          isManager={true}
           colors={{
             primary: colors.primary,
             background: colors.background,
@@ -1089,7 +1090,6 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   todayTabsCard: {
-    marginHorizontal: 16,
     marginBottom: 12,
     borderRadius: 12,
     padding: 8,

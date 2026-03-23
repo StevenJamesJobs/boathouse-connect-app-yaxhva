@@ -278,10 +278,10 @@ export default function ManagerManageScreen() {
           </>
         ) : (
           <>
-            {/* Employee Management */}
+            {/* Employee Management Hub */}
             <TouchableOpacity
               style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => router.push('/employee-editor')}
+              onPress={() => router.push('/employee-hub')}
             >
               <View style={styles.cardContent}>
                 <IconSymbol
@@ -293,34 +293,7 @@ export default function ManagerManageScreen() {
                 <View style={styles.cardTextContainer}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_tools.employee_management')}</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    {t('manager_manage.employee_management_desc')}
-                  </Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={24}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-
-            {/* Rewards and Reviews Editor - MOVED FROM Employee tab */}
-            <TouchableOpacity
-              style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => router.push('/rewards-and-reviews-editor')}
-            >
-              <View style={styles.cardContent}>
-                <IconSymbol
-                  ios_icon_name="gift.fill"
-                  android_material_icon_name="star"
-                  size={28}
-                  color={colors.highlight}
-                />
-                <View style={styles.cardTextContainer}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.rewards_reviews_editor')}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    {t('manager_manage.rewards_reviews_editor_desc')}
+                    {t('manager_manage.employee_hub_desc', 'Staff, schedules, rewards & reviews')}
                   </Text>
                 </View>
                 <IconSymbol
@@ -348,33 +321,6 @@ export default function ManagerManageScreen() {
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.menu_editor')}</Text>
                   <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                     {t('manager_manage.menu_editor_desc')}
-                  </Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={24}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-
-            {/* Staff Schedules */}
-            <TouchableOpacity
-              style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => router.push('/schedule-upload')}
-            >
-              <View style={styles.cardContent}>
-                <IconSymbol
-                  ios_icon_name="calendar"
-                  android_material_icon_name="schedule"
-                  size={28}
-                  color={colors.highlight}
-                />
-                <View style={styles.cardTextContainer}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.schedules', 'Staff Schedules')}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    {t('manager_manage.schedules_desc', 'Upload & manage staff schedules')}
                   </Text>
                 </View>
                 <IconSymbol

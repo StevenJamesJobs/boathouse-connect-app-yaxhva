@@ -379,6 +379,7 @@
     "schedules": "Horarios del Personal",
     "schedules_desc": "Subir y gestionar horarios del personal",
     "employee_management_desc": "Agregar, editar y gestionar cuentas de empleados",
+    "employee_hub_desc": "Personal, horarios, recompensas y reseñas",
     "employees": "Empleados",
     "announcements": "Anuncios",
     "events": "Eventos",
@@ -1334,7 +1335,8 @@
   "upcoming_shifts": {
     "your_next_shifts": "Tus Próximos Turnos",
     "full_schedule": "Horario Completo",
-    "no_shifts": "Sin turnos próximos"
+    "no_shifts": "Sin turnos próximos",
+    "view_todays_roster": "Ver Lista de Hoy"
   },
   "my_schedule": {
     "title": "Mi Horario",
@@ -1344,6 +1346,7 @@
     "no_schedule_desc": "Tu horario aún no ha sido subido. ¡Vuelve pronto!",
     "opener": "Apertura",
     "closer": "Cierre",
-    "training": "Entrenamiento"
+    "training": "Entrenamiento",
+    "disclaimer": "Los horarios se publican semanalmente y pueden no reflejar los cambios recientes de liberación o intercambio de turnos. ¡Siempre verifica con HotSchedules!"
   }
 }

@@ -4,7 +4,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -26,6 +25,7 @@ interface Shift {
 
 interface UpcomingShiftsCardProps {
   userId: string | undefined;
+  isManager?: boolean;
   colors: {
     primary: string;
     background: string;
@@ -35,7 +35,7 @@ interface UpcomingShiftsCardProps {
   };
 }
 
-export default function UpcomingShiftsCard({ userId, colors }: UpcomingShiftsCardProps) {
+export default function UpcomingShiftsCard({ userId, isManager = false, colors }: UpcomingShiftsCardProps) {
   const router = useRouter();
   const { t } = useTranslation();
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -58,7 +58,7 @@ export default function UpcomingShiftsCard({ userId, colors }: UpcomingShiftsCar
         .gte('shift_date', today)
         .order('shift_date', { ascending: true })
         .order('start_time', { ascending: true })
-        .limit(4);
+        .limit(5);
 
       if (error) throw error;
       setShifts(data || []);
@@ -87,7 +87,6 @@ export default function UpcomingShiftsCard({ userId, colors }: UpcomingShiftsCar
 
   const getPrimaryRole = (shift: Shift) => {
     if (shift.roles.length === 0) return '';
-    // Filter out duplicate roles and get the primary one
     const uniqueRoles = [...new Set(shift.roles)];
     return uniqueRoles[0];
   };
@@ -143,6 +142,16 @@ export default function UpcomingShiftsCard({ userId, colors }: UpcomingShiftsCar
             {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
           </Text>
           <View style={styles.shiftMeta}>
+            {shift.is_opener && (
+              <View style={[styles.flagBadge, { backgroundColor: '#4CAF5020' }]}>
+                <Text style={[styles.flagText, { color: '#4CAF50' }]}>O</Text>
+              </View>
+            )}
+            {shift.is_closer && (
+              <View style={[styles.flagBadge, { backgroundColor: '#FF980020' }]}>
+                <Text style={[styles.flagText, { color: '#FF9800' }]}>C</Text>
+              </View>
+            )}
             {getPrimaryRole(shift) ? (
               <View style={[styles.roleBadge, { backgroundColor: colors.primary + '15' }]}>
                 <Text style={[styles.roleText, { color: colors.primary }]}>
@@ -150,27 +159,40 @@ export default function UpcomingShiftsCard({ userId, colors }: UpcomingShiftsCar
                 </Text>
               </View>
             ) : null}
-            {shift.is_closer && (
-              <View style={[styles.flagBadge, { backgroundColor: '#FF980020' }]}>
-                <Text style={[styles.flagText, { color: '#FF9800' }]}>C</Text>
-              </View>
-            )}
-            {shift.is_opener && (
-              <View style={[styles.flagBadge, { backgroundColor: '#4CAF5020' }]}>
-                <Text style={[styles.flagText, { color: '#4CAF50' }]}>O</Text>
-              </View>
-            )}
           </View>
         </View>
       ))}
+
+      {/* Manager-only: View Today's Roster */}
+      {isManager && (
+        <TouchableOpacity
+          style={[styles.rosterButton, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.12)' }]}
+          onPress={() => router.push('/todays-roster')}
+          activeOpacity={0.7}
+        >
+          <IconSymbol
+            ios_icon_name="person.3.fill"
+            android_material_icon_name="groups"
+            size={15}
+            color={colors.primary}
+          />
+          <Text style={[styles.rosterButtonText, { color: colors.primary }]}>
+            {t('upcoming_shifts.view_todays_roster', "View Today's Roster")}
+          </Text>
+          <IconSymbol
+            ios_icon_name="chevron.right"
+            android_material_icon_name="chevron-right"
+            size={13}
+            color={colors.primary}
+          />
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: 16,
-    marginBottom: 12,
     borderRadius: 12,
     padding: 12,
     shadowColor: '#000',
@@ -242,5 +264,17 @@ const styles = StyleSheet.create({
   flagText: {
     fontSize: 10,
     fontWeight: '700',
+  },
+  rosterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 10,
+    marginTop: 4,
+    gap: 6,
+  },
+  rosterButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
 });

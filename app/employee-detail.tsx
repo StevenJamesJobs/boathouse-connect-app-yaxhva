@@ -285,9 +285,17 @@ export default function EmployeeDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const { error } = await supabase.from('users').delete().eq('id', employee.id);
+              const { error, count } = await supabase
+                .from('users')
+                .delete({ count: 'exact' })
+                .eq('id', employee.id);
 
               if (error) throw error;
+
+              if (count === 0) {
+                Alert.alert(t('common:error'), 'Unable to delete employee. Please try again.');
+                return;
+              }
 
               Alert.alert(t('common:success'), t('employee_deleted'));
               router.back();

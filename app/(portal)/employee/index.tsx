@@ -1089,7 +1089,6 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   todayTabsCard: {
-    marginHorizontal: 16,
     marginBottom: 12,
     borderRadius: 12,
     padding: 8,

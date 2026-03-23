@@ -151,6 +151,16 @@ export default function MyScheduleScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Disclaimer banner */}
+        {!loading && dayGroups.length > 0 && (
+          <View style={[styles.disclaimerBanner, { backgroundColor: '#FFF3E0', borderColor: '#FFB74D' }]}>
+            <IconSymbol ios_icon_name="exclamationmark.triangle.fill" android_material_icon_name="warning" size={14} color="#F57C00" />
+            <Text style={styles.disclaimerText}>
+              {t('my_schedule.disclaimer', 'Schedules are released on a week to week basis and may not reflect recent Shift Releases or Shift Swap & Trade changes. Always double check with HotSchedules!')}
+            </Text>
+          </View>
+        )}
+
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={styles.loadingIndicator} />
         ) : dayGroups.length === 0 ? (
@@ -182,67 +192,55 @@ export default function MyScheduleScreen() {
                   key={shift.id}
                   style={[styles.shiftCard, { backgroundColor: colors.card }]}
                 >
-                  <View style={styles.shiftTimeSection}>
-                    <View style={[styles.timeDot, { backgroundColor: colors.primary }]} />
-                    <View style={[styles.timeLine, { backgroundColor: colors.primary + '30' }]} />
-                    <View style={[styles.timeDot, { backgroundColor: colors.primary + '60' }]} />
-                  </View>
-
-                  <View style={styles.shiftDetails}>
-                    <View style={styles.timeRow}>
-                      <Text style={[styles.timeText, { color: colors.text }]}>
-                        {formatTime(shift.start_time)}
-                      </Text>
+                  {/* Role & Flag badges at top */}
+                  <View style={styles.badgesRow}>
+                    {[...new Set(shift.roles)].map((role, idx) => (
+                      <View key={idx} style={[styles.roleBadge, { backgroundColor: colors.primary + '15' }]}>
+                        <Text style={[styles.roleText, { color: colors.primary }]}>{role}</Text>
+                      </View>
+                    ))}
+                    {shift.is_opener && (
+                      <View style={[styles.flagBadge, { backgroundColor: '#4CAF5020' }]}>
+                        <Text style={[styles.flagText, { color: '#4CAF50' }]}>Opener</Text>
+                      </View>
+                    )}
+                    {shift.is_closer && (
+                      <View style={[styles.flagBadge, { backgroundColor: '#FF980020' }]}>
+                        <Text style={[styles.flagText, { color: '#FF9800' }]}>Closer</Text>
+                      </View>
+                    )}
+                    {shift.is_training && (
+                      <View style={[styles.flagBadge, { backgroundColor: '#2196F320' }]}>
+                        <Text style={[styles.flagText, { color: '#2196F3' }]}>Training</Text>
+                      </View>
+                    )}
+                    {shift.room_assignment && (
+                      <View style={[styles.flagBadge, { backgroundColor: '#9C27B020' }]}>
+                        <Text style={[styles.flagText, { color: '#9C27B0' }]}>{shift.room_assignment}</Text>
+                      </View>
+                    )}
+                    {/* Duration in top right */}
+                    <View style={styles.durationBadge}>
                       <Text style={[styles.durationText, { color: colors.textSecondary }]}>
                         {getShiftDuration(shift.start_time, shift.end_time)}
                       </Text>
                     </View>
+                  </View>
 
-                    {/* Roles */}
-                    <View style={styles.rolesRow}>
-                      {[...new Set(shift.roles)].map((role, idx) => (
-                        <View key={idx} style={[styles.roleBadge, { backgroundColor: colors.primary + '15' }]}>
-                          <Text style={[styles.roleText, { color: colors.primary }]}>{role}</Text>
-                        </View>
-                      ))}
+                  {/* Time section with compact timeline */}
+                  <View style={styles.timeSection}>
+                    <View style={styles.timelineColumn}>
+                      <View style={[styles.timeDot, { backgroundColor: colors.primary }]} />
+                      <View style={[styles.timeLine, { backgroundColor: colors.primary + '30' }]} />
+                      <View style={[styles.timeDot, { backgroundColor: colors.primary + '50' }]} />
                     </View>
-
-                    <View style={styles.timeRow}>
-                      <Text style={[styles.endTimeText, { color: colors.textSecondary }]}>
+                    <View style={styles.timesColumn}>
+                      <Text style={[styles.timeText, { color: colors.text }]}>
+                        {formatTime(shift.start_time)}
+                      </Text>
+                      <Text style={[styles.timeText, { color: colors.text }]}>
                         {formatTime(shift.end_time)}
                       </Text>
-                    </View>
-
-                    {/* Flags */}
-                    <View style={styles.flagsRow}>
-                      {shift.is_opener && (
-                        <View style={[styles.flagBadge, { backgroundColor: '#4CAF5020' }]}>
-                          <Text style={[styles.flagText, { color: '#4CAF50' }]}>
-                            {t('my_schedule.opener', 'Opener')}
-                          </Text>
-                        </View>
-                      )}
-                      {shift.is_closer && (
-                        <View style={[styles.flagBadge, { backgroundColor: '#FF980020' }]}>
-                          <Text style={[styles.flagText, { color: '#FF9800' }]}>
-                            {t('my_schedule.closer', 'Closer')}
-                          </Text>
-                        </View>
-                      )}
-                      {shift.is_training && (
-                        <View style={[styles.flagBadge, { backgroundColor: '#2196F320' }]}>
-                          <Text style={[styles.flagText, { color: '#2196F3' }]}>
-                            {t('my_schedule.training', 'Training')}
-                          </Text>
-                        </View>
-                      )}
-                      {shift.room_assignment && (
-                        <View style={[styles.flagBadge, { backgroundColor: '#9C27B020' }]}>
-                          <Text style={[styles.flagText, { color: '#9C27B0' }]}>
-                            {shift.room_assignment}
-                          </Text>
-                        </View>
-                      )}
                     </View>
                   </View>
                 </View>
@@ -285,6 +283,22 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
+  disclaimerBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 16,
+    gap: 8,
+  },
+  disclaimerText: {
+    flex: 1,
+    fontSize: 11.5,
+    lineHeight: 16,
+    color: '#E65100',
+    fontWeight: '500',
+  },
   loadingIndicator: {
     marginTop: 40,
   },
@@ -313,7 +327,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   shiftCard: {
-    flexDirection: 'row',
     borderRadius: 12,
     padding: 14,
     marginBottom: 8,
@@ -323,10 +336,14 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 1,
   },
-  shiftTimeSection: {
+  timeSection: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  timelineColumn: {
     alignItems: 'center',
     width: 12,
-    marginRight: 12,
+    marginRight: 10,
     paddingVertical: 2,
   },
   timeDot: {
@@ -339,29 +356,25 @@ const styles = StyleSheet.create({
     flex: 1,
     marginVertical: 2,
   },
-  shiftDetails: {
-    flex: 1,
-  },
-  timeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  timesColumn: {
     justifyContent: 'space-between',
+    paddingVertical: 1,
   },
   timeText: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
   },
-  endTimeText: {
-    fontSize: 13,
+  durationBadge: {
+    marginLeft: 'auto',
   },
   durationText: {
     fontSize: 12,
   },
-  rolesRow: {
+  badgesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 4,
-    marginVertical: 8,
+    gap: 5,
+    marginBottom: 8,
   },
   roleBadge: {
     paddingHorizontal: 8,
@@ -371,12 +384,6 @@ const styles = StyleSheet.create({
   roleText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  flagsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 4,
   },
   flagBadge: {
     paddingHorizontal: 8,

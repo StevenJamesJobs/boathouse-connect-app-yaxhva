@@ -379,6 +379,7 @@
     "schedules": "Staff Schedules",
     "schedules_desc": "Upload & manage staff schedules",
     "employee_management_desc": "Add, edit, and manage employee accounts",
+    "employee_hub_desc": "Staff, schedules, rewards & reviews",
     "employees": "Employees",
     "announcements": "Announcements",
     "events": "Events",
@@ -1334,7 +1335,8 @@
   "upcoming_shifts": {
     "your_next_shifts": "Your Next Shifts",
     "full_schedule": "Full Schedule",
-    "no_shifts": "No upcoming shifts"
+    "no_shifts": "No upcoming shifts",
+    "view_todays_roster": "View Today's Roster"
   },
   "my_schedule": {
     "title": "My Schedule",
@@ -1344,6 +1346,7 @@
     "no_schedule_desc": "Your schedule hasn't been uploaded yet. Check back soon!",
     "opener": "Opener",
     "closer": "Closer",
-    "training": "Training"
+    "training": "Training",
+    "disclaimer": "Schedules are released on a week to week basis and may not reflect recent Shift Releases or Shift Swap & Trade changes. Always double check with HotSchedules!"
   }
 }
