@@ -77,6 +77,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: userData.role as 'employee' | 'manager',
         profilePictureUrl: userData.profile_picture_url || undefined,
         badgeTitle: userData.badge_title || undefined,
+        mcloonesBucks: userData.mcloones_bucks || 0,
+        quickTools: userData.quick_tools ? (Array.isArray(userData.quick_tools) ? userData.quick_tools : JSON.parse(userData.quick_tools)) : undefined,
       };
 
       console.log('[AuthContext] User data fetched successfully, job titles:', user.jobTitles);
@@ -266,6 +268,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         role: userData.role as 'employee' | 'manager',
         profilePictureUrl: userData.profile_picture_url || undefined,
         badgeTitle: userData.badge_title || undefined,
+        mcloonesBucks: userData.mcloones_bucks || 0,
+        quickTools: userData.quick_tools ? (Array.isArray(userData.quick_tools) ? userData.quick_tools : JSON.parse(userData.quick_tools)) : undefined,
       };
 
       // Store auth state if AsyncStorage is available

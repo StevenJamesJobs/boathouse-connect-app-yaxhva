@@ -11,9 +11,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -29,6 +31,7 @@ interface MessageThread {
   sender_profile_picture: string | null;
   subject: string | null;
   body: string;
+  image_url: string | null;
   created_at: string;
   is_current_user: boolean;
   recipient_names?: string[];
@@ -45,6 +48,8 @@ export default function MessageDetailScreen() {
   const [messages, setMessages] = useState<MessageThread[]>([]);
   const [loading, setLoading] = useState(true);
   const [allRecipientIds, setAllRecipientIds] = useState<string[]>([]);
+  const [viewingImageUrl, setViewingImageUrl] = useState<string | null>(null);
+  const scrollViewRef = React.useRef<ScrollView>(null);
 
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -61,6 +66,7 @@ export default function MessageDetailScreen() {
           sender_id,
           subject,
           body,
+          image_url,
           created_at,
           sender:users!messages_sender_id_fkey (
             name,
@@ -100,6 +106,7 @@ export default function MessageDetailScreen() {
           sender_id,
           subject,
           body,
+          image_url,
           created_at,
           sender:users!messages_sender_id_fkey (
             name,
@@ -120,6 +127,7 @@ export default function MessageDetailScreen() {
         sender_profile_picture: msg.sender?.profile_picture_url || null,
         subject: msg.subject,
         body: msg.body,
+        image_url: msg.image_url || null,
         created_at: msg.created_at,
         is_current_user: msg.sender_id === user?.id,
         recipient_names: msg.id === messageId ? recipientNames : undefined,
@@ -177,10 +185,18 @@ export default function MessageDetailScreen() {
     }
   }, [messageId, threadId, user?.id]);
 
-  useEffect(() => {
-    loadThread();
-    markThreadAsRead();
-  }, [loadThread, markThreadAsRead]);
+  // Reload thread when screen gains focus (e.g., returning from compose reply)
+  useFocusEffect(
+    useCallback(() => {
+      loadThread().then(() => {
+        // Auto-scroll to bottom after loading to show latest messages
+        setTimeout(() => {
+          scrollViewRef.current?.scrollToEnd({ animated: false });
+        }, 100);
+      });
+      markThreadAsRead();
+    }, [loadThread, markThreadAsRead])
+  );
 
   const handleReply = () => {
     const originalMessage = messages[0];
@@ -328,7 +344,7 @@ export default function MessageDetailScreen() {
       </View>
 
       {/* Messages Thread — iMessage-style bubbles */}
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+      <ScrollView ref={scrollViewRef} style={styles.content} contentContainerStyle={styles.contentContainer}>
         {/* Subject header card — shown once at top */}
         {messages.length > 0 && messages[0].subject && (
           <View style={[styles.subjectCard, { backgroundColor: colors.card }]}>
@@ -391,11 +407,30 @@ export default function MessageDetailScreen() {
                     isMe
                       ? [styles.bubbleRight, { backgroundColor: '#1976D2' }]
                       : [styles.bubbleLeft, { backgroundColor: colors.card }],
+                    message.image_url ? styles.bubbleWithImage : null,
                   ]}
                 >
-                  <Text style={[styles.bubbleText, { color: isMe ? '#FFFFFF' : colors.text }]}>
-                    {message.body}
-                  </Text>
+                  {message.image_url && (
+                    <TouchableOpacity
+                      onPress={() => setViewingImageUrl(message.image_url)}
+                      activeOpacity={0.9}
+                    >
+                      <Image
+                        source={{ uri: message.image_url }}
+                        style={styles.bubbleImage}
+                        resizeMode="cover"
+                      />
+                    </TouchableOpacity>
+                  )}
+                  {message.body ? (
+                    <Text style={[
+                      styles.bubbleText,
+                      { color: isMe ? '#FFFFFF' : colors.text },
+                      message.image_url ? styles.bubbleTextWithImage : null,
+                    ]}>
+                      {message.body}
+                    </Text>
+                  ) : null}
                 </View>
 
                 <Text
@@ -449,6 +484,34 @@ export default function MessageDetailScreen() {
           )}
         </View>
       </View>
+      {/* Full-screen Image Viewer Modal */}
+      <Modal
+        visible={!!viewingImageUrl}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setViewingImageUrl(null)}
+      >
+        <View style={styles.imageViewerOverlay}>
+          <TouchableOpacity
+            style={styles.imageViewerClose}
+            onPress={() => setViewingImageUrl(null)}
+          >
+            <IconSymbol
+              ios_icon_name="xmark.circle.fill"
+              android_material_icon_name="cancel"
+              size={32}
+              color="#FFFFFF"
+            />
+          </TouchableOpacity>
+          {viewingImageUrl && (
+            <Image
+              source={{ uri: viewingImageUrl }}
+              style={styles.imageViewerImage}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -603,6 +666,38 @@ const styles = StyleSheet.create({
   },
   bubbleTimeRight: {
     textAlign: 'right',
+  },
+  // Image in bubble
+  bubbleWithImage: {
+    padding: 0,
+    overflow: 'hidden',
+  },
+  bubbleImage: {
+    width: 220,
+    height: 165,
+    borderRadius: 0,
+  },
+  bubbleTextWithImage: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  // Full-screen image viewer
+  imageViewerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    zIndex: 10,
+    padding: 8,
+  },
+  imageViewerImage: {
+    width: Dimensions.get('window').width,
+    height: Dimensions.get('window').height * 0.7,
   },
   // Reply buttons — compact
   replyButtonContainer: {

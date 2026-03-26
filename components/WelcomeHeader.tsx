@@ -76,10 +76,18 @@ export default function WelcomeHeader({
 
   const profilePictureUrl = getProfilePictureUrl(user?.profilePictureUrl);
 
+  const handleProfilePress = () => {
+    if (user?.role === 'manager') {
+      router.push('/(portal)/manager/profile' as any);
+    } else {
+      router.push('/(portal)/employee/profile' as any);
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.card }]}>
       {/* Profile Photo */}
-      <View style={[styles.profilePicContainer, { borderColor: colors.highlight }]}>
+      <TouchableOpacity onPress={handleProfilePress} style={[styles.profilePicContainer, { borderColor: colors.highlight }]}>
         {profilePictureUrl ? (
           <Image source={{ uri: profilePictureUrl }} style={styles.profilePic} />
         ) : (
@@ -92,7 +100,7 @@ export default function WelcomeHeader({
             />
           </View>
         )}
-      </View>
+      </TouchableOpacity>
 
       {/* Name + Job Title */}
       <View style={styles.nameContainer}>

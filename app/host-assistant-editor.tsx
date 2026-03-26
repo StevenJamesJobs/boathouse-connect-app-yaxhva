@@ -11,6 +11,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import BottomNavBar from '@/components/BottomNavBar';
 
 export default function HostAssistantEditorScreen() {
   const router = useRouter();
@@ -185,6 +186,7 @@ export default function HostAssistantEditorScreen() {
           </>
         )}
       </ScrollView>
+      <BottomNavBar activeTab="manage" />
     </View>
   );
 }

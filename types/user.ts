@@ -10,6 +10,8 @@ export interface User {
   role: 'employee' | 'manager';
   profilePictureUrl?: string;
   badgeTitle?: string; // Custom badge title override (e.g., "General Manager")
+  mcloonesBucks?: number; // McLoone's Bucks balance
+  quickTools?: string[]; // Array of quick tool IDs for profile dashboard
 }
 
 export interface AuthState {

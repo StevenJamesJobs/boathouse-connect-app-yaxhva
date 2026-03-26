@@ -11,14 +11,17 @@ import {
   ActivityIndicator,
   Modal,
   FlatList,
+  Image,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useNotification } from '@/contexts/NotificationContext';
+import { uploadMessageImage, validateImageSize } from '@/utils/messageImages';
 
 interface User {
   id: string;
@@ -57,6 +60,8 @@ export default function ComposeMessageScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sending, setSending] = useState(false);
   const [recipientGroups, setRecipientGroups] = useState<RecipientGroup[]>([]);
+  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const colors = useThemeColors();
 
@@ -253,19 +258,63 @@ export default function ComposeMessageScreen() {
     setSelectedRecipients(selectedRecipients.filter(r => r.id !== userId));
   };
 
+  const handlePickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: 0.8,
+        allowsEditing: false,
+      });
+
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const uri = result.assets[0].uri;
+
+      // Validate file size (5MB limit)
+      const isValidSize = await validateImageSize(uri);
+      if (!isValidSize) {
+        Alert.alert(
+          t('common:error', { defaultValue: 'Error' }),
+          t('photo_too_large', { defaultValue: 'Image must be under 5MB' })
+        );
+        return;
+      }
+
+      setSelectedImageUri(uri);
+    } catch (error) {
+      console.error('Error picking image:', error);
+    }
+  };
+
   const handleSend = async () => {
     if (selectedRecipients.length === 0) {
       Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_no_recipients'));
       return;
     }
 
-    if (!body.trim()) {
+    if (!body.trim() && !selectedImageUri) {
       Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_no_message'));
       return;
     }
 
     try {
       setSending(true);
+
+      // Upload image if selected
+      let imageUrl: string | null = null;
+      if (selectedImageUri) {
+        setUploadingImage(true);
+        imageUrl = await uploadMessageImage(selectedImageUri);
+        setUploadingImage(false);
+        if (!imageUrl) {
+          Alert.alert(
+            t('common:error', { defaultValue: 'Error' }),
+            t('upload_failed', { defaultValue: 'Failed to upload image' })
+          );
+          setSending(false);
+          return;
+        }
+      }
 
       // Determine thread_id and parent_message_id for replies
       let threadId = null;
@@ -294,7 +343,8 @@ export default function ComposeMessageScreen() {
         .insert({
           sender_id: user?.id,
           subject: subject.trim() || null,
-          body: body.trim(),
+          body: body.trim() || '',
+          image_url: imageUrl,
           thread_id: threadId,
           parent_message_id: parentMessageId,
         })
@@ -321,9 +371,9 @@ export default function ComposeMessageScreen() {
           userIds: selectedRecipients.map(r => r.id),
           notificationType: 'message',
           title: '📨 New Message',
-          body: subject.trim() 
-            ? `${user?.name}: ${subject.trim()}`
-            : `${user?.name} sent you a message`,
+          body: subject.trim()
+            ? `${user?.name}: ${subject.trim()}${imageUrl ? ' 📷' : ''}`
+            : `${user?.name} sent you a ${imageUrl ? 'photo' : 'message'}`,
           data: {
             messageId: messageData.id,
             senderId: user?.id,
@@ -454,6 +504,42 @@ export default function ComposeMessageScreen() {
           />
         </View>
 
+        {/* Attach Photo */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={[styles.attachButton, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={handlePickImage}
+          >
+            <IconSymbol
+              ios_icon_name="photo"
+              android_material_icon_name="photo"
+              size={20}
+              color={colors.primary || colors.highlight}
+            />
+            <Text style={[styles.attachButtonText, { color: colors.text }]}>
+              {t('attach_photo', { defaultValue: 'Attach Photo' })}
+            </Text>
+          </TouchableOpacity>
+
+          {/* Image Preview */}
+          {selectedImageUri && (
+            <View style={[styles.imagePreviewContainer, { borderColor: colors.border }]}>
+              <Image source={{ uri: selectedImageUri }} style={styles.imagePreview} resizeMode="cover" />
+              <TouchableOpacity
+                style={styles.removeImageButton}
+                onPress={() => setSelectedImageUri(null)}
+              >
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={24}
+                  color="#E74C3C"
+                />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
         {/* Action Buttons */}
         <View style={styles.buttonRow}>
           <TouchableOpacity
@@ -470,7 +556,14 @@ export default function ComposeMessageScreen() {
             disabled={sending}
           >
             {sending ? (
-              <ActivityIndicator color={user?.role === 'manager' ? colors.text : '#FFFFFF'} />
+              <View style={styles.sendingContainer}>
+                <ActivityIndicator color={user?.role === 'manager' ? colors.text : '#FFFFFF'} />
+                {uploadingImage && (
+                  <Text style={[styles.uploadingText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
+                    {t('uploading', { defaultValue: 'Uploading...' })}
+                  </Text>
+                )}
+              </View>
             ) : (
               <>
                 <IconSymbol
@@ -813,6 +906,47 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontSize: 16,
+  },
+  attachButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    gap: 10,
+  },
+  attachButtonText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  imagePreviewContainer: {
+    marginTop: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  imagePreview: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 12,
+  },
+  sendingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  uploadingText: {
+    fontSize: 13,
+    fontWeight: '500',
   },
   doneButton: {
     margin: 16,

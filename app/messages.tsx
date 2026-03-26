@@ -38,6 +38,7 @@ interface Message {
   recipient_id?: string;
   recipient_names?: string[];
   reply_count?: number;
+  image_url?: string | null;
 }
 
 export default function MessagesScreen() {
@@ -73,6 +74,7 @@ export default function MessagesScreen() {
           sender_id,
           subject,
           body,
+          image_url,
           parent_message_id,
           thread_id,
           created_at,
@@ -124,11 +126,20 @@ export default function MessagesScreen() {
           .neq('id', threadId);
 
         // Check if ANY message in this thread is unread for this user
+        // Step 1: Get all message IDs in this thread
+        const { data: threadMsgs } = await supabase
+          .from('messages')
+          .select('id')
+          .or(`id.eq.${threadId},thread_id.eq.${threadId}`);
+
+        const threadMsgIds = threadMsgs?.map((m: any) => m.id) || [threadId];
+
+        // Step 2: Check message_recipients for unread entries
         const { data: threadRecipients } = await supabase
           .from('message_recipients')
-          .select('is_read, message:messages!inner(id, thread_id)')
+          .select('is_read')
           .eq('recipient_id', user.id)
-          .or(`message_id.eq.${threadId},message.thread_id.eq.${threadId}`);
+          .in('message_id', threadMsgIds);
 
         const hasUnreadInThread = threadRecipients?.some((tr: any) => !tr.is_read) || false;
 
@@ -137,6 +148,7 @@ export default function MessagesScreen() {
           sender_id: msg.sender_id,
           subject: msg.subject,
           body: msg.body,
+          image_url: msg.image_url || null,
           parent_message_id: msg.parent_message_id,
           thread_id: msg.thread_id,
           created_at: msg.created_at,
@@ -180,6 +192,7 @@ export default function MessagesScreen() {
         sender_id,
         subject,
         body,
+        image_url,
         parent_message_id,
         thread_id,
         created_at,
@@ -224,6 +237,7 @@ export default function MessagesScreen() {
           sender_id: msg.sender_id,
           subject: msg.subject,
           body: msg.body,
+          image_url: msg.image_url || null,
           parent_message_id: msg.parent_message_id,
           thread_id: msg.thread_id,
           created_at: msg.created_at,
@@ -845,13 +859,16 @@ function MessageCard({
     );
   };
 
+  const isUnread = !message.is_read && activeTab === 'inbox';
+  const accentColor = colors.primary || colors.highlight;
+
   const cardContent = (
     <TouchableOpacity
       style={[
         styles.messageItem,
         { backgroundColor: colors.card },
-        !message.is_read && (activeTab === 'inbox') && styles.unreadMessage,
-        selectionMode && isSelected && styles.selectedMessage,
+        isUnread && [styles.unreadMessage, { borderLeftColor: accentColor, backgroundColor: accentColor + '08' }],
+        selectionMode && isSelected && [styles.selectedMessage, { borderColor: accentColor }],
       ]}
       onPress={onPress}
       onLongPress={onLongPress}
@@ -863,7 +880,7 @@ function MessageCard({
           <View style={[
             styles.checkbox,
             { borderColor: colors.border },
-            isSelected && { backgroundColor: colors.primary || colors.highlight, borderColor: colors.primary || colors.highlight }
+            isSelected && { backgroundColor: accentColor, borderColor: accentColor }
           ]}>
             {isSelected && (
               <IconSymbol
@@ -892,17 +909,20 @@ function MessageCard({
           </View>
         )}
         {/* Unread dot on profile picture */}
-        {!message.is_read && (activeTab === 'inbox') && (
-          <View style={styles.unreadDot} />
+        {isUnread && (
+          <View style={[styles.unreadDot, { backgroundColor: accentColor, borderColor: colors.card }]} />
         )}
       </View>
 
-      {/* Message Content — compact single-column layout */}
+      {/* Message Content — compact two-column layout */}
       <View style={styles.messageContent}>
+        {/* Top row: sender name + date */}
         <View style={styles.messageHeader}>
-          <Text style={[styles.messageSender, { color: colors.text }]} numberOfLines={1}>
+          <Text style={[styles.messageSender, { color: colors.text }, isUnread && styles.messageSenderUnread]} numberOfLines={1}>
             {activeTab === 'sent'
-              ? t('messages.recipients', { count: message.recipient_count })
+              ? (message.recipient_names && message.recipient_names.length > 0
+                  ? message.recipient_names.join(', ')
+                  : t('messages.recipients', { count: message.recipient_count }))
               : message.sender_name}
           </Text>
           <Text style={[styles.messageDate, { color: colors.textSecondary }]}>
@@ -910,41 +930,48 @@ function MessageCard({
           </Text>
         </View>
 
-        {/* Job title or recipient names — single line */}
-        {activeTab === 'sent' && message.recipient_names && message.recipient_names.length > 0 ? (
-          <Text style={[styles.messageMetaLine, { color: colors.textSecondary }]} numberOfLines={1}>
-            {message.recipient_names.join(', ')}
-          </Text>
-        ) : activeTab !== 'sent' && message.sender_job_title ? (
-          <Text style={[styles.messageMetaLine, { color: colors.textSecondary }]} numberOfLines={1}>
-            {message.sender_job_title}
-          </Text>
-        ) : null}
-
+        {/* Subject line */}
         {message.subject && (
-          <Text style={[styles.messageSubject, { color: colors.text }]} numberOfLines={1}>
+          <Text style={[styles.messageSubject, { color: colors.text }, isUnread && styles.messageSubjectUnread]} numberOfLines={1}>
             {message.subject}
           </Text>
         )}
-        <Text style={[styles.messageBody, { color: colors.textSecondary }]} numberOfLines={1}>
-          {message.body}
-        </Text>
 
-        {/* Reply count — inline with bottom row */}
-        {message.reply_count != null && message.reply_count > 0 && (
-          <View style={styles.replyCountContainer}>
-            <IconSymbol
-              ios_icon_name="bubble.left.and.bubble.right"
-              android_material_icon_name="forum"
-              size={12}
-              color={colors.primary || colors.highlight}
-            />
-            <Text style={[styles.replyCountText, { color: colors.primary || colors.highlight }]}>
-              {message.reply_count} {message.reply_count === 1 ? 'reply' : 'replies'}
-            </Text>
+        {/* Bottom row: body preview (left) + meta indicators (right) */}
+        <View style={styles.messageBottomRow}>
+          <Text style={[styles.messageBody, { color: colors.textSecondary }]} numberOfLines={1}>
+            {message.image_url && !message.body ? '📷 Photo' : message.body}
+          </Text>
+          <View style={styles.messageMetaRight}>
+            {message.image_url && message.body ? (
+              <View style={styles.metaChip}>
+                <IconSymbol
+                  ios_icon_name="photo"
+                  android_material_icon_name="photo"
+                  size={11}
+                  color={colors.textSecondary}
+                />
+              </View>
+            ) : null}
+            {message.reply_count != null && message.reply_count > 0 ? (
+              <View style={styles.metaChip}>
+                <IconSymbol
+                  ios_icon_name="bubble.left.and.bubble.right"
+                  android_material_icon_name="forum"
+                  size={11}
+                  color={accentColor}
+                />
+                <Text style={[styles.metaChipText, { color: accentColor }]}>
+                  {message.reply_count}
+                </Text>
+              </View>
+            ) : null}
           </View>
-        )}
+        </View>
       </View>
+
+      {/* Unread accent bar on right edge */}
+      {isUnread && <View style={[styles.unreadBar, { backgroundColor: accentColor }]} />}
     </TouchableOpacity>
   );
 
@@ -1098,21 +1125,20 @@ const styles = StyleSheet.create({
   },
   messageItem: {
     flexDirection: 'row',
-    padding: 10,
-    borderRadius: 12,
+    padding: 12,
+    borderRadius: 14,
     boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.08)',
     elevation: 1,
     gap: 10,
     marginBottom: 8,
     alignItems: 'center',
+    overflow: 'hidden',
   },
   unreadMessage: {
-    borderLeftWidth: 3,
-    borderLeftColor: '#3498DB',
+    borderLeftWidth: 4,
   },
   selectedMessage: {
     borderWidth: 2,
-    borderColor: '#3498DB',
   },
   checkboxContainer: {
     justifyContent: 'center',
@@ -1150,14 +1176,12 @@ const styles = StyleSheet.create({
   },
   unreadDot: {
     position: 'absolute',
-    top: -1,
-    right: -1,
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#3498DB',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
+    top: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 2.5,
   },
   messageContent: {
     flex: 1,
@@ -1170,36 +1194,58 @@ const styles = StyleSheet.create({
   },
   messageSender: {
     fontSize: 15,
-    fontWeight: '600',
+    fontWeight: '500',
     flex: 1,
     marginRight: 8,
+  },
+  messageSenderUnread: {
+    fontWeight: '700',
   },
   messageDate: {
     fontSize: 11,
   },
-  messageMetaLine: {
-    fontSize: 12,
-    marginBottom: 1,
-    fontStyle: 'italic',
-  },
   messageSubject: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '500',
     marginBottom: 1,
+  },
+  messageSubjectUnread: {
+    fontWeight: '700',
+  },
+  messageBottomRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 1,
   },
   messageBody: {
     fontSize: 13,
     lineHeight: 17,
+    flex: 1,
+    marginRight: 8,
   },
-  replyCountContainer: {
+  messageMetaRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 3,
+    gap: 6,
+    flexShrink: 0,
   },
-  replyCountText: {
+  metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  metaChipText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  unreadBar: {
+    position: 'absolute',
+    right: 0,
+    top: 8,
+    bottom: 8,
+    width: 4,
+    borderRadius: 2,
   },
   // Swipe action styles
   swipeActionsContainer: {

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -23,6 +24,20 @@ import * as FileSystem from 'expo-file-system';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { MessageBadge } from '@/components/MessageBadge';
 import { useTranslation } from 'react-i18next';
+import { QUICK_TOOLS_CATALOG, getDefaultQuickTools } from '@/config/quickTools';
+import QuickToolsSelector from '@/components/QuickToolsSelector';
+
+const formatTime = (timeStr: string) => {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  const h = hours % 12 || 12;
+  return `${h}:${minutes.toString().padStart(2, '0')} ${ampm}`;
+};
+
+const formatShiftDate = (dateStr: string) => {
+  const date = new Date(dateStr + 'T12:00:00');
+  return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+};
 
 export default function ManagerProfileScreen() {
   const { t } = useTranslation();
@@ -36,6 +51,9 @@ export default function ManagerProfileScreen() {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [profileInfoExpanded, setProfileInfoExpanded] = useState(false);
+  const [nextShift, setNextShift] = useState<any>(null);
+  const [loadingShift, setLoadingShift] = useState(true);
+  const [showToolSelector, setShowToolSelector] = useState(false);
 
   // Update local state when user context changes
   useEffect(() => {
@@ -44,6 +62,40 @@ export default function ManagerProfileScreen() {
       setPhoneNumber(user.phoneNumber);
     }
   }, [user]);
+
+  // Load next shift on focus
+  useFocusEffect(
+    useCallback(() => {
+      loadNextShift();
+    }, [user?.id])
+  );
+
+  const loadNextShift = async () => {
+    if (!user?.id) return;
+    try {
+      setLoadingShift(true);
+      const today = new Date().toISOString().split('T')[0];
+      const { data, error } = await supabase
+        .from('staff_schedules')
+        .select('*')
+        .eq('user_id', user.id)
+        .gte('shift_date', today)
+        .order('shift_date', { ascending: true })
+        .order('start_time', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading next shift:', error);
+      }
+      setNextShift(data || null);
+    } catch (error) {
+      console.error('Error loading next shift:', error);
+      setNextShift(null);
+    } finally {
+      setLoadingShift(false);
+    }
+  };
 
   const handleSave = async () => {
     try {
@@ -185,91 +237,193 @@ export default function ManagerProfileScreen() {
     }
   };
 
+  const handleSaveQuickTools = async (toolIds: string[]) => {
+    try {
+      await supabase.rpc('update_quick_tools', {
+        user_id: user?.id,
+        tools: JSON.stringify(toolIds),
+      });
+      await refreshUser();
+      setShowToolSelector(false);
+    } catch (error) {
+      console.error('Error saving quick tools:', error);
+    }
+  };
+
+  // Quick tools
+  const currentToolIds = user?.quickTools || getDefaultQuickTools('manager', user?.jobTitles);
+  const currentTools = currentToolIds
+    .map((id) => QUICK_TOOLS_CATALOG.find((t) => t.id === id))
+    .filter(Boolean);
+
   return (
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-    <ScrollView style={[styles.container, { backgroundColor: colors.background }]} contentContainerStyle={styles.contentContainer} keyboardShouldPersistTaps="handled">
-      {/* Profile Header */}
-      <View style={[styles.profileHeader, { backgroundColor: colors.card }]}>
-        <TouchableOpacity onPress={handlePickImage} style={styles.avatarContainer}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={styles.contentContainer}
+      keyboardShouldPersistTaps="handled"
+    >
+      {/* 1. Compact Header Card */}
+      <View style={[styles.headerCard, { backgroundColor: colors.card }]}>
+        <TouchableOpacity onPress={handlePickImage} style={styles.headerAvatarContainer}>
           {uploading ? (
-            <ActivityIndicator size="large" color={colors.highlight} />
+            <ActivityIndicator size="small" color={colors.highlight} />
           ) : user?.profilePictureUrl ? (
             <Image
               source={{ uri: user.profilePictureUrl }}
-              style={styles.avatar}
-              key={user.profilePictureUrl} // Force re-render when URL changes
+              style={styles.headerAvatar}
+              key={user.profilePictureUrl}
             />
           ) : (
             <IconSymbol
               ios_icon_name="person.circle.fill"
               android_material_icon_name="account-circle"
-              size={100}
+              size={64}
               color={colors.highlight}
             />
           )}
-          <View style={[styles.cameraIcon, { backgroundColor: colors.highlight, borderColor: colors.card }]}>
+          <View style={[styles.headerCameraIcon, { backgroundColor: colors.highlight }]}>
             <IconSymbol
               ios_icon_name="camera.fill"
               android_material_icon_name="camera-alt"
-              size={16}
+              size={10}
               color="#FFFFFF"
             />
           </View>
         </TouchableOpacity>
-        <Text style={[styles.uploadHint, { color: colors.textSecondary }]}>{t('profile.tap_to_change_photo')}</Text>
-        <Text style={[styles.userName, { color: colors.text }]}>{user?.name}</Text>
-        <Text style={[styles.userRole, { color: colors.textSecondary }]}>{user?.jobTitle}</Text>
-        <View style={[styles.managerBadge, { backgroundColor: colors.highlight }]}>
+
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerName, { color: colors.text }]} numberOfLines={1}>{user?.name}</Text>
+          <Text style={[styles.headerJobTitle, { color: colors.textSecondary }]} numberOfLines={1}>{user?.jobTitle}</Text>
+          <View style={[styles.headerBadge, { backgroundColor: colors.highlight }]}>
+            <IconSymbol
+              ios_icon_name="star.fill"
+              android_material_icon_name="star"
+              size={12}
+              color={colors.text}
+            />
+            <Text style={[styles.headerBadgeText, { color: colors.text }]}>{user?.badgeTitle || t('profile.manager_badge')}</Text>
+          </View>
+        </View>
+
+        <View style={[styles.bucksChip, { backgroundColor: colors.highlight }]}>
           <IconSymbol
-            ios_icon_name="star.fill"
-            android_material_icon_name="star"
-            size={16}
+            ios_icon_name="dollarsign.circle.fill"
+            android_material_icon_name="attach-money"
+            size={18}
             color={colors.text}
           />
-          <Text style={[styles.managerBadgeText, { color: colors.text }]}>{user?.badgeTitle || t('profile.manager_badge')}</Text>
+          <Text style={[styles.bucksValue, { color: colors.text }]}>{user?.mcloonesBucks ?? 0}</Text>
         </View>
       </View>
 
-      {/* Messages Section */}
-      <TouchableOpacity
-        style={[styles.messagesCard, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/messages')}
-      >
-        <View style={styles.messagesHeader}>
-          <View style={styles.messagesIconContainer}>
+      {/* 2. Quick Actions Grid */}
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <View style={styles.quickActionsRow}>
+          <TouchableOpacity
+            style={[styles.quickActionButton, { backgroundColor: colors.highlight + '20' }]}
+            onPress={() => router.push('/messages')}
+          >
+            <View style={styles.quickActionIconContainer}>
+              <IconSymbol
+                ios_icon_name="envelope.fill"
+                android_material_icon_name="mail"
+                size={24}
+                color={colors.highlight}
+              />
+              {unreadCount > 0 && (
+                <View style={styles.quickActionBadge}>
+                  <MessageBadge count={unreadCount} size="small" />
+                </View>
+              )}
+            </View>
+            <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('profile_dashboard.messages')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.quickActionButton, { backgroundColor: colors.highlight + '20' }]}
+            onPress={() => router.push('/my-schedule')}
+          >
             <IconSymbol
-              ios_icon_name="envelope.fill"
-              android_material_icon_name="mail"
+              ios_icon_name="calendar"
+              android_material_icon_name="event"
               size={24}
               color={colors.highlight}
             />
-            {unreadCount > 0 && (
-              <View style={styles.badgePosition}>
-                <MessageBadge count={unreadCount} size="small" />
-              </View>
-            )}
-          </View>
-          <View style={styles.messagesContent}>
-            <Text style={[styles.messagesTitle, { color: colors.text }]}>{t('common.messages')}</Text>
-            <Text style={[styles.messagesSubtitle, { color: colors.textSecondary }]}>
-              {unreadCount > 0
-                ? t(unreadCount > 1 ? 'profile.unread_message_other' : 'profile.unread_message_one', { count: unreadCount })
-                : t('profile.no_new_messages')}
-            </Text>
-          </View>
+            <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('profile_dashboard.my_schedule')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.quickActionButton, { backgroundColor: colors.highlight + '20' }]}
+            onPress={() => router.push('/employee-hub')}
+          >
+            <IconSymbol
+              ios_icon_name="person.2.fill"
+              android_material_icon_name="people"
+              size={24}
+              color={colors.highlight}
+            />
+            <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('profile_dashboard.employee_hub')}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.quickActionButton, { backgroundColor: colors.highlight + '20' }]}
+            onPress={() => router.push('/settings' as any)}
+          >
+            <IconSymbol
+              ios_icon_name="gearshape.fill"
+              android_material_icon_name="settings"
+              size={24}
+              color={colors.highlight}
+            />
+            <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('profile_dashboard.settings')}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* 3. Next Shift Card */}
+      <TouchableOpacity
+        style={[styles.card, { backgroundColor: colors.card }]}
+        onPress={() => router.push('/my-schedule')}
+        activeOpacity={0.7}
+      >
+        <View style={styles.nextShiftHeader}>
+          <Text style={[styles.nextShiftTitle, { color: colors.text }]}>{t('profile_dashboard.your_next_shift')}</Text>
           <IconSymbol
             ios_icon_name="chevron.right"
             android_material_icon_name="chevron-right"
-            size={24}
+            size={20}
             color={colors.textSecondary}
           />
         </View>
+        {loadingShift ? (
+          <ActivityIndicator size="small" color={colors.highlight} style={{ marginTop: 8 }} />
+        ) : nextShift ? (
+          <View style={styles.nextShiftContent}>
+            <Text style={[styles.nextShiftDate, { color: colors.textSecondary }]}>
+              {formatShiftDate(nextShift.shift_date)}
+              {'  '}
+              {formatTime(nextShift.start_time)} - {formatTime(nextShift.end_time)}
+            </Text>
+            {nextShift.roles && nextShift.roles.length > 0 && (
+              <View style={styles.roleBadgesRow}>
+                {nextShift.roles.map((role: string, index: number) => (
+                  <View key={index} style={[styles.roleBadge, { backgroundColor: colors.highlight + '30' }]}>
+                    <Text style={[styles.roleBadgeText, { color: colors.highlight }]}>{role}</Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+        ) : (
+          <Text style={[styles.noShiftText, { color: colors.textSecondary }]}>{t('profile_dashboard.no_upcoming_shifts')}</Text>
+        )}
       </TouchableOpacity>
 
-      {/* Profile Information - Collapsible */}
+      {/* 4. Profile Information - Collapsible */}
       <View style={[styles.card, { backgroundColor: colors.card }]}>
         <TouchableOpacity
           style={styles.collapsibleHeader}
@@ -360,34 +514,49 @@ export default function ManagerProfileScreen() {
         )}
       </View>
 
-      {/* Settings Section */}
-      <TouchableOpacity
-        style={[styles.messagesCard, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/settings' as any)}
-      >
-        <View style={styles.messagesHeader}>
-          <View style={styles.messagesIconContainer}>
+      {/* 5. My Quick Tools */}
+      <View style={[styles.card, { backgroundColor: colors.card }]}>
+        <View style={styles.quickToolsHeader}>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('profile_dashboard.my_quick_tools')}</Text>
+          <TouchableOpacity onPress={() => setShowToolSelector(true)}>
             <IconSymbol
-              ios_icon_name="gearshape.fill"
-              android_material_icon_name="settings"
-              size={24}
-              color={colors.primary}
+              ios_icon_name="pencil"
+              android_material_icon_name="edit"
+              size={20}
+              color={colors.highlight}
             />
-          </View>
-          <View style={styles.messagesContent}>
-            <Text style={[styles.messagesTitle, { color: colors.text }]}>{t('settings.title')}</Text>
-            <Text style={[styles.messagesSubtitle, { color: colors.textSecondary }]}>
-              {t('settings.settings_subtitle')}
-            </Text>
-          </View>
-          <IconSymbol
-            ios_icon_name="chevron.right"
-            android_material_icon_name="chevron-right"
-            size={24}
-            color={colors.textSecondary}
-          />
+          </TouchableOpacity>
         </View>
-      </TouchableOpacity>
+        <View style={styles.quickToolsGrid}>
+          {currentTools.map((tool) => {
+            if (!tool) return null;
+            return (
+              <TouchableOpacity
+                key={tool.id}
+                style={styles.quickToolItem}
+                onPress={() => router.push(tool.route as any)}
+              >
+                <View style={[styles.quickToolIconCircle, { backgroundColor: colors.highlight + '20' }]}>
+                  <IconSymbol
+                    ios_icon_name={tool.iosIcon as any}
+                    android_material_icon_name={tool.androidIcon as any}
+                    size={28}
+                    color={colors.highlight}
+                  />
+                </View>
+                <Text style={[styles.quickToolLabel, { color: colors.text }]} numberOfLines={2}>{t(tool.labelKey)}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      <QuickToolsSelector
+        visible={showToolSelector}
+        selectedToolIds={currentToolIds}
+        onSave={handleSaveQuickTools}
+        onClose={() => setShowToolSelector(false)}
+      />
     </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -402,99 +571,145 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 100,
   },
-  profileHeader: {
-    alignItems: 'center',
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 20,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  avatarContainer: {
-    position: 'relative',
-    marginBottom: 8,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-  },
-  cameraIcon: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    borderRadius: 16,
-    width: 32,
-    height: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-  },
-  uploadHint: {
-    fontSize: 12,
-    fontStyle: 'italic',
-    marginBottom: 12,
-  },
-  userName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  userRole: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 12,
-  },
-  managerBadge: {
+  // 1. Compact Header Card
+  headerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-  },
-  managerBadgeText: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 6,
-  },
-  messagesCard: {
     borderRadius: 16,
     padding: 16,
-    marginBottom: 20,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  messagesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  messagesIconContainer: {
-    position: 'relative',
-  },
-  badgePosition: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-  },
-  messagesContent: {
-    flex: 1,
-  },
-  messagesTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 2,
-  },
-  messagesSubtitle: {
-    fontSize: 14,
-  },
-  card: {
-    borderRadius: 16,
-    padding: 20,
     marginBottom: 16,
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
+  headerAvatarContainer: {
+    position: 'relative',
+  },
+  headerAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+  },
+  headerCameraIcon: {
+    position: 'absolute',
+    bottom: 0,
+    right: -2,
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    marginLeft: 14,
+  },
+  headerName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  headerJobTitle: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  headerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    marginTop: 6,
+  },
+  headerBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  bucksChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginLeft: 8,
+  },
+  bucksValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 4,
+  },
+  // 2. Quick Actions Grid
+  card: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  quickActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  quickActionButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 4,
+  },
+  quickActionIconContainer: {
+    position: 'relative',
+  },
+  quickActionBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+  },
+  quickActionLabel: {
+    fontSize: 10,
+    fontWeight: '600',
+    marginTop: 6,
+    textAlign: 'center',
+  },
+  // 3. Next Shift Card
+  nextShiftHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  nextShiftTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  nextShiftContent: {
+    marginTop: 8,
+  },
+  nextShiftDate: {
+    fontSize: 14,
+  },
+  roleBadgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 8,
+  },
+  roleBadge: {
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  roleBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  noShiftText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+    marginTop: 8,
+  },
+  // 4. Profile Information
   collapsibleHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -502,7 +717,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
   },
   fieldContainer: {
@@ -573,5 +788,34 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  // 5. Quick Tools
+  quickToolsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  quickToolsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  quickToolItem: {
+    width: '22%',
+    alignItems: 'center',
+  },
+  quickToolIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickToolLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    textAlign: 'center',
+    marginTop: 6,
   },
 });

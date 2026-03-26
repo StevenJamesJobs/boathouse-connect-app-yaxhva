@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
+import BottomNavBar from '@/components/BottomNavBar';
 
 export default function EmployeeHubScreen() {
   const colors = useThemeColors();
@@ -99,6 +100,7 @@ export default function EmployeeHubScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+      <BottomNavBar activeTab="manage" />
     </View>
   );
 }
