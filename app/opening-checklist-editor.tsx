@@ -571,7 +571,7 @@ export default function OpeningChecklistEditorScreen() {
           <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.highlight} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </View>
     );
@@ -595,7 +595,7 @@ export default function OpeningChecklistEditorScreen() {
             ios_icon_name="plus.circle.fill"
             android_material_icon_name="add-circle"
             size={28}
-            color={colors.highlight}
+            color={colors.primary}
           />
         </TouchableOpacity>
       </View>
@@ -607,7 +607,7 @@ export default function OpeningChecklistEditorScreen() {
             ios_icon_name="info.circle.fill"
             android_material_icon_name="info"
             size={24}
-            color={colors.highlight}
+            color={colors.primary}
           />
           <Text style={styles.infoText}>
             {t('checklist_editor:info_opening_hosts')}
@@ -648,7 +648,7 @@ export default function OpeningChecklistEditorScreen() {
                       ios_icon_name="pencil"
                       android_material_icon_name="edit"
                       size={20}
-                      color={colors.highlight}
+                      color={colors.primary}
                     />
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -679,7 +679,7 @@ export default function OpeningChecklistEditorScreen() {
                             ios_icon_name="pencil"
                             android_material_icon_name="edit"
                             size={18}
-                            color={colors.highlight}
+                            color={colors.primary}
                           />
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -704,7 +704,7 @@ export default function OpeningChecklistEditorScreen() {
                       ios_icon_name="plus.circle"
                       android_material_icon_name="add-circle-outline"
                       size={20}
-                      color={colors.highlight}
+                      color={colors.primary}
                     />
                     <Text style={styles.addItemText}>{t('checklist_editor:add_item')}</Text>
                   </TouchableOpacity>

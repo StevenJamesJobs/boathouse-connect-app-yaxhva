@@ -646,7 +646,7 @@ export default function MenuEditorScreen() {
             ios_icon_name="magnifyingglass"
             android_material_icon_name="search"
             size={16}
-            color={colors.highlight}
+            color={colors.primary}
           />
           <Text style={styles.searchInfoText}>
             {filteredItems.length === 1
@@ -738,7 +738,7 @@ export default function MenuEditorScreen() {
       {/* Menu Items List */}
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.highlight} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <>
@@ -819,7 +819,7 @@ export default function MenuEditorScreen() {
                 )}
                 <View style={styles.menuItemActions}>
                   <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}>
-                    <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.highlight} />
+                    <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.primary} />
                     <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)}>
@@ -930,7 +930,7 @@ export default function MenuEditorScreen() {
                           <IconSymbol ios_icon_name="arrow.down" android_material_icon_name="arrow-downward" size={18} color={index === filteredItems.length - 1 ? colors.textSecondary : colors.highlight} />
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}>
-                          <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.highlight} />
+                          <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.primary} />
                           <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)}>

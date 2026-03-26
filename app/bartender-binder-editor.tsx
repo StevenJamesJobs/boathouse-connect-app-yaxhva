@@ -41,7 +41,7 @@ export default function BartenderBinderEditorScreen() {
               ios_icon_name="checklist"
               android_material_icon_name="checklist"
               size={32}
-              color={colors.highlight}
+              color={colors.primary}
             />
             <View style={styles.cardHeaderText}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_binder_editor.checklists_editor')}</Text>
@@ -61,7 +61,7 @@ export default function BartenderBinderEditorScreen() {
                 ios_icon_name="sunrise.fill"
                 android_material_icon_name="wb-sunny"
                 size={24}
-                color={colors.highlight}
+                color={colors.primary}
               />
               <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_binder_editor.opening_checklist_editor')}</Text>
             </View>
@@ -83,7 +83,7 @@ export default function BartenderBinderEditorScreen() {
                 ios_icon_name="moon.fill"
                 android_material_icon_name="nightlight"
                 size={24}
-                color={colors.highlight}
+                color={colors.primary}
               />
               <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_binder_editor.closing_checklist_editor')}</Text>
             </View>
@@ -103,7 +103,7 @@ export default function BartenderBinderEditorScreen() {
               ios_icon_name="drop.fill"
               android_material_icon_name="opacity"
               size={32}
-              color={colors.highlight}
+              color={colors.primary}
             />
             <View style={styles.cardHeaderText}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_binder_editor.purees_syrups_editor')}</Text>
@@ -123,7 +123,7 @@ export default function BartenderBinderEditorScreen() {
                 ios_icon_name="drop.fill"
                 android_material_icon_name="opacity"
                 size={24}
-                color={colors.highlight}
+                color={colors.primary}
               />
               <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_binder_editor.purees_syrups_button')}</Text>
             </View>

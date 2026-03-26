@@ -546,7 +546,7 @@ export default function CocktailsAZEditorScreen() {
       {/* Loading Overlay */}
       {loading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={colors.highlight} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       )}
 

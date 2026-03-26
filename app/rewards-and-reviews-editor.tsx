@@ -1403,7 +1403,7 @@ export default function RewardsAndReviewsEditorScreen() {
                             ios_icon_name="pencil.circle.fill"
                             android_material_icon_name="edit"
                             size={24}
-                            color={colors.highlight}
+                            color={colors.primary}
                           />
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -1473,7 +1473,7 @@ export default function RewardsAndReviewsEditorScreen() {
                             ios_icon_name="pencil.circle.fill"
                             android_material_icon_name="edit"
                             size={28}
-                            color={colors.highlight}
+                            color={colors.primary}
                           />
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => handleDeleteReview(review.id)}>
@@ -1501,7 +1501,7 @@ export default function RewardsAndReviewsEditorScreen() {
       {/* Loading Overlay */}
       {loading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={colors.highlight} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       )}
 

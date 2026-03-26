@@ -69,7 +69,7 @@ export default function KitchenAssistantEditorScreen() {
                   ios_icon_name="book.pages"
                   android_material_icon_name="menu-book"
                   size={28}
-                  color={colors.highlight}
+                  color={colors.primary}
                 />
                 <View style={styles.cardText}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{t('kitchen_assistant_editor.main_menu_recipes_editor')}</Text>
@@ -97,7 +97,7 @@ export default function KitchenAssistantEditorScreen() {
                   ios_icon_name="person.3.fill"
                   android_material_icon_name="groups"
                   size={28}
-                  color={colors.highlight}
+                  color={colors.primary}
                 />
                 <View style={styles.cardText}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{t('kitchen_assistant_editor.banquet_recipes_editor')}</Text>
@@ -125,7 +125,7 @@ export default function KitchenAssistantEditorScreen() {
                   ios_icon_name="list.clipboard.fill"
                   android_material_icon_name="list-alt"
                   size={28}
-                  color={colors.highlight}
+                  color={colors.primary}
                 />
                 <View style={styles.cardText}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{t('kitchen_assistant_editor.buffet_recipes_editor')}</Text>
@@ -155,7 +155,7 @@ export default function KitchenAssistantEditorScreen() {
                   ios_icon_name="questionmark.circle.fill"
                   android_material_icon_name="quiz"
                   size={28}
-                  color={colors.highlight}
+                  color={colors.primary}
                 />
                 <View style={styles.cardText}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{t('kitchen_assistant_editor.weekly_quiz_editor')}</Text>
@@ -178,7 +178,7 @@ export default function KitchenAssistantEditorScreen() {
                 ios_icon_name="info.circle.fill"
                 android_material_icon_name="info"
                 size={24}
-                color={colors.highlight}
+                color={colors.primary}
               />
               <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                 {t('kitchen_assistant_editor.more_exam_editors_coming')}

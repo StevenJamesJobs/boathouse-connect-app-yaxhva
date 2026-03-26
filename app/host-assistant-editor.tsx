@@ -65,7 +65,7 @@ export default function HostAssistantEditorScreen() {
                   ios_icon_name="checklist"
                   android_material_icon_name="checklist"
                   size={32}
-                  color={colors.highlight}
+                  color={colors.primary}
                 />
                 <View style={styles.cardHeaderText}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{t('host_assistant_editor.checklists_editor')}</Text>
@@ -85,7 +85,7 @@ export default function HostAssistantEditorScreen() {
                     ios_icon_name="sunrise.fill"
                     android_material_icon_name="wb-sunny"
                     size={24}
-                    color={colors.highlight}
+                    color={colors.primary}
                   />
                   <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant_editor.opening_checklist_editor')}</Text>
                 </View>
@@ -107,7 +107,7 @@ export default function HostAssistantEditorScreen() {
                     ios_icon_name="clock.fill"
                     android_material_icon_name="schedule"
                     size={24}
-                    color={colors.highlight}
+                    color={colors.primary}
                   />
                   <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant_editor.running_side_work_editor')}</Text>
                 </View>
@@ -129,7 +129,7 @@ export default function HostAssistantEditorScreen() {
                     ios_icon_name="moon.fill"
                     android_material_icon_name="nightlight"
                     size={24}
-                    color={colors.highlight}
+                    color={colors.primary}
                   />
                   <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant_editor.closing_checklist_editor')}</Text>
                 </View>
@@ -154,7 +154,7 @@ export default function HostAssistantEditorScreen() {
                   ios_icon_name="questionmark.circle.fill"
                   android_material_icon_name="quiz"
                   size={32}
-                  color={colors.highlight}
+                  color={colors.primary}
                 />
                 <View style={styles.sectionCardText}>
                   <Text style={[styles.sectionCardTitle, { color: colors.text }]}>{t('host_assistant_editor.weekly_quiz_editor')}</Text>
@@ -177,7 +177,7 @@ export default function HostAssistantEditorScreen() {
                 ios_icon_name="info.circle.fill"
                 android_material_icon_name="info"
                 size={24}
-                color={colors.highlight}
+                color={colors.primary}
               />
               <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                 {t('host_assistant_editor.more_exam_editors_coming')}

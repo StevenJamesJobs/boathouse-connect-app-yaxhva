@@ -726,7 +726,7 @@ export default function SpecialFeaturesEditorScreen() {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.highlight} />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>{t('special_features_editor:loading')}</Text>
         </View>
       ) : features.length === 0 ? (
@@ -852,7 +852,7 @@ export default function SpecialFeaturesEditorScreen() {
                         <IconSymbol ios_icon_name="arrow.down" android_material_icon_name="arrow-downward" size={18} color={index === features.length - 1 ? colors.textSecondary : colors.highlight} />
                       </TouchableOpacity>
                       <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(feature)}>
-                        <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.highlight} />
+                        <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.primary} />
                         <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(feature)}>
@@ -1112,7 +1112,7 @@ export default function SpecialFeaturesEditorScreen() {
                         ios_icon_name="doc.fill"
                         android_material_icon_name="description"
                         size={24}
-                        color={colors.highlight}
+                        color={colors.primary}
                       />
                       <View style={styles.selectedFileText}>
                         <Text style={styles.selectedFileTitle}>{selectedGuideFile.title}</Text>
@@ -1137,7 +1137,7 @@ export default function SpecialFeaturesEditorScreen() {
                       ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
                       android_material_icon_name={showFileSection ? "expand-less" : "expand-more"}
                       size={24}
-                      color={colors.highlight}
+                      color={colors.primary}
                     />
                     <Text style={styles.filePickerButtonText}>
                       {showFileSection ? t('special_features_editor:hide_file_selection') : t('special_features_editor:show_file_selection')}
@@ -1191,7 +1191,7 @@ export default function SpecialFeaturesEditorScreen() {
                                   ios_icon_name="doc.fill"
                                   android_material_icon_name="description"
                                   size={24}
-                                  color={colors.highlight}
+                                  color={colors.primary}
                                 />
                                 <View style={styles.fileItemText}>
                                   <Text style={styles.fileItemTitle}>{file.title}</Text>

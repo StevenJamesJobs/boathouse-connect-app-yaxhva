@@ -85,33 +85,6 @@ export default function ServerAssistantScreen() {
               />
             </TouchableOpacity>
 
-            {/* Menu Memory Game Section - Coming Soon */}
-            <TouchableOpacity
-              style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => console.log('Menu Memory Game - Coming Soon')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <IconSymbol
-                  ios_icon_name="gamecontroller.fill"
-                  android_material_icon_name="sports-esports"
-                  size={28}
-                  color={colors.primary}
-                />
-                <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('server_assistant.menu_memory_game')}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    {t('server_assistant.menu_memory_game_desc')}
-                  </Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
           </>
         ) : (
           <>

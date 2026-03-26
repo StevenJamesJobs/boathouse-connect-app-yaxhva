@@ -69,7 +69,7 @@ export default function ServerAssistantEditorScreen() {
                   ios_icon_name="dollarsign.circle.fill"
                   android_material_icon_name="calculate"
                   size={28}
-                  color={colors.highlight}
+                  color={colors.primary}
                 />
                 <View style={styles.cardText}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{t('server_assistant_editor.check_out_calculator')}</Text>
@@ -86,33 +86,6 @@ export default function ServerAssistantEditorScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* Menu Memory Game Editor - Coming Soon */}
-            <TouchableOpacity
-              style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => console.log('Menu Memory Game Editor - Coming Soon')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <IconSymbol
-                  ios_icon_name="gamecontroller.fill"
-                  android_material_icon_name="sports-esports"
-                  size={28}
-                  color={colors.highlight}
-                />
-                <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('server_assistant_editor.menu_memory_game_editor')}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    {t('server_assistant_editor.menu_memory_game_editor_desc')}
-                  </Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
           </>
         ) : (
           <>
@@ -127,7 +100,7 @@ export default function ServerAssistantEditorScreen() {
                   ios_icon_name="questionmark.circle.fill"
                   android_material_icon_name="quiz"
                   size={28}
-                  color={colors.highlight}
+                  color={colors.primary}
                 />
                 <View style={styles.cardText}>
                   <Text style={[styles.cardTitle, { color: colors.text }]}>{t('server_assistant_editor.weekly_quiz_editor')}</Text>
@@ -150,7 +123,7 @@ export default function ServerAssistantEditorScreen() {
                 ios_icon_name="info.circle.fill"
                 android_material_icon_name="info"
                 size={24}
-                color={colors.highlight}
+                color={colors.primary}
               />
               <Text style={[styles.infoText, { color: colors.textSecondary }]}>
                 {t('server_assistant_editor.more_exam_editors_coming')}

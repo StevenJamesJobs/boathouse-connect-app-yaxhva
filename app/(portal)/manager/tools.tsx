@@ -62,7 +62,7 @@ export default function ManagerToolsScreen() {
               ios_icon_name="book.fill"
               android_material_icon_name="menu-book"
               size={28}
-              color={colors.highlight}
+              color={colors.primary}
             />
             <View style={styles.cardText}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_tools.guides_training')}</Text>
@@ -79,7 +79,35 @@ export default function ManagerToolsScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* 2. Server Assistant Section - For Servers, Lead Servers, and Managers */}
+        {/* 2. Menu Memory Game - Available to ALL staff */}
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: colors.card }]}
+          onPress={() => router.push('/menu-memory-game')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.cardContent}>
+            <IconSymbol
+              ios_icon_name="gamecontroller.fill"
+              android_material_icon_name="sports-esports"
+              size={28}
+              color={colors.primary}
+            />
+            <View style={styles.cardText}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.memory_game')}</Text>
+              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                {t('employee_tools.memory_game_desc')}
+              </Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </View>
+        </TouchableOpacity>
+
+        {/* 3. Server Assistant Section - For Servers, Lead Servers, and Managers */}
         {canSeeServerAssistant && (
           <TouchableOpacity
             style={[styles.card, { backgroundColor: colors.card }]}
@@ -91,7 +119,7 @@ export default function ManagerToolsScreen() {
                 ios_icon_name="tray.full.fill"
                 android_material_icon_name="room-service"
                 size={28}
-                color={colors.highlight}
+                color={colors.primary}
               />
               <View style={styles.cardText}>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.server_assistant')}</Text>
@@ -121,7 +149,7 @@ export default function ManagerToolsScreen() {
                 ios_icon_name="wineglass.fill"
                 android_material_icon_name="local-bar"
                 size={28}
-                color={colors.highlight}
+                color={colors.primary}
               />
               <View style={styles.cardText}>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.bartender_assistant')}</Text>
@@ -151,7 +179,7 @@ export default function ManagerToolsScreen() {
                 ios_icon_name="person.2.fill"
                 android_material_icon_name="people"
                 size={28}
-                color={colors.highlight}
+                color={colors.primary}
               />
               <View style={styles.cardText}>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.host_assistant')}</Text>
@@ -181,7 +209,7 @@ export default function ManagerToolsScreen() {
                 ios_icon_name="flame.fill"
                 android_material_icon_name="local-fire-department"
                 size={28}
-                color={colors.highlight}
+                color={colors.primary}
               />
               <View style={styles.cardText}>
                 <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.kitchen_assistant')}</Text>

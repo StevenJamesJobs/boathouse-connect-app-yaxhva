@@ -18,8 +18,21 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+const GRID_PADDING = 16;
+const GRID_GAP = 12;
+const NUM_COLUMNS = 3;
+const ITEM_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
+
 const TABS = ['newsfeed', 'employee', 'management'] as const;
 type TabName = typeof TABS[number];
+
+interface GridItem {
+  id: string;
+  label: string;
+  iosIcon: string;
+  androidIcon: string;
+  route: string;
+}
 
 export default function ManagerManageScreen() {
   const colors = useThemeColors();
@@ -44,188 +57,60 @@ export default function ManagerManageScreen() {
     }
   }, [activeTab]);
 
-  const renderNewsfeedTab = () => (
-    <>
-      {/* Announcements Editor */}
-      <TouchableOpacity
-        style={[styles.card, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/announcement-editor')}
-      >
-        <View style={styles.cardContent}>
-          <IconSymbol ios_icon_name="megaphone.fill" android_material_icon_name="campaign" size={28} color={colors.highlight} />
-          <View style={styles.cardTextContainer}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.announcements_editor')}</Text>
-            <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{t('manager_manage.announcements_editor_desc')}</Text>
-          </View>
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={24} color={colors.textSecondary} />
-        </View>
-      </TouchableOpacity>
+  // Grid data for each tab
+  const newsfeedItems: GridItem[] = [
+    { id: 'announcements', label: t('manager_manage.grid_announcements'), iosIcon: 'megaphone.fill', androidIcon: 'campaign', route: '/announcement-editor' },
+    { id: 'special-features', label: t('manager_manage.grid_special_features'), iosIcon: 'star.fill', androidIcon: 'star', route: '/special-features-editor' },
+    { id: 'events', label: t('manager_manage.grid_events'), iosIcon: 'calendar', androidIcon: 'event', route: '/upcoming-events-editor' },
+  ];
 
-      {/* Special Features Editor */}
-      <TouchableOpacity
-        style={[styles.card, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/special-features-editor')}
-      >
-        <View style={styles.cardContent}>
-          <IconSymbol ios_icon_name="star.fill" android_material_icon_name="star" size={28} color={colors.highlight} />
-          <View style={styles.cardTextContainer}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.special_features_editor')}</Text>
-            <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{t('manager_manage.special_features_editor_desc')}</Text>
-          </View>
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={24} color={colors.textSecondary} />
-        </View>
-      </TouchableOpacity>
+  const employeeItems: GridItem[] = [
+    { id: 'guides', label: t('manager_manage.grid_guides'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training-editor' },
+    { id: 'memory-game', label: t('manager_manage.grid_memory_game'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/memory-game-editor' },
+    { id: 'server', label: t('manager_manage.grid_server'), iosIcon: 'tray.full.fill', androidIcon: 'room-service', route: '/server-assistant-editor' },
+    { id: 'bartender', label: t('manager_manage.grid_bartender'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant-editor' },
+    { id: 'host', label: t('manager_manage.grid_host'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/host-assistant-editor' },
+    { id: 'kitchen', label: t('manager_manage.grid_kitchen'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant-editor' },
+  ];
 
-      {/* Upcoming Events Editor */}
-      <TouchableOpacity
-        style={[styles.card, styles.lastCard, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/upcoming-events-editor')}
-      >
-        <View style={styles.cardContent}>
-          <IconSymbol ios_icon_name="calendar" android_material_icon_name="event" size={28} color={colors.highlight} />
-          <View style={styles.cardTextContainer}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.upcoming_events_editor')}</Text>
-            <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{t('manager_manage.upcoming_events_editor_desc')}</Text>
-          </View>
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={24} color={colors.textSecondary} />
-        </View>
-      </TouchableOpacity>
-    </>
+  const managementItems: GridItem[] = [
+    { id: 'employee-hub', label: t('manager_manage.grid_employee_hub'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/employee-hub' },
+    { id: 'menu-editor', label: t('manager_manage.grid_menu'), iosIcon: 'fork.knife', androidIcon: 'restaurant', route: '/menu-editor' },
+    { id: 'notifications', label: t('manager_manage.grid_notifications'), iosIcon: 'bell.fill', androidIcon: 'notifications', route: '/notification-center' },
+  ];
+
+  const renderGridItem = (item: GridItem) => (
+    <TouchableOpacity
+      key={item.id}
+      style={[styles.gridItem, { backgroundColor: colors.card, width: ITEM_WIDTH }]}
+      onPress={() => router.push(item.route as any)}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+        <IconSymbol
+          ios_icon_name={item.iosIcon as any}
+          android_material_icon_name={item.androidIcon as any}
+          size={28}
+          color={colors.primary}
+        />
+      </View>
+      <Text style={[styles.gridLabel, { color: colors.text }]} numberOfLines={2}>
+        {item.label}
+      </Text>
+    </TouchableOpacity>
   );
 
-  const renderEmployeeTab = () => (
-    <>
-      {/* Guides and Training Editor */}
-      <TouchableOpacity
-        style={[styles.card, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/guides-and-training-editor')}
-      >
-        <View style={styles.cardContent}>
-          <IconSymbol ios_icon_name="square.and.pencil" android_material_icon_name="book" size={28} color={colors.highlight} />
-          <View style={styles.cardTextContainer}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.guides_training_editor')}</Text>
-            <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{t('manager_manage.guides_training_editor_desc')}</Text>
-          </View>
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={24} color={colors.textSecondary} />
-        </View>
-      </TouchableOpacity>
-
-      {/* Server Assistant Editor */}
-      <TouchableOpacity
-        style={[styles.card, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/server-assistant-editor')}
-      >
-        <View style={styles.cardContent}>
-          <IconSymbol ios_icon_name="tray.full.fill" android_material_icon_name="room-service" size={28} color={colors.highlight} />
-          <View style={styles.cardTextContainer}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.server_assistant_editor')}</Text>
-            <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{t('manager_manage.server_assistant_editor_desc')}</Text>
-          </View>
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={24} color={colors.textSecondary} />
-        </View>
-      </TouchableOpacity>
-
-      {/* Bartender Assistant Editor */}
-      <TouchableOpacity
-        style={[styles.card, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/bartender-assistant-editor')}
-      >
-        <View style={styles.cardContent}>
-          <IconSymbol ios_icon_name="wineglass.fill" android_material_icon_name="local-bar" size={28} color={colors.highlight} />
-          <View style={styles.cardTextContainer}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.bartender_assistant_editor')}</Text>
-            <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{t('manager_manage.bartender_assistant_editor_desc')}</Text>
-          </View>
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={24} color={colors.textSecondary} />
-        </View>
-      </TouchableOpacity>
-
-      {/* Host Assistant Editor */}
-      <TouchableOpacity
-        style={[styles.card, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/host-assistant-editor')}
-      >
-        <View style={styles.cardContent}>
-          <IconSymbol ios_icon_name="person.2.fill" android_material_icon_name="people" size={28} color={colors.highlight} />
-          <View style={styles.cardTextContainer}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.host_assistant_editor')}</Text>
-            <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{t('manager_manage.host_assistant_editor_desc')}</Text>
-          </View>
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={24} color={colors.textSecondary} />
-        </View>
-      </TouchableOpacity>
-
-      {/* Kitchen Assistant Editor */}
-      <TouchableOpacity
-        style={[styles.card, styles.lastCard, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/kitchen-assistant-editor')}
-      >
-        <View style={styles.cardContent}>
-          <IconSymbol ios_icon_name="flame.fill" android_material_icon_name="local-fire-department" size={28} color={colors.highlight} />
-          <View style={styles.cardTextContainer}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.kitchen_assistant_editor')}</Text>
-            <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{t('manager_manage.kitchen_assistant_editor_desc')}</Text>
-          </View>
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={24} color={colors.textSecondary} />
-        </View>
-      </TouchableOpacity>
-    </>
-  );
-
-  const renderManagementTab = () => (
-    <>
-      {/* Employee Management Hub */}
-      <TouchableOpacity
-        style={[styles.card, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/employee-hub')}
-      >
-        <View style={styles.cardContent}>
-          <IconSymbol ios_icon_name="person.2.fill" android_material_icon_name="people" size={28} color={colors.highlight} />
-          <View style={styles.cardTextContainer}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_tools.employee_management')}</Text>
-            <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{t('manager_manage.employee_hub_desc', 'Staff, schedules, rewards & reviews')}</Text>
-          </View>
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={24} color={colors.textSecondary} />
-        </View>
-      </TouchableOpacity>
-
-      {/* Menu Editor */}
-      <TouchableOpacity
-        style={[styles.card, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/menu-editor')}
-      >
-        <View style={styles.cardContent}>
-          <IconSymbol ios_icon_name="fork.knife" android_material_icon_name="restaurant" size={28} color={colors.highlight} />
-          <View style={styles.cardTextContainer}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_manage.menu_editor')}</Text>
-            <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{t('manager_manage.menu_editor_desc')}</Text>
-          </View>
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={24} color={colors.textSecondary} />
-        </View>
-      </TouchableOpacity>
-
-      {/* Notification Center */}
-      <TouchableOpacity
-        style={[styles.card, styles.lastCard, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/notification-center')}
-      >
-        <View style={styles.cardContent}>
-          <IconSymbol ios_icon_name="bell.fill" android_material_icon_name="notifications" size={28} color={colors.highlight} />
-          <View style={styles.cardTextContainer}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>{t('manager_tools.notification_center')}</Text>
-            <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>{t('manager_tools.notification_center_desc')}</Text>
-          </View>
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={24} color={colors.textSecondary} />
-        </View>
-      </TouchableOpacity>
-    </>
+  const renderGrid = (items: GridItem[]) => (
+    <View style={styles.gridContainer}>
+      {items.map(renderGridItem)}
+    </View>
   );
 
   const renderTabContent = (tab: TabName) => {
     switch (tab) {
-      case 'newsfeed': return renderNewsfeedTab();
-      case 'employee': return renderEmployeeTab();
-      case 'management': return renderManagementTab();
+      case 'newsfeed': return renderGrid(newsfeedItems);
+      case 'employee': return renderGrid(employeeItems);
+      case 'management': return renderGrid(managementItems);
     }
   };
 
@@ -325,36 +210,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   pageContentContainer: {
-    paddingTop: 12,
-    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingHorizontal: GRID_PADDING,
     paddingBottom: 100,
   },
-  card: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: GRID_GAP,
+  },
+  gridItem: {
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.15)',
     elevation: 3,
   },
-  lastCard: {
-    marginBottom: 0,
-  },
-  cardContent: {
-    flexDirection: 'row',
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
     alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
   },
-  cardTextContainer: {
-    flex: 1,
-    marginLeft: 12,
-    marginRight: 8,
-  },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  cardDescription: {
-    fontSize: 13,
-    lineHeight: 18,
+  gridLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });

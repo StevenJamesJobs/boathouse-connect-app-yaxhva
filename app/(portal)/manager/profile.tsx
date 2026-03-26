@@ -270,7 +270,7 @@ export default function ManagerProfileScreen() {
       <View style={[styles.headerCard, { backgroundColor: colors.card }]}>
         <TouchableOpacity onPress={handlePickImage} style={styles.headerAvatarContainer}>
           {uploading ? (
-            <ActivityIndicator size="small" color={colors.highlight} />
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : user?.profilePictureUrl ? (
             <Image
               source={{ uri: user.profilePictureUrl }}
@@ -282,7 +282,7 @@ export default function ManagerProfileScreen() {
               ios_icon_name="person.circle.fill"
               android_material_icon_name="account-circle"
               size={64}
-              color={colors.highlight}
+              color={colors.primary}
             />
           )}
           <View style={[styles.headerCameraIcon, { backgroundColor: colors.highlight }]}>
@@ -324,7 +324,7 @@ export default function ManagerProfileScreen() {
       <View style={[styles.card, { backgroundColor: colors.card }]}>
         <View style={styles.quickActionsRow}>
           <TouchableOpacity
-            style={[styles.quickActionButton, { backgroundColor: colors.highlight + '20' }]}
+            style={[styles.quickActionButton, { backgroundColor: colors.primary + '20' }]}
             onPress={() => router.push('/messages')}
           >
             <View style={styles.quickActionIconContainer}>
@@ -332,7 +332,7 @@ export default function ManagerProfileScreen() {
                 ios_icon_name="envelope.fill"
                 android_material_icon_name="mail"
                 size={24}
-                color={colors.highlight}
+                color={colors.primary}
               />
               {unreadCount > 0 && (
                 <View style={styles.quickActionBadge}>
@@ -344,40 +344,40 @@ export default function ManagerProfileScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.quickActionButton, { backgroundColor: colors.highlight + '20' }]}
+            style={[styles.quickActionButton, { backgroundColor: colors.primary + '20' }]}
             onPress={() => router.push('/my-schedule')}
           >
             <IconSymbol
               ios_icon_name="calendar"
               android_material_icon_name="event"
               size={24}
-              color={colors.highlight}
+              color={colors.primary}
             />
             <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('profile_dashboard.my_schedule')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.quickActionButton, { backgroundColor: colors.highlight + '20' }]}
+            style={[styles.quickActionButton, { backgroundColor: colors.primary + '20' }]}
             onPress={() => router.push('/employee-hub')}
           >
             <IconSymbol
               ios_icon_name="person.2.fill"
               android_material_icon_name="people"
               size={24}
-              color={colors.highlight}
+              color={colors.primary}
             />
             <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('profile_dashboard.employee_hub')}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.quickActionButton, { backgroundColor: colors.highlight + '20' }]}
+            style={[styles.quickActionButton, { backgroundColor: colors.primary + '20' }]}
             onPress={() => router.push('/settings' as any)}
           >
             <IconSymbol
               ios_icon_name="gearshape.fill"
               android_material_icon_name="settings"
               size={24}
-              color={colors.highlight}
+              color={colors.primary}
             />
             <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('profile_dashboard.settings')}</Text>
           </TouchableOpacity>
@@ -400,7 +400,7 @@ export default function ManagerProfileScreen() {
           />
         </View>
         {loadingShift ? (
-          <ActivityIndicator size="small" color={colors.highlight} style={{ marginTop: 8 }} />
+          <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
         ) : nextShift ? (
           <View style={styles.nextShiftContent}>
             <Text style={[styles.nextShiftDate, { color: colors.textSecondary }]}>
@@ -411,8 +411,8 @@ export default function ManagerProfileScreen() {
             {nextShift.roles && nextShift.roles.length > 0 && (
               <View style={styles.roleBadgesRow}>
                 {nextShift.roles.map((role: string, index: number) => (
-                  <View key={index} style={[styles.roleBadge, { backgroundColor: colors.highlight + '30' }]}>
-                    <Text style={[styles.roleBadgeText, { color: colors.highlight }]}>{role}</Text>
+                  <View key={index} style={[styles.roleBadge, { backgroundColor: colors.primary + '30' }]}>
+                    <Text style={[styles.roleBadgeText, { color: colors.primary }]}>{role}</Text>
                   </View>
                 ))}
               </View>
@@ -523,7 +523,7 @@ export default function ManagerProfileScreen() {
               ios_icon_name="pencil"
               android_material_icon_name="edit"
               size={20}
-              color={colors.highlight}
+              color={colors.primary}
             />
           </TouchableOpacity>
         </View>
@@ -536,12 +536,12 @@ export default function ManagerProfileScreen() {
                 style={styles.quickToolItem}
                 onPress={() => router.push(tool.route as any)}
               >
-                <View style={[styles.quickToolIconCircle, { backgroundColor: colors.highlight + '20' }]}>
+                <View style={[styles.quickToolIconCircle, { backgroundColor: colors.primary + '20' }]}>
                   <IconSymbol
                     ios_icon_name={tool.iosIcon as any}
                     android_material_icon_name={tool.androidIcon as any}
                     size={28}
-                    color={colors.highlight}
+                    color={colors.primary}
                   />
                 </View>
                 <Text style={[styles.quickToolLabel, { color: colors.text }]} numberOfLines={2}>{t(tool.labelKey)}</Text>

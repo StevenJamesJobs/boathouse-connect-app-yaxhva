@@ -775,7 +775,7 @@ export default function UpcomingEventsEditorScreen() {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.highlight} />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.loadingText}>{t('upcoming_events_editor:loading')}</Text>
         </View>
       ) : events.length === 0 ? (
@@ -959,7 +959,7 @@ export default function UpcomingEventsEditorScreen() {
                           ios_icon_name="pencil"
                           android_material_icon_name="edit"
                           size={20}
-                          color={colors.highlight}
+                          color={colors.primary}
                         />
                         <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
                       </TouchableOpacity>
@@ -1271,7 +1271,7 @@ export default function UpcomingEventsEditorScreen() {
                         ios_icon_name="doc.fill"
                         android_material_icon_name="description"
                         size={24}
-                        color={colors.highlight}
+                        color={colors.primary}
                       />
                       <View style={styles.selectedFileText}>
                         <Text style={styles.selectedFileTitle}>{selectedGuideFile.title}</Text>
@@ -1296,7 +1296,7 @@ export default function UpcomingEventsEditorScreen() {
                       ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
                       android_material_icon_name={showFileSection ? "expand-less" : "expand-more"}
                       size={24}
-                      color={colors.highlight}
+                      color={colors.primary}
                     />
                     <Text style={styles.filePickerButtonText}>
                       {showFileSection ? t('upcoming_events_editor:hide_file_selection') : t('upcoming_events_editor:show_file_selection')}
@@ -1350,7 +1350,7 @@ export default function UpcomingEventsEditorScreen() {
                                   ios_icon_name="doc.fill"
                                   android_material_icon_name="description"
                                   size={24}
-                                  color={colors.highlight}
+                                  color={colors.primary}
                                 />
                                 <View style={styles.fileItemText}>
                                   <Text style={styles.fileItemTitle}>{file.title}</Text>

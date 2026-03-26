@@ -146,7 +146,7 @@ export default function NotificationCenter() {
               ios_icon_name="chevron.left"
               android_material_icon_name="arrow-back"
               size={24}
-              color={colors.highlight}
+              color={colors.primary}
             />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>
@@ -162,7 +162,7 @@ export default function NotificationCenter() {
                 ios_icon_name="megaphone.fill"
                 android_material_icon_name="campaign"
                 size={48}
-                color={colors.highlight}
+                color={colors.primary}
               />
             </View>
 
@@ -296,7 +296,7 @@ export default function NotificationCenter() {
                           ios_icon_name="checkmark"
                           android_material_icon_name="check"
                           size={18}
-                          color={colors.highlight}
+                          color={colors.primary}
                         />
                       )}
                     </TouchableOpacity>

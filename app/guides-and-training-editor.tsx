@@ -650,7 +650,7 @@ export default function GuidesAndTrainingEditorScreen() {
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.highlight} />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('guides_training_editor.loading_guides')}</Text>
         </View>
       ) : filteredGuides.length === 0 ? (
@@ -744,7 +744,7 @@ export default function GuidesAndTrainingEditorScreen() {
                         style={[styles.actionButton, { backgroundColor: colors.background }]}
                         onPress={() => openEditModal(guide)}
                       >
-                        <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.highlight} />
+                        <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.primary} />
                         <Text style={[styles.actionButtonText, { color: colors.highlight }]}>{t('common.edit')}</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -835,7 +835,7 @@ export default function GuidesAndTrainingEditorScreen() {
                     ios_icon_name="doc.fill"
                     android_material_icon_name="description"
                     size={24}
-                    color={colors.highlight}
+                    color={colors.primary}
                   />
                   <Text style={styles.fileUploadText}>
                     {selectedFile ? selectedFile.name : editingGuide ? editingGuide.file_name : t('guides_training_editor.select_file')}

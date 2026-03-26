@@ -333,7 +333,7 @@ export default function RunningSideWorkEditorScreen() {
           <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.highlight} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       </View>
     );
@@ -398,7 +398,7 @@ export default function RunningSideWorkEditorScreen() {
                       ios_icon_name="pencil"
                       android_material_icon_name="edit"
                       size={20}
-                      color={colors.highlight}
+                      color={colors.primary}
                     />
                   </TouchableOpacity>
                   <TouchableOpacity
@@ -430,7 +430,7 @@ export default function RunningSideWorkEditorScreen() {
                               ios_icon_name="pencil"
                               android_material_icon_name="edit"
                               size={18}
-                              color={colors.highlight}
+                              color={colors.primary}
                             />
                           </TouchableOpacity>
                           <TouchableOpacity
