@@ -6,12 +6,28 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Dimensions,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+
+// ─── Grid layout constants (matching Manage page) ────────────────────────────
+const SCREEN_WIDTH = Dimensions.get('window').width;
+const GRID_PADDING = 16;
+const GRID_GAP = 12;
+const NUM_COLUMNS = 3;
+const ITEM_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
+
+interface GridItem {
+  id: string;
+  label: string;
+  iosIcon: string;
+  androidIcon: string;
+  route: string;
+}
 
 export default function EmployeeToolsScreen() {
   const router = useRouter();
@@ -22,26 +38,98 @@ export default function EmployeeToolsScreen() {
   // Get job titles array from user
   const jobTitles = user?.jobTitles || [];
 
-  // Check if user can see Server Assistant (Server, Lead Server, or Manager)
+  // Role-based visibility checks
   const canSeeServerAssistant = jobTitles.includes('Server') ||
                                 jobTitles.includes('Lead Server') ||
                                 jobTitles.includes('Manager');
 
-  // Check if user can see Bar Assistant (Bartender, Manager, Lead Server, or Banquet Captain)
   const canSeeBarAssistant = jobTitles.includes('Bartender') ||
                              jobTitles.includes('Manager') ||
                              jobTitles.includes('Lead Server') ||
                              jobTitles.includes('Banquet Captain');
 
-  // Check if user can see Host Assistant (Host or Manager)
   const canSeeHostAssistant = jobTitles.includes('Host') || jobTitles.includes('Manager');
 
-  // Check if user can see Kitchen Assistant (Busser, Chef, Kitchen, Manager, or Runner)
   const canSeeKitchenAssistant = jobTitles.includes('Busser') ||
                                  jobTitles.includes('Chef') ||
                                  jobTitles.includes('Kitchen') ||
                                  jobTitles.includes('Manager') ||
                                  jobTitles.includes('Runner');
+
+  // ─── Section data ───────────────────────────────────────────────────────────
+
+  const guidesItems: GridItem[] = [
+    { id: 'guides-training', label: t('employee_tools.guides_training'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training' },
+  ];
+
+  const gameHubItems: GridItem[] = [
+    { id: 'memory-game', label: t('employee_tools.memory_game'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/menu-memory-game' },
+    { id: 'word-search', label: 'Word Search', iosIcon: 'textformat.abc', androidIcon: 'spellcheck', route: '/word-search-game' },
+  ];
+
+  const assistantItems: GridItem[] = [];
+  if (canSeeServerAssistant) {
+    assistantItems.push({ id: 'server', label: t('employee_tools.server_assistant'), iosIcon: 'tray.full.fill', androidIcon: 'room-service', route: '/server-assistant' });
+  }
+  if (canSeeBarAssistant) {
+    assistantItems.push({ id: 'bartender', label: t('employee_tools.bartender_assistant'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant' });
+  }
+  if (canSeeHostAssistant) {
+    assistantItems.push({ id: 'host', label: t('employee_tools.host_assistant'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/host-assistant' });
+  }
+  if (canSeeKitchenAssistant) {
+    assistantItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
+  }
+
+  // ─── Grid rendering ─────────────────────────────────────────────────────────
+
+  const renderGridItem = (item: GridItem) => (
+    <TouchableOpacity
+      key={item.id}
+      style={[styles.gridItem, { backgroundColor: colors.card, width: ITEM_WIDTH }]}
+      onPress={() => router.push(item.route as any)}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+        <IconSymbol
+          ios_icon_name={item.iosIcon as any}
+          android_material_icon_name={item.androidIcon as any}
+          size={28}
+          color={colors.primary}
+        />
+      </View>
+      <Text style={[styles.gridLabel, { color: colors.text }]} numberOfLines={2}>
+        {item.label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const renderSection = (
+    title: string,
+    icon: { ios: string; android: string },
+    items: GridItem[],
+    isFirst?: boolean
+  ) => {
+    if (items.length === 0) return null;
+    return (
+      <View style={[styles.section, !isFirst && { marginTop: 20 }]}>
+        <View style={styles.sectionHeader}>
+          <View style={[styles.sectionIconContainer, { backgroundColor: colors.primary + '12' }]}>
+            <IconSymbol
+              ios_icon_name={icon.ios as any}
+              android_material_icon_name={icon.android as any}
+              size={16}
+              color={colors.primary}
+            />
+          </View>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
+        </View>
+        <View style={styles.gridContainer}>
+          {items.map(renderGridItem)}
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -51,180 +139,26 @@ export default function EmployeeToolsScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* 1. Guides and Training Section - ALWAYS AT TOP FOR EVERYONE */}
-        <TouchableOpacity
-          style={[styles.card, { backgroundColor: colors.card }]}
-          onPress={() => router.push('/guides-and-training')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.cardContent}>
-            <IconSymbol
-              ios_icon_name="book.fill"
-              android_material_icon_name="menu-book"
-              size={28}
-              color={colors.primary}
-            />
-            <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.guides_training')}</Text>
-              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                {t('employee_tools.guides_training_desc')}
-              </Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </View>
-        </TouchableOpacity>
-
-        {/* 2. Menu Memory Game - Available to ALL employees */}
-        <TouchableOpacity
-          style={[styles.card, { backgroundColor: colors.card }]}
-          onPress={() => router.push('/menu-memory-game')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.cardContent}>
-            <IconSymbol
-              ios_icon_name="gamecontroller.fill"
-              android_material_icon_name="sports-esports"
-              size={28}
-              color={colors.primary}
-            />
-            <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.memory_game')}</Text>
-              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                {t('employee_tools.memory_game_desc')}
-              </Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </View>
-        </TouchableOpacity>
-
-        {/* 3. Server Assistant Section - For Servers, Lead Servers, and Managers */}
-        {canSeeServerAssistant && (
-          <TouchableOpacity
-            style={[styles.card, { backgroundColor: colors.card }]}
-            onPress={() => router.push('/server-assistant')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cardContent}>
-              <IconSymbol
-                ios_icon_name="tray.full.fill"
-                android_material_icon_name="room-service"
-                size={28}
-                color={colors.primary}
-              />
-              <View style={styles.cardText}>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.server_assistant')}</Text>
-                <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                  {t('employee_tools.server_assistant_desc')}
-                </Text>
-              </View>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={20}
-                color={colors.textSecondary}
-              />
-            </View>
-          </TouchableOpacity>
+        {/* 1. Guides & Training */}
+        {renderSection(
+          t('employee_tools.guides_training'),
+          { ios: 'book.fill', android: 'menu-book' },
+          guidesItems,
+          true
         )}
 
-        {/* 3. Bartender Assistant Section - For Bartenders, Managers, Lead Servers, and Banquet Captains */}
-        {canSeeBarAssistant && (
-          <TouchableOpacity
-            style={[styles.card, { backgroundColor: colors.card }]}
-            onPress={() => router.push('/bartender-assistant')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cardContent}>
-              <IconSymbol
-                ios_icon_name="wineglass.fill"
-                android_material_icon_name="local-bar"
-                size={28}
-                color={colors.primary}
-              />
-              <View style={styles.cardText}>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.bartender_assistant')}</Text>
-                <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                  {t('employee_tools.bartender_assistant_desc')}
-                </Text>
-              </View>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={20}
-                color={colors.textSecondary}
-              />
-            </View>
-          </TouchableOpacity>
+        {/* 2. Game Hub */}
+        {renderSection(
+          '🎮 Game Hub',
+          { ios: 'gamecontroller.fill', android: 'sports-esports' },
+          gameHubItems
         )}
 
-        {/* 4. Host Assistant Section - For Hosts and Managers */}
-        {canSeeHostAssistant && (
-          <TouchableOpacity
-            style={[styles.card, { backgroundColor: colors.card }]}
-            onPress={() => router.push('/host-assistant')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cardContent}>
-              <IconSymbol
-                ios_icon_name="person.2.fill"
-                android_material_icon_name="people"
-                size={28}
-                color={colors.primary}
-              />
-              <View style={styles.cardText}>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.host_assistant')}</Text>
-                <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                  {t('employee_tools.host_assistant_desc')}
-                </Text>
-              </View>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={20}
-                color={colors.textSecondary}
-              />
-            </View>
-          </TouchableOpacity>
-        )}
-
-        {/* 5. Kitchen Assistant Section - For Bussers, Chefs, Kitchen, Managers, and Runners */}
-        {canSeeKitchenAssistant && (
-          <TouchableOpacity
-            style={[styles.card, { backgroundColor: colors.card }]}
-            onPress={() => router.push('/kitchen-assistant')}
-            activeOpacity={0.7}
-          >
-            <View style={styles.cardContent}>
-              <IconSymbol
-                ios_icon_name="flame.fill"
-                android_material_icon_name="local-fire-department"
-                size={28}
-                color={colors.primary}
-              />
-              <View style={styles.cardText}>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>{t('employee_tools.kitchen_assistant')}</Text>
-                <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                  {t('employee_tools.kitchen_assistant_desc')}
-                </Text>
-              </View>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={20}
-                color={colors.textSecondary}
-              />
-            </View>
-          </TouchableOpacity>
+        {/* 3. Assistants */}
+        {renderSection(
+          'Assistants',
+          { ios: 'wrench.and.screwdriver.fill', android: 'build' },
+          assistantItems
         )}
       </ScrollView>
     </View>
@@ -249,32 +183,56 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingTop: 20,
-    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingHorizontal: GRID_PADDING,
     paddingBottom: 100,
   },
-  card: {
-    borderRadius: 12,
-    marginBottom: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 2,
-  },
-  cardContent: {
+  // ─── Sections ─────────────────────────────────────────────────────────────
+  section: {},
+  sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    gap: 12,
+    gap: 8,
+    marginBottom: 12,
   },
-  cardText: {
-    flex: 1,
+  sectionIconContainer: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  cardTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
   },
-  cardDescription: {
-    fontSize: 13,
-    lineHeight: 18,
+  // ─── Grid ──────────────────────────────────────────────────────────────────
+  gridContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: GRID_GAP,
+  },
+  gridItem: {
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.15)',
+    elevation: 3,
+  },
+  iconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  gridLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 16,
   },
 });

@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
+import { PlayMode } from '@/types/game';
 
 interface WinePairing {
   id: string;
@@ -27,11 +28,14 @@ interface WinePairing {
   is_active: boolean;
 }
 
+type ScoreFilter = 'all' | PlayMode;
+
 export default function MemoryGameEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const [activeTab, setActiveTab] = useState<'pairings' | 'scoreboard'>('pairings');
+  const [scoreFilter, setScoreFilter] = useState<ScoreFilter>('all');
   const [pairings, setPairings] = useState<WinePairing[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -122,8 +126,12 @@ export default function MemoryGameEditorScreen() {
   };
 
   const handleResetScoreboard = (mode?: string) => {
+    const playModeFilter = scoreFilter !== 'all' ? scoreFilter : undefined;
+    const filterLabel = playModeFilter
+      ? ` (${playModeFilter === 'lives' ? t('memory_game.lives_mode') : t('memory_game.timed_mode')})`
+      : '';
     const title = mode
-      ? t('memory_game.reset_scores_mode')
+      ? t('memory_game.reset_scores_mode') + filterLabel
       : t('memory_game.reset_scores');
     const message = t('memory_game.reset_scores_confirm');
 
@@ -134,8 +142,12 @@ export default function MemoryGameEditorScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            if (mode) {
-              await supabase.from('game_scores').delete().eq('game_mode', mode);
+            if (mode || playModeFilter) {
+              // Use RPC with optional filters
+              await (supabase.rpc as any)('reset_game_scores', {
+                p_game_mode: mode || null,
+                p_play_mode: playModeFilter || null,
+              });
             } else {
               await (supabase.rpc as any)('reset_game_scores', {});
             }
@@ -281,6 +293,12 @@ export default function MemoryGameEditorScreen() {
     </>
   );
 
+  const scoreFilters: { key: ScoreFilter; label: string }[] = [
+    { key: 'all', label: t('common.all') },
+    { key: 'lives', label: '❤️ ' + t('memory_game.lives_mode') },
+    { key: 'timed', label: '⏱ ' + t('memory_game.timed_mode') },
+  ];
+
   const renderScoreboardTab = () => (
     <>
       <View style={[styles.infoCard, { backgroundColor: '#E74C3C' + '15' }]}>
@@ -288,6 +306,30 @@ export default function MemoryGameEditorScreen() {
         <Text style={[styles.infoText, { color: colors.text }]}>
           {t('memory_game_editor.scoreboard_info')}
         </Text>
+      </View>
+
+      {/* Score Filter Toggle */}
+      <View style={[styles.scoreFilterContainer, { backgroundColor: colors.card }]}>
+        {scoreFilters.map(sf => (
+          <TouchableOpacity
+            key={sf.key}
+            style={[
+              styles.scoreFilterTab,
+              scoreFilter === sf.key && { backgroundColor: colors.primary, borderRadius: 8 },
+            ]}
+            onPress={() => setScoreFilter(sf.key)}
+          >
+            <Text
+              style={[
+                styles.scoreFilterText,
+                { color: colors.textSecondary },
+                scoreFilter === sf.key && { color: '#fff', fontWeight: '700' },
+              ]}
+            >
+              {sf.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {/* Reset by mode */}
@@ -565,4 +607,20 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   resetAllText: { fontSize: 16, fontWeight: '700' },
+  scoreFilterContainer: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+    gap: 4,
+  },
+  scoreFilterTab: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: 'center',
+  },
+  scoreFilterText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
 });

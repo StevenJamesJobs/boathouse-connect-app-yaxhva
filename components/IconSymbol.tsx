@@ -147,6 +147,9 @@ const ICON_MAP: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   // Tools
   'wrench.and.screwdriver': 'build',
   'wrench.and.screwdriver.fill': 'build',
+
+  // Word/Text
+  'textformat.abc': 'spellcheck',
   
   // Eye visibility
   'eye': 'visibility',

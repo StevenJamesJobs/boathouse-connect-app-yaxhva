@@ -13,7 +13,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
-import { GameMode, GAME_MODE_INFO, LeaderboardEntry } from '@/types/game';
+import { GameMode, PlayMode, GAME_MODE_INFO, LeaderboardEntry } from '@/types/game';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
 
@@ -22,13 +22,14 @@ export default function MemoryGameLeaderboardScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
+  const [activePlayMode, setActivePlayMode] = useState<PlayMode>('lives');
   const [activeMode, setActiveMode] = useState<GameMode>('wine_pairings');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadLeaderboard();
-  }, [activeMode]);
+  }, [activeMode, activePlayMode]);
 
   const loadLeaderboard = async () => {
     setLoading(true);
@@ -36,6 +37,7 @@ export default function MemoryGameLeaderboardScreen() {
       const { data, error } = await (supabase.rpc as any)('get_game_leaderboard', {
         p_game_mode: activeMode,
         p_limit: 20,
+        p_play_mode: activePlayMode,
       });
 
       if (!error && data) {
@@ -50,6 +52,11 @@ export default function MemoryGameLeaderboardScreen() {
       setLoading(false);
     }
   };
+
+  const playModes: { key: PlayMode; label: string }[] = [
+    { key: 'lives', label: '❤️ ' + t('memory_game.lives_mode') },
+    { key: 'timed', label: '⏱ ' + t('memory_game.timed_mode') },
+  ];
 
   const modes: GameMode[] = ['wine_pairings', 'ingredients_dishes', 'cocktail_ingredients'];
   const modeLabels: Record<GameMode, string> = {
@@ -139,14 +146,38 @@ export default function MemoryGameLeaderboardScreen() {
         <View style={styles.placeholder} />
       </View>
 
-      {/* Mode Tabs */}
+      {/* Play Mode Toggle */}
+      <View style={[styles.playModeToggle, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        {playModes.map(pm => (
+          <TouchableOpacity
+            key={pm.key}
+            style={[
+              styles.playModeTab,
+              activePlayMode === pm.key && { backgroundColor: colors.primary, borderRadius: 8 },
+            ]}
+            onPress={() => setActivePlayMode(pm.key)}
+          >
+            <Text
+              style={[
+                styles.playModeTabText,
+                { color: colors.textSecondary },
+                activePlayMode === pm.key && { color: '#fff', fontWeight: '700' },
+              ]}
+            >
+              {pm.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Game Mode Tabs */}
       <View style={[styles.tabContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         {modes.map(m => (
           <TouchableOpacity
             key={m}
             style={[
               styles.tab,
-              activeMode === m && { backgroundColor: colors.primary, borderRadius: 8 },
+              activeMode === m && { backgroundColor: colors.primary + '20', borderRadius: 8 },
             ]}
             onPress={() => setActiveMode(m)}
           >
@@ -154,7 +185,7 @@ export default function MemoryGameLeaderboardScreen() {
               style={[
                 styles.tabText,
                 { color: colors.textSecondary },
-                activeMode === m && { color: '#fff', fontWeight: '700' },
+                activeMode === m && { color: colors.primary, fontWeight: '700' },
               ]}
               numberOfLines={1}
             >
@@ -177,7 +208,7 @@ export default function MemoryGameLeaderboardScreen() {
           </Text>
           <TouchableOpacity
             style={[styles.playButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push(`/memory-game-play?mode=${activeMode}&difficulty=1`)}
+            onPress={() => router.push(`/memory-game-play?mode=${activeMode}&difficulty=1&play_mode=${activePlayMode}`)}
           >
             <Text style={styles.playButtonText}>
               {t('memory_game.be_first')}
@@ -223,6 +254,23 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 40,
+  },
+  playModeToggle: {
+    flexDirection: 'row',
+    padding: 8,
+    gap: 4,
+    borderBottomWidth: 1,
+  },
+  playModeTab: {
+    flex: 1,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  playModeTabText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   tabContainer: {
     flexDirection: 'row',

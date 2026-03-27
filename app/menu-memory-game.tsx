@@ -5,13 +5,14 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Modal,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
-import { GameMode, GAME_MODE_INFO } from '@/types/game';
+import { GameMode, PlayMode, GAME_MODE_INFO } from '@/types/game';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
 
@@ -31,6 +32,7 @@ export default function MenuMemoryGameScreen() {
     ingredients_dishes: null,
     cocktail_ingredients: null,
   });
+  const [selectedMode, setSelectedMode] = useState<GameMode | null>(null);
 
   useEffect(() => {
     if (user?.id) loadStats();
@@ -64,13 +66,14 @@ export default function MenuMemoryGameScreen() {
     setModeStats(stats as Record<GameMode, ModeStats | null>);
   };
 
-  const startGame = (mode: GameMode) => {
+  const startGame = (mode: GameMode, playMode: PlayMode) => {
+    setSelectedMode(null);
     const stats = modeStats[mode];
     // Start at difficulty 1, or continue from highest completed + 1
     const startDifficulty = stats && stats.highest_difficulty > 0
       ? Math.min(stats.highest_difficulty + 1, 5)
       : 1;
-    router.push(`/memory-game-play?mode=${mode}&difficulty=${startDifficulty}`);
+    router.push(`/memory-game-play?mode=${mode}&difficulty=${startDifficulty}&play_mode=${playMode}`);
   };
 
   const renderModeCard = (mode: GameMode) => {
@@ -81,7 +84,7 @@ export default function MenuMemoryGameScreen() {
       <TouchableOpacity
         key={mode}
         style={[styles.modeCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-        onPress={() => startGame(mode)}
+        onPress={() => setSelectedMode(mode)}
         activeOpacity={0.7}
       >
         <View style={styles.modeCardContent}>
@@ -145,17 +148,7 @@ export default function MenuMemoryGameScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           {t('memory_game.hub_title')}
         </Text>
-        <TouchableOpacity
-          onPress={() => router.push('/memory-game-leaderboard')}
-          style={styles.leaderboardButton}
-        >
-          <IconSymbol
-            ios_icon_name="trophy.fill"
-            android_material_icon_name="emoji-events"
-            size={24}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
+        <View style={styles.placeholder} />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
@@ -177,9 +170,102 @@ export default function MenuMemoryGameScreen() {
         {renderModeCard('wine_pairings')}
         {renderModeCard('ingredients_dishes')}
         {renderModeCard('cocktail_ingredients')}
+
+        {/* Leaderboard Button */}
+        <TouchableOpacity
+          style={[styles.leaderboardBtn, { backgroundColor: colors.primary }]}
+          onPress={() => router.push('/memory-game-leaderboard')}
+          activeOpacity={0.8}
+        >
+          <IconSymbol
+            ios_icon_name="trophy.fill"
+            android_material_icon_name="emoji-events"
+            size={22}
+            color="#fff"
+          />
+          <Text style={styles.leaderboardBtnText}>
+            {t('memory_game.leaderboard')}
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
 
       <BottomNavBar activeTab="tools" />
+
+      {/* Play Mode Selection Modal */}
+      <Modal
+        visible={selectedMode !== null}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedMode(null)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setSelectedMode(null)}
+        >
+          <View style={[styles.playModeCard, { backgroundColor: colors.card }]}>
+            <Text style={[styles.playModeTitle, { color: colors.text }]}>
+              {t('memory_game.choose_play_mode')}
+            </Text>
+
+            {/* Lives Mode Option */}
+            <TouchableOpacity
+              style={[styles.playModeOption, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
+              onPress={() => selectedMode && startGame(selectedMode, 'lives')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.playModeEmoji}>❤️</Text>
+              <View style={styles.playModeInfo}>
+                <Text style={[styles.playModeOptionTitle, { color: colors.text }]}>
+                  {t('memory_game.lives_mode')}
+                </Text>
+                <Text style={[styles.playModeOptionDesc, { color: colors.textSecondary }]}>
+                  {t('memory_game.lives_mode_desc')}
+                </Text>
+              </View>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={18}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {/* Timed Mode Option */}
+            <TouchableOpacity
+              style={[styles.playModeOption, { backgroundColor: '#F5A623' + '10', borderColor: '#F5A623' + '30' }]}
+              onPress={() => selectedMode && startGame(selectedMode, 'timed')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.playModeEmoji}>⏱</Text>
+              <View style={styles.playModeInfo}>
+                <Text style={[styles.playModeOptionTitle, { color: colors.text }]}>
+                  {t('memory_game.timed_mode')}
+                </Text>
+                <Text style={[styles.playModeOptionDesc, { color: colors.textSecondary }]}>
+                  {t('memory_game.timed_mode_desc')}
+                </Text>
+              </View>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={18}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {/* Cancel */}
+            <TouchableOpacity
+              style={[styles.cancelButton, { borderColor: colors.border }]}
+              onPress={() => setSelectedMode(null)}
+            >
+              <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
+                {t('common.cancel')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
     </View>
   );
 }
@@ -207,10 +293,8 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  leaderboardButton: {
-    padding: 4,
+  placeholder: {
     width: 40,
-    alignItems: 'flex-end',
   },
   scrollView: {
     flex: 1,
@@ -295,5 +379,76 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     fontStyle: 'italic',
+  },
+  // Leaderboard Button
+  leaderboardBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    marginTop: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  leaderboardBtnText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  // Play Mode Modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  playModeCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 16,
+    padding: 24,
+  },
+  playModeTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  playModeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 12,
+  },
+  playModeEmoji: {
+    fontSize: 28,
+    marginRight: 14,
+  },
+  playModeInfo: {
+    flex: 1,
+    marginRight: 8,
+  },
+  playModeOptionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  playModeOptionDesc: {
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  cancelButton: {
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginTop: 4,
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

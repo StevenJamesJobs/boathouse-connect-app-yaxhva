@@ -1,12 +1,14 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { CardData, DifficultyConfig, GameState } from '@/types/game';
+import { CardData, DifficultyConfig, GameState, PlayMode } from '@/types/game';
 import {
   createInitialGameState,
   checkMatch,
   processMatch,
   processMismatch,
+  isGraceMismatch,
+  processGraceMismatch,
 } from '@/utils/game/gameEngine';
 import MemoryCard from './MemoryCard';
 
@@ -17,23 +19,29 @@ const BOARD_PADDING = 16;
 interface MemoryGameBoardProps {
   cards: CardData[];
   difficulty: DifficultyConfig;
+  playMode: PlayMode;
+  timeRemaining?: number;
   onGameStateChange: (state: GameState) => void;
   onMatch: () => void;
   onMismatch: () => void;
+  onGraceMismatch?: () => void;
   onGameComplete: (state: GameState) => void;
 }
 
 export default function MemoryGameBoard({
   cards,
   difficulty,
+  playMode,
+  timeRemaining,
   onGameStateChange,
   onMatch,
   onMismatch,
+  onGraceMismatch,
   onGameComplete,
 }: MemoryGameBoardProps) {
   const { width: screenWidth } = useWindowDimensions();
   const [gameState, setGameState] = useState<GameState>(() =>
-    createInitialGameState(cards, difficulty.startingLives)
+    createInitialGameState(cards, difficulty.startingLives, playMode)
   );
   const mismatchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -99,15 +107,28 @@ export default function MemoryGameBoard({
 
           // Small delay so the player sees both cards, then process match
           setTimeout(() => {
-            setGameState(prev => processMatch(prev, pairId, difficulty.level));
+            setGameState(prev => processMatch(prev, pairId, difficulty.level, timeRemaining));
           }, 400);
         } else {
-          // Mismatch — flip back after delay
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-          onMismatch();
+          // Check if this is a grace mismatch (at least one unseen card)
+          const grace = isGraceMismatch(
+            { ...gameState, flippedIndices: newFlipped },
+            newFlipped[0],
+            newFlipped[1]
+          );
+
+          if (grace) {
+            // Grace mismatch — lighter haptic, no life lost
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            onGraceMismatch?.();
+          } else {
+            // Real mismatch — error haptic
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            onMismatch();
+          }
 
           mismatchTimeout.current = setTimeout(() => {
-            setGameState(prev => processMismatch(prev));
+            setGameState(prev => grace ? processGraceMismatch(prev) : processMismatch(prev));
           }, MISMATCH_DELAY);
         }
       }

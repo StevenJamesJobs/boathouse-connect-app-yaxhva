@@ -1,12 +1,12 @@
-import { CardData, DifficultyConfig, GameState, GameMode } from '@/types/game';
+import { CardData, DifficultyConfig, GameState, GameMode, PlayMode } from '@/types/game';
 
 // Difficulty configurations
 export const DIFFICULTY_CONFIGS: DifficultyConfig[] = [
-  { level: 1, gridRows: 2, gridCols: 3, totalPairs: 3, startingLives: 5 },
-  { level: 2, gridRows: 2, gridCols: 4, totalPairs: 4, startingLives: 4 },
-  { level: 3, gridRows: 3, gridCols: 4, totalPairs: 6, startingLives: 4 },
-  { level: 4, gridRows: 4, gridCols: 4, totalPairs: 8, startingLives: 3 },
-  { level: 5, gridRows: 4, gridCols: 5, totalPairs: 10, startingLives: 3 },
+  { level: 1, gridRows: 2, gridCols: 3, totalPairs: 3, startingLives: 7, timeLimitSeconds: 45 },
+  { level: 2, gridRows: 2, gridCols: 4, totalPairs: 4, startingLives: 6, timeLimitSeconds: 60 },
+  { level: 3, gridRows: 3, gridCols: 4, totalPairs: 6, startingLives: 6, timeLimitSeconds: 90 },
+  { level: 4, gridRows: 4, gridCols: 4, totalPairs: 8, startingLives: 5, timeLimitSeconds: 120 },
+  { level: 5, gridRows: 4, gridCols: 5, totalPairs: 10, startingLives: 5, timeLimitSeconds: 180 },
 ];
 
 export function getDifficultyConfig(level: number): DifficultyConfig {
@@ -65,6 +65,7 @@ export function createCardPair(
 export function createInitialGameState(
   cards: CardData[],
   startingLives: number,
+  playMode: PlayMode = 'lives',
 ): GameState {
   return {
     cards: shuffleArray(cards),
@@ -77,6 +78,8 @@ export function createInitialGameState(
     isComplete: false,
     isWin: false,
     isProcessing: false,
+    seenCardIds: [],
+    playMode,
   };
 }
 
@@ -99,6 +102,7 @@ export function processMatch(
   state: GameState,
   pairId: string,
   difficulty: number,
+  timeRemaining?: number,
 ): GameState {
   const newMatchedPairIds = [...state.matchedPairIds, pairId];
   const matchScore = 100 * difficulty;
@@ -106,10 +110,22 @@ export function processMatch(
   const totalPairs = state.cards.length / 2;
   const isWin = newMatchedPairIds.length === totalPairs;
 
+  // Track seen cards
+  const card1Id = state.cards[state.flippedIndices[0]]?.id;
+  const card2Id = state.cards[state.flippedIndices[1]]?.id;
+  const newSeenCardIds = [...state.seenCardIds];
+  if (card1Id && !newSeenCardIds.includes(card1Id)) newSeenCardIds.push(card1Id);
+  if (card2Id && !newSeenCardIds.includes(card2Id)) newSeenCardIds.push(card2Id);
+
   let finalScore = newScore;
   if (isWin) {
-    // Lives bonus
-    finalScore += state.lives * 50 * difficulty;
+    if (state.playMode === 'timed' && timeRemaining != null) {
+      // Time bonus for timed mode
+      finalScore += timeRemaining * 10 * difficulty;
+    } else {
+      // Lives bonus for lives mode
+      finalScore += state.lives * 50 * difficulty;
+    }
     // Perfect game bonus (no mismatches at all)
     const mismatches = state.moveCount + 1 - newMatchedPairIds.length;
     if (mismatches === 0) {
@@ -126,20 +142,65 @@ export function processMatch(
     isComplete: isWin,
     isWin,
     isProcessing: false,
+    seenCardIds: newSeenCardIds,
+  };
+}
+
+// Check if a mismatch is a grace mismatch (at least one card never seen before)
+export function isGraceMismatch(state: GameState, index1: number, index2: number): boolean {
+  if (state.playMode !== 'lives') return false;
+  const card1 = state.cards[index1];
+  const card2 = state.cards[index2];
+  // Grace: at least one card has never been seen before
+  return !state.seenCardIds.includes(card1.id) || !state.seenCardIds.includes(card2.id);
+}
+
+// Process a grace mismatch — does NOT cost a life, but tracks seen cards
+export function processGraceMismatch(state: GameState): GameState {
+  const card1Id = state.cards[state.flippedIndices[0]]?.id;
+  const card2Id = state.cards[state.flippedIndices[1]]?.id;
+  const newSeenCardIds = [...state.seenCardIds];
+  if (card1Id && !newSeenCardIds.includes(card1Id)) newSeenCardIds.push(card1Id);
+  if (card2Id && !newSeenCardIds.includes(card2Id)) newSeenCardIds.push(card2Id);
+
+  return {
+    ...state,
+    flippedIndices: [],
+    moveCount: state.moveCount + 1,
+    isProcessing: false,
+    seenCardIds: newSeenCardIds,
   };
 }
 
 // Process a mismatch result and return new game state
 export function processMismatch(state: GameState): GameState {
   const newLives = state.lives - 1;
-  const isGameOver = newLives <= 0;
+  const isGameOver = state.playMode === 'lives' && newLives <= 0;
+
+  // Track seen cards
+  const card1Id = state.cards[state.flippedIndices[0]]?.id;
+  const card2Id = state.cards[state.flippedIndices[1]]?.id;
+  const newSeenCardIds = [...state.seenCardIds];
+  if (card1Id && !newSeenCardIds.includes(card1Id)) newSeenCardIds.push(card1Id);
+  if (card2Id && !newSeenCardIds.includes(card2Id)) newSeenCardIds.push(card2Id);
 
   return {
     ...state,
     flippedIndices: [],
-    lives: newLives,
+    lives: state.playMode === 'lives' ? newLives : state.lives,
     moveCount: state.moveCount + 1,
     isComplete: isGameOver,
+    isWin: false,
+    isProcessing: false,
+    seenCardIds: newSeenCardIds,
+  };
+}
+
+// Process a timeout (timed mode game over)
+export function processTimeout(state: GameState): GameState {
+  return {
+    ...state,
+    isComplete: true,
     isWin: false,
     isProcessing: false,
   };

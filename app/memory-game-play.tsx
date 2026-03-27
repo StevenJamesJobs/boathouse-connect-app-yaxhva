@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,12 +13,13 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
-import { GameMode, GameState, CardData } from '@/types/game';
+import { GameMode, GameState, CardData, PlayMode } from '@/types/game';
 import {
   getDifficultyConfig,
   getMaxDifficulty,
   getElapsedSeconds,
   getModeName,
+  processTimeout,
 } from '@/utils/game/gameEngine';
 import { generateCards } from '@/utils/game/gameDataAdapters';
 import MemoryGameBoard from '@/components/game/MemoryGameBoard';
@@ -31,9 +32,10 @@ export default function MemoryGamePlayScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
-  const params = useLocalSearchParams<{ mode: string; difficulty: string }>();
+  const params = useLocalSearchParams<{ mode: string; difficulty: string; play_mode: string }>();
 
   const mode = (params.mode || 'wine_pairings') as GameMode;
+  const playMode = (params.play_mode || 'lives') as PlayMode;
   const difficultyLevel = parseInt(params.difficulty || '1', 10);
   const difficultyConfig = getDifficultyConfig(difficultyLevel);
 
@@ -44,15 +46,54 @@ export default function MemoryGamePlayScreen() {
   const [scoreSaved, setScoreSaved] = useState(false);
   const [gameKey, setGameKey] = useState(0); // for restarting
 
+  // Timed mode countdown
+  const [timeRemaining, setTimeRemaining] = useState<number>(difficultyConfig.timeLimitSeconds);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const gameStateRef = useRef<GameState | null>(null);
+
+  // Keep ref in sync
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+
   // Load cards on mount or restart
   useEffect(() => {
     loadCards();
   }, [gameKey]);
 
+  // Timed mode countdown timer
+  useEffect(() => {
+    if (playMode !== 'timed' || !gameState || gameState.isComplete || loading) return;
+
+    timerRef.current = setInterval(() => {
+      setTimeRemaining(prev => {
+        const next = prev - 1;
+        if (next <= 0) {
+          // Time's up!
+          if (timerRef.current) clearInterval(timerRef.current);
+          // Trigger game over
+          const currentState = gameStateRef.current;
+          if (currentState && !currentState.isComplete) {
+            const timeoutState = processTimeout(currentState);
+            setGameState(timeoutState);
+            handleGameComplete(timeoutState);
+          }
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [playMode, gameState?.startTime, gameState?.isComplete, loading]);
+
   const loadCards = async () => {
     setLoading(true);
     setShowResults(false);
     setScoreSaved(false);
+    setTimeRemaining(difficultyConfig.timeLimitSeconds);
     try {
       const generatedCards = await generateCards(mode, difficultyConfig.totalPairs);
       setCards(generatedCards);
@@ -75,7 +116,14 @@ export default function MemoryGamePlayScreen() {
     // Additional mismatch feedback can go here
   }, []);
 
+  const handleGraceMismatch = useCallback(() => {
+    // Grace mismatch — no life lost, lighter feedback
+  }, []);
+
   const handleGameComplete = useCallback(async (finalState: GameState) => {
+    // Stop timer
+    if (timerRef.current) clearInterval(timerRef.current);
+
     // Haptic for game end
     if (finalState.isWin) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -92,12 +140,13 @@ export default function MemoryGamePlayScreen() {
         await (supabase.from('game_scores') as any).insert({
           user_id: user.id,
           game_mode: mode,
+          play_mode: playMode,
           difficulty: difficultyLevel,
           score: finalState.score,
           time_seconds: elapsed,
           pairs_matched: finalState.matchedPairIds.length,
           total_pairs: difficultyConfig.totalPairs,
-          lives_remaining: finalState.lives,
+          lives_remaining: playMode === 'lives' ? finalState.lives : 0,
           completed: finalState.isWin,
         });
         setScoreSaved(true);
@@ -105,7 +154,7 @@ export default function MemoryGamePlayScreen() {
         console.error('Error saving score:', e);
       }
     }
-  }, [user?.id, mode, difficultyLevel, difficultyConfig.totalPairs]);
+  }, [user?.id, mode, playMode, difficultyLevel, difficultyConfig.totalPairs]);
 
   const handlePlayAgain = () => {
     setGameKey(prev => prev + 1);
@@ -113,30 +162,39 @@ export default function MemoryGamePlayScreen() {
 
   const handleNextDifficulty = () => {
     const next = Math.min(difficultyLevel + 1, getMaxDifficulty());
-    router.replace(`/memory-game-play?mode=${mode}&difficulty=${next}`);
+    router.replace(`/memory-game-play?mode=${mode}&difficulty=${next}&play_mode=${playMode}`);
   };
 
   const handleBackToHub = () => {
     router.back();
   };
 
-  // Extract matched pairs for the review section
-  const getMatchedPairs = () => {
-    if (!gameState || !cards) return [];
-    const pairs: { primary: string; match: string }[] = [];
+  // Get ALL pairs with matched/unmatched status for the results review
+  const getAllPairs = () => {
+    if (!gameState) return [];
+    const pairs: { primary: string; match: string; isMatched: boolean }[] = [];
     const seenPairIds = new Set<string>();
 
     for (const card of gameState.cards) {
-      if (gameState.matchedPairIds.includes(card.pairId) && !seenPairIds.has(card.pairId)) {
-        seenPairIds.add(card.pairId);
-        const primary = gameState.cards.find(c => c.pairId === card.pairId && c.cardType === 'primary');
-        const match = gameState.cards.find(c => c.pairId === card.pairId && c.cardType === 'match');
-        if (primary && match) {
-          pairs.push({ primary: primary.displayText, match: match.displayText });
-        }
+      if (seenPairIds.has(card.pairId)) continue;
+      seenPairIds.add(card.pairId);
+      const primary = gameState.cards.find(c => c.pairId === card.pairId && c.cardType === 'primary');
+      const match = gameState.cards.find(c => c.pairId === card.pairId && c.cardType === 'match');
+      if (primary && match) {
+        pairs.push({
+          primary: primary.displayText,
+          match: match.displayText,
+          isMatched: gameState.matchedPairIds.includes(card.pairId),
+        });
       }
     }
-    return pairs;
+    // Sort: matched first, then unmatched
+    return pairs.sort((a, b) => (a.isMatched === b.isMatched ? 0 : a.isMatched ? -1 : 1));
+  };
+
+  // Extract matched pairs only (for win screen)
+  const getMatchedPairs = () => {
+    return getAllPairs().filter(p => p.isMatched);
   };
 
   if (loading || !cards) {
@@ -165,7 +223,11 @@ export default function MemoryGamePlayScreen() {
         <Text style={[styles.headerTitle, { color: colors.text }]}>
           {getModeName(mode)}
         </Text>
-        <View style={styles.placeholder} />
+        <View style={[styles.playModeBadge, { backgroundColor: playMode === 'timed' ? '#F5A623' + '30' : colors.primary + '20' }]}>
+          <Text style={[styles.playModeBadgeText, { color: playMode === 'timed' ? '#F5A623' : colors.primary }]}>
+            {playMode === 'timed' ? '⏱' : '❤️'}
+          </Text>
+        </View>
       </View>
 
       {/* HUD */}
@@ -178,6 +240,9 @@ export default function MemoryGamePlayScreen() {
         isComplete={gameState?.isComplete ?? false}
         matchedCount={gameState?.matchedPairIds.length ?? 0}
         totalPairs={difficultyConfig.totalPairs}
+        playMode={playMode}
+        timeRemaining={playMode === 'timed' ? timeRemaining : undefined}
+        timeLimit={playMode === 'timed' ? difficultyConfig.timeLimitSeconds : undefined}
       />
 
       {/* Game Board */}
@@ -185,9 +250,12 @@ export default function MemoryGamePlayScreen() {
         key={gameKey}
         cards={cards}
         difficulty={difficultyConfig}
+        playMode={playMode}
+        timeRemaining={playMode === 'timed' ? timeRemaining : undefined}
         onGameStateChange={handleGameStateChange}
         onMatch={handleMatch}
         onMismatch={handleMismatch}
+        onGraceMismatch={handleGraceMismatch}
         onGameComplete={handleGameComplete}
       />
 
@@ -222,14 +290,25 @@ export default function MemoryGamePlayScreen() {
                     {gameState?.matchedPairIds.length ?? 0}/{difficultyConfig.totalPairs}
                   </Text>
                 </View>
-                <View style={styles.scoreRow}>
-                  <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>
-                    {t('memory_game.lives_remaining')}
-                  </Text>
-                  <Text style={[styles.scoreValue, { color: colors.text }]}>
-                    {gameState?.lives ?? 0}
-                  </Text>
-                </View>
+                {playMode === 'lives' ? (
+                  <View style={styles.scoreRow}>
+                    <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>
+                      {t('memory_game.lives_remaining')}
+                    </Text>
+                    <Text style={[styles.scoreValue, { color: colors.text }]}>
+                      {gameState?.lives ?? 0}
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.scoreRow}>
+                    <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>
+                      {t('memory_game.time_remaining')}
+                    </Text>
+                    <Text style={[styles.scoreValue, { color: colors.text }]}>
+                      {timeRemaining}s
+                    </Text>
+                  </View>
+                )}
                 <View style={styles.scoreRow}>
                   <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>
                     {t('memory_game.time_elapsed')}
@@ -248,8 +327,8 @@ export default function MemoryGamePlayScreen() {
                 </View>
               </View>
 
-              {/* Matched Pairs Review (shown on win) */}
-              {gameState?.isWin && (
+              {/* Pairs Review — shown on win (matched only) and loss (all pairs with status) */}
+              {gameState?.isWin ? (
                 <View style={[styles.pairsReview, { backgroundColor: colors.background }]}>
                   <Text style={[styles.pairsReviewTitle, { color: colors.text }]}>
                     {t('memory_game.your_matches')}
@@ -264,6 +343,41 @@ export default function MemoryGamePlayScreen() {
                       </Text>
                       <Text style={[styles.pairArrow, { color: colors.textSecondary }]}>→</Text>
                       <Text style={[styles.pairMatch, { color: colors.text }]} numberOfLines={2}>
+                        {pair.match}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View style={[styles.pairsReview, { backgroundColor: colors.background }]}>
+                  <Text style={[styles.pairsReviewTitle, { color: colors.text }]}>
+                    {t('memory_game.all_pairs')}
+                  </Text>
+                  {getAllPairs().map((pair, i) => (
+                    <View
+                      key={i}
+                      style={[styles.pairRow, { borderBottomColor: colors.border }]}
+                    >
+                      <Text style={styles.pairStatusIcon}>
+                        {pair.isMatched ? '✅' : '❌'}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.pairPrimaryCompact,
+                          { color: pair.isMatched ? colors.primary : colors.textSecondary },
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {pair.primary}
+                      </Text>
+                      <Text style={[styles.pairArrow, { color: colors.textSecondary }]}>→</Text>
+                      <Text
+                        style={[
+                          styles.pairMatchCompact,
+                          { color: pair.isMatched ? colors.text : colors.textSecondary },
+                        ]}
+                        numberOfLines={2}
+                      >
                         {pair.match}
                       </Text>
                     </View>
@@ -353,8 +467,15 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  placeholder: {
-    width: 40,
+  playModeBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playModeBadgeText: {
+    fontSize: 16,
   },
   // Results Modal
   modalOverlay: {
@@ -478,5 +599,24 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
     paddingLeft: 6,
+  },
+  pairStatusIcon: {
+    fontSize: 14,
+    marginRight: 6,
+    width: 20,
+    textAlign: 'center',
+  },
+  pairPrimaryCompact: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'right',
+    paddingRight: 4,
+  },
+  pairMatchCompact: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: '600',
+    paddingLeft: 4,
   },
 });

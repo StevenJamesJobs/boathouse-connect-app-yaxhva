@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useTranslation } from 'react-i18next';
 import { formatTime, getElapsedSeconds } from '@/utils/game/gameEngine';
+import { PlayMode } from '@/types/game';
 
 interface GameHUDProps {
   lives: number;
@@ -13,6 +14,9 @@ interface GameHUDProps {
   isComplete: boolean;
   matchedCount: number;
   totalPairs: number;
+  playMode: PlayMode;
+  timeRemaining?: number;
+  timeLimit?: number;
 }
 
 export default function GameHUD({
@@ -24,6 +28,9 @@ export default function GameHUD({
   isComplete,
   matchedCount,
   totalPairs,
+  playMode,
+  timeRemaining,
+  timeLimit,
 }: GameHUDProps) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -37,23 +44,57 @@ export default function GameHUD({
     return () => clearInterval(interval);
   }, [startTime, isComplete]);
 
+  // Countdown urgency colors for timed mode
+  const getCountdownColor = () => {
+    if (timeRemaining == null || timeLimit == null) return colors.textSecondary;
+    const ratio = timeRemaining / timeLimit;
+    if (ratio <= 0.25) return '#E74C3C'; // critical — red
+    if (ratio <= 0.5) return '#F5A623'; // warning — orange
+    return colors.primary; // normal
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-      {/* Top row: Lives and Timer */}
+      {/* Top row: Lives/Countdown and Timer */}
       <View style={styles.topRow}>
-        {/* Lives */}
-        <View style={styles.livesContainer}>
-          {Array.from({ length: maxLives }).map((_, i) => (
-            <Text key={i} style={styles.heartIcon}>
-              {i < lives ? '❤️' : '🖤'}
-            </Text>
-          ))}
-        </View>
+        {playMode === 'lives' ? (
+          <>
+            {/* Lives */}
+            <View style={styles.livesContainer}>
+              {Array.from({ length: maxLives }).map((_, i) => (
+                <Text key={i} style={styles.heartIcon}>
+                  {i < lives ? '❤️' : '🖤'}
+                </Text>
+              ))}
+            </View>
 
-        {/* Timer */}
-        <Text style={[styles.timerText, { color: colors.textSecondary }]}>
-          {formatTime(elapsed)}
-        </Text>
+            {/* Elapsed Timer */}
+            <Text style={[styles.timerText, { color: colors.textSecondary }]}>
+              {formatTime(elapsed)}
+            </Text>
+          </>
+        ) : (
+          <>
+            {/* Timed mode: countdown timer prominently */}
+            <View style={styles.countdownContainer}>
+              <Text style={[styles.countdownLabel, { color: colors.textSecondary }]}>
+                ⏱
+              </Text>
+              <Text style={[
+                styles.countdownText,
+                { color: getCountdownColor() },
+                timeRemaining != null && timeLimit != null && timeRemaining / timeLimit <= 0.25 && styles.countdownCritical,
+              ]}>
+                {formatTime(timeRemaining ?? 0)}
+              </Text>
+            </View>
+
+            {/* Elapsed time (secondary) */}
+            <Text style={[styles.timerText, { color: colors.textSecondary }]}>
+              {formatTime(elapsed)}
+            </Text>
+          </>
+        )}
       </View>
 
       {/* Bottom row: Score, Difficulty, Progress */}
@@ -112,6 +153,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     fontVariant: ['tabular-nums'],
+  },
+  countdownContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  countdownLabel: {
+    fontSize: 18,
+  },
+  countdownText: {
+    fontSize: 22,
+    fontWeight: '800',
+    fontVariant: ['tabular-nums'],
+  },
+  countdownCritical: {
+    fontSize: 24,
   },
   bottomRow: {
     flexDirection: 'row',
