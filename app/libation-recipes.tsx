@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,12 @@ import {
   Image,
   Platform,
   Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const DISMISS_THRESHOLD = 120;
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -98,6 +103,27 @@ export default function LibationRecipesScreen() {
       scrollY.setValue(0);
     }, 300);
   };
+
+  // Pull-down-to-dismiss
+  const modalTranslateY = useRef(new Animated.Value(0)).current;
+  const dragDismissing = useRef(false);
+  const modalPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 4 && Math.abs(gs.dy) > Math.abs(gs.dx),
+      onPanResponderMove: (_, gs) => { if (gs.dy > 0) modalTranslateY.setValue(gs.dy); },
+      onPanResponderRelease: (_, gs) => {
+        if (gs.dy > DISMISS_THRESHOLD) {
+          dragDismissing.current = true;
+          Animated.timing(modalTranslateY, { toValue: SCREEN_HEIGHT, duration: 250, useNativeDriver: true }).start(() => {
+            closeDetailModal();
+          });
+        } else {
+          Animated.spring(modalTranslateY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 10 }).start();
+        }
+      },
+    })
+  ).current;
 
   const handleBackPress = () => {
     router.back();
@@ -217,9 +243,13 @@ export default function LibationRecipesScreen() {
       {/* Detail Modal - Beautiful Styled Card */}
       <Modal
         visible={showDetailModal}
-        animationType="slide"
+        animationType={dragDismissing.current ? 'none' : 'slide'}
         transparent={true}
         onRequestClose={closeDetailModal}
+        onShow={() => {
+          modalTranslateY.setValue(0);
+          dragDismissing.current = false;
+        }}
       >
         <View style={styles.modalContainer}>
           <TouchableOpacity
@@ -227,10 +257,15 @@ export default function LibationRecipesScreen() {
             activeOpacity={1}
             onPress={closeDetailModal}
           />
-          <View style={styles.modalCard}>
+          <Animated.View style={[styles.modalCard, { transform: [{ translateY: modalTranslateY }] }]}>
+            {/* Drag Handle */}
+            <View {...modalPanResponder.panHandlers} style={styles.dragHandleArea}>
+              <View style={styles.dragHandle} />
+            </View>
+
             {/* Close Button */}
-            <TouchableOpacity 
-              style={styles.closeButton} 
+            <TouchableOpacity
+              style={styles.closeButton}
               onPress={closeDetailModal}
               activeOpacity={0.7}
             >
@@ -368,7 +403,7 @@ export default function LibationRecipesScreen() {
                 <View style={styles.bottomPadding} />
               </View>
             </Animated.ScrollView>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </View>
@@ -491,9 +526,21 @@ const styles = StyleSheet.create({
     boxShadow: '0px -4px 24px rgba(0, 0, 0, 0.5)',
     elevation: 12,
   },
+  dragHandleArea: {
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 4,
+    zIndex: 20,
+  },
+  dragHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+  },
   closeButton: {
     position: 'absolute',
-    top: 20,
+    top: 30,
     right: 20,
     zIndex: 100,
   },

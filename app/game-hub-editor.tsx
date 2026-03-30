@@ -3,17 +3,20 @@
  * Manager landing screen linking to Memory Game Editor and Word Search Editor.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { supabase } from '@/app/integrations/supabase/client';
 
 interface EditorCard {
   title: string;
@@ -46,6 +49,46 @@ const EDITOR_CARDS: EditorCard[] = [
 export default function GameHubEditorScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const [resettingAll, setResettingAll] = useState(false);
+
+  const handleResetAllScores = () => {
+    Alert.alert(
+      '⚠️ Reset ALL Game Scores',
+      'This will permanently delete every score for both Menu Memory Game and Word Search across all players. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset Everything',
+          style: 'destructive',
+          onPress: async () => {
+            setResettingAll(true);
+            try {
+              // Delete all memory game scores
+              const { error: memoryError } = await supabase
+                .from('game_scores')
+                .delete()
+                .neq('id', '00000000-0000-0000-0000-000000000000');
+              // Delete all word search scores
+              const { error: wsError } = await supabase
+                .from('word_search_scores')
+                .delete()
+                .neq('id', '00000000-0000-0000-0000-000000000000');
+
+              if (memoryError || wsError) {
+                Alert.alert('Error', 'Failed to reset some scores. Try again.');
+              } else {
+                Alert.alert('✅ Done', 'All game scores have been reset.');
+              }
+            } catch {
+              Alert.alert('Error', 'Something went wrong. Try again.');
+            } finally {
+              setResettingAll(false);
+            }
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -95,6 +138,25 @@ export default function GameHubEditorScreen() {
             />
           </TouchableOpacity>
         ))}
+
+        {/* Reset All Scores */}
+        <View style={[styles.resetSection, { borderTopColor: colors.border }]}>
+          <Text style={[styles.resetSectionTitle, { color: colors.text }]}>⚠️ Danger Zone</Text>
+          <Text style={[styles.resetSectionDesc, { color: colors.textSecondary }]}>
+            Reset all scores across both games for every player.
+          </Text>
+          <TouchableOpacity
+            style={[styles.resetAllBtn, resettingAll && { opacity: 0.6 }]}
+            onPress={handleResetAllScores}
+            disabled={resettingAll}
+          >
+            {resettingAll ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.resetAllBtnText}>Reset All Game Scores</Text>
+            )}
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -134,4 +196,34 @@ const styles = StyleSheet.create({
   cardText: { flex: 1 },
   cardTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
   cardDesc: { fontSize: 12, lineHeight: 17 },
+  resetSection: {
+    marginTop: 10,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    alignItems: 'center',
+    gap: 8,
+  },
+  resetSectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  resetSectionDesc: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 17,
+    marginBottom: 4,
+  },
+  resetAllBtn: {
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    width: '100%',
+  },
+  resetAllBtnText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
+  },
 });

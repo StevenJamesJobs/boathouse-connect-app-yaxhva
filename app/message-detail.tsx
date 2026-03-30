@@ -20,8 +20,10 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import * as WebBrowser from 'expo-web-browser';
 import { supabase } from '@/app/integrations/supabase/client';
 import { refreshAllUnreadCounts } from '@/hooks/useUnreadMessages';
+import { getFileIconInfo } from '@/utils/messageFiles';
 
 interface MessageThread {
   id: string;
@@ -32,6 +34,8 @@ interface MessageThread {
   subject: string | null;
   body: string;
   image_url: string | null;
+  file_url: string | null;
+  file_name: string | null;
   created_at: string;
   is_current_user: boolean;
   recipient_names?: string[];
@@ -67,6 +71,8 @@ export default function MessageDetailScreen() {
           subject,
           body,
           image_url,
+          file_url,
+          file_name,
           created_at,
           sender:users!messages_sender_id_fkey (
             name,
@@ -107,6 +113,8 @@ export default function MessageDetailScreen() {
           subject,
           body,
           image_url,
+          file_url,
+          file_name,
           created_at,
           sender:users!messages_sender_id_fkey (
             name,
@@ -128,6 +136,8 @@ export default function MessageDetailScreen() {
         subject: msg.subject,
         body: msg.body,
         image_url: msg.image_url || null,
+        file_url: msg.file_url || null,
+        file_name: msg.file_name || null,
         created_at: msg.created_at,
         is_current_user: msg.sender_id === user?.id,
         recipient_names: msg.id === messageId ? recipientNames : undefined,
@@ -407,7 +417,7 @@ export default function MessageDetailScreen() {
                     isMe
                       ? [styles.bubbleRight, { backgroundColor: '#1976D2' }]
                       : [styles.bubbleLeft, { backgroundColor: colors.card }],
-                    message.image_url ? styles.bubbleWithImage : null,
+                    (message.image_url || message.file_url) ? styles.bubbleWithImage : null,
                   ]}
                 >
                   {message.image_url && (
@@ -422,11 +432,55 @@ export default function MessageDetailScreen() {
                       />
                     </TouchableOpacity>
                   )}
+                  {message.file_url && message.file_name && (() => {
+                    const fileIcon = getFileIconInfo(message.file_name!);
+                    return (
+                      <TouchableOpacity
+                        style={[
+                          styles.fileAttachment,
+                          { backgroundColor: isMe ? 'rgba(255,255,255,0.15)' : (colors.highlight || 'rgba(0,0,0,0.05)') },
+                        ]}
+                        onPress={async () => {
+                          try {
+                            await WebBrowser.openBrowserAsync(message.file_url!);
+                          } catch (err) {
+                            console.error('Error opening file:', err);
+                            Alert.alert('Error', 'Could not open the file');
+                          }
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <IconSymbol
+                          ios_icon_name={fileIcon.iosIcon}
+                          android_material_icon_name={fileIcon.androidIcon}
+                          size={28}
+                          color={isMe ? '#FFFFFF' : fileIcon.color}
+                        />
+                        <View style={styles.fileAttachmentInfo}>
+                          <Text
+                            style={[styles.fileAttachmentName, { color: isMe ? '#FFFFFF' : colors.text }]}
+                            numberOfLines={1}
+                          >
+                            {message.file_name}
+                          </Text>
+                          <Text style={[styles.fileAttachmentAction, { color: isMe ? 'rgba(255,255,255,0.7)' : colors.textSecondary }]}>
+                            Tap to open
+                          </Text>
+                        </View>
+                        <IconSymbol
+                          ios_icon_name="arrow.down.circle"
+                          android_material_icon_name="download"
+                          size={20}
+                          color={isMe ? 'rgba(255,255,255,0.7)' : colors.textSecondary}
+                        />
+                      </TouchableOpacity>
+                    );
+                  })()}
                   {message.body ? (
                     <Text style={[
                       styles.bubbleText,
                       { color: isMe ? '#FFFFFF' : colors.text },
-                      message.image_url ? styles.bubbleTextWithImage : null,
+                      (message.image_url || message.file_url) ? styles.bubbleTextWithImage : null,
                     ]}>
                       {message.body}
                     </Text>
@@ -680,6 +734,26 @@ const styles = StyleSheet.create({
   bubbleTextWithImage: {
     paddingHorizontal: 14,
     paddingVertical: 8,
+  },
+  // File attachment in bubble
+  fileAttachment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    margin: 8,
+    padding: 10,
+    borderRadius: 10,
+    gap: 10,
+  },
+  fileAttachmentInfo: {
+    flex: 1,
+  },
+  fileAttachmentName: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  fileAttachmentAction: {
+    fontSize: 11,
+    marginTop: 1,
   },
   // Full-screen image viewer
   imageViewerOverlay: {

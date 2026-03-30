@@ -16,12 +16,14 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useNotification } from '@/contexts/NotificationContext';
 import { uploadMessageImage, validateImageSize } from '@/utils/messageImages';
+import { uploadMessageFile, validateFileSize, getFileIconInfo } from '@/utils/messageFiles';
 
 interface User {
   id: string;
@@ -62,6 +64,9 @@ export default function ComposeMessageScreen() {
   const [recipientGroups, setRecipientGroups] = useState<RecipientGroup[]>([]);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [selectedFileUri, setSelectedFileUri] = useState<string | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
 
   const colors = useThemeColors();
 
@@ -286,13 +291,41 @@ export default function ComposeMessageScreen() {
     }
   };
 
+  const handlePickFile = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets?.[0]) return;
+
+      const asset = result.assets[0];
+
+      // Validate file size (10MB limit)
+      const isValidSize = await validateFileSize(asset.uri);
+      if (!isValidSize) {
+        Alert.alert(
+          t('common:error', { defaultValue: 'Error' }),
+          t('file_too_large', { defaultValue: 'File must be under 10MB' })
+        );
+        return;
+      }
+
+      setSelectedFileUri(asset.uri);
+      setSelectedFileName(asset.name);
+    } catch (error) {
+      console.error('Error picking file:', error);
+    }
+  };
+
   const handleSend = async () => {
     if (selectedRecipients.length === 0) {
       Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_no_recipients'));
       return;
     }
 
-    if (!body.trim() && !selectedImageUri) {
+    if (!body.trim() && !selectedImageUri && !selectedFileUri) {
       Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_no_message'));
       return;
     }
@@ -310,6 +343,23 @@ export default function ComposeMessageScreen() {
           Alert.alert(
             t('common:error', { defaultValue: 'Error' }),
             t('upload_failed', { defaultValue: 'Failed to upload image' })
+          );
+          setSending(false);
+          return;
+        }
+      }
+
+      // Upload file if selected
+      let fileUrl: string | null = null;
+      let fileName: string | null = selectedFileName;
+      if (selectedFileUri && selectedFileName) {
+        setUploadingFile(true);
+        fileUrl = await uploadMessageFile(selectedFileUri, selectedFileName);
+        setUploadingFile(false);
+        if (!fileUrl) {
+          Alert.alert(
+            t('common:error', { defaultValue: 'Error' }),
+            t('file_upload_failed', { defaultValue: 'Failed to upload file' })
           );
           setSending(false);
           return;
@@ -345,6 +395,8 @@ export default function ComposeMessageScreen() {
           subject: subject.trim() || null,
           body: body.trim() || '',
           image_url: imageUrl,
+          file_url: fileUrl,
+          file_name: fileName,
           thread_id: threadId,
           parent_message_id: parentMessageId,
         })
@@ -372,8 +424,8 @@ export default function ComposeMessageScreen() {
           notificationType: 'message',
           title: '📨 New Message',
           body: subject.trim()
-            ? `${user?.name}: ${subject.trim()}${imageUrl ? ' 📷' : ''}`
-            : `${user?.name} sent you a ${imageUrl ? 'photo' : 'message'}`,
+            ? `${user?.name}: ${subject.trim()}${imageUrl ? ' 📷' : ''}${fileUrl ? ' 📎' : ''}`
+            : `${user?.name} sent you a ${imageUrl ? 'photo' : fileUrl ? 'file' : 'message'}`,
           data: {
             messageId: messageData.id,
             senderId: user?.id,
@@ -538,6 +590,52 @@ export default function ComposeMessageScreen() {
               </TouchableOpacity>
             </View>
           )}
+
+          {/* Attach File (Manager Only) */}
+          {user?.role === 'manager' && (
+            <TouchableOpacity
+              style={[styles.attachButton, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 10 }]}
+              onPress={handlePickFile}
+            >
+              <IconSymbol
+                ios_icon_name="paperclip"
+                android_material_icon_name="attach-file"
+                size={20}
+                color={colors.primary || colors.highlight}
+              />
+              <Text style={[styles.attachButtonText, { color: colors.text }]}>
+                {t('attach_file', { defaultValue: 'Attach File' })}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {/* File Preview */}
+          {selectedFileUri && selectedFileName && (
+            <View style={[styles.filePreviewContainer, { backgroundColor: colors.highlight, borderColor: colors.border }]}>
+              <IconSymbol
+                ios_icon_name={getFileIconInfo(selectedFileName).iosIcon}
+                android_material_icon_name={getFileIconInfo(selectedFileName).androidIcon}
+                size={24}
+                color={getFileIconInfo(selectedFileName).color}
+              />
+              <Text style={[styles.filePreviewName, { color: colors.text }]} numberOfLines={1}>
+                {selectedFileName}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setSelectedFileUri(null);
+                  setSelectedFileName(null);
+                }}
+              >
+                <IconSymbol
+                  ios_icon_name="xmark.circle.fill"
+                  android_material_icon_name="cancel"
+                  size={22}
+                  color="#E74C3C"
+                />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Action Buttons */}
@@ -558,7 +656,7 @@ export default function ComposeMessageScreen() {
             {sending ? (
               <View style={styles.sendingContainer}>
                 <ActivityIndicator color={user?.role === 'manager' ? colors.text : '#FFFFFF'} />
-                {uploadingImage && (
+                {(uploadingImage || uploadingFile) && (
                   <Text style={[styles.uploadingText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
                     {t('uploading', { defaultValue: 'Uploading...' })}
                   </Text>
@@ -938,6 +1036,20 @@ const styles = StyleSheet.create({
     right: 8,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     borderRadius: 12,
+  },
+  filePreviewContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 10,
+  },
+  filePreviewName: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '500',
   },
   sendingContainer: {
     flexDirection: 'row',

@@ -212,7 +212,10 @@ export default function WordSearchPlayScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryBtn, { borderColor: colors.border }]}
-              onPress={() => router.push('/word-search-game')}
+              onPress={() => {
+                setPhase('loading');
+                router.replace('/word-search-game');
+              }}
             >
               <Text style={[styles.secondaryBtnText, { color: colors.textSecondary }]}>Back to Categories</Text>
             </TouchableOpacity>
@@ -252,7 +255,7 @@ export default function WordSearchPlayScreen() {
       {/* Back button */}
       <TouchableOpacity
         style={[styles.backChip, { backgroundColor: colors.card }]}
-        onPress={() => router.push('/word-search-game')}
+        onPress={() => router.replace('/word-search-game')}
       >
         <Text style={[styles.backChipText, { color: colors.textSecondary }]}>← Categories</Text>
       </TouchableOpacity>

@@ -349,6 +349,8 @@ export default function EmployeePortalScreen() {
   const loadUpcomingEvents = async () => {
     try {
       setLoadingEvents(true);
+      // Clean up expired events before loading
+      try { await supabase.rpc('delete_expired_upcoming_events' as any); } catch {}
       const { data, error } = await supabase
         .from('upcoming_events')
         .select(`

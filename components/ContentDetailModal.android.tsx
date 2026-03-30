@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   View,
   Text,
@@ -9,12 +9,18 @@ import {
   StyleSheet,
   Alert,
   Image,
+  Animated,
+  PanResponder,
+  Dimensions,
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import * as WebBrowser from 'expo-web-browser';
 import * as Sharing from 'expo-sharing';
 import ImageCarousel from '@/components/ImageCarousel';
 import FormattedText from '@/components/FormattedText';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const DISMISS_THRESHOLD = 120;
 
 interface GuideFile {
   id: string;
@@ -63,13 +69,42 @@ export default function ContentDetailModal({
   guideFile,
   colors,
 }: ContentDetailModalProps) {
-  console.log('ContentDetailModal (Android) rendering with:', {
-    visible,
-    title,
-    hasThumbnail: !!thumbnailUrl,
-    thumbnailShape,
-    imageCount: imageUrls?.length || 0,
-  });
+  // ─── Pull-down-to-dismiss ─────────────────────────────────────────────────
+  const translateY = useRef(new Animated.Value(0)).current;
+  const dragDismissing = useRef(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return gestureState.dy > 4 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          translateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > DISMISS_THRESHOLD) {
+          dragDismissing.current = true;
+          Animated.timing(translateY, {
+            toValue: SCREEN_HEIGHT,
+            duration: 250,
+            useNativeDriver: true,
+          }).start(() => {
+            onClose();
+          });
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 80,
+            friction: 10,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   const formatDateTime = (dateTime: string | null) => {
     if (!dateTime) return null;
@@ -189,9 +224,13 @@ export default function ContentDetailModal({
   return (
     <Modal
       visible={visible}
-      animationType="slide"
+      animationType={dragDismissing.current ? 'none' : 'slide'}
       transparent={true}
       onRequestClose={onClose}
+      onShow={() => {
+        translateY.setValue(0);
+        dragDismissing.current = false;
+      }}
     >
       <View style={styles.modalContainer}>
         <TouchableOpacity
@@ -199,7 +238,17 @@ export default function ContentDetailModal({
           activeOpacity={1}
           onPress={onClose}
         />
-        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+        <Animated.View
+          style={[
+            styles.modalContent,
+            { backgroundColor: colors.card, transform: [{ translateY }] },
+          ]}
+        >
+          {/* Drag Handle */}
+          <View {...panResponder.panHandlers} style={styles.dragHandleArea}>
+            <View style={[styles.dragHandle, { backgroundColor: colors.textSecondary + '40' }]} />
+          </View>
+
           <View style={styles.modalHeader}>
             <Text style={[styles.modalTitle, { color: colors.text }]}>{title}</Text>
             <TouchableOpacity onPress={onClose}>
@@ -329,7 +378,7 @@ export default function ContentDetailModal({
               <FormattedText style={[styles.detailText, { color: colors.textSecondary }]}>{content}</FormattedText>
             </View>
           </ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
@@ -358,6 +407,16 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.4,
     shadowRadius: 20,
     elevation: 10,
+  },
+  dragHandleArea: {
+    alignItems: 'center',
+    paddingTop: 10,
+    paddingBottom: 4,
+  },
+  dragHandle: {
+    width: 40,
+    height: 5,
+    borderRadius: 3,
   },
   modalHeader: {
     flexDirection: 'row',

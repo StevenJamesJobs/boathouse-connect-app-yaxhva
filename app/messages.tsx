@@ -39,6 +39,8 @@ interface Message {
   recipient_names?: string[];
   reply_count?: number;
   image_url?: string | null;
+  file_url?: string | null;
+  file_name?: string | null;
 }
 
 export default function MessagesScreen() {
@@ -75,6 +77,8 @@ export default function MessagesScreen() {
           subject,
           body,
           image_url,
+          file_url,
+          file_name,
           parent_message_id,
           thread_id,
           created_at,
@@ -149,6 +153,8 @@ export default function MessagesScreen() {
           subject: msg.subject,
           body: msg.body,
           image_url: msg.image_url || null,
+          file_url: msg.file_url || null,
+          file_name: msg.file_name || null,
           parent_message_id: msg.parent_message_id,
           thread_id: msg.thread_id,
           created_at: msg.created_at,
@@ -193,6 +199,8 @@ export default function MessagesScreen() {
         subject,
         body,
         image_url,
+        file_url,
+        file_name,
         parent_message_id,
         thread_id,
         created_at,
@@ -238,6 +246,8 @@ export default function MessagesScreen() {
           subject: msg.subject,
           body: msg.body,
           image_url: msg.image_url || null,
+          file_url: msg.file_url || null,
+          file_name: msg.file_name || null,
           parent_message_id: msg.parent_message_id,
           thread_id: msg.thread_id,
           created_at: msg.created_at,
@@ -940,9 +950,21 @@ function MessageCard({
         {/* Bottom row: body preview (left) + meta indicators (right) */}
         <View style={styles.messageBottomRow}>
           <Text style={[styles.messageBody, { color: colors.textSecondary }]} numberOfLines={1}>
-            {message.image_url && !message.body ? '📷 Photo' : message.body}
+            {message.image_url && !message.body && !message.file_url ? '📷 Photo' :
+             message.file_url && !message.body && !message.image_url ? `📎 ${message.file_name || 'File'}` :
+             message.body}
           </Text>
           <View style={styles.messageMetaRight}>
+            {message.file_url ? (
+              <View style={styles.metaChip}>
+                <IconSymbol
+                  ios_icon_name="paperclip"
+                  android_material_icon_name="attach-file"
+                  size={11}
+                  color={colors.textSecondary}
+                />
+              </View>
+            ) : null}
             {message.image_url && message.body ? (
               <View style={styles.metaChip}>
                 <IconSymbol

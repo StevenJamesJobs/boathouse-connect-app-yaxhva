@@ -114,6 +114,7 @@
     "feedback_hint": "Los empleados pueden enviar comentarios desde su página de Herramientas",
     "send_new_message": "Enviar Nuevo Mensaje",
     "loading_feedback": "Cargando comentarios...",
+    "loading_messages": "Cargando mensajes...",
     "selected": "{{count}} seleccionado(s)",
     "mark_as_read": "Marcar como Leído",
     "delete_confirm_title": "Eliminar {{count}} {{type}}...",

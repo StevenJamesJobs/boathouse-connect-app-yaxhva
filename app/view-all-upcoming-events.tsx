@@ -85,7 +85,8 @@ export default function ViewAllUpcomingEventsScreen() {
   const loadEvents = async () => {
     try {
       setLoading(true);
-      console.log('Loading all upcoming events...');
+      // Clean up expired events before loading
+      try { await supabase.rpc('delete_expired_upcoming_events' as any); } catch {}
 
       const { data, error } = await supabase
         .from('upcoming_events')

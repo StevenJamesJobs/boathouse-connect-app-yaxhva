@@ -56,29 +56,26 @@ export default function EmployeeToolsScreen() {
                                  jobTitles.includes('Manager') ||
                                  jobTitles.includes('Runner');
 
-  // ─── Section data ───────────────────────────────────────────────────────────
+  // ─── Build flat tile list ────────────────────────────────────────────────────
 
-  const guidesItems: GridItem[] = [
+  const allItems: GridItem[] = [
+    // Always first two: Guides & Training (top-left), Game Hub (top-middle)
     { id: 'guides-training', label: t('employee_tools.guides_training'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training' },
+    { id: 'game-hub', label: 'Game Hub', iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub' },
   ];
 
-  const gameHubItems: GridItem[] = [
-    { id: 'memory-game', label: t('employee_tools.memory_game'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/menu-memory-game' },
-    { id: 'word-search', label: 'Word Search', iosIcon: 'textformat.abc', androidIcon: 'spellcheck', route: '/word-search-game' },
-  ];
-
-  const assistantItems: GridItem[] = [];
+  // Role-based assistants fill remaining positions
   if (canSeeServerAssistant) {
-    assistantItems.push({ id: 'server', label: t('employee_tools.server_assistant'), iosIcon: 'tray.full.fill', androidIcon: 'room-service', route: '/server-assistant' });
+    allItems.push({ id: 'server', label: t('employee_tools.server_assistant'), iosIcon: 'tray.full.fill', androidIcon: 'room-service', route: '/server-assistant' });
   }
   if (canSeeBarAssistant) {
-    assistantItems.push({ id: 'bartender', label: t('employee_tools.bartender_assistant'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant' });
+    allItems.push({ id: 'bartender', label: t('employee_tools.bartender_assistant'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant' });
   }
   if (canSeeHostAssistant) {
-    assistantItems.push({ id: 'host', label: t('employee_tools.host_assistant'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/host-assistant' });
+    allItems.push({ id: 'host', label: t('employee_tools.host_assistant'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/host-assistant' });
   }
   if (canSeeKitchenAssistant) {
-    assistantItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
+    allItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
   }
 
   // ─── Grid rendering ─────────────────────────────────────────────────────────
@@ -104,33 +101,6 @@ export default function EmployeeToolsScreen() {
     </TouchableOpacity>
   );
 
-  const renderSection = (
-    title: string,
-    icon: { ios: string; android: string },
-    items: GridItem[],
-    isFirst?: boolean
-  ) => {
-    if (items.length === 0) return null;
-    return (
-      <View style={[styles.section, !isFirst && { marginTop: 20 }]}>
-        <View style={styles.sectionHeader}>
-          <View style={[styles.sectionIconContainer, { backgroundColor: colors.primary + '12' }]}>
-            <IconSymbol
-              ios_icon_name={icon.ios as any}
-              android_material_icon_name={icon.android as any}
-              size={16}
-              color={colors.primary}
-            />
-          </View>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>{title}</Text>
-        </View>
-        <View style={styles.gridContainer}>
-          {items.map(renderGridItem)}
-        </View>
-      </View>
-    );
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* User's Name Header */}
@@ -139,27 +109,9 @@ export default function EmployeeToolsScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* 1. Guides & Training */}
-        {renderSection(
-          t('employee_tools.guides_training'),
-          { ios: 'book.fill', android: 'menu-book' },
-          guidesItems,
-          true
-        )}
-
-        {/* 2. Game Hub */}
-        {renderSection(
-          '🎮 Game Hub',
-          { ios: 'gamecontroller.fill', android: 'sports-esports' },
-          gameHubItems
-        )}
-
-        {/* 3. Assistants */}
-        {renderSection(
-          'Assistants',
-          { ios: 'wrench.and.screwdriver.fill', android: 'build' },
-          assistantItems
-        )}
+        <View style={styles.gridContainer}>
+          {allItems.map(renderGridItem)}
+        </View>
       </ScrollView>
     </View>
   );
@@ -186,25 +138,6 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingHorizontal: GRID_PADDING,
     paddingBottom: 100,
-  },
-  // ─── Sections ─────────────────────────────────────────────────────────────
-  section: {},
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 12,
-  },
-  sectionIconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
   },
   // ─── Grid ──────────────────────────────────────────────────────────────────
   gridContainer: {

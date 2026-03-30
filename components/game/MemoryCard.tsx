@@ -69,9 +69,10 @@ export default function MemoryCard({
 
   // Determine font size based on card size and text length
   const getFontSize = (text: string) => {
-    if (text.length > 25) return Math.max(9, size * 0.08);
-    if (text.length > 15) return Math.max(10, size * 0.1);
-    return Math.max(11, size * 0.12);
+    if (text.length > 40) return Math.max(11, size * 0.1);
+    if (text.length > 25) return Math.max(12, size * 0.11);
+    if (text.length > 15) return Math.max(13, size * 0.12);
+    return Math.max(14, size * 0.14);
   };
 
   return (
@@ -119,7 +120,7 @@ export default function MemoryCard({
               styles.subtextLabel,
               {
                 color: colors.primary,
-                fontSize: Math.max(8, size * 0.07),
+                fontSize: Math.max(9, size * 0.08),
               },
             ]}
             numberOfLines={1}
@@ -133,11 +134,12 @@ export default function MemoryCard({
             {
               color: colors.text,
               fontSize: getFontSize(card.displayText),
+              lineHeight: getFontSize(card.displayText) * 1.3,
             },
           ]}
-          numberOfLines={3}
+          numberOfLines={4}
           adjustsFontSizeToFit
-          minimumFontScale={0.7}
+          minimumFontScale={0.6}
         >
           {card.displayText}
         </Text>
@@ -179,6 +181,5 @@ const styles = StyleSheet.create({
   cardText: {
     fontWeight: '700',
     textAlign: 'center',
-    lineHeight: 16,
   },
 });

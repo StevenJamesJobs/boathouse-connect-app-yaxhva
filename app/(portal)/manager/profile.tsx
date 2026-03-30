@@ -54,6 +54,7 @@ export default function ManagerProfileScreen() {
   const [nextShift, setNextShift] = useState<any>(null);
   const [loadingShift, setLoadingShift] = useState(true);
   const [showToolSelector, setShowToolSelector] = useState(false);
+  const [totalGameScore, setTotalGameScore] = useState(0);
 
   // Update local state when user context changes
   useEffect(() => {
@@ -63,10 +64,24 @@ export default function ManagerProfileScreen() {
     }
   }, [user]);
 
-  // Load next shift on focus
+  // Load total game score
+  const loadGameScore = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const { data, error } = await (supabase.rpc as any)('get_user_total_game_score', {
+        p_user_id: user.id,
+      });
+      if (!error && data !== null) {
+        setTotalGameScore(Number(data));
+      }
+    } catch {}
+  }, [user?.id]);
+
+  // Load next shift + game score on focus
   useFocusEffect(
     useCallback(() => {
       loadNextShift();
+      loadGameScore();
     }, [user?.id])
   );
 
@@ -309,14 +324,26 @@ export default function ManagerProfileScreen() {
           </View>
         </View>
 
-        <View style={[styles.bucksChip, { backgroundColor: colors.highlight }]}>
-          <IconSymbol
-            ios_icon_name="dollarsign.circle.fill"
-            android_material_icon_name="attach-money"
-            size={18}
-            color={colors.text}
-          />
-          <Text style={[styles.bucksValue, { color: colors.text }]}>{user?.mcloonesBucks ?? 0}</Text>
+        <View style={styles.headerChips}>
+          <View style={[styles.bucksChip, { backgroundColor: colors.highlight }]}>
+            <IconSymbol
+              ios_icon_name="dollarsign.circle.fill"
+              android_material_icon_name="attach-money"
+              size={18}
+              color={colors.text}
+            />
+            <Text style={[styles.bucksValue, { color: colors.text }]}>{user?.mcloonesBucks ?? 0}</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.gameScoreChip, { backgroundColor: '#F59E0B' }]}
+            onPress={() => router.push('/game-hub')}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.gameScoreIcon}>🏆</Text>
+            <Text style={styles.gameScoreText}>
+              {totalGameScore.toLocaleString()}
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -625,18 +652,37 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 4,
   },
+  headerChips: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
   bucksChip: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 16,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    marginLeft: 8,
   },
   bucksValue: {
     fontSize: 16,
     fontWeight: 'bold',
     marginLeft: 4,
+  },
+  gameScoreChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    gap: 4,
+  },
+  gameScoreIcon: {
+    fontSize: 13,
+  },
+  gameScoreText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   // 2. Quick Actions Grid
   card: {

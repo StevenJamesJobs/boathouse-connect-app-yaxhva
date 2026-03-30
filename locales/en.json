@@ -114,6 +114,7 @@
     "feedback_hint": "Employees can submit feedback from their Tools page",
     "send_new_message": "Send a New Message",
     "loading_feedback": "Loading feedback...",
+    "loading_messages": "Loading messages...",
     "selected": "{{count}} selected",
     "mark_as_read": "Mark as Read",
     "delete_confirm_title": "Delete {{count}} {{type}}...",
