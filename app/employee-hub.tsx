@@ -37,15 +37,6 @@ export default function EmployeeHubScreen() {
       route: '/schedule-upload',
       iconColor: '#FF9800',
     },
-    {
-      key: 'rewards_reviews',
-      title: t('manager_manage.rewards_reviews_editor'),
-      description: t('manager_manage.rewards_reviews_editor_desc'),
-      iosIcon: 'gift.fill' as const,
-      androidIcon: 'star' as const,
-      route: '/rewards-and-reviews-editor',
-      iconColor: '#E91E63',
-    },
   ];
 
   return (

@@ -209,7 +209,7 @@ export default function BartenderAssistantEditorScreen() {
             {/* Weekly Quiz Editor */}
             <TouchableOpacity
               style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => console.log('Weekly Quiz Editor - Coming Soon')}
+              onPress={() => router.push('/exam-editor?type=bartender')}
               activeOpacity={0.7}
             >
               <View style={styles.cardContent}>
@@ -234,18 +234,6 @@ export default function BartenderAssistantEditorScreen() {
               </View>
             </TouchableOpacity>
 
-            {/* Placeholder for future exam editors */}
-            <View style={[styles.infoCard, { backgroundColor: colors.card }]}>
-              <IconSymbol
-                ios_icon_name="info.circle.fill"
-                android_material_icon_name="info"
-                size={24}
-                color={colors.primary}
-              />
-              <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-                {t('bartender_assistant_editor.more_exam_editors_coming')}
-              </Text>
-            </View>
           </>
         )}
       </ScrollView>

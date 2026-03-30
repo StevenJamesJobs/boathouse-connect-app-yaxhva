@@ -181,6 +181,7 @@ export default function ManagerPortalScreen() {
   } | null>(null);
 
   const SECTIONS: ConnectBarTab[] = ['today', 'events', 'specials'];
+  const FLATLIST_PAGES = ['today', 'events', 'specials', 'menu-bridge'] as const;
 
   useEffect(() => {
     loadWeeklySpecials();
@@ -565,11 +566,23 @@ export default function ManagerPortalScreen() {
   const handleSectionScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const pageIndex = Math.round(offsetX / SCREEN_WIDTH);
+
+    // If user swiped to the phantom 4th page, navigate to Menu tab
+    if (pageIndex === 3) {
+      router.navigate('/(portal)/manager/menus');
+      // Scroll back to specials so if they come back it's in the right position
+      setTimeout(() => {
+        sectionListRef.current?.scrollToIndex({ index: 2, animated: false });
+        setActiveSection('specials');
+      }, 100);
+      return;
+    }
+
     const newTab = SECTIONS[pageIndex];
     if (newTab && newTab !== activeSection) {
       setActiveSection(newTab);
     }
-  }, [activeSection]);
+  }, [activeSection, router]);
 
   // Handle ConnectBar tab press
   const handleTabChange = useCallback((tab: ConnectBarTab) => {
@@ -893,11 +906,12 @@ export default function ManagerPortalScreen() {
     </View>
   );
 
-  const renderSection = ({ item }: { item: ConnectBarTab }) => {
+  const renderSection = ({ item }: { item: string }) => {
     switch (item) {
       case 'today': return renderTodaySection();
       case 'events': return renderEventsSection();
       case 'specials': return renderSpecialsSection();
+      case 'menu-bridge': return <View style={{ width: SCREEN_WIDTH }} />;
       default: return null;
     }
   };
@@ -923,7 +937,7 @@ export default function ManagerPortalScreen() {
       {/* Horizontal Swipeable Sections */}
       <FlatList
         ref={sectionListRef}
-        data={SECTIONS}
+        data={FLATLIST_PAGES as unknown as string[]}
         renderItem={renderSection}
         keyExtractor={(item) => item}
         horizontal

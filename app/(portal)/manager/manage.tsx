@@ -76,6 +76,7 @@ export default function ManagerManageScreen() {
   const managementItems: GridItem[] = [
     { id: 'employee-hub', label: t('manager_manage.grid_employee_hub'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/employee-hub' },
     { id: 'menu-editor', label: t('manager_manage.grid_menu'), iosIcon: 'fork.knife', androidIcon: 'restaurant', route: '/menu-editor' },
+    { id: 'rewards-editor', label: 'Rewards & Reviews', iosIcon: 'gift.fill', androidIcon: 'card-giftcard', route: '/rewards-and-reviews-editor' },
     { id: 'notifications', label: t('manager_manage.grid_notifications'), iosIcon: 'bell.fill', androidIcon: 'notifications', route: '/notification-center' },
   ];
 

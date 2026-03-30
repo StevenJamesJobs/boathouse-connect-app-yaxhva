@@ -163,7 +163,7 @@ export default function RewardsAndReviewsEditorScreen() {
     bucksAmount: {
       fontSize: 48,
       fontWeight: 'bold',
-      color: colors.highlight,
+      color: colors.primary,
     },
     section: {
       marginBottom: 24,
@@ -214,7 +214,7 @@ export default function RewardsAndReviewsEditorScreen() {
     leaderboardBucks: {
       fontSize: 18,
       fontWeight: 'bold',
-      color: colors.highlight,
+      color: colors.primary,
     },
     transactionItem: {
       flexDirection: 'row',
@@ -589,6 +589,16 @@ export default function RewardsAndReviewsEditorScreen() {
   const [editDescription, setEditDescription] = useState('');
   const [editIsReward, setEditIsReward] = useState(true);
 
+  // Sub-tab state
+  const [rewardsSubTab, setRewardsSubTab] = useState<'leaderboard' | 'recent'>('leaderboard');
+
+  // Employee lookup state
+  const [showEmployeeLookup, setShowEmployeeLookup] = useState(false);
+  const [lookupSearchQuery, setLookupSearchQuery] = useState('');
+  const [lookupFilteredEmployees, setLookupFilteredEmployees] = useState<Employee[]>([]);
+  const [lookupEmployee, setLookupEmployee] = useState<Employee | null>(null);
+  const [lookupTransactions, setLookupTransactions] = useState<RewardTransaction[]>([]);
+
   // Reviews state
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviews, setReviews] = useState<GuestReview[]>([]);
@@ -631,13 +641,13 @@ export default function RewardsAndReviewsEditorScreen() {
         }
       }
 
-      // Fetch top 5 employees
+      // Fetch top 10 employees
       const { data: topData, error: topError } = await supabase
         .from('users')
         .select('id, name, job_title, mcloones_bucks')
         .eq('is_active', true)
         .order('mcloones_bucks', { ascending: false })
-        .limit(5);
+        .limit(10);
 
       if (!topError && topData) {
         setTopEmployees(topData);
@@ -739,6 +749,43 @@ export default function RewardsAndReviewsEditorScreen() {
       setResetFilteredEmployees([]);
     }
   }, [resetSearchQuery, employees]);
+
+  useEffect(() => {
+    if (lookupSearchQuery) {
+      const filtered = employees.filter(
+        (emp) =>
+          emp.name.toLowerCase().includes(lookupSearchQuery.toLowerCase()) ||
+          emp.username.toLowerCase().includes(lookupSearchQuery.toLowerCase())
+      );
+      setLookupFilteredEmployees(filtered);
+    } else {
+      setLookupFilteredEmployees([]);
+    }
+  }, [lookupSearchQuery, employees]);
+
+  const fetchEmployeeTransactions = async (employeeId: string, employeeName: string) => {
+    try {
+      const { data: transData, error: transError } = await supabase
+        .from('rewards_transactions')
+        .select('id, user_id, amount, description, is_visible, created_at')
+        .eq('user_id', employeeId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (!transError && transData) {
+        setLookupTransactions((transData as any[]).map((t: any) => ({ ...t, user_name: employeeName })));
+      }
+    } catch (error) {
+      console.error('Error fetching employee transactions:', error);
+    }
+  };
+
+  const handleSelectLookupEmployee = (emp: Employee) => {
+    setLookupEmployee(emp);
+    setLookupSearchQuery(emp.name);
+    setLookupFilteredEmployees([]);
+    fetchEmployeeTransactions(emp.id, emp.name);
+  };
 
   const handleRewardEmployee = async () => {
     try {
@@ -1344,96 +1391,233 @@ export default function RewardsAndReviewsEditorScreen() {
 
             {/* My McLoone's Bucks */}
             <View style={styles.bucksCard}>
+              <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={32} color={colors.primary} />
               <Text style={styles.bucksLabel}>{t('rewards_reviews_editor:my_bucks_label')}</Text>
               <Text style={styles.bucksAmount}>${myBucks}</Text>
             </View>
 
-            {/* Top 5 Leaderboard */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t('rewards_reviews_editor:top_leaderboard')}</Text>
-              {topEmployees.map((emp, index) => (
-                <View key={index} style={styles.leaderboardItem}>
-                  <View style={styles.leaderboardRank}>
-                    <Text style={styles.leaderboardRankText}>#{index + 1}</Text>
-                  </View>
-                  <View style={styles.leaderboardInfo}>
-                    <Text style={styles.leaderboardName}>{emp.name}</Text>
-                    <Text style={styles.leaderboardJob}>{emp.job_title}</Text>
-                  </View>
-                  <Text style={styles.leaderboardBucks}>${emp.mcloones_bucks || 0}</Text>
-                </View>
+            {/* Sub-Tab Selector: Leaderboard / Recent Awards / Employee Lookup */}
+            <View style={{
+              flexDirection: 'row',
+              backgroundColor: colors.card,
+              borderRadius: 12,
+              padding: 4,
+              marginBottom: 16,
+              boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
+              elevation: 3,
+            }}>
+              {(['leaderboard', 'recent', 'lookup'] as const).map((tab) => (
+                <TouchableOpacity
+                  key={tab}
+                  style={{
+                    flex: 1,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingVertical: 10,
+                    borderRadius: 10,
+                    gap: 4,
+                    backgroundColor: (tab === 'lookup' ? showEmployeeLookup : rewardsSubTab === tab) && !(!showEmployeeLookup && tab !== 'lookup' && rewardsSubTab !== tab)
+                      ? (tab === 'lookup' && showEmployeeLookup) || (tab !== 'lookup' && rewardsSubTab === tab && !showEmployeeLookup)
+                        ? colors.primary : 'transparent'
+                      : 'transparent',
+                  }}
+                  onPress={() => {
+                    if (tab === 'lookup') {
+                      setShowEmployeeLookup(true);
+                    } else {
+                      setShowEmployeeLookup(false);
+                      setRewardsSubTab(tab);
+                    }
+                  }}
+                >
+                  <IconSymbol
+                    ios_icon_name={tab === 'leaderboard' ? 'trophy.fill' : tab === 'recent' ? 'clock.fill' : 'magnifyingglass'}
+                    android_material_icon_name={tab === 'leaderboard' ? 'emoji-events' : tab === 'recent' ? 'history' : 'search'}
+                    size={14}
+                    color={
+                      (tab === 'lookup' && showEmployeeLookup) || (tab !== 'lookup' && rewardsSubTab === tab && !showEmployeeLookup)
+                        ? '#FFF' : colors.textSecondary
+                    }
+                  />
+                  <Text style={{
+                    fontSize: 12,
+                    fontWeight: '600',
+                    color: (tab === 'lookup' && showEmployeeLookup) || (tab !== 'lookup' && rewardsSubTab === tab && !showEmployeeLookup)
+                      ? '#FFF' : colors.textSecondary,
+                  }}>
+                    {tab === 'leaderboard' ? 'Leaderboard' : tab === 'recent' ? 'Recent' : 'Lookup'}
+                  </Text>
+                </TouchableOpacity>
               ))}
             </View>
 
-            {/* Recent Transactions */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t('rewards_reviews_editor:recent_transactions')}</Text>
-              {recentTransactions.length === 0 ? (
-                <Text style={styles.emptyText}>{t('rewards_reviews_editor:no_transactions')}</Text>
-              ) : (
-                recentTransactions.map((trans, index) => (
-                  <View key={index} style={styles.transactionItem}>
-                    <View style={styles.transactionInfo}>
-                      <Text style={styles.transactionEmployee}>
-                        {trans.user_name || 'Unknown Employee'}
-                      </Text>
-                      <Text style={styles.transactionDescription}>{trans.description}</Text>
-                      <Text style={styles.transactionDate}>
-                        {new Date(trans.created_at).toLocaleDateString()}
-                      </Text>
-                      {!trans.is_visible && (
-                        <Text style={styles.hiddenBadge}>{t('rewards_reviews_editor:hidden_badge')}</Text>
-                      )}
-                    </View>
-                    <View style={styles.transactionRight}>
-                      <Text
-                        style={[
-                          styles.transactionAmount,
-                          trans.amount > 0 ? styles.positiveAmount : styles.negativeAmount,
-                        ]}
+            {/* Sub-Tab Content */}
+            {showEmployeeLookup ? (
+              <View style={styles.section}>
+                {/* Employee Search */}
+                <TextInput
+                  style={[styles.formInput, { marginBottom: 12 }]}
+                  value={lookupSearchQuery}
+                  onChangeText={(text) => {
+                    setLookupSearchQuery(text);
+                    if (!text) {
+                      setLookupEmployee(null);
+                      setLookupTransactions([]);
+                    }
+                  }}
+                  placeholder="Search employee by name..."
+                  placeholderTextColor={colors.textSecondary}
+                />
+                {lookupFilteredEmployees.length > 0 && !lookupEmployee && (
+                  <View style={[styles.searchResults, { marginBottom: 12, marginTop: 0 }]}>
+                    {lookupFilteredEmployees.slice(0, 5).map((emp) => (
+                      <TouchableOpacity
+                        key={emp.id}
+                        style={styles.searchResultItem}
+                        onPress={() => handleSelectLookupEmployee(emp)}
                       >
-                        {trans.amount > 0 ? '+' : ''}${trans.amount}
-                      </Text>
-                      <View style={styles.transactionActions}>
-                        <TouchableOpacity
-                          onPress={() => handleEditTransaction(trans)}
-                          style={styles.actionIconButton}
+                        <Text style={styles.searchResultName}>{emp.name}</Text>
+                        <Text style={styles.searchResultJob}>{emp.job_title} — ${emp.mcloones_bucks || 0}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {lookupEmployee && (
+                  <>
+                    {/* Employee Bucks Card */}
+                    <View style={[styles.bucksCard, { marginBottom: 16, paddingVertical: 16 }]}>
+                      <Text style={[styles.leaderboardName, { fontSize: 18, color: colors.text, marginBottom: 4 }]}>{lookupEmployee.name}</Text>
+                      <Text style={[styles.leaderboardJob, { color: colors.textSecondary, marginBottom: 8 }]}>{lookupEmployee.job_title}</Text>
+                      <Text style={[styles.bucksAmount, { fontSize: 36 }]}>${lookupEmployee.mcloones_bucks || 0}</Text>
+                      <Text style={[styles.bucksLabel, { marginTop: 2 }]}>McLoone's Bucks Balance</Text>
+                    </View>
+
+                    {/* Employee Transactions */}
+                    <Text style={styles.sectionTitle}>Transaction History</Text>
+                    {lookupTransactions.length === 0 ? (
+                      <Text style={styles.emptyText}>No transactions found</Text>
+                    ) : (
+                      lookupTransactions.map((trans, index) => (
+                        <View key={trans.id || index} style={styles.transactionItem}>
+                          <View style={styles.transactionInfo}>
+                            <Text style={styles.transactionDescription}>{trans.description}</Text>
+                            <Text style={styles.transactionDate}>
+                              {new Date(trans.created_at).toLocaleDateString()}
+                            </Text>
+                            {!trans.is_visible && (
+                              <Text style={styles.hiddenBadge}>(hidden)</Text>
+                            )}
+                          </View>
+                          <View style={styles.transactionRight}>
+                            <Text
+                              style={[
+                                styles.transactionAmount,
+                                trans.amount > 0 ? styles.positiveAmount : styles.negativeAmount,
+                              ]}
+                            >
+                              {trans.amount > 0 ? '+' : ''}${trans.amount}
+                            </Text>
+                          </View>
+                        </View>
+                      ))
+                    )}
+                  </>
+                )}
+              </View>
+            ) : rewardsSubTab === 'leaderboard' ? (
+              <View style={styles.section}>
+                {topEmployees.length === 0 ? (
+                  <Text style={styles.emptyText}>No leaderboard data yet</Text>
+                ) : (
+                  topEmployees.map((emp, index) => (
+                    <View key={emp.id || index} style={styles.leaderboardItem}>
+                      <View style={[styles.leaderboardRank, {
+                        backgroundColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : colors.primary,
+                      }]}>
+                        <Text style={styles.leaderboardRankText}>
+                          {index < 3 ? ['🥇', '🥈', '🥉'][index] : `#${index + 1}`}
+                        </Text>
+                      </View>
+                      <View style={styles.leaderboardInfo}>
+                        <Text style={styles.leaderboardName}>{emp.name}</Text>
+                        <Text style={styles.leaderboardJob}>{emp.job_title}</Text>
+                      </View>
+                      <Text style={styles.leaderboardBucks}>${emp.mcloones_bucks || 0}</Text>
+                    </View>
+                  ))
+                )}
+              </View>
+            ) : (
+              <View style={styles.section}>
+                {recentTransactions.length === 0 ? (
+                  <Text style={styles.emptyText}>{t('rewards_reviews_editor:no_transactions')}</Text>
+                ) : (
+                  recentTransactions.map((trans, index) => (
+                    <View key={trans.id || index} style={styles.transactionItem}>
+                      <View style={styles.transactionInfo}>
+                        <Text style={styles.transactionEmployee}>
+                          {trans.user_name || 'Unknown Employee'}
+                        </Text>
+                        <Text style={styles.transactionDescription}>{trans.description}</Text>
+                        <Text style={styles.transactionDate}>
+                          {new Date(trans.created_at).toLocaleDateString()}
+                        </Text>
+                        {!trans.is_visible && (
+                          <Text style={styles.hiddenBadge}>{t('rewards_reviews_editor:hidden_badge')}</Text>
+                        )}
+                      </View>
+                      <View style={styles.transactionRight}>
+                        <Text
+                          style={[
+                            styles.transactionAmount,
+                            trans.amount > 0 ? styles.positiveAmount : styles.negativeAmount,
+                          ]}
                         >
-                          <IconSymbol
-                            ios_icon_name="pencil.circle.fill"
-                            android_material_icon_name="edit"
-                            size={24}
-                            color={colors.primary}
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => handleHideTransaction(trans)}
-                          style={styles.actionIconButton}
-                        >
-                          <IconSymbol
-                            ios_icon_name={trans.is_visible ? 'eye.slash.fill' : 'eye.fill'}
-                            android_material_icon_name={trans.is_visible ? 'visibility-off' : 'visibility'}
-                            size={24}
-                            color={trans.is_visible ? '#FF9800' : '#4CAF50'}
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => handleDeleteTransaction(trans)}
-                          style={styles.actionIconButton}
-                        >
-                          <IconSymbol
-                            ios_icon_name="trash.fill"
-                            android_material_icon_name="delete"
-                            size={24}
-                            color="#F44336"
-                          />
-                        </TouchableOpacity>
+                          {trans.amount > 0 ? '+' : ''}${trans.amount}
+                        </Text>
+                        <View style={styles.transactionActions}>
+                          <TouchableOpacity
+                            onPress={() => handleEditTransaction(trans)}
+                            style={styles.actionIconButton}
+                          >
+                            <IconSymbol
+                              ios_icon_name="pencil.circle.fill"
+                              android_material_icon_name="edit"
+                              size={24}
+                              color={colors.primary}
+                            />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => handleHideTransaction(trans)}
+                            style={styles.actionIconButton}
+                          >
+                            <IconSymbol
+                              ios_icon_name={trans.is_visible ? 'eye.slash.fill' : 'eye.fill'}
+                              android_material_icon_name={trans.is_visible ? 'visibility-off' : 'visibility'}
+                              size={24}
+                              color={trans.is_visible ? '#FF9800' : '#4CAF50'}
+                            />
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() => handleDeleteTransaction(trans)}
+                            style={styles.actionIconButton}
+                          >
+                            <IconSymbol
+                              ios_icon_name="trash.fill"
+                              android_material_icon_name="delete"
+                              size={24}
+                              color="#F44336"
+                            />
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                ))
-              )}
-            </View>
+                  ))
+                )}
+              </View>
+            )}
           </>
         ) : (
           <>

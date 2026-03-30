@@ -71,17 +71,20 @@ interface PageConfig {
   subcategory: string | null;
 }
 
-const PAGES: PageConfig[] = [];
+const MENU_PAGES: PageConfig[] = [];
 for (const category of CATEGORIES) {
   const subs = SUBCATEGORIES[category];
   if (subs.length === 0) {
-    PAGES.push({ category, subcategory: null });
+    MENU_PAGES.push({ category, subcategory: null });
   } else {
     for (const sub of subs) {
-      PAGES.push({ category, subcategory: sub });
+      MENU_PAGES.push({ category, subcategory: sub });
     }
   }
 }
+
+// Phantom bridge page used when swipe-to-welcome is enabled
+const WELCOME_BRIDGE_PAGE: PageConfig = { category: '__welcome-bridge__', subcategory: null };
 
 // Filter options
 const FILTER_OPTIONS = [
@@ -152,15 +155,25 @@ interface MenuDisplayProps {
     highlight: string;
     border: string;
   };
+  /** Called when user swipes right past Weekly Specials (first page) to go back to Welcome */
+  onSwipeToWelcome?: () => void;
 }
 
-export default function MenuDisplay({ colors }: MenuDisplayProps) {
+export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayProps) {
   const { t } = useTranslation();
   const { language } = useLanguage();
+
+  // Build pages array — prepend phantom bridge page when swipe-to-welcome is enabled
+  const hasBridge = !!onSwipeToWelcome;
+  const PAGES = useMemo(() => {
+    return hasBridge ? [WELCOME_BRIDGE_PAGE, ...MENU_PAGES] : MENU_PAGES;
+  }, [hasBridge]);
+  const bridgeOffset = hasBridge ? 1 : 0;
+
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const [currentPageIndex, setCurrentPageIndex] = useState(bridgeOffset);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
@@ -419,6 +432,18 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
   const onMomentumScrollEnd = (event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const newIndex = Math.round(offsetX / SCREEN_WIDTH);
+
+    // If user swiped to the phantom bridge page (index 0), navigate back to Welcome
+    if (hasBridge && newIndex === 0 && onSwipeToWelcome) {
+      onSwipeToWelcome();
+      // Scroll back to Weekly Specials (index 1) so position is correct if they return
+      setTimeout(() => {
+        pagerRef.current?.scrollToIndex({ index: bridgeOffset, animated: false });
+        setCurrentPageIndex(bridgeOffset);
+      }, 100);
+      return;
+    }
+
     if (newIndex >= 0 && newIndex < PAGES.length && newIndex !== currentPageIndex) {
       setCurrentPageIndex(newIndex);
     }
@@ -491,6 +516,11 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
 
   // Render a single page of menu items (for swipe pager)
   const renderPage = ({ item: page, index }: { item: PageConfig; index: number }) => {
+    // Phantom bridge page — render empty
+    if (page.category === '__welcome-bridge__') {
+      return <View style={{ width: SCREEN_WIDTH }} />;
+    }
+
     const pageItems = getItemsForPage(page);
     const categoryColor = CATEGORY_COLORS[page.category] || colors.primary;
 
@@ -725,7 +755,7 @@ export default function MenuDisplay({ colors }: MenuDisplayProps) {
             offset: SCREEN_WIDTH * index,
             index,
           })}
-          initialScrollIndex={0}
+          initialScrollIndex={bridgeOffset}
         />
       )}
 

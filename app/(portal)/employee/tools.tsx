@@ -56,6 +56,9 @@ export default function EmployeeToolsScreen() {
                                  jobTitles.includes('Manager') ||
                                  jobTitles.includes('Runner');
 
+  const canSeeWeeklyQuiz = jobTitles.includes('Busser') ||
+                           jobTitles.includes('Runner');
+
   // ─── Build flat tile list ────────────────────────────────────────────────────
 
   const allItems: GridItem[] = [
@@ -76,6 +79,9 @@ export default function EmployeeToolsScreen() {
   }
   if (canSeeKitchenAssistant) {
     allItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
+  }
+  if (canSeeWeeklyQuiz) {
+    allItems.push({ id: 'weekly-quiz', label: 'Weekly Quizzes', iosIcon: 'doc.text.fill', androidIcon: 'quiz', route: '/weekly-quiz' });
   }
 
   // ─── Grid rendering ─────────────────────────────────────────────────────────
