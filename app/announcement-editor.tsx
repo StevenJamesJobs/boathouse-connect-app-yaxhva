@@ -58,7 +58,7 @@ interface GuideFile {
 }
 
 const PRIORITY_LEVELS = ['none', 'new', 'important', 'update'];
-const VISIBILITY_OPTIONS = ['everyone', 'employees', 'managers'];
+const VISIBILITY_OPTIONS = ['everyone', 'employees', 'managers', 'none'];
 const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
 
 export default function AnnouncementEditorScreen() {
@@ -676,6 +676,8 @@ export default function AnnouncementEditorScreen() {
         return 'person.2';
       case 'everyone':
         return 'person.3';
+      case 'none':
+        return 'eye.slash';
       default:
         return 'person.3';
     }

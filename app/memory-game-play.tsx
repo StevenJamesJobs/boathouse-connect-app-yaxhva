@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
+  Animated as RNAnimated,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -55,6 +56,60 @@ export default function MemoryGamePlayScreen() {
   useEffect(() => {
     gameStateRef.current = gameState;
   }, [gameState]);
+
+  // ─── Preview pills state ─────────────────────────────────────────────────
+  const previewCards = gameState?.flippedIndices
+    .map(i => gameState.cards[i])
+    .filter(Boolean) ?? [];
+  const prevPreviewRef = useRef<CardData[]>([]);
+  const previewAnim1 = useRef(new RNAnimated.Value(0)).current;
+  const previewAnim2 = useRef(new RNAnimated.Value(0)).current;
+
+  useEffect(() => {
+    const prev = prevPreviewRef.current;
+    if (previewCards.length === 1 && prev.length === 0) {
+      previewAnim1.setValue(0);
+      RNAnimated.spring(previewAnim1, { toValue: 1, useNativeDriver: true, tension: 120, friction: 8 }).start();
+    }
+    if (previewCards.length === 2 && prev.length < 2) {
+      previewAnim2.setValue(0);
+      RNAnimated.spring(previewAnim2, { toValue: 1, useNativeDriver: true, tension: 120, friction: 8 }).start();
+    }
+    if (previewCards.length === 0 && prev.length > 0) {
+      previewAnim1.setValue(0);
+      previewAnim2.setValue(0);
+    }
+    prevPreviewRef.current = previewCards;
+  }, [previewCards.length]);
+
+  const renderPreviewCard = (card: CardData, index: number) => {
+    const anim = index === 0 ? previewAnim1 : previewAnim2;
+    const isMatch = previewCards.length === 2 && gameState
+      ? previewCards[0].pairId === previewCards[1].pairId
+      : false;
+    const isMismatch = previewCards.length === 2 && !isMatch;
+
+    const borderColor = isMatch ? '#10B981' : isMismatch ? '#EF4444' : colors.border;
+    const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
+    const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
+
+    return (
+      <RNAnimated.View
+        key={card.id}
+        style={[
+          styles.previewCard,
+          { backgroundColor: colors.card, borderColor, transform: [{ scale }], opacity },
+        ]}
+      >
+        <Text style={[styles.previewSubtext, { color: colors.textSecondary }]} numberOfLines={1}>
+          {card.subText}
+        </Text>
+        <Text style={[styles.previewText, { color: colors.text }]} numberOfLines={2}>
+          {card.displayText}
+        </Text>
+      </RNAnimated.View>
+    );
+  };
 
   // Load cards on mount or restart
   useEffect(() => {
@@ -244,6 +299,11 @@ export default function MemoryGamePlayScreen() {
         timeRemaining={playMode === 'timed' ? timeRemaining : undefined}
         timeLimit={playMode === 'timed' ? difficultyConfig.timeLimitSeconds : undefined}
       />
+
+      {/* Preview Pills */}
+      <View style={styles.previewBar}>
+        {previewCards.map((card, i) => renderPreviewCard(card, i))}
+      </View>
 
       {/* Game Board */}
       <MemoryGameBoard
@@ -476,6 +536,40 @@ const styles = StyleSheet.create({
   },
   playModeBadgeText: {
     fontSize: 16,
+  },
+  // Preview Pills
+  previewBar: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: 90,
+    paddingHorizontal: 12,
+    gap: 10,
+  },
+  previewCard: {
+    flex: 1,
+    maxWidth: 180,
+    height: 78,
+    borderRadius: 14,
+    borderWidth: 2,
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingTop: 7,
+    paddingBottom: 5,
+  },
+  previewSubtext: {
+    fontSize: 11,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  previewText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   // Results Modal
   modalOverlay: {

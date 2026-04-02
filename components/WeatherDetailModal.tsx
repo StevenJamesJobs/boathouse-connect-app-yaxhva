@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   Dimensions,
   ActivityIndicator,
   Image,
+  Animated,
+  PanResponder,
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
@@ -56,6 +58,8 @@ interface WeatherDetailModalProps {
 
 const WEATHER_API_KEY = '6e3db8832cf34a5bbc5182329251711';
 const LOCATION = 'West Orange, NJ'; // Zip code 07003
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const DISMISS_THRESHOLD = 120;
 
 export default function WeatherDetailModal({
   visible,
@@ -67,6 +71,43 @@ export default function WeatherDetailModal({
   const [weatherData, setWeatherData] = useState<WeatherDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // ─── Pull-down-to-dismiss ─────────────────────────────────────────────────
+  const translateY = useRef(new Animated.Value(0)).current;
+  const dragDismissing = useRef(false);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return gestureState.dy > 4 && Math.abs(gestureState.dy) > Math.abs(gestureState.dx);
+      },
+      onPanResponderMove: (_, gestureState) => {
+        if (gestureState.dy > 0) {
+          translateY.setValue(gestureState.dy);
+        }
+      },
+      onPanResponderRelease: (_, gestureState) => {
+        if (gestureState.dy > DISMISS_THRESHOLD) {
+          dragDismissing.current = true;
+          Animated.timing(translateY, {
+            toValue: SCREEN_HEIGHT,
+            duration: 250,
+            useNativeDriver: true,
+          }).start(() => {
+            onClose();
+          });
+        } else {
+          Animated.spring(translateY, {
+            toValue: 0,
+            useNativeDriver: true,
+            tension: 80,
+            friction: 10,
+          }).start();
+        }
+      },
+    })
+  ).current;
 
   useEffect(() => {
     if (visible) {
@@ -222,8 +263,12 @@ export default function WeatherDetailModal({
     <Modal
       visible={visible}
       transparent={true}
-      animationType="slide"
+      animationType={dragDismissing.current ? 'none' : 'slide'}
       onRequestClose={onClose}
+      onShow={() => {
+        translateY.setValue(0);
+        dragDismissing.current = false;
+      }}
     >
       <View style={styles.modalOverlay}>
         <TouchableOpacity
@@ -231,10 +276,10 @@ export default function WeatherDetailModal({
           activeOpacity={1}
           onPress={onClose}
         />
-        <View style={[styles.modalContent, { backgroundColor: colors.card, height: screenHeight * 0.85 }]}>
-          {/* Swipe Indicator */}
-          <View style={styles.swipeIndicatorContainer}>
-            <View style={[styles.swipeIndicator, { backgroundColor: colors.border || colors.textSecondary }]} />
+        <Animated.View style={[styles.modalContent, { backgroundColor: colors.card, height: screenHeight * 0.85, transform: [{ translateY }] }]}>
+          {/* Drag Handle */}
+          <View {...panResponder.panHandlers} style={styles.dragHandleArea}>
+            <View style={[styles.dragHandle, { backgroundColor: colors.border || colors.textSecondary }]} />
           </View>
 
           {/* Close Button */}
@@ -454,7 +499,7 @@ export default function WeatherDetailModal({
                 </>
               )}
             </ScrollView>
-          </View>
+        </Animated.View>
         </View>
     </Modal>
   );
@@ -480,14 +525,15 @@ const styles = StyleSheet.create({
     boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.3)',
     elevation: 10,
   },
-  swipeIndicatorContainer: {
+  dragHandleArea: {
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingTop: 10,
+    paddingBottom: 4,
   },
-  swipeIndicator: {
+  dragHandle: {
     width: 40,
-    height: 4,
-    borderRadius: 2,
+    height: 5,
+    borderRadius: 3,
   },
   closeButton: {
     position: 'absolute',

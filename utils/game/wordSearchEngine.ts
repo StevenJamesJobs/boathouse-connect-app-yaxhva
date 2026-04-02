@@ -350,16 +350,24 @@ export function checkWordMatch(
 
 // ─── Scoring ──────────────────────────────────────────────────────────────────
 
-const POINTS_PER_WORD = 10;
-const TIMED_BONUS_PER_SECOND = 2;
+export const POINTS_PER_WORD = 50;
+export const TIMED_BONUS_PER_SECOND = 5;
+
+export const DIFFICULTY_MULTIPLIER: Record<WordSearchDifficulty, number> = {
+  easy: 1.5,
+  medium: 3,
+  hard: 5,
+};
 
 export function calculateWordSearchScore(
   wordsFound: number,
   timeRemaining: number,
-  playMode: WordSearchPlayMode
+  playMode: WordSearchPlayMode,
+  difficulty: WordSearchDifficulty
 ): number {
-  const wordPoints = wordsFound * POINTS_PER_WORD;
-  const timeBonus = playMode === 'timed' ? Math.max(0, timeRemaining) * TIMED_BONUS_PER_SECOND : 0;
+  const multiplier = DIFFICULTY_MULTIPLIER[difficulty];
+  const wordPoints = Math.round(wordsFound * POINTS_PER_WORD * multiplier);
+  const timeBonus = playMode === 'timed' ? Math.round(Math.max(0, timeRemaining) * TIMED_BONUS_PER_SECOND * multiplier) : 0;
   return wordPoints + timeBonus;
 }
 

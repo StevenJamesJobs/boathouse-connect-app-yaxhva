@@ -15,6 +15,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import * as DocumentPicker from 'expo-document-picker';
+import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
@@ -100,82 +101,169 @@ export default function ScheduleUploadScreen() {
     }
   };
 
+  // Helper: upload a file (base64) to Supabase storage and return the public URL
+  const uploadFileToStorage = async (
+    base64: string,
+    fileName: string,
+    contentType: string
+  ): Promise<string> => {
+    const binaryString = atob(base64);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const storageName = `${Date.now()}-${fileName}`;
+    const { error: uploadError } = await supabase.storage
+      .from('schedules')
+      .upload(storageName, bytes, { contentType, upsert: false });
+
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage
+      .from('schedules')
+      .getPublicUrl(storageName);
+
+    return urlData.publicUrl;
+  };
+
+  // Helper: create upload record + invoke edge function
+  const processScheduleUpload = async (
+    fileUrl: string,
+    displayName: string,
+    mediaType: string,
+    additionalImageUrls: string[] = []
+  ) => {
+    const { data: uploadRecord, error: insertError } = await supabase
+      .from('schedule_uploads')
+      .insert({
+        uploaded_by: user?.id,
+        file_url: fileUrl,
+        file_name: displayName,
+        week_start: new Date().toISOString().split('T')[0],
+        week_end: new Date().toISOString().split('T')[0],
+        status: 'processing',
+      })
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    setProcessingId(uploadRecord.id);
+
+    const { error: fnError } = await supabase.functions.invoke('parse-schedule', {
+      body: {
+        file_url: fileUrl,
+        upload_id: uploadRecord.id,
+        media_type: mediaType,
+        additional_image_urls: additionalImageUrls,
+      },
+    });
+
+    if (fnError) {
+      console.error('Edge function error:', fnError);
+    }
+
+    loadUploads();
+  };
+
+  // Determine media type from file name/extension
+  const getMediaType = (fileName: string): string => {
+    const ext = fileName.toLowerCase().split('.').pop();
+    switch (ext) {
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'pdf':
+      default:
+        return 'application/pdf';
+    }
+  };
+
+  // ─── PDF / Image Upload (via Document Picker → Files app) ─────────────────
   const handleUpload = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf'],
+        type: ['application/pdf', 'image/jpeg', 'image/png'],
         copyToCacheDirectory: true,
       });
 
       if (result.canceled || !result.assets?.[0]) return;
 
       const file = result.assets[0];
+      const mediaType = file.mimeType || getMediaType(file.name);
       setUploading(true);
 
-      // Read file as base64
       const base64 = await FileSystem.readAsStringAsync(file.uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      // Convert base64 to byte array using atob (available in Hermes)
-      const binaryString = atob(base64);
-      const bytes = new Uint8Array(binaryString.length);
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      // Upload to Supabase storage
-      const fileName = `${Date.now()}-${file.name}`;
-      const { error: uploadError } = await supabase.storage
-        .from('schedules')
-        .upload(fileName, bytes, {
-          contentType: 'application/pdf',
-          upsert: false,
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('schedules')
-        .getPublicUrl(fileName);
-
-      const fileUrl = urlData.publicUrl;
-
-      // Create upload record (week_start/week_end will be filled by edge function)
-      const { data: uploadRecord, error: insertError } = await supabase
-        .from('schedule_uploads')
-        .insert({
-          uploaded_by: user?.id,
-          file_url: fileUrl,
-          file_name: file.name,
-          week_start: new Date().toISOString().split('T')[0], // placeholder
-          week_end: new Date().toISOString().split('T')[0], // placeholder
-          status: 'processing',
-        })
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      setProcessingId(uploadRecord.id);
-
-      // Invoke the parse-schedule edge function
-      const { error: fnError } = await supabase.functions.invoke('parse-schedule', {
-        body: {
-          file_url: fileUrl,
-          upload_id: uploadRecord.id,
-        },
-      });
-
-      if (fnError) {
-        console.error('Edge function error:', fnError);
-        // The edge function should update the upload status on its own
-      }
-
-      loadUploads();
+      const fileUrl = await uploadFileToStorage(base64, file.name, mediaType);
+      await processScheduleUpload(fileUrl, file.name, mediaType);
     } catch (error: any) {
       console.error('Upload error:', error);
+      Alert.alert(
+        t('schedule_upload.error_title', 'Upload Failed'),
+        error.message || t('schedule_upload.error_generic', 'An error occurred.')
+      );
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // ─── Image Upload (via Image Picker → Photos library) ─────────────────────
+  const handleImageUpload = async () => {
+    try {
+      // Request permission
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission Required',
+          'Please allow access to your photo library to upload schedule images.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        quality: 0.9,
+        orderedSelection: true,
+      });
+
+      if (result.canceled || !result.assets?.length) return;
+
+      setUploading(true);
+
+      const images = result.assets;
+      const uploadedUrls: string[] = [];
+
+      for (let i = 0; i < images.length; i++) {
+        const image = images[i];
+        const ext = image.uri.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+        const contentType = ext === 'png' ? 'image/png' : 'image/jpeg';
+        const imageName = `schedule-page-${i + 1}.${ext}`;
+
+        const base64 = await FileSystem.readAsStringAsync(image.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+
+        const url = await uploadFileToStorage(base64, imageName, contentType);
+        uploadedUrls.push(url);
+      }
+
+      const primaryUrl = uploadedUrls[0];
+      const additionalUrls = uploadedUrls.slice(1);
+      const displayName = images.length > 1
+        ? `Schedule images (${images.length} pages)`
+        : 'Schedule image (1 page)';
+      const primaryExt = images[0].uri.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+
+      await processScheduleUpload(primaryUrl, displayName, primaryExt, additionalUrls);
+    } catch (error: any) {
+      console.error('Image upload error:', error);
       Alert.alert(
         t('schedule_upload.error_title', 'Upload Failed'),
         error.message || t('schedule_upload.error_generic', 'An error occurred.')
@@ -265,34 +353,66 @@ export default function ScheduleUploadScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Upload Button Card */}
-        <TouchableOpacity
-          style={[styles.uploadCard, { backgroundColor: colors.primary }]}
-          onPress={handleUpload}
-          disabled={uploading || processingId !== null}
-          activeOpacity={0.8}
-        >
-          {uploading ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <IconSymbol
-              ios_icon_name="arrow.up.doc.fill"
-              android_material_icon_name="upload-file"
-              size={28}
-              color="#FFFFFF"
-            />
-          )}
-          <View style={styles.uploadTextContainer}>
-            <Text style={styles.uploadTitle}>
-              {uploading
-                ? t('schedule_upload.uploading', 'Uploading...')
-                : t('schedule_upload.upload_button', 'Upload Schedule PDF')}
-            </Text>
-            <Text style={styles.uploadSubtitle}>
-              {t('schedule_upload.upload_desc', 'Import from HotSchedules export')}
-            </Text>
-          </View>
-        </TouchableOpacity>
+        {/* Upload Buttons */}
+        <View style={styles.uploadRow}>
+          {/* PDF Upload */}
+          <TouchableOpacity
+            style={[styles.uploadCard, { backgroundColor: colors.primary }]}
+            onPress={handleUpload}
+            disabled={uploading || processingId !== null}
+            activeOpacity={0.8}
+          >
+            {uploading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <IconSymbol
+                ios_icon_name="doc.fill"
+                android_material_icon_name="description"
+                size={26}
+                color="#FFFFFF"
+              />
+            )}
+            <View style={styles.uploadTextContainer}>
+              <Text style={styles.uploadTitle}>
+                {uploading
+                  ? t('schedule_upload.uploading', 'Uploading...')
+                  : t('schedule_upload.upload_file', 'Upload File')}
+              </Text>
+              <Text style={styles.uploadSubtitle}>
+                {t('schedule_upload.file_desc', 'PDF or Image')}
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Image Upload */}
+          <TouchableOpacity
+            style={[styles.uploadCard, { backgroundColor: colors.primary }]}
+            onPress={handleImageUpload}
+            disabled={uploading || processingId !== null}
+            activeOpacity={0.8}
+          >
+            {uploading ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <IconSymbol
+                ios_icon_name="photo.on.rectangle"
+                android_material_icon_name="add-photo-alternate"
+                size={26}
+                color="#FFFFFF"
+              />
+            )}
+            <View style={styles.uploadTextContainer}>
+              <Text style={styles.uploadTitle}>
+                {uploading
+                  ? t('schedule_upload.uploading', 'Uploading...')
+                  : t('schedule_upload.upload_images', 'Upload Images')}
+              </Text>
+              <Text style={styles.uploadSubtitle}>
+                {t('schedule_upload.images_desc', 'From Photos')}
+              </Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
         {/* Processing indicator */}
         {processingId && (
@@ -470,26 +590,32 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
-  uploadCard: {
+  uploadRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
+    gap: 10,
     marginBottom: 16,
-    gap: 12,
+  },
+  uploadCard: {
+    flex: 1,
+    alignItems: 'center',
+    padding: 14,
+    borderRadius: 12,
+    gap: 8,
   },
   uploadTextContainer: {
-    flex: 1,
+    alignItems: 'center',
   },
   uploadTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#FFFFFF',
+    textAlign: 'center',
   },
   uploadSubtitle: {
-    fontSize: 13,
+    fontSize: 12,
     color: 'rgba(255,255,255,0.8)',
-    marginTop: 2,
+    marginTop: 1,
+    textAlign: 'center',
   },
   processingBanner: {
     flexDirection: 'row',

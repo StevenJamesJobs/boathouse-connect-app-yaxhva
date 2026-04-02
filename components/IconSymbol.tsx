@@ -164,6 +164,10 @@ const ICON_MAP: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   // Logout
   'rectangle.portrait.and.arrow.right': 'logout',
   
+  // Upload / Documents
+  'doc.fill': 'description',
+  'photo.on.rectangle': 'add-photo-alternate',
+
   // Download
   'arrow.down.circle': 'download',
   'arrow.down.circle.fill': 'download',

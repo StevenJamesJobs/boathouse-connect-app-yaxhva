@@ -67,6 +67,9 @@ Rules:
 interface ParseRequest {
   file_url: string;
   upload_id: string;
+  media_type?: string; // 'application/pdf' | 'image/jpeg' | 'image/png'
+  // For multi-image uploads (multiple pages as separate images)
+  additional_image_urls?: string[];
 }
 
 // Normalize unicode quotes/apostrophes and special chars for comparison
@@ -123,11 +126,15 @@ serve(async (req) => {
   // Parse request body early so upload_id is available in error handler
   let file_url = '';
   let upload_id = '';
+  let media_type = 'application/pdf';
+  let additional_image_urls: string[] = [];
 
   try {
     const body = (await req.json()) as ParseRequest;
     file_url = body.file_url || '';
     upload_id = body.upload_id || '';
+    media_type = body.media_type || 'application/pdf';
+    additional_image_urls = body.additional_image_urls || [];
 
     if (!anthropicApiKey) {
       throw new Error('ANTHROPIC_API_KEY not configured');
@@ -145,25 +152,34 @@ serve(async (req) => {
       .update({ status: 'processing' })
       .eq('id', upload_id);
 
-    // Fetch PDF from storage URL
-    const pdfResponse = await fetch(file_url);
-    if (!pdfResponse.ok) {
-      throw new Error(`Failed to fetch PDF: ${pdfResponse.status}`);
+    // Helper: fetch a file URL and return base64
+    async function fetchFileAsBase64(url: string): Promise<{ base64: string; byteLength: number }> {
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        throw new Error(`Failed to fetch file: ${resp.status}`);
+      }
+      const arrayBuffer = await resp.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let base64 = '';
+      const CHUNK = 8192;
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        const slice = bytes.subarray(i, Math.min(i + CHUNK, bytes.length));
+        base64 += String.fromCharCode(...slice);
+      }
+      return { base64: btoa(base64), byteLength: arrayBuffer.byteLength };
     }
 
-    const pdfArrayBuffer = await pdfResponse.arrayBuffer();
-    const pdfBytes = new Uint8Array(pdfArrayBuffer);
+    // Fetch primary file from storage
+    const primaryFile = await fetchFileAsBase64(file_url);
+    console.log(`Primary file fetched (${media_type}), size: ${primaryFile.byteLength} bytes, base64 length: ${primaryFile.base64.length}`);
 
-    // Convert to base64 in chunks to avoid call stack overflow
-    let pdfBase64 = '';
-    const CHUNK = 8192;
-    for (let i = 0; i < pdfBytes.length; i += CHUNK) {
-      const slice = pdfBytes.subarray(i, Math.min(i + CHUNK, pdfBytes.length));
-      pdfBase64 += String.fromCharCode(...slice);
+    // For multi-image uploads, fetch additional pages
+    const additionalFiles: Array<{ base64: string; byteLength: number }> = [];
+    for (let i = 0; i < additional_image_urls.length; i++) {
+      const extra = await fetchFileAsBase64(additional_image_urls[i]);
+      console.log(`Additional image ${i + 1} fetched, size: ${extra.byteLength} bytes`);
+      additionalFiles.push(extra);
     }
-    pdfBase64 = btoa(pdfBase64);
-
-    console.log(`PDF fetched, size: ${pdfArrayBuffer.byteLength} bytes, base64 length: ${pdfBase64.length}`);
 
     // Fetch all users BEFORE calling Claude so we can include names in the prompt
     const { data: users, error: usersError } = await supabase
@@ -181,37 +197,68 @@ serve(async (req) => {
       .map((u: { name: string }) => u.name.trim());
     const prompt = buildSchedulePrompt(employeeNames);
 
-    console.log(`Sending to Claude with ${employeeNames.length} known employee names`);
+    console.log(`Sending to Claude with ${employeeNames.length} known employee names, format: ${media_type}`);
 
-    // Send to Claude API with PDF support via beta header
+    // Build content blocks based on file type (PDF vs images)
+    const isImage = media_type.startsWith('image/');
+    const contentBlocks: any[] = [];
+
+    if (isImage) {
+      // Primary image
+      contentBlocks.push({
+        type: 'image',
+        source: {
+          type: 'base64',
+          media_type: media_type,
+          data: primaryFile.base64,
+        },
+      });
+      // Additional page images
+      for (const extra of additionalFiles) {
+        contentBlocks.push({
+          type: 'image',
+          source: {
+            type: 'base64',
+            media_type: media_type,
+            data: extra.base64,
+          },
+        });
+      }
+      console.log(`Sending ${1 + additionalFiles.length} image(s) to Claude`);
+    } else {
+      // PDF document
+      contentBlocks.push({
+        type: 'document',
+        source: {
+          type: 'base64',
+          media_type: 'application/pdf',
+          data: primaryFile.base64,
+        },
+      });
+    }
+
+    // Add the prompt as the last content block
+    contentBlocks.push({
+      type: 'text',
+      text: prompt,
+    });
+
+    // Send to Claude API with PDF support + extended output via beta headers
     const claudeResponse = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': anthropicApiKey,
         'anthropic-version': '2023-06-01',
-        'anthropic-beta': 'pdfs-2024-09-25',
+        'anthropic-beta': 'pdfs-2024-09-25,output-128k-2025-02-19',
       },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 16384,
+        max_tokens: 64000,
         messages: [
           {
             role: 'user',
-            content: [
-              {
-                type: 'document',
-                source: {
-                  type: 'base64',
-                  media_type: 'application/pdf',
-                  data: pdfBase64,
-                },
-              },
-              {
-                type: 'text',
-                text: prompt,
-              },
-            ],
+            content: contentBlocks,
           },
         ],
       }),
@@ -225,8 +272,15 @@ serve(async (req) => {
 
     const claudeData = await claudeResponse.json();
     const responseText = claudeData.content?.[0]?.text || '';
+    const stopReason = claudeData.stop_reason || 'unknown';
 
-    console.log(`Claude response received, length: ${responseText.length}`);
+    console.log(`Claude response received, length: ${responseText.length}, stop_reason: ${stopReason}`);
+
+    // Detect output truncation — this means the schedule was too large for the token limit
+    if (stopReason === 'max_tokens') {
+      console.error('Claude response was TRUNCATED — output hit max_tokens limit. Schedule may be incomplete.');
+      throw new Error('Schedule PDF is too large — the AI response was truncated. Try uploading fewer pages or splitting into separate uploads per job role.');
+    }
 
     // Parse the JSON response
     let parsedSchedule;

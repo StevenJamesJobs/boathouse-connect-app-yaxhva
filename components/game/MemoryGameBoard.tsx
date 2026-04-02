@@ -12,7 +12,7 @@ import {
 } from '@/utils/game/gameEngine';
 import MemoryCard from './MemoryCard';
 
-const MISMATCH_DELAY = 800;
+const MISMATCH_DELAY = 1400;
 const CARD_GAP = 8; // total gap between cards
 const BOARD_PADDING = 16;
 
@@ -105,10 +105,10 @@ export default function MemoryGameBoard({
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           onMatch();
 
-          // Small delay so the player sees both cards, then process match
+          // Delay so the player sees both cards in the preview bar, then process match
           setTimeout(() => {
             setGameState(prev => processMatch(prev, pairId, difficulty.level, timeRemaining));
-          }, 400);
+          }, 800);
         } else {
           // Check if this is a grace mismatch (at least one unseen card)
           const grace = isGraceMismatch(

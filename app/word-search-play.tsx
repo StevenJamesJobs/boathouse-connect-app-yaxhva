@@ -33,6 +33,9 @@ import {
   getTimeLimitSeconds,
   calculateWordSearchScore,
   getDifficultyConfig,
+  POINTS_PER_WORD,
+  TIMED_BONUS_PER_SECOND,
+  DIFFICULTY_MULTIPLIER,
 } from '@/utils/game/wordSearchEngine';
 import { getWordsForCategory } from '@/utils/game/wordSearchDataAdapters';
 import WordSearchGrid from '@/components/game/WordSearchGrid';
@@ -92,7 +95,7 @@ export default function WordSearchPlayScreen() {
       }
       return next;
     });
-    setScore((prev) => prev + 10);
+    setScore((prev) => prev + Math.round(POINTS_PER_WORD * DIFFICULTY_MULTIPLIER[difficulty]));
   }, [puzzle]);
 
   // ─── Timer callbacks ──────────────────────────────────────────────────────────
@@ -114,7 +117,7 @@ export default function WordSearchPlayScreen() {
       scoreSavedRef.current = true;
       const timeRemaining = timeLimitSeconds > 0 ? Math.max(0, timeLimitSeconds - elapsedSeconds) : 0;
       const finalScore = phase === 'won'
-        ? calculateWordSearchScore(foundWordIds.length, timeRemaining, playMode)
+        ? calculateWordSearchScore(foundWordIds.length, timeRemaining, playMode, difficulty)
         : score;
 
       supabase.from('word_search_scores').insert({
@@ -152,9 +155,18 @@ export default function WordSearchPlayScreen() {
     const isWin = phase === 'won';
     const timeRemaining = timeLimitSeconds > 0 ? Math.max(0, timeLimitSeconds - elapsedSeconds) : 0;
     const finalScore = isWin
-      ? calculateWordSearchScore(foundWordIds.length, timeRemaining, playMode)
+      ? calculateWordSearchScore(foundWordIds.length, timeRemaining, playMode, difficulty)
       : score;
-    const timeBonus = isWin && playMode === 'timed' ? timeRemaining * 2 : 0;
+    const multiplier = DIFFICULTY_MULTIPLIER[difficulty];
+    const pointsPerWord = Math.round(POINTS_PER_WORD * multiplier);
+    const timeBonus = isWin && playMode === 'timed' ? Math.round(timeRemaining * TIMED_BONUS_PER_SECOND * multiplier) : 0;
+
+    // Group words by dish/cocktail for review
+    const grouped = new Map<string, WordSearchWord[]>();
+    for (const word of puzzle.words) {
+      if (!grouped.has(word.itemName)) grouped.set(word.itemName, []);
+      grouped.get(word.itemName)!.push(word);
+    }
 
     return (
       <Modal visible transparent animationType="fade">
@@ -172,7 +184,7 @@ export default function WordSearchPlayScreen() {
 
             {/* Score breakdown */}
             <View style={[styles.scoreBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <ScoreRow label="Words Found" value={`${foundWordIds.length} × 10`} color={colors.primary} />
+              <ScoreRow label="Words Found" value={`${foundWordIds.length} × ${pointsPerWord}`} color={colors.primary} />
               {playMode === 'timed' && isWin && (
                 <ScoreRow label="Time Bonus" value={`+${timeBonus}`} color="#10B981" />
               )}
@@ -180,26 +192,35 @@ export default function WordSearchPlayScreen() {
               <ScoreRow label="Total Score" value={String(finalScore)} color={colors.primary} bold />
             </View>
 
-            {/* Word review */}
+            {/* Word review grouped by dish/cocktail */}
             <View style={[styles.reviewBox, { borderColor: colors.border }]}>
               <Text style={[styles.reviewTitle, { color: colors.text }]}>Word Review</Text>
               <ScrollView style={styles.reviewScroll} showsVerticalScrollIndicator={false}>
-                {puzzle.words.map((word) => {
-                  const wasFound = foundWordIds.includes(word.id);
-                  return (
-                    <View key={word.id} style={styles.reviewRow}>
-                      <Text style={[styles.reviewCheck, { color: wasFound ? '#10B981' : '#EF4444' }]}>
-                        {wasFound ? '✓' : '✗'}
-                      </Text>
-                      <Text style={[styles.reviewWordLabel, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {word.displayLabel}
-                      </Text>
-                      <Text style={[styles.reviewSearchWord, { color: wasFound ? colors.primary : colors.textSecondary }]}>
-                        {word.searchWord}
+                {Array.from(grouped.entries()).map(([itemName, words]) => (
+                  <View key={itemName}>
+                    <View style={styles.reviewGroupHeader}>
+                      <Text style={[styles.reviewGroupTitle, { color: colors.text }]}>
+                        🍽 {itemName}
                       </Text>
                     </View>
-                  );
-                })}
+                    {words.map((word) => {
+                      const wasFound = foundWordIds.includes(word.id);
+                      return (
+                        <View key={word.id} style={styles.reviewRow}>
+                          <Text style={[styles.reviewCheck, { color: wasFound ? '#10B981' : '#EF4444' }]}>
+                            {wasFound ? '✓' : '✗'}
+                          </Text>
+                          <Text style={[styles.reviewWordLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+                            {word.displayLabel}
+                          </Text>
+                          <Text style={[styles.reviewSearchWord, { color: wasFound ? colors.primary : colors.textSecondary }]}>
+                            {word.searchWord}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                ))}
               </ScrollView>
             </View>
 
@@ -385,11 +406,20 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 6,
   },
-  reviewScroll: { maxHeight: 160, paddingHorizontal: 12, paddingBottom: 8 },
+  reviewScroll: { maxHeight: 220, paddingHorizontal: 12, paddingBottom: 8 },
+  reviewGroupHeader: {
+    paddingTop: 8,
+    paddingBottom: 2,
+  },
+  reviewGroupTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
   reviewRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 4,
+    paddingLeft: 4,
     gap: 8,
   },
   reviewCheck: { fontSize: 14, fontWeight: '700', width: 18 },
