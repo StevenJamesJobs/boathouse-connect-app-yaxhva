@@ -41,7 +41,8 @@ chat_history.json
 assets/images/winter-*.png
 assets/images/MarchStPatricks*.png
 assets/images/MarchStPatricks*.jpg
-assets/images/MarchMadnessAppClip.jpg
+assets/images/MarchMadness*.png
+assets/images/MarchMadness*.jpg
 
 # Unused UUID-named images (old splash/icon variants)
 # Keep only the ones actually referenced in code
