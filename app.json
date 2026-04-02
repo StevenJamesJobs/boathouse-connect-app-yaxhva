@@ -20,7 +20,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": ["remote-notification"],
-        "NSPhotoLibraryUsageDescription": "Boathouse Connect needs access to your photo library so you can upload a profile picture, as well as images for menu items, announcements, special features, upcoming events, recipes, and messages."
+        "NSPhotoLibraryUsageDescription": "Boathouse Connect needs access to your photo library so you can upload a profile picture, as well as images for menu items, announcements, special features, upcoming events, recipes, and messages.",
+        "NSCameraUsageDescription": "Boathouse Connect needs camera access so you can take photos for your profile picture, menu items, announcements, and other content."
       },
       "googleServicesFile": "./GoogleService-Info.plist"
     },

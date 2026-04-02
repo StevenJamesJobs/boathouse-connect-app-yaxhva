@@ -86,6 +86,9 @@
     "no_new_messages": "Sin mensajes nuevos"
   },
   "notifications": {
+    "title": "Notificaciones",
+    "empty": "Sin notificaciones",
+    "just_now": "Ahora",
     "loading": "Cargando preferencias...",
     "choose_notifications": "Elige qué notificaciones quieres recibir",
     "messages": "Mensajes",
@@ -316,11 +319,6 @@
     "today": "Hoy",
     "events": "Eventos",
     "specials": "Especiales"
-  },
-  "notifications": {
-    "title": "Notificaciones",
-    "empty": "Sin notificaciones",
-    "just_now": "Ahora"
   },
   "manager_home": {
     "good_morning": "Buenos Días",
