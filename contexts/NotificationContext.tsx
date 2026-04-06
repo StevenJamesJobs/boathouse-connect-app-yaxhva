@@ -246,6 +246,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               case 'tools':
                 router.push(`${portalPrefix}/tools`);
                 break;
+              case 'game_hub':
+                router.push('/game-hub');
+                break;
               case 'profile':
                 router.push(`${portalPrefix}/profile`);
                 break;

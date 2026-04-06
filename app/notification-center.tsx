@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,9 +14,33 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
+import { supabase } from '@/app/integrations/supabase/client';
+
+const JOB_TITLE_OPTIONS = [
+  'Banquet Captain',
+  'Banquets',
+  'Bartender',
+  'Busser',
+  'Chef',
+  'Host',
+  'Kitchen',
+  'Lead Server',
+  'Manager',
+  'Runner',
+  'Server',
+];
+
+interface SentNotification {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string;
+  data: any;
+}
 
 export default function NotificationCenter() {
   const router = useRouter();
@@ -33,6 +57,7 @@ export default function NotificationCenter() {
     { value: 'rewards', label: t('notification_center.opens_to_rewards') },
     { value: 'menus', label: t('notification_center.opens_to_menus') },
     { value: 'tools', label: t('notification_center.opens_to_tools') },
+    { value: 'game_hub', label: t('notification_center.opens_to_game_hub') },
   ];
 
   const [title, setTitle] = useState('');
@@ -41,8 +66,104 @@ export default function NotificationCenter() {
   const [showDestinationPicker, setShowDestinationPicker] = useState(false);
   const [sending, setSending] = useState(false);
 
+  // Audience targeting
+  const [audienceMode, setAudienceMode] = useState<'all' | 'job_titles'>('all');
+  const [selectedJobTitles, setSelectedJobTitles] = useState<string[]>([]);
+  const [showAudiencePicker, setShowAudiencePicker] = useState(false);
+
+  // Sent notification history
+  const [activeTab, setActiveTab] = useState<'compose' | 'history'>('compose');
+  const [sentNotifications, setSentNotifications] = useState<SentNotification[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const maxTitleLength = 50;
   const maxBodyLength = 200;
+
+  const loadSentHistory = useCallback(async () => {
+    setLoadingHistory(true);
+    try {
+      const { data, error } = await (supabase
+        .from('custom_notifications') as any)
+        .select('id, title, body, created_at, data')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (!error && data) {
+        setSentNotifications(data as SentNotification[]);
+      }
+    } catch (err) {
+      console.error('Error loading sent history:', err);
+    }
+    setLoadingHistory(false);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (activeTab === 'history') {
+        loadSentHistory();
+      }
+    }, [activeTab])
+  );
+
+  const handleDeleteNotification = (notif: SentNotification) => {
+    Alert.alert(
+      'Delete Notification',
+      `Remove "${notif.title}" from the notification shade for all users?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingId(notif.id);
+            try {
+              const { error } = await (supabase
+                .from('custom_notifications') as any)
+                .delete()
+                .eq('id', notif.id);
+
+              if (error) throw error;
+              setSentNotifications(prev => prev.filter(n => n.id !== notif.id));
+            } catch (err) {
+              console.error('Error deleting notification:', err);
+              Alert.alert('Error', 'Failed to delete notification.');
+            }
+            setDeletingId(null);
+          },
+        },
+      ]
+    );
+  };
+
+  const toggleJobTitle = (title: string) => {
+    setSelectedJobTitles(prev => {
+      if (prev.includes(title)) {
+        return prev.filter(t => t !== title);
+      }
+      return [...prev, title];
+    });
+  };
+
+  const getAudienceLabel = () => {
+    if (audienceMode === 'all') return 'All Staff';
+    if (selectedJobTitles.length === 0) return 'Select job titles...';
+    if (selectedJobTitles.length <= 2) return selectedJobTitles.join(', ');
+    return `${selectedJobTitles.length} job titles selected`;
+  };
+
+  const getTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffHours < 1) return 'Just now';
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays === 1) return '1d ago';
+    return `${diffDays}d ago`;
+  };
 
   async function handleSendNotification() {
     // Validation
@@ -56,26 +177,41 @@ export default function NotificationCenter() {
       return;
     }
 
+    if (audienceMode === 'job_titles' && selectedJobTitles.length === 0) {
+      Alert.alert('Audience Required', 'Please select at least one job title.');
+      return;
+    }
+
+    const audienceText = audienceMode === 'all'
+      ? 'All Staff'
+      : selectedJobTitles.join(', ');
+
     // Confirm sending
     Alert.alert(
       t('notification_center.send_confirm_title'),
-      `${t('notification_center.send_confirm_body')}\n\n${t('notification_center.title_label')}: "${title}"\n${t('notification_center.message_label')}: "${body}"${destination ? `\n${t('notification_center.opens_to')}: ${DESTINATION_OPTIONS.find(d => d.value === destination)?.label}` : ''}`,
+      `${t('notification_center.send_confirm_body')}\n\n${t('notification_center.title_label')}: "${title}"\n${t('notification_center.message_label')}: "${body}"\nTo: ${audienceText}${destination ? `\n${t('notification_center.opens_to')}: ${DESTINATION_OPTIONS.find(d => d.value === destination)?.label}` : ''}`,
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
           text: t('common.send'),
           style: 'default',
-          onPress: sendNotification,
+          onPress: doSendNotification,
         },
       ]
     );
   }
 
-  async function sendNotification() {
+  async function doSendNotification() {
     setSending(true);
 
     try {
-      await sendCustomNotification(title, body, destination ? { destination } : undefined);
+      const extraData: Record<string, any> = {};
+      if (destination) extraData.destination = destination;
+      if (audienceMode === 'job_titles' && selectedJobTitles.length > 0) {
+        extraData.job_titles = selectedJobTitles;
+      }
+
+      await sendCustomNotification(title, body, Object.keys(extraData).length > 0 ? extraData : undefined);
 
       Alert.alert(
         t('notification_center.sent_title'),
@@ -87,7 +223,8 @@ export default function NotificationCenter() {
               setTitle('');
               setBody('');
               setDestination('');
-              router.back();
+              setAudienceMode('all');
+              setSelectedJobTitles([]);
             },
           },
         ]
@@ -155,215 +292,426 @@ export default function NotificationCenter() {
           <View style={{ width: 40 }} />
         </View>
 
-        <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-          <View style={styles.card}>
-            <View style={styles.iconContainer}>
-              <IconSymbol
-                ios_icon_name="megaphone.fill"
-                android_material_icon_name="campaign"
-                size={48}
-                color={colors.primary}
-              />
-            </View>
-
-            <Text style={styles.cardTitle}>
-              {t('notification_center.send_to_all')}
+        {/* Tabs: Compose / Sent History */}
+        <View style={styles.tabBar}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'compose' && { backgroundColor: colors.primary }]}
+            onPress={() => setActiveTab('compose')}
+          >
+            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'compose' && { color: '#FFFFFF' }]}>
+              Compose
             </Text>
-
-            <Text style={styles.cardDescription}>
-              {t('notification_center.description')}
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'history' && { backgroundColor: colors.primary }]}
+            onPress={() => {
+              setActiveTab('history');
+              loadSentHistory();
+            }}
+          >
+            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'history' && { color: '#FFFFFF' }]}>
+              Sent History
             </Text>
+          </TouchableOpacity>
+        </View>
 
-            {/* Title Input */}
-            <View style={styles.inputContainer}>
-              <View style={styles.inputHeader}>
-                <Text style={styles.inputLabel}>
-                  {t('notification_center.title_label')}
-                </Text>
-                <Text style={styles.characterCount}>
-                  {title.length}/{maxTitleLength}
-                </Text>
-              </View>
-              <TextInput
-                style={styles.titleInput}
-                placeholder={t('notification_center.title_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-                value={title}
-                onChangeText={(text) => {
-                  if (text.length <= maxTitleLength) {
-                    setTitle(text);
-                  }
-                }}
-                maxLength={maxTitleLength}
-              />
-            </View>
-
-            {/* Body Input */}
-            <View style={styles.inputContainer}>
-              <View style={styles.inputHeader}>
-                <Text style={styles.inputLabel}>
-                  {t('notification_center.message_label')}
-                </Text>
-                <Text style={styles.characterCount}>
-                  {body.length}/{maxBodyLength}
-                </Text>
-              </View>
-              <TextInput
-                style={styles.bodyInput}
-                placeholder={t('notification_center.message_placeholder')}
-                placeholderTextColor={colors.textSecondary}
-                value={body}
-                onChangeText={(text) => {
-                  if (text.length <= maxBodyLength) {
-                    setBody(text);
-                  }
-                }}
-                maxLength={maxBodyLength}
-                multiline
-                numberOfLines={4}
-                textAlignVertical="top"
-              />
-            </View>
-
-            {/* Destination Picker */}
-            <View style={styles.inputContainer}>
-              <View style={styles.inputHeader}>
-                <Text style={styles.inputLabel}>
-                  {t('notification_center.opens_to')}
-                </Text>
-                <Text style={styles.characterCount}>
-                  Optional
-                </Text>
-              </View>
-              <TouchableOpacity
-                style={styles.destinationSelector}
-                onPress={() => setShowDestinationPicker(true)}
-              >
-                <Text style={[
-                  styles.destinationSelectorText,
-                  !destination && { color: colors.textSecondary }
-                ]}>
-                  {destination
-                    ? DESTINATION_OPTIONS.find(d => d.value === destination)?.label
-                    : t('notification_center.opens_to_placeholder')}
-                </Text>
+        {activeTab === 'compose' ? (
+          <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <View style={styles.card}>
+              <View style={styles.iconContainer}>
                 <IconSymbol
-                  ios_icon_name="chevron.down"
-                  android_material_icon_name="expand-more"
-                  size={20}
-                  color={colors.textSecondary}
+                  ios_icon_name="megaphone.fill"
+                  android_material_icon_name="campaign"
+                  size={48}
+                  color={colors.primary}
                 />
-              </TouchableOpacity>
-              <Text style={styles.destinationHint}>
-                {t('notification_center.opens_to_hint')}
-              </Text>
-            </View>
+              </View>
 
-            {/* Destination Picker Modal */}
-            <Modal
-              visible={showDestinationPicker}
-              transparent
-              animationType="fade"
-              onRequestClose={() => setShowDestinationPicker(false)}
-            >
-              <TouchableOpacity
-                style={styles.pickerOverlay}
-                activeOpacity={1}
-                onPress={() => setShowDestinationPicker(false)}
+              <Text style={styles.cardTitle}>
+                Send Notification
+              </Text>
+
+              <Text style={styles.cardDescription}>
+                {t('notification_center.description')}
+              </Text>
+
+              {/* Audience Selector */}
+              <View style={styles.inputContainer}>
+                <View style={styles.inputHeader}>
+                  <Text style={styles.inputLabel}>Send To</Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.destinationSelector}
+                  onPress={() => setShowAudiencePicker(true)}
+                >
+                  <IconSymbol
+                    ios_icon_name="person.2.fill"
+                    android_material_icon_name="group"
+                    size={18}
+                    color={colors.primary}
+                  />
+                  <Text style={[
+                    styles.destinationSelectorText,
+                    audienceMode === 'job_titles' && selectedJobTitles.length === 0 && { color: colors.textSecondary },
+                  ]}>
+                    {getAudienceLabel()}
+                  </Text>
+                  <IconSymbol
+                    ios_icon_name="chevron.down"
+                    android_material_icon_name="expand-more"
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+
+              {/* Title Input */}
+              <View style={styles.inputContainer}>
+                <View style={styles.inputHeader}>
+                  <Text style={styles.inputLabel}>
+                    {t('notification_center.title_label')}
+                  </Text>
+                  <Text style={styles.characterCount}>
+                    {title.length}/{maxTitleLength}
+                  </Text>
+                </View>
+                <TextInput
+                  style={styles.titleInput}
+                  placeholder={t('notification_center.title_placeholder')}
+                  placeholderTextColor={colors.textSecondary}
+                  value={title}
+                  onChangeText={(text) => {
+                    if (text.length <= maxTitleLength) {
+                      setTitle(text);
+                    }
+                  }}
+                  maxLength={maxTitleLength}
+                />
+              </View>
+
+              {/* Body Input */}
+              <View style={styles.inputContainer}>
+                <View style={styles.inputHeader}>
+                  <Text style={styles.inputLabel}>
+                    {t('notification_center.message_label')}
+                  </Text>
+                  <Text style={styles.characterCount}>
+                    {body.length}/{maxBodyLength}
+                  </Text>
+                </View>
+                <TextInput
+                  style={styles.bodyInput}
+                  placeholder={t('notification_center.message_placeholder')}
+                  placeholderTextColor={colors.textSecondary}
+                  value={body}
+                  onChangeText={(text) => {
+                    if (text.length <= maxBodyLength) {
+                      setBody(text);
+                    }
+                  }}
+                  maxLength={maxBodyLength}
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
+
+              {/* Destination Picker */}
+              <View style={styles.inputContainer}>
+                <View style={styles.inputHeader}>
+                  <Text style={styles.inputLabel}>
+                    {t('notification_center.opens_to')}
+                  </Text>
+                  <Text style={styles.characterCount}>
+                    Optional
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.destinationSelector}
+                  onPress={() => setShowDestinationPicker(true)}
+                >
+                  <Text style={[
+                    styles.destinationSelectorText,
+                    !destination && { color: colors.textSecondary }
+                  ]}>
+                    {destination
+                      ? DESTINATION_OPTIONS.find(d => d.value === destination)?.label
+                      : t('notification_center.opens_to_placeholder')}
+                  </Text>
+                  <IconSymbol
+                    ios_icon_name="chevron.down"
+                    android_material_icon_name="expand-more"
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+                <Text style={styles.destinationHint}>
+                  {t('notification_center.opens_to_hint')}
+                </Text>
+              </View>
+
+              {/* Destination Picker Modal */}
+              <Modal
+                visible={showDestinationPicker}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowDestinationPicker(false)}
               >
-                <View style={styles.pickerContainer}>
-                  <Text style={styles.pickerTitle}>{t('notification_center.opens_to')}</Text>
-                  {DESTINATION_OPTIONS.map((option) => (
+                <TouchableOpacity
+                  style={styles.pickerOverlay}
+                  activeOpacity={1}
+                  onPress={() => setShowDestinationPicker(false)}
+                >
+                  <View style={styles.pickerContainer}>
+                    <Text style={styles.pickerTitle}>{t('notification_center.opens_to')}</Text>
+                    {DESTINATION_OPTIONS.map((option) => (
+                      <TouchableOpacity
+                        key={option.value}
+                        style={[
+                          styles.pickerOption,
+                          destination === option.value && styles.pickerOptionSelected,
+                        ]}
+                        onPress={() => {
+                          setDestination(option.value);
+                          setShowDestinationPicker(false);
+                        }}
+                      >
+                        <Text style={[
+                          styles.pickerOptionText,
+                          destination === option.value && styles.pickerOptionTextSelected,
+                        ]}>
+                          {option.label}
+                        </Text>
+                        {destination === option.value && (
+                          <IconSymbol
+                            ios_icon_name="checkmark"
+                            android_material_icon_name="check"
+                            size={18}
+                            color={colors.primary}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </TouchableOpacity>
+              </Modal>
+
+              {/* Audience Picker Modal */}
+              <Modal
+                visible={showAudiencePicker}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setShowAudiencePicker(false)}
+              >
+                <TouchableOpacity
+                  style={styles.pickerOverlay}
+                  activeOpacity={1}
+                  onPress={() => setShowAudiencePicker(false)}
+                >
+                  <View style={styles.pickerContainer}>
+                    <Text style={styles.pickerTitle}>Send To</Text>
+                    {/* All Staff option */}
                     <TouchableOpacity
-                      key={option.value}
-                      style={[
-                        styles.pickerOption,
-                        destination === option.value && styles.pickerOptionSelected,
-                      ]}
+                      style={[styles.pickerOption, audienceMode === 'all' && styles.pickerOptionSelected]}
                       onPress={() => {
-                        setDestination(option.value);
-                        setShowDestinationPicker(false);
+                        setAudienceMode('all');
+                        setSelectedJobTitles([]);
+                        setShowAudiencePicker(false);
                       }}
                     >
-                      <Text style={[
-                        styles.pickerOptionText,
-                        destination === option.value && styles.pickerOptionTextSelected,
-                      ]}>
-                        {option.label}
-                      </Text>
-                      {destination === option.value && (
+                      <View style={styles.audienceOptionRow}>
                         <IconSymbol
-                          ios_icon_name="checkmark"
-                          android_material_icon_name="check"
+                          ios_icon_name="person.2.fill"
+                          android_material_icon_name="group"
                           size={18}
-                          color={colors.primary}
+                          color={audienceMode === 'all' ? colors.primary : colors.textSecondary}
+                        />
+                        <Text style={[
+                          styles.pickerOptionText,
+                          audienceMode === 'all' && styles.pickerOptionTextSelected,
+                        ]}>
+                          All Staff
+                        </Text>
+                      </View>
+                      {audienceMode === 'all' && (
+                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={18} color={colors.primary} />
+                      )}
+                    </TouchableOpacity>
+
+                    {/* Divider */}
+                    <View style={[styles.audienceDivider, { backgroundColor: colors.border }]} />
+                    <Text style={[styles.audienceSectionLabel, { color: colors.textSecondary }]}>By Job Title</Text>
+
+                    {/* Job title checkboxes */}
+                    {JOB_TITLE_OPTIONS.map((jt) => {
+                      const isSelected = selectedJobTitles.includes(jt);
+                      return (
+                        <TouchableOpacity
+                          key={jt}
+                          style={[styles.pickerOption, isSelected && styles.pickerOptionSelected]}
+                          onPress={() => {
+                            setAudienceMode('job_titles');
+                            toggleJobTitle(jt);
+                          }}
+                        >
+                          <Text style={[
+                            styles.pickerOptionText,
+                            isSelected && styles.pickerOptionTextSelected,
+                          ]}>
+                            {jt}
+                          </Text>
+                          {isSelected && (
+                            <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={18} color={colors.primary} />
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })}
+
+                    {/* Done button */}
+                    <TouchableOpacity
+                      style={[styles.audienceDoneBtn, { backgroundColor: colors.primary }]}
+                      onPress={() => setShowAudiencePicker(false)}
+                    >
+                      <Text style={styles.audienceDoneBtnText}>Done</Text>
+                    </TouchableOpacity>
+                  </View>
+                </TouchableOpacity>
+              </Modal>
+
+              {/* Preview */}
+              {(title || body) && (
+                <View style={styles.previewContainer}>
+                  <Text style={styles.previewLabel}>
+                    {t('notification_center.preview')}
+                  </Text>
+                  <View style={styles.previewCard}>
+                    {title && (
+                      <Text style={styles.previewTitle}>
+                        {title}
+                      </Text>
+                    )}
+                    {body && (
+                      <Text style={styles.previewBody}>
+                        {body}
+                      </Text>
+                    )}
+                    {audienceMode === 'job_titles' && selectedJobTitles.length > 0 && (
+                      <Text style={[styles.previewAudience, { color: colors.textSecondary }]}>
+                        To: {selectedJobTitles.join(', ')}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+
+              {/* Send Button */}
+              <TouchableOpacity
+                style={[
+                  styles.sendButton,
+                  (!title.trim() || !body.trim() || sending || (audienceMode === 'job_titles' && selectedJobTitles.length === 0)) && styles.sendButtonDisabled,
+                ]}
+                onPress={handleSendNotification}
+                disabled={!title.trim() || !body.trim() || sending || (audienceMode === 'job_titles' && selectedJobTitles.length === 0)}
+              >
+                {sending ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <>
+                    <IconSymbol
+                      ios_icon_name="paperplane.fill"
+                      android_material_icon_name="send"
+                      size={20}
+                      color="#FFFFFF"
+                    />
+                    <Text style={styles.sendButtonText}>
+                      {audienceMode === 'all' ? t('notification_center.send_button') : `Send to ${selectedJobTitles.length} Group${selectedJobTitles.length !== 1 ? 's' : ''}`}
+                    </Text>
+                  </>
+                )}
+              </TouchableOpacity>
+
+              {/* Info */}
+              <View style={styles.infoContainer}>
+                <IconSymbol
+                  ios_icon_name="info.circle"
+                  android_material_icon_name="info"
+                  size={16}
+                  color={colors.textSecondary}
+                />
+                <Text style={styles.infoText}>
+                  {t('notification_center.preferences_hint')}
+                </Text>
+              </View>
+            </View>
+          </ScrollView>
+        ) : (
+          /* Sent History Tab */
+          <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <View style={styles.card}>
+              <View style={styles.iconContainer}>
+                <IconSymbol
+                  ios_icon_name="clock.arrow.circlepath"
+                  android_material_icon_name="history"
+                  size={48}
+                  color={colors.primary}
+                />
+              </View>
+              <Text style={styles.cardTitle}>Sent Notifications</Text>
+              <Text style={styles.cardDescription}>
+                View and manage recently sent custom notifications. Deleting a notification removes it from the notification shade for all users.
+              </Text>
+
+              {loadingHistory ? (
+                <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} />
+              ) : sentNotifications.length === 0 ? (
+                <View style={styles.historyEmpty}>
+                  <Text style={[styles.historyEmptyText, { color: colors.textSecondary }]}>
+                    No custom notifications sent yet.
+                  </Text>
+                </View>
+              ) : (
+                sentNotifications.map((notif) => (
+                  <View key={notif.id} style={[styles.historyItem, { borderColor: colors.border }]}>
+                    <View style={styles.historyItemContent}>
+                      <Text style={[styles.historyItemTitle, { color: colors.text }]} numberOfLines={1}>
+                        {notif.title}
+                      </Text>
+                      <Text style={[styles.historyItemBody, { color: colors.textSecondary }]} numberOfLines={2}>
+                        {notif.body}
+                      </Text>
+                      <View style={styles.historyItemMeta}>
+                        <Text style={[styles.historyItemTime, { color: colors.textSecondary }]}>
+                          {getTimeAgo(notif.created_at)}
+                        </Text>
+                        {notif.data?.job_titles && (
+                          <Text style={[styles.historyItemAudience, { color: colors.primary }]}>
+                            To: {(notif.data.job_titles as string[]).join(', ')}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    <TouchableOpacity
+                      style={styles.historyDeleteBtn}
+                      onPress={() => handleDeleteNotification(notif)}
+                      disabled={deletingId === notif.id}
+                    >
+                      {deletingId === notif.id ? (
+                        <ActivityIndicator size="small" color="#FF3B30" />
+                      ) : (
+                        <IconSymbol
+                          ios_icon_name="trash.fill"
+                          android_material_icon_name="delete"
+                          size={20}
+                          color="#FF3B30"
                         />
                       )}
                     </TouchableOpacity>
-                  ))}
-                </View>
-              </TouchableOpacity>
-            </Modal>
-
-            {/* Preview */}
-            {(title || body) && (
-              <View style={styles.previewContainer}>
-                <Text style={styles.previewLabel}>
-                  {t('notification_center.preview')}
-                </Text>
-                <View style={styles.previewCard}>
-                  {title && (
-                    <Text style={styles.previewTitle}>
-                      {title}
-                    </Text>
-                  )}
-                  {body && (
-                    <Text style={styles.previewBody}>
-                      {body}
-                    </Text>
-                  )}
-                </View>
-              </View>
-            )}
-
-            {/* Send Button */}
-            <TouchableOpacity
-              style={[
-                styles.sendButton,
-                (!title.trim() || !body.trim() || sending) && styles.sendButtonDisabled,
-              ]}
-              onPress={handleSendNotification}
-              disabled={!title.trim() || !body.trim() || sending}
-            >
-              {sending ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <>
-                  <IconSymbol
-                    ios_icon_name="paperplane.fill"
-                    android_material_icon_name="send"
-                    size={20}
-                    color="#FFFFFF"
-                  />
-                  <Text style={styles.sendButtonText}>{t('notification_center.send_button')}</Text>
-                </>
+                  </View>
+                ))
               )}
-            </TouchableOpacity>
-
-            {/* Info */}
-            <View style={styles.infoContainer}>
-              <IconSymbol
-                ios_icon_name="info.circle"
-                android_material_icon_name="info"
-                size={16}
-                color={colors.textSecondary}
-              />
-              <Text style={styles.infoText}>
-                {t('notification_center.preferences_hint')}
-              </Text>
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -381,9 +729,26 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     paddingHorizontal: 16,
     paddingTop: 60,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomWidth: 0,
     backgroundColor: colors.card,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: colors.card,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
+    gap: 8,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 10,
+    backgroundColor: colors.background,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   backButton: {
     padding: 8,
@@ -578,5 +943,85 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontSize: 12,
     lineHeight: 18,
     color: colors.textSecondary,
+  },
+  // Audience picker
+  audienceOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  audienceDivider: {
+    height: 1,
+    marginVertical: 8,
+  },
+  audienceSectionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 4,
+    paddingHorizontal: 16,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  audienceDoneBtn: {
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  audienceDoneBtnText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  previewAudience: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 6,
+  },
+  // Sent History
+  historyEmpty: {
+    paddingVertical: 30,
+    alignItems: 'center',
+  },
+  historyEmptyText: {
+    fontSize: 14,
+    fontStyle: 'italic',
+  },
+  historyItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+    gap: 12,
+  },
+  historyItemContent: {
+    flex: 1,
+  },
+  historyItemTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  historyItemBody: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  historyItemMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginTop: 6,
+  },
+  historyItemTime: {
+    fontSize: 11,
+  },
+  historyItemAudience: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  historyDeleteBtn: {
+    padding: 8,
   },
 });

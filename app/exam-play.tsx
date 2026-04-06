@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
+  BackHandler,
+  AppState,
+  Alert,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -51,10 +54,58 @@ export default function ExamPlayScreen() {
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const examStateRef = useRef<ExamState | null>(null);
+  const examStartedAtRef = useRef<number | null>(null);
+  const phaseRef = useRef<Phase>('loading');
 
   useEffect(() => {
     examStateRef.current = examState;
   }, [examState]);
+
+  useEffect(() => {
+    phaseRef.current = phase;
+  }, [phase]);
+
+  // Block back navigation during active quiz (Android hardware back + iOS gesture blocked in _layout.tsx)
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (phase === 'playing' || phase === 'feedback') {
+        return true; // Block back
+      }
+      return false; // Allow back during loading, intro, completed
+    });
+    return () => backHandler.remove();
+  }, [phase]);
+
+  // AppState listener: recalculate timer when app returns from background
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && examStartedAtRef.current && timeLimitSeconds > 0) {
+        const currentPhase = phaseRef.current;
+        if (currentPhase === 'playing' || currentPhase === 'feedback') {
+          const elapsed = Math.floor((Date.now() - examStartedAtRef.current) / 1000);
+          const remaining = timeLimitSeconds - elapsed;
+
+          if (remaining <= 0) {
+            // Time expired while app was in background
+            if (timerRef.current) clearInterval(timerRef.current);
+            setTimeRemaining(0);
+            const currentState = examStateRef.current;
+            if (currentState && currentState.phase !== 'completed') {
+              const timedOutState = handleTimeout(currentState);
+              setExamState(timedOutState);
+              setPhase('completed');
+              if (!isPreview) {
+                submitResults(timedOutState);
+              }
+            }
+          } else {
+            setTimeRemaining(remaining);
+          }
+        }
+      }
+    });
+    return () => subscription.remove();
+  }, [timeLimitSeconds, isPreview]);
 
   // Load exam data
   useEffect(() => {
@@ -83,6 +134,26 @@ export default function ExamPlayScreen() {
       setTimeLimitSeconds(examData.time_limit_seconds);
       setTimeRemaining(examData.time_limit_seconds);
 
+      // Check for existing attempt (anti-cheat: detect already completed or already started)
+      if (!isPreview && user?.id) {
+        const { data: existingResult } = await (supabase
+          .from('exam_results' as any) as any)
+          .select('id, completed_at, correct_count, started_at')
+          .eq('exam_id', examId)
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (existingResult?.completed_at && existingResult?.correct_count > 0) {
+          // Already completed — redirect back
+          Alert.alert(
+            isSpanish ? 'Examen Completado' : 'Quiz Already Completed',
+            isSpanish ? 'Ya completaste este examen.' : 'You have already completed this quiz.',
+            [{ text: 'OK', onPress: () => router.back() }]
+          );
+          return;
+        }
+      }
+
       // Fetch questions
       const { data: questionsData, error: questionsError } = await (supabase
         .from('exam_questions' as any) as any)
@@ -105,33 +176,100 @@ export default function ExamPlayScreen() {
     }
   };
 
-  // Start timer
+  // Start timer — uses wall-clock time to prevent backgrounding exploit
   const startTimer = () => {
     timerRef.current = setInterval(() => {
-      setTimeRemaining(prev => {
-        const next = prev - 1;
-        if (next <= 0) {
-          if (timerRef.current) clearInterval(timerRef.current);
-          // Time's up
-          const currentState = examStateRef.current;
-          if (currentState && currentState.phase !== 'completed') {
-            const timedOutState = handleTimeout(currentState);
-            setExamState(timedOutState);
-            setPhase('completed');
-            if (!isPreview) {
-              submitResults(timedOutState);
-            }
+      if (!examStartedAtRef.current) return;
+      const elapsed = Math.floor((Date.now() - examStartedAtRef.current) / 1000);
+      const remaining = timeLimitSeconds - elapsed;
+
+      if (remaining <= 0) {
+        if (timerRef.current) clearInterval(timerRef.current);
+        setTimeRemaining(0);
+        // Time's up
+        const currentState = examStateRef.current;
+        if (currentState && currentState.phase !== 'completed') {
+          const timedOutState = handleTimeout(currentState);
+          setExamState(timedOutState);
+          setPhase('completed');
+          if (!isPreview) {
+            submitResults(timedOutState);
           }
-          return 0;
         }
-        return next;
-      });
+      } else {
+        setTimeRemaining(remaining);
+      }
     }, 1000);
   };
 
-  // Handle start quiz
-  const handleStart = () => {
+  // Handle start quiz — registers server-side started_at to prevent force-close exploit
+  const handleStart = async () => {
     if (!examState) return;
+
+    if (!isPreview && user?.id) {
+      try {
+        const { data, error } = await (supabase.rpc as any)('start_exam_attempt', {
+          p_exam_id: examId,
+          p_user_id: user.id,
+        });
+
+        if (error) {
+          console.error('start_exam_attempt error:', error);
+          Alert.alert(
+            isSpanish ? 'Error' : 'Error',
+            isSpanish ? 'No se pudo iniciar el examen. Inténtalo de nuevo.' : 'Could not start the quiz. Please try again.'
+          );
+          return;
+        }
+
+        const attempt = Array.isArray(data) ? data[0] : data;
+
+        if (attempt?.is_completed) {
+          Alert.alert(
+            isSpanish ? 'Examen Completado' : 'Quiz Already Completed',
+            isSpanish ? 'Ya completaste este examen.' : 'You have already completed this quiz.',
+            [{ text: 'OK', onPress: () => router.back() }]
+          );
+          return;
+        }
+
+        // Set the wall-clock start time from the server timestamp
+        if (attempt?.started_at) {
+          const serverStartMs = new Date(attempt.started_at).getTime();
+
+          // Check if this is a resumed attempt (started_at is more than 5 seconds ago)
+          const elapsed = Math.floor((Date.now() - serverStartMs) / 1000);
+          if (elapsed > 5 && timeLimitSeconds > 0) {
+            const remaining = timeLimitSeconds - elapsed;
+            if (remaining <= 0) {
+              // Time expired while they were away — auto-submit as timed out
+              const timedOutState = handleTimeout(examState);
+              setExamState(timedOutState);
+              setPhase('completed');
+              submitResults(timedOutState);
+              return;
+            }
+            // Resume with reduced time
+            setTimeRemaining(remaining);
+          }
+
+          examStartedAtRef.current = serverStartMs;
+        } else {
+          examStartedAtRef.current = Date.now();
+        }
+      } catch (err) {
+        console.error('start_exam_attempt exception:', err);
+        Alert.alert(
+          isSpanish ? 'Error' : 'Error',
+          isSpanish ? 'No se pudo iniciar el examen. Inténtalo de nuevo.' : 'Could not start the quiz. Please try again.'
+        );
+        return;
+      }
+    } else {
+      // Preview mode — just use local time
+      examStartedAtRef.current = Date.now();
+    }
+
     const started = startExam(examState);
     setExamState(started);
     setPhase('playing');
@@ -270,7 +408,22 @@ export default function ExamPlayScreen() {
             <View style={[styles.introInfoRow, { backgroundColor: colors.background }]}>
               <IconSymbol ios_icon_name="exclamationmark.triangle.fill" android_material_icon_name="warning" size={20} color="#F59E0B" />
               <Text style={[styles.introInfoText, { color: colors.text }]}>
-                {isSpanish ? 'No puedes volver a preguntas anteriores' : 'You cannot go back to previous questions'}
+                {timeLimitSeconds > 0
+                  ? (isSpanish
+                    ? 'No puedes volver a preguntas anteriores y el reloj seguirá corriendo una vez que comiences'
+                    : 'You cannot go back to previous questions and the clock will continue to run once you start')
+                  : (isSpanish
+                    ? 'No puedes volver a preguntas anteriores'
+                    : 'You cannot go back to previous questions')}
+              </Text>
+            </View>
+
+            <View style={[styles.introInfoRow, { backgroundColor: colors.background }]}>
+              <IconSymbol ios_icon_name="lock.shield.fill" android_material_icon_name="shield" size={20} color={colors.primary} />
+              <Text style={[styles.introInfoText, { color: colors.text }]}>
+                {isSpanish
+                  ? 'No te preocupes, tus compañeros no podrán ver tus resultados'
+                  : "Don't worry, your teammates will not be able to view your test scores"}
               </Text>
             </View>
           </View>

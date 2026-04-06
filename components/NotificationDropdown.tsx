@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import { fetchContentImagesBatch } from '@/utils/contentImages';
 import { stripFormattingTags } from '@/components/FormattedText';
 
-type NotificationType = 'announcement' | 'special_feature' | 'upcoming_event' | 'weekly_special';
+type NotificationType = 'announcement' | 'special_feature' | 'upcoming_event' | 'weekly_special' | 'custom_notification';
 
 interface NotificationItem {
   id: string;
@@ -53,6 +53,7 @@ interface NotificationDropdownProps {
     guideFile?: GuideFile | null;
   }) => void;
   visibility?: 'everyone' | 'managers' | 'employees';
+  isManager?: boolean;
 }
 
 const TYPE_CONFIG: Record<NotificationType, {
@@ -80,6 +81,11 @@ const TYPE_CONFIG: Record<NotificationType, {
     iconAndroid: 'restaurant',
     color: '#F44336', // Red
   },
+  custom_notification: {
+    iconIos: 'bell.fill',
+    iconAndroid: 'notifications',
+    color: '#9C27B0', // Purple
+  },
 };
 
 export default function NotificationDropdown({
@@ -87,12 +93,14 @@ export default function NotificationDropdown({
   onClose,
   onItemPress,
   visibility = 'everyone',
+  isManager = false,
 }: NotificationDropdownProps) {
   const colors = useThemeColors();
   const { language } = useLanguage();
   const { t } = useTranslation();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
@@ -195,6 +203,26 @@ export default function NotificationDropdown({
         }
       }
 
+      // Fetch custom notifications
+      const { data: customNotifs } = await (supabase
+        .from('custom_notifications') as any)
+        .select('id, title, body, created_at, data')
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (customNotifs) {
+        for (const cn of customNotifs) {
+          items.push({
+            id: cn.id,
+            type: 'custom_notification',
+            title: cn.title,
+            subtitle: cn.body,
+            createdAt: cn.created_at,
+            rawData: cn,
+          });
+        }
+      }
+
       // Sort all by created_at descending, take top 5
       items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
@@ -243,6 +271,11 @@ export default function NotificationDropdown({
         thumbnailUrl: data.thumbnail_url,
         thumbnailShape: data.thumbnail_shape,
       });
+    } else if (item.type === 'custom_notification') {
+      onItemPress({
+        title: data.title,
+        content: data.body,
+      });
     } else {
       const contentField = item.type === 'announcement' ? 'content' : 'content';
       onItemPress({
@@ -259,6 +292,27 @@ export default function NotificationDropdown({
       });
     }
     onClose();
+  };
+
+  const handleDeleteNotification = async (item: NotificationItem) => {
+    setDeletingId(item.id);
+    try {
+      if (item.type === 'custom_notification') {
+        await (supabase.from('custom_notifications') as any).delete().eq('id', item.id);
+      } else if (item.type === 'announcement') {
+        await (supabase.from('announcements') as any).update({ is_active: false }).eq('id', item.id);
+      } else if (item.type === 'special_feature') {
+        await (supabase.from('special_features') as any).update({ is_active: false }).eq('id', item.id);
+      } else if (item.type === 'upcoming_event') {
+        await (supabase.from('upcoming_events') as any).update({ is_active: false }).eq('id', item.id);
+      } else if (item.type === 'weekly_special') {
+        await (supabase.from('menu_items') as any).update({ is_active: false }).eq('id', item.id);
+      }
+      setNotifications(prev => prev.filter(n => !(n.id === item.id && n.type === item.type)));
+    } catch (err) {
+      console.error('Error deleting notification:', err);
+    }
+    setDeletingId(null);
   };
 
   const getTimeAgo = (dateString: string) => {
@@ -351,6 +405,28 @@ export default function NotificationDropdown({
                     <Text style={[styles.timeAgo, { color: colors.textSecondary }]}>
                       {getTimeAgo(item.createdAt)}
                     </Text>
+                    {isManager && (
+                      <TouchableOpacity
+                        style={styles.deleteBtn}
+                        onPress={(e) => {
+                          e.stopPropagation?.();
+                          handleDeleteNotification(item);
+                        }}
+                        disabled={deletingId === item.id}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        {deletingId === item.id ? (
+                          <ActivityIndicator size="small" color={colors.textSecondary} />
+                        ) : (
+                          <IconSymbol
+                            ios_icon_name="xmark.circle.fill"
+                            android_material_icon_name="cancel"
+                            size={18}
+                            color={colors.textSecondary}
+                          />
+                        )}
+                      </TouchableOpacity>
+                    )}
                   </TouchableOpacity>
                 );
               })
@@ -428,5 +504,9 @@ const styles = StyleSheet.create({
   timeAgo: {
     fontSize: 12,
     fontWeight: '500',
+  },
+  deleteBtn: {
+    padding: 4,
+    marginLeft: 4,
   },
 });

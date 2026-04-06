@@ -1,19 +1,24 @@
 /**
  * Game Hub
- * Player-facing hub screen with cards for Memory Game and Word Search.
+ * Player-facing hub screen with cards for Memory Game, Word Search,
+ * and a Leaderboard preview showing the top 3 overall leaders.
  */
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { supabase } from '@/app/integrations/supabase/client';
+import { useFocusEffect } from '@react-navigation/native';
 
 interface GameCard {
   title: string;
@@ -22,6 +27,14 @@ interface GameCard {
   androidIcon: string;
   route: string;
   color: string;
+}
+
+interface LeaderboardEntry {
+  user_id: string;
+  name: string;
+  profile_picture_url: string | null;
+  total_score: number;
+  games_played: number;
 }
 
 const GAME_CARDS: GameCard[] = [
@@ -43,9 +56,33 @@ const GAME_CARDS: GameCard[] = [
   },
 ];
 
+const RANK_MEDALS = ['🥇', '🥈', '🥉'];
+
 export default function GameHubScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const [topLeaders, setTopLeaders] = useState<LeaderboardEntry[]>([]);
+  const [loadingLeaders, setLoadingLeaders] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      const fetchTopLeaders = async () => {
+        setLoadingLeaders(true);
+        try {
+          const { data, error } = await (supabase.rpc as any)('get_master_leaderboard_overall', {
+            p_limit: 3,
+          });
+          if (!error && data) {
+            setTopLeaders(data as LeaderboardEntry[]);
+          }
+        } catch (err) {
+          console.error('Error fetching top leaders:', err);
+        }
+        setLoadingLeaders(false);
+      };
+      fetchTopLeaders();
+    }, [])
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -96,26 +133,60 @@ export default function GameHubScreen() {
           </TouchableOpacity>
         ))}
 
-        {/* Leaderboard Card */}
-        <TouchableOpacity
-          style={[styles.leaderboardCard, { backgroundColor: colors.card }]}
-          onPress={() => router.push('/master-leaderboard')}
-          activeOpacity={0.75}
-        >
-          <View style={[styles.iconContainer, { backgroundColor: '#F59E0B18' }]}>
-            <Text style={styles.trophyIcon}>🏆</Text>
+        {/* Leaderboard Card with Top 3 Preview */}
+        <View style={[styles.leaderboardCard, { backgroundColor: colors.card }]}>
+          <View style={styles.leaderboardHeader}>
+            <View style={[styles.iconContainer, { backgroundColor: '#F59E0B18' }]}>
+              <Text style={styles.trophyIcon}>🏆</Text>
+            </View>
+            <View style={styles.cardText}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Leaderboard</Text>
+              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>Top players across all games</Text>
+            </View>
           </View>
-          <View style={styles.cardText}>
-            <Text style={[styles.cardTitle, { color: colors.text }]}>Leaderboard</Text>
-            <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>See who's on top across all games</Text>
-          </View>
-          <IconSymbol
-            ios_icon_name="chevron.right"
-            android_material_icon_name="chevron-right"
-            size={18}
-            color={colors.textSecondary}
-          />
-        </TouchableOpacity>
+
+          {/* Top 3 Preview */}
+          {loadingLeaders ? (
+            <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
+          ) : topLeaders.length > 0 ? (
+            <View style={styles.top3Container}>
+              {topLeaders.map((leader, index) => (
+                <View key={leader.user_id} style={[styles.leaderRow, { borderTopColor: colors.border }]}>
+                  <Text style={styles.rankMedal}>{RANK_MEDALS[index]}</Text>
+                  {leader.profile_picture_url ? (
+                    <Image source={{ uri: leader.profile_picture_url }} style={styles.leaderAvatar} />
+                  ) : (
+                    <View style={[styles.leaderAvatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
+                      <Text style={[styles.leaderInitial, { color: colors.primary }]}>
+                        {leader.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={[styles.leaderName, { color: colors.text }]} numberOfLines={1}>
+                    {leader.name}
+                  </Text>
+                  <Text style={[styles.leaderScore, { color: colors.primary }]}>
+                    {leader.total_score.toLocaleString()}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <Text style={[styles.noScoresText, { color: colors.textSecondary }]}>
+              No scores yet — be the first!
+            </Text>
+          )}
+
+          {/* View Full Leaderboard Button */}
+          <TouchableOpacity
+            style={[styles.viewAllBtn, { backgroundColor: '#F59E0B15' }]}
+            onPress={() => router.push('/master-leaderboard')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.viewAllText, { color: '#F59E0B' }]}>View Full Leaderboard</Text>
+            <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color="#F59E0B" />
+          </TouchableOpacity>
+        </View>
       </ScrollView>
     </View>
   );
@@ -155,17 +226,57 @@ const styles = StyleSheet.create({
   cardText: { flex: 1 },
   cardTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
   cardDesc: { fontSize: 12, lineHeight: 17 },
+  trophyIcon: { fontSize: 28 },
+
+  // Leaderboard card
   leaderboardCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     borderRadius: 16,
     padding: 16,
-    gap: 14,
     marginTop: 6,
     boxShadow: '0px 2px 10px rgba(0,0,0,0.12)',
     elevation: 3,
   },
-  trophyIcon: {
-    fontSize: 28,
+  leaderboardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
   },
+  top3Container: {
+    marginTop: 12,
+  },
+  leaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    gap: 10,
+  },
+  rankMedal: { fontSize: 20, width: 28, textAlign: 'center' },
+  leaderAvatar: { width: 36, height: 36, borderRadius: 18 },
+  leaderAvatarPlaceholder: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  leaderInitial: { fontSize: 16, fontWeight: 'bold' },
+  leaderName: { flex: 1, fontSize: 14, fontWeight: '600' },
+  leaderScore: { fontSize: 15, fontWeight: '800' },
+  noScoresText: {
+    textAlign: 'center',
+    fontSize: 13,
+    fontStyle: 'italic',
+    marginVertical: 12,
+  },
+  viewAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 10,
+    paddingVertical: 10,
+    marginTop: 10,
+    gap: 6,
+  },
+  viewAllText: { fontSize: 14, fontWeight: '700' },
 });

@@ -49,6 +49,8 @@ interface MenuItem {
   price: string;
   category: string;
   subcategory: string | null;
+  available_for_lunch: boolean;
+  available_for_dinner: boolean;
   is_gluten_free: boolean;
   is_gluten_free_available: boolean;
   is_vegetarian: boolean;
@@ -704,8 +706,41 @@ export default function EmployeePortalScreen() {
               {formatPrice(item.price)}
             </Text>
           </View>
+          {/* Meal Period + Dietary Tags */}
+          <View style={styles.specialTagsRow}>
+            {item.available_for_lunch && (
+              <View style={[styles.specialMealTag, { backgroundColor: '#FF980018' }]}>
+                <Text style={[styles.specialTagText, { color: '#FF9800' }]}>Lunch</Text>
+              </View>
+            )}
+            {item.available_for_dinner && (
+              <View style={[styles.specialMealTag, { backgroundColor: '#9C27B018' }]}>
+                <Text style={[styles.specialTagText, { color: '#9C27B0' }]}>Dinner</Text>
+              </View>
+            )}
+            {item.is_gluten_free && (
+              <View style={[styles.specialDietTag, { backgroundColor: colors.highlight }]}>
+                <Text style={[styles.specialTagText, { color: colors.text }]}>GF</Text>
+              </View>
+            )}
+            {item.is_gluten_free_available && (
+              <View style={[styles.specialDietTag, { backgroundColor: colors.highlight }]}>
+                <Text style={[styles.specialTagText, { color: colors.text }]}>GFA</Text>
+              </View>
+            )}
+            {item.is_vegetarian && (
+              <View style={[styles.specialDietTag, { backgroundColor: colors.highlight }]}>
+                <Text style={[styles.specialTagText, { color: colors.text }]}>V</Text>
+              </View>
+            )}
+            {item.is_vegetarian_available && (
+              <View style={[styles.specialDietTag, { backgroundColor: colors.highlight }]}>
+                <Text style={[styles.specialTagText, { color: colors.text }]}>VA</Text>
+              </View>
+            )}
+          </View>
           <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
-            {getLocalizedField(item, 'description', language) || item.description}
+            {stripFormattingTags(getLocalizedField(item, 'description', language) || item.description || '')}
           </Text>
         </View>
       </View>
@@ -1100,6 +1135,26 @@ const styles = StyleSheet.create({
   priceText: {
     fontSize: 16,
     fontWeight: '700',
+  },
+  specialTagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginBottom: 4,
+  },
+  specialMealTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  specialDietTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  specialTagText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   eventsContainer: {
     padding: 12,

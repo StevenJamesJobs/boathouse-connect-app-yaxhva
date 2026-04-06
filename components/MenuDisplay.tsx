@@ -18,6 +18,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { useTranslation } from 'react-i18next';
+import { stripFormattingTags } from '@/components/FormattedText';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -479,9 +480,19 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
               {formatPrice(item.price)}
             </Text>
           </View>
-          {(item.is_gluten_free || item.is_gluten_free_available ||
-            item.is_vegetarian || item.is_vegetarian_available) && (
+          {(item.category === 'Weekly Specials' && (item.available_for_lunch || item.available_for_dinner)) || item.is_gluten_free || item.is_gluten_free_available ||
+            item.is_vegetarian || item.is_vegetarian_available ? (
             <View style={styles.tagsRow}>
+              {item.category === 'Weekly Specials' && item.available_for_lunch && (
+                <View style={[styles.tag, { backgroundColor: '#FF980018' }]}>
+                  <Text style={[styles.tagText, { color: '#FF9800' }]}>Lunch</Text>
+                </View>
+              )}
+              {item.category === 'Weekly Specials' && item.available_for_dinner && (
+                <View style={[styles.tag, { backgroundColor: '#9C27B018' }]}>
+                  <Text style={[styles.tagText, { color: '#9C27B0' }]}>Dinner</Text>
+                </View>
+              )}
               {item.is_gluten_free && (
                 <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
                   <Text style={[styles.tagText, { color: colors.text }]}>GF</Text>
@@ -503,10 +514,10 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
                 </View>
               )}
             </View>
-          )}
+          ) : null}
           {item.description && (
             <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
-              {getLocalizedField(item, 'description', language) || item.description}
+              {stripFormattingTags(getLocalizedField(item, 'description', language) || item.description)}
             </Text>
           )}
         </View>

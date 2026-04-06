@@ -192,6 +192,7 @@
     "opens_to_rewards": "Rewards",
     "opens_to_menus": "Menus",
     "opens_to_tools": "Tools",
+    "opens_to_game_hub": "Game Hub",
     "title_placeholder": "Enter notification title",
     "message_placeholder": "Enter notification message",
     "opens_to_placeholder": "Select where notification opens to...",

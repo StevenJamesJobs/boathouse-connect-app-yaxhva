@@ -13,6 +13,7 @@ interface SendNotificationParams {
   title: string;
   body: string;
   data?: Record<string, any>;
+  jobTitles?: string[]; // Filter recipients by job titles
 }
 
 /**
@@ -142,12 +143,16 @@ export async function sendSpecialFeatureNotification(
 
 /**
  * Send a custom notification (manager only)
+ * Supports optional job_titles filtering for targeted notifications
  */
 export async function sendCustomNotification(
   title: string,
   body: string,
   data?: Record<string, any>
 ): Promise<void> {
+  // Extract job_titles from data to pass as top-level param for edge function filtering
+  const jobTitles = data?.job_titles as string[] | undefined;
+
   await sendNotification({
     notificationType: 'custom',
     title: title,
@@ -156,5 +161,6 @@ export async function sendCustomNotification(
       ...data,
       type: 'custom',
     },
+    jobTitles,
   });
 }

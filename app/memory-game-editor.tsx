@@ -142,15 +142,10 @@ export default function MemoryGameEditorScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            if (mode || playModeFilter) {
-              // Use RPC with optional filters
-              await (supabase.rpc as any)('reset_game_scores', {
-                p_game_mode: mode || null,
-                p_play_mode: playModeFilter || null,
-              });
-            } else {
-              await (supabase.rpc as any)('reset_game_scores', {});
-            }
+            await (supabase.rpc as any)('reset_game_scores', {
+              p_game_mode: mode || null,
+              p_play_mode: playModeFilter || null,
+            });
             Alert.alert('', t('memory_game.reset_success'));
           } catch (e) {
             console.error('Error resetting scores:', e);
@@ -294,7 +289,7 @@ export default function MemoryGameEditorScreen() {
   );
 
   const scoreFilters: { key: ScoreFilter; label: string }[] = [
-    { key: 'all', label: t('common.all') },
+    { key: 'all', label: 'All' },
     { key: 'lives', label: '❤️ ' + t('memory_game.lives_mode') },
     { key: 'timed', label: '⏱ ' + t('memory_game.timed_mode') },
   ];

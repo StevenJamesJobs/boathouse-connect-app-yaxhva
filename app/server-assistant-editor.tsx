@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -17,8 +17,6 @@ export default function ServerAssistantEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const [activeTab, setActiveTab] = useState<'encyclopedia' | 'exams'>('encyclopedia');
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -36,89 +34,33 @@ export default function ServerAssistantEditorScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Tab Selector */}
-        <View style={[styles.tabContainer, { backgroundColor: colors.card }]}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'encyclopedia' && { backgroundColor: colors.highlight }]}
-            onPress={() => setActiveTab('encyclopedia')}
-          >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'encyclopedia' && { color: colors.text }]}>
-              {t('server_assistant_editor.tab_encyclopedia')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'exams' && { backgroundColor: colors.highlight }]}
-            onPress={() => setActiveTab('exams')}
-          >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'exams' && { color: colors.text }]}>
-              {t('server_assistant_editor.tab_server_exams')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {activeTab === 'encyclopedia' ? (
-          <>
-            {/* Check Out Calculator - View Only (not editable) */}
-            <TouchableOpacity
-              style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => router.push('/check-out-calculator')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <IconSymbol
-                  ios_icon_name="dollarsign.circle.fill"
-                  android_material_icon_name="calculate"
-                  size={28}
-                  color={colors.primary}
-                />
-                <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('server_assistant_editor.check_out_calculator')}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    {t('server_assistant_editor.check_out_calculator_desc')}
-                  </Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-
-          </>
-        ) : (
-          <>
-            {/* Weekly Quiz Editor */}
-            <TouchableOpacity
-              style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => router.push('/exam-editor?type=server')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <IconSymbol
-                  ios_icon_name="questionmark.circle.fill"
-                  android_material_icon_name="quiz"
-                  size={28}
-                  color={colors.primary}
-                />
-                <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('server_assistant_editor.weekly_quiz_editor')}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    {t('server_assistant_editor.weekly_quiz_editor_desc')}
-                  </Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-
-          </>
-        )}
+        {/* Check Out Calculator - View Only (not editable) */}
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: colors.card }]}
+          onPress={() => router.push('/check-out-calculator')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.cardContent}>
+            <IconSymbol
+              ios_icon_name="dollarsign.circle.fill"
+              android_material_icon_name="calculate"
+              size={28}
+              color={colors.primary}
+            />
+            <View style={styles.cardText}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('server_assistant_editor.check_out_calculator')}</Text>
+              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                {t('server_assistant_editor.check_out_calculator_desc')}
+              </Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </View>
+        </TouchableOpacity>
       </ScrollView>
       <BottomNavBar activeTab="manage" />
     </View>

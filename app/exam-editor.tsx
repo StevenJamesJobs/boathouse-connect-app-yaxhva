@@ -397,6 +397,54 @@ export default function ExamEditorScreen() {
     );
   };
 
+  // Refresh single question — regenerate just one question
+  const [refreshingQuestionId, setRefreshingQuestionId] = useState<string | null>(null);
+
+  const handleRefreshQuestion = async (question: ExamQuestion) => {
+    if (!currentExam) return;
+    setRefreshingQuestionId(question.id);
+    try {
+      // Generate a batch of questions and pick one that's different from the current
+      const cycleKey = currentExam.cycle_key + '-refresh-' + Date.now().toString(36);
+      const generated = await generateQuizQuestions(examType, cycleKey, 5);
+
+      // Find one that doesn't duplicate existing questions
+      const existingTexts = new Set(questions.map(q => q.question_text));
+      const newQuestion = generated.find(q => !existingTexts.has(q.question_text)) || generated[0];
+
+      if (newQuestion) {
+        const { error } = await (supabase
+          .from('exam_questions' as any) as any)
+          .update({
+            question_text: newQuestion.question_text,
+            option_a: newQuestion.option_a,
+            option_b: newQuestion.option_b,
+            option_c: newQuestion.option_c,
+            option_d: newQuestion.option_d,
+            correct_option: newQuestion.correct_option,
+            source_type: newQuestion.source_type,
+            source_table: newQuestion.source_table,
+            question_text_es: newQuestion.question_text_es || null,
+            option_a_es: newQuestion.option_a_es || null,
+            option_b_es: newQuestion.option_b_es || null,
+            option_c_es: newQuestion.option_c_es || null,
+            option_d_es: newQuestion.option_d_es || null,
+          })
+          .eq('id', question.id);
+
+        if (error) {
+          Alert.alert('Error', error.message);
+        } else {
+          await fetchQuestions(currentExam.id);
+        }
+      }
+    } catch (err) {
+      console.error('Refresh question error:', err);
+      Alert.alert('Error', 'Failed to refresh question');
+    }
+    setRefreshingQuestionId(null);
+  };
+
   // Save edited question
   const handleSaveEdit = async () => {
     if (!editingQuestion) return;
@@ -451,6 +499,46 @@ export default function ExamEditorScreen() {
     if (q.source_type === 'bonus') return 'BONUS';
     if (q.source_type === 'custom') return 'CUSTOM';
     return (q.source_table || 'auto').replace(/_/g, ' ').toUpperCase();
+  };
+
+  // Reset a specific user's quiz result so they can retake
+  const handleResetUserQuiz = (entry: CompletionEntry) => {
+    if (!currentExam) return;
+
+    Alert.alert(
+      'Allow Retake',
+      `This will reset ${entry.name}'s quiz result and allow them to retake the quiz. Their McLoone's Bucks from this quiz will NOT be revoked. Continue?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Delete their exam result (including started_at record)
+              await (supabase
+                .from('exam_results' as any) as any)
+                .delete()
+                .eq('exam_id', currentExam.id)
+                .eq('user_id', entry.user_id);
+
+              // Also delete any reward dismissals for this result
+              await (supabase
+                .from('exam_reward_dismissals' as any) as any)
+                .delete()
+                .eq('user_id', entry.user_id);
+
+              // Refresh tracker data
+              await fetchCompletionData(currentExam.id);
+              Alert.alert('Success', `${entry.name} can now retake the quiz.`);
+            } catch (err) {
+              console.error('Reset user quiz error:', err);
+              Alert.alert('Error', 'Failed to reset quiz result.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const completedCount = completionData.filter(e => e.has_completed).length;
@@ -598,10 +686,6 @@ export default function ExamEditorScreen() {
                 </View>
               </View>
               <View style={styles.statusRow}>
-                <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Cycle</Text>
-                <Text style={[styles.statusValue, { color: colors.text }]}>{currentExam.cycle_key}</Text>
-              </View>
-              <View style={styles.statusRow}>
                 <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Questions</Text>
                 <Text style={[styles.statusValue, { color: colors.text }]}>{questions.length}</Text>
               </View>
@@ -668,6 +752,19 @@ export default function ExamEditorScreen() {
                   <View style={styles.questionActions}>
                     {currentExam.status === 'draft' && (
                       <>
+                        {q.source_type === 'auto' && (
+                          <TouchableOpacity
+                            onPress={() => handleRefreshQuestion(q)}
+                            style={styles.actionButton}
+                            disabled={refreshingQuestionId === q.id}
+                          >
+                            {refreshingQuestionId === q.id ? (
+                              <ActivityIndicator size={16} color={colors.primary} />
+                            ) : (
+                              <IconSymbol ios_icon_name="arrow.clockwise" android_material_icon_name="refresh" size={18} color={colors.primary} />
+                            )}
+                          </TouchableOpacity>
+                        )}
                         <TouchableOpacity onPress={() => setEditingQuestion(q)} style={styles.actionButton}>
                           <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={18} color={colors.primary} />
                         </TouchableOpacity>
@@ -816,13 +913,22 @@ export default function ExamEditorScreen() {
                   <Text style={[styles.trackerJob, { color: colors.textSecondary }]}>{entry.job_title}</Text>
                 </View>
                 {entry.has_completed ? (
-                  <View style={styles.trackerResult}>
-                    <Text style={[styles.trackerScore, { color: '#10B981' }]}>
-                      {entry.correct_count}/{entry.total_questions}
-                    </Text>
-                    <Text style={[styles.trackerBucks, { color: '#10B981' }]}>
-                      +${entry.bucks_awarded}
-                    </Text>
+                  <View style={styles.trackerResultContainer}>
+                    <View style={styles.trackerResult}>
+                      <Text style={[styles.trackerScore, { color: '#10B981' }]}>
+                        {entry.correct_count}/{entry.total_questions}
+                      </Text>
+                      <Text style={[styles.trackerBucks, { color: '#10B981' }]}>
+                        +${entry.bucks_awarded}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      style={[styles.retakeButton, { borderColor: colors.primary }]}
+                      onPress={() => handleResetUserQuiz(entry)}
+                    >
+                      <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="refresh" size={12} color={colors.primary} />
+                      <Text style={[styles.retakeButtonText, { color: colors.primary }]}>Retake</Text>
+                    </TouchableOpacity>
                   </View>
                 ) : (
                   <View style={[styles.notTakenBadge, { backgroundColor: '#EF444420' }]}>
@@ -1224,7 +1330,18 @@ const styles = StyleSheet.create({
   trackerInfo: { flex: 1 },
   trackerName: { fontSize: 15, fontWeight: '600' },
   trackerJob: { fontSize: 12, marginTop: 2 },
+  trackerResultContainer: { alignItems: 'flex-end', gap: 6 },
   trackerResult: { alignItems: 'flex-end' },
+  retakeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    gap: 4,
+  },
+  retakeButtonText: { fontSize: 11, fontWeight: '600' },
   trackerScore: { fontSize: 16, fontWeight: 'bold' },
   trackerBucks: { fontSize: 13, fontWeight: '600' },
   notTakenBadge: { borderRadius: 8, paddingHorizontal: 12, paddingVertical: 6 },

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -17,8 +17,6 @@ export default function BartenderAssistantEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const [activeTab, setActiveTab] = useState<'encyclopedia' | 'exams'>('encyclopedia');
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -36,206 +34,151 @@ export default function BartenderAssistantEditorScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Tab Selector */}
-        <View style={[styles.tabContainer, { backgroundColor: colors.card }]}>
+        {/* Checklists Editor Section */}
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
+          <View style={styles.cardHeader}>
+            <IconSymbol
+              ios_icon_name="checklist"
+              android_material_icon_name="checklist"
+              size={32}
+              color={colors.primary}
+            />
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.checklists_editor')}</Text>
+              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                {t('bartender_assistant_editor.checklists_editor_desc')}
+              </Text>
+            </View>
+          </View>
+
+          {/* Opening Checklist Editor */}
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'encyclopedia' && { backgroundColor: colors.highlight }]}
-            onPress={() => setActiveTab('encyclopedia')}
+            style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => router.push('/bartender-opening-checklist-editor')}
           >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'encyclopedia' && { color: colors.text }]}>
-              {t('bartender_assistant_editor.tab_encyclopedia')}
-            </Text>
+            <View style={styles.subCardContent}>
+              <IconSymbol
+                ios_icon_name="sunrise.fill"
+                android_material_icon_name="wb-sunny"
+                size={24}
+                color={colors.primary}
+              />
+              <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_assistant_editor.opening_checklist_editor')}</Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.text}
+            />
           </TouchableOpacity>
+
+          {/* Closing Checklist Editor */}
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'exams' && { backgroundColor: colors.highlight }]}
-            onPress={() => setActiveTab('exams')}
+            style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => router.push('/bartender-closing-checklist-editor')}
           >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'exams' && { color: colors.text }]}>
-              {t('bartender_assistant_editor.tab_bar_exams')}
-            </Text>
+            <View style={styles.subCardContent}>
+              <IconSymbol
+                ios_icon_name="moon.fill"
+                android_material_icon_name="nightlight"
+                size={24}
+                color={colors.primary}
+              />
+              <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_assistant_editor.closing_checklist_editor')}</Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.text}
+            />
           </TouchableOpacity>
         </View>
 
-        {activeTab === 'encyclopedia' ? (
-          <>
-            {/* Checklists Editor Section - MOVED FROM BARTENDER BINDER EDITOR */}
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              <View style={styles.cardHeader}>
-                <IconSymbol
-                  ios_icon_name="checklist"
-                  android_material_icon_name="checklist"
-                  size={32}
-                  color={colors.primary}
-                />
-                <View style={styles.cardHeaderText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.checklists_editor')}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    {t('bartender_assistant_editor.checklists_editor_desc')}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Opening Checklist Editor */}
-              <TouchableOpacity
-                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => router.push('/bartender-opening-checklist-editor')}
-              >
-                <View style={styles.subCardContent}>
-                  <IconSymbol
-                    ios_icon_name="sunrise.fill"
-                    android_material_icon_name="wb-sunny"
-                    size={24}
-                    color={colors.primary}
-                  />
-                  <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_assistant_editor.opening_checklist_editor')}</Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
-
-              {/* Closing Checklist Editor */}
-              <TouchableOpacity
-                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => router.push('/bartender-closing-checklist-editor')}
-              >
-                <View style={styles.subCardContent}>
-                  <IconSymbol
-                    ios_icon_name="moon.fill"
-                    android_material_icon_name="nightlight"
-                    size={24}
-                    color={colors.primary}
-                  />
-                  <Text style={[styles.subCardText, { color: colors.text }]}>{t('bartender_assistant_editor.closing_checklist_editor')}</Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
+        {/* Libation Recipes Editor */}
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: colors.card }]}
+          onPress={() => router.push('/libation-recipes-editor')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.cardContent}>
+            <IconSymbol
+              ios_icon_name="wineglass"
+              android_material_icon_name="local-bar"
+              size={28}
+              color={colors.primary}
+            />
+            <View style={styles.cardText}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.libation_recipes_editor')}</Text>
+              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                {t('bartender_assistant_editor.libation_recipes_editor_desc')}
+              </Text>
             </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </View>
+        </TouchableOpacity>
 
-            {/* Libation Recipes Editor */}
-            <TouchableOpacity
-              style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => router.push('/libation-recipes-editor')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <IconSymbol
-                  ios_icon_name="wineglass"
-                  android_material_icon_name="local-bar"
-                  size={28}
-                  color={colors.primary}
-                />
-                <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.libation_recipes_editor')}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    {t('bartender_assistant_editor.libation_recipes_editor_desc')}
-                  </Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
+        {/* Cocktails A-Z Editor */}
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: colors.card }]}
+          onPress={() => router.push('/cocktails-az-editor')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.cardContent}>
+            <IconSymbol
+              ios_icon_name="list.bullet"
+              android_material_icon_name="format-list-bulleted"
+              size={28}
+              color={colors.primary}
+            />
+            <View style={styles.cardText}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.cocktails_az_editor')}</Text>
+              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                {t('bartender_assistant_editor.cocktails_az_editor_desc')}
+              </Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </View>
+        </TouchableOpacity>
 
-            {/* Cocktails A-Z Editor */}
-            <TouchableOpacity
-              style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => router.push('/cocktails-az-editor')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <IconSymbol
-                  ios_icon_name="list.bullet"
-                  android_material_icon_name="format-list-bulleted"
-                  size={28}
-                  color={colors.primary}
-                />
-                <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.cocktails_az_editor')}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    {t('bartender_assistant_editor.cocktails_az_editor_desc')}
-                  </Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-
-            {/* Purees & Simple Syrups Recipes Editor - NOW MATCHES COCKTAILS A-Z DESIGN */}
-            <TouchableOpacity
-              style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => router.push('/puree-syrup-recipes-editor')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <IconSymbol
-                  ios_icon_name="drop.fill"
-                  android_material_icon_name="opacity"
-                  size={28}
-                  color={colors.primary}
-                />
-                <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.purees_syrups_editor')}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    {t('bartender_assistant_editor.purees_syrups_editor_desc')}
-                  </Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            {/* Weekly Quiz Editor */}
-            <TouchableOpacity
-              style={[styles.card, { backgroundColor: colors.card }]}
-              onPress={() => router.push('/exam-editor?type=bartender')}
-              activeOpacity={0.7}
-            >
-              <View style={styles.cardContent}>
-                <IconSymbol
-                  ios_icon_name="questionmark.circle.fill"
-                  android_material_icon_name="quiz"
-                  size={28}
-                  color={colors.primary}
-                />
-                <View style={styles.cardText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.weekly_quiz_editor')}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    {t('bartender_assistant_editor.weekly_quiz_editor_desc')}
-                  </Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-
-          </>
-        )}
+        {/* Purees & Simple Syrups Recipes Editor */}
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: colors.card }]}
+          onPress={() => router.push('/puree-syrup-recipes-editor')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.cardContent}>
+            <IconSymbol
+              ios_icon_name="drop.fill"
+              android_material_icon_name="opacity"
+              size={28}
+              color={colors.primary}
+            />
+            <View style={styles.cardText}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.purees_syrups_editor')}</Text>
+              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                {t('bartender_assistant_editor.purees_syrups_editor_desc')}
+              </Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </View>
+        </TouchableOpacity>
       </ScrollView>
       <BottomNavBar activeTab="manage" />
     </View>

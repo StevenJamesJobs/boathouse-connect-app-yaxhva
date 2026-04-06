@@ -100,6 +100,10 @@ const ICON_MAP: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   // Info
   'info.circle': 'info',
   'info.circle.fill': 'info',
+
+  // Shield / Privacy
+  'lock.shield.fill': 'shield',
+  'lock.shield': 'shield',
   
   // Settings
   'gearshape': 'settings',

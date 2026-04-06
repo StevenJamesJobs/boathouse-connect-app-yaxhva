@@ -209,6 +209,7 @@ function RootLayoutNav() {
                 <Stack.Screen name="index" />
                 <Stack.Screen name="login" />
                 <Stack.Screen name="(portal)" />
+                <Stack.Screen name="exam-play" options={{ gestureEnabled: false }} />
               </Stack>
               <SystemBars style="auto" />
             </GestureHandlerRootView>

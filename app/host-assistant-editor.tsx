@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -17,8 +17,6 @@ export default function HostAssistantEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const [activeTab, setActiveTab] = useState<'encyclopedia' | 'exams'>('encyclopedia');
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -36,143 +34,89 @@ export default function HostAssistantEditorScreen() {
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Tab Selector */}
-        <View style={[styles.tabContainer, { backgroundColor: colors.card }]}>
+        {/* Checklists Editor Section */}
+        <View style={[styles.card, { backgroundColor: colors.card }]}>
+          <View style={styles.cardHeader}>
+            <IconSymbol
+              ios_icon_name="checklist"
+              android_material_icon_name="checklist"
+              size={32}
+              color={colors.primary}
+            />
+            <View style={styles.cardHeaderText}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('host_assistant_editor.checklists_editor')}</Text>
+              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                {t('host_assistant_editor.checklists_editor_desc')}
+              </Text>
+            </View>
+          </View>
+
+          {/* Opening Checklist Editor */}
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'encyclopedia' && { backgroundColor: colors.highlight }]}
-            onPress={() => setActiveTab('encyclopedia')}
+            style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => router.push('/opening-checklist-editor')}
           >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'encyclopedia' && { color: colors.text }]}>
-              {t('host_assistant_editor.tab_encyclopedia')}
-            </Text>
+            <View style={styles.subCardContent}>
+              <IconSymbol
+                ios_icon_name="sunrise.fill"
+                android_material_icon_name="wb-sunny"
+                size={24}
+                color={colors.primary}
+              />
+              <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant_editor.opening_checklist_editor')}</Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.text}
+            />
           </TouchableOpacity>
+
+          {/* Running Side Work Editor */}
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'exams' && { backgroundColor: colors.highlight }]}
-            onPress={() => setActiveTab('exams')}
+            style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => router.push('/running-side-work-editor')}
           >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'exams' && { color: colors.text }]}>
-              {t('host_assistant_editor.tab_host_exams')}
-            </Text>
+            <View style={styles.subCardContent}>
+              <IconSymbol
+                ios_icon_name="clock.fill"
+                android_material_icon_name="schedule"
+                size={24}
+                color={colors.primary}
+              />
+              <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant_editor.running_side_work_editor')}</Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.text}
+            />
+          </TouchableOpacity>
+
+          {/* Closing Checklist Editor */}
+          <TouchableOpacity
+            style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={() => router.push('/closing-checklist-editor')}
+          >
+            <View style={styles.subCardContent}>
+              <IconSymbol
+                ios_icon_name="moon.fill"
+                android_material_icon_name="nightlight"
+                size={24}
+                color={colors.primary}
+              />
+              <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant_editor.closing_checklist_editor')}</Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.text}
+            />
           </TouchableOpacity>
         </View>
-
-        {activeTab === 'encyclopedia' ? (
-          <>
-            {/* Checklists Editor Section */}
-            <View style={[styles.card, { backgroundColor: colors.card }]}>
-              <View style={styles.cardHeader}>
-                <IconSymbol
-                  ios_icon_name="checklist"
-                  android_material_icon_name="checklist"
-                  size={32}
-                  color={colors.primary}
-                />
-                <View style={styles.cardHeaderText}>
-                  <Text style={[styles.cardTitle, { color: colors.text }]}>{t('host_assistant_editor.checklists_editor')}</Text>
-                  <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                    {t('host_assistant_editor.checklists_editor_desc')}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Opening Checklist Editor */}
-              <TouchableOpacity
-                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => router.push('/opening-checklist-editor')}
-              >
-                <View style={styles.subCardContent}>
-                  <IconSymbol
-                    ios_icon_name="sunrise.fill"
-                    android_material_icon_name="wb-sunny"
-                    size={24}
-                    color={colors.primary}
-                  />
-                  <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant_editor.opening_checklist_editor')}</Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
-
-              {/* Running Side Work Editor */}
-              <TouchableOpacity
-                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => router.push('/running-side-work-editor')}
-              >
-                <View style={styles.subCardContent}>
-                  <IconSymbol
-                    ios_icon_name="clock.fill"
-                    android_material_icon_name="schedule"
-                    size={24}
-                    color={colors.primary}
-                  />
-                  <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant_editor.running_side_work_editor')}</Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
-
-              {/* Closing Checklist Editor */}
-              <TouchableOpacity
-                style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                onPress={() => router.push('/closing-checklist-editor')}
-              >
-                <View style={styles.subCardContent}>
-                  <IconSymbol
-                    ios_icon_name="moon.fill"
-                    android_material_icon_name="nightlight"
-                    size={24}
-                    color={colors.primary}
-                  />
-                  <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant_editor.closing_checklist_editor')}</Text>
-                </View>
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={20}
-                  color={colors.text}
-                />
-              </TouchableOpacity>
-            </View>
-          </>
-        ) : (
-          <>
-            {/* Weekly Quiz Editor - Compact Design */}
-            <TouchableOpacity
-              style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-              onPress={() => router.push('/exam-editor?type=host')}
-            >
-              <View style={styles.sectionCardContent}>
-                <IconSymbol
-                  ios_icon_name="questionmark.circle.fill"
-                  android_material_icon_name="quiz"
-                  size={32}
-                  color={colors.primary}
-                />
-                <View style={styles.sectionCardText}>
-                  <Text style={[styles.sectionCardTitle, { color: colors.text }]}>{t('host_assistant_editor.weekly_quiz_editor')}</Text>
-                  <Text style={[styles.sectionCardDescription, { color: colors.textSecondary }]}>
-                    {t('host_assistant_editor.weekly_quiz_editor_desc')}
-                  </Text>
-                </View>
-              </View>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={24}
-                color={colors.text}
-              />
-            </TouchableOpacity>
-
-          </>
-        )}
       </ScrollView>
       <BottomNavBar activeTab="manage" />
     </View>

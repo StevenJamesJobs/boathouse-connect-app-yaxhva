@@ -13,6 +13,7 @@ interface NotificationRequest {
   title: string;
   body: string;
   data?: Record<string, any>;
+  jobTitles?: string[]; // Filter recipients by job titles (if not provided, sends to all)
 }
 
 serve(async (req) => {
@@ -52,9 +53,9 @@ serve(async (req) => {
 
     // Parse request body
     const requestData: NotificationRequest = await req.json();
-    const { userIds, notificationType, title, body, data } = requestData;
+    const { userIds, notificationType, title, body, data, jobTitles } = requestData;
 
-    console.log('Processing notification request:', { notificationType, title, userIds });
+    console.log('Processing notification request:', { notificationType, title, userIds, jobTitles });
 
     // Get recipient user IDs
     let recipientIds: string[] = [];
@@ -62,6 +63,27 @@ serve(async (req) => {
     if (userIds && userIds.length > 0) {
       // Send to specific users
       recipientIds = userIds;
+    } else if (jobTitles && jobTitles.length > 0) {
+      // Send to users matching specific job titles
+      // job_titles is a JSONB array column on users table
+      const { data: matchingUsers, error: usersError } = await supabaseClient
+        .from('users')
+        .select('id, job_titles, job_title')
+        .eq('is_active', true);
+
+      if (usersError) {
+        throw usersError;
+      }
+
+      // Filter users whose job_titles array overlaps with the requested job titles
+      recipientIds = matchingUsers
+        .filter((u: any) => {
+          const userJobTitles: string[] = u.job_titles || (u.job_title ? [u.job_title] : []);
+          return userJobTitles.some((jt: string) => jobTitles.includes(jt));
+        })
+        .map((u: any) => u.id);
+
+      console.log(`Found ${recipientIds.length} users matching job titles: ${jobTitles.join(', ')}`);
     } else {
       // Send to all users (for announcements, events, etc.)
       const { data: allUsers, error: usersError } = await supabaseClient
@@ -195,6 +217,7 @@ serve(async (req) => {
           title: title,
           body: body,
           sent_by: user.id,
+          data: data || null,
         });
 
       if (customError) {

@@ -192,6 +192,7 @@
     "opens_to_rewards": "Recompensas",
     "opens_to_menus": "Menús",
     "opens_to_tools": "Herramientas",
+    "opens_to_game_hub": "Centro de Juegos",
     "title_placeholder": "Ingresa el título de la notificación",
     "message_placeholder": "Ingresa el mensaje de la notificación",
     "opens_to_placeholder": "Selecciona dónde se abrirá la notificación...",
