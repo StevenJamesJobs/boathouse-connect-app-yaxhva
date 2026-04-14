@@ -114,8 +114,16 @@ export function handleTimeout(state: ExamState): ExamState {
   };
 }
 
-// Calculate scoring results
-export function calculateResults(state: ExamState): {
+// Calculate scoring results.
+//
+// rewardPerCorrect defaults to $1 per correct standard question. When a user
+// is eligible for multiple weekly quizzes we pass $1/N here so the weekly
+// maximum earnings from standard questions stays constant regardless of how
+// many quizzes a user takes (bonus questions always pay their full value).
+export function calculateResults(
+  state: ExamState,
+  rewardPerCorrect: number = 1
+): {
   correctCount: number;
   totalQuestions: number;
   standardCorrect: number;
@@ -147,8 +155,9 @@ export function calculateResults(state: ExamState): {
   const correctCount = standardCorrect + (bonusCorrect ? 1 : 0);
   const totalQuestions = state.questions.length;
 
-  // $1 per correct standard question + bonus value if bonus is correct
-  const totalBucksAwarded = standardCorrect + (bonusCorrect ? bonusBucksValue : 0);
+  // Standard reward × rewardPerCorrect (rounded to cents) + full bonus value
+  const standardBucks = Math.round(standardCorrect * rewardPerCorrect * 100) / 100;
+  const totalBucksAwarded = standardBucks + (bonusCorrect ? bonusBucksValue : 0);
 
   const timeSeconds = state.startTime
     ? Math.floor((Date.now() - state.startTime) / 1000)
@@ -184,4 +193,33 @@ export function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Countdown urgency tiers used for color-coding close_at countdowns.
+export type CountdownUrgency = 'normal' | 'amber' | 'red' | 'expired';
+
+export function getCountdownUrgency(msRemaining: number): CountdownUrgency {
+  if (msRemaining <= 0) return 'expired';
+  if (msRemaining < 60 * 60 * 1000) return 'red'; // < 1h
+  if (msRemaining < 24 * 60 * 60 * 1000) return 'amber'; // < 24h
+  return 'normal';
+}
+
+// Human-readable short countdown: "3d 4h", "5h 12m", "4m 23s", or "Expired".
+// For sub-day durations it shows two adjacent units so the label doesn't
+// flicker every second once you're far from the deadline.
+export function formatCountdown(msRemaining: number, isSpanish: boolean = false): string {
+  if (msRemaining <= 0) {
+    return isSpanish ? 'Expirado' : 'Expired';
+  }
+  const totalSeconds = Math.floor(msRemaining / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
 }

@@ -167,15 +167,45 @@ serve(async (req) => {
       );
     }
 
+    // Compute per-recipient badge totals so the APNs payload reflects the
+    // user's actual unread (messages + uncompleted eligible weekly quizzes)
+    // instead of overwriting their existing badge with a hardcoded value.
+    const recipientIdsForBadge = Array.from(new Set(filteredTokens.map((t: any) => t.user_id)));
+    const badgeTotals: Record<string, number> = {};
+    try {
+      const { data: badgeRows, error: badgeErr } = await supabaseClient.rpc(
+        'get_user_badge_totals',
+        { p_user_ids: recipientIdsForBadge }
+      );
+      if (badgeErr) {
+        console.error('Error fetching badge totals:', badgeErr);
+      } else if (badgeRows) {
+        for (const row of badgeRows as any[]) {
+          badgeTotals[row.user_id] = row.badge_total || 0;
+        }
+      }
+    } catch (e) {
+      console.error('Exception fetching badge totals:', e);
+    }
+
     // Prepare messages for Expo Push API
-    const messages = filteredTokens.map((item: any) => ({
-      to: item.token,
-      sound: 'default',
-      title: title,
-      body: body,
-      data: data || {},
-      badge: 1,
-    }));
+    const messages = filteredTokens.map((item: any) => {
+      // Server-computed total reflects the DB right now. For quiz activation
+      // pushes, the new active exam is already in the DB, so the count
+      // already includes it. For message pushes, the new message row is
+      // likewise already inserted before this function runs. Fall back to 1
+      // only if the RPC failed, so the user still sees a badge bump.
+      const computedTotal = badgeTotals[item.user_id];
+      const badgeValue = typeof computedTotal === 'number' ? computedTotal : 1;
+      return {
+        to: item.token,
+        sound: 'default',
+        title: title,
+        body: body,
+        data: data || {},
+        badge: badgeValue,
+      };
+    });
 
     // Send notifications to Expo Push API
     const expoPushEndpoint = 'https://exp.host/--/api/v2/push/send';

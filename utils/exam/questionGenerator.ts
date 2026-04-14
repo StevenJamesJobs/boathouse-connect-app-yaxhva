@@ -1,4 +1,5 @@
 import { supabase } from '@/app/integrations/supabase/client';
+import { stripFormattingTags } from '@/components/FormattedText';
 
 // Types
 export type ExamType = 'server' | 'bartender' | 'host';
@@ -12,6 +13,8 @@ export interface GeneratedQuestion {
   correct_option: 'A' | 'B' | 'C' | 'D';
   source_type: 'auto';
   source_table: string;
+  // Optional picture-question image (menu_items.thumbnail_url)
+  question_image_url?: string | null;
   // Spanish translations
   question_text_es?: string;
   option_a_es?: string;
@@ -153,6 +156,7 @@ interface MenuItem {
   name: string;
   name_es: string | null;
   description: string | null;
+  description_es?: string | null;
   price: string;
   category: string;
   subcategory: string | null;
@@ -160,6 +164,7 @@ interface MenuItem {
   is_vegetarian: boolean;
   available_for_lunch: boolean;
   available_for_dinner: boolean;
+  thumbnail_url?: string | null;
 }
 
 interface Cocktail {
@@ -199,6 +204,24 @@ async function fetchMenuItems(): Promise<MenuItem[]> {
 
   if (error || !data) return [];
   return data as MenuItem[];
+}
+
+// Pool of items with thumbnails for picture questions — broader than
+// fetchMenuItems: includes Libations and Wine so bartender/server/host
+// quizzes can all pull imagery. Only returns rows with a non-null
+// thumbnail_url.
+async function fetchMenuItemsWithImages(): Promise<MenuItem[]> {
+  const { data, error } = await (supabase
+    .from('menu_items') as any)
+    .select('id, name, name_es, description, description_es, price, category, subcategory, is_gluten_free, is_vegetarian, available_for_lunch, available_for_dinner, thumbnail_url')
+    .eq('is_active', true)
+    .in('category', ['Lunch', 'Dinner', 'Libations', 'Wine'])
+    .not('thumbnail_url', 'is', null);
+
+  if (error || !data) return [];
+  return (data as MenuItem[]).filter(
+    (m) => !!m.thumbnail_url && m.thumbnail_url.trim().length > 0
+  );
 }
 
 async function fetchCocktails(): Promise<Cocktail[]> {
@@ -629,6 +652,181 @@ function libationIngredientQuestion(recipes: LibationRecipe[], rng: () => number
 }
 
 // =============================================
+// PICTURE QUESTION TEMPLATE
+// =============================================
+
+// Extract candidate ingredient words from a description. We split on commas
+// and the word "with", trim, strip any formatting tags, drop obvious noise
+// (empty strings, pure numbers, very short words). Order-preserved.
+function extractIngredientsFromDescription(description: string): string[] {
+  const cleaned = stripFormattingTags(description);
+  const parts = cleaned
+    .split(/,|\bwith\b|\band\b|\./i)
+    .map(p => p.trim())
+    .map(p => p.replace(/^(served|topped|tossed|drizzled|finished|with|and)\s+/i, '').trim())
+    .filter(p => p.length >= 3 && p.length <= 40)
+    .filter(p => !/^\d+$/.test(p));
+  // De-dupe while preserving order
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const p of parts) {
+    const key = p.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      out.push(p);
+    }
+  }
+  return out;
+}
+
+function menuPhotoQuestion(
+  pool: MenuItem[],
+  rng: () => number,
+  excludeIds: Set<string> = new Set(),
+): QuestionCandidate | null {
+  const usable = pool.filter(m => !excludeIds.has(m.id));
+  if (usable.length < 4) return null;
+
+  const target = seededPick(usable, 1, rng)[0];
+  if (!target.thumbnail_url) return null;
+  const nameEs = target.name_es || target.name;
+
+  // Decide which sub-form to use based on available data, weighted by RNG.
+  // Order of preference: name > ingredient > dietary flag.
+  const canDoName = usable.filter(m => m.category === target.category && m.id !== target.id).length >= 3;
+  const ingredients = target.description ? extractIngredientsFromDescription(target.description) : [];
+  const canDoIngredient =
+    ingredients.length >= 1 &&
+    usable.filter(m => m.id !== target.id && m.description && extractIngredientsFromDescription(m.description).length > 0).length >= 3;
+  const canDoDietary =
+    (target.is_vegetarian || target.is_gluten_free) &&
+    usable.filter(m => m.id !== target.id).length >= 1;
+
+  const options: Array<'name' | 'ingredient' | 'dietary'> = [];
+  if (canDoName) options.push('name');
+  if (canDoIngredient) options.push('ingredient');
+  if (canDoDietary) options.push('dietary');
+  if (options.length === 0) return null;
+
+  const form = options[Math.floor(rng() * options.length)];
+
+  // ─── Form 1: Dish/drink name ────────────────────────────────────────
+  if (form === 'name') {
+    const siblings = usable.filter(m => m.category === target.category && m.id !== target.id);
+    const wrongItems = seededPick(siblings, 3, rng);
+    const wrongs = wrongItems.map(i => i.name);
+    const { options: opts, correctLetter } = shuffleOptions(target.name, wrongs, rng);
+    const nameMap = new Map([target, ...wrongItems].map(i => [i.name, i.name_es || i.name]));
+    const optsEs = opts.map(o => nameMap.get(o) || o);
+
+    return {
+      question_text: 'What is this item called?',
+      option_a: opts[0],
+      option_b: opts[1],
+      option_c: opts[2],
+      option_d: opts[3],
+      correct_option: correctLetter,
+      source_type: 'auto',
+      source_table: 'menu_items',
+      templateId: 'menu_photo_name',
+      question_image_url: target.thumbnail_url,
+      question_text_es: '¿Cómo se llama este platillo?',
+      option_a_es: optsEs[0],
+      option_b_es: optsEs[1],
+      option_c_es: optsEs[2],
+      option_d_es: optsEs[3],
+    };
+  }
+
+  // ─── Form 2: Ingredient ─────────────────────────────────────────────
+  if (form === 'ingredient') {
+    const correctIngredient = ingredients[Math.floor(rng() * ingredients.length)];
+    const otherItems = usable.filter(
+      m => m.id !== target.id && m.description && extractIngredientsFromDescription(m.description).length > 0,
+    );
+    const otherIngredients = [
+      ...new Set(
+        otherItems
+          .flatMap(m => extractIngredientsFromDescription(m.description || ''))
+          .filter(i => i.toLowerCase() !== correctIngredient.toLowerCase()),
+      ),
+    ];
+    if (otherIngredients.length < 3) return null;
+
+    const wrongs = seededPick(otherIngredients, 3, rng);
+    const { options: opts, correctLetter } = shuffleOptions(correctIngredient, wrongs, rng);
+
+    return {
+      question_text: `Which of these is an ingredient in this ${target.name}?`,
+      option_a: opts[0],
+      option_b: opts[1],
+      option_c: opts[2],
+      option_d: opts[3],
+      correct_option: correctLetter,
+      source_type: 'auto',
+      source_table: 'menu_items',
+      templateId: 'menu_photo_ingredient',
+      question_image_url: target.thumbnail_url,
+      question_text_es: `¿Cuál de estos es un ingrediente de este ${nameEs}?`,
+      option_a_es: opts[0],
+      option_b_es: opts[1],
+      option_c_es: opts[2],
+      option_d_es: opts[3],
+    };
+  }
+
+  // ─── Form 3: Dietary flag (Yes/No/Depends/Unknown) ──────────────────
+  // Alternate randomly between vegetarian and gluten-free based on what's known.
+  const useVeg = target.is_vegetarian && (!target.is_gluten_free || rng() < 0.5);
+  const flagQuestionEn = useVeg ? 'Is this item vegetarian?' : 'Is this item gluten-free?';
+  const flagQuestionEs = useVeg ? '¿Este platillo es vegetariano?' : '¿Este platillo es libre de gluten?';
+  const correctAnswer = 'Yes'; // We only use this form when the item has the flag set
+  const correctAnswerEs = 'Sí';
+
+  const answerPool = ['No', 'Depends on preparation', 'Not listed'];
+  const answerPoolEs = ['No', 'Depende de la preparación', 'No indicado'];
+  const { options: opts, correctLetter } = shuffleOptions(correctAnswer, answerPool, rng);
+  // Map EN answers back to ES in the shuffled order
+  const enToEs = new Map<string, string>([
+    [correctAnswer, correctAnswerEs],
+    ...answerPool.map((en, idx) => [en, answerPoolEs[idx]] as [string, string]),
+  ]);
+  const optsEs = opts.map(o => enToEs.get(o) || o);
+
+  return {
+    question_text: flagQuestionEn,
+    option_a: opts[0],
+    option_b: opts[1],
+    option_c: opts[2],
+    option_d: opts[3],
+    correct_option: correctLetter,
+    source_type: 'auto',
+    source_table: 'menu_items',
+    templateId: 'menu_photo_dietary',
+    question_image_url: target.thumbnail_url,
+    question_text_es: flagQuestionEs,
+    option_a_es: optsEs[0],
+    option_b_es: optsEs[1],
+    option_c_es: optsEs[2],
+    option_d_es: optsEs[3],
+  };
+}
+
+// Exported so exam-editor's per-question refresh can regenerate a picture
+// question against a filtered pool (excluding the item currently shown).
+export async function generatePhotoQuestion(
+  excludeMenuItemIds: string[] = [],
+  seed?: string,
+): Promise<GeneratedQuestion | null> {
+  const pool = await fetchMenuItemsWithImages();
+  const rng = seededRandom(hashString(seed || `photo-${Date.now()}-${Math.random()}`));
+  const q = menuPhotoQuestion(pool, rng, new Set(excludeMenuItemIds));
+  if (!q) return null;
+  const { templateId, ...rest } = q;
+  return rest;
+}
+
+// =============================================
 // MAIN GENERATOR
 // =============================================
 
@@ -642,9 +840,34 @@ export async function generateQuizQuestions(
 
   // Fetch all data sources
   const menuItems = await fetchMenuItems();
+  const photoPool = await fetchMenuItemsWithImages();
 
   // Build candidate pool based on exam type
   const candidates: QuestionCandidate[] = [];
+
+  // ─── Picture question slots (1-in-5 ratio) ──────────────────────────
+  // Reserve Math.max(1, round(count/5)) slots for picture questions.
+  // Gracefully downgrades to 0 if the image pool is too small.
+  const reservedPhotoSlots = Math.max(1, Math.round(questionCount / 5));
+  const usedPhotoItemIds = new Set<string>();
+  let photoSlotsFilled = 0;
+  for (let i = 0; i < reservedPhotoSlots; i++) {
+    const q = menuPhotoQuestion(photoPool, rng, usedPhotoItemIds);
+    if (!q) {
+      if (photoSlotsFilled < reservedPhotoSlots) {
+        console.warn(
+          `[questionGenerator] Picture pool too small — filled ${photoSlotsFilled}/${reservedPhotoSlots} photo slots, falling back to text questions.`,
+        );
+      }
+      break;
+    }
+    // Track the underlying menu_item so we don't re-use it this quiz.
+    // We identify it by matching thumbnail_url in the pool.
+    const usedItem = photoPool.find(m => m.thumbnail_url === q.question_image_url && !usedPhotoItemIds.has(m.id));
+    if (usedItem) usedPhotoItemIds.add(usedItem.id);
+    candidates.push(q);
+    photoSlotsFilled++;
+  }
 
   // Menu questions — available for all exam types
   const menuGenerators = [

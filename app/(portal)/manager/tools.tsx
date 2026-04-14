@@ -59,9 +59,10 @@ export default function ManagerToolsScreen() {
   // ─── Build flat tile list ────────────────────────────────────────────────────
 
   const allItems: GridItem[] = [
-    // Always first two: Guides & Training (top-left), Game Hub (top-middle)
+    // Fixed top row: Guides & Training → Game Hub → Rewards & Reviews
     { id: 'guides-training', label: t('manager_tools.guides_training'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training' },
-    { id: 'game-hub', label: 'Game Hub', iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub' },
+    { id: 'game-hub', label: t('employee_tools.game_hub'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub' },
+    { id: 'rewards-reviews', label: t('manager_tools.rewards_reviews'), iosIcon: 'gift.fill', androidIcon: 'card-giftcard', route: '/rewards-and-reviews-editor' },
   ];
 
   // Role-based assistants fill remaining positions

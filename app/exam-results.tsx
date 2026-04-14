@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
+  Image,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -14,6 +15,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
 import { formatTime } from '@/utils/exam/examEngine';
 import { useTranslation } from 'react-i18next';
+import QuestionReviewList from '@/components/QuestionReviewList';
 
 interface QuestionReview {
   id: string;
@@ -28,6 +30,7 @@ interface QuestionReview {
   bonus_bucks_value: number | null;
   user_answer: string | null;
   is_correct: boolean;
+  question_image_url?: string | null;
   // Spanish fields
   question_text_es?: string;
   option_a_es?: string;
@@ -52,6 +55,7 @@ export default function ExamResultsScreen() {
     timeSeconds: string;
     isTimedOut: string;
     preview: string;
+    previewAnswers: string;
   }>();
 
   const examId = params.examId || '';
@@ -87,9 +91,18 @@ export default function ExamResultsScreen() {
         return;
       }
 
-      // Try to load user's answers from exam_results
+      // Try to load user's answers from exam_results (real attempt) or from
+      // query param (preview mode — manager hasn't written to the DB).
       let userAnswers: any[] = [];
-      if (!isPreview) {
+      if (isPreview) {
+        if (params.previewAnswers) {
+          try {
+            userAnswers = JSON.parse(decodeURIComponent(params.previewAnswers));
+          } catch (e) {
+            console.warn('Failed to parse previewAnswers param', e);
+          }
+        }
+      } else {
         const { data: resultData } = await (supabase
           .from('exam_results' as any) as any)
           .select('answers')
@@ -109,10 +122,16 @@ export default function ExamResultsScreen() {
       // Build review data
       const reviewQuestions: QuestionReview[] = questionsData.map((q: any, index: number) => {
         const answer = userAnswers.find((a: any) => a.question_id === q.id);
+        // Belt-and-suspenders: if preview mode somehow lost is_correct, derive it
+        // from the selected option matching the correct option on the question row.
+        const derivedCorrect =
+          isPreview && answer?.selected_option
+            ? answer.selected_option === q.correct_option
+            : false;
         return {
           ...q,
           user_answer: answer?.selected_option || null,
-          is_correct: answer?.is_correct || false,
+          is_correct: answer?.is_correct ?? derivedCorrect,
         };
       });
 
@@ -204,79 +223,7 @@ export default function ExamResultsScreen() {
         {/* Question Review */}
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{isSpanish ? 'Revisión de Preguntas' : 'Question Review'}</Text>
 
-        {questions.map((q) => (
-          <View
-            key={q.id}
-            style={[
-              styles.reviewCard,
-              { backgroundColor: colors.card },
-              q.is_bonus && { borderWidth: 2, borderColor: '#F59E0B' },
-            ]}
-          >
-            <View style={styles.reviewHeader}>
-              <View style={styles.reviewHeaderLeft}>
-                <View style={[
-                  styles.resultBadge,
-                  { backgroundColor: q.is_correct ? '#10B98120' : '#EF444420' },
-                ]}>
-                  <IconSymbol
-                    ios_icon_name={q.is_correct ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
-                    android_material_icon_name={q.is_correct ? 'check-circle' : 'cancel'}
-                    size={18}
-                    color={q.is_correct ? '#10B981' : '#EF4444'}
-                  />
-                  <Text style={[styles.resultBadgeText, { color: q.is_correct ? '#10B981' : '#EF4444' }]}>
-                    {q.is_correct ? (isSpanish ? 'Correcto' : 'Correct') : (isSpanish ? 'Incorrecto' : 'Wrong')}
-                  </Text>
-                </View>
-                {q.is_bonus && (
-                  <View style={[styles.bonusChip, { backgroundColor: '#F59E0B20' }]}>
-                    <Text style={styles.bonusChipText}>BONUS</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={[styles.reviewQuestionNum, { color: colors.textSecondary }]}>Q{q.question_order}</Text>
-            </View>
-
-            <Text style={[styles.reviewQuestionText, { color: colors.text }]}>
-              {isSpanish && q.question_text_es ? q.question_text_es : q.question_text}
-            </Text>
-
-            {(['A', 'B', 'C', 'D'] as const).map(letter => {
-              const optionKey = `option_${letter.toLowerCase()}` as keyof QuestionReview;
-              const optionKeyEs = `${optionKey}_es` as keyof QuestionReview;
-              const optionText = (isSpanish && q[optionKeyEs]) ? q[optionKeyEs] as string : q[optionKey] as string;
-              const isCorrectAnswer = q.correct_option === letter;
-              const isUserAnswer = q.user_answer === letter;
-
-              let rowBg = 'transparent';
-              let rowTextColor = colors.text;
-              let icon = null;
-
-              if (isCorrectAnswer) {
-                rowBg = '#10B98110';
-                rowTextColor = '#10B981';
-                icon = <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={16} color="#10B981" />;
-              }
-              if (isUserAnswer && !isCorrectAnswer) {
-                rowBg = '#EF444410';
-                rowTextColor = '#EF4444';
-                icon = <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={16} color="#EF4444" />;
-              }
-
-              return (
-                <View key={letter} style={[styles.reviewOption, { backgroundColor: rowBg }]}>
-                  <Text style={[styles.reviewOptionLetter, { color: rowTextColor }]}>{letter}.</Text>
-                  <Text style={[styles.reviewOptionText, { color: rowTextColor }]} numberOfLines={2}>{optionText}</Text>
-                  {icon}
-                  {isUserAnswer && (
-                    <Text style={[styles.yourAnswerTag, { color: rowTextColor }]}>{isSpanish ? 'Tu respuesta' : 'Your answer'}</Text>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-        ))}
+        <QuestionReviewList questions={questions as any} />
 
         {/* Done Button */}
         <TouchableOpacity
@@ -367,6 +314,13 @@ const styles = StyleSheet.create({
   bonusChipText: { color: '#F59E0B', fontSize: 10, fontWeight: '800' },
   reviewQuestionNum: { fontSize: 13, fontWeight: '600' },
   reviewQuestionText: { fontSize: 15, fontWeight: '600', marginBottom: 10, lineHeight: 21 },
+  reviewQuestionImage: {
+    width: '100%',
+    aspectRatio: 16 / 10,
+    borderRadius: 10,
+    marginBottom: 10,
+    backgroundColor: '#00000010',
+  },
   reviewOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 8, borderRadius: 8, gap: 6 },
   reviewOptionLetter: { fontSize: 13, width: 18, fontWeight: '600' },
   reviewOptionText: { flex: 1, fontSize: 13 },

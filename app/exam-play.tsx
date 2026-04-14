@@ -9,6 +9,7 @@ import {
   BackHandler,
   AppState,
   Alert,
+  Image,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -28,8 +29,11 @@ import {
   getCurrentQuestion,
   getAnswerStatuses,
   formatTime,
+  formatCountdown,
+  getCountdownUrgency,
 } from '@/utils/exam/examEngine';
 import { getExamTypeName } from '@/utils/exam/questionGenerator';
+import { getEligibleQuizTypes } from '@/app/weekly-quizzes';
 import { useTranslation } from 'react-i18next';
 
 type Phase = 'loading' | 'intro' | 'playing' | 'feedback' | 'completed';
@@ -49,8 +53,15 @@ export default function ExamPlayScreen() {
   const [timeRemaining, setTimeRemaining] = useState(300);
   const [timeLimitSeconds, setTimeLimitSeconds] = useState(300);
   const [examType, setExamType] = useState('');
+  const [closeAt, setCloseAt] = useState<Date | null>(null);
+  const [, setCountdownTick] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [feedbackCorrect, setFeedbackCorrect] = useState(false);
+
+  // Multi-quiz reward split: a user eligible for N weekly quizzes earns
+  // $1/N per correct standard question. Bonus questions always pay full.
+  const eligibleQuizCount = Math.max(1, getEligibleQuizTypes(user?.jobTitles || []).length);
+  const rewardPerCorrect = 1 / eligibleQuizCount;
 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const examStateRef = useRef<ExamState | null>(null);
@@ -64,6 +75,13 @@ export default function ExamPlayScreen() {
   useEffect(() => {
     phaseRef.current = phase;
   }, [phase]);
+
+  // Countdown tick for close_at display on intro screen
+  useEffect(() => {
+    if (!closeAt || phase !== 'intro') return;
+    const interval = setInterval(() => setCountdownTick((t) => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [closeAt, phase]);
 
   // Block back navigation during active quiz (Android hardware back + iOS gesture blocked in _layout.tsx)
   useEffect(() => {
@@ -133,6 +151,9 @@ export default function ExamPlayScreen() {
       setExamType(examData.exam_type);
       setTimeLimitSeconds(examData.time_limit_seconds);
       setTimeRemaining(examData.time_limit_seconds);
+      if (examData.close_at) {
+        setCloseAt(new Date(examData.close_at));
+      }
 
       // Check for existing attempt (anti-cheat: detect already completed or already started)
       if (!isPreview && user?.id) {
@@ -326,7 +347,7 @@ export default function ExamPlayScreen() {
     setSubmitting(true);
 
     try {
-      const results = calculateResults(state);
+      const results = calculateResults(state, rewardPerCorrect);
 
       await (supabase.rpc as any)('submit_exam_and_award_bucks', {
         p_exam_id: examId,
@@ -350,9 +371,15 @@ export default function ExamPlayScreen() {
   // Navigate to results
   const handleViewResults = () => {
     if (!examState) return;
-    const results = calculateResults(examState);
+    const results = calculateResults(examState, rewardPerCorrect);
+    // In preview mode there is no exam_results row to read, so we pass the
+    // in-memory answers through the URL so exam-results can render the
+    // per-question correct/wrong badges accurately.
+    const previewAnswersParam = isPreview
+      ? `&previewAnswers=${encodeURIComponent(JSON.stringify(examState.answers))}`
+      : '';
     router.replace(
-      `/exam-results?examId=${examId}&correctCount=${results.correctCount}&totalQuestions=${results.totalQuestions}&standardCorrect=${results.standardCorrect}&bonusCorrect=${results.bonusCorrect}&bonusBucksValue=${results.bonusBucksValue}&totalBucks=${results.totalBucksAwarded}&timeSeconds=${results.timeSeconds}&isTimedOut=${examState.isTimedOut}&preview=${isPreview}`
+      `/exam-results?examId=${examId}&correctCount=${results.correctCount}&totalQuestions=${results.totalQuestions}&standardCorrect=${results.standardCorrect}&bonusCorrect=${results.bonusCorrect}&bonusBucksValue=${results.bonusBucksValue}&totalBucks=${results.totalBucksAwarded}&timeSeconds=${results.timeSeconds}&isTimedOut=${examState.isTimedOut}&preview=${isPreview}${previewAnswersParam}`
     );
   };
 
@@ -398,12 +425,41 @@ export default function ExamPlayScreen() {
               </Text>
             </View>
 
+            {closeAt && (() => {
+              const msRemaining = closeAt.getTime() - Date.now();
+              const urgency = getCountdownUrgency(msRemaining);
+              const color =
+                urgency === 'red' ? '#EF4444'
+                : urgency === 'amber' ? '#F59E0B'
+                : colors.text;
+              return (
+                <View style={[styles.introInfoRow, { backgroundColor: colors.background }]}>
+                  <IconSymbol ios_icon_name="hourglass" android_material_icon_name="hourglass-empty" size={20} color={color} />
+                  <Text style={[styles.introInfoText, { color }]}>
+                    {isSpanish
+                      ? `Cierra en ${formatCountdown(msRemaining, true)}`
+                      : `Closes in ${formatCountdown(msRemaining)}`}
+                  </Text>
+                </View>
+              );
+            })()}
+
             <View style={[styles.introInfoRow, { backgroundColor: colors.background }]}>
               <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={20} color="#10B981" />
               <Text style={[styles.introInfoText, { color: colors.text }]}>
-                {isSpanish ? 'Gana $1 McLoone\'s Buck por respuesta correcta' : 'Earn $1 McLoone\'s Buck per correct answer'}
+                {isSpanish
+                  ? `Gana $${rewardPerCorrect.toFixed(2)} McLoone's Bucks por respuesta correcta`
+                  : `Earn $${rewardPerCorrect.toFixed(2)} McLoone's Bucks per correct answer`}
               </Text>
             </View>
+
+            {eligibleQuizCount > 1 && (
+              <Text style={[styles.introSplitNote, { color: colors.textSecondary }]}>
+                {isSpanish
+                  ? `Tu recompensa por pregunta se divide entre tus ${eligibleQuizCount} exámenes — el máximo semanal sigue siendo el mismo.`
+                  : `Your reward per question is split across your ${eligibleQuizCount} quizzes — total weekly max stays the same.`}
+              </Text>
+            )}
 
             <View style={[styles.introInfoRow, { backgroundColor: colors.background }]}>
               <IconSymbol ios_icon_name="exclamationmark.triangle.fill" android_material_icon_name="warning" size={20} color="#F59E0B" />
@@ -445,7 +501,7 @@ export default function ExamPlayScreen() {
 
   // COMPLETED SCREEN (brief before navigating to results)
   if (phase === 'completed') {
-    const results = calculateResults(examState);
+    const results = calculateResults(examState, rewardPerCorrect);
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.completedContent}>
@@ -553,6 +609,13 @@ export default function ExamPlayScreen() {
             { backgroundColor: colors.card },
             currentQuestion.is_bonus && { borderWidth: 2, borderColor: '#F59E0B' },
           ]}>
+            {(currentQuestion as any).question_image_url && (
+              <Image
+                source={{ uri: (currentQuestion as any).question_image_url }}
+                style={styles.questionImage}
+                resizeMode="cover"
+              />
+            )}
             <Text style={[styles.questionText, { color: colors.text }]}>
               {isSpanish && (currentQuestion as any).question_text_es ? (currentQuestion as any).question_text_es : currentQuestion.question_text}
             </Text>
@@ -693,6 +756,15 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   introInfoText: { fontSize: 14, flex: 1 },
+  introSplitNote: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 4,
+    paddingHorizontal: 8,
+    lineHeight: 16,
+  },
   startButton: {
     borderRadius: 14,
     paddingVertical: 18,
@@ -717,6 +789,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   questionText: { fontSize: 18, fontWeight: '600', lineHeight: 26 },
+  questionImage: {
+    width: '100%',
+    aspectRatio: 16 / 10,
+    borderRadius: 12,
+    marginBottom: 14,
+    backgroundColor: '#00000010',
+  },
 
   // Options
   optionsContainer: { gap: 10 },

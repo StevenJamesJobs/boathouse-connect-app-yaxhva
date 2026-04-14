@@ -13,6 +13,8 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { hasAnyQuizEligibleRole } from '@/app/weekly-quizzes';
+import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 
 // ─── Grid layout constants (matching Manage page) ────────────────────────────
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -27,6 +29,7 @@ interface GridItem {
   iosIcon: string;
   androidIcon: string;
   route: string;
+  badge?: boolean;
 }
 
 export default function EmployeeToolsScreen() {
@@ -56,18 +59,21 @@ export default function EmployeeToolsScreen() {
                                  jobTitles.includes('Manager') ||
                                  jobTitles.includes('Runner');
 
-  const canSeeWeeklyQuiz = jobTitles.includes('Busser') ||
-                           jobTitles.includes('Runner');
+  const canSeeWeeklyQuizzes = hasAnyQuizEligibleRole(jobTitles);
+  const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
 
   // ─── Build flat tile list ────────────────────────────────────────────────────
 
+  // Fixed top row: Guides & Training → Game Hub → Weekly Quizzes (when eligible)
   const allItems: GridItem[] = [
-    // Always first two: Guides & Training (top-left), Game Hub (top-middle)
     { id: 'guides-training', label: t('employee_tools.guides_training'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training' },
-    { id: 'game-hub', label: 'Game Hub', iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub' },
+    { id: 'game-hub', label: t('employee_tools.game_hub'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub' },
   ];
+  if (canSeeWeeklyQuizzes) {
+    allItems.push({ id: 'weekly-quizzes', label: t('employee_tools.weekly_quizzes'), iosIcon: 'questionmark.circle.fill', androidIcon: 'quiz', route: '/weekly-quizzes', badge: unreadQuizCount > 0 });
+  }
 
-  // Role-based assistants fill remaining positions
+  // Role-based assistants fill remaining rows
   if (canSeeServerAssistant) {
     allItems.push({ id: 'server', label: t('employee_tools.server_assistant'), iosIcon: 'tray.full.fill', androidIcon: 'room-service', route: '/server-assistant' });
   }
@@ -79,9 +85,6 @@ export default function EmployeeToolsScreen() {
   }
   if (canSeeKitchenAssistant) {
     allItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
-  }
-  if (canSeeWeeklyQuiz) {
-    allItems.push({ id: 'weekly-quiz', label: 'Weekly Quizzes', iosIcon: 'doc.text.fill', androidIcon: 'quiz', route: '/weekly-quiz' });
   }
 
   // ─── Grid rendering ─────────────────────────────────────────────────────────
@@ -100,6 +103,7 @@ export default function EmployeeToolsScreen() {
           size={28}
           color={colors.primary}
         />
+        {item.badge && <View style={styles.badgeDot} />}
       </View>
       <Text style={[styles.gridLabel, { color: colors.text }]} numberOfLines={2}>
         {item.label}
@@ -167,6 +171,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
+    position: 'relative',
+  },
+  badgeDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#EF4444',
+    borderWidth: 2,
+    borderColor: '#FFF',
   },
   gridLabel: {
     fontSize: 12,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,17 +12,23 @@ import {
   Platform,
   Image,
   Modal,
+  Switch,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useAppTheme } from '@/contexts/ThemeContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { generateQuizQuestions, getCurrentWeekKey, getExamTypeName } from '@/utils/exam/questionGenerator';
+import { generateQuizQuestions, generatePhotoQuestion, getCurrentWeekKey, getExamTypeName } from '@/utils/exam/questionGenerator';
 import type { ExamType } from '@/utils/exam/questionGenerator';
-import { formatTime } from '@/utils/exam/examEngine';
+import { formatTime, formatCountdown, getCountdownUrgency } from '@/utils/exam/examEngine';
+import { sendCustomNotification } from '@/utils/notificationHelpers';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 
 interface Exam {
   id: string;
@@ -34,6 +40,8 @@ interface Exam {
   activated_at: string | null;
   closed_at: string | null;
   created_at: string;
+  close_at: string | null;
+  notify_on_activate: boolean | null;
 }
 
 interface ExamQuestion {
@@ -50,6 +58,7 @@ interface ExamQuestion {
   bonus_bucks_value: number | null;
   source_type: 'auto' | 'custom' | 'bonus';
   source_table: string | null;
+  question_image_url?: string | null;
 }
 
 interface CompletionEntry {
@@ -69,6 +78,7 @@ export default function ExamEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { mode } = useAppTheme();
   const { user } = useAuth();
   const params = useLocalSearchParams<{ type: string }>();
   const examType = (params.type || 'server') as ExamType;
@@ -93,10 +103,29 @@ export default function ExamEditorScreen() {
   const [customD, setCustomD] = useState('');
   const [customCorrect, setCustomCorrect] = useState<'A' | 'B' | 'C' | 'D'>('A');
   const [bonusBucksValue, setBonusBucksValue] = useState('5');
+  const [customImageUrl, setCustomImageUrl] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+
+  // Close-at scheduling + Notify Staff toggle
+  const [closeAt, setCloseAt] = useState<Date | null>(null);
+  const [notifyOnActivate, setNotifyOnActivate] = useState(false);
+  const [showCloseDatePicker, setShowCloseDatePicker] = useState(false);
+  const [showCloseTimePicker, setShowCloseTimePicker] = useState(false);
+  // Countdown tick state — forces re-render every second while a close_at is set
+  const [countdownTick, setCountdownTick] = useState(0);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchCurrentExam = useCallback(async () => {
     setLoading(true);
     try {
+      // Auto-close any active exams whose close_at has passed. Fire-and-forget
+      // — if it fails we still show the (now slightly stale) data below.
+      try {
+        await (supabase.rpc as any)('close_expired_exams');
+      } catch (cleanupErr) {
+        console.warn('close_expired_exams cleanup failed:', cleanupErr);
+      }
+
       // Get the most recent draft or active exam for this type
       const { data, error } = await (supabase
         .from('exams' as any) as any)
@@ -110,6 +139,8 @@ export default function ExamEditorScreen() {
         const exam = data[0] as Exam;
         setCurrentExam(exam);
         setTimeLimit(exam.time_limit_seconds);
+        setCloseAt(exam.close_at ? new Date(exam.close_at) : null);
+        setNotifyOnActivate(Boolean(exam.notify_on_activate));
         await fetchQuestions(exam.id);
         if (exam.status === 'active') {
           await fetchCompletionData(exam.id);
@@ -117,12 +148,35 @@ export default function ExamEditorScreen() {
       } else {
         setCurrentExam(null);
         setQuestions([]);
+        setCloseAt(null);
+        setNotifyOnActivate(false);
       }
     } catch (err) {
       console.error('Error fetching exam:', err);
     }
     setLoading(false);
   }, [examType]);
+
+  // Tick a countdown re-render once per second while a close_at is active,
+  // so the "Closes in …" label updates live.
+  useEffect(() => {
+    if (!closeAt || !currentExam || currentExam.status === 'closed') {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      return;
+    }
+    countdownIntervalRef.current = setInterval(() => {
+      setCountdownTick(t => (t + 1) % 1_000_000);
+    }, 1000);
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, [closeAt, currentExam?.status]);
 
   const fetchQuestions = async (examId: string) => {
     const { data, error } = await (supabase
@@ -236,6 +290,7 @@ export default function ExamEditorScreen() {
       option_b_es: q.option_b_es || null,
       option_c_es: q.option_c_es || null,
       option_d_es: q.option_d_es || null,
+      question_image_url: q.question_image_url || null,
     }));
 
     const { error } = await (supabase.from('exam_questions' as any) as any).insert(questionsToInsert);
@@ -272,12 +327,55 @@ export default function ExamEditorScreen() {
                 .eq('exam_type', examType)
                 .eq('status', 'active');
 
+              // Default close_at = 7 days from now at 23:59 local if unset
+              let effectiveCloseAt = closeAt;
+              if (!effectiveCloseAt) {
+                const d = new Date();
+                d.setDate(d.getDate() + 7);
+                d.setHours(23, 59, 0, 0);
+                effectiveCloseAt = d;
+                setCloseAt(d);
+              }
+
               // Activate current exam
               await (supabase
                 .from('exams' as any) as any)
-                .update({ status: 'active', activated_at: new Date().toISOString() })
+                .update({
+                  status: 'active',
+                  activated_at: new Date().toISOString(),
+                  close_at: effectiveCloseAt.toISOString(),
+                  // Reset the notify flag after activation so re-activation
+                  // requires re-arming and we don't double-notify on reopen.
+                  notify_on_activate: false,
+                })
                 .eq('id', currentExam.id);
 
+              // Fire push if the manager armed the toggle
+              if (notifyOnActivate) {
+                try {
+                  const jobTitlesByType: Record<string, string[]> = {
+                    server: ['Server', 'Lead Server', 'Busser', 'Runner'],
+                    bartender: ['Bartender'],
+                    host: ['Host'],
+                  };
+                  const targetJobTitles = jobTitlesByType[examType] || [];
+                  const examTypeLabel = getExamTypeName(examType);
+                  await sendCustomNotification(
+                    'New Weekly Quiz Available',
+                    `Your ${examTypeLabel} quiz is live — tap to take it.`,
+                    {
+                      destination: 'weekly-quizzes',
+                      exam_id: currentExam.id,
+                      job_titles: targetJobTitles,
+                    }
+                  );
+                } catch (pushErr) {
+                  // Non-fatal: activation still succeeded.
+                  console.error('Notify Staff push failed:', pushErr);
+                }
+              }
+
+              setNotifyOnActivate(false);
               await fetchCurrentExam();
               Alert.alert('Quiz Activated', 'The quiz is now live for employees!');
             } catch (err) {
@@ -287,6 +385,34 @@ export default function ExamEditorScreen() {
         },
       ]
     );
+  };
+
+  // Persist a new close_at value (draft or active)
+  const handleUpdateCloseAt = async (next: Date | null) => {
+    if (!currentExam) return;
+    setCloseAt(next);
+    try {
+      await (supabase
+        .from('exams' as any) as any)
+        .update({ close_at: next ? next.toISOString() : null })
+        .eq('id', currentExam.id);
+    } catch (err) {
+      console.error('Update close_at error:', err);
+    }
+  };
+
+  // Persist the Notify Staff toggle (draft only)
+  const handleToggleNotifyOnActivate = async (next: boolean) => {
+    if (!currentExam || currentExam.status !== 'draft') return;
+    setNotifyOnActivate(next);
+    try {
+      await (supabase
+        .from('exams' as any) as any)
+        .update({ notify_on_activate: next })
+        .eq('id', currentExam.id);
+    } catch (err) {
+      console.error('Toggle notify_on_activate error:', err);
+    }
   };
 
   // Close quiz
@@ -366,6 +492,7 @@ export default function ExamEditorScreen() {
       bonus_bucks_value: bonusValue,
       source_type: isBonus ? 'bonus' : 'custom',
       source_table: null,
+      question_image_url: customImageUrl,
     });
 
     if (error) {
@@ -404,13 +531,29 @@ export default function ExamEditorScreen() {
     if (!currentExam) return;
     setRefreshingQuestionId(question.id);
     try {
-      // Generate a batch of questions and pick one that's different from the current
-      const cycleKey = currentExam.cycle_key + '-refresh-' + Date.now().toString(36);
-      const generated = await generateQuizQuestions(examType, cycleKey, 5);
+      // If the current question has an image, regenerate another photo
+      // question against the same pool (this yields a fresh item + prompt).
+      // Otherwise fall back to the text-template batch path below.
+      let newQuestion = null as any;
+      if (question.question_image_url) {
+        const photo = await generatePhotoQuestion(
+          [],
+          `${currentExam.cycle_key}-photo-refresh-${question.id}-${Date.now()}`,
+        );
+        if (photo && photo.question_text !== question.question_text) {
+          newQuestion = photo;
+        }
+      }
 
-      // Find one that doesn't duplicate existing questions
-      const existingTexts = new Set(questions.map(q => q.question_text));
-      const newQuestion = generated.find(q => !existingTexts.has(q.question_text)) || generated[0];
+      if (!newQuestion) {
+        // Generate a batch of questions and pick one that's different from the current
+        const cycleKey = currentExam.cycle_key + '-refresh-' + Date.now().toString(36);
+        const generated = await generateQuizQuestions(examType, cycleKey, 5);
+
+        // Find one that doesn't duplicate existing questions
+        const existingTexts = new Set(questions.map(q => q.question_text));
+        newQuestion = generated.find(q => !existingTexts.has(q.question_text)) || generated[0];
+      }
 
       if (newQuestion) {
         const { error } = await (supabase
@@ -429,6 +572,7 @@ export default function ExamEditorScreen() {
             option_b_es: newQuestion.option_b_es || null,
             option_c_es: newQuestion.option_c_es || null,
             option_d_es: newQuestion.option_d_es || null,
+            question_image_url: newQuestion.question_image_url ?? null,
           })
           .eq('id', question.id);
 
@@ -459,6 +603,7 @@ export default function ExamEditorScreen() {
         option_d: editingQuestion.option_d,
         correct_option: editingQuestion.correct_option,
         bonus_bucks_value: editingQuestion.bonus_bucks_value,
+        question_image_url: editingQuestion.question_image_url ?? null,
       })
       .eq('id', editingQuestion.id);
 
@@ -484,6 +629,74 @@ export default function ExamEditorScreen() {
     setCustomD('');
     setCustomCorrect('A');
     setBonusBucksValue('5');
+    setCustomImageUrl(null);
+  };
+
+  // ─── Image picker / upload for picture questions ───────────────────
+  // Reuses the menu-editor pattern: pick via ImagePicker → base64 →
+  // Uint8Array → upload to the 'menu-items' bucket under the
+  // quiz-questions/ subfolder → return the public URL.
+  const pickAndUploadQuizImage = async (): Promise<string | null> => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission Required', 'We need photo library access to attach an image.');
+        return null;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 10],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets[0]) return null;
+
+      setUploadingImage(true);
+      const uri = result.assets[0].uri;
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+      const byteArray = new Uint8Array(byteNumbers);
+
+      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `quiz-questions/${Date.now()}.${ext}`;
+      let contentType = 'image/jpeg';
+      if (ext === 'png') contentType = 'image/png';
+      else if (ext === 'webp') contentType = 'image/webp';
+
+      const { error } = await supabase.storage
+        .from('menu-items')
+        .upload(fileName, byteArray, { contentType, upsert: false });
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage.from('menu-items').getPublicUrl(fileName);
+      return urlData.publicUrl;
+    } catch (err: any) {
+      console.error('Quiz image upload error:', err);
+      Alert.alert('Upload Failed', err?.message || 'Could not upload image.');
+      return null;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleAttachPhotoToCustomForm = async () => {
+    const url = await pickAndUploadQuizImage();
+    if (url) setCustomImageUrl(url);
+  };
+
+  const handleAttachPhotoToEditingQuestion = async () => {
+    if (!editingQuestion) return;
+    const url = await pickAndUploadQuizImage();
+    if (url) setEditingQuestion({ ...editingQuestion, question_image_url: url });
+  };
+
+  const handleRemovePhotoFromEditingQuestion = () => {
+    if (!editingQuestion) return;
+    setEditingQuestion({ ...editingQuestion, question_image_url: null });
   };
 
   const getStatusColor = (status: string) => {
@@ -689,6 +902,75 @@ export default function ExamEditorScreen() {
                 <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Questions</Text>
                 <Text style={[styles.statusValue, { color: colors.text }]}>{questions.length}</Text>
               </View>
+
+              {/* Closes At row — editable while draft or active */}
+              {currentExam.status !== 'closed' && (
+                <TouchableOpacity
+                  style={styles.statusRow}
+                  onPress={() => setShowCloseDatePicker(true)}
+                  activeOpacity={0.6}
+                >
+                  <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Closes At</Text>
+                  <View style={styles.closeAtRight}>
+                    {closeAt ? (
+                      (() => {
+                        const msRemaining = closeAt.getTime() - Date.now();
+                        const urgency = getCountdownUrgency(msRemaining);
+                        const color =
+                          urgency === 'red' ? '#EF4444'
+                          : urgency === 'amber' ? '#F59E0B'
+                          : urgency === 'expired' ? '#9CA3AF'
+                          : colors.text;
+                        return (
+                          <>
+                            <Text style={[styles.statusValue, { color }]}>
+                              {formatCountdown(msRemaining)}
+                            </Text>
+                            <Text style={[styles.closeAtDate, { color: colors.textSecondary }]}>
+                              {closeAt.toLocaleString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })}
+                            </Text>
+                          </>
+                        );
+                      })()
+                    ) : (
+                      <Text style={[styles.statusValue, { color: colors.primary }]}>Set date/time</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )}
+              {closeAt && currentExam.status !== 'closed' && (
+                <View style={styles.closeAtActions}>
+                  <TouchableOpacity
+                    style={[styles.closeAtClearBtn, { borderColor: colors.border }]}
+                    onPress={() => handleUpdateCloseAt(null)}
+                  >
+                    <Text style={[styles.closeAtClearText, { color: colors.textSecondary }]}>Clear</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Notify Staff toggle — draft only */}
+              {currentExam.status === 'draft' && (
+                <View style={styles.statusRow}>
+                  <View style={styles.notifyLabelCol}>
+                    <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Notify Staff</Text>
+                    <Text style={[styles.notifyDesc, { color: colors.textSecondary }]}>
+                      Send a push notification when activated
+                    </Text>
+                  </View>
+                  <Switch
+                    value={notifyOnActivate}
+                    onValueChange={handleToggleNotifyOnActivate}
+                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                    thumbColor={notifyOnActivate ? colors.primary : '#F4F3F4'}
+                  />
+                </View>
+              )}
             </View>
 
             {/* Time Limit */}
@@ -775,6 +1057,13 @@ export default function ExamEditorScreen() {
                     )}
                   </View>
                 </View>
+                {q.question_image_url && (
+                  <Image
+                    source={{ uri: q.question_image_url }}
+                    style={styles.questionCardImage}
+                    resizeMode="cover"
+                  />
+                )}
                 <Text style={[styles.questionText, { color: colors.text }]}>{q.question_text}</Text>
                 <View style={styles.optionsList}>
                   {(['A', 'B', 'C', 'D'] as const).map(letter => {
@@ -924,6 +1213,17 @@ export default function ExamEditorScreen() {
                     </View>
                     <TouchableOpacity
                       style={[styles.retakeButton, { borderColor: colors.primary }]}
+                      onPress={() =>
+                        router.push(
+                          `/exam-answer-review?examId=${currentExam.id}&userId=${entry.user_id}` as any
+                        )
+                      }
+                    >
+                      <IconSymbol ios_icon_name="doc.text.magnifyingglass" android_material_icon_name="pageview" size={12} color={colors.primary} />
+                      <Text style={[styles.retakeButtonText, { color: colors.primary }]}>View</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.retakeButton, { borderColor: colors.primary }]}
                       onPress={() => handleResetUserQuiz(entry)}
                     >
                       <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="refresh" size={12} color={colors.primary} />
@@ -974,6 +1274,42 @@ export default function ExamEditorScreen() {
                       placeholderTextColor={colors.textSecondary}
                     />
                   </View>
+                )}
+
+                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Photo (optional)</Text>
+                {customImageUrl ? (
+                  <View style={styles.photoPreviewRow}>
+                    <Image source={{ uri: customImageUrl }} style={styles.photoPreview} resizeMode="cover" />
+                    <View style={styles.photoPreviewButtons}>
+                      <TouchableOpacity
+                        style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+                        onPress={handleAttachPhotoToCustomForm}
+                        disabled={uploadingImage}
+                      >
+                        <Text style={[styles.photoButtonText, { color: colors.primary }]}>
+                          {uploadingImage ? 'Uploading…' : 'Change Photo'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.photoButton, { backgroundColor: '#EF444415', borderColor: '#EF4444' }]}
+                        onPress={() => setCustomImageUrl(null)}
+                        disabled={uploadingImage}
+                      >
+                        <Text style={[styles.photoButtonText, { color: '#EF4444' }]}>Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary, alignSelf: 'flex-start' }]}
+                    onPress={handleAttachPhotoToCustomForm}
+                    disabled={uploadingImage}
+                  >
+                    <IconSymbol ios_icon_name="photo.fill" android_material_icon_name="photo" size={16} color={colors.primary} />
+                    <Text style={[styles.photoButtonText, { color: colors.primary, marginLeft: 6 }]}>
+                      {uploadingImage ? 'Uploading…' : 'Add Photo'}
+                    </Text>
+                  </TouchableOpacity>
                 )}
 
                 <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Question</Text>
@@ -1057,6 +1393,42 @@ export default function ExamEditorScreen() {
                     </View>
                   )}
 
+                  <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Photo (optional)</Text>
+                  {editingQuestion.question_image_url ? (
+                    <View style={styles.photoPreviewRow}>
+                      <Image source={{ uri: editingQuestion.question_image_url }} style={styles.photoPreview} resizeMode="cover" />
+                      <View style={styles.photoPreviewButtons}>
+                        <TouchableOpacity
+                          style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+                          onPress={handleAttachPhotoToEditingQuestion}
+                          disabled={uploadingImage}
+                        >
+                          <Text style={[styles.photoButtonText, { color: colors.primary }]}>
+                            {uploadingImage ? 'Uploading…' : 'Change Photo'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.photoButton, { backgroundColor: '#EF444415', borderColor: '#EF4444' }]}
+                          onPress={handleRemovePhotoFromEditingQuestion}
+                          disabled={uploadingImage}
+                        >
+                          <Text style={[styles.photoButtonText, { color: '#EF4444' }]}>Remove</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary, alignSelf: 'flex-start' }]}
+                      onPress={handleAttachPhotoToEditingQuestion}
+                      disabled={uploadingImage}
+                    >
+                      <IconSymbol ios_icon_name="photo.fill" android_material_icon_name="photo" size={16} color={colors.primary} />
+                      <Text style={[styles.photoButtonText, { color: colors.primary, marginLeft: 6 }]}>
+                        {uploadingImage ? 'Uploading…' : 'Add Photo'}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+
                   <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Question</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
@@ -1105,6 +1477,121 @@ export default function ExamEditorScreen() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      {/* iOS Close-At Date Picker */}
+      {Platform.OS === 'ios' && showCloseDatePicker && (
+        <Modal visible transparent animationType="fade">
+          <View style={styles.datePickerOverlay}>
+            <View style={[styles.datePickerContainer, { backgroundColor: colors.card }]}>
+              <View style={styles.datePickerHeader}>
+                <TouchableOpacity onPress={() => { setShowCloseDatePicker(false); setShowCloseTimePicker(true); }}>
+                  <Text style={[styles.datePickerDone, { color: colors.primary }]}>Next: Time</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={closeAt || (() => {
+                  const d = new Date();
+                  d.setDate(d.getDate() + 7);
+                  d.setHours(23, 59, 0, 0);
+                  return d;
+                })()}
+                mode="date"
+                display="spinner"
+                textColor={colors.text}
+                themeVariant={mode === 'dark' ? 'dark' : 'light'}
+                onChange={(_event, selectedDate) => {
+                  if (selectedDate) {
+                    const base = closeAt ? new Date(closeAt) : (() => {
+                      const d = new Date();
+                      d.setHours(23, 59, 0, 0);
+                      return d;
+                    })();
+                    base.setFullYear(selectedDate.getFullYear());
+                    base.setMonth(selectedDate.getMonth());
+                    base.setDate(selectedDate.getDate());
+                    handleUpdateCloseAt(base);
+                  }
+                }}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+      {Platform.OS === 'ios' && showCloseTimePicker && (
+        <Modal visible transparent animationType="fade">
+          <View style={styles.datePickerOverlay}>
+            <View style={[styles.datePickerContainer, { backgroundColor: colors.card }]}>
+              <View style={styles.datePickerHeader}>
+                <TouchableOpacity onPress={() => setShowCloseTimePicker(false)}>
+                  <Text style={[styles.datePickerDone, { color: colors.primary }]}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={closeAt || new Date()}
+                mode="time"
+                display="spinner"
+                textColor={colors.text}
+                themeVariant={mode === 'dark' ? 'dark' : 'light'}
+                onChange={(_event, selectedTime) => {
+                  if (selectedTime) {
+                    const base = closeAt ? new Date(closeAt) : new Date();
+                    base.setHours(selectedTime.getHours());
+                    base.setMinutes(selectedTime.getMinutes());
+                    base.setSeconds(0, 0);
+                    handleUpdateCloseAt(base);
+                  }
+                }}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+      {/* Android native Close-At Pickers */}
+      {Platform.OS === 'android' && showCloseDatePicker && (
+        <DateTimePicker
+          value={closeAt || (() => {
+            const d = new Date();
+            d.setDate(d.getDate() + 7);
+            d.setHours(23, 59, 0, 0);
+            return d;
+          })()}
+          mode="date"
+          display="default"
+          onChange={(_event, selectedDate) => {
+            setShowCloseDatePicker(false);
+            if (selectedDate) {
+              const base = closeAt ? new Date(closeAt) : (() => {
+                const d = new Date();
+                d.setHours(23, 59, 0, 0);
+                return d;
+              })();
+              base.setFullYear(selectedDate.getFullYear());
+              base.setMonth(selectedDate.getMonth());
+              base.setDate(selectedDate.getDate());
+              handleUpdateCloseAt(base);
+              // Chain into the time picker
+              setTimeout(() => setShowCloseTimePicker(true), 200);
+            }
+          }}
+        />
+      )}
+      {Platform.OS === 'android' && showCloseTimePicker && (
+        <DateTimePicker
+          value={closeAt || new Date()}
+          mode="time"
+          display="default"
+          onChange={(_event, selectedTime) => {
+            setShowCloseTimePicker(false);
+            if (selectedTime) {
+              const base = closeAt ? new Date(closeAt) : new Date();
+              base.setHours(selectedTime.getHours());
+              base.setMinutes(selectedTime.getMinutes());
+              base.setSeconds(0, 0);
+              handleUpdateCloseAt(base);
+            }
+          }}
+        />
+      )}
 
       <BottomNavBar activeTab="manage" />
     </KeyboardAvoidingView>
@@ -1391,4 +1878,68 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalSaveText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+
+  // Picture questions
+  questionCardImage: {
+    width: '100%',
+    aspectRatio: 16 / 10,
+    borderRadius: 10,
+    marginBottom: 10,
+    backgroundColor: '#00000010',
+  },
+  photoPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  photoPreview: {
+    width: 96,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#00000010',
+  },
+  photoPreviewButtons: { flex: 1, gap: 6 },
+  photoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  photoButtonText: { fontSize: 13, fontWeight: '600' },
+
+  // Closes At / Notify Staff / Date picker
+  closeAtRight: { alignItems: 'flex-end' },
+  closeAtDate: { fontSize: 11, marginTop: 2 },
+  closeAtActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 },
+  closeAtClearBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  closeAtClearText: { fontSize: 12, fontWeight: '600' },
+  notifyLabelCol: { flex: 1, paddingRight: 12 },
+  notifyDesc: { fontSize: 11, marginTop: 2 },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  datePickerContainer: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 24,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#00000020',
+  },
+  datePickerDone: { fontSize: 16, fontWeight: '600' },
 });
