@@ -13,6 +13,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { hasAnyQuizEligibleRole } from '@/app/weekly-quizzes';
 
 // ─── Grid layout constants (matching Manage page) ────────────────────────────
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -56,18 +57,20 @@ export default function EmployeeToolsScreen() {
                                  jobTitles.includes('Manager') ||
                                  jobTitles.includes('Runner');
 
-  const canSeeWeeklyQuiz = jobTitles.includes('Busser') ||
-                           jobTitles.includes('Runner');
+  const canSeeWeeklyQuizzes = hasAnyQuizEligibleRole(jobTitles);
 
   // ─── Build flat tile list ────────────────────────────────────────────────────
 
+  // Fixed top row: Guides & Training → Game Hub → Weekly Quizzes (when eligible)
   const allItems: GridItem[] = [
-    // Always first two: Guides & Training (top-left), Game Hub (top-middle)
     { id: 'guides-training', label: t('employee_tools.guides_training'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training' },
-    { id: 'game-hub', label: 'Game Hub', iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub' },
+    { id: 'game-hub', label: t('employee_tools.game_hub'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub' },
   ];
+  if (canSeeWeeklyQuizzes) {
+    allItems.push({ id: 'weekly-quizzes', label: t('employee_tools.weekly_quizzes'), iosIcon: 'questionmark.circle.fill', androidIcon: 'quiz', route: '/weekly-quizzes' });
+  }
 
-  // Role-based assistants fill remaining positions
+  // Role-based assistants fill remaining rows
   if (canSeeServerAssistant) {
     allItems.push({ id: 'server', label: t('employee_tools.server_assistant'), iosIcon: 'tray.full.fill', androidIcon: 'room-service', route: '/server-assistant' });
   }
@@ -79,9 +82,6 @@ export default function EmployeeToolsScreen() {
   }
   if (canSeeKitchenAssistant) {
     allItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
-  }
-  if (canSeeWeeklyQuiz) {
-    allItems.push({ id: 'weekly-quiz', label: 'Weekly Quizzes', iosIcon: 'doc.text.fill', androidIcon: 'quiz', route: '/weekly-quiz' });
   }
 
   // ─── Grid rendering ─────────────────────────────────────────────────────────

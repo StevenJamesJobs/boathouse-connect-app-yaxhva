@@ -305,7 +305,18 @@
     "server_assistant": "Asistente de Mesero",
     "server_assistant_desc": "Calculadora de cierre y exámenes de mesero",
     "kitchen_assistant": "Asistente de Cocina",
-    "kitchen_assistant_desc": "Recetas, base de conocimiento y exámenes de cocina"
+    "kitchen_assistant_desc": "Recetas, base de conocimiento y exámenes de cocina",
+    "weekly_quizzes": "Cuestionarios Semanales",
+    "game_hub": "Centro de Juegos"
+  },
+  "weekly_quizzes": {
+    "title": "Cuestionarios Semanales",
+    "subtitle": "Tus cuestionarios asignados para esta semana",
+    "empty_title": "No Hay Examen Disponible",
+    "empty_desc": "No hay cuestionarios activos en este momento. ¡Vuelve pronto!",
+    "server_title": "Examen Semanal del Servidor",
+    "bartender_title": "Examen Semanal del Bartender",
+    "host_title": "Examen Semanal del Anfitrión"
   },
   "employee_rewards": {
     "title": "McLoone's Bucks",

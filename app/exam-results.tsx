@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
+  Image,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -28,6 +29,7 @@ interface QuestionReview {
   bonus_bucks_value: number | null;
   user_answer: string | null;
   is_correct: boolean;
+  question_image_url?: string | null;
   // Spanish fields
   question_text_es?: string;
   option_a_es?: string;
@@ -52,6 +54,7 @@ export default function ExamResultsScreen() {
     timeSeconds: string;
     isTimedOut: string;
     preview: string;
+    previewAnswers: string;
   }>();
 
   const examId = params.examId || '';
@@ -87,9 +90,18 @@ export default function ExamResultsScreen() {
         return;
       }
 
-      // Try to load user's answers from exam_results
+      // Try to load user's answers from exam_results (real attempt) or from
+      // query param (preview mode — manager hasn't written to the DB).
       let userAnswers: any[] = [];
-      if (!isPreview) {
+      if (isPreview) {
+        if (params.previewAnswers) {
+          try {
+            userAnswers = JSON.parse(decodeURIComponent(params.previewAnswers));
+          } catch (e) {
+            console.warn('Failed to parse previewAnswers param', e);
+          }
+        }
+      } else {
         const { data: resultData } = await (supabase
           .from('exam_results' as any) as any)
           .select('answers')
@@ -109,10 +121,16 @@ export default function ExamResultsScreen() {
       // Build review data
       const reviewQuestions: QuestionReview[] = questionsData.map((q: any, index: number) => {
         const answer = userAnswers.find((a: any) => a.question_id === q.id);
+        // Belt-and-suspenders: if preview mode somehow lost is_correct, derive it
+        // from the selected option matching the correct option on the question row.
+        const derivedCorrect =
+          isPreview && answer?.selected_option
+            ? answer.selected_option === q.correct_option
+            : false;
         return {
           ...q,
           user_answer: answer?.selected_option || null,
-          is_correct: answer?.is_correct || false,
+          is_correct: answer?.is_correct ?? derivedCorrect,
         };
       });
 
@@ -238,6 +256,13 @@ export default function ExamResultsScreen() {
               <Text style={[styles.reviewQuestionNum, { color: colors.textSecondary }]}>Q{q.question_order}</Text>
             </View>
 
+            {q.question_image_url && (
+              <Image
+                source={{ uri: q.question_image_url }}
+                style={styles.reviewQuestionImage}
+                resizeMode="cover"
+              />
+            )}
             <Text style={[styles.reviewQuestionText, { color: colors.text }]}>
               {isSpanish && q.question_text_es ? q.question_text_es : q.question_text}
             </Text>
@@ -367,6 +392,13 @@ const styles = StyleSheet.create({
   bonusChipText: { color: '#F59E0B', fontSize: 10, fontWeight: '800' },
   reviewQuestionNum: { fontSize: 13, fontWeight: '600' },
   reviewQuestionText: { fontSize: 15, fontWeight: '600', marginBottom: 10, lineHeight: 21 },
+  reviewQuestionImage: {
+    width: '100%',
+    aspectRatio: 16 / 10,
+    borderRadius: 10,
+    marginBottom: 10,
+    backgroundColor: '#00000010',
+  },
   reviewOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, paddingHorizontal: 8, borderRadius: 8, gap: 6 },
   reviewOptionLetter: { fontSize: 13, width: 18, fontWeight: '600' },
   reviewOptionText: { flex: 1, fontSize: 13 },

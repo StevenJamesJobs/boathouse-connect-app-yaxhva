@@ -9,6 +9,7 @@ import {
   BackHandler,
   AppState,
   Alert,
+  Image,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -351,8 +352,14 @@ export default function ExamPlayScreen() {
   const handleViewResults = () => {
     if (!examState) return;
     const results = calculateResults(examState);
+    // In preview mode there is no exam_results row to read, so we pass the
+    // in-memory answers through the URL so exam-results can render the
+    // per-question correct/wrong badges accurately.
+    const previewAnswersParam = isPreview
+      ? `&previewAnswers=${encodeURIComponent(JSON.stringify(examState.answers))}`
+      : '';
     router.replace(
-      `/exam-results?examId=${examId}&correctCount=${results.correctCount}&totalQuestions=${results.totalQuestions}&standardCorrect=${results.standardCorrect}&bonusCorrect=${results.bonusCorrect}&bonusBucksValue=${results.bonusBucksValue}&totalBucks=${results.totalBucksAwarded}&timeSeconds=${results.timeSeconds}&isTimedOut=${examState.isTimedOut}&preview=${isPreview}`
+      `/exam-results?examId=${examId}&correctCount=${results.correctCount}&totalQuestions=${results.totalQuestions}&standardCorrect=${results.standardCorrect}&bonusCorrect=${results.bonusCorrect}&bonusBucksValue=${results.bonusBucksValue}&totalBucks=${results.totalBucksAwarded}&timeSeconds=${results.timeSeconds}&isTimedOut=${examState.isTimedOut}&preview=${isPreview}${previewAnswersParam}`
     );
   };
 
@@ -553,6 +560,13 @@ export default function ExamPlayScreen() {
             { backgroundColor: colors.card },
             currentQuestion.is_bonus && { borderWidth: 2, borderColor: '#F59E0B' },
           ]}>
+            {(currentQuestion as any).question_image_url && (
+              <Image
+                source={{ uri: (currentQuestion as any).question_image_url }}
+                style={styles.questionImage}
+                resizeMode="cover"
+              />
+            )}
             <Text style={[styles.questionText, { color: colors.text }]}>
               {isSpanish && (currentQuestion as any).question_text_es ? (currentQuestion as any).question_text_es : currentQuestion.question_text}
             </Text>
@@ -717,6 +731,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   questionText: { fontSize: 18, fontWeight: '600', lineHeight: 26 },
+  questionImage: {
+    width: '100%',
+    aspectRatio: 16 / 10,
+    borderRadius: 12,
+    marginBottom: 14,
+    backgroundColor: '#00000010',
+  },
 
   // Options
   optionsContainer: { gap: 10 },

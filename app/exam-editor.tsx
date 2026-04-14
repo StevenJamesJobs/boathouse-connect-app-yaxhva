@@ -20,9 +20,11 @@ import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { generateQuizQuestions, getCurrentWeekKey, getExamTypeName } from '@/utils/exam/questionGenerator';
+import { generateQuizQuestions, generatePhotoQuestion, getCurrentWeekKey, getExamTypeName } from '@/utils/exam/questionGenerator';
 import type { ExamType } from '@/utils/exam/questionGenerator';
 import { formatTime } from '@/utils/exam/examEngine';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 
 interface Exam {
   id: string;
@@ -50,6 +52,7 @@ interface ExamQuestion {
   bonus_bucks_value: number | null;
   source_type: 'auto' | 'custom' | 'bonus';
   source_table: string | null;
+  question_image_url?: string | null;
 }
 
 interface CompletionEntry {
@@ -93,6 +96,8 @@ export default function ExamEditorScreen() {
   const [customD, setCustomD] = useState('');
   const [customCorrect, setCustomCorrect] = useState<'A' | 'B' | 'C' | 'D'>('A');
   const [bonusBucksValue, setBonusBucksValue] = useState('5');
+  const [customImageUrl, setCustomImageUrl] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
 
   const fetchCurrentExam = useCallback(async () => {
     setLoading(true);
@@ -236,6 +241,7 @@ export default function ExamEditorScreen() {
       option_b_es: q.option_b_es || null,
       option_c_es: q.option_c_es || null,
       option_d_es: q.option_d_es || null,
+      question_image_url: q.question_image_url || null,
     }));
 
     const { error } = await (supabase.from('exam_questions' as any) as any).insert(questionsToInsert);
@@ -366,6 +372,7 @@ export default function ExamEditorScreen() {
       bonus_bucks_value: bonusValue,
       source_type: isBonus ? 'bonus' : 'custom',
       source_table: null,
+      question_image_url: customImageUrl,
     });
 
     if (error) {
@@ -404,13 +411,29 @@ export default function ExamEditorScreen() {
     if (!currentExam) return;
     setRefreshingQuestionId(question.id);
     try {
-      // Generate a batch of questions and pick one that's different from the current
-      const cycleKey = currentExam.cycle_key + '-refresh-' + Date.now().toString(36);
-      const generated = await generateQuizQuestions(examType, cycleKey, 5);
+      // If the current question has an image, regenerate another photo
+      // question against the same pool (this yields a fresh item + prompt).
+      // Otherwise fall back to the text-template batch path below.
+      let newQuestion = null as any;
+      if (question.question_image_url) {
+        const photo = await generatePhotoQuestion(
+          [],
+          `${currentExam.cycle_key}-photo-refresh-${question.id}-${Date.now()}`,
+        );
+        if (photo && photo.question_text !== question.question_text) {
+          newQuestion = photo;
+        }
+      }
 
-      // Find one that doesn't duplicate existing questions
-      const existingTexts = new Set(questions.map(q => q.question_text));
-      const newQuestion = generated.find(q => !existingTexts.has(q.question_text)) || generated[0];
+      if (!newQuestion) {
+        // Generate a batch of questions and pick one that's different from the current
+        const cycleKey = currentExam.cycle_key + '-refresh-' + Date.now().toString(36);
+        const generated = await generateQuizQuestions(examType, cycleKey, 5);
+
+        // Find one that doesn't duplicate existing questions
+        const existingTexts = new Set(questions.map(q => q.question_text));
+        newQuestion = generated.find(q => !existingTexts.has(q.question_text)) || generated[0];
+      }
 
       if (newQuestion) {
         const { error } = await (supabase
@@ -429,6 +452,7 @@ export default function ExamEditorScreen() {
             option_b_es: newQuestion.option_b_es || null,
             option_c_es: newQuestion.option_c_es || null,
             option_d_es: newQuestion.option_d_es || null,
+            question_image_url: newQuestion.question_image_url ?? null,
           })
           .eq('id', question.id);
 
@@ -459,6 +483,7 @@ export default function ExamEditorScreen() {
         option_d: editingQuestion.option_d,
         correct_option: editingQuestion.correct_option,
         bonus_bucks_value: editingQuestion.bonus_bucks_value,
+        question_image_url: editingQuestion.question_image_url ?? null,
       })
       .eq('id', editingQuestion.id);
 
@@ -484,6 +509,74 @@ export default function ExamEditorScreen() {
     setCustomD('');
     setCustomCorrect('A');
     setBonusBucksValue('5');
+    setCustomImageUrl(null);
+  };
+
+  // ─── Image picker / upload for picture questions ───────────────────
+  // Reuses the menu-editor pattern: pick via ImagePicker → base64 →
+  // Uint8Array → upload to the 'menu-items' bucket under the
+  // quiz-questions/ subfolder → return the public URL.
+  const pickAndUploadQuizImage = async (): Promise<string | null> => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert('Permission Required', 'We need photo library access to attach an image.');
+        return null;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [16, 10],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets[0]) return null;
+
+      setUploadingImage(true);
+      const uri = result.assets[0].uri;
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+      const byteArray = new Uint8Array(byteNumbers);
+
+      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `quiz-questions/${Date.now()}.${ext}`;
+      let contentType = 'image/jpeg';
+      if (ext === 'png') contentType = 'image/png';
+      else if (ext === 'webp') contentType = 'image/webp';
+
+      const { error } = await supabase.storage
+        .from('menu-items')
+        .upload(fileName, byteArray, { contentType, upsert: false });
+      if (error) throw error;
+
+      const { data: urlData } = supabase.storage.from('menu-items').getPublicUrl(fileName);
+      return urlData.publicUrl;
+    } catch (err: any) {
+      console.error('Quiz image upload error:', err);
+      Alert.alert('Upload Failed', err?.message || 'Could not upload image.');
+      return null;
+    } finally {
+      setUploadingImage(false);
+    }
+  };
+
+  const handleAttachPhotoToCustomForm = async () => {
+    const url = await pickAndUploadQuizImage();
+    if (url) setCustomImageUrl(url);
+  };
+
+  const handleAttachPhotoToEditingQuestion = async () => {
+    if (!editingQuestion) return;
+    const url = await pickAndUploadQuizImage();
+    if (url) setEditingQuestion({ ...editingQuestion, question_image_url: url });
+  };
+
+  const handleRemovePhotoFromEditingQuestion = () => {
+    if (!editingQuestion) return;
+    setEditingQuestion({ ...editingQuestion, question_image_url: null });
   };
 
   const getStatusColor = (status: string) => {
@@ -775,6 +868,13 @@ export default function ExamEditorScreen() {
                     )}
                   </View>
                 </View>
+                {q.question_image_url && (
+                  <Image
+                    source={{ uri: q.question_image_url }}
+                    style={styles.questionCardImage}
+                    resizeMode="cover"
+                  />
+                )}
                 <Text style={[styles.questionText, { color: colors.text }]}>{q.question_text}</Text>
                 <View style={styles.optionsList}>
                   {(['A', 'B', 'C', 'D'] as const).map(letter => {
@@ -976,6 +1076,42 @@ export default function ExamEditorScreen() {
                   </View>
                 )}
 
+                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Photo (optional)</Text>
+                {customImageUrl ? (
+                  <View style={styles.photoPreviewRow}>
+                    <Image source={{ uri: customImageUrl }} style={styles.photoPreview} resizeMode="cover" />
+                    <View style={styles.photoPreviewButtons}>
+                      <TouchableOpacity
+                        style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+                        onPress={handleAttachPhotoToCustomForm}
+                        disabled={uploadingImage}
+                      >
+                        <Text style={[styles.photoButtonText, { color: colors.primary }]}>
+                          {uploadingImage ? 'Uploading…' : 'Change Photo'}
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.photoButton, { backgroundColor: '#EF444415', borderColor: '#EF4444' }]}
+                        onPress={() => setCustomImageUrl(null)}
+                        disabled={uploadingImage}
+                      >
+                        <Text style={[styles.photoButtonText, { color: '#EF4444' }]}>Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary, alignSelf: 'flex-start' }]}
+                    onPress={handleAttachPhotoToCustomForm}
+                    disabled={uploadingImage}
+                  >
+                    <IconSymbol ios_icon_name="photo.fill" android_material_icon_name="photo" size={16} color={colors.primary} />
+                    <Text style={[styles.photoButtonText, { color: colors.primary, marginLeft: 6 }]}>
+                      {uploadingImage ? 'Uploading…' : 'Add Photo'}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+
                 <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Question</Text>
                 <TextInput
                   style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
@@ -1055,6 +1191,42 @@ export default function ExamEditorScreen() {
                         keyboardType="numeric"
                       />
                     </View>
+                  )}
+
+                  <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Photo (optional)</Text>
+                  {editingQuestion.question_image_url ? (
+                    <View style={styles.photoPreviewRow}>
+                      <Image source={{ uri: editingQuestion.question_image_url }} style={styles.photoPreview} resizeMode="cover" />
+                      <View style={styles.photoPreviewButtons}>
+                        <TouchableOpacity
+                          style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
+                          onPress={handleAttachPhotoToEditingQuestion}
+                          disabled={uploadingImage}
+                        >
+                          <Text style={[styles.photoButtonText, { color: colors.primary }]}>
+                            {uploadingImage ? 'Uploading…' : 'Change Photo'}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          style={[styles.photoButton, { backgroundColor: '#EF444415', borderColor: '#EF4444' }]}
+                          onPress={handleRemovePhotoFromEditingQuestion}
+                          disabled={uploadingImage}
+                        >
+                          <Text style={[styles.photoButtonText, { color: '#EF4444' }]}>Remove</Text>
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary, alignSelf: 'flex-start' }]}
+                      onPress={handleAttachPhotoToEditingQuestion}
+                      disabled={uploadingImage}
+                    >
+                      <IconSymbol ios_icon_name="photo.fill" android_material_icon_name="photo" size={16} color={colors.primary} />
+                      <Text style={[styles.photoButtonText, { color: colors.primary, marginLeft: 6 }]}>
+                        {uploadingImage ? 'Uploading…' : 'Add Photo'}
+                      </Text>
+                    </TouchableOpacity>
                   )}
 
                   <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Question</Text>
@@ -1391,4 +1563,36 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   modalSaveText: { color: '#FFF', fontSize: 16, fontWeight: '700' },
+
+  // Picture questions
+  questionCardImage: {
+    width: '100%',
+    aspectRatio: 16 / 10,
+    borderRadius: 10,
+    marginBottom: 10,
+    backgroundColor: '#00000010',
+  },
+  photoPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 8,
+  },
+  photoPreview: {
+    width: 96,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#00000010',
+  },
+  photoPreviewButtons: { flex: 1, gap: 6 },
+  photoButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  photoButtonText: { fontSize: 13, fontWeight: '600' },
 });

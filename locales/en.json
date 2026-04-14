@@ -305,7 +305,18 @@
     "server_assistant": "Server Assistant",
     "server_assistant_desc": "Check out calculator and server exams",
     "kitchen_assistant": "Kitchen Assistant",
-    "kitchen_assistant_desc": "Recipes, knowledge base, and kitchen exams"
+    "kitchen_assistant_desc": "Recipes, knowledge base, and kitchen exams",
+    "weekly_quizzes": "Weekly Quizzes",
+    "game_hub": "Game Hub"
+  },
+  "weekly_quizzes": {
+    "title": "Weekly Quizzes",
+    "subtitle": "Your assigned quizzes this week",
+    "empty_title": "No Quiz Available",
+    "empty_desc": "No active quizzes right now — check back later.",
+    "server_title": "Server Weekly Quiz",
+    "bartender_title": "Bartender Weekly Quiz",
+    "host_title": "Host Weekly Quiz"
   },
   "employee_rewards": {
     "title": "McLoone's Bucks",

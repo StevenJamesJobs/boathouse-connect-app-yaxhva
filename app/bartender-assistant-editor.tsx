@@ -216,24 +216,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingBottom: 100,
   },
-  tabContainer: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 20,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderRadius: 8,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
   card: {
     borderRadius: 12,
     marginBottom: 12,
