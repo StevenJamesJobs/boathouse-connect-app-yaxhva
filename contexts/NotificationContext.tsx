@@ -5,6 +5,8 @@ import { Platform, AppState } from 'react-native';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { router } from 'expo-router';
+import { useUnreadMessages } from '@/hooks/useUnreadMessages';
+import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -49,13 +51,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         }
       });
 
-      // Clear badge when app is opened/foregrounded
-      Notifications.setBadgeCountAsync(0);
+      // Dismiss banner notifications on open/foreground — badge count is
+      // managed by <BadgeSyncer /> below (derived from unread messages + quizzes)
       Notifications.dismissAllNotificationsAsync();
 
       const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
         if (nextAppState === 'active') {
-          Notifications.setBadgeCountAsync(0);
           Notifications.dismissAllNotificationsAsync();
         }
       });
@@ -68,8 +69,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       // Listen for notification interactions (user taps notification)
       responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
         console.log('Notification tapped:', response);
-        // Clear badge when user taps a notification
-        Notifications.setBadgeCountAsync(0);
+        // Dismiss banners; badge count will reconcile via <BadgeSyncer />
         Notifications.dismissAllNotificationsAsync();
 
         // Deep link based on notification data
@@ -249,6 +249,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               case 'game_hub':
                 router.push('/game-hub');
                 break;
+              case 'weekly-quizzes':
+                router.push('/weekly-quizzes' as any);
+                // Fire-and-forget dismissal of the bell entry for this exam
+                if (data.exam_id && user?.id) {
+                  (supabase
+                    .from('quiz_notification_dismissals' as any) as any)
+                    .insert({ user_id: user.id, exam_id: data.exam_id })
+                    .then(() => {}, () => {});
+                }
+                break;
               case 'profile':
                 router.push(`${portalPrefix}/profile`);
                 break;
@@ -305,9 +315,27 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         sendNotification,
       }}
     >
+      <BadgeSyncer />
       {children}
     </NotificationContext.Provider>
   );
+}
+
+/**
+ * Keeps the iOS/Android app icon badge count in sync with the user's
+ * unread messages + uncompleted weekly quizzes. Rendered inside
+ * NotificationProvider so it can call hooks freely.
+ */
+function BadgeSyncer() {
+  const { unreadCount: unreadMessages } = useUnreadMessages();
+  const { unreadCount: unreadQuizzes } = useUnreadQuizzes();
+
+  useEffect(() => {
+    const total = (unreadMessages || 0) + (unreadQuizzes || 0);
+    Notifications.setBadgeCountAsync(total).catch(() => {});
+  }, [unreadMessages, unreadQuizzes]);
+
+  return null;
 }
 
 export function useNotifications() {

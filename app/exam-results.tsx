@@ -15,6 +15,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
 import { formatTime } from '@/utils/exam/examEngine';
 import { useTranslation } from 'react-i18next';
+import QuestionReviewList from '@/components/QuestionReviewList';
 
 interface QuestionReview {
   id: string;
@@ -222,86 +223,7 @@ export default function ExamResultsScreen() {
         {/* Question Review */}
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{isSpanish ? 'Revisión de Preguntas' : 'Question Review'}</Text>
 
-        {questions.map((q) => (
-          <View
-            key={q.id}
-            style={[
-              styles.reviewCard,
-              { backgroundColor: colors.card },
-              q.is_bonus && { borderWidth: 2, borderColor: '#F59E0B' },
-            ]}
-          >
-            <View style={styles.reviewHeader}>
-              <View style={styles.reviewHeaderLeft}>
-                <View style={[
-                  styles.resultBadge,
-                  { backgroundColor: q.is_correct ? '#10B98120' : '#EF444420' },
-                ]}>
-                  <IconSymbol
-                    ios_icon_name={q.is_correct ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
-                    android_material_icon_name={q.is_correct ? 'check-circle' : 'cancel'}
-                    size={18}
-                    color={q.is_correct ? '#10B981' : '#EF4444'}
-                  />
-                  <Text style={[styles.resultBadgeText, { color: q.is_correct ? '#10B981' : '#EF4444' }]}>
-                    {q.is_correct ? (isSpanish ? 'Correcto' : 'Correct') : (isSpanish ? 'Incorrecto' : 'Wrong')}
-                  </Text>
-                </View>
-                {q.is_bonus && (
-                  <View style={[styles.bonusChip, { backgroundColor: '#F59E0B20' }]}>
-                    <Text style={styles.bonusChipText}>BONUS</Text>
-                  </View>
-                )}
-              </View>
-              <Text style={[styles.reviewQuestionNum, { color: colors.textSecondary }]}>Q{q.question_order}</Text>
-            </View>
-
-            {q.question_image_url && (
-              <Image
-                source={{ uri: q.question_image_url }}
-                style={styles.reviewQuestionImage}
-                resizeMode="cover"
-              />
-            )}
-            <Text style={[styles.reviewQuestionText, { color: colors.text }]}>
-              {isSpanish && q.question_text_es ? q.question_text_es : q.question_text}
-            </Text>
-
-            {(['A', 'B', 'C', 'D'] as const).map(letter => {
-              const optionKey = `option_${letter.toLowerCase()}` as keyof QuestionReview;
-              const optionKeyEs = `${optionKey}_es` as keyof QuestionReview;
-              const optionText = (isSpanish && q[optionKeyEs]) ? q[optionKeyEs] as string : q[optionKey] as string;
-              const isCorrectAnswer = q.correct_option === letter;
-              const isUserAnswer = q.user_answer === letter;
-
-              let rowBg = 'transparent';
-              let rowTextColor = colors.text;
-              let icon = null;
-
-              if (isCorrectAnswer) {
-                rowBg = '#10B98110';
-                rowTextColor = '#10B981';
-                icon = <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={16} color="#10B981" />;
-              }
-              if (isUserAnswer && !isCorrectAnswer) {
-                rowBg = '#EF444410';
-                rowTextColor = '#EF4444';
-                icon = <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={16} color="#EF4444" />;
-              }
-
-              return (
-                <View key={letter} style={[styles.reviewOption, { backgroundColor: rowBg }]}>
-                  <Text style={[styles.reviewOptionLetter, { color: rowTextColor }]}>{letter}.</Text>
-                  <Text style={[styles.reviewOptionText, { color: rowTextColor }]} numberOfLines={2}>{optionText}</Text>
-                  {icon}
-                  {isUserAnswer && (
-                    <Text style={[styles.yourAnswerTag, { color: rowTextColor }]}>{isSpanish ? 'Tu respuesta' : 'Your answer'}</Text>
-                  )}
-                </View>
-              );
-            })}
-          </View>
-        ))}
+        <QuestionReviewList questions={questions as any} />
 
         {/* Done Button */}
         <TouchableOpacity

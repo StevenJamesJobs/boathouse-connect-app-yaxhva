@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,10 @@ import {
   Platform,
   Image,
   Modal,
+  Switch,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useAppTheme } from '@/contexts/ThemeContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -22,7 +24,9 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { generateQuizQuestions, generatePhotoQuestion, getCurrentWeekKey, getExamTypeName } from '@/utils/exam/questionGenerator';
 import type { ExamType } from '@/utils/exam/questionGenerator';
-import { formatTime } from '@/utils/exam/examEngine';
+import { formatTime, formatCountdown, getCountdownUrgency } from '@/utils/exam/examEngine';
+import { sendCustomNotification } from '@/utils/notificationHelpers';
+import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 
@@ -36,6 +40,8 @@ interface Exam {
   activated_at: string | null;
   closed_at: string | null;
   created_at: string;
+  close_at: string | null;
+  notify_on_activate: boolean | null;
 }
 
 interface ExamQuestion {
@@ -72,6 +78,7 @@ export default function ExamEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { mode } = useAppTheme();
   const { user } = useAuth();
   const params = useLocalSearchParams<{ type: string }>();
   const examType = (params.type || 'server') as ExamType;
@@ -99,9 +106,26 @@ export default function ExamEditorScreen() {
   const [customImageUrl, setCustomImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
+  // Close-at scheduling + Notify Staff toggle
+  const [closeAt, setCloseAt] = useState<Date | null>(null);
+  const [notifyOnActivate, setNotifyOnActivate] = useState(false);
+  const [showCloseDatePicker, setShowCloseDatePicker] = useState(false);
+  const [showCloseTimePicker, setShowCloseTimePicker] = useState(false);
+  // Countdown tick state — forces re-render every second while a close_at is set
+  const [countdownTick, setCountdownTick] = useState(0);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const fetchCurrentExam = useCallback(async () => {
     setLoading(true);
     try {
+      // Auto-close any active exams whose close_at has passed. Fire-and-forget
+      // — if it fails we still show the (now slightly stale) data below.
+      try {
+        await (supabase.rpc as any)('close_expired_exams');
+      } catch (cleanupErr) {
+        console.warn('close_expired_exams cleanup failed:', cleanupErr);
+      }
+
       // Get the most recent draft or active exam for this type
       const { data, error } = await (supabase
         .from('exams' as any) as any)
@@ -115,6 +139,8 @@ export default function ExamEditorScreen() {
         const exam = data[0] as Exam;
         setCurrentExam(exam);
         setTimeLimit(exam.time_limit_seconds);
+        setCloseAt(exam.close_at ? new Date(exam.close_at) : null);
+        setNotifyOnActivate(Boolean(exam.notify_on_activate));
         await fetchQuestions(exam.id);
         if (exam.status === 'active') {
           await fetchCompletionData(exam.id);
@@ -122,12 +148,35 @@ export default function ExamEditorScreen() {
       } else {
         setCurrentExam(null);
         setQuestions([]);
+        setCloseAt(null);
+        setNotifyOnActivate(false);
       }
     } catch (err) {
       console.error('Error fetching exam:', err);
     }
     setLoading(false);
   }, [examType]);
+
+  // Tick a countdown re-render once per second while a close_at is active,
+  // so the "Closes in …" label updates live.
+  useEffect(() => {
+    if (!closeAt || !currentExam || currentExam.status === 'closed') {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+      return;
+    }
+    countdownIntervalRef.current = setInterval(() => {
+      setCountdownTick(t => (t + 1) % 1_000_000);
+    }, 1000);
+    return () => {
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
+    };
+  }, [closeAt, currentExam?.status]);
 
   const fetchQuestions = async (examId: string) => {
     const { data, error } = await (supabase
@@ -278,12 +327,55 @@ export default function ExamEditorScreen() {
                 .eq('exam_type', examType)
                 .eq('status', 'active');
 
+              // Default close_at = 7 days from now at 23:59 local if unset
+              let effectiveCloseAt = closeAt;
+              if (!effectiveCloseAt) {
+                const d = new Date();
+                d.setDate(d.getDate() + 7);
+                d.setHours(23, 59, 0, 0);
+                effectiveCloseAt = d;
+                setCloseAt(d);
+              }
+
               // Activate current exam
               await (supabase
                 .from('exams' as any) as any)
-                .update({ status: 'active', activated_at: new Date().toISOString() })
+                .update({
+                  status: 'active',
+                  activated_at: new Date().toISOString(),
+                  close_at: effectiveCloseAt.toISOString(),
+                  // Reset the notify flag after activation so re-activation
+                  // requires re-arming and we don't double-notify on reopen.
+                  notify_on_activate: false,
+                })
                 .eq('id', currentExam.id);
 
+              // Fire push if the manager armed the toggle
+              if (notifyOnActivate) {
+                try {
+                  const jobTitlesByType: Record<string, string[]> = {
+                    server: ['Server', 'Lead Server', 'Busser', 'Runner'],
+                    bartender: ['Bartender'],
+                    host: ['Host'],
+                  };
+                  const targetJobTitles = jobTitlesByType[examType] || [];
+                  const examTypeLabel = getExamTypeName(examType);
+                  await sendCustomNotification(
+                    'New Weekly Quiz Available',
+                    `Your ${examTypeLabel} quiz is live — tap to take it.`,
+                    {
+                      destination: 'weekly-quizzes',
+                      exam_id: currentExam.id,
+                      job_titles: targetJobTitles,
+                    }
+                  );
+                } catch (pushErr) {
+                  // Non-fatal: activation still succeeded.
+                  console.error('Notify Staff push failed:', pushErr);
+                }
+              }
+
+              setNotifyOnActivate(false);
               await fetchCurrentExam();
               Alert.alert('Quiz Activated', 'The quiz is now live for employees!');
             } catch (err) {
@@ -293,6 +385,34 @@ export default function ExamEditorScreen() {
         },
       ]
     );
+  };
+
+  // Persist a new close_at value (draft or active)
+  const handleUpdateCloseAt = async (next: Date | null) => {
+    if (!currentExam) return;
+    setCloseAt(next);
+    try {
+      await (supabase
+        .from('exams' as any) as any)
+        .update({ close_at: next ? next.toISOString() : null })
+        .eq('id', currentExam.id);
+    } catch (err) {
+      console.error('Update close_at error:', err);
+    }
+  };
+
+  // Persist the Notify Staff toggle (draft only)
+  const handleToggleNotifyOnActivate = async (next: boolean) => {
+    if (!currentExam || currentExam.status !== 'draft') return;
+    setNotifyOnActivate(next);
+    try {
+      await (supabase
+        .from('exams' as any) as any)
+        .update({ notify_on_activate: next })
+        .eq('id', currentExam.id);
+    } catch (err) {
+      console.error('Toggle notify_on_activate error:', err);
+    }
   };
 
   // Close quiz
@@ -782,6 +902,75 @@ export default function ExamEditorScreen() {
                 <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Questions</Text>
                 <Text style={[styles.statusValue, { color: colors.text }]}>{questions.length}</Text>
               </View>
+
+              {/* Closes At row — editable while draft or active */}
+              {currentExam.status !== 'closed' && (
+                <TouchableOpacity
+                  style={styles.statusRow}
+                  onPress={() => setShowCloseDatePicker(true)}
+                  activeOpacity={0.6}
+                >
+                  <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Closes At</Text>
+                  <View style={styles.closeAtRight}>
+                    {closeAt ? (
+                      (() => {
+                        const msRemaining = closeAt.getTime() - Date.now();
+                        const urgency = getCountdownUrgency(msRemaining);
+                        const color =
+                          urgency === 'red' ? '#EF4444'
+                          : urgency === 'amber' ? '#F59E0B'
+                          : urgency === 'expired' ? '#9CA3AF'
+                          : colors.text;
+                        return (
+                          <>
+                            <Text style={[styles.statusValue, { color }]}>
+                              {formatCountdown(msRemaining)}
+                            </Text>
+                            <Text style={[styles.closeAtDate, { color: colors.textSecondary }]}>
+                              {closeAt.toLocaleString(undefined, {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })}
+                            </Text>
+                          </>
+                        );
+                      })()
+                    ) : (
+                      <Text style={[styles.statusValue, { color: colors.primary }]}>Set date/time</Text>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              )}
+              {closeAt && currentExam.status !== 'closed' && (
+                <View style={styles.closeAtActions}>
+                  <TouchableOpacity
+                    style={[styles.closeAtClearBtn, { borderColor: colors.border }]}
+                    onPress={() => handleUpdateCloseAt(null)}
+                  >
+                    <Text style={[styles.closeAtClearText, { color: colors.textSecondary }]}>Clear</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Notify Staff toggle — draft only */}
+              {currentExam.status === 'draft' && (
+                <View style={styles.statusRow}>
+                  <View style={styles.notifyLabelCol}>
+                    <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Notify Staff</Text>
+                    <Text style={[styles.notifyDesc, { color: colors.textSecondary }]}>
+                      Send a push notification when activated
+                    </Text>
+                  </View>
+                  <Switch
+                    value={notifyOnActivate}
+                    onValueChange={handleToggleNotifyOnActivate}
+                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                    thumbColor={notifyOnActivate ? colors.primary : '#F4F3F4'}
+                  />
+                </View>
+              )}
             </View>
 
             {/* Time Limit */}
@@ -1022,6 +1211,17 @@ export default function ExamEditorScreen() {
                         +${entry.bucks_awarded}
                       </Text>
                     </View>
+                    <TouchableOpacity
+                      style={[styles.retakeButton, { borderColor: colors.primary }]}
+                      onPress={() =>
+                        router.push(
+                          `/exam-answer-review?examId=${currentExam.id}&userId=${entry.user_id}` as any
+                        )
+                      }
+                    >
+                      <IconSymbol ios_icon_name="doc.text.magnifyingglass" android_material_icon_name="pageview" size={12} color={colors.primary} />
+                      <Text style={[styles.retakeButtonText, { color: colors.primary }]}>View</Text>
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.retakeButton, { borderColor: colors.primary }]}
                       onPress={() => handleResetUserQuiz(entry)}
@@ -1277,6 +1477,121 @@ export default function ExamEditorScreen() {
           </KeyboardAvoidingView>
         </View>
       </Modal>
+
+      {/* iOS Close-At Date Picker */}
+      {Platform.OS === 'ios' && showCloseDatePicker && (
+        <Modal visible transparent animationType="fade">
+          <View style={styles.datePickerOverlay}>
+            <View style={[styles.datePickerContainer, { backgroundColor: colors.card }]}>
+              <View style={styles.datePickerHeader}>
+                <TouchableOpacity onPress={() => { setShowCloseDatePicker(false); setShowCloseTimePicker(true); }}>
+                  <Text style={[styles.datePickerDone, { color: colors.primary }]}>Next: Time</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={closeAt || (() => {
+                  const d = new Date();
+                  d.setDate(d.getDate() + 7);
+                  d.setHours(23, 59, 0, 0);
+                  return d;
+                })()}
+                mode="date"
+                display="spinner"
+                textColor={colors.text}
+                themeVariant={mode === 'dark' ? 'dark' : 'light'}
+                onChange={(_event, selectedDate) => {
+                  if (selectedDate) {
+                    const base = closeAt ? new Date(closeAt) : (() => {
+                      const d = new Date();
+                      d.setHours(23, 59, 0, 0);
+                      return d;
+                    })();
+                    base.setFullYear(selectedDate.getFullYear());
+                    base.setMonth(selectedDate.getMonth());
+                    base.setDate(selectedDate.getDate());
+                    handleUpdateCloseAt(base);
+                  }
+                }}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+      {Platform.OS === 'ios' && showCloseTimePicker && (
+        <Modal visible transparent animationType="fade">
+          <View style={styles.datePickerOverlay}>
+            <View style={[styles.datePickerContainer, { backgroundColor: colors.card }]}>
+              <View style={styles.datePickerHeader}>
+                <TouchableOpacity onPress={() => setShowCloseTimePicker(false)}>
+                  <Text style={[styles.datePickerDone, { color: colors.primary }]}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={closeAt || new Date()}
+                mode="time"
+                display="spinner"
+                textColor={colors.text}
+                themeVariant={mode === 'dark' ? 'dark' : 'light'}
+                onChange={(_event, selectedTime) => {
+                  if (selectedTime) {
+                    const base = closeAt ? new Date(closeAt) : new Date();
+                    base.setHours(selectedTime.getHours());
+                    base.setMinutes(selectedTime.getMinutes());
+                    base.setSeconds(0, 0);
+                    handleUpdateCloseAt(base);
+                  }
+                }}
+              />
+            </View>
+          </View>
+        </Modal>
+      )}
+      {/* Android native Close-At Pickers */}
+      {Platform.OS === 'android' && showCloseDatePicker && (
+        <DateTimePicker
+          value={closeAt || (() => {
+            const d = new Date();
+            d.setDate(d.getDate() + 7);
+            d.setHours(23, 59, 0, 0);
+            return d;
+          })()}
+          mode="date"
+          display="default"
+          onChange={(_event, selectedDate) => {
+            setShowCloseDatePicker(false);
+            if (selectedDate) {
+              const base = closeAt ? new Date(closeAt) : (() => {
+                const d = new Date();
+                d.setHours(23, 59, 0, 0);
+                return d;
+              })();
+              base.setFullYear(selectedDate.getFullYear());
+              base.setMonth(selectedDate.getMonth());
+              base.setDate(selectedDate.getDate());
+              handleUpdateCloseAt(base);
+              // Chain into the time picker
+              setTimeout(() => setShowCloseTimePicker(true), 200);
+            }
+          }}
+        />
+      )}
+      {Platform.OS === 'android' && showCloseTimePicker && (
+        <DateTimePicker
+          value={closeAt || new Date()}
+          mode="time"
+          display="default"
+          onChange={(_event, selectedTime) => {
+            setShowCloseTimePicker(false);
+            if (selectedTime) {
+              const base = closeAt ? new Date(closeAt) : new Date();
+              base.setHours(selectedTime.getHours());
+              base.setMinutes(selectedTime.getMinutes());
+              base.setSeconds(0, 0);
+              handleUpdateCloseAt(base);
+            }
+          }}
+        />
+      )}
 
       <BottomNavBar activeTab="manage" />
     </KeyboardAvoidingView>
@@ -1595,4 +1910,36 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   photoButtonText: { fontSize: 13, fontWeight: '600' },
+
+  // Closes At / Notify Staff / Date picker
+  closeAtRight: { alignItems: 'flex-end' },
+  closeAtDate: { fontSize: 11, marginTop: 2 },
+  closeAtActions: { flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4 },
+  closeAtClearBtn: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  closeAtClearText: { fontSize: 12, fontWeight: '600' },
+  notifyLabelCol: { flex: 1, paddingRight: 12 },
+  notifyDesc: { fontSize: 11, marginTop: 2 },
+  datePickerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  datePickerContainer: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 24,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#00000020',
+  },
+  datePickerDone: { fontSize: 16, fontWeight: '600' },
 });

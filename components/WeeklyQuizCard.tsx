@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
-import { formatTime } from '@/utils/exam/examEngine';
+import { formatTime, formatCountdown, getCountdownUrgency } from '@/utils/exam/examEngine';
 
 export interface WeeklyQuizCardResult {
   correct_count: number;
@@ -17,6 +17,9 @@ export interface WeeklyQuizCardProps {
   activeExam: { id: string; time_limit_seconds: number } | null;
   result: WeeklyQuizCardResult | null;
   questionCount: number;
+  rewardPerCorrect?: number; // $ per correct standard question (default 1)
+  eligibleQuizCount?: number; // total number of weekly quizzes this user is eligible for
+  closeAt?: string | null; // ISO timestamp for when the quiz auto-closes
   onTakeQuiz: (examId: string) => void;
   onReviewAnswers: (result: WeeklyQuizCardResult) => void;
 }
@@ -26,12 +29,23 @@ export default function WeeklyQuizCard({
   activeExam,
   result,
   questionCount,
+  rewardPerCorrect = 1,
+  eligibleQuizCount = 1,
+  closeAt = null,
   onTakeQuiz,
   onReviewAnswers,
 }: WeeklyQuizCardProps) {
   const colors = useThemeColors();
   const { i18n } = useTranslation();
   const isSpanish = i18n.language === 'es';
+
+  // Tick every second while a closeAt is set so the countdown label refreshes
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!closeAt) return;
+    const interval = setInterval(() => setTick((t) => t + 1), 1000);
+    return () => clearInterval(interval);
+  }, [closeAt]);
 
   // Empty state — no active exam for this type
   if (!activeExam) {
@@ -103,13 +117,31 @@ export default function WeeklyQuizCard({
   }
 
   // Active state — take quiz
+  const closeAtDate = closeAt ? new Date(closeAt) : null;
+  const msRemaining = closeAtDate ? closeAtDate.getTime() - Date.now() : 0;
+  const urgency = closeAtDate ? getCountdownUrgency(msRemaining) : 'normal';
+  const countdownColor =
+    urgency === 'red' ? '#EF4444'
+    : urgency === 'amber' ? '#F59E0B'
+    : urgency === 'expired' ? '#9CA3AF'
+    : colors.textSecondary;
+
   return (
     <View style={[styles.examActiveCard, { backgroundColor: colors.card }]}>
-      <View style={[styles.examActiveBadge, { backgroundColor: '#10B98120' }]}>
-        <View style={[styles.examActiveDot, { backgroundColor: '#10B981' }]} />
-        <Text style={styles.examActiveBadgeText}>
-          {isSpanish ? 'Examen Activo' : 'Active Quiz'}
-        </Text>
+      <View style={styles.examActiveRow}>
+        <View style={[styles.examActiveBadge, { backgroundColor: '#10B98120' }]}>
+          <View style={[styles.examActiveDot, { backgroundColor: '#10B981' }]} />
+          <Text style={styles.examActiveBadgeText}>
+            {isSpanish ? 'Examen Activo' : 'Active Quiz'}
+          </Text>
+        </View>
+        {closeAtDate && (
+          <Text style={[styles.closeAtCountdown, { color: countdownColor }]}>
+            {isSpanish
+              ? `Cierra en ${formatCountdown(msRemaining, true)}`
+              : `Closes in ${formatCountdown(msRemaining)}`}
+          </Text>
+        )}
       </View>
       <Text style={[styles.examActiveTitle, { color: colors.text }]}>{titleLabel}</Text>
       <View style={styles.examInfoRow}>
@@ -148,7 +180,9 @@ export default function WeeklyQuizCard({
           color="#10B981"
         />
         <Text style={[styles.examInfoText, { color: '#10B981' }]}>
-          {isSpanish ? 'Gana $1 por respuesta correcta' : 'Earn $1 per correct answer'}
+          {isSpanish
+            ? `Gana $${rewardPerCorrect.toFixed(2)} por respuesta correcta`
+            : `Earn $${rewardPerCorrect.toFixed(2)} per correct answer`}
         </Text>
       </View>
       <TouchableOpacity
@@ -165,6 +199,13 @@ export default function WeeklyQuizCard({
           color="#FFF"
         />
       </TouchableOpacity>
+      {eligibleQuizCount > 1 && (
+        <Text style={[styles.splitNote, { color: colors.textSecondary }]}>
+          {isSpanish
+            ? `Tu recompensa por pregunta se divide entre tus ${eligibleQuizCount} exámenes — el máximo semanal sigue siendo el mismo.`
+            : `Your reward per question is split across your ${eligibleQuizCount} quizzes — total weekly max stays the same.`}
+        </Text>
+      )}
     </View>
   );
 }
@@ -219,6 +260,12 @@ const styles = StyleSheet.create({
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
     elevation: 3,
   },
+  examActiveRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   examActiveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -226,9 +273,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    marginBottom: 12,
     gap: 6,
   },
+  closeAtCountdown: { fontSize: 12, fontWeight: '700' },
   examActiveDot: { width: 8, height: 8, borderRadius: 4 },
   examActiveBadgeText: { color: '#10B981', fontSize: 13, fontWeight: '700' },
   examActiveTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 16 },
@@ -244,4 +291,11 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   takeQuizButtonText: { color: '#FFF', fontSize: 17, fontWeight: '700' },
+  splitNote: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 10,
+    lineHeight: 16,
+  },
 });

@@ -10,6 +10,7 @@ import { hexToRgba } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { BlurView } from 'expo-blur';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
+import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { MessageBadge } from '@/components/MessageBadge';
 import { useTranslation } from 'react-i18next';
 
@@ -50,6 +51,7 @@ function ManagerHeader() {
 
 function FloatingTabBar({ state, descriptors, navigation }: any) {
   const { unreadCount } = useUnreadMessages();
+  const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
   const colors = useThemeColors();
   const { mode } = useAppTheme();
 
@@ -72,6 +74,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
             const label = options.tabBarLabel ?? options.title ?? route.name;
             const isFocused = state.index === index;
             const isProfileTab = route.name === 'profile';
+            const isToolsTab = route.name === 'tools';
 
             const onPress = () => {
               const event = navigation.emit({
@@ -103,6 +106,11 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
                   {isProfileTab && unreadCount > 0 && (
                     <View style={styles.tabBadgePosition}>
                       <MessageBadge count={unreadCount} size="small" />
+                    </View>
+                  )}
+                  {isToolsTab && unreadQuizCount > 0 && (
+                    <View style={styles.tabBadgePosition}>
+                      <MessageBadge count={unreadQuizCount} size="small" />
                     </View>
                   )}
                 </View>

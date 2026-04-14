@@ -10,6 +10,8 @@ import {
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'expo-router';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useTranslation } from 'react-i18next';
@@ -98,6 +100,8 @@ export default function NotificationDropdown({
   const colors = useThemeColors();
   const { language } = useLanguage();
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const router = useRouter();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -208,10 +212,31 @@ export default function NotificationDropdown({
         .from('custom_notifications') as any)
         .select('id, title, body, created_at, data')
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(10);
+
+      // Load this user's quiz dismissals so we can hide the bell entry
+      // after they've already tapped it once.
+      let dismissedExamIds = new Set<string>();
+      if (user?.id) {
+        const { data: dismissals } = await (supabase
+          .from('quiz_notification_dismissals' as any) as any)
+          .select('exam_id')
+          .eq('user_id', user.id);
+        if (dismissals) {
+          dismissedExamIds = new Set((dismissals as any[]).map((d) => d.exam_id));
+        }
+      }
 
       if (customNotifs) {
         for (const cn of customNotifs) {
+          // Hide quiz bell entries that this user has already dismissed
+          if (
+            cn.data?.destination === 'weekly-quizzes' &&
+            cn.data?.exam_id &&
+            dismissedExamIds.has(cn.data.exam_id)
+          ) {
+            continue;
+          }
           items.push({
             id: cn.id,
             type: 'custom_notification',
@@ -272,6 +297,20 @@ export default function NotificationDropdown({
         thumbnailShape: data.thumbnail_shape,
       });
     } else if (item.type === 'custom_notification') {
+      // Weekly quiz deep-link: route to the quizzes screen and record dismissal
+      if (data.data?.destination === 'weekly-quizzes') {
+        if (data.data?.exam_id && user?.id) {
+          (supabase
+            .from('quiz_notification_dismissals' as any) as any)
+            .insert({ user_id: user.id, exam_id: data.data.exam_id })
+            .then(() => {}, () => {});
+        }
+        // Optimistically hide the entry immediately
+        setNotifications((prev) => prev.filter((n) => n.id !== item.id));
+        onClose();
+        router.push('/weekly-quizzes' as any);
+        return;
+      }
       onItemPress({
         title: data.title,
         content: data.body,

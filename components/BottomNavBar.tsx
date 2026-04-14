@@ -8,6 +8,7 @@ import { useAppTheme } from '@/contexts/ThemeContext';
 import { hexToRgba } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
+import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { MessageBadge } from '@/components/MessageBadge';
 import { useTranslation } from 'react-i18next';
 
@@ -44,6 +45,7 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
   const router = useRouter();
   const { user } = useAuth();
   const { unreadCount } = useUnreadMessages();
+  const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
   const colors = useThemeColors();
   const { mode } = useAppTheme();
   const { t } = useTranslation();
@@ -74,6 +76,7 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
           {tabs.map((tab, index) => {
             const isFocused = tab.name === activeTab;
             const isProfileTab = tab.name === 'profile';
+            const isToolsTab = tab.name === 'tools';
 
             return (
               <TouchableOpacity
@@ -93,6 +96,11 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
                   {isProfileTab && unreadCount > 0 && (
                     <View style={styles.tabBadgePosition}>
                       <MessageBadge count={unreadCount} size="small" />
+                    </View>
+                  )}
+                  {isToolsTab && unreadQuizCount > 0 && (
+                    <View style={styles.tabBadgePosition}>
+                      <MessageBadge count={unreadQuizCount} size="small" />
                     </View>
                   )}
                 </View>

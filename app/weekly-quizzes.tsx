@@ -22,6 +22,7 @@ interface ActiveExam {
   id: string;
   time_limit_seconds: number;
   status: string;
+  close_at: string | null;
 }
 
 interface QuizEntry {
@@ -72,6 +73,13 @@ export default function WeeklyQuizzesScreen() {
   const fetchQuizzes = useCallback(async () => {
     setLoading(true);
     try {
+      // Fire-and-forget cleanup of expired exams (auto-close)
+      try {
+        await (supabase.rpc as any)('close_expired_exams');
+      } catch {
+        // ignore — cleanup is best-effort
+      }
+
       const eligibleTypes = getEligibleQuizTypes(user?.jobTitles || []);
       const entries: QuizEntry[] = [];
 
@@ -80,7 +88,7 @@ export default function WeeklyQuizzesScreen() {
 
         // Get active exam for this type
         const { data: examData } = await (supabase.from('exams' as any) as any)
-          .select('id, time_limit_seconds, status')
+          .select('id, time_limit_seconds, status, close_at')
           .eq('exam_type', examType)
           .eq('status', 'active')
           .order('activated_at', { ascending: false })
@@ -143,6 +151,10 @@ export default function WeeklyQuizzesScreen() {
 
   const noEligibleRoles = !loading && quizzes.length === 0;
 
+  // Multi-quiz reward split: N quizzes → $1/N per correct standard question
+  const eligibleQuizCount = Math.max(1, getEligibleQuizTypes(user?.jobTitles || []).length);
+  const rewardPerCorrect = 1 / eligibleQuizCount;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -191,6 +203,9 @@ export default function WeeklyQuizzesScreen() {
               activeExam={q.activeExam}
               result={q.result}
               questionCount={q.questionCount}
+              rewardPerCorrect={rewardPerCorrect}
+              eligibleQuizCount={eligibleQuizCount}
+              closeAt={q.activeExam?.close_at || null}
               onTakeQuiz={handleTakeQuiz}
               onReviewAnswers={handleReviewAnswers}
             />
