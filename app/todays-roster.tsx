@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Platform,
+  FlatList,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -14,51 +16,132 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
+import { useAuth } from '@/contexts/AuthContext';
+import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
+import ManagerTabBarStatic from '@/components/ManagerTabBarStatic';
+import ShiftEditForm, { ShiftLike } from '@/components/ShiftEditForm';
+import { isSameDay } from '@/utils/dateUtils';
 
 interface RosterShift {
   id: string;
+  upload_id: string;
   employee_name: string;
   user_id: string | null;
+  shift_date: string;
   start_time: string;
   end_time: string;
   roles: string[];
   is_closer: boolean;
   is_opener: boolean;
   is_training: boolean;
+  room_assignment: string | null;
 }
+
+function toISODate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const DAYS_BEFORE = 30;
+const DAYS_AFTER = 30;
+const TOTAL_DAYS = DAYS_BEFORE + DAYS_AFTER + 1;
+const INITIAL_INDEX = DAYS_BEFORE;
 
 export default function TodaysRosterScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { user } = useAuth();
 
-  const [shifts, setShifts] = useState<RosterShift[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Build the ±30 day window anchored on today (stable for the lifetime of the screen).
+  const days = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Array.from({ length: TOTAL_DAYS }, (_, i) => {
+      const d = new Date(today);
+      d.setDate(d.getDate() + (i - DAYS_BEFORE));
+      return d;
+    });
+  }, []);
+
+  const [currentIndex, setCurrentIndex] = useState(INITIAL_INDEX);
+  const selectedDate = days[currentIndex];
+
+  const [shiftsByDate, setShiftsByDate] = useState<Record<string, RosterShift[]>>({});
+  const [loadingByDate, setLoadingByDate] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<'am' | 'pm'>('am');
 
-  useFocusEffect(
-    useCallback(() => {
-      loadTodaysShifts();
-    }, [])
-  );
+  // Shift edit form state
+  const [shiftFormVisible, setShiftFormVisible] = useState(false);
+  const [shiftFormMode, setShiftFormMode] = useState<'add' | 'edit'>('add');
+  const [shiftFormShift, setShiftFormShift] = useState<ShiftLike | undefined>(undefined);
 
-  const loadTodaysShifts = async () => {
+  const pagerRef = useRef<FlatList<Date>>(null);
+
+  const loadShiftsForDate = useCallback(async (date: Date, force = false) => {
+    const iso = toISODate(date);
+    setLoadingByDate((prev) => ({ ...prev, [iso]: true }));
     try {
-      setLoading(true);
-      const today = new Date().toISOString().split('T')[0];
-
       const { data, error } = await supabase
         .from('staff_schedules')
-        .select('id, employee_name, user_id, start_time, end_time, roles, is_closer, is_opener, is_training')
-        .eq('shift_date', today)
+        .select(
+          'id, upload_id, employee_name, user_id, shift_date, start_time, end_time, roles, is_closer, is_opener, is_training, room_assignment'
+        )
+        .eq('shift_date', iso)
         .order('start_time', { ascending: true });
-
       if (error) throw error;
-      setShifts(data || []);
+      setShiftsByDate((prev) => ({ ...prev, [iso]: (data || []) as RosterShift[] }));
     } catch (error) {
       console.error('Error loading roster:', error);
+      if (force) {
+        setShiftsByDate((prev) => ({ ...prev, [iso]: [] }));
+      }
     } finally {
-      setLoading(false);
+      setLoadingByDate((prev) => ({ ...prev, [iso]: false }));
+    }
+  }, []);
+
+  // Prefetch current day + neighbors whenever the visible index changes.
+  useEffect(() => {
+    const indexes = [currentIndex - 1, currentIndex, currentIndex + 1].filter(
+      (i) => i >= 0 && i < TOTAL_DAYS
+    );
+    indexes.forEach((i) => {
+      const iso = toISODate(days[i]);
+      if (shiftsByDate[iso] === undefined && !loadingByDate[iso]) {
+        loadShiftsForDate(days[i]);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentIndex]);
+
+  // On focus, invalidate and reload the current day so edits made elsewhere (e.g. Review Schedule)
+  // show up immediately when returning to the Roster.
+  useFocusEffect(
+    useCallback(() => {
+      loadShiftsForDate(days[currentIndex], true);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentIndex])
+  );
+
+  const handleSelectDate = (date: Date | null) => {
+    if (!date) return;
+    const normalized = new Date(date);
+    normalized.setHours(0, 0, 0, 0);
+    const idx = days.findIndex((d) => isSameDay(d, normalized));
+    if (idx >= 0 && idx !== currentIndex) {
+      pagerRef.current?.scrollToIndex({ index: idx, animated: true });
+      setCurrentIndex(idx);
+    }
+  };
+
+  const handleMomentumScrollEnd = (e: any) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    if (idx !== currentIndex && idx >= 0 && idx < TOTAL_DAYS) {
+      setCurrentIndex(idx);
     }
   };
 
@@ -72,53 +155,160 @@ export default function TodaysRosterScreen() {
   const getShiftDuration = (start: string, end: string) => {
     const [startH, startM] = start.split(':').map(Number);
     const [endH, endM] = end.split(':').map(Number);
-    let totalMinutes = (endH * 60 + endM) - (startH * 60 + startM);
+    let totalMinutes = endH * 60 + endM - (startH * 60 + startM);
     if (totalMinutes < 0) totalMinutes += 24 * 60;
     const hours = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
-  // Split shifts into AM (start before 12pm) and PM (start at 12pm or later)
-  const amShifts = shifts.filter((s) => {
-    const [hours] = s.start_time.split(':').map(Number);
-    return hours < 12;
-  });
+  const currentIso = toISODate(selectedDate);
+  const currentShifts = shiftsByDate[currentIso] || [];
+  const currentLoading = loadingByDate[currentIso] || shiftsByDate[currentIso] === undefined;
 
-  const pmShifts = shifts.filter((s) => {
-    const [hours] = s.start_time.split(':').map(Number);
-    return hours >= 12;
-  });
+  const amCount = currentShifts.filter((s) => Number(s.start_time.split(':')[0]) < 12).length;
+  const pmCount = currentShifts.filter((s) => Number(s.start_time.split(':')[0]) >= 12).length;
 
-  const activeShifts = activeTab === 'am' ? amShifts : pmShifts;
-
-  // Group active shifts by primary role, sorted alphabetically
-  const roleGroups: { role: string; shifts: RosterShift[] }[] = (() => {
-    const map: Record<string, RosterShift[]> = {};
-    activeShifts.forEach((shift) => {
-      const role = shift.roles.length > 0 ? [...new Set(shift.roles)][0] : 'Other';
-      if (!map[role]) map[role] = [];
-      map[role].push(shift);
-    });
-    // Sort roles alphabetically, then sort employees within each role
-    return Object.keys(map)
-      .sort((a, b) => a.localeCompare(b))
-      .map((role) => ({
-        role,
-        shifts: map[role].sort((a, b) => a.start_time.localeCompare(b.start_time)),
-      }));
-  })();
-
-  const todayStr = new Date().toLocaleDateString('en-US', {
+  const dateStr = selectedDate.toLocaleDateString('en-US', {
     weekday: 'long',
     month: 'long',
     day: 'numeric',
     year: 'numeric',
   });
 
-  const getPrimaryRole = (shift: RosterShift) => {
-    if (shift.roles.length === 0) return '';
-    return [...new Set(shift.roles)][0];
+  const isViewingToday = isSameDay(selectedDate, new Date());
+
+  const openAddShift = () => {
+    setShiftFormMode('add');
+    setShiftFormShift(undefined);
+    setShiftFormVisible(true);
+  };
+
+  const openEditShift = (shift: RosterShift) => {
+    setShiftFormMode('edit');
+    setShiftFormShift(shift);
+    setShiftFormVisible(true);
+  };
+
+  const handleShiftSaved = () => {
+    setShiftFormVisible(false);
+    // Invalidate and reload so the visible page reflects the change immediately.
+    loadShiftsForDate(days[currentIndex], true);
+  };
+
+  const renderDayPage = ({ item: day }: { item: Date }) => {
+    const iso = toISODate(day);
+    const dayShifts = shiftsByDate[iso] || [];
+    const isLoading = loadingByDate[iso] || shiftsByDate[iso] === undefined;
+
+    const amShifts = dayShifts.filter((s) => Number(s.start_time.split(':')[0]) < 12);
+    const pmShifts = dayShifts.filter((s) => Number(s.start_time.split(':')[0]) >= 12);
+    const active = activeTab === 'am' ? amShifts : pmShifts;
+
+    const roleGroups: { role: string; shifts: RosterShift[] }[] = (() => {
+      const map: Record<string, RosterShift[]> = {};
+      active.forEach((shift) => {
+        const role = shift.roles.length > 0 ? [...new Set(shift.roles)][0] : 'Other';
+        if (!map[role]) map[role] = [];
+        map[role].push(shift);
+      });
+      return Object.keys(map)
+        .sort((a, b) => a.localeCompare(b))
+        .map((role) => ({
+          role,
+          shifts: map[role].sort((a, b) => a.start_time.localeCompare(b.start_time)),
+        }));
+    })();
+
+    return (
+      <View style={{ width: SCREEN_WIDTH }}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="large" color={colors.primary} style={styles.loadingIndicator} />
+          ) : active.length === 0 ? (
+            <View style={[styles.emptyCard, { backgroundColor: colors.card }]}>
+              <IconSymbol
+                ios_icon_name={activeTab === 'am' ? 'sun.max.fill' : 'moon.fill'}
+                android_material_icon_name={activeTab === 'am' ? 'wb-sunny' : 'nightlight-round'}
+                size={36}
+                color={colors.textSecondary}
+              />
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>
+                No {activeTab === 'am' ? 'Morning' : 'Evening'} Shifts
+              </Text>
+              <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+                No staff scheduled for the {activeTab === 'am' ? 'AM' : 'PM'} shift on this day.
+              </Text>
+            </View>
+          ) : (
+            roleGroups.map((group) => (
+              <View key={group.role} style={styles.roleGroup}>
+                <View style={styles.roleGroupHeader}>
+                  <View style={[styles.roleGroupBadge, { backgroundColor: colors.primary + '12' }]}>
+                    <Text style={[styles.roleGroupTitle, { color: colors.primary }]}>{group.role}</Text>
+                  </View>
+                  <View style={[styles.roleGroupLine, { backgroundColor: colors.primary + '15' }]} />
+                  <Text style={[styles.roleGroupCount, { color: colors.textSecondary }]}>
+                    {group.shifts.length}
+                  </Text>
+                </View>
+
+                {group.shifts.map((shift) => (
+                  <TouchableOpacity
+                    key={shift.id}
+                    style={[styles.shiftCard, { backgroundColor: colors.card }]}
+                    onPress={() => openEditShift(shift)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.shiftCardTop}>
+                      <View style={[styles.avatar, { backgroundColor: colors.primary + '15' }]}>
+                        <Text style={[styles.avatarText, { color: colors.primary }]}>
+                          {(shift.employee_name || '?').charAt(0).toUpperCase()}
+                        </Text>
+                      </View>
+
+                      <View style={styles.shiftInfo}>
+                        <Text style={[styles.employeeName, { color: colors.text }]}>
+                          {shift.employee_name}
+                        </Text>
+                        <Text style={[styles.timeRange, { color: colors.textSecondary }]}>
+                          {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
+                          {'  '}
+                          <Text style={styles.duration}>
+                            {getShiftDuration(shift.start_time, shift.end_time)}
+                          </Text>
+                        </Text>
+                      </View>
+
+                      <View style={styles.flagsColumn}>
+                        {shift.is_opener && (
+                          <View style={[styles.flagBadge, { backgroundColor: '#4CAF5020' }]}>
+                            <Text style={[styles.flagText, { color: '#4CAF50' }]}>O</Text>
+                          </View>
+                        )}
+                        {shift.is_closer && (
+                          <View style={[styles.flagBadge, { backgroundColor: '#FF980020' }]}>
+                            <Text style={[styles.flagText, { color: '#FF9800' }]}>C</Text>
+                          </View>
+                        )}
+                        {shift.is_training && (
+                          <View style={[styles.flagBadge, { backgroundColor: '#2196F320' }]}>
+                            <Text style={[styles.flagText, { color: '#2196F3' }]}>T</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))
+          )}
+        </ScrollView>
+      </View>
+    );
   };
 
   return (
@@ -128,24 +318,43 @@ export default function TodaysRosterScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Today's Roster</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>Roster</Text>
         <View style={styles.headerRight} />
       </View>
 
+      {/* Weekly calendar strip — edge-to-edge to match the header */}
+      <WeeklyCalendarStrip
+        selectedDate={selectedDate}
+        onSelectDate={handleSelectDate}
+        colors={{
+          primary: colors.primary,
+          background: colors.background,
+          text: colors.text,
+          textSecondary: colors.textSecondary,
+          card: colors.card,
+        }}
+        events={[]}
+        edgeToEdge
+        hideViewTopEvents
+      />
+
       {/* Date and stats */}
       <View style={[styles.dateBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <Text style={[styles.dateText, { color: colors.text }]}>{todayStr}</Text>
+        <Text style={[styles.dateText, { color: colors.text }]}>
+          {isViewingToday ? 'Today — ' : ''}
+          {dateStr}
+        </Text>
         <View style={styles.statsRow}>
           <View style={[styles.statBadge, { backgroundColor: colors.primary + '12' }]}>
-            <Text style={[styles.statNumber, { color: colors.primary }]}>{shifts.length}</Text>
+            <Text style={[styles.statNumber, { color: colors.primary }]}>{currentShifts.length}</Text>
             <Text style={[styles.statLabel, { color: colors.primary }]}>Total</Text>
           </View>
           <View style={[styles.statBadge, { backgroundColor: '#FF980012' }]}>
-            <Text style={[styles.statNumber, { color: '#FF9800' }]}>{amShifts.length}</Text>
+            <Text style={[styles.statNumber, { color: '#FF9800' }]}>{amCount}</Text>
             <Text style={[styles.statLabel, { color: '#FF9800' }]}>AM</Text>
           </View>
           <View style={[styles.statBadge, { backgroundColor: '#7C4DFF12' }]}>
-            <Text style={[styles.statNumber, { color: '#7C4DFF' }]}>{pmShifts.length}</Text>
+            <Text style={[styles.statNumber, { color: '#7C4DFF' }]}>{pmCount}</Text>
             <Text style={[styles.statLabel, { color: '#7C4DFF' }]}>PM</Text>
           </View>
         </View>
@@ -164,7 +373,7 @@ export default function TodaysRosterScreen() {
             color={activeTab === 'am' ? '#FFFFFF' : '#FF9800'}
           />
           <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'am' && { color: '#FFFFFF' }]}>
-            AM ({amShifts.length})
+            AM ({amCount})
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -178,96 +387,56 @@ export default function TodaysRosterScreen() {
             color={activeTab === 'pm' ? '#FFFFFF' : '#7C4DFF'}
           />
           <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'pm' && { color: '#FFFFFF' }]}>
-            PM ({pmShifts.length})
+            PM ({pmCount})
           </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+      {/* Horizontal day pager — swipe left/right to navigate between days */}
+      <FlatList
+        ref={pagerRef}
+        data={days}
+        keyExtractor={(d) => toISODate(d)}
+        renderItem={renderDayPage}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        initialScrollIndex={INITIAL_INDEX}
+        getItemLayout={(_, i) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * i, index: i })}
+        onMomentumScrollEnd={handleMomentumScrollEnd}
+        extraData={{ activeTab, shiftsByDate, loadingByDate }}
+        removeClippedSubviews={false}
+        style={styles.pager}
+      />
+
+      {/* Floating + button — positioned above the floating tab bar */}
+      <TouchableOpacity
+        style={[styles.fab, { backgroundColor: colors.highlight || colors.primary }]}
+        onPress={openAddShift}
+        activeOpacity={0.85}
       >
-        {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} style={styles.loadingIndicator} />
-        ) : activeShifts.length === 0 ? (
-          <View style={[styles.emptyCard, { backgroundColor: colors.card }]}>
-            <IconSymbol
-              ios_icon_name={activeTab === 'am' ? 'sun.max.fill' : 'moon.fill'}
-              android_material_icon_name={activeTab === 'am' ? 'wb-sunny' : 'nightlight-round'}
-              size={36}
-              color={colors.textSecondary}
-            />
-            <Text style={[styles.emptyTitle, { color: colors.text }]}>
-              No {activeTab === 'am' ? 'Morning' : 'Evening'} Shifts
-            </Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-              No staff scheduled for the {activeTab === 'am' ? 'AM' : 'PM'} shift today.
-            </Text>
-          </View>
-        ) : (
-          roleGroups.map((group) => (
-            <View key={group.role} style={styles.roleGroup}>
-              {/* Role section header */}
-              <View style={styles.roleGroupHeader}>
-                <View style={[styles.roleGroupBadge, { backgroundColor: colors.primary + '12' }]}>
-                  <Text style={[styles.roleGroupTitle, { color: colors.primary }]}>{group.role}</Text>
-                </View>
-                <View style={[styles.roleGroupLine, { backgroundColor: colors.primary + '15' }]} />
-                <Text style={[styles.roleGroupCount, { color: colors.textSecondary }]}>
-                  {group.shifts.length}
-                </Text>
-              </View>
+        <IconSymbol
+          ios_icon_name="plus"
+          android_material_icon_name="add"
+          size={28}
+          color="#FFFFFF"
+        />
+      </TouchableOpacity>
 
-              {/* Shift cards for this role */}
-              {group.shifts.map((shift) => (
-                <View
-                  key={shift.id}
-                  style={[styles.shiftCard, { backgroundColor: colors.card }]}
-                >
-                  <View style={styles.shiftCardTop}>
-                    <View style={[styles.avatar, { backgroundColor: colors.primary + '15' }]}>
-                      <Text style={[styles.avatarText, { color: colors.primary }]}>
-                        {(shift.employee_name || '?').charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
+      {/* Floating tab bar — matches the manager portal's nav bar, navigates back on tap */}
+      <ManagerTabBarStatic />
 
-                    <View style={styles.shiftInfo}>
-                      <Text style={[styles.employeeName, { color: colors.text }]}>
-                        {shift.employee_name}
-                      </Text>
-                      <Text style={[styles.timeRange, { color: colors.textSecondary }]}>
-                        {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
-                        {'  '}
-                        <Text style={styles.duration}>{getShiftDuration(shift.start_time, shift.end_time)}</Text>
-                      </Text>
-                    </View>
-
-                    {/* Flag badges on the right */}
-                    <View style={styles.flagsColumn}>
-                      {shift.is_opener && (
-                        <View style={[styles.flagBadge, { backgroundColor: '#4CAF5020' }]}>
-                          <Text style={[styles.flagText, { color: '#4CAF50' }]}>O</Text>
-                        </View>
-                      )}
-                      {shift.is_closer && (
-                        <View style={[styles.flagBadge, { backgroundColor: '#FF980020' }]}>
-                          <Text style={[styles.flagText, { color: '#FF9800' }]}>C</Text>
-                        </View>
-                      )}
-                      {shift.is_training && (
-                        <View style={[styles.flagBadge, { backgroundColor: '#2196F320' }]}>
-                          <Text style={[styles.flagText, { color: '#2196F3' }]}>T</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              ))}
-            </View>
-          ))
-        )}
-      </ScrollView>
+      {/* Shift edit form */}
+      <ShiftEditForm
+        visible={shiftFormVisible}
+        mode={shiftFormMode}
+        shift={shiftFormShift}
+        defaultDate={selectedDate}
+        currentUserId={user?.id}
+        colors={colors}
+        onClose={() => setShiftFormVisible(false)}
+        onSaved={handleShiftSaved}
+      />
     </View>
   );
 }
@@ -347,12 +516,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  scrollView: {
+  pager: {
     flex: 1,
+    marginTop: 12,
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 40,
+    paddingBottom: 200,
   },
   loadingIndicator: {
     marginTop: 40,
@@ -455,5 +625,21 @@ const styles = StyleSheet.create({
   flagText: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 110,
+    width: 56,
+    height: 56,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 1001,
   },
 });

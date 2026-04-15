@@ -1414,13 +1414,13 @@
   "schedule_upload": {
     "title": "Horarios del Personal",
     "upload_button": "Subir PDF de Horarios",
-    "upload_desc": "Importar desde exportación de HotSchedules",
+    "upload_desc": "Importar desde exportación de Restaurant 365",
     "uploading": "Subiendo...",
     "processing_message": "La IA está leyendo tu PDF de horarios... Esto puede tardar 15-30 segundos.",
     "processing_short": "Procesando...",
     "history": "Historial de Subidas",
     "no_uploads": "Sin Horarios Aún",
-    "no_uploads_desc": "Sube un PDF de HotSchedules para comenzar. Los turnos se analizarán y asignarán automáticamente a los empleados.",
+    "no_uploads_desc": "Sube un PDF de Restaurant 365 para comenzar. Los turnos se analizarán y asignarán automáticamente a los empleados.",
     "success_title": "¡Horario Procesado!",
     "success_message": "Se analizaron {{count}} turnos. {{unmatched}} empleados no pudieron ser emparejados.",
     "error_title": "Procesamiento Fallido",
@@ -1451,7 +1451,8 @@
     "opener": "Apertura",
     "closer": "Cierre",
     "training": "Entrenamiento",
-    "disclaimer": "Los horarios se publican semanalmente y pueden no reflejar los cambios recientes de liberación o intercambio de turnos. ¡Siempre verifica con HotSchedules!"
+    "not_scheduled": "Sin horario",
+    "disclaimer": "Los horarios se publican semanalmente y pueden no reflejar los cambios recientes de liberación o intercambio de turnos. ¡Siempre verifica con Restaurant 365!"
   },
   "profile_dashboard": {
     "mcloones_bucks": "McLoone's Bucks",

@@ -443,7 +443,7 @@ export default function ScheduleUploadScreen() {
               {t('schedule_upload.no_uploads', 'No Schedules Yet')}
             </Text>
             <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-              {t('schedule_upload.no_uploads_desc', 'Upload a HotSchedules PDF to get started. Shifts will be automatically parsed and assigned to employees.')}
+              {t('schedule_upload.no_uploads_desc', 'Upload a Restaurant 365 PDF to get started. Shifts will be automatically parsed and assigned to employees.')}
             </Text>
           </View>
         ) : (

@@ -21,7 +21,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
-import DateTimePicker from '@react-native-community/datetimepicker';
+import ShiftEditForm from '@/components/ShiftEditForm';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -29,11 +29,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-
-const ROLE_OPTIONS = [
-  'Server', 'Bartender', 'Busser', 'Runner', 'Host',
-  'Barback', 'Expo', 'Cook', 'Dishwasher', 'Manager',
-];
 
 interface ShiftRecord {
   id: string;
@@ -90,21 +85,14 @@ export default function ScheduleReviewScreen() {
   // Section layout positions for letter jump
   const [sectionPositions, setSectionPositions] = useState<Record<string, number>>({});
 
-  // Add/Edit Shift Modal state
-  const [addShiftModalVisible, setAddShiftModalVisible] = useState(false);
-  const [editingShiftId, setEditingShiftId] = useState<string | null>(null); // null = adding, string = editing
-  const [addShiftEmployee, setAddShiftEmployee] = useState<string>('');
-  const [addShiftUserId, setAddShiftUserId] = useState<string | null>(null);
-  const [addShiftDate, setAddShiftDate] = useState(new Date());
-  const [addShiftStartTime, setAddShiftStartTime] = useState(new Date());
-  const [addShiftEndTime, setAddShiftEndTime] = useState(new Date());
-  const [addShiftRole, setAddShiftRole] = useState('Server');
-  const [addShiftIsCloser, setAddShiftIsCloser] = useState(false);
-  const [addShiftIsOpener, setAddShiftIsOpener] = useState(false);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showStartTimePicker, setShowStartTimePicker] = useState(false);
-  const [showEndTimePicker, setShowEndTimePicker] = useState(false);
-  const [showRolePicker, setShowRolePicker] = useState(false);
+  // Add/Edit Shift Modal state — actual form lives in <ShiftEditForm />
+  const [shiftFormVisible, setShiftFormVisible] = useState(false);
+  const [shiftFormMode, setShiftFormMode] = useState<'add' | 'edit'>('add');
+  const [shiftFormTarget, setShiftFormTarget] = useState<{
+    shift?: ShiftRecord;
+    employeeName?: string;
+    userId?: string | null;
+  }>({});
 
   // New Schedule flow (pick employee first, then add shifts)
   const [newScheduleModalVisible, setNewScheduleModalVisible] = useState(false);
@@ -225,14 +213,6 @@ export default function ScheduleReviewScreen() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const formatDateDisplay = (date: Date) => {
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  };
-
-  const formatTimeDisplay = (date: Date) => {
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  };
-
   const toggleCardExpanded = (employeeName: string) => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setExpandedCards((prev) => {
@@ -327,66 +307,17 @@ export default function ScheduleReviewScreen() {
     );
   };
 
-  // Add/Edit Shift handlers
+  // Add/Edit Shift handlers — actual form lives in <ShiftEditForm />
   const openAddShiftModal = (employeeName: string, userId: string | null) => {
-    setEditingShiftId(null); // Adding mode
-    setAddShiftEmployee(employeeName);
-    setAddShiftUserId(userId);
-
-    // Default date to start of the week range
-    if (weekStart) {
-      setAddShiftDate(new Date(weekStart + 'T12:00:00'));
-    } else {
-      setAddShiftDate(new Date());
-    }
-
-    // Default times
-    const startDefault = new Date();
-    startDefault.setHours(16, 30, 0, 0);
-    setAddShiftStartTime(startDefault);
-
-    const endDefault = new Date();
-    endDefault.setHours(22, 0, 0, 0);
-    setAddShiftEndTime(endDefault);
-
-    setAddShiftRole('Server');
-    setAddShiftIsCloser(false);
-    setAddShiftIsOpener(false);
-    setShowDatePicker(false);
-    setShowStartTimePicker(false);
-    setShowEndTimePicker(false);
-    setShowRolePicker(false);
-    setAddShiftModalVisible(true);
+    setShiftFormMode('add');
+    setShiftFormTarget({ employeeName, userId });
+    setShiftFormVisible(true);
   };
 
   const openEditShiftModal = (shift: ShiftRecord) => {
-    setEditingShiftId(shift.id); // Editing mode
-    setAddShiftEmployee(shift.employee_name);
-    setAddShiftUserId(shift.user_id);
-
-    // Parse existing date
-    setAddShiftDate(new Date(shift.shift_date + 'T12:00:00'));
-
-    // Parse existing start time
-    const [startH, startM] = shift.start_time.split(':').map(Number);
-    const startDate = new Date();
-    startDate.setHours(startH, startM, 0, 0);
-    setAddShiftStartTime(startDate);
-
-    // Parse existing end time
-    const [endH, endM] = shift.end_time.split(':').map(Number);
-    const endDate = new Date();
-    endDate.setHours(endH, endM, 0, 0);
-    setAddShiftEndTime(endDate);
-
-    setAddShiftRole(shift.roles.length > 0 ? shift.roles[0] : 'Server');
-    setAddShiftIsCloser(shift.is_closer);
-    setAddShiftIsOpener(shift.is_opener);
-    setShowDatePicker(false);
-    setShowStartTimePicker(false);
-    setShowEndTimePicker(false);
-    setShowRolePicker(false);
-    setAddShiftModalVisible(true);
+    setShiftFormMode('edit');
+    setShiftFormTarget({ shift });
+    setShiftFormVisible(true);
   };
 
   // New Schedule flow — select employee then open add shift
@@ -403,67 +334,6 @@ export default function ScheduleReviewScreen() {
       (u.username && u.username.includes(search))
     );
   });
-
-  const handleSaveShift = async () => {
-    try {
-      setSaving(true);
-      setAddShiftModalVisible(false);
-
-      const shiftDate = addShiftDate.toISOString().split('T')[0];
-      const startHours = addShiftStartTime.getHours().toString().padStart(2, '0');
-      const startMins = addShiftStartTime.getMinutes().toString().padStart(2, '0');
-      const endHours = addShiftEndTime.getHours().toString().padStart(2, '0');
-      const endMins = addShiftEndTime.getMinutes().toString().padStart(2, '0');
-
-      const shiftData = {
-        shift_date: shiftDate,
-        start_time: `${startHours}:${startMins}`,
-        end_time: `${endHours}:${endMins}`,
-        roles: [addShiftRole],
-        is_closer: addShiftIsCloser,
-        is_opener: addShiftIsOpener,
-      };
-
-      if (editingShiftId) {
-        // UPDATE existing shift
-        const { error } = await supabase
-          .from('staff_schedules')
-          .update(shiftData)
-          .eq('id', editingShiftId);
-
-        if (error) throw error;
-        await loadData();
-        Alert.alert('Shift Updated', `Updated shift for ${addShiftEmployee} on ${formatDate(shiftDate)}.`);
-      } else {
-        // INSERT new shift
-        const { error } = await supabase.from('staff_schedules').insert({
-          upload_id,
-          user_id: addShiftUserId,
-          employee_name: addShiftEmployee,
-          ...shiftData,
-          is_training: false,
-          room_assignment: null,
-        });
-
-        if (error) throw error;
-
-        // Update shift count
-        const newCount = shifts.length + 1;
-        await supabase
-          .from('schedule_uploads')
-          .update({ parsed_shifts_count: newCount })
-          .eq('id', upload_id);
-
-        await loadData();
-        Alert.alert('Shift Added', `Added shift for ${addShiftEmployee} on ${formatDate(shiftDate)}.`);
-      }
-    } catch (error: any) {
-      console.error('Error saving shift:', error);
-      Alert.alert('Error', error.message || 'Failed to save shift.');
-    } finally {
-      setSaving(false);
-    }
-  };
 
   const filteredUsers = users.filter((u) => {
     if (!userSearch.trim()) return true;
@@ -678,9 +548,9 @@ export default function ScheduleReviewScreen() {
                           {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
                         </Text>
                         <View style={styles.shiftMeta}>
-                          {shift.roles.length > 0 && (
-                            <View style={[styles.roleBadge, { backgroundColor: colors.primary + '15' }]}>
-                              <Text style={[styles.roleText, { color: colors.primary }]}>{shift.roles[0]}</Text>
+                          {shift.is_opener && (
+                            <View style={[styles.flagBadge, { backgroundColor: '#4CAF5020' }]}>
+                              <Text style={[styles.flagText, { color: '#4CAF50' }]}>O</Text>
                             </View>
                           )}
                           {shift.is_closer && (
@@ -688,9 +558,14 @@ export default function ScheduleReviewScreen() {
                               <Text style={[styles.flagText, { color: '#FF9800' }]}>C</Text>
                             </View>
                           )}
-                          {shift.is_opener && (
-                            <View style={[styles.flagBadge, { backgroundColor: '#4CAF5020' }]}>
-                              <Text style={[styles.flagText, { color: '#4CAF50' }]}>O</Text>
+                          {shift.is_training && (
+                            <View style={[styles.flagBadge, { backgroundColor: '#2196F320' }]}>
+                              <Text style={[styles.flagText, { color: '#2196F3' }]}>T</Text>
+                            </View>
+                          )}
+                          {shift.roles.length > 0 && (
+                            <View style={[styles.roleBadge, { backgroundColor: colors.primary + '15' }]}>
+                              <Text style={[styles.roleText, { color: colors.primary }]}>{shift.roles[0]}</Text>
                             </View>
                           )}
                         </View>
@@ -874,199 +749,22 @@ export default function ScheduleReviewScreen() {
         </View>
       </Modal>
 
-      {/* Add/Edit Shift Modal */}
-      <Modal visible={addShiftModalVisible} animationType="slide" presentationStyle="pageSheet">
-        <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
-          <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-            <TouchableOpacity onPress={() => setAddShiftModalVisible(false)} style={styles.modalCancel}>
-              <Text style={[styles.modalCancelText, { color: colors.primary }]}>Cancel</Text>
-            </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>{editingShiftId ? 'Edit Shift' : 'Add Shift'}</Text>
-            <TouchableOpacity onPress={handleSaveShift} style={styles.modalSave}>
-              <Text style={[styles.modalSaveText, { color: colors.primary }]}>Save</Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView style={styles.addShiftForm} contentContainerStyle={styles.addShiftFormContent}>
-            {/* Employee name */}
-            <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Employee</Text>
-              <Text style={[styles.formValue, { color: colors.text }]}>{addShiftEmployee}</Text>
-            </View>
-
-            {/* Date picker */}
-            <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Date</Text>
-              <TouchableOpacity
-                style={[styles.formPickerButton, { backgroundColor: colors.card }]}
-                onPress={() => setShowDatePicker(!showDatePicker)}
-              >
-                <IconSymbol ios_icon_name="calendar" android_material_icon_name="event" size={18} color={colors.primary} />
-                <Text style={[styles.formPickerText, { color: colors.text }]}>{formatDateDisplay(addShiftDate)}</Text>
-                <IconSymbol ios_icon_name="chevron.down" android_material_icon_name="expand-more" size={16} color={colors.textSecondary} />
-              </TouchableOpacity>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={addShiftDate}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  themeVariant="light"
-                  onChange={(event, date) => {
-                    if (Platform.OS === 'android') setShowDatePicker(false);
-                    if (date) setAddShiftDate(date);
-                  }}
-                  style={styles.datePicker}
-                />
-              )}
-            </View>
-
-            {/* Start Time */}
-            <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Start Time</Text>
-              <TouchableOpacity
-                style={[styles.formPickerButton, { backgroundColor: colors.card }]}
-                onPress={() => setShowStartTimePicker(!showStartTimePicker)}
-              >
-                <IconSymbol ios_icon_name="clock" android_material_icon_name="schedule" size={18} color={colors.primary} />
-                <Text style={[styles.formPickerText, { color: colors.text }]}>{formatTimeDisplay(addShiftStartTime)}</Text>
-                <IconSymbol ios_icon_name="chevron.down" android_material_icon_name="expand-more" size={16} color={colors.textSecondary} />
-              </TouchableOpacity>
-              {showStartTimePicker && (
-                <DateTimePicker
-                  value={addShiftStartTime}
-                  mode="time"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  themeVariant="light"
-                  minuteInterval={5}
-                  onChange={(event, date) => {
-                    if (Platform.OS === 'android') setShowStartTimePicker(false);
-                    if (date) setAddShiftStartTime(date);
-                  }}
-                  style={styles.datePicker}
-                />
-              )}
-            </View>
-
-            {/* End Time */}
-            <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: colors.textSecondary }]}>End Time</Text>
-              <TouchableOpacity
-                style={[styles.formPickerButton, { backgroundColor: colors.card }]}
-                onPress={() => setShowEndTimePicker(!showEndTimePicker)}
-              >
-                <IconSymbol ios_icon_name="clock.fill" android_material_icon_name="schedule" size={18} color={colors.primary} />
-                <Text style={[styles.formPickerText, { color: colors.text }]}>{formatTimeDisplay(addShiftEndTime)}</Text>
-                <IconSymbol ios_icon_name="chevron.down" android_material_icon_name="expand-more" size={16} color={colors.textSecondary} />
-              </TouchableOpacity>
-              {showEndTimePicker && (
-                <DateTimePicker
-                  value={addShiftEndTime}
-                  mode="time"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  themeVariant="light"
-                  minuteInterval={5}
-                  onChange={(event, date) => {
-                    if (Platform.OS === 'android') setShowEndTimePicker(false);
-                    if (date) setAddShiftEndTime(date);
-                  }}
-                  style={styles.datePicker}
-                />
-              )}
-            </View>
-
-            {/* Role picker */}
-            <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Job Title / Role</Text>
-              <TouchableOpacity
-                style={[styles.formPickerButton, { backgroundColor: colors.card }]}
-                onPress={() => setShowRolePicker(!showRolePicker)}
-              >
-                <IconSymbol ios_icon_name="person.fill" android_material_icon_name="person" size={18} color={colors.primary} />
-                <Text style={[styles.formPickerText, { color: colors.text }]}>{addShiftRole}</Text>
-                <IconSymbol ios_icon_name="chevron.down" android_material_icon_name="expand-more" size={16} color={colors.textSecondary} />
-              </TouchableOpacity>
-              {showRolePicker && (
-                <View style={[styles.rolePickerList, { backgroundColor: colors.card }]}>
-                  {ROLE_OPTIONS.map((role) => (
-                    <TouchableOpacity
-                      key={role}
-                      style={[
-                        styles.rolePickerItem,
-                        addShiftRole === role && { backgroundColor: colors.primary + '15' },
-                      ]}
-                      onPress={() => {
-                        setAddShiftRole(role);
-                        setShowRolePicker(false);
-                      }}
-                    >
-                      <Text
-                        style={[
-                          styles.rolePickerText,
-                          { color: addShiftRole === role ? colors.primary : colors.text },
-                        ]}
-                      >
-                        {role}
-                      </Text>
-                      {addShiftRole === role && (
-                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={16} color={colors.primary} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </View>
-
-            {/* Closer/Opener toggles */}
-            <View style={styles.formSection}>
-              <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Shift Tags</Text>
-              <View style={styles.toggleRow}>
-                <TouchableOpacity
-                  style={[
-                    styles.toggleButton,
-                    { backgroundColor: addShiftIsOpener ? '#4CAF5020' : colors.card },
-                    addShiftIsOpener && { borderColor: '#4CAF50', borderWidth: 1 },
-                  ]}
-                  onPress={() => {
-                    setAddShiftIsOpener(!addShiftIsOpener);
-                    if (!addShiftIsOpener) setAddShiftIsCloser(false);
-                  }}
-                >
-                  <IconSymbol
-                    ios_icon_name="sunrise.fill"
-                    android_material_icon_name="wb-sunny"
-                    size={16}
-                    color={addShiftIsOpener ? '#4CAF50' : colors.textSecondary}
-                  />
-                  <Text style={[styles.toggleText, { color: addShiftIsOpener ? '#4CAF50' : colors.textSecondary }]}>
-                    Opener
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.toggleButton,
-                    { backgroundColor: addShiftIsCloser ? '#FF980020' : colors.card },
-                    addShiftIsCloser && { borderColor: '#FF9800', borderWidth: 1 },
-                  ]}
-                  onPress={() => {
-                    setAddShiftIsCloser(!addShiftIsCloser);
-                    if (!addShiftIsCloser) setAddShiftIsOpener(false);
-                  }}
-                >
-                  <IconSymbol
-                    ios_icon_name="moon.fill"
-                    android_material_icon_name="nightlight-round"
-                    size={16}
-                    color={addShiftIsCloser ? '#FF9800' : colors.textSecondary}
-                  />
-                  <Text style={[styles.toggleText, { color: addShiftIsCloser ? '#FF9800' : colors.textSecondary }]}>
-                    Closer
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </ScrollView>
-        </View>
-      </Modal>
+      {/* Add/Edit Shift Modal — reusable form */}
+      <ShiftEditForm
+        visible={shiftFormVisible}
+        mode={shiftFormMode}
+        shift={shiftFormTarget.shift}
+        employeeName={shiftFormTarget.employeeName}
+        userId={shiftFormTarget.userId}
+        uploadId={upload_id}
+        defaultDate={weekStart ? new Date(weekStart + 'T12:00:00') : undefined}
+        colors={colors}
+        onClose={() => setShiftFormVisible(false)}
+        onSaved={() => {
+          setShiftFormVisible(false);
+          loadData();
+        }}
+      />
 
       {/* New Schedule — Pick Employee Modal */}
       <Modal visible={newScheduleModalVisible} animationType="slide" presentationStyle="pageSheet">

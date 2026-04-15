@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { JOB_TITLES } from '@/constants/jobTitles';
 
 interface Employee {
   id: string;
@@ -33,19 +34,7 @@ interface Employee {
   profile_picture_url?: string;
 }
 
-const JOB_TITLE_OPTIONS = [
-  'Banquet Captain',
-  'Banquets',
-  'Bartender',
-  'Busser',
-  'Chef',
-  'Host',
-  'Kitchen',
-  'Lead Server',
-  'Manager',
-  'Runner',
-  'Server',
-];
+const JOB_TITLE_OPTIONS = JOB_TITLES;
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 

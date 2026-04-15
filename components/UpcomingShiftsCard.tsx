@@ -152,6 +152,11 @@ export default function UpcomingShiftsCard({ userId, isManager = false, colors }
                 <Text style={[styles.flagText, { color: '#FF9800' }]}>C</Text>
               </View>
             )}
+            {shift.is_training && (
+              <View style={[styles.flagBadge, { backgroundColor: '#2196F320' }]}>
+                <Text style={[styles.flagText, { color: '#2196F3' }]}>T</Text>
+              </View>
+            )}
             {getPrimaryRole(shift) ? (
               <View style={[styles.roleBadge, { backgroundColor: colors.primary + '15' }]}>
                 <Text style={[styles.roleText, { color: colors.primary }]}>

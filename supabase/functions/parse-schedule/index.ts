@@ -9,24 +9,47 @@ const corsHeaders = {
 
 function buildSchedulePrompt(employeeNames: string[]): string {
   const nameList = employeeNames.map((n) => `  - ${n}`).join('\n');
-  return `You are parsing a HotSchedules Weekly Roster Report PDF for McLoone's Boathouse restaurant.
+  return `You are parsing a Restaurant 365 (R365) Weekly Schedule PDF for McLoone's Boathouse restaurant.
 
-IMPORTANT: This PDF uses a calendar-grid visual layout. The underlying text layer may be garbled or incorrect. You MUST read employee names from the VISUAL rendering of the PDF (what a human would see), NOT from any hidden text layer. Look at the actual printed text in the leftmost column of each row.
+IMPORTANT: This PDF uses a calendar-grid visual layout. You MUST read employee names from the VISUAL rendering of the PDF (what a human would see), NOT from any hidden text layer. Look at the actual printed text in the leftmost column of each row.
 
-The PDF is a calendar-grid layout with:
-- Column headers: Employee name column, then one column per day of the week (typically Thursday through Wednesday)
-- Each employee row contains: Full name [Nickname] on line 1, phone number on line 2
-- Shift cells contain: time range (e.g., "4:30 PM - 10:00 PM"), roles (e.g., "Bus | Training Busser"), and sometimes flags like "Closer", "Opener", "CL", "Rm 1", "Rm 2"
-- Some employees have MULTIPLE shifts in one day (double shifts) — these appear as stacked entries in the same cell
-- Empty cells mean the employee is off that day
-- The report header shows the restaurant name and the date range for the week
+R365 VISUAL FORMAT
+- Calendar-grid layout: leftmost column is the Employee name, then one column per day of the week (typically Thursday through Wednesday).
+- The report header shows the restaurant name and the date range for the week.
+- Each employee row has the full name (and may include a role label below the name).
+- Shift cells contain: a time range (e.g., "4:30 PM - 10:00 PM"), the job title, and sometimes extra annotations like "CL", "Rm 1", "Rm 2", or a moon icon 🌙.
+- Empty cells mean the employee is off that day.
+- Some employees have MULTIPLE shifts in one day (double shifts) — stacked entries in the same cell → emit them as separate shift objects.
 
-KNOWN EMPLOYEE NAMES — These are the actual staff members. When you read a name from the PDF, match it to the closest name from this list. The PDF names may have slight visual artifacts, OCR-like errors, or formatting differences, but they should correspond to someone on this list. If a PDF name is clearly a variant/misspelling of a known employee, use the KNOWN employee name instead.
+ROW/CELL COLOR CODING (most reliable signal for the primary role — use this to disambiguate job titles when text is unclear):
+- Purple  (#A143D1 approx) = Manager / Bar Manager / Banquet Captain
+- Red     (#E50001 approx) = Server / Lead Server / Training Server / Banquet Server
+- Orange  (#FF7701 approx) = Bartender / Training Bartender / Banquet Bartender / Barback
+- Yellow  (#F3B202 approx) = Host
+- Forest Green (#9BB700 approx) = Busser / Runner / Expo
+- Highlighter Green (#26BC41 approx) = Chef / Cook / Kitchen / Dishwasher
+
+CLOSER / OPENER / TRAINING DETECTION
+- A moon icon 🌙 next to a shift time means that shift is a CLOSER. Set is_closer: true. This is especially common on manager shifts.
+- Server/Bartender cells may also show "CL" (closer), "RM 1 CL", "RM 2 CL" etc. — "CL" → is_closer: true. Preserve "RM 1"/"RM 2" in room_assignment.
+- If a cell or role label says "Opener" or "OP", set is_opener: true.
+- If a cell or role says anything containing "Training" (e.g., "Training Server", "Training Bartender"), set is_training: true. Keep the training label as the primary role value.
+
+ALLOWED ROLE VALUES (use these exact strings in the "roles" array — map any variant to the closest match below):
+  Manager, Bar Manager, Banquet Captain,
+  Server, Lead Server, Training Server, Banquet Server,
+  Bartender, Training Bartender, Banquet Bartender, Barback,
+  Host, Busser, Runner, Expo,
+  Chef, Cook, Kitchen, Dishwasher
+
+If you see "Bus" → "Busser". "Bart" → "Bartender". "Bqt Server" → "Banquet Server". Always normalize to one of the strings above.
+
+KNOWN EMPLOYEE NAMES — These are the actual staff members. When you read a name from the PDF, match it to the closest name from this list. The PDF names may have slight visual artifacts or formatting differences, but they should correspond to someone on this list. If a PDF name is clearly a variant/misspelling of a known employee, use the KNOWN employee name instead.
 
 Known employees:
 ${nameList}
 
-If a name in the PDF does NOT reasonably match anyone on the known list (e.g., a brand new hire not yet in the system), use the name exactly as shown in the PDF.
+If a name in the PDF does NOT reasonably match anyone on the known list (e.g., a brand new hire), use the name exactly as shown in the PDF.
 
 Extract ALL shifts from ALL pages. Return ONLY valid JSON (no markdown, no explanation) with this exact structure:
 
@@ -36,7 +59,6 @@ Extract ALL shifts from ALL pages. Return ONLY valid JSON (no markdown, no expla
   "shifts": [
     {
       "employee_name": "Full Name (use known employee name if matched)",
-      "nickname": "Nickname from brackets or null",
       "date": "YYYY-MM-DD",
       "start_time": "HH:MM",
       "end_time": "HH:MM",
@@ -50,18 +72,16 @@ Extract ALL shifts from ALL pages. Return ONLY valid JSON (no markdown, no expla
 }
 
 Rules:
-- Use 24-hour time format (e.g., "16:30" not "4:30 PM")
-- If end_time would be after midnight (e.g., "1:00 AM" for a shift starting at "10:00 PM"), still use "01:00"
-- Parse "CL" as room_assignment: "CL"
-- Parse "Rm 1", "Rm 2" etc. as room_assignment with that value
-- If roles contain "Closer", set is_closer: true and keep the primary role in the roles array
-- If roles contain "Opener", set is_opener: true and keep the primary role in the roles array
-- If roles contain "Training" in any form (e.g., "Training Server", "Training Busser"), set is_training: true and include both the training role and base role
-- Double shifts in one cell = two separate shift entries for that employee on that date
-- Return ALL employees from ALL pages — do not skip anyone
-- The employee_name should be the full name WITHOUT the bracket nickname portion
+- Use 24-hour time format (e.g., "16:30" not "4:30 PM").
+- If end_time is after midnight (e.g., "1:00 AM" after a shift starting "10:00 PM"), still use "01:00".
+- "CL" alone → room_assignment: "CL" AND is_closer: true.
+- "Rm 1", "Rm 2", etc. → room_assignment with that value. If combined with "CL", also set is_closer: true.
+- Moon icon 🌙 on a shift → is_closer: true (even if no "CL" text is present).
+- Double shifts in one cell = two separate shift entries for that employee on that date.
+- Return ALL employees from ALL pages — do not skip anyone.
+- The "roles" array should contain ONE value: the primary job title for that shift, normalized to the allowed list above.
 - CRITICAL: Match PDF names to the known employee list above whenever possible. Use the known spelling, not the PDF's potentially garbled version.
-- Return ONLY the JSON object, nothing else`;
+- Return ONLY the JSON object, nothing else.`;
 }
 
 interface ParseRequest {
@@ -253,7 +273,7 @@ serve(async (req) => {
         'anthropic-beta': 'pdfs-2024-09-25,output-128k-2025-02-19',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-5',
         max_tokens: 64000,
         messages: [
           {

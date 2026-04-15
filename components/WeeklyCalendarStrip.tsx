@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -38,6 +38,10 @@ interface WeeklyCalendarStripProps {
   events: UpcomingEvent[];
   onViewAll?: () => void;
   children?: React.ReactNode;
+  /** When true, removes the card container styling (margins, border radius, shadow) for edge-to-edge layouts. */
+  edgeToEdge?: boolean;
+  /** When true, hides the "View Top Events" button even when a date is selected. */
+  hideViewTopEvents?: boolean;
 }
 
 export default function WeeklyCalendarStrip({
@@ -47,13 +51,25 @@ export default function WeeklyCalendarStrip({
   events,
   onViewAll,
   children,
+  edgeToEdge = false,
+  hideViewTopEvents = false,
 }: WeeklyCalendarStripProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language || 'en';
 
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
-    getWeekStartDate(new Date())
+    getWeekStartDate(selectedDate || new Date())
   );
+
+  // Keep the visible week in sync when selectedDate is changed externally
+  // (e.g. by swiping between days on the Roster page).
+  useEffect(() => {
+    if (!selectedDate) return;
+    const targetWeekStart = getWeekStartDate(selectedDate);
+    if (!isSameDay(targetWeekStart, currentWeekStart)) {
+      setCurrentWeekStart(targetWeekStart);
+    }
+  }, [selectedDate]);
 
   const weekDays = getWeekDays(currentWeekStart);
 
@@ -88,14 +104,20 @@ export default function WeeklyCalendarStrip({
   const monthLabelDate = weekDays[3];
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.card }]}>
+    <View
+      style={[
+        styles.container,
+        edgeToEdge && styles.containerEdgeToEdge,
+        { backgroundColor: colors.card },
+      ]}
+    >
       {/* Month/Year header row */}
       <View style={styles.headerRow}>
         <Text style={[styles.monthLabel, { color: colors.text }]}>
           {formatMonthYear(monthLabelDate, locale)}
         </Text>
         <View style={styles.headerRight}>
-          {selectedDate !== null && (
+          {selectedDate !== null && !hideViewTopEvents && (
             <TouchableOpacity
               style={[styles.viewTopButton, { backgroundColor: colors.primary + '18' }]}
               onPress={handleViewTopEvents}
@@ -238,6 +260,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 4,
     elevation: 2,
+  },
+  containerEdgeToEdge: {
+    marginHorizontal: 0,
+    marginTop: 0,
+    borderRadius: 0,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   headerRow: {
     flexDirection: 'row',

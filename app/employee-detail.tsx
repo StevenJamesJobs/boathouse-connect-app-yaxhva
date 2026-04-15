@@ -20,6 +20,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
+import { JOB_TITLES } from '@/constants/jobTitles';
 
 interface Employee {
   id: string;
@@ -34,19 +35,7 @@ interface Employee {
   profile_picture_url?: string;
 }
 
-const JOB_TITLE_OPTIONS = [
-  'Banquet Captain',
-  'Banquets',
-  'Bartender',
-  'Busser',
-  'Chef',
-  'Host',
-  'Kitchen',
-  'Lead Server',
-  'Manager',
-  'Runner',
-  'Server',
-];
+const JOB_TITLE_OPTIONS = JOB_TITLES;
 
 export default function EmployeeDetailScreen() {
   const router = useRouter();
