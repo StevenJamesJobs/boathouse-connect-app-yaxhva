@@ -33,6 +33,7 @@ export default function ExamAnswerReviewScreen() {
   const params = useLocalSearchParams<{ examId: string; userId: string }>();
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [targetUser, setTargetUser] = useState<{ name: string; profile_picture_url: string | null } | null>(null);
   const [questions, setQuestions] = useState<QuestionReviewEntry[]>([]);
   const [summary, setSummary] = useState<{
@@ -60,28 +61,47 @@ export default function ExamAnswerReviewScreen() {
   const loadData = async () => {
     try {
       setLoading(true);
+      setLoadError(null);
 
       // Fetch questions
-      const { data: qData } = await (supabase
+      const { data: qData, error: qError } = await (supabase
         .from('exam_questions' as any) as any)
         .select('*')
         .eq('exam_id', params.examId)
         .order('question_order');
 
+      if (qError) {
+        console.error('exam-answer-review: failed to load questions', qError);
+        setLoadError(qError.message || 'Failed to load questions.');
+        return;
+      }
+
       // Fetch result
-      const { data: rData } = await (supabase
+      const { data: rData, error: rError } = await (supabase
         .from('exam_results' as any) as any)
         .select('answers, correct_count, total_questions, bucks_awarded, time_seconds, is_timed_out')
         .eq('exam_id', params.examId)
         .eq('user_id', params.userId)
         .maybeSingle();
 
+      if (rError) {
+        console.error('exam-answer-review: failed to load result', rError);
+        setLoadError(rError.message || 'Failed to load result.');
+        return;
+      }
+
       // Fetch user
-      const { data: uData } = await supabase
+      const { data: uData, error: uError } = await supabase
         .from('users')
         .select('name, profile_picture_url')
         .eq('id', params.userId as string)
         .maybeSingle();
+
+      if (uError) {
+        console.error('exam-answer-review: failed to load user', uError);
+        setLoadError(uError.message || 'Failed to load user.');
+        return;
+      }
 
       if (uData) {
         setTargetUser({
@@ -100,8 +120,22 @@ export default function ExamAnswerReviewScreen() {
         });
       }
 
+      // `answers` is declared JSONB but can come back as either a parsed array
+      // or a JSON string depending on the client path. exam-results.tsx handles
+      // both shapes — mirror that here (plus Array.isArray belt-and-suspenders).
       const answersByQuestionId: Record<string, AnswerRecord> = {};
-      const answersArray: AnswerRecord[] = ((rData as any)?.answers || []) as AnswerRecord[];
+      const rawAnswers = (rData as any)?.answers;
+      let answersArray: AnswerRecord[] = [];
+      if (Array.isArray(rawAnswers)) {
+        answersArray = rawAnswers;
+      } else if (typeof rawAnswers === 'string') {
+        try {
+          const parsed = JSON.parse(rawAnswers);
+          if (Array.isArray(parsed)) answersArray = parsed;
+        } catch (parseErr) {
+          console.warn('exam-answer-review: failed to parse answers JSON', parseErr);
+        }
+      }
       answersArray.forEach((a) => {
         answersByQuestionId[a.question_id] = a;
       });
@@ -197,7 +231,16 @@ export default function ExamAnswerReviewScreen() {
           </View>
         </View>
 
-        {summary ? (
+        {loadError ? (
+          <View style={[styles.emptyCard, { backgroundColor: '#EF444415', borderColor: '#EF4444', borderWidth: 1 }]}>
+            <Text style={[styles.emptyText, { color: '#EF4444' }]}>
+              {isSpanish ? 'Error al cargar las respuestas:' : 'Failed to load answers:'}
+            </Text>
+            <Text style={[styles.emptyText, { color: '#EF4444', marginTop: 4 }]}>
+              {loadError}
+            </Text>
+          </View>
+        ) : summary ? (
           <QuestionReviewList questions={questions} />
         ) : (
           <View style={[styles.emptyCard, { backgroundColor: colors.card }]}>

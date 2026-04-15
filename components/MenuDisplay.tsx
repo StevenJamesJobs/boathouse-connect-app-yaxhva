@@ -19,6 +19,7 @@ import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { useTranslation } from 'react-i18next';
 import { stripFormattingTags } from '@/components/FormattedText';
+import CategoryPill from '@/components/CategoryPill';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -653,13 +654,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             contentContainerStyle={styles.categoryScrollContent}
           >
             {CATEGORIES.map((category, index) => (
-              <TouchableOpacity
+              <CategoryPill
                 key={index}
-                style={[
-                  styles.categoryTab,
-                  { backgroundColor: colors.card },
-                  selectedCategory === category && { backgroundColor: colors.primary },
-                ]}
+                size="lg"
+                label={getCategoryLabel(category)}
+                selected={selectedCategory === category}
                 onPress={() => navigateToPage(category)}
                 onLayout={(e) => {
                   categoryLayoutsRef.current[category] = {
@@ -667,17 +666,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
                     width: e.nativeEvent.layout.width,
                   };
                 }}
-              >
-                <Text
-                  style={[
-                    styles.categoryTabText,
-                    { color: colors.textSecondary },
-                    selectedCategory === category && { color: '#FFFFFF' },
-                  ]}
-                >
-                  {getCategoryLabel(category)}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
         )}
@@ -692,13 +681,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             contentContainerStyle={styles.subcategoryScrollContent}
           >
             {SUBCATEGORIES[selectedCategory].map((subcategory, index) => (
-              <TouchableOpacity
+              <CategoryPill
                 key={index}
-                style={[
-                  styles.subcategoryTab,
-                  { backgroundColor: colors.card },
-                  selectedSubcategory === subcategory && { backgroundColor: colors.highlight },
-                ]}
+                size="sm"
+                label={getSubcategoryLabel(subcategory)}
+                selected={selectedSubcategory === subcategory}
                 onPress={() => navigateToPage(selectedCategory, subcategory)}
                 onLayout={(e) => {
                   subcategoryLayoutsRef.current[`${selectedCategory}_${subcategory}`] = {
@@ -706,17 +693,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
                     width: e.nativeEvent.layout.width,
                   };
                 }}
-              >
-                <Text
-                  style={[
-                    styles.subcategoryTabText,
-                    { color: colors.textSecondary },
-                    selectedSubcategory === subcategory && { color: colors.text },
-                  ]}
-                >
-                  {getSubcategoryLabel(subcategory)}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
         )}
@@ -972,18 +949,6 @@ const createStyles = (colors: any) =>
       paddingHorizontal: 16,
       gap: 8,
     },
-    categoryTab: {
-      paddingHorizontal: 20,
-      paddingVertical: 10,
-      borderRadius: 20,
-      marginRight: 8,
-      boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
-      elevation: 2,
-    },
-    categoryTabText: {
-      fontSize: 14,
-      fontWeight: '600',
-    },
     // Subcategory tabs
     subcategoryScroll: {
       maxHeight: 40,
@@ -992,18 +957,6 @@ const createStyles = (colors: any) =>
     subcategoryScrollContent: {
       paddingHorizontal: 16,
       gap: 8,
-    },
-    subcategoryTab: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      borderRadius: 16,
-      marginRight: 8,
-      boxShadow: '0px 1px 3px rgba(0, 0, 0, 0.1)',
-      elevation: 1,
-    },
-    subcategoryTabText: {
-      fontSize: 12,
-      fontWeight: '600',
     },
     // Page content
     pageScrollView: {

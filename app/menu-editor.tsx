@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
+  ActionSheetIOS,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -28,6 +29,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
+import CategoryPill from '@/components/CategoryPill';
 
 interface MenuItem {
   id: string;
@@ -486,6 +488,59 @@ export default function MenuEditorScreen() {
     }
   };
 
+  // Overflow (⋮) action sheet for a menu item row. Combines Edit / Move Up /
+  // Move Down / Delete into one compact menu so individual cards can ditch
+  // their four-button footer. Drag-to-reorder remains the primary reorder
+  // path; Up/Down here are a secondary nicety.
+  const openItemActions = (item: MenuItem, index: number) => {
+    const isFirst = index === 0;
+    const isLast = index === filteredItems.length - 1;
+
+    const editLabel = t('common:edit');
+    const moveUpLabel = t('upcoming_events_editor:move_up');
+    const moveDownLabel = t('upcoming_events_editor:move_down');
+    const deleteLabel = t('common:delete');
+    const cancelLabel = t('common:cancel');
+
+    if (Platform.OS === 'ios') {
+      const options: string[] = [editLabel];
+      const actions: Array<() => void> = [() => openEditModal(item)];
+      if (!isFirst) {
+        options.push(moveUpLabel);
+        actions.push(() => handleMoveUp(index));
+      }
+      if (!isLast) {
+        options.push(moveDownLabel);
+        actions.push(() => handleMoveDown(index));
+      }
+      options.push(deleteLabel);
+      actions.push(() => handleDelete(item));
+      options.push(cancelLabel);
+
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          destructiveButtonIndex: options.length - 2,
+          cancelButtonIndex: options.length - 1,
+          title: item.name,
+        },
+        (buttonIndex) => {
+          if (buttonIndex === options.length - 1) return;
+          actions[buttonIndex]?.();
+        }
+      );
+    } else {
+      const buttons: Array<{ text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }> = [
+        { text: editLabel, onPress: () => openEditModal(item) },
+      ];
+      if (!isFirst) buttons.push({ text: moveUpLabel, onPress: () => handleMoveUp(index) });
+      if (!isLast) buttons.push({ text: moveDownLabel, onPress: () => handleMoveDown(index) });
+      buttons.push({ text: deleteLabel, style: 'destructive', onPress: () => handleDelete(item) });
+      buttons.push({ text: cancelLabel, style: 'cancel' });
+      Alert.alert(item.name, undefined, buttons);
+    }
+  };
+
   const handleDragEnd = async ({ data: reorderedData }: { data: MenuItem[] }) => {
     const updatedFiltered = reorderedData.map((item, index) => ({
       ...item,
@@ -554,7 +609,7 @@ export default function MenuEditorScreen() {
       name_es: item.name_es || '',
       description_es: item.description_es || '',
     });
-    setShowSpanish(!!(item.name_es || item.description_es));
+    setShowSpanish(false);
     setSelectedImageUri(null);
     setShowAddModal(true);
   };
@@ -665,26 +720,16 @@ export default function MenuEditorScreen() {
           contentContainerStyle={styles.categoryScrollContent}
         >
           {CATEGORIES.map((category, index) => (
-            <TouchableOpacity
+            <CategoryPill
               key={index}
-              style={[
-                styles.categoryTab,
-                selectedCategory === category && styles.categoryTabActive,
-              ]}
+              size="lg"
+              label={category}
+              selected={selectedCategory === category}
               onPress={() => {
                 setSelectedCategory(category);
                 setSelectedSubcategory(null);
               }}
-            >
-              <Text
-                style={[
-                  styles.categoryTabText,
-                  selectedCategory === category && styles.categoryTabTextActive,
-                ]}
-              >
-                {category}
-              </Text>
-            </TouchableOpacity>
+            />
           ))}
         </ScrollView>
       )}
@@ -697,40 +742,20 @@ export default function MenuEditorScreen() {
           style={styles.subcategoryScroll}
           contentContainerStyle={styles.subcategoryScrollContent}
         >
-          <TouchableOpacity
-            style={[
-              styles.subcategoryTab,
-              selectedSubcategory === null && styles.subcategoryTabActive,
-            ]}
+          <CategoryPill
+            size="sm"
+            label={t('menu_editor:subcategory_all')}
+            selected={selectedSubcategory === null}
             onPress={() => setSelectedSubcategory(null)}
-          >
-            <Text
-              style={[
-                styles.subcategoryTabText,
-                selectedSubcategory === null && styles.subcategoryTabTextActive,
-              ]}
-            >
-              {t('menu_editor:subcategory_all')}
-            </Text>
-          </TouchableOpacity>
+          />
           {SUBCATEGORIES[selectedCategory].map((subcategory, index) => (
-            <TouchableOpacity
+            <CategoryPill
               key={index}
-              style={[
-                styles.subcategoryTab,
-                selectedSubcategory === subcategory && styles.subcategoryTabActive,
-              ]}
+              size="sm"
+              label={subcategory}
+              selected={selectedSubcategory === subcategory}
               onPress={() => setSelectedSubcategory(subcategory)}
-            >
-              <Text
-                style={[
-                  styles.subcategoryTabText,
-                  selectedSubcategory === subcategory && styles.subcategoryTabTextActive,
-                ]}
-              >
-                {subcategory}
-              </Text>
-            </TouchableOpacity>
+            />
           ))}
         </ScrollView>
       )}
@@ -764,18 +789,27 @@ export default function MenuEditorScreen() {
           <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
             {filteredItems.map((item, index) => (
               <View key={item.id} style={styles.menuItemCard}>
+                {/* Overflow menu (Edit / Move Up / Move Down / Delete) */}
+                <TouchableOpacity
+                  style={styles.overflowButton}
+                  onPress={() => openItemActions(item, index)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <IconSymbol
+                    ios_icon_name="ellipsis"
+                    android_material_icon_name="more-vert"
+                    size={20}
+                    color="#FFFFFF"
+                  />
+                </TouchableOpacity>
+
                 {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
                   <View style={styles.squareLayout}>
                     <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.squareImage} />
                     <View style={styles.squareContent}>
                       <View style={styles.squareHeader}>
-                        <Text style={styles.menuItemName}>{getLocalizedField(item, 'name', language)}</Text>
-                        <View style={styles.priceOrderContainer}>
-                          <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
-                          <View style={styles.displayOrderBadgeCompact}>
-                            <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
-                          </View>
-                        </View>
+                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                        <Text style={styles.menuItemName} numberOfLines={1}>{getLocalizedField(item, 'name', language)}</Text>
                       </View>
                       {item.description && (
                         <FormattedText style={styles.squareDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>
@@ -790,19 +824,17 @@ export default function MenuEditorScreen() {
                         {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
                       </View>
                     </View>
+                    <View style={styles.displayOrderCorner}>
+                      <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
+                    </View>
                   </View>
                 ) : (
                   <>
                     {item.thumbnail_url && <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.menuItemImageBanner} />}
                     <View style={styles.menuItemContent}>
                       <View style={styles.menuItemHeader}>
-                        <Text style={styles.menuItemName}>{getLocalizedField(item, 'name', language)}</Text>
-                        <View style={styles.priceOrderContainer}>
-                          <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
-                          <View style={styles.displayOrderBadgeCompact}>
-                            <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
-                          </View>
-                        </View>
+                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                        <Text style={styles.menuItemName} numberOfLines={1}>{getLocalizedField(item, 'name', language)}</Text>
                       </View>
                       {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
                       <View style={styles.menuItemTags}>
@@ -814,19 +846,12 @@ export default function MenuEditorScreen() {
                         {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
                         {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
                       </View>
+                      <View style={styles.displayOrderCorner}>
+                        <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
+                      </View>
                     </View>
                   </>
                 )}
-                <View style={styles.menuItemActions}>
-                  <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}>
-                    <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.primary} />
-                    <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)}>
-                    <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color="#E74C3C" />
-                    <Text style={[styles.actionButtonText, styles.deleteButtonText]}>{t('common:delete')}</Text>
-                  </TouchableOpacity>
-                </View>
               </View>
             ))}
           </ScrollView>
@@ -861,18 +886,27 @@ export default function MenuEditorScreen() {
                         />
                       </TouchableOpacity>
 
+                      {/* Overflow menu (Edit / Move Up / Move Down / Delete) */}
+                      <TouchableOpacity
+                        style={styles.overflowButton}
+                        onPress={() => openItemActions(item, index)}
+                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      >
+                        <IconSymbol
+                          ios_icon_name="ellipsis"
+                          android_material_icon_name="more-vert"
+                          size={20}
+                          color="#FFFFFF"
+                        />
+                      </TouchableOpacity>
+
                       {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
                         <View style={styles.squareLayout}>
                           <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.squareImage} />
                           <View style={styles.squareContent}>
                             <View style={styles.squareHeader}>
-                              <Text style={styles.menuItemName}>{getLocalizedField(item, 'name', language)}</Text>
-                              <View style={styles.priceOrderContainer}>
-                                <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
-                                <View style={styles.displayOrderBadgeCompact}>
-                                  <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
-                                </View>
-                              </View>
+                              <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                              <Text style={styles.menuItemName} numberOfLines={1}>{getLocalizedField(item, 'name', language)}</Text>
                             </View>
                             {item.description && (
                               <FormattedText style={styles.squareDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>
@@ -887,19 +921,17 @@ export default function MenuEditorScreen() {
                               {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
                             </View>
                           </View>
+                          <View style={styles.displayOrderCorner}>
+                            <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
+                          </View>
                         </View>
                       ) : (
                         <>
                           {item.thumbnail_url && <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.menuItemImageBanner} />}
                           <View style={styles.menuItemContent}>
                             <View style={styles.menuItemHeader}>
-                              <Text style={styles.menuItemName}>{getLocalizedField(item, 'name', language)}</Text>
-                              <View style={styles.priceOrderContainer}>
-                                <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
-                                <View style={styles.displayOrderBadgeCompact}>
-                                  <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
-                                </View>
-                              </View>
+                              <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                              <Text style={styles.menuItemName} numberOfLines={1}>{getLocalizedField(item, 'name', language)}</Text>
                             </View>
                             {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
                             <View style={styles.menuItemTags}>
@@ -911,33 +943,12 @@ export default function MenuEditorScreen() {
                               {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
                               {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
                             </View>
+                            <View style={styles.displayOrderCorner}>
+                              <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
+                            </View>
                           </View>
                         </>
                       )}
-                      <View style={styles.menuItemActions}>
-                        <TouchableOpacity
-                          style={[styles.arrowButton, index === 0 && styles.arrowButtonDisabled]}
-                          onPress={() => handleMoveUp(index)}
-                          disabled={index === 0}
-                        >
-                          <IconSymbol ios_icon_name="arrow.up" android_material_icon_name="arrow-upward" size={18} color={index === 0 ? colors.textSecondary : colors.highlight} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          style={[styles.arrowButton, index === filteredItems.length - 1 && styles.arrowButtonDisabled]}
-                          onPress={() => handleMoveDown(index)}
-                          disabled={index === filteredItems.length - 1}
-                        >
-                          <IconSymbol ios_icon_name="arrow.down" android_material_icon_name="arrow-downward" size={18} color={index === filteredItems.length - 1 ? colors.textSecondary : colors.highlight} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(item)}>
-                          <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.primary} />
-                          <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(item)}>
-                          <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color="#E74C3C" />
-                          <Text style={[styles.actionButtonText, styles.deleteButtonText]}>{t('common:delete')}</Text>
-                        </TouchableOpacity>
-                      </View>
                     </View>
                   </ScaleDecorator>
                 );
@@ -987,76 +998,75 @@ export default function MenuEditorScreen() {
               bounces={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* Image Upload */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('menu_editor:thumbnail_label')}</Text>
-                <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
-                  {selectedImageUri || editingItem?.thumbnail_url ? (
-                    <Image
-                      source={{ uri: selectedImageUri || getImageUrl(editingItem?.thumbnail_url || '') || '' }}
-                      style={styles.uploadedImage}
-                      key={selectedImageUri || getImageUrl(editingItem?.thumbnail_url || '')}
-                    />
-                  ) : (
-                    <View style={styles.imageUploadPlaceholder}>
-                      <IconSymbol
-                        ios_icon_name="photo"
-                        android_material_icon_name="add-photo-alternate"
-                        size={48}
-                        color="#666666"
+              {/* Thumbnail (80×80, top-left) + Name (right) */}
+              <View style={styles.thumbAndNameRow}>
+                <View style={styles.thumbColumn}>
+                  <TouchableOpacity style={styles.thumbSquare} onPress={pickImage}>
+                    {selectedImageUri || editingItem?.thumbnail_url ? (
+                      <Image
+                        source={{ uri: selectedImageUri || getImageUrl(editingItem?.thumbnail_url || '') || '' }}
+                        style={styles.thumbImage}
+                        key={selectedImageUri || getImageUrl(editingItem?.thumbnail_url || '')}
                       />
-                      <Text style={styles.imageUploadText}>{t('menu_editor:tap_upload')}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                
-                {/* Thumbnail Shape */}
-                <View style={styles.shapeSelector}>
-                  <TouchableOpacity
-                    style={[
-                      styles.shapeOption,
-                      formData.thumbnail_shape === 'square' && styles.shapeOptionActive,
-                    ]}
-                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
-                  >
-                    <Text
-                      style={[
-                        styles.shapeOptionText,
-                        formData.thumbnail_shape === 'square' && styles.shapeOptionTextActive,
-                      ]}
-                    >
-                      {t('menu_editor:shape_square')}
-                    </Text>
+                    ) : (
+                      <View style={styles.thumbPlaceholder}>
+                        <IconSymbol
+                          ios_icon_name="photo"
+                          android_material_icon_name="add-photo-alternate"
+                          size={28}
+                          color="#999999"
+                        />
+                      </View>
+                    )}
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.shapeOption,
-                      formData.thumbnail_shape === 'banner' && styles.shapeOptionActive,
-                    ]}
-                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
-                  >
-                    <Text
-                      style={[
-                        styles.shapeOptionText,
-                        formData.thumbnail_shape === 'banner' && styles.shapeOptionTextActive,
-                      ]}
-                    >
-                      {t('menu_editor:shape_banner')}
-                    </Text>
-                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.nameColumn}>
+                  <Text style={styles.formLabel}>{t('menu_editor:name_label')}</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={t('menu_editor:name_placeholder')}
+                    placeholderTextColor="#999999"
+                    value={formData.name}
+                    onChangeText={(text) => setFormData({ ...formData, name: text })}
+                  />
                 </View>
               </View>
 
-              {/* Name */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('menu_editor:name_label')}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t('menu_editor:name_placeholder')}
-                  placeholderTextColor="#999999"
-                  value={formData.name}
-                  onChangeText={(text) => setFormData({ ...formData, name: text })}
-                />
+              {/* Square / Banner segmented control — full width row */}
+              <View style={styles.shapeSegmented}>
+                <TouchableOpacity
+                  style={[
+                    styles.shapeSegment,
+                    formData.thumbnail_shape === 'square' && styles.shapeSegmentActive,
+                  ]}
+                  onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
+                >
+                  <Text
+                    style={[
+                      styles.shapeSegmentText,
+                      formData.thumbnail_shape === 'square' && styles.shapeSegmentTextActive,
+                    ]}
+                  >
+                    {t('menu_editor:shape_square')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.shapeSegment,
+                    formData.thumbnail_shape === 'banner' && styles.shapeSegmentActive,
+                  ]}
+                  onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
+                >
+                  <Text
+                    style={[
+                      styles.shapeSegmentText,
+                      formData.thumbnail_shape === 'banner' && styles.shapeSegmentTextActive,
+                    ]}
+                  >
+                    {t('menu_editor:shape_banner')}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* Description */}
@@ -1139,35 +1149,39 @@ export default function MenuEditorScreen() {
                 )}
               </View>
 
-              {/* Price */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('menu_editor:price_label')}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t('menu_editor:price_placeholder')}
-                  placeholderTextColor="#999999"
-                  value={formData.price}
-                  onChangeText={(text) => setFormData({ ...formData, price: text })}
-                />
-              </View>
-
-              {/* Display Order */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('menu_editor:display_order_label')}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t('menu_editor:display_order_placeholder')}
-                  placeholderTextColor="#999999"
-                  value={formData.display_order.toString()}
-                  onChangeText={(text) => {
-                    const num = parseInt(text) || 0;
-                    setFormData({ ...formData, display_order: num });
-                  }}
-                  keyboardType="numeric"
-                />
-                <Text style={styles.formHint}>
-                  {t('menu_editor:display_order_hint')}
-                </Text>
+              {/* Price + Display Order — side by side */}
+              <View style={styles.priceOrderRow}>
+                <View style={styles.priceOrderCol}>
+                  <Text style={styles.formLabel}>{t('menu_editor:price_label')}</Text>
+                  <View style={styles.inputWithAdornment}>
+                    <Text style={styles.inputAdornment}>$</Text>
+                    <TextInput
+                      style={styles.inputAdornmentField}
+                      placeholder={t('menu_editor:price_placeholder')}
+                      placeholderTextColor="#999999"
+                      value={formData.price}
+                      onChangeText={(text) => setFormData({ ...formData, price: text })}
+                      keyboardType="decimal-pad"
+                    />
+                  </View>
+                </View>
+                <View style={styles.priceOrderCol}>
+                  <Text style={styles.formLabel}>{t('menu_editor:display_order_label')}</Text>
+                  <View style={styles.inputWithAdornment}>
+                    <Text style={styles.inputAdornment}>#</Text>
+                    <TextInput
+                      style={styles.inputAdornmentField}
+                      placeholder={t('menu_editor:display_order_placeholder')}
+                      placeholderTextColor="#999999"
+                      value={formData.display_order.toString()}
+                      onChangeText={(text) => {
+                        const num = parseInt(text) || 0;
+                        setFormData({ ...formData, display_order: num });
+                      }}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                </View>
               </View>
 
               {/* Category */}
@@ -1179,23 +1193,13 @@ export default function MenuEditorScreen() {
                   style={styles.optionsScroll}
                 >
                   {CATEGORIES.map((category, index) => (
-                    <TouchableOpacity
+                    <CategoryPill
                       key={index}
-                      style={[
-                        styles.optionButton,
-                        formData.category === category && styles.optionButtonActive,
-                      ]}
+                      size="sm"
+                      label={category}
+                      selected={formData.category === category}
                       onPress={() => setFormData({ ...formData, category, subcategory: '' })}
-                    >
-                      <Text
-                        style={[
-                          styles.optionButtonText,
-                          formData.category === category && styles.optionButtonTextActive,
-                        ]}
-                      >
-                        {category}
-                      </Text>
-                    </TouchableOpacity>
+                    />
                   ))}
                 </ScrollView>
               </View>
@@ -1210,23 +1214,13 @@ export default function MenuEditorScreen() {
                     style={styles.optionsScroll}
                   >
                     {SUBCATEGORIES[formData.category].map((subcategory, index) => (
-                      <TouchableOpacity
+                      <CategoryPill
                         key={index}
-                        style={[
-                          styles.optionButton,
-                          formData.subcategory === subcategory && styles.optionButtonActive,
-                        ]}
+                        size="sm"
+                        label={subcategory}
+                        selected={formData.subcategory === subcategory}
                         onPress={() => setFormData({ ...formData, subcategory })}
-                      >
-                        <Text
-                          style={[
-                            styles.optionButtonText,
-                            formData.subcategory === subcategory && styles.optionButtonTextActive,
-                          ]}
-                        >
-                          {subcategory}
-                        </Text>
-                      </TouchableOpacity>
+                      />
                     ))}
                   </ScrollView>
                 </View>
@@ -1404,28 +1398,28 @@ export default function MenuEditorScreen() {
                 </View>
               </View>
 
-              {/* Save Button */}
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={handleSave}
-                disabled={uploadingImage}
-              >
-                {uploadingImage ? (
-                  <ActivityIndicator color="#1A1A1A" />
-                ) : (
-                  <Text style={styles.saveButtonText}>
-                    {editingItem ? t('menu_editor:save_button') : t('menu_editor:add_save_button')}
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              {/* Cancel Button */}
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={closeModal}
-              >
-                <Text style={styles.cancelButtonText}>{t('menu_editor:cancel_button')}</Text>
-              </TouchableOpacity>
+              {/* Cancel + Save — side by side */}
+              <View style={styles.formFooter}>
+                <TouchableOpacity
+                  style={[styles.cancelButton, styles.footerButton]}
+                  onPress={closeModal}
+                >
+                  <Text style={styles.cancelButtonText}>{t('menu_editor:cancel_button')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.saveButton, styles.footerButton]}
+                  onPress={handleSave}
+                  disabled={uploadingImage}
+                >
+                  {uploadingImage ? (
+                    <ActivityIndicator color="#1A1A1A" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>
+                      {editingItem ? t('menu_editor:save_button') : t('menu_editor:add_save_button')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -1520,24 +1514,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     paddingHorizontal: 16,
     gap: 8,
   },
-  categoryTab: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: colors.card,
-    marginRight: 8,
-  },
-  categoryTabActive: {
-    backgroundColor: colors.highlight,
-  },
-  categoryTabText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  categoryTabTextActive: {
-    color: colors.text,
-  },
   subcategoryScroll: {
     marginTop: 12,
     maxHeight: 40,
@@ -1545,24 +1521,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   subcategoryScrollContent: {
     paddingHorizontal: 16,
     gap: 8,
-  },
-  subcategoryTab: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 16,
-    backgroundColor: colors.card,
-    marginRight: 8,
-  },
-  subcategoryTabActive: {
-    backgroundColor: colors.highlight,
-  },
-  subcategoryTabText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  subcategoryTabTextActive: {
-    color: colors.text,
   },
   loadingContainer: {
     flex: 1,
@@ -1625,9 +1583,10 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   squareHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 6,
+    gap: 8,
+    paddingRight: 40, // leave space for overflow ⋮ button
   },
   squareDescription: {
     fontSize: 13,
@@ -1637,44 +1596,42 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   menuItemImageBanner: {
     width: '100%',
-    height: 200,
+    height: 120,
     resizeMode: 'cover',
   },
   menuItemContent: {
-    padding: 16,
+    padding: 12,
   },
   menuItemHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     marginBottom: 8,
+    gap: 8,
+    paddingRight: 40, // leave space for overflow ⋮ button
   },
   menuItemName: {
     flex: 1,
     fontSize: 18,
     fontWeight: 'bold',
     color: colors.text,
-    marginRight: 12,
-  },
-  priceOrderContainer: {
-    alignItems: 'flex-end',
-    gap: 4,
   },
   menuItemPrice: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: colors.highlight,
   },
-  displayOrderBadgeCompact: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+  displayOrderCorner: {
+    position: 'absolute',
+    bottom: 6,
+    right: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
   },
   displayOrderTextCompact: {
     fontSize: 11,
     fontWeight: '600',
     color: colors.textSecondary,
+    opacity: 0.7,
   },
   menuItemDescription: {
     fontSize: 14,
@@ -1718,38 +1675,19 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontWeight: '600',
     color: colors.textSecondary,
   },
-  menuItemActions: {
-    flexDirection: 'row',
-    gap: 12,
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 6,
-  },
-  deleteButton: {
-    backgroundColor: '#2C1F1F',
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.highlight,
-  },
-  deleteButtonText: {
-    color: '#E74C3C',
-  },
   dragHandle: {
     position: 'absolute',
     top: 8,
     left: 8,
+    padding: 6,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 14,
+  },
+  overflowButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
     padding: 6,
     zIndex: 10,
     backgroundColor: 'rgba(0,0,0,0.3)',
@@ -1763,17 +1701,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     paddingHorizontal: 16,
     marginBottom: 8,
     marginTop: 12,
-  },
-  arrowButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowButtonDisabled: {
-    opacity: 0.3,
   },
   // Modal styles
   modalContainer: {
@@ -1883,78 +1810,107 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     textAlignVertical: 'top',
     paddingTop: 14,
   },
-  imageUploadButton: {
-    backgroundColor: '#F5F5F5',
+  // Compact 80x80 thumbnail + name row
+  thumbAndNameRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+    alignItems: 'flex-start',
+  },
+  thumbColumn: {
+    width: 80,
+    alignItems: 'center',
+  },
+  nameColumn: {
+    flex: 1,
+  },
+  thumbSquare: {
+    width: 80,
+    height: 80,
     borderRadius: 12,
-    overflow: 'hidden',
+    backgroundColor: '#F5F5F5',
     borderWidth: 2,
     borderColor: '#E0E0E0',
     borderStyle: 'dashed',
+    overflow: 'hidden',
   },
-  imageUploadPlaceholder: {
-    height: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageUploadText: {
-    fontSize: 14,
-    color: '#666666',
-    marginTop: 8,
-  },
-  uploadedImage: {
+  thumbImage: {
     width: '100%',
-    height: 200,
+    height: '100%',
     resizeMode: 'cover',
   },
-  shapeSelector: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
-  },
-  shapeOption: {
+  thumbPlaceholder: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#F5F5F5',
     alignItems: 'center',
-    borderWidth: 2,
+    justifyContent: 'center',
+  },
+  // Square / Banner segmented control — full-width row below thumb+name
+  shapeSegmented: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    borderRadius: 10,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
     borderColor: '#E0E0E0',
+    overflow: 'hidden',
   },
-  shapeOptionActive: {
+  shapeSegment: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  shapeSegmentActive: {
     backgroundColor: colors.highlight,
-    borderColor: colors.highlight,
   },
-  shapeOptionText: {
+  shapeSegmentText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#666666',
   },
-  shapeOptionTextActive: {
+  shapeSegmentTextActive: {
     color: '#1A1A1A',
+  },
+  // Price + Display Order row
+  priceOrderRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  priceOrderCol: {
+    flex: 1,
+  },
+  inputWithAdornment: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    paddingHorizontal: 12,
+  },
+  inputAdornment: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#666666',
+    marginRight: 6,
+  },
+  inputAdornmentField: {
+    flex: 1,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#1A1A1A',
+  },
+  formFooter: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 24,
+  },
+  footerButton: {
+    flex: 1,
+    marginTop: 0,
   },
   optionsScroll: {
     maxHeight: 50,
-  },
-  optionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  optionButtonActive: {
-    backgroundColor: colors.highlight,
-    borderColor: colors.highlight,
-  },
-  optionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
-  },
-  optionButtonTextActive: {
-    color: '#1A1A1A',
   },
   checkboxGroup: {
     flexDirection: 'row',

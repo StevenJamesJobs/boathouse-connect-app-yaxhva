@@ -13,6 +13,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { formatTime } from '@/utils/exam/examEngine';
 import { useTranslation } from 'react-i18next';
 import QuestionReviewList from '@/components/QuestionReviewList';
@@ -42,6 +43,7 @@ interface QuestionReview {
 export default function ExamResultsScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { user } = useAuth();
   const { i18n } = useTranslation();
   const isSpanish = i18n.language === 'es';
   const params = useLocalSearchParams<{
@@ -102,15 +104,17 @@ export default function ExamResultsScreen() {
             console.warn('Failed to parse previewAnswers param', e);
           }
         }
-      } else {
-        const { data: resultData } = await (supabase
+      } else if (user?.id) {
+        const { data: resultData, error: resultError } = await (supabase
           .from('exam_results' as any) as any)
           .select('answers')
           .eq('exam_id', examId)
-          .limit(1)
-          .single();
+          .eq('user_id', user.id)
+          .maybeSingle();
 
-        if (resultData?.answers) {
+        if (resultError) {
+          console.warn('exam-results: failed to load answers', resultError);
+        } else if (resultData?.answers) {
           userAnswers = typeof resultData.answers === 'string'
             ? JSON.parse(resultData.answers)
             : resultData.answers;
