@@ -127,46 +127,47 @@ function matchEmployee(
       return parts[0] === pdfFirst && parts[parts.length - 1] === pdfLast;
     });
     if (partial) return partial.id;
+
+    // Nickname/prefix match — handles Steve↔Steven, Mike↔Michael, Dan↔Daniel,
+    // Chris↔Christopher, Matt↔Matthew, Tom↔Thomas, Kate↔Katherine, etc.
+    // Rule: last names equal AND one first name is a prefix of the other,
+    // where the shorter first name is at least 3 characters (prevents false
+    // positives like "Al"↔"Alice" or "Jo"↔"Joseph").
+    const nickname = users.find((u) => {
+      if (!u.name) return false;
+      const parts = normalizeStr(u.name).split(/\s+/);
+      if (parts.length < 2) return false;
+      const userFirst = parts[0];
+      const userLast = parts[parts.length - 1];
+      if (userLast !== pdfLast) return false;
+      const shorter = pdfFirst.length <= userFirst.length ? pdfFirst : userFirst;
+      const longer = pdfFirst.length <= userFirst.length ? userFirst : pdfFirst;
+      return shorter.length >= 3 && longer.startsWith(shorter);
+    });
+    if (nickname) return nickname.id;
   }
 
   return null;
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+// ─── Heavy background work ──────────────────────────────────────────────────
+// Parsing a full PDF + calling Claude can take well over 150 seconds (the
+// default Supabase Edge Function wall-clock timeout). We run it as a
+// background task via EdgeRuntime.waitUntil so the HTTP response returns
+// immediately and the client polls `schedule_uploads.status` for completion.
 
-  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-  const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
-
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-  // Parse request body early so upload_id is available in error handler
-  let file_url = '';
-  let upload_id = '';
-  let media_type = 'application/pdf';
-  let additional_image_urls: string[] = [];
-
+async function processScheduleInBackground(
+  supabase: any,
+  anthropicApiKey: string,
+  file_url: string,
+  upload_id: string,
+  media_type: string,
+  additional_image_urls: string[]
+): Promise<void> {
   try {
-    const body = (await req.json()) as ParseRequest;
-    file_url = body.file_url || '';
-    upload_id = body.upload_id || '';
-    media_type = body.media_type || 'application/pdf';
-    additional_image_urls = body.additional_image_urls || [];
+    console.log(`[bg] Starting schedule parse for upload ${upload_id}`);
 
-    if (!anthropicApiKey) {
-      throw new Error('ANTHROPIC_API_KEY not configured');
-    }
-
-    if (!file_url || !upload_id) {
-      throw new Error('Missing required fields: file_url and upload_id');
-    }
-
-    console.log(`Starting schedule parse for upload ${upload_id}`);
-
-    // Update status to processing
+    // Ensure status is processing (caller already set it, but idempotent)
     await supabase
       .from('schedule_uploads')
       .update({ status: 'processing' })
@@ -424,16 +425,96 @@ serve(async (req) => {
       week_end,
     };
 
-    console.log('Schedule parse complete:', JSON.stringify(summary));
-
-    return new Response(JSON.stringify(summary), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    console.log('[bg] Schedule parse complete:', JSON.stringify(summary));
   } catch (error) {
-    console.error('Schedule parse error:', error);
+    console.error('[bg] Schedule parse error:', error);
 
     // Update upload status to failed
+    if (upload_id) {
+      try {
+        await supabase
+          .from('schedule_uploads')
+          .update({
+            status: 'failed',
+            error_message: error.message || 'Unknown error',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', upload_id);
+      } catch (_) {
+        console.error('[bg] Failed to update upload status:', _);
+      }
+    }
+  }
+}
+
+// ─── HTTP handler ───────────────────────────────────────────────────────────
+// Validates the request, kicks off the background parse task, and returns
+// 202 Accepted immediately. The client polls `schedule_uploads.status` to
+// know when parsing is done.
+
+serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+  const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+  const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
+
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  let upload_id = '';
+
+  try {
+    const body = (await req.json()) as ParseRequest;
+    const file_url = body.file_url || '';
+    upload_id = body.upload_id || '';
+    const media_type = body.media_type || 'application/pdf';
+    const additional_image_urls = body.additional_image_urls || [];
+
+    if (!anthropicApiKey) {
+      throw new Error('ANTHROPIC_API_KEY not configured');
+    }
+    if (!file_url || !upload_id) {
+      throw new Error('Missing required fields: file_url and upload_id');
+    }
+
+    // Kick off the heavy work as a background task so we don't hit the
+    // 150s HTTP handler timeout.
+    const task = processScheduleInBackground(
+      supabase,
+      anthropicApiKey,
+      file_url,
+      upload_id,
+      media_type,
+      additional_image_urls
+    );
+
+    // @ts-ignore EdgeRuntime is a Supabase Edge Runtime global
+    if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+      // @ts-ignore
+      EdgeRuntime.waitUntil(task);
+    } else {
+      // Fallback: fire-and-forget (works locally with supabase functions serve).
+      task.catch((err) => console.error('[bg] Background task rejected:', err));
+    }
+
+    return new Response(
+      JSON.stringify({
+        accepted: true,
+        upload_id,
+        status: 'processing',
+        message: 'Schedule parse started — poll schedule_uploads.status for completion.',
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 202,
+      }
+    );
+  } catch (error) {
+    console.error('Request validation error:', error);
+
+    // Mark upload as failed if we know its ID
     if (upload_id) {
       try {
         await supabase
@@ -452,11 +533,11 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Internal error parsing schedule',
+        error: error.message || 'Internal error starting schedule parse',
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+        status: 400,
       }
     );
   }
