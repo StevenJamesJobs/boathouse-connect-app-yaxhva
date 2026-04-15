@@ -14,6 +14,8 @@ import {
   Platform,
   KeyboardAvoidingView,
   ActionSheetIOS,
+  FlatList,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -52,6 +54,8 @@ interface MenuItem {
   description_es?: string | null;
 }
 
+const SCREEN_WIDTH = Dimensions.get('window').width;
+
 const CATEGORIES = ['Weekly Specials', 'Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
 
 const SUBCATEGORIES: { [key: string]: string[] } = {
@@ -62,6 +66,23 @@ const SUBCATEGORIES: { [key: string]: string[] } = {
   Wine: ['Sparkling', 'Rose', 'Chardonnay', 'Pinot Grigio', 'Sauvignon Blanc', 'Interesting Whites', 'Cabernet Sauvignon', 'Pinot Noir', 'Merlot', 'Italian Reds', 'Interesting Reds'],
   'Happy Hour': ['Appetizers', 'Drinks', 'Spirits'],
 };
+
+// Build flat page sequence for horizontal swipe navigation (mirrors MenuDisplay)
+interface PageConfig {
+  category: string;
+  subcategory: string | null;
+}
+const PAGES: PageConfig[] = [];
+for (const category of CATEGORIES) {
+  const subs = SUBCATEGORIES[category];
+  if (!subs || subs.length === 0) {
+    PAGES.push({ category, subcategory: null });
+  } else {
+    for (const sub of subs) {
+      PAGES.push({ category, subcategory: sub });
+    }
+  }
+}
 
 export default function MenuEditorScreen() {
   const { t } = useTranslation();
@@ -74,8 +95,16 @@ export default function MenuEditorScreen() {
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('Weekly Specials');
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+  const pagerRef = useRef<FlatList>(null);
+  const categoryScrollRef = useRef<ScrollView>(null);
+  const subcategoryScrollRef = useRef<ScrollView>(null);
+  const categoryLayoutsRef = useRef<{ [key: string]: { x: number; width: number } }>({});
+  const subcategoryLayoutsRef = useRef<{ [key: string]: { x: number; width: number } }>({});
+  // Derive selected category/subcategory from current page index
+  const currentPage = PAGES[currentPageIndex] || PAGES[0];
+  const selectedCategory = currentPage.category;
+  const selectedSubcategory = currentPage.subcategory;
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
@@ -170,6 +199,83 @@ export default function MenuEditorScreen() {
   useEffect(() => {
     filterItems();
   }, [filterItems]);
+
+  // Navigate pager to a specific page by category/subcategory
+  const navigateToPage = (category: string, subcategory?: string | null) => {
+    let targetIndex: number;
+    if (subcategory) {
+      targetIndex = PAGES.findIndex(p => p.category === category && p.subcategory === subcategory);
+    } else {
+      targetIndex = PAGES.findIndex(p => p.category === category);
+    }
+    if (targetIndex >= 0) {
+      setCurrentPageIndex(targetIndex);
+      pagerRef.current?.scrollToIndex({ index: targetIndex, animated: true });
+    }
+  };
+
+  // Handle swipe end — sync page index
+  const onMomentumScrollEnd = (event: any) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const newIndex = Math.round(offsetX / SCREEN_WIDTH);
+    if (newIndex >= 0 && newIndex < PAGES.length && newIndex !== currentPageIndex) {
+      setCurrentPageIndex(newIndex);
+    }
+  };
+
+  // Auto-scroll category pills to center the active one
+  useEffect(() => {
+    const layout = categoryLayoutsRef.current[selectedCategory];
+    if (layout && categoryScrollRef.current) {
+      const scrollToX = Math.max(0, layout.x - (SCREEN_WIDTH / 2) + (layout.width / 2));
+      categoryScrollRef.current.scrollTo({ x: scrollToX, animated: true });
+    }
+  }, [selectedCategory]);
+
+  // Auto-scroll subcategory pills to center the active one
+  const prevCategoryRef = useRef(selectedCategory);
+  useEffect(() => {
+    if (!selectedSubcategory || !subcategoryScrollRef.current) return;
+    const categoryChanged = prevCategoryRef.current !== selectedCategory;
+    prevCategoryRef.current = selectedCategory;
+    if (categoryChanged) {
+      subcategoryLayoutsRef.current = {};
+      subcategoryScrollRef.current.scrollTo({ x: 0, animated: true });
+      setTimeout(() => {
+        const layoutKey = `${selectedCategory}_${selectedSubcategory}`;
+        const layout = subcategoryLayoutsRef.current[layoutKey];
+        if (layout && subcategoryScrollRef.current) {
+          const scrollToX = Math.max(0, layout.x - (SCREEN_WIDTH / 2) + (layout.width / 2));
+          subcategoryScrollRef.current.scrollTo({ x: scrollToX, animated: true });
+        }
+      }, 100);
+    } else {
+      const layoutKey = `${selectedCategory}_${selectedSubcategory}`;
+      const layout = subcategoryLayoutsRef.current[layoutKey];
+      if (layout) {
+        const scrollToX = Math.max(0, layout.x - (SCREEN_WIDTH / 2) + (layout.width / 2));
+        subcategoryScrollRef.current.scrollTo({ x: scrollToX, animated: true });
+      }
+    }
+  }, [selectedCategory, selectedSubcategory]);
+
+  // Get items for a specific page (used by the horizontal pager)
+  const getItemsForPage = useCallback((page: PageConfig): MenuItem[] => {
+    let filtered = menuItems;
+    if (page.category === 'Weekly Specials') {
+      filtered = filtered.filter(item => item.category === 'Weekly Specials');
+    } else if (page.category === 'Lunch') {
+      filtered = filtered.filter(item => item.available_for_lunch);
+    } else if (page.category === 'Dinner') {
+      filtered = filtered.filter(item => item.available_for_dinner);
+    } else {
+      filtered = filtered.filter(item => item.category === page.category);
+    }
+    if (page.subcategory) {
+      filtered = filtered.filter(item => item.subcategory === page.subcategory);
+    }
+    return filtered;
+  }, [menuItems]);
 
   const pickImage = async () => {
     try {
@@ -657,42 +763,46 @@ export default function MenuEditorScreen() {
         <View style={styles.backButton} />
       </View>
 
-      {/* Add New Item Button - Elongated button above search bar */}
-      <TouchableOpacity style={styles.addNewItemButton} onPress={openAddModal}>
-        <IconSymbol
-          ios_icon_name="plus.circle.fill"
-          android_material_icon_name="add-circle"
-          size={24}
-          color={colors.text}
-        />
-        <Text style={styles.addNewItemButtonText}>{t('menu_editor:add_button')}</Text>
-      </TouchableOpacity>
-
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <IconSymbol
-          ios_icon_name="magnifyingglass"
-          android_material_icon_name="search"
-          size={20}
-          color={colors.textSecondary}
-        />
-        <TextInput
-          style={styles.searchInput}
-          placeholder={t('menu_editor:search_placeholder')}
-          placeholderTextColor={colors.textSecondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <IconSymbol
-              ios_icon_name="xmark.circle.fill"
-              android_material_icon_name="cancel"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-        )}
+      {/* Search Bar + Add Button */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchContainer}>
+          <IconSymbol
+            ios_icon_name="magnifyingglass"
+            android_material_icon_name="search"
+            size={20}
+            color={colors.textSecondary}
+          />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={t('menu_editor:search_placeholder')}
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <IconSymbol
+                ios_icon_name="xmark.circle.fill"
+                android_material_icon_name="cancel"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+        <TouchableOpacity
+          style={styles.addIconButton}
+          onPress={openAddModal}
+          accessibilityLabel={t('menu_editor:add_button')}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <IconSymbol
+            ios_icon_name="plus"
+            android_material_icon_name="add"
+            size={26}
+            color={colors.text}
+          />
+        </TouchableOpacity>
       </View>
 
       {searchQuery.length > 0 && (
@@ -714,6 +824,7 @@ export default function MenuEditorScreen() {
       {/* Category Tabs - Only show when NOT searching */}
       {!searchQuery && (
         <ScrollView
+          ref={categoryScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.categoryScroll}
@@ -725,9 +836,12 @@ export default function MenuEditorScreen() {
               size="lg"
               label={category}
               selected={selectedCategory === category}
-              onPress={() => {
-                setSelectedCategory(category);
-                setSelectedSubcategory(null);
+              onPress={() => navigateToPage(category)}
+              onLayout={(e) => {
+                categoryLayoutsRef.current[category] = {
+                  x: e.nativeEvent.layout.x,
+                  width: e.nativeEvent.layout.width,
+                };
               }}
             />
           ))}
@@ -737,24 +851,25 @@ export default function MenuEditorScreen() {
       {/* Subcategory Tabs - Only show when NOT searching */}
       {!searchQuery && SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
         <ScrollView
+          ref={subcategoryScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.subcategoryScroll}
           contentContainerStyle={styles.subcategoryScrollContent}
         >
-          <CategoryPill
-            size="sm"
-            label={t('menu_editor:subcategory_all')}
-            selected={selectedSubcategory === null}
-            onPress={() => setSelectedSubcategory(null)}
-          />
           {SUBCATEGORIES[selectedCategory].map((subcategory, index) => (
             <CategoryPill
               key={index}
               size="sm"
               label={subcategory}
               selected={selectedSubcategory === subcategory}
-              onPress={() => setSelectedSubcategory(subcategory)}
+              onPress={() => navigateToPage(selectedCategory, subcategory)}
+              onLayout={(e) => {
+                subcategoryLayoutsRef.current[`${selectedCategory}_${subcategory}`] = {
+                  x: e.nativeEvent.layout.x,
+                  width: e.nativeEvent.layout.width,
+                };
+              }}
             />
           ))}
         </ScrollView>
@@ -767,7 +882,7 @@ export default function MenuEditorScreen() {
         </View>
       ) : (
         <>
-        {filteredItems.length === 0 ? (
+        {searchQuery && filteredItems.length === 0 ? (
           <View style={styles.emptyContainer}>
             <IconSymbol
               ios_icon_name="fork.knife"
@@ -779,10 +894,7 @@ export default function MenuEditorScreen() {
               {t('menu_editor:empty_title')}
             </Text>
             <Text style={styles.emptySubtext}>
-              {searchQuery
-                ? t('menu_editor:empty_search_subtext')
-                : t('menu_editor:empty_subtext')
-              }
+              {t('menu_editor:empty_search_subtext')}
             </Text>
           </View>
         ) : searchQuery ? (
@@ -856,18 +968,54 @@ export default function MenuEditorScreen() {
             ))}
           </ScrollView>
         ) : (
-          <View style={styles.itemsList}>
-            {filteredItems.length > 1 && (
-              <Text style={styles.reorderHint}>{t('upcoming_events_editor:reorder_hint')}</Text>
-            )}
-            <DraggableFlatList
-              data={filteredItems}
-              keyExtractor={(item) => item.id}
-              onDragEnd={handleDragEnd}
-              activationDistance={10}
-              contentContainerStyle={styles.itemsListContent}
-              renderItem={({ item, getIndex, drag, isActive }: RenderItemParams<MenuItem>) => {
-                const index = getIndex() ?? 0;
+          /* Normal mode: horizontal swipe pager — one page per category/subcategory */
+          <FlatList
+            ref={pagerRef}
+            style={{ flex: 1 }}
+            data={PAGES}
+            keyExtractor={(_, index) => `page-${index}`}
+            horizontal
+            pagingEnabled
+            bounces={false}
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={onMomentumScrollEnd}
+            getItemLayout={(_, index) => ({
+              length: SCREEN_WIDTH,
+              offset: SCREEN_WIDTH * index,
+              index,
+            })}
+            initialScrollIndex={0}
+            renderItem={({ item: page }) => {
+              const pageItems = getItemsForPage(page);
+              if (pageItems.length === 0) {
+                return (
+                  <View style={{ width: SCREEN_WIDTH }}>
+                    <View style={styles.emptyContainer}>
+                      <IconSymbol
+                        ios_icon_name="fork.knife"
+                        android_material_icon_name="restaurant-menu"
+                        size={64}
+                        color={colors.textSecondary}
+                      />
+                      <Text style={styles.emptyText}>{t('menu_editor:empty_title')}</Text>
+                      <Text style={styles.emptySubtext}>{t('menu_editor:empty_subtext')}</Text>
+                    </View>
+                  </View>
+                );
+              }
+              return (
+                <View style={[styles.itemsList, { width: SCREEN_WIDTH }]}>
+                  {pageItems.length > 1 && (
+                    <Text style={styles.reorderHint}>{t('upcoming_events_editor:reorder_hint')}</Text>
+                  )}
+                  <DraggableFlatList
+                    data={pageItems}
+                    keyExtractor={(item) => item.id}
+                    onDragEnd={handleDragEnd}
+                    activationDistance={10}
+                    contentContainerStyle={styles.itemsListContent}
+                    renderItem={({ item, getIndex, drag, isActive }: RenderItemParams<MenuItem>) => {
+                      const index = getIndex() ?? 0;
 
                 return (
                   <ScaleDecorator>
@@ -953,8 +1101,11 @@ export default function MenuEditorScreen() {
                   </ScaleDecorator>
                 );
               }}
-            />
-          </View>
+                  />
+                </View>
+              );
+            }}
+          />
         )}
         </>
       )}
@@ -1453,34 +1604,31 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontWeight: 'bold',
     color: colors.text,
   },
-  addNewItemButton: {
+  searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.highlight,
     marginHorizontal: 16,
     marginTop: 16,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
     gap: 10,
   },
-  addNewItemButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
   searchContainer: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
-    marginHorizontal: 16,
-    marginTop: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
+    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+    elevation: 3,
+  },
+  addIconButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.highlight,
+    alignItems: 'center',
+    justifyContent: 'center',
     boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
     elevation: 3,
   },
