@@ -68,10 +68,7 @@ export default function ManagerManageScreen() {
     { id: 'guides', label: t('manager_manage.grid_guides'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training-editor' },
     { id: 'game-hub', label: t('manager_manage.grid_game_hub'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub-editor' },
     { id: 'weekly-quizzes', label: 'Weekly Quizzes', iosIcon: 'questionmark.circle.fill', androidIcon: 'quiz', route: '/quiz-hub-editor' },
-    { id: 'server', label: t('manager_manage.grid_server'), iosIcon: 'tray.full.fill', androidIcon: 'room-service', route: '/server-assistant-editor' },
-    { id: 'bartender', label: t('manager_manage.grid_bartender'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant-editor' },
-    { id: 'host', label: t('manager_manage.grid_host'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/host-assistant-editor' },
-    { id: 'kitchen', label: t('manager_manage.grid_kitchen'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant-editor' },
+    { id: 'assistant-editors', label: t('manager_manage.grid_assistant_editors'), iosIcon: 'person.crop.rectangle.stack.fill', androidIcon: 'groups', route: '/assistant-editors' },
   ];
 
   const managementItems: GridItem[] = [

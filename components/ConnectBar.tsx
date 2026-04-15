@@ -45,12 +45,19 @@ const TABS: TabConfig[] = [
   },
 ];
 
+interface ConnectBarBadges {
+  today?: boolean;
+  events?: boolean;
+  specials?: boolean;
+}
+
 interface ConnectBarProps {
   activeTab: ConnectBarTab;
   onTabChange: (tab: ConnectBarTab) => void;
+  badges?: ConnectBarBadges;
 }
 
-export default function ConnectBar({ activeTab, onTabChange }: ConnectBarProps) {
+export default function ConnectBar({ activeTab, onTabChange, badges }: ConnectBarProps) {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const slideAnim = useRef(new Animated.Value(0)).current;
@@ -96,6 +103,7 @@ export default function ConnectBar({ activeTab, onTabChange }: ConnectBarProps) 
 
         {TABS.map((tab, index) => {
           const isActive = activeTab === tab.key;
+          const hasBadge = badges?.[tab.key] && !isActive;
           return (
             <TouchableOpacity
               key={tab.key}
@@ -104,12 +112,15 @@ export default function ConnectBar({ activeTab, onTabChange }: ConnectBarProps) 
               onLayout={(e) => handleTabLayout(index, e)}
               activeOpacity={0.7}
             >
-              <IconSymbol
-                ios_icon_name={tab.iconIos as any}
-                android_material_icon_name={tab.iconAndroid as any}
-                size={16}
-                color={isActive ? '#FFFFFF' : colors.textSecondary}
-              />
+              <View style={styles.iconWrapper}>
+                <IconSymbol
+                  ios_icon_name={tab.iconIos as any}
+                  android_material_icon_name={tab.iconAndroid as any}
+                  size={16}
+                  color={isActive ? '#FFFFFF' : colors.textSecondary}
+                />
+                {hasBadge && <View style={styles.badgeDot} />}
+              </View>
               <Text
                 style={[
                   styles.tabText,
@@ -159,6 +170,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     gap: 5,
     zIndex: 1,
+  },
+  iconWrapper: {
+    position: 'relative',
+  },
+  badgeDot: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E74C3C',
   },
   tabText: {
     fontSize: 14,

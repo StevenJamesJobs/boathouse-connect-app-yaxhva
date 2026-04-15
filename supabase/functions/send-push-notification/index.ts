@@ -239,19 +239,19 @@ serve(async (req) => {
       console.error('Error logging notifications:', logError);
     }
 
-    // If this is a custom notification, save it
-    if (notificationType === 'custom' && user) {
+    // Save all sent notifications to custom_notifications for Sent History
+    if (user) {
       const { error: customError } = await supabaseClient
         .from('custom_notifications')
         .insert({
           title: title,
           body: body,
           sent_by: user.id,
-          data: data || null,
+          data: { ...data, notificationType } || { notificationType },
         });
 
       if (customError) {
-        console.error('Error saving custom notification:', customError);
+        console.error('Error saving notification to history:', customError);
       }
     }
 

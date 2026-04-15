@@ -1025,62 +1025,75 @@ export default function UpcomingEventsEditorScreen() {
               bounces={false}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('upcoming_events_editor:thumbnail_label')}</Text>
-                <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
-                  {selectedImageUri || editingEvent?.thumbnail_url ? (
-                    <Image
-                      source={{ uri: selectedImageUri || getImageUrl(editingEvent?.thumbnail_url || '') || '' }}
-                      style={styles.uploadedImage}
-                      key={selectedImageUri || getImageUrl(editingEvent?.thumbnail_url || '')}
-                    />
-                  ) : (
-                    <View style={styles.imageUploadPlaceholder}>
-                      <IconSymbol
-                        ios_icon_name="photo"
-                        android_material_icon_name="add-photo-alternate"
-                        size={48}
-                        color="#666666"
+              {/* Thumbnail (80x80, top-left) + Title (right) */}
+              <View style={styles.thumbAndNameRow}>
+                <View style={styles.thumbColumn}>
+                  <TouchableOpacity style={styles.thumbSquare} onPress={pickImage}>
+                    {selectedImageUri || editingEvent?.thumbnail_url ? (
+                      <Image
+                        source={{ uri: selectedImageUri || getImageUrl(editingEvent?.thumbnail_url || '') || '' }}
+                        style={styles.thumbImage}
+                        key={selectedImageUri || getImageUrl(editingEvent?.thumbnail_url || '')}
                       />
-                      <Text style={styles.imageUploadText}>{t('upcoming_events_editor:tap_upload')}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                
-                <View style={styles.shapeSelector}>
-                  <TouchableOpacity
-                    style={[
-                      styles.shapeOption,
-                      formData.thumbnail_shape === 'square' && styles.shapeOptionActive,
-                    ]}
-                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
-                  >
-                    <Text
-                      style={[
-                        styles.shapeOptionText,
-                        formData.thumbnail_shape === 'square' && styles.shapeOptionTextActive,
-                      ]}
-                    >
-                      {t('upcoming_events_editor:shape_square')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.shapeOption,
-                      formData.thumbnail_shape === 'banner' && styles.shapeOptionActive,
-                    ]}
-                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
-                  >
-                    <Text
-                      style={[
-                        styles.shapeOptionText,
-                        formData.thumbnail_shape === 'banner' && styles.shapeOptionTextActive,
-                      ]}
-                    >
-                      {t('upcoming_events_editor:shape_banner')}
-                    </Text>
+                    ) : (
+                      <View style={styles.thumbPlaceholder}>
+                        <IconSymbol
+                          ios_icon_name="photo"
+                          android_material_icon_name="add-photo-alternate"
+                          size={28}
+                          color="#999999"
+                        />
+                      </View>
+                    )}
                   </TouchableOpacity>
                 </View>
+
+                <View style={styles.nameColumn}>
+                  <Text style={styles.formLabel}>{t('upcoming_events_editor:event_title_label')}</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={t('upcoming_events_editor:event_title_placeholder')}
+                    placeholderTextColor="#999999"
+                    value={formData.title}
+                    onChangeText={(text) => setFormData({ ...formData, title: text })}
+                  />
+                </View>
+              </View>
+
+              {/* Square / Banner segmented control */}
+              <View style={styles.shapeSegmented}>
+                <TouchableOpacity
+                  style={[
+                    styles.shapeSegment,
+                    formData.thumbnail_shape === 'square' && styles.shapeSegmentActive,
+                  ]}
+                  onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
+                >
+                  <Text
+                    style={[
+                      styles.shapeSegmentText,
+                      formData.thumbnail_shape === 'square' && styles.shapeSegmentTextActive,
+                    ]}
+                  >
+                    {t('upcoming_events_editor:shape_square')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.shapeSegment,
+                    formData.thumbnail_shape === 'banner' && styles.shapeSegmentActive,
+                  ]}
+                  onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
+                >
+                  <Text
+                    style={[
+                      styles.shapeSegmentText,
+                      formData.thumbnail_shape === 'banner' && styles.shapeSegmentTextActive,
+                    ]}
+                  >
+                    {t('upcoming_events_editor:shape_banner')}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* Additional Images Section */}
@@ -1112,17 +1125,6 @@ export default function UpcomingEventsEditorScreen() {
                     <Text style={styles.addImageText}>Add</Text>
                   </TouchableOpacity>
                 </ScrollView>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('upcoming_events_editor:event_title_label')}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t('upcoming_events_editor:event_title_placeholder')}
-                  placeholderTextColor="#999999"
-                  value={formData.title}
-                  onChangeText={(text) => setFormData({ ...formData, title: text })}
-                />
               </View>
 
               <View style={styles.formGroup}>
@@ -2073,53 +2075,62 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     textAlignVertical: 'top',
     paddingTop: 14,
   },
-  imageUploadButton: {
-    backgroundColor: '#F5F5F5',
+  thumbAndNameRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+    alignItems: 'flex-start',
+  },
+  thumbColumn: {
+    width: 80,
+    alignItems: 'center',
+  },
+  nameColumn: {
+    flex: 1,
+  },
+  thumbSquare: {
+    width: 80,
+    height: 80,
     borderRadius: 12,
-    overflow: 'hidden',
+    backgroundColor: '#F5F5F5',
     borderWidth: 2,
     borderColor: '#E0E0E0',
     borderStyle: 'dashed',
+    overflow: 'hidden',
   },
-  imageUploadPlaceholder: {
-    height: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageUploadText: {
-    fontSize: 14,
-    color: '#666666',
-    marginTop: 8,
-  },
-  uploadedImage: {
+  thumbImage: {
     width: '100%',
-    height: 200,
+    height: '100%',
     resizeMode: 'cover',
   },
-  shapeSelector: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
-  },
-  shapeOption: {
+  thumbPlaceholder: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#F5F5F5',
     alignItems: 'center',
-    borderWidth: 2,
+    justifyContent: 'center',
+  },
+  shapeSegmented: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    borderRadius: 10,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
     borderColor: '#E0E0E0',
+    overflow: 'hidden',
   },
-  shapeOptionActive: {
+  shapeSegment: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  shapeSegmentActive: {
     backgroundColor: colors.highlight,
-    borderColor: colors.highlight,
   },
-  shapeOptionText: {
+  shapeSegmentText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#666666',
   },
-  shapeOptionTextActive: {
+  shapeSegmentTextActive: {
     color: '#1A1A1A',
   },
   categorySelector: {

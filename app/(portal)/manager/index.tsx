@@ -34,6 +34,7 @@ import { fetchContentImagesBatch, ContentType } from '@/utils/contentImages';
 import WelcomeHeader from '@/components/WelcomeHeader';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import ConnectBar, { ConnectBarTab } from '@/components/ConnectBar';
+import { useUnreadContent } from '@/hooks/useUnreadContent';
 import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
 import UpcomingShiftsCard from '@/components/UpcomingShiftsCard';
 import { eventFallsOnDate } from '@/utils/dateUtils';
@@ -149,8 +150,9 @@ export default function ManagerPortalScreen() {
   // What's Happening tab state (Announcements / Special Features)
   const [whatsHappeningTab, setWhatsHappeningTab] = useState<'Announcements' | 'Special Features'>('Announcements');
 
-  // ConnectBar active tab
+  // ConnectBar active tab + unread content badges
   const [activeSection, setActiveSection] = useState<ConnectBarTab>('today');
+  const { todayHasNew, eventsHasNew, specialsHasNew, newContentCount, markTabViewed } = useUnreadContent();
   const sectionListRef = useRef<FlatList>(null);
   const isScrollingRef = useRef(false);
 
@@ -583,15 +585,17 @@ export default function ManagerPortalScreen() {
     const newTab = SECTIONS[pageIndex];
     if (newTab && newTab !== activeSection) {
       setActiveSection(newTab);
+      markTabViewed(newTab);
     }
-  }, [activeSection, router]);
+  }, [activeSection, router, markTabViewed]);
 
   // Handle ConnectBar tab press
   const handleTabChange = useCallback((tab: ConnectBarTab) => {
     setActiveSection(tab);
+    markTabViewed(tab);
     const index = SECTIONS.indexOf(tab);
     sectionListRef.current?.scrollToIndex({ index, animated: true });
-  }, []);
+  }, [markTabViewed]);
 
   // ===== RENDER CARD COMPONENTS =====
 
@@ -959,12 +963,14 @@ export default function ManagerPortalScreen() {
           <WelcomeHeader
             onWeatherPress={openWeatherDetail}
             onNotificationPress={() => setNotificationVisible(true)}
+            newContentCount={newContentCount}
           />
 
           {/* Connect Bar */}
           <ConnectBar
             activeTab={activeSection}
             onTabChange={handleTabChange}
+            badges={{ today: todayHasNew, events: eventsHasNew, specials: specialsHasNew }}
           />
         </View>
       </View>

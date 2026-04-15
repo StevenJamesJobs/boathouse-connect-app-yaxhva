@@ -22,6 +22,7 @@ interface WelcomeHeaderProps {
   onWeatherPress: () => void;
   onNotificationPress: () => void;
   notificationCount?: number;
+  newContentCount?: number;
   weather?: WeatherInfo | null;
 }
 
@@ -31,6 +32,7 @@ export default function WelcomeHeader({
   onWeatherPress,
   onNotificationPress,
   notificationCount = 0,
+  newContentCount = 0,
   weather: externalWeather,
 }: WelcomeHeaderProps) {
   const colors = useThemeColors();
@@ -166,10 +168,13 @@ export default function WelcomeHeader({
             size={20}
             color={colors.primary}
           />
-          {notificationCount > 0 && (
+          {(notificationCount > 0 || newContentCount > 0) && (
             <View style={styles.badge}>
               <Text style={styles.badgeText}>
-                {notificationCount > 99 ? '99+' : notificationCount}
+                {(() => {
+                  const total = notificationCount + newContentCount;
+                  return total > 99 ? '99+' : total;
+                })()}
               </Text>
             </View>
           )}

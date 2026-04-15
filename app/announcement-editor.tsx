@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
+  Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -94,6 +95,7 @@ export default function AnnouncementEditorScreen() {
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
   const [showSpanish, setShowSpanish] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const [shouldSendNotification, setShouldSendNotification] = useState(true);
 
   // Rich text toolbar state
   const contentInputRef = useRef<TextInput>(null);
@@ -382,20 +384,22 @@ export default function AnnouncementEditorScreen() {
         }
         console.log('Announcement created successfully');
         
-        // Send push notification for new announcements only
-        try {
-          await sendNotification({
-            notificationType: 'announcement',
-            title: '📢 New Announcement',
-            body: formData.title,
-            data: {
-              announcementId: null, // Will be set by the database
-              priority: formData.priority,
-            },
-          });
-        } catch (notificationError) {
-          // Silent fail - don't block announcement creation
-          console.error('Failed to send push notification:', notificationError);
+        // Send push notification for new announcements only (if toggle is enabled)
+        if (shouldSendNotification) {
+          try {
+            await sendNotification({
+              notificationType: 'announcement',
+              title: '📢 New Announcement',
+              body: formData.title,
+              data: {
+                announcementId: null, // Will be set by the database
+                priority: formData.priority,
+              },
+            });
+          } catch (notificationError) {
+            // Silent fail - don't block announcement creation
+            console.error('Failed to send push notification:', notificationError);
+          }
         }
         
         Alert.alert('Success', t('announcement_editor:created_success'));
@@ -574,6 +578,7 @@ export default function AnnouncementEditorScreen() {
     setFileSearchQuery('');
     setShowFileSection(false);
     setShowSpanish(false);
+    setShouldSendNotification(true);
     setShowAddModal(true);
   };
 
@@ -972,62 +977,75 @@ export default function AnnouncementEditorScreen() {
               bounces={false}
               keyboardShouldPersistTaps="handled"
             >
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('announcement_editor:thumbnail_label')}</Text>
-                <TouchableOpacity style={styles.imageUploadButton} onPress={pickImage}>
-                  {selectedImageUri || editingAnnouncement?.thumbnail_url ? (
-                    <Image
-                      source={{ uri: selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '') || '' }}
-                      style={styles.uploadedImage}
-                      key={selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '')}
-                    />
-                  ) : (
-                    <View style={styles.imageUploadPlaceholder}>
-                      <IconSymbol
-                        ios_icon_name="photo"
-                        android_material_icon_name="add-photo-alternate"
-                        size={48}
-                        color="#666666"
+              {/* Thumbnail (80x80, top-left) + Title (right) */}
+              <View style={styles.thumbAndNameRow}>
+                <View style={styles.thumbColumn}>
+                  <TouchableOpacity style={styles.thumbSquare} onPress={pickImage}>
+                    {selectedImageUri || editingAnnouncement?.thumbnail_url ? (
+                      <Image
+                        source={{ uri: selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '') || '' }}
+                        style={styles.thumbImage}
+                        key={selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '')}
                       />
-                      <Text style={styles.imageUploadText}>{t('announcement_editor:tap_upload')}</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-                
-                <View style={styles.shapeSelector}>
-                  <TouchableOpacity
-                    style={[
-                      styles.shapeOption,
-                      formData.thumbnail_shape === 'square' && styles.shapeOptionActive,
-                    ]}
-                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
-                  >
-                    <Text
-                      style={[
-                        styles.shapeOptionText,
-                        formData.thumbnail_shape === 'square' && styles.shapeOptionTextActive,
-                      ]}
-                    >
-                      {t('announcement_editor:shape_square')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.shapeOption,
-                      formData.thumbnail_shape === 'banner' && styles.shapeOptionActive,
-                    ]}
-                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
-                  >
-                    <Text
-                      style={[
-                        styles.shapeOptionText,
-                        formData.thumbnail_shape === 'banner' && styles.shapeOptionTextActive,
-                      ]}
-                    >
-                      {t('announcement_editor:shape_banner')}
-                    </Text>
+                    ) : (
+                      <View style={styles.thumbPlaceholder}>
+                        <IconSymbol
+                          ios_icon_name="photo"
+                          android_material_icon_name="add-photo-alternate"
+                          size={28}
+                          color="#999999"
+                        />
+                      </View>
+                    )}
                   </TouchableOpacity>
                 </View>
+
+                <View style={styles.nameColumn}>
+                  <Text style={styles.formLabel}>{t('announcement_editor:announcement_title_label')}</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={t('announcement_editor:announcement_title_placeholder')}
+                    placeholderTextColor="#999999"
+                    value={formData.title}
+                    onChangeText={(text) => setFormData({ ...formData, title: text })}
+                  />
+                </View>
+              </View>
+
+              {/* Square / Banner segmented control */}
+              <View style={styles.shapeSegmented}>
+                <TouchableOpacity
+                  style={[
+                    styles.shapeSegment,
+                    formData.thumbnail_shape === 'square' && styles.shapeSegmentActive,
+                  ]}
+                  onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
+                >
+                  <Text
+                    style={[
+                      styles.shapeSegmentText,
+                      formData.thumbnail_shape === 'square' && styles.shapeSegmentTextActive,
+                    ]}
+                  >
+                    {t('announcement_editor:shape_square')}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.shapeSegment,
+                    formData.thumbnail_shape === 'banner' && styles.shapeSegmentActive,
+                  ]}
+                  onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
+                >
+                  <Text
+                    style={[
+                      styles.shapeSegmentText,
+                      formData.thumbnail_shape === 'banner' && styles.shapeSegmentTextActive,
+                    ]}
+                  >
+                    {t('announcement_editor:shape_banner')}
+                  </Text>
+                </TouchableOpacity>
               </View>
 
               {/* Additional Images Section */}
@@ -1068,17 +1086,6 @@ export default function AnnouncementEditorScreen() {
                     <Text style={styles.addImageText}>Add</Text>
                   </TouchableOpacity>
                 </ScrollView>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('announcement_editor:announcement_title_label')}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t('announcement_editor:announcement_title_placeholder')}
-                  placeholderTextColor="#999999"
-                  value={formData.title}
-                  onChangeText={(text) => setFormData({ ...formData, title: text })}
-                />
               </View>
 
               <View style={styles.formGroup}>
@@ -1381,6 +1388,25 @@ export default function AnnouncementEditorScreen() {
                   Lower numbers appear first. Announcements with the same order are sorted by creation date.
                 </Text>
               </View>
+
+              {!editingAnnouncement && (
+                <View style={styles.notificationToggleContainer}>
+                  <View style={styles.notificationToggleTextContainer}>
+                    <Text style={styles.notificationToggleLabel}>
+                      Send notification to staff?
+                    </Text>
+                    <Text style={styles.notificationToggleHint}>
+                      Select whether to send a push notification when this announcement is published.
+                    </Text>
+                  </View>
+                  <Switch
+                    value={shouldSendNotification}
+                    onValueChange={setShouldSendNotification}
+                    trackColor={{ false: '#767577', true: colors.primary }}
+                    thumbColor="#f4f3f4"
+                  />
+                </View>
+              )}
 
               <TouchableOpacity
                 style={styles.saveButton}
@@ -1759,53 +1785,62 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     textAlignVertical: 'top',
     paddingTop: 14,
   },
-  imageUploadButton: {
-    backgroundColor: '#F5F5F5',
+  thumbAndNameRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+    alignItems: 'flex-start',
+  },
+  thumbColumn: {
+    width: 80,
+    alignItems: 'center',
+  },
+  nameColumn: {
+    flex: 1,
+  },
+  thumbSquare: {
+    width: 80,
+    height: 80,
     borderRadius: 12,
-    overflow: 'hidden',
+    backgroundColor: '#F5F5F5',
     borderWidth: 2,
     borderColor: '#E0E0E0',
     borderStyle: 'dashed',
+    overflow: 'hidden',
   },
-  imageUploadPlaceholder: {
-    height: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  imageUploadText: {
-    fontSize: 14,
-    color: '#666666',
-    marginTop: 8,
-  },
-  uploadedImage: {
+  thumbImage: {
     width: '100%',
-    height: 200,
+    height: '100%',
     resizeMode: 'cover',
   },
-  shapeSelector: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 12,
-  },
-  shapeOption: {
+  thumbPlaceholder: {
     flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    backgroundColor: '#F5F5F5',
     alignItems: 'center',
-    borderWidth: 2,
+    justifyContent: 'center',
+  },
+  shapeSegmented: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    borderRadius: 10,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
     borderColor: '#E0E0E0',
+    overflow: 'hidden',
   },
-  shapeOptionActive: {
+  shapeSegment: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  shapeSegmentActive: {
     backgroundColor: colors.highlight,
-    borderColor: colors.highlight,
   },
-  shapeOptionText: {
+  shapeSegmentText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#666666',
   },
-  shapeOptionTextActive: {
+  shapeSegmentTextActive: {
     color: '#1A1A1A',
   },
   selectedFileContainer: {
@@ -1960,6 +1995,31 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   optionButtonTextActive: {
     color: '#1A1A1A',
+  },
+  notificationToggleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: 16,
+    marginTop: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  notificationToggleTextContainer: {
+    flex: 1,
+    marginRight: 12,
+  },
+  notificationToggleLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  notificationToggleHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 4,
   },
   saveButton: {
     backgroundColor: colors.highlight,

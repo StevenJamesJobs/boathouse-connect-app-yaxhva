@@ -417,7 +417,9 @@
     "grid_kitchen": "Kitchen",
     "grid_employee_hub": "Employee Hub",
     "grid_menu": "Menu Editor",
-    "grid_notifications": "Notifications"
+    "grid_notifications": "Notifications",
+    "grid_assistant_editors": "Assistant Editors",
+    "assistant_editors_title": "Assistant Editors"
   },
   "bartender_assistant": {
     "title": "Bartender Assistant",
@@ -1501,7 +1503,11 @@
     "employee_hub": "Employee Hub",
     "schedule_upload": "Schedule Upload",
     "todays_roster": "Today's Roster",
-    "notification_center": "Notifications"
+    "notification_center": "Notifications",
+    "weekly_quizzes": "Weekly Quizzes",
+    "game_hub": "Game Hub",
+    "rewards_reviews_editor": "Rewards & Reviews Editor",
+    "quiz_hub_editor": "Quizzes Editor"
   },
   "word_search": {
     "hub_title": "Word Search Games",

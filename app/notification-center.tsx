@@ -658,7 +658,7 @@ export default function NotificationCenter() {
               </View>
               <Text style={styles.cardTitle}>Sent Notifications</Text>
               <Text style={styles.cardDescription}>
-                View and manage recently sent custom notifications. Deleting a notification removes it from the notification shade for all users.
+                View and manage recently sent notifications. Deleting a notification removes it from the notification shade for all users.
               </Text>
 
               {loadingHistory ? (
@@ -666,16 +666,28 @@ export default function NotificationCenter() {
               ) : sentNotifications.length === 0 ? (
                 <View style={styles.historyEmpty}>
                   <Text style={[styles.historyEmptyText, { color: colors.textSecondary }]}>
-                    No custom notifications sent yet.
+                    No notifications sent yet.
                   </Text>
                 </View>
               ) : (
                 sentNotifications.map((notif) => (
                   <View key={notif.id} style={[styles.historyItem, { borderColor: colors.border }]}>
                     <View style={styles.historyItemContent}>
-                      <Text style={[styles.historyItemTitle, { color: colors.text }]} numberOfLines={1}>
-                        {notif.title}
-                      </Text>
+                      <View style={styles.historyItemTitleRow}>
+                        <Text style={[styles.historyItemTitle, { color: colors.text }]} numberOfLines={1}>
+                          {notif.title}
+                        </Text>
+                        {notif.data?.notificationType && notif.data.notificationType !== 'custom' && (
+                          <View style={[styles.historyTypeBadge, { backgroundColor: colors.primary + '20' }]}>
+                            <Text style={[styles.historyTypeBadgeText, { color: colors.primary }]}>
+                              {notif.data.notificationType === 'announcement' ? 'Announcement' :
+                               notif.data.notificationType === 'event' ? 'Event' :
+                               notif.data.notificationType === 'special_feature' ? 'Special Feature' :
+                               notif.data.notificationType}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
                       <Text style={[styles.historyItemBody, { color: colors.textSecondary }]} numberOfLines={2}>
                         {notif.body}
                       </Text>
@@ -999,10 +1011,25 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   historyItemContent: {
     flex: 1,
   },
+  historyItemTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 2,
+  },
   historyItemTitle: {
     fontSize: 15,
     fontWeight: '700',
-    marginBottom: 2,
+    flex: 1,
+  },
+  historyTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  historyTypeBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   historyItemBody: {
     fontSize: 13,

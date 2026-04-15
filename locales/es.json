@@ -417,7 +417,9 @@
     "grid_kitchen": "Cocina",
     "grid_employee_hub": "Hub Empleados",
     "grid_menu": "Editor Menú",
-    "grid_notifications": "Notificaciones"
+    "grid_notifications": "Notificaciones",
+    "grid_assistant_editors": "Editores de Asistentes",
+    "assistant_editors_title": "Editores de Asistentes"
   },
   "bartender_assistant": {
     "title": "Asistente de Barman",
@@ -1501,7 +1503,11 @@
     "employee_hub": "Hub de Empleados",
     "schedule_upload": "Subir Horario",
     "todays_roster": "Planilla del Día",
-    "notification_center": "Notificaciones"
+    "notification_center": "Notificaciones",
+    "weekly_quizzes": "Cuestionarios Semanales",
+    "game_hub": "Centro de Juegos",
+    "rewards_reviews_editor": "Editor Recompensas y Reseñas",
+    "quiz_hub_editor": "Editor de Cuestionarios"
   },
   "word_search": {
     "hub_title": "Sopa de Letras",
