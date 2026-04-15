@@ -446,6 +446,18 @@ export default function UpcomingEventsEditorScreen() {
             // Silent fail - don't block event creation
             console.error('Failed to send push notification:', notificationError);
           }
+        } else {
+          // Log to sent history even when notification is skipped
+          try {
+            await (supabase.from('custom_notifications') as any).insert({
+              title: '📅 New Event',
+              body: formData.title,
+              sent_by: user?.id,
+              data: { notificationType: 'event', notificationSkipped: true, category: formData.category },
+            });
+          } catch (err) {
+            console.error('Failed to log skipped notification:', err);
+          }
         }
         
         Alert.alert(t('common:success'), t('upcoming_events_editor:created_success'));

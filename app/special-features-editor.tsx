@@ -412,6 +412,18 @@ export default function SpecialFeaturesEditorScreen() {
             // Silent fail - don't block feature creation
             console.error('Failed to send push notification:', notificationError);
           }
+        } else {
+          // Log to sent history even when notification is skipped
+          try {
+            await (supabase.from('custom_notifications') as any).insert({
+              title: '⭐ New Special Feature',
+              body: formData.title,
+              sent_by: user?.id,
+              data: { notificationType: 'special_feature', notificationSkipped: true },
+            });
+          } catch (err) {
+            console.error('Failed to log skipped notification:', err);
+          }
         }
         
         Alert.alert(t('common:success'), t('special_features_editor:created_success'));

@@ -400,6 +400,18 @@ export default function AnnouncementEditorScreen() {
             // Silent fail - don't block announcement creation
             console.error('Failed to send push notification:', notificationError);
           }
+        } else {
+          // Log to sent history even when notification is skipped
+          try {
+            await (supabase.from('custom_notifications') as any).insert({
+              title: '📢 New Announcement',
+              body: formData.title,
+              sent_by: user?.id,
+              data: { notificationType: 'announcement', notificationSkipped: true, priority: formData.priority },
+            });
+          } catch (err) {
+            console.error('Failed to log skipped notification:', err);
+          }
         }
         
         Alert.alert('Success', t('announcement_editor:created_success'));

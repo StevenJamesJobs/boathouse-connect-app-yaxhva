@@ -695,6 +695,11 @@ export default function NotificationCenter() {
                         <Text style={[styles.historyItemTime, { color: colors.textSecondary }]}>
                           {getTimeAgo(notif.created_at)}
                         </Text>
+                        {notif.data?.notificationSkipped && (
+                          <Text style={[styles.historyItemSkipped, { color: '#F59E0B' }]}>
+                            Not sent to staff
+                          </Text>
+                        )}
                         {notif.data?.job_titles && (
                           <Text style={[styles.historyItemAudience, { color: colors.primary }]}>
                             To: {(notif.data.job_titles as string[]).join(', ')}
@@ -1047,6 +1052,11 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   historyItemAudience: {
     fontSize: 11,
     fontWeight: '600',
+  },
+  historyItemSkipped: {
+    fontSize: 11,
+    fontWeight: '600',
+    fontStyle: 'italic',
   },
   historyDeleteBtn: {
     padding: 8,
