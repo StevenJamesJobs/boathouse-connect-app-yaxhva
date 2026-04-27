@@ -239,21 +239,9 @@ serve(async (req) => {
       console.error('Error logging notifications:', logError);
     }
 
-    // Save all sent notifications to custom_notifications for Sent History
-    if (user) {
-      const { error: customError } = await supabaseClient
-        .from('custom_notifications')
-        .insert({
-          title: title,
-          body: body,
-          sent_by: user.id,
-          data: { ...data, notificationType } || { notificationType },
-        });
-
-      if (customError) {
-        console.error('Error saving notification to history:', customError);
-      }
-    }
+    // NOTE: custom_notifications inserts are handled by the calling editor
+    // (announcement, special-features, upcoming-events, notification-center)
+    // so the writer is consistent regardless of whether the push toggle is on.
 
     return new Response(
       JSON.stringify({

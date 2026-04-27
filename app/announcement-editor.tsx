@@ -384,7 +384,23 @@ export default function AnnouncementEditorScreen() {
         }
         console.log('Announcement created successfully');
         
-        // Send push notification for new announcements only (if toggle is enabled)
+        // Always log to Sent History (single source of truth — edge function no longer logs)
+        try {
+          await (supabase.from('custom_notifications') as any).insert({
+            title: '📢 New Announcement',
+            body: formData.title,
+            sent_by: user?.id,
+            data: {
+              notificationType: 'announcement',
+              notificationSkipped: !shouldSendNotification,
+              priority: formData.priority,
+            },
+          });
+        } catch (err) {
+          console.error('Failed to log notification:', err);
+        }
+
+        // Send the actual push only when toggle is on
         if (shouldSendNotification) {
           try {
             await sendNotification({
@@ -392,25 +408,12 @@ export default function AnnouncementEditorScreen() {
               title: '📢 New Announcement',
               body: formData.title,
               data: {
-                announcementId: null, // Will be set by the database
+                announcementId: null,
                 priority: formData.priority,
               },
             });
           } catch (notificationError) {
-            // Silent fail - don't block announcement creation
             console.error('Failed to send push notification:', notificationError);
-          }
-        } else {
-          // Log to sent history even when notification is skipped
-          try {
-            await (supabase.from('custom_notifications') as any).insert({
-              title: '📢 New Announcement',
-              body: formData.title,
-              sent_by: user?.id,
-              data: { notificationType: 'announcement', notificationSkipped: true, priority: formData.priority },
-            });
-          } catch (err) {
-            console.error('Failed to log skipped notification:', err);
           }
         }
         

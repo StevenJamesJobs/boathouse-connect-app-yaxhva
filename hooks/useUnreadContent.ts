@@ -8,7 +8,13 @@ const STORAGE_KEYS = {
   today: 'lastViewed_today',
   events: 'lastViewed_events',
   specials: 'lastViewed_specials',
+  announcements: 'lastViewed_announcements',
+  specialFeatures: 'lastViewed_specialFeatures',
+  viewedAnnouncementIds: 'viewed_announcement_ids',
+  viewedSpecialFeatureIds: 'viewed_special_feature_ids',
 } as const;
+
+export type WelcomeTab = 'announcements' | 'specialFeatures';
 
 // Global event system for cross-component refresh
 type Listener = () => void;
@@ -22,9 +28,24 @@ interface UnreadContentResult {
   todayHasNew: boolean;
   eventsHasNew: boolean;
   specialsHasNew: boolean;
+  /** Announcements tab on the Welcome screen segmented control */
+  announcementsHasNew: boolean;
+  /** Special Features tab on the Welcome screen segmented control */
+  specialFeaturesHasNew: boolean;
+  /** ISO timestamp set on first install — items created before this don't get NEW pills. Never advances on tab tap. */
+  lastViewedAnnouncements: string | null;
+  lastViewedSpecialFeatures: string | null;
+  /** Per-item viewed sets — an item ID is added when the user opens its detail modal. */
+  viewedAnnouncementIds: Set<string>;
+  viewedSpecialFeatureIds: Set<string>;
   hasAnyNew: boolean;
   newContentCount: number;
   markTabViewed: (tab: ConnectBarTab) => Promise<void>;
+  /** Bootstraps the cutoff timestamp on first install only — does NOT clear NEW state. */
+  markWelcomeTabViewed: (tab: WelcomeTab) => Promise<void>;
+  /** Mark an individual content item as viewed (clears its NEW pill). Call when opening the detail modal. */
+  markAnnouncementViewed: (id: string) => Promise<void>;
+  markSpecialFeatureViewed: (id: string) => Promise<void>;
   refresh: () => void;
 }
 
@@ -32,31 +53,92 @@ export function useUnreadContent(): UnreadContentResult {
   const [todayHasNew, setTodayHasNew] = useState(false);
   const [eventsHasNew, setEventsHasNew] = useState(false);
   const [specialsHasNew, setSpecialsHasNew] = useState(false);
+  const [announcementsHasNew, setAnnouncementsHasNew] = useState(false);
+  const [specialFeaturesHasNew, setSpecialFeaturesHasNew] = useState(false);
+  const [lastViewedAnnouncements, setLastViewedAnnouncements] = useState<string | null>(null);
+  const [lastViewedSpecialFeatures, setLastViewedSpecialFeatures] = useState<string | null>(null);
+  const [viewedAnnouncementIds, setViewedAnnouncementIds] = useState<Set<string>>(() => new Set());
+  const [viewedSpecialFeatureIds, setViewedSpecialFeatureIds] = useState<Set<string>>(() => new Set());
   const [newContentCount, setNewContentCount] = useState(0);
 
   const checkUnread = useCallback(async () => {
     try {
-      // Load last-viewed timestamps
-      const [todayTs, eventsTs, specialsTs] = await Promise.all([
+      // Load last-viewed timestamps + per-item viewed sets
+      const [todayTs, eventsTs, specialsTs, announcementsTs, specialFeaturesTs, annViewedRaw, sfViewedRaw] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.today),
         AsyncStorage.getItem(STORAGE_KEYS.events),
         AsyncStorage.getItem(STORAGE_KEYS.specials),
+        AsyncStorage.getItem(STORAGE_KEYS.announcements),
+        AsyncStorage.getItem(STORAGE_KEYS.specialFeatures),
+        AsyncStorage.getItem(STORAGE_KEYS.viewedAnnouncementIds),
+        AsyncStorage.getItem(STORAGE_KEYS.viewedSpecialFeatureIds),
       ]);
 
-      // Check "Today" tab: announcements + special_features
+      // Bootstrap cutoff on first ever load — items that already exist at install
+      // time don't all flood the NEW state. After bootstrap, the timestamp is
+      // never advanced; per-item viewedSet is the source of truth for clearing NEW.
+      let effectiveAnnouncementsTs = announcementsTs;
+      let effectiveSpecialFeaturesTs = specialFeaturesTs;
+      if (!effectiveAnnouncementsTs) {
+        effectiveAnnouncementsTs = new Date().toISOString();
+        await AsyncStorage.setItem(STORAGE_KEYS.announcements, effectiveAnnouncementsTs);
+      }
+      if (!effectiveSpecialFeaturesTs) {
+        effectiveSpecialFeaturesTs = new Date().toISOString();
+        await AsyncStorage.setItem(STORAGE_KEYS.specialFeatures, effectiveSpecialFeaturesTs);
+      }
+      setLastViewedAnnouncements(effectiveAnnouncementsTs);
+      setLastViewedSpecialFeatures(effectiveSpecialFeaturesTs);
+
+      const parseIds = (raw: string | null): Set<string> => {
+        if (!raw) return new Set();
+        try {
+          const arr = JSON.parse(raw);
+          return new Set(Array.isArray(arr) ? arr : []);
+        } catch {
+          return new Set();
+        }
+      };
+      const annViewed = parseIds(annViewedRaw);
+      const sfViewed = parseIds(sfViewedRaw);
+      setViewedAnnouncementIds(annViewed);
+      setViewedSpecialFeatureIds(sfViewed);
+
+      // Tab dot logic: any active item created after cutoff that the user hasn't opened yet.
+      // We must fetch IDs (not just counts) so we can filter against the local viewed set.
+      const annCutoff = effectiveAnnouncementsTs;
+      const sfCutoff = effectiveSpecialFeaturesTs;
       const todayCutoff = todayTs || new Date(0).toISOString();
-      const [announcementsRes, specialFeaturesRes] = await Promise.all([
+      const [todayAnnRes, todaySfRes, annTabRes, sfTabRes] = await Promise.all([
         (supabase.from('announcements') as any)
-          .select('id', { count: 'exact', head: true })
+          .select('id')
           .eq('is_active', true)
           .gt('created_at', todayCutoff),
         (supabase.from('special_features') as any)
-          .select('id', { count: 'exact', head: true })
+          .select('id')
           .eq('is_active', true)
           .gt('created_at', todayCutoff),
+        (supabase.from('announcements') as any)
+          .select('id')
+          .eq('is_active', true)
+          .gt('created_at', annCutoff),
+        (supabase.from('special_features') as any)
+          .select('id')
+          .eq('is_active', true)
+          .gt('created_at', sfCutoff),
       ]);
-      const todayCount = (announcementsRes.count || 0) + (specialFeaturesRes.count || 0);
+      const todayAnnUnviewed = ((todayAnnRes.data as { id: string }[] | null) ?? [])
+        .filter((r) => !annViewed.has(r.id)).length;
+      const todaySfUnviewed = ((todaySfRes.data as { id: string }[] | null) ?? [])
+        .filter((r) => !sfViewed.has(r.id)).length;
+      const annTabUnviewed = ((annTabRes.data as { id: string }[] | null) ?? [])
+        .filter((r) => !annViewed.has(r.id)).length;
+      const sfTabUnviewed = ((sfTabRes.data as { id: string }[] | null) ?? [])
+        .filter((r) => !sfViewed.has(r.id)).length;
+      const todayCount = todayAnnUnviewed + todaySfUnviewed;
       setTodayHasNew(todayCount > 0);
+      setAnnouncementsHasNew(annTabUnviewed > 0);
+      setSpecialFeaturesHasNew(sfTabUnviewed > 0);
 
       // Check "Events" tab: upcoming_events
       const eventsCutoff = eventsTs || new Date(0).toISOString();
@@ -95,6 +177,51 @@ export function useUnreadContent(): UnreadContentResult {
       case 'specials': setSpecialsHasNew(false); break;
     }
   }, []);
+
+  // Tab tap no longer clears NEW state — it only bootstraps the cutoff timestamp
+  // on first install, so existing items at install time don't all get NEW pills.
+  // Per-item NEW state is cleared via markAnnouncementViewed / markSpecialFeatureViewed
+  // when the user actually opens an item's detail modal.
+  const markWelcomeTabViewed = useCallback(async (tab: WelcomeTab) => {
+    if (tab === 'announcements') {
+      if (!lastViewedAnnouncements) {
+        const now = new Date().toISOString();
+        await AsyncStorage.setItem(STORAGE_KEYS.announcements, now);
+        setLastViewedAnnouncements(now);
+      }
+    } else {
+      if (!lastViewedSpecialFeatures) {
+        const now = new Date().toISOString();
+        await AsyncStorage.setItem(STORAGE_KEYS.specialFeatures, now);
+        setLastViewedSpecialFeatures(now);
+      }
+    }
+  }, [lastViewedAnnouncements, lastViewedSpecialFeatures]);
+
+  const markAnnouncementViewed = useCallback(async (id: string) => {
+    if (!id) return;
+    setViewedAnnouncementIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      AsyncStorage.setItem(STORAGE_KEYS.viewedAnnouncementIds, JSON.stringify(Array.from(next))).catch(() => {});
+      return next;
+    });
+    // Refresh tab dot state so it can clear if this was the only unviewed item
+    setTimeout(() => checkUnread(), 0);
+  }, [checkUnread]);
+
+  const markSpecialFeatureViewed = useCallback(async (id: string) => {
+    if (!id) return;
+    setViewedSpecialFeatureIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      AsyncStorage.setItem(STORAGE_KEYS.viewedSpecialFeatureIds, JSON.stringify(Array.from(next))).catch(() => {});
+      return next;
+    });
+    setTimeout(() => checkUnread(), 0);
+  }, [checkUnread]);
 
   useEffect(() => {
     checkUnread();
@@ -145,9 +272,18 @@ export function useUnreadContent(): UnreadContentResult {
     todayHasNew,
     eventsHasNew,
     specialsHasNew,
+    announcementsHasNew,
+    specialFeaturesHasNew,
+    lastViewedAnnouncements,
+    lastViewedSpecialFeatures,
+    viewedAnnouncementIds,
+    viewedSpecialFeatureIds,
     hasAnyNew: todayHasNew || eventsHasNew || specialsHasNew,
     newContentCount,
     markTabViewed,
+    markWelcomeTabViewed,
+    markAnnouncementViewed,
+    markSpecialFeatureViewed,
     refresh: checkUnread,
   };
 }

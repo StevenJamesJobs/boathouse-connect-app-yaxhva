@@ -152,7 +152,22 @@ export default function ManagerPortalScreen() {
 
   // ConnectBar active tab + unread content badges
   const [activeSection, setActiveSection] = useState<ConnectBarTab>('today');
-  const { todayHasNew, eventsHasNew, specialsHasNew, newContentCount, markTabViewed } = useUnreadContent();
+  const {
+    todayHasNew,
+    eventsHasNew,
+    specialsHasNew,
+    announcementsHasNew,
+    specialFeaturesHasNew,
+    lastViewedAnnouncements,
+    lastViewedSpecialFeatures,
+    viewedAnnouncementIds,
+    viewedSpecialFeatureIds,
+    newContentCount,
+    markTabViewed,
+    markWelcomeTabViewed,
+    markAnnouncementViewed,
+    markSpecialFeatureViewed,
+  } = useUnreadContent();
   const sectionListRef = useRef<FlatList>(null);
   const isScrollingRef = useRef(false);
 
@@ -603,16 +618,19 @@ export default function ManagerPortalScreen() {
     <TouchableOpacity
       key={announcement.id}
       style={[styles.card, { backgroundColor: colors.card, borderLeftColor: getPriorityColor(announcement.priority) }]}
-      onPress={() => openDetailModal({
-        title: getLocalizedField(announcement, 'title', language),
-        content: getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message || '',
-        thumbnailUrl: announcement.thumbnail_url,
-        thumbnailShape: announcement.thumbnail_shape,
-        imageUrls: buildImageUrls(announcement.id, announcement.thumbnail_url),
-        priority: announcement.priority,
-        link: announcement.link,
-        guideFile: announcement.guide_file || null,
-      })}
+      onPress={() => {
+        markAnnouncementViewed(announcement.id);
+        openDetailModal({
+          title: getLocalizedField(announcement, 'title', language),
+          content: getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message || '',
+          thumbnailUrl: announcement.thumbnail_url,
+          thumbnailShape: announcement.thumbnail_shape,
+          imageUrls: buildImageUrls(announcement.id, announcement.thumbnail_url),
+          priority: announcement.priority,
+          link: announcement.link,
+          guideFile: announcement.guide_file || null,
+        });
+      }}
       activeOpacity={0.7}
     >
       <View style={styles.cardRow}>
@@ -627,6 +645,12 @@ export default function ManagerPortalScreen() {
             <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
               {getLocalizedField(announcement, 'title', language)}
             </Text>
+            {!viewedAnnouncementIds.has(announcement.id) &&
+              (!lastViewedAnnouncements || new Date(announcement.created_at) > new Date(lastViewedAnnouncements)) && (
+                <View style={styles.newPill}>
+                  <Text style={styles.newPillText}>NEW</Text>
+                </View>
+              )}
             {announcement.priority && announcement.priority !== 'none' && (
               <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(announcement.priority) }]}>
                 <Text style={styles.priorityText}>{getPriorityLabel(announcement.priority).toUpperCase()}</Text>
@@ -645,17 +669,20 @@ export default function ManagerPortalScreen() {
     <TouchableOpacity
       key={feature.id}
       style={[styles.card, { backgroundColor: colors.card, borderLeftColor: '#FF9800' }]}
-      onPress={() => openDetailModal({
-        title: getLocalizedField(feature, 'title', language),
-        content: getLocalizedField(feature, 'content', language) || feature.content || feature.message || '',
-        thumbnailUrl: feature.thumbnail_url,
-        thumbnailShape: feature.thumbnail_shape,
-        imageUrls: buildImageUrls(feature.id, feature.thumbnail_url),
-        startDateTime: feature.start_date_time,
-        endDateTime: feature.end_date_time,
-        link: feature.link,
-        guideFile: feature.guide_file || null,
-      })}
+      onPress={() => {
+        markSpecialFeatureViewed(feature.id);
+        openDetailModal({
+          title: getLocalizedField(feature, 'title', language),
+          content: getLocalizedField(feature, 'content', language) || feature.content || feature.message || '',
+          thumbnailUrl: feature.thumbnail_url,
+          thumbnailShape: feature.thumbnail_shape,
+          imageUrls: buildImageUrls(feature.id, feature.thumbnail_url),
+          startDateTime: feature.start_date_time,
+          endDateTime: feature.end_date_time,
+          link: feature.link,
+          guideFile: feature.guide_file || null,
+        });
+      }}
       activeOpacity={0.7}
     >
       <View style={styles.cardRow}>
@@ -666,9 +693,17 @@ export default function ManagerPortalScreen() {
           />
         )}
         <View style={styles.cardContent}>
-          <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
-            {getLocalizedField(feature, 'title', language)}
-          </Text>
+          <View style={styles.cardTitleRow}>
+            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+              {getLocalizedField(feature, 'title', language)}
+            </Text>
+            {!viewedSpecialFeatureIds.has(feature.id) &&
+              (!lastViewedSpecialFeatures || new Date(feature.created_at) > new Date(lastViewedSpecialFeatures)) && (
+                <View style={styles.newPill}>
+                  <Text style={styles.newPillText}>NEW</Text>
+                </View>
+              )}
+          </View>
           <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
             {truncateText(getLocalizedField(feature, 'content', language) || feature.content || feature.message)}
           </Text>
@@ -779,21 +814,37 @@ export default function ManagerPortalScreen() {
           <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginBottom: 0 }]}>
             <TouchableOpacity
               style={[styles.subTab, whatsHappeningTab === 'Announcements' && { backgroundColor: colors.primary }]}
-              onPress={() => setWhatsHappeningTab('Announcements')}
+              onPress={() => {
+                setWhatsHappeningTab('Announcements');
+                markWelcomeTabViewed('announcements');
+              }}
               activeOpacity={0.7}
             >
-              <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Announcements' && { color: '#FFFFFF' }]}>
-                {t('manager_home.announcements')}
-              </Text>
+              <View style={styles.subTabLabelRow}>
+                <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Announcements' && { color: '#FFFFFF' }]}>
+                  {t('manager_home.announcements')}
+                </Text>
+                {announcementsHasNew && whatsHappeningTab !== 'Announcements' && (
+                  <View style={styles.subTabBadgeDot} />
+                )}
+              </View>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.subTab, whatsHappeningTab === 'Special Features' && { backgroundColor: colors.primary }]}
-              onPress={() => setWhatsHappeningTab('Special Features')}
+              onPress={() => {
+                setWhatsHappeningTab('Special Features');
+                markWelcomeTabViewed('specialFeatures');
+              }}
               activeOpacity={0.7}
             >
-              <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Special Features' && { color: '#FFFFFF' }]}>
-                {t('manager_home.special_features')}
-              </Text>
+              <View style={styles.subTabLabelRow}>
+                <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Special Features' && { color: '#FFFFFF' }]}>
+                  {t('manager_home.special_features')}
+                </Text>
+                {specialFeaturesHasNew && whatsHappeningTab !== 'Special Features' && (
+                  <View style={styles.subTabBadgeDot} />
+                )}
+              </View>
             </TouchableOpacity>
           </View>
         </View>
@@ -1083,6 +1134,29 @@ const styles = StyleSheet.create({
   subTabText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  subTabLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  subTabBadgeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+  },
+  newPill: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  newPillText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   card: {
     borderRadius: 12,

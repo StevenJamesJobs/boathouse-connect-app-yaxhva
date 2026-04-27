@@ -396,7 +396,23 @@ export default function SpecialFeaturesEditorScreen() {
         }
         console.log('Special feature created successfully');
         
-        // Send push notification for new special features only (if toggle is enabled)
+        // Always log to Sent History (single source of truth — edge function no longer logs)
+        try {
+          await (supabase.from('custom_notifications') as any).insert({
+            title: '⭐ New Special Feature',
+            body: formData.title,
+            sent_by: user?.id,
+            data: {
+              notificationType: 'special_feature',
+              notificationSkipped: !shouldSendNotification,
+              startDateTime: startDateTime?.toISOString() || null,
+            },
+          });
+        } catch (err) {
+          console.error('Failed to log notification:', err);
+        }
+
+        // Send the actual push only when toggle is on
         if (shouldSendNotification) {
           try {
             await sendNotification({
@@ -404,25 +420,12 @@ export default function SpecialFeaturesEditorScreen() {
               title: '⭐ New Special Feature',
               body: formData.title,
               data: {
-                featureId: null, // Will be set by the database
+                featureId: null,
                 startDateTime: startDateTime?.toISOString() || null,
               },
             });
           } catch (notificationError) {
-            // Silent fail - don't block feature creation
             console.error('Failed to send push notification:', notificationError);
-          }
-        } else {
-          // Log to sent history even when notification is skipped
-          try {
-            await (supabase.from('custom_notifications') as any).insert({
-              title: '⭐ New Special Feature',
-              body: formData.title,
-              sent_by: user?.id,
-              data: { notificationType: 'special_feature', notificationSkipped: true },
-            });
-          } catch (err) {
-            console.error('Failed to log skipped notification:', err);
           }
         }
         

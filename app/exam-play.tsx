@@ -54,6 +54,7 @@ export default function ExamPlayScreen() {
   const [timeLimitSeconds, setTimeLimitSeconds] = useState(300);
   const [examType, setExamType] = useState('');
   const [closeAt, setCloseAt] = useState<Date | null>(null);
+  const [rewardsEnabled, setRewardsEnabled] = useState(true);
   const [, setCountdownTick] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [feedbackCorrect, setFeedbackCorrect] = useState(false);
@@ -154,6 +155,8 @@ export default function ExamPlayScreen() {
       if (examData.close_at) {
         setCloseAt(new Date(examData.close_at));
       }
+      // rewards_enabled defaults to true if column missing (older quizzes)
+      setRewardsEnabled(examData.rewards_enabled !== false);
 
       // Check for existing attempt (anti-cheat: detect already completed or already started)
       if (!isPreview && user?.id) {
@@ -347,7 +350,7 @@ export default function ExamPlayScreen() {
     setSubmitting(true);
 
     try {
-      const results = calculateResults(state, rewardPerCorrect);
+      const results = calculateResults(state, rewardPerCorrect, rewardsEnabled);
 
       await (supabase.rpc as any)('submit_exam_and_award_bucks', {
         p_exam_id: examId,
@@ -371,7 +374,7 @@ export default function ExamPlayScreen() {
   // Navigate to results
   const handleViewResults = () => {
     if (!examState) return;
-    const results = calculateResults(examState, rewardPerCorrect);
+    const results = calculateResults(examState, rewardPerCorrect, rewardsEnabled);
     // In preview mode there is no exam_results row to read, so we pass the
     // in-memory answers through the URL so exam-results can render the
     // per-question correct/wrong badges accurately.
@@ -501,7 +504,7 @@ export default function ExamPlayScreen() {
 
   // COMPLETED SCREEN (brief before navigating to results)
   if (phase === 'completed') {
-    const results = calculateResults(examState, rewardPerCorrect);
+    const results = calculateResults(examState, rewardPerCorrect, rewardsEnabled);
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.completedContent}>

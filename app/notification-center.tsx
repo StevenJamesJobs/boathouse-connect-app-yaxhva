@@ -19,6 +19,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const JOB_TITLE_OPTIONS = [
   'Banquet Captain',
@@ -46,6 +47,7 @@ export default function NotificationCenter() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { user } = useAuth();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const DESTINATION_OPTIONS = [
@@ -209,6 +211,18 @@ export default function NotificationCenter() {
       if (destination) extraData.destination = destination;
       if (audienceMode === 'job_titles' && selectedJobTitles.length > 0) {
         extraData.job_titles = selectedJobTitles;
+      }
+
+      // Always log to Sent History (single source of truth — edge function no longer logs)
+      try {
+        await (supabase.from('custom_notifications') as any).insert({
+          title,
+          body,
+          sent_by: user?.id,
+          data: { ...extraData, notificationType: 'custom' },
+        });
+      } catch (err) {
+        console.error('Failed to log notification:', err);
       }
 
       await sendCustomNotification(title, body, Object.keys(extraData).length > 0 ? extraData : undefined);

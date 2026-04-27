@@ -10,11 +10,13 @@ import {
   Alert,
   StyleProp,
   ViewStyle,
+  useColorScheme,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { JOB_TITLES } from '@/constants/jobTitles';
+import EmployeePickerModal from '@/components/EmployeePickerModal';
 
 export interface ShiftLike {
   id: string;
@@ -155,6 +157,8 @@ export default function ShiftEditForm({
   onClose,
   onSaved,
 }: ShiftEditFormProps) {
+  const colorScheme = useColorScheme();
+  const pickerTheme: 'light' | 'dark' = colorScheme === 'dark' ? 'dark' : 'light';
   const [saving, setSaving] = useState(false);
 
   const [shiftDate, setShiftDate] = useState<Date>(new Date());
@@ -170,6 +174,12 @@ export default function ShiftEditForm({
   const [showStartTimePicker, setShowStartTimePicker] = useState(false);
   const [showEndTimePicker, setShowEndTimePicker] = useState(false);
   const [showRolePicker, setShowRolePicker] = useState(false);
+  const [showEmployeePicker, setShowEmployeePicker] = useState(false);
+
+  const [selectedEmployee, setSelectedEmployee] = useState<{ id: string | null; name: string }>({
+    id: null,
+    name: '',
+  });
 
   // Re-initialize form state each time the modal opens
   useEffect(() => {
@@ -184,6 +194,7 @@ export default function ShiftEditForm({
       setIsCloser(shift.is_closer);
       setIsTraining(shift.is_training);
       setRoomAssignment(shift.room_assignment);
+      setSelectedEmployee({ id: shift.user_id, name: shift.employee_name });
     } else {
       setShiftDate(defaultDate ? new Date(defaultDate) : new Date());
       const startDefault = new Date();
@@ -197,17 +208,24 @@ export default function ShiftEditForm({
       setIsCloser(false);
       setIsTraining(false);
       setRoomAssignment(null);
+      setSelectedEmployee({
+        id: userId ?? null,
+        name: employeeName ?? '',
+      });
     }
 
     setShowDatePicker(false);
     setShowStartTimePicker(false);
     setShowEndTimePicker(false);
     setShowRolePicker(false);
-  }, [visible, mode, shift, defaultDate]);
-
-  const displayEmployeeName = mode === 'edit' ? shift?.employee_name : employeeName;
+    setShowEmployeePicker(false);
+  }, [visible, mode, shift, defaultDate, employeeName, userId]);
 
   const handleSave = async () => {
+    if (!selectedEmployee.name.trim()) {
+      Alert.alert('Select Employee', 'Please choose an employee for this shift.');
+      return;
+    }
     try {
       setSaving(true);
 
@@ -232,7 +250,11 @@ export default function ShiftEditForm({
       if (mode === 'edit' && shift) {
         const { error } = await supabase
           .from('staff_schedules')
-          .update(shiftData)
+          .update({
+            ...shiftData,
+            employee_name: selectedEmployee.name,
+            user_id: selectedEmployee.id,
+          })
           .eq('id', shift.id);
         if (error) throw error;
 
@@ -249,8 +271,8 @@ export default function ShiftEditForm({
 
       const { error: insertErr } = await supabase.from('staff_schedules').insert({
         upload_id: targetUploadId,
-        user_id: userId ?? null,
-        employee_name: displayEmployeeName || '',
+        user_id: selectedEmployee.id,
+        employee_name: selectedEmployee.name,
         ...shiftData,
         room_assignment: roomAssignment,
       });
@@ -349,122 +371,6 @@ export default function ShiftEditForm({
         </View>
 
         <ScrollView style={styles.form} contentContainerStyle={styles.formContent}>
-          {/* Employee name */}
-          <View style={styles.formSection}>
-            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Employee</Text>
-            <Text style={[styles.formValue, { color: colors.text }]}>{displayEmployeeName}</Text>
-          </View>
-
-          {/* Date */}
-          <View style={styles.formSection}>
-            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Date</Text>
-            <TouchableOpacity
-              style={[styles.pickerButton, { backgroundColor: colors.card }]}
-              onPress={() => setShowDatePicker(!showDatePicker)}
-            >
-              <IconSymbol
-                ios_icon_name="calendar"
-                android_material_icon_name="event"
-                size={18}
-                color={colors.primary}
-              />
-              <Text style={[styles.pickerText, { color: colors.text }]}>{formatDateDisplay(shiftDate)}</Text>
-              <IconSymbol
-                ios_icon_name="chevron.down"
-                android_material_icon_name="expand-more"
-                size={16}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-            {showDatePicker && (
-              <DateTimePicker
-                value={shiftDate}
-                mode="date"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                themeVariant="light"
-                onChange={(_event, date) => {
-                  if (Platform.OS === 'android') setShowDatePicker(false);
-                  if (date) setShiftDate(date);
-                }}
-                style={styles.datePicker}
-              />
-            )}
-          </View>
-
-          {/* Start Time */}
-          <View style={styles.formSection}>
-            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Start Time</Text>
-            <TouchableOpacity
-              style={[styles.pickerButton, { backgroundColor: colors.card }]}
-              onPress={() => setShowStartTimePicker(!showStartTimePicker)}
-            >
-              <IconSymbol
-                ios_icon_name="clock"
-                android_material_icon_name="schedule"
-                size={18}
-                color={colors.primary}
-              />
-              <Text style={[styles.pickerText, { color: colors.text }]}>{formatTimeDisplay(startTime)}</Text>
-              <IconSymbol
-                ios_icon_name="chevron.down"
-                android_material_icon_name="expand-more"
-                size={16}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-            {showStartTimePicker && (
-              <DateTimePicker
-                value={startTime}
-                mode="time"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                themeVariant="light"
-                minuteInterval={5}
-                onChange={(_event, date) => {
-                  if (Platform.OS === 'android') setShowStartTimePicker(false);
-                  if (date) setStartTime(date);
-                }}
-                style={styles.datePicker}
-              />
-            )}
-          </View>
-
-          {/* End Time */}
-          <View style={styles.formSection}>
-            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>End Time</Text>
-            <TouchableOpacity
-              style={[styles.pickerButton, { backgroundColor: colors.card }]}
-              onPress={() => setShowEndTimePicker(!showEndTimePicker)}
-            >
-              <IconSymbol
-                ios_icon_name="clock.fill"
-                android_material_icon_name="schedule"
-                size={18}
-                color={colors.primary}
-              />
-              <Text style={[styles.pickerText, { color: colors.text }]}>{formatTimeDisplay(endTime)}</Text>
-              <IconSymbol
-                ios_icon_name="chevron.down"
-                android_material_icon_name="expand-more"
-                size={16}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-            {showEndTimePicker && (
-              <DateTimePicker
-                value={endTime}
-                mode="time"
-                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                themeVariant="light"
-                minuteInterval={5}
-                onChange={(_event, date) => {
-                  if (Platform.OS === 'android') setShowEndTimePicker(false);
-                  if (date) setEndTime(date);
-                }}
-                style={styles.datePicker}
-              />
-            )}
-          </View>
-
           {/* Role picker */}
           <View style={styles.formSection}>
             <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Job Title / Role</Text>
@@ -517,6 +423,146 @@ export default function ShiftEditForm({
             )}
           </View>
 
+          {/* Employee picker */}
+          <View style={styles.formSection}>
+            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Employee</Text>
+            <TouchableOpacity
+              style={[styles.pickerButton, { backgroundColor: colors.card }]}
+              onPress={() => setShowEmployeePicker(true)}
+            >
+              <IconSymbol
+                ios_icon_name="person.fill"
+                android_material_icon_name="person"
+                size={18}
+                color={colors.primary}
+              />
+              <Text
+                style={[
+                  styles.pickerText,
+                  { color: selectedEmployee.name ? colors.text : colors.textSecondary },
+                ]}
+              >
+                {selectedEmployee.name || 'Select employee'}
+              </Text>
+              <IconSymbol
+                ios_icon_name="chevron.right"
+                android_material_icon_name="chevron-right"
+                size={16}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Date */}
+          <View style={styles.formSection}>
+            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Date</Text>
+            <TouchableOpacity
+              style={[styles.pickerButton, { backgroundColor: colors.card }]}
+              onPress={() => setShowDatePicker(!showDatePicker)}
+            >
+              <IconSymbol
+                ios_icon_name="calendar"
+                android_material_icon_name="event"
+                size={18}
+                color={colors.primary}
+              />
+              <Text style={[styles.pickerText, { color: colors.text }]}>{formatDateDisplay(shiftDate)}</Text>
+              <IconSymbol
+                ios_icon_name="chevron.down"
+                android_material_icon_name="expand-more"
+                size={16}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={shiftDate}
+                mode="date"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                themeVariant={pickerTheme}
+                onChange={(_event, date) => {
+                  if (Platform.OS === 'android') setShowDatePicker(false);
+                  if (date) setShiftDate(date);
+                }}
+                style={styles.datePicker}
+              />
+            )}
+          </View>
+
+          {/* Start Time */}
+          <View style={styles.formSection}>
+            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Start Time</Text>
+            <TouchableOpacity
+              style={[styles.pickerButton, { backgroundColor: colors.card }]}
+              onPress={() => setShowStartTimePicker(!showStartTimePicker)}
+            >
+              <IconSymbol
+                ios_icon_name="clock"
+                android_material_icon_name="schedule"
+                size={18}
+                color={colors.primary}
+              />
+              <Text style={[styles.pickerText, { color: colors.text }]}>{formatTimeDisplay(startTime)}</Text>
+              <IconSymbol
+                ios_icon_name="chevron.down"
+                android_material_icon_name="expand-more"
+                size={16}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+            {showStartTimePicker && (
+              <DateTimePicker
+                value={startTime}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                themeVariant={pickerTheme}
+                minuteInterval={5}
+                onChange={(_event, date) => {
+                  if (Platform.OS === 'android') setShowStartTimePicker(false);
+                  if (date) setStartTime(date);
+                }}
+                style={styles.datePicker}
+              />
+            )}
+          </View>
+
+          {/* End Time */}
+          <View style={styles.formSection}>
+            <Text style={[styles.formLabel, { color: colors.textSecondary }]}>End Time</Text>
+            <TouchableOpacity
+              style={[styles.pickerButton, { backgroundColor: colors.card }]}
+              onPress={() => setShowEndTimePicker(!showEndTimePicker)}
+            >
+              <IconSymbol
+                ios_icon_name="clock.fill"
+                android_material_icon_name="schedule"
+                size={18}
+                color={colors.primary}
+              />
+              <Text style={[styles.pickerText, { color: colors.text }]}>{formatTimeDisplay(endTime)}</Text>
+              <IconSymbol
+                ios_icon_name="chevron.down"
+                android_material_icon_name="expand-more"
+                size={16}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+            {showEndTimePicker && (
+              <DateTimePicker
+                value={endTime}
+                mode="time"
+                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                themeVariant={pickerTheme}
+                minuteInterval={5}
+                onChange={(_event, date) => {
+                  if (Platform.OS === 'android') setShowEndTimePicker(false);
+                  if (date) setEndTime(date);
+                }}
+                style={styles.datePicker}
+              />
+            )}
+          </View>
+
           {/* Shift Tags: Opener / Closer / Training */}
           <View style={styles.formSection}>
             <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Shift Tags</Text>
@@ -556,6 +602,16 @@ export default function ShiftEditForm({
               />
             </View>
           </View>
+
+          {/* Employee picker modal */}
+          <EmployeePickerModal
+            visible={showEmployeePicker}
+            filterRole={role}
+            selectedId={selectedEmployee.id}
+            colors={colors}
+            onSelect={(emp) => setSelectedEmployee({ id: emp.id, name: emp.name })}
+            onClose={() => setShowEmployeePicker(false)}
+          />
 
           {/* Delete button (edit mode only) */}
           {mode === 'edit' && (

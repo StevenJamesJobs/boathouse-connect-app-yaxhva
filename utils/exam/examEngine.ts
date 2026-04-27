@@ -11,6 +11,8 @@ export interface ExamQuestion {
   correct_option: 'A' | 'B' | 'C' | 'D';
   is_bonus: boolean;
   bonus_bucks_value: number | null;
+  bucks_value: number | null;
+  category_label: string | null;
   source_type: 'auto' | 'custom' | 'bonus';
   // Spanish translations
   question_text_es?: string | null;
@@ -116,13 +118,19 @@ export function handleTimeout(state: ExamState): ExamState {
 
 // Calculate scoring results.
 //
-// rewardPerCorrect defaults to $1 per correct standard question. When a user
-// is eligible for multiple weekly quizzes we pass $1/N here so the weekly
-// maximum earnings from standard questions stays constant regardless of how
-// many quizzes a user takes (bonus questions always pay their full value).
+// rewardPerCorrect is the fallback used for any standard question whose
+// per-question bucks_value is NULL. When a user is eligible for multiple
+// weekly quizzes we pass $1/N here so the weekly maximum earnings from
+// fallback questions stays constant regardless of how many quizzes a user
+// takes. Per-question bucks_value (when set) is paid in full and is NOT
+// scaled by N — managers explicitly chose those values.
+//
+// rewardsEnabled gates the entire quiz: when false (the manager flipped the
+// "No Rewards" toggle on the exam), totalBucksAwarded is forced to 0.
 export function calculateResults(
   state: ExamState,
-  rewardPerCorrect: number = 1
+  rewardPerCorrect: number = 1,
+  rewardsEnabled: boolean = true
 ): {
   correctCount: number;
   totalQuestions: number;
@@ -135,6 +143,7 @@ export function calculateResults(
   let standardCorrect = 0;
   let bonusCorrect = false;
   let bonusBucksValue = 0;
+  let standardBucks = 0;
 
   state.answers.forEach((answer, index) => {
     const question = state.questions[index];
@@ -148,16 +157,24 @@ export function calculateResults(
     } else {
       if (answer.is_correct) {
         standardCorrect++;
+        // Per-question bucks_value (full value) when set; otherwise the
+        // shared rewardPerCorrect fallback (already $1/N when relevant).
+        const perQ = question.bucks_value;
+        standardBucks += typeof perQ === 'number' ? perQ : rewardPerCorrect;
       }
     }
   });
 
+  // Round to cents only after summing
+  standardBucks = Math.round(standardBucks * 100) / 100;
+
   const correctCount = standardCorrect + (bonusCorrect ? 1 : 0);
   const totalQuestions = state.questions.length;
 
-  // Standard reward × rewardPerCorrect (rounded to cents) + full bonus value
-  const standardBucks = Math.round(standardCorrect * rewardPerCorrect * 100) / 100;
-  const totalBucksAwarded = standardBucks + (bonusCorrect ? bonusBucksValue : 0);
+  let totalBucksAwarded = standardBucks + (bonusCorrect ? bonusBucksValue : 0);
+  if (!rewardsEnabled) {
+    totalBucksAwarded = 0;
+  }
 
   const timeSeconds = state.startTime
     ? Math.floor((Date.now() - state.startTime) / 1000)

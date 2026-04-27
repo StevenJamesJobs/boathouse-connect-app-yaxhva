@@ -42,6 +42,7 @@ interface Exam {
   created_at: string;
   close_at: string | null;
   notify_on_activate: boolean | null;
+  rewards_enabled: boolean | null;
 }
 
 interface ExamQuestion {
@@ -56,10 +57,20 @@ interface ExamQuestion {
   correct_option: 'A' | 'B' | 'C' | 'D';
   is_bonus: boolean;
   bonus_bucks_value: number | null;
+  bucks_value: number | null;
+  category_label: string | null;
   source_type: 'auto' | 'custom' | 'bonus';
   source_table: string | null;
   question_image_url?: string | null;
 }
+
+const CATEGORY_OPTIONS: { label: string; sourceTable: string | null }[] = [
+  { label: 'Menu Items', sourceTable: 'menu_items' },
+  { label: 'Wine Pairings', sourceTable: 'wine_pairings' },
+  { label: 'Libation Recipes', sourceTable: 'recipes' },
+  { label: 'Check List Items', sourceTable: 'checklist_items' },
+  { label: 'Menu Category', sourceTable: 'menu_category' },
+];
 
 interface CompletionEntry {
   user_id: string;
@@ -106,9 +117,16 @@ export default function ExamEditorScreen() {
   const [customImageUrl, setCustomImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
 
-  // Close-at scheduling + Notify Staff toggle
+  // Close-at scheduling + Notify Staff toggle + No Rewards toggle
   const [closeAt, setCloseAt] = useState<Date | null>(null);
   const [notifyOnActivate, setNotifyOnActivate] = useState(false);
+  const [rewardsEnabled, setRewardsEnabled] = useState(true);
+  const [customBucksValue, setCustomBucksValue] = useState('');
+
+  // Category-tag picker state for editing a question's category_label
+  const [categoryPickerForQuestion, setCategoryPickerForQuestion] = useState<ExamQuestion | null>(null);
+  const [showCustomCategoryInput, setShowCustomCategoryInput] = useState(false);
+  const [customCategoryText, setCustomCategoryText] = useState('');
   const [showCloseDatePicker, setShowCloseDatePicker] = useState(false);
   const [showCloseTimePicker, setShowCloseTimePicker] = useState(false);
   // Countdown tick state — forces re-render every second while a close_at is set
@@ -141,6 +159,7 @@ export default function ExamEditorScreen() {
         setTimeLimit(exam.time_limit_seconds);
         setCloseAt(exam.close_at ? new Date(exam.close_at) : null);
         setNotifyOnActivate(Boolean(exam.notify_on_activate));
+        setRewardsEnabled(exam.rewards_enabled !== false);
         await fetchQuestions(exam.id);
         if (exam.status === 'active') {
           await fetchCompletionData(exam.id);
@@ -150,6 +169,7 @@ export default function ExamEditorScreen() {
         setQuestions([]);
         setCloseAt(null);
         setNotifyOnActivate(false);
+        setRewardsEnabled(true);
       }
     } catch (err) {
       console.error('Error fetching exam:', err);
@@ -401,6 +421,41 @@ export default function ExamEditorScreen() {
     }
   };
 
+  // Persist the No Rewards toggle (draft only). When false, no Bucks awarded
+  // for this quiz regardless of per-question values.
+  const handleToggleRewardsEnabled = async (next: boolean) => {
+    if (!currentExam || currentExam.status !== 'draft') return;
+    setRewardsEnabled(next);
+    setCurrentExam({ ...currentExam, rewards_enabled: next });
+    try {
+      await (supabase
+        .from('exams' as any) as any)
+        .update({ rewards_enabled: next })
+        .eq('id', currentExam.id);
+    } catch (err) {
+      console.error('Toggle rewards_enabled error:', err);
+    }
+  };
+
+  // Persist a question's category_label override
+  const handleUpdateCategoryLabel = async (q: ExamQuestion, newLabel: string | null) => {
+    setCategoryPickerForQuestion(null);
+    setShowCustomCategoryInput(false);
+    setCustomCategoryText('');
+    try {
+      await (supabase
+        .from('exam_questions' as any) as any)
+        .update({ category_label: newLabel })
+        .eq('id', q.id);
+      setQuestions(prev =>
+        prev.map(qq => (qq.id === q.id ? { ...qq, category_label: newLabel } : qq))
+      );
+    } catch (err) {
+      console.error('Update category_label error:', err);
+      Alert.alert('Error', 'Failed to update category.');
+    }
+  };
+
   // Persist the Notify Staff toggle (draft only)
   const handleToggleNotifyOnActivate = async (next: boolean) => {
     if (!currentExam || currentExam.status !== 'draft') return;
@@ -478,6 +533,10 @@ export default function ExamEditorScreen() {
 
     const nextOrder = questions.length > 0 ? Math.max(...questions.map(q => q.question_order)) + 1 : 1;
     const bonusValue = isBonus ? parseInt(bonusBucksValue) || 5 : null;
+    const trimmedCustomBucks = customBucksValue.trim();
+    const customBucks = !isBonus && trimmedCustomBucks !== ''
+      ? (Number.isNaN(parseInt(trimmedCustomBucks)) ? null : parseInt(trimmedCustomBucks))
+      : null;
 
     const { error } = await (supabase.from('exam_questions' as any) as any).insert({
       exam_id: currentExam.id,
@@ -490,6 +549,7 @@ export default function ExamEditorScreen() {
       correct_option: customCorrect,
       is_bonus: isBonus,
       bonus_bucks_value: bonusValue,
+      bucks_value: customBucks,
       source_type: isBonus ? 'bonus' : 'custom',
       source_table: null,
       question_image_url: customImageUrl,
@@ -603,6 +663,7 @@ export default function ExamEditorScreen() {
         option_d: editingQuestion.option_d,
         correct_option: editingQuestion.correct_option,
         bonus_bucks_value: editingQuestion.bonus_bucks_value,
+        bucks_value: editingQuestion.bucks_value,
         question_image_url: editingQuestion.question_image_url ?? null,
       })
       .eq('id', editingQuestion.id);
@@ -629,6 +690,7 @@ export default function ExamEditorScreen() {
     setCustomD('');
     setCustomCorrect('A');
     setBonusBucksValue('5');
+    setCustomBucksValue('');
     setCustomImageUrl(null);
   };
 
@@ -709,6 +771,7 @@ export default function ExamEditorScreen() {
   };
 
   const getSourceLabel = (q: ExamQuestion) => {
+    if (q.category_label) return q.category_label.toUpperCase();
     if (q.source_type === 'bonus') return 'BONUS';
     if (q.source_type === 'custom') return 'CUSTOM';
     return (q.source_table || 'auto').replace(/_/g, ' ').toUpperCase();
@@ -743,6 +806,38 @@ export default function ExamEditorScreen() {
 
               // Refresh tracker data
               await fetchCompletionData(currentExam.id);
+
+              // Push the user a "you've been cleared" notification — uses the
+              // existing send-push-notification edge function with userIds filter.
+              try {
+                await supabase.functions.invoke('send-push-notification', {
+                  body: {
+                    userIds: [entry.user_id],
+                    notificationType: 'custom',
+                    title: 'Take 2! 🎯',
+                    body: 'You have been cleared to retake your quiz.',
+                    data: {
+                      destination: 'weekly-quizzes',
+                      exam_id: currentExam.id,
+                    },
+                  },
+                });
+                // Log to Sent History so the manager has a record (single-user push)
+                await (supabase.from('custom_notifications') as any).insert({
+                  title: 'Take 2! 🎯',
+                  body: `Cleared ${entry.name} to retake the quiz.`,
+                  sent_by: user?.id,
+                  data: {
+                    notificationType: 'custom',
+                    destination: 'weekly-quizzes',
+                    exam_id: currentExam.id,
+                    target_user_id: entry.user_id,
+                  },
+                });
+              } catch (pushErr) {
+                console.error('Retake push failed:', pushErr);
+              }
+
               Alert.alert('Success', `${entry.name} can now retake the quiz.`);
             } catch (err) {
               console.error('Reset user quiz error:', err);
@@ -971,6 +1066,24 @@ export default function ExamEditorScreen() {
                   />
                 </View>
               )}
+
+              {/* No Rewards toggle — draft only. Off = no McLoone's Bucks awarded for this quiz. */}
+              {currentExam.status === 'draft' && (
+                <View style={styles.statusRow}>
+                  <View style={styles.notifyLabelCol}>
+                    <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Award McLoone's Bucks</Text>
+                    <Text style={[styles.notifyDesc, { color: colors.textSecondary }]}>
+                      Off for training-only quizzes (e.g. New Menu)
+                    </Text>
+                  </View>
+                  <Switch
+                    value={rewardsEnabled}
+                    onValueChange={handleToggleRewardsEnabled}
+                    trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                    thumbColor={rewardsEnabled ? colors.primary : '#F4F3F4'}
+                  />
+                </View>
+              )}
             </View>
 
             {/* Time Limit */}
@@ -1018,15 +1131,38 @@ export default function ExamEditorScreen() {
                 <View style={styles.questionHeader}>
                   <View style={styles.questionNumberContainer}>
                     <Text style={[styles.questionNumber, { color: colors.primary }]}>Q{q.question_order}</Text>
-                    <View style={[styles.sourceChip, { backgroundColor: q.is_bonus ? '#F59E0B20' : colors.primary + '15' }]}>
+                    <TouchableOpacity
+                      style={[styles.sourceChip, { backgroundColor: q.is_bonus ? '#F59E0B20' : colors.primary + '15' }]}
+                      onPress={() => {
+                        if (currentExam.status === 'draft' && !q.is_bonus) {
+                          setCategoryPickerForQuestion(q);
+                        }
+                      }}
+                      disabled={currentExam.status !== 'draft' || q.is_bonus}
+                    >
                       <Text style={[styles.sourceChipText, { color: q.is_bonus ? '#F59E0B' : colors.primary }]}>
                         {getSourceLabel(q)}
                       </Text>
-                    </View>
+                      {currentExam.status === 'draft' && !q.is_bonus && (
+                        <IconSymbol
+                          ios_icon_name="chevron.down"
+                          android_material_icon_name="expand-more"
+                          size={10}
+                          color={colors.primary}
+                        />
+                      )}
+                    </TouchableOpacity>
                     {q.is_bonus && (
                       <View style={[styles.sourceChip, { backgroundColor: '#F59E0B20' }]}>
                         <Text style={[styles.sourceChipText, { color: '#F59E0B' }]}>
                           ${q.bonus_bucks_value}
+                        </Text>
+                      </View>
+                    )}
+                    {!q.is_bonus && typeof q.bucks_value === 'number' && (
+                      <View style={[styles.sourceChip, { backgroundColor: colors.primary + '15' }]}>
+                        <Text style={[styles.sourceChipText, { color: colors.primary }]}>
+                          ${q.bucks_value}
                         </Text>
                       </View>
                     )}
@@ -1250,7 +1386,7 @@ export default function ExamEditorScreen() {
       {/* Add Custom Question Modal */}
       <Modal visible={showAddCustom || showAddBonus} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalContainer}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0} style={styles.modalContainer}>
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>
@@ -1261,8 +1397,8 @@ export default function ExamEditorScreen() {
                 </TouchableOpacity>
               </View>
 
-              <ScrollView style={styles.modalScroll}>
-                {showAddBonus && (
+              <ScrollView style={styles.modalScroll} contentContainerStyle={{ paddingBottom: 320 }} keyboardShouldPersistTaps="handled">
+                {showAddBonus ? (
                   <View style={styles.bonusValueRow}>
                     <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Bonus Bucks Value</Text>
                     <TextInput
@@ -1271,6 +1407,23 @@ export default function ExamEditorScreen() {
                       onChangeText={setBonusBucksValue}
                       keyboardType="numeric"
                       placeholder="5"
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                  </View>
+                ) : (
+                  <View style={styles.bonusValueRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Mcloone's Bucks Value</Text>
+                      <Text style={[styles.notifyDesc, { color: colors.textSecondary, marginTop: 2 }]}>
+                        Leave blank for the default per-quiz amount
+                      </Text>
+                    </View>
+                    <TextInput
+                      style={[styles.bonusInput, { backgroundColor: colors.background, color: colors.primary, borderColor: colors.primary }]}
+                      value={customBucksValue}
+                      onChangeText={setCustomBucksValue}
+                      keyboardType="numeric"
+                      placeholder="Default"
                       placeholderTextColor={colors.textSecondary}
                     />
                   </View>
@@ -1370,7 +1523,7 @@ export default function ExamEditorScreen() {
       {/* Edit Question Modal */}
       <Modal visible={!!editingQuestion} transparent animationType="slide">
         <View style={styles.modalOverlay}>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.modalContainer}>
+          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0} style={styles.modalContainer}>
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Question</Text>
@@ -1380,8 +1533,8 @@ export default function ExamEditorScreen() {
               </View>
 
               {editingQuestion && (
-                <ScrollView style={styles.modalScroll}>
-                  {editingQuestion.is_bonus && (
+                <ScrollView style={styles.modalScroll} contentContainerStyle={{ paddingBottom: 320 }} keyboardShouldPersistTaps="handled">
+                  {editingQuestion.is_bonus ? (
                     <View style={styles.bonusValueRow}>
                       <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Bonus Bucks Value</Text>
                       <TextInput
@@ -1389,6 +1542,35 @@ export default function ExamEditorScreen() {
                         value={String(editingQuestion.bonus_bucks_value || 5)}
                         onChangeText={(v) => setEditingQuestion({ ...editingQuestion, bonus_bucks_value: parseInt(v) || 0 })}
                         keyboardType="numeric"
+                      />
+                    </View>
+                  ) : (
+                    <View style={styles.bonusValueRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Mcloone's Bucks Value</Text>
+                        <Text style={[styles.notifyDesc, { color: colors.textSecondary, marginTop: 2 }]}>
+                          Leave blank for the default per-quiz amount
+                        </Text>
+                      </View>
+                      <TextInput
+                        style={[styles.bonusInput, { backgroundColor: colors.background, color: colors.primary, borderColor: colors.primary }]}
+                        value={
+                          editingQuestion.bucks_value === null || editingQuestion.bucks_value === undefined
+                            ? ''
+                            : String(editingQuestion.bucks_value)
+                        }
+                        onChangeText={(v) => {
+                          const trimmed = v.trim();
+                          if (trimmed === '') {
+                            setEditingQuestion({ ...editingQuestion, bucks_value: null });
+                          } else {
+                            const n = parseInt(trimmed);
+                            setEditingQuestion({ ...editingQuestion, bucks_value: Number.isNaN(n) ? null : n });
+                          }
+                        }}
+                        keyboardType="numeric"
+                        placeholder="Default"
+                        placeholderTextColor={colors.textSecondary}
                       />
                     </View>
                   )}
@@ -1476,6 +1658,139 @@ export default function ExamEditorScreen() {
             </View>
           </KeyboardAvoidingView>
         </View>
+      </Modal>
+
+      {/* Category Picker Modal — for editing a question's category_label */}
+      <Modal
+        visible={!!categoryPickerForQuestion}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setCategoryPickerForQuestion(null);
+          setShowCustomCategoryInput(false);
+          setCustomCategoryText('');
+        }}
+      >
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+        >
+          <TouchableOpacity
+            style={styles.datePickerOverlay}
+            activeOpacity={1}
+            onPress={() => {
+              setCategoryPickerForQuestion(null);
+              setShowCustomCategoryInput(false);
+              setCustomCategoryText('');
+            }}
+          >
+          <View
+            style={[styles.datePickerContainer, { backgroundColor: colors.card, padding: 16 }]}
+            onStartShouldSetResponder={() => true}
+          >
+            <Text style={[styles.modalTitle, { color: colors.text, marginBottom: 12 }]}>
+              Question Category
+            </Text>
+            {!showCustomCategoryInput ? (
+              <>
+                {CATEGORY_OPTIONS.map((opt) => {
+                  const q = categoryPickerForQuestion;
+                  const isCurrent =
+                    q && (q.category_label
+                      ? q.category_label === opt.label
+                      : q.source_table === opt.sourceTable);
+                  return (
+                    <TouchableOpacity
+                      key={opt.label}
+                      style={[
+                        styles.categoryRow,
+                        { borderBottomColor: colors.border },
+                        isCurrent && { backgroundColor: colors.primary + '15' },
+                      ]}
+                      onPress={() => {
+                        if (!q) return;
+                        // If selection matches the derived label, clear the override.
+                        const newLabel = q.source_table === opt.sourceTable ? null : opt.label;
+                        handleUpdateCategoryLabel(q, newLabel);
+                      }}
+                    >
+                      <Text style={{ color: colors.text, fontSize: 15, fontWeight: '500' }}>
+                        {opt.label}
+                      </Text>
+                      {isCurrent && (
+                        <IconSymbol
+                          ios_icon_name="checkmark"
+                          android_material_icon_name="check"
+                          size={16}
+                          color={colors.primary}
+                        />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+                <TouchableOpacity
+                  style={[styles.categoryRow, { borderBottomColor: colors.border }]}
+                  onPress={() => {
+                    const q = categoryPickerForQuestion;
+                    setCustomCategoryText(q?.category_label || '');
+                    setShowCustomCategoryInput(true);
+                  }}
+                >
+                  <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '600' }}>
+                    Custom…
+                  </Text>
+                  <IconSymbol
+                    ios_icon_name="chevron.right"
+                    android_material_icon_name="chevron-right"
+                    size={16}
+                    color={colors.primary}
+                  />
+                </TouchableOpacity>
+              </>
+            ) : (
+              <View>
+                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>
+                  Custom category
+                </Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    { backgroundColor: colors.background, color: colors.text, borderColor: colors.border },
+                  ]}
+                  value={customCategoryText}
+                  onChangeText={setCustomCategoryText}
+                  placeholder="e.g. Cocktail Specs"
+                  placeholderTextColor={colors.textSecondary}
+                  autoFocus
+                />
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                  <TouchableOpacity
+                    style={[styles.modalSaveButton, { flex: 1, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border }]}
+                    onPress={() => {
+                      setShowCustomCategoryInput(false);
+                      setCustomCategoryText('');
+                    }}
+                  >
+                    <Text style={[styles.modalSaveText, { color: colors.text }]}>Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.modalSaveButton, { flex: 1, backgroundColor: colors.primary }]}
+                    onPress={() => {
+                      const q = categoryPickerForQuestion;
+                      if (!q) return;
+                      const trimmed = customCategoryText.trim();
+                      handleUpdateCategoryLabel(q, trimmed || null);
+                    }}
+                  >
+                    <Text style={styles.modalSaveText}>Save</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </View>
+          </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* iOS Close-At Date Picker */}
@@ -1724,7 +2039,15 @@ const styles = StyleSheet.create({
   questionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   questionNumberContainer: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   questionNumber: { fontSize: 16, fontWeight: 'bold' },
-  sourceChip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
+  sourceChip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2, flexDirection: 'row', alignItems: 'center', gap: 4 },
+  categoryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
   sourceChipText: { fontSize: 10, fontWeight: '700' },
   questionActions: { flexDirection: 'row', gap: 4 },
   actionButton: { padding: 6 },

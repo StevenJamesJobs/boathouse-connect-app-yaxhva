@@ -429,7 +429,24 @@ export default function UpcomingEventsEditorScreen() {
         }
         console.log('Upcoming event created successfully');
         
-        // Send push notification for new events only (if toggle is enabled)
+        // Always log to Sent History (single source of truth — edge function no longer logs)
+        try {
+          await (supabase.from('custom_notifications') as any).insert({
+            title: '📅 New Event',
+            body: formData.title,
+            sent_by: user?.id,
+            data: {
+              notificationType: 'event',
+              notificationSkipped: !shouldSendNotification,
+              category: formData.category,
+              startDateTime: startDateTime?.toISOString() || null,
+            },
+          });
+        } catch (err) {
+          console.error('Failed to log notification:', err);
+        }
+
+        // Send the actual push only when toggle is on
         if (shouldSendNotification) {
           try {
             await sendNotification({
@@ -437,26 +454,13 @@ export default function UpcomingEventsEditorScreen() {
               title: '📅 New Event',
               body: formData.title,
               data: {
-                eventId: null, // Will be set by the database
+                eventId: null,
                 category: formData.category,
                 startDateTime: startDateTime?.toISOString() || null,
               },
             });
           } catch (notificationError) {
-            // Silent fail - don't block event creation
             console.error('Failed to send push notification:', notificationError);
-          }
-        } else {
-          // Log to sent history even when notification is skipped
-          try {
-            await (supabase.from('custom_notifications') as any).insert({
-              title: '📅 New Event',
-              body: formData.title,
-              sent_by: user?.id,
-              data: { notificationType: 'event', notificationSkipped: true, category: formData.category },
-            });
-          } catch (err) {
-            console.error('Failed to log skipped notification:', err);
           }
         }
         

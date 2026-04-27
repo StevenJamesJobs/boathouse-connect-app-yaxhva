@@ -17,6 +17,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useTranslation } from 'react-i18next';
 import { fetchContentImagesBatch } from '@/utils/contentImages';
 import { stripFormattingTags } from '@/components/FormattedText';
+import { useUnreadContent } from '@/hooks/useUnreadContent';
 
 type NotificationType = 'announcement' | 'special_feature' | 'upcoming_event' | 'weekly_special' | 'custom_notification';
 
@@ -102,6 +103,7 @@ export default function NotificationDropdown({
   const { t } = useTranslation();
   const { user } = useAuth();
   const router = useRouter();
+  const { markAnnouncementViewed, markSpecialFeatureViewed } = useUnreadContent();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -237,6 +239,18 @@ export default function NotificationDropdown({
           ) {
             continue;
           }
+          // Skip rows that mirror a content-table item (announcement/event/special_feature/weekly_special).
+          // Those are already shown in the shade via the content tables themselves; including them
+          // again here would cause duplicate entries. Only general/custom notifications should pass.
+          const linkedType = cn.data?.notificationType;
+          if (
+            linkedType === 'announcement' ||
+            linkedType === 'special_feature' ||
+            linkedType === 'event' ||
+            linkedType === 'weekly_special'
+          ) {
+            continue;
+          }
           items.push({
             id: cn.id,
             type: 'custom_notification',
@@ -316,6 +330,12 @@ export default function NotificationDropdown({
         content: data.body,
       });
     } else {
+      // Mark per-item NEW state cleared when the user opens the detail modal from the shade.
+      if (item.type === 'announcement') {
+        markAnnouncementViewed(item.id);
+      } else if (item.type === 'special_feature') {
+        markSpecialFeatureViewed(item.id);
+      }
       const contentField = item.type === 'announcement' ? 'content' : 'content';
       onItemPress({
         title: getLocalizedField(data, 'title', language),
