@@ -251,6 +251,13 @@ export default function NotificationDropdown({
           ) {
             continue;
           }
+          // Redemption shade entries are role/user-targeted
+          if (linkedType === 'redemption_requested') {
+            if (user?.role !== 'manager') continue;
+          }
+          if (linkedType === 'redemption_decision') {
+            if (cn.data?.targetUserId !== user?.id) continue;
+          }
           items.push({
             id: cn.id,
             type: 'custom_notification',
@@ -323,6 +330,23 @@ export default function NotificationDropdown({
         setNotifications((prev) => prev.filter((n) => n.id !== item.id));
         onClose();
         router.push('/weekly-quizzes' as any);
+        return;
+      }
+      // Manager: redemption request → Approvals
+      if (data.data?.notificationType === 'redemption_requested') {
+        setNotifications((prev) => prev.filter((n) => n.id !== item.id));
+        onClose();
+        router.push('/manager-approvals' as any);
+        return;
+      }
+      // Employee: decision → Redeem (lands on Recent Awards via the page itself)
+      if (data.data?.notificationType === 'redemption_decision') {
+        setNotifications((prev) => prev.filter((n) => n.id !== item.id));
+        // Drop the row so the badge clears
+        (supabase.from('custom_notifications') as any).delete().eq('id', item.id).then(() => {}, () => {});
+        onClose();
+        const portalPrefix = user?.role === 'manager' ? '/(portal)/manager' : '/(portal)/employee';
+        router.push(`${portalPrefix}/rewards` as any);
         return;
       }
       onItemPress({

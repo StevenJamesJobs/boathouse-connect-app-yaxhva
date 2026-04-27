@@ -13,6 +13,8 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { usePendingApprovals } from '@/hooks/usePendingApprovals';
+import { MessageBadge } from '@/components/MessageBadge';
 
 // ─── Grid layout constants (matching Manage page) ────────────────────────────
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -34,6 +36,7 @@ export default function ManagerToolsScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { t } = useTranslation();
+  const { pendingCount } = usePendingApprovals();
 
   // Get job titles array from user
   const jobTitles = user?.jobTitles || [];
@@ -81,26 +84,34 @@ export default function ManagerToolsScreen() {
 
   // ─── Grid rendering ─────────────────────────────────────────────────────────
 
-  const renderGridItem = (item: GridItem) => (
-    <TouchableOpacity
-      key={item.id}
-      style={[styles.gridItem, { backgroundColor: colors.card, width: ITEM_WIDTH }]}
-      onPress={() => router.push(item.route as any)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
-        <IconSymbol
-          ios_icon_name={item.iosIcon as any}
-          android_material_icon_name={item.androidIcon as any}
-          size={28}
-          color={colors.primary}
-        />
-      </View>
-      <Text style={[styles.gridLabel, { color: colors.text }]} numberOfLines={2}>
-        {item.label}
-      </Text>
-    </TouchableOpacity>
-  );
+  const renderGridItem = (item: GridItem) => {
+    const showApprovalsBadge = item.id === 'rewards-reviews' && pendingCount > 0;
+    return (
+      <TouchableOpacity
+        key={item.id}
+        style={[styles.gridItem, { backgroundColor: colors.card, width: ITEM_WIDTH }]}
+        onPress={() => router.push(item.route as any)}
+        activeOpacity={0.7}
+      >
+        <View style={[styles.iconContainer, { backgroundColor: colors.primary + '15' }]}>
+          <IconSymbol
+            ios_icon_name={item.iosIcon as any}
+            android_material_icon_name={item.androidIcon as any}
+            size={28}
+            color={colors.primary}
+          />
+          {showApprovalsBadge && (
+            <View style={styles.tileBadge}>
+              <MessageBadge count={pendingCount} size="small" />
+            </View>
+          )}
+        </View>
+        <Text style={[styles.gridLabel, { color: colors.text }]} numberOfLines={2}>
+          {item.label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -162,6 +173,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
+    position: 'relative',
+  },
+  tileBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
   },
   gridLabel: {
     fontSize: 12,

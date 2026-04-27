@@ -11,6 +11,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { BlurView } from 'expo-blur';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
+import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { MessageBadge } from '@/components/MessageBadge';
 import { useTranslation } from 'react-i18next';
 
@@ -52,6 +53,7 @@ function EmployeeHeader() {
 function FloatingTabBar({ state, descriptors, navigation }: any) {
   const { unreadCount } = useUnreadMessages();
   const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
+  const { hasNew: awardsHasNew } = useUnreadAwards();
   const colors = useThemeColors();
   const { mode } = useAppTheme();
 
@@ -75,6 +77,7 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
             const isFocused = state.index === index;
             const isProfileTab = route.name === 'profile';
             const isToolsTab = route.name === 'tools';
+            const isRewardsTab = route.name === 'rewards';
 
             const onPress = () => {
               const event = navigation.emit({
@@ -111,6 +114,11 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
                   {isToolsTab && unreadQuizCount > 0 && (
                     <View style={styles.tabBadgePosition}>
                       <MessageBadge count={unreadQuizCount} size="small" />
+                    </View>
+                  )}
+                  {isRewardsTab && awardsHasNew && !isFocused && (
+                    <View style={styles.tabRedDotPosition}>
+                      <View style={styles.tabRedDot} />
                     </View>
                   )}
                 </View>
@@ -285,6 +293,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -6,
     right: -6,
+  },
+  tabRedDotPosition: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+  },
+  tabRedDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E74C3C',
   },
   tabLabel: {
     fontSize: 11,

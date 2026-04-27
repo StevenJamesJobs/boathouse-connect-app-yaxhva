@@ -8,12 +8,14 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import ExamRewardBlurb from '@/components/ExamRewardBlurb';
+import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 
 interface Employee {
   id: string;
@@ -30,6 +32,7 @@ interface RewardTransaction {
   is_visible: boolean;
   created_at: string;
   user_name?: string;
+  isDenied?: boolean;
 }
 
 interface GuestReview {
@@ -47,6 +50,8 @@ export default function EmployeeRewardsScreen() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const router = useRouter();
+  const { hasNew: awardsHasNew, markRecentViewed } = useUnreadAwards();
   const [activeTab, setActiveTab] = useState<MainTab>('rewards');
   const [rewardsSubTab, setRewardsSubTab] = useState<RewardsSubTab>('leaderboard');
   const [loading, setLoading] = useState(true);
@@ -100,34 +105,53 @@ export default function EmployeeRewardsScreen() {
         return;
       }
 
-      if (transData && transData.length > 0) {
-        const visibleTransactions = transData.filter(t => t.is_visible === true).slice(0, 5);
+      // Visible transactions (shared across all employees)
+      const visibleTransactions = ((transData as any[]) || []).filter((t: any) => t.is_visible === true);
 
-        if (visibleTransactions.length > 0) {
-          const userIds = [...new Set(visibleTransactions.map(t => t.user_id))];
-          const { data: usersData, error: usersError } = await supabase
-            .from('users')
-            .select('id, name')
-            .in('id', userIds);
-
-          if (!usersError && usersData) {
-            const userMap = new Map(usersData.map(u => [u.id, u.name]));
-            setRecentTransactions(visibleTransactions.map(trans => ({
-              ...trans,
-              user_name: userMap.get(trans.user_id) || 'Unknown Employee'
-            })));
-          } else {
-            setRecentTransactions(visibleTransactions.map(trans => ({
-              ...trans,
-              user_name: 'Unknown Employee'
-            })));
-          }
-        } else {
-          setRecentTransactions([]);
-        }
-      } else {
-        setRecentTransactions([]);
+      // Denied redemption requests for the current user only — surface in their
+      // own Recent Awards as a "denied" entry (no balance change).
+      let deniedEntries: RewardTransaction[] = [];
+      if (user?.id) {
+        const { data: deniedRows } = await (supabase
+          .from('redemption_requests' as any) as any)
+          .select('id, user_id, bucks_amount, request_type, item_name_snapshot, decided_at, decision_reason')
+          .eq('user_id', user.id)
+          .eq('status', 'denied')
+          .order('decided_at', { ascending: false })
+          .limit(10);
+        deniedEntries = ((deniedRows as any[]) || []).map((r) => ({
+          id: `denied_${r.id}`,
+          user_id: r.user_id,
+          amount: -r.bucks_amount,
+          description:
+            r.request_type === 'food_beverage'
+              ? `Denied: ${r.item_name_snapshot || 'Menu item'}${r.decision_reason ? ` — ${r.decision_reason}` : ''}`
+              : `Denied: ${r.request_type.replace(/_/g, ' ')}${r.decision_reason ? ` — ${r.decision_reason}` : ''}`,
+          is_visible: true,
+          created_at: r.decided_at,
+          isDenied: true,
+        }));
       }
+
+      const userIds = [...new Set(visibleTransactions.map((t: any) => t.user_id))];
+      let userMap = new Map<string, string>();
+      if (userIds.length > 0) {
+        const { data: usersData } = await (supabase
+          .from('users') as any)
+          .select('id, name')
+          .in('id', userIds);
+        if (usersData) userMap = new Map((usersData as any[]).map((u: any) => [u.id, u.name]));
+      }
+
+      const decoratedTx: RewardTransaction[] = visibleTransactions.map((trans: any) => ({
+        ...trans,
+        user_name: userMap.get(trans.user_id) || 'Unknown Employee',
+      }));
+
+      const merged = [...decoratedTx, ...deniedEntries]
+        .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+        .slice(0, 8);
+      setRecentTransactions(merged);
     } catch (error) {
       console.error('Error fetching rewards data:', error);
     } finally {
@@ -222,6 +246,18 @@ export default function EmployeeRewardsScreen() {
               <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={32} color={colors.primary} />
               <Text style={[styles.bucksLabel, { color: colors.textSecondary }]}>My McLoone's Bucks</Text>
               <Text style={[styles.bucksAmount, { color: colors.primary }]}>${myBucks}</Text>
+              <TouchableOpacity
+                style={[styles.redeemBtn, { backgroundColor: colors.primary }]}
+                onPress={() => router.push('/redeem' as any)}
+              >
+                <IconSymbol
+                  ios_icon_name="gift.fill"
+                  android_material_icon_name="card-giftcard"
+                  size={16}
+                  color="#FFF"
+                />
+                <Text style={styles.redeemBtnText}>Redeem</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Sub-Tab Selector: Leaderboard / Recent Awards */}
@@ -251,14 +287,22 @@ export default function EmployeeRewardsScreen() {
                   styles.subTab,
                   rewardsSubTab === 'recent' && { backgroundColor: colors.primary },
                 ]}
-                onPress={() => setRewardsSubTab('recent')}
+                onPress={() => {
+                  setRewardsSubTab('recent');
+                  markRecentViewed();
+                }}
               >
-                <IconSymbol
-                  ios_icon_name="clock.fill"
-                  android_material_icon_name="history"
-                  size={16}
-                  color={rewardsSubTab === 'recent' ? '#FFF' : colors.textSecondary}
-                />
+                <View style={{ position: 'relative' }}>
+                  <IconSymbol
+                    ios_icon_name="clock.fill"
+                    android_material_icon_name="history"
+                    size={16}
+                    color={rewardsSubTab === 'recent' ? '#FFF' : colors.textSecondary}
+                  />
+                  {awardsHasNew && rewardsSubTab !== 'recent' ? (
+                    <View style={styles.subTabDot} />
+                  ) : null}
+                </View>
                 <Text style={[
                   styles.subTabText,
                   { color: rewardsSubTab === 'recent' ? '#FFF' : colors.textSecondary },
@@ -313,35 +357,47 @@ export default function EmployeeRewardsScreen() {
                     <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No recent awards yet</Text>
                   </View>
                 ) : (
-                  recentTransactions.map((trans, index) => (
-                    <View key={trans.id || index} style={[styles.transactionItem, { backgroundColor: colors.card }]}>
-                      <View style={[styles.transactionIcon, { backgroundColor: trans.amount > 0 ? '#E8F5E9' : '#FFEBEE' }]}>
-                        <IconSymbol
-                          ios_icon_name={trans.amount > 0 ? 'arrow.up.circle.fill' : 'arrow.down.circle.fill'}
-                          android_material_icon_name={trans.amount > 0 ? 'arrow-upward' : 'arrow-downward'}
-                          size={20}
-                          color={trans.amount > 0 ? '#4CAF50' : '#F44336'}
-                        />
+                  recentTransactions.map((trans, index) => {
+                    const denied = trans.isDenied;
+                    return (
+                      <View key={trans.id || index} style={[styles.transactionItem, { backgroundColor: colors.card }]}>
+                        <View style={[
+                          styles.transactionIcon,
+                          { backgroundColor: denied ? '#FFEBEE' : trans.amount > 0 ? '#E8F5E9' : '#FFEBEE' },
+                        ]}>
+                          <IconSymbol
+                            ios_icon_name={denied ? 'xmark.circle.fill' : trans.amount > 0 ? 'arrow.up.circle.fill' : 'arrow.down.circle.fill'}
+                            android_material_icon_name={denied ? 'cancel' : trans.amount > 0 ? 'arrow-upward' : 'arrow-downward'}
+                            size={20}
+                            color={denied ? '#F44336' : trans.amount > 0 ? '#4CAF50' : '#F44336'}
+                          />
+                        </View>
+                        <View style={styles.transactionInfo}>
+                          <Text style={[styles.transactionEmployee, { color: colors.text }]}>
+                            {denied ? 'You' : trans.user_name || 'Unknown Employee'}
+                          </Text>
+                          <Text style={[styles.transactionDescription, { color: colors.textSecondary }]}>{trans.description}</Text>
+                          <Text style={[styles.transactionDate, { color: colors.textSecondary }]}>
+                            {new Date(trans.created_at).toLocaleDateString()}
+                          </Text>
+                        </View>
+                        {denied ? (
+                          <View style={styles.deniedPill}>
+                            <Text style={styles.deniedPillText}>DENIED</Text>
+                          </View>
+                        ) : (
+                          <Text
+                            style={[
+                              styles.transactionAmount,
+                              trans.amount > 0 ? styles.positiveAmount : styles.negativeAmount,
+                            ]}
+                          >
+                            {trans.amount > 0 ? '+' : ''}${trans.amount}
+                          </Text>
+                        )}
                       </View>
-                      <View style={styles.transactionInfo}>
-                        <Text style={[styles.transactionEmployee, { color: colors.text }]}>
-                          {trans.user_name || 'Unknown Employee'}
-                        </Text>
-                        <Text style={[styles.transactionDescription, { color: colors.textSecondary }]}>{trans.description}</Text>
-                        <Text style={[styles.transactionDate, { color: colors.textSecondary }]}>
-                          {new Date(trans.created_at).toLocaleDateString()}
-                        </Text>
-                      </View>
-                      <Text
-                        style={[
-                          styles.transactionAmount,
-                          trans.amount > 0 ? styles.positiveAmount : styles.negativeAmount,
-                        ]}
-                      >
-                        {trans.amount > 0 ? '+' : ''}${trans.amount}
-                      </Text>
-                    </View>
-                  ))
+                    );
+                  })
                 )}
               </View>
             )}
@@ -436,6 +492,40 @@ const styles = StyleSheet.create({
   bucksAmount: {
     fontSize: 48,
     fontWeight: 'bold',
+  },
+  redeemBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 22,
+    marginTop: 12,
+  },
+  redeemBtnText: {
+    color: '#FFF',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  subTabDot: {
+    position: 'absolute',
+    top: -4,
+    right: -6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E74C3C',
+  },
+  deniedPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: '#F4433620',
+  },
+  deniedPillText: {
+    color: '#F44336',
+    fontSize: 11,
+    fontWeight: '700',
   },
 
   // Sub-tabs

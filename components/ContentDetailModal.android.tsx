@@ -43,6 +43,10 @@ interface ContentDetailModalProps {
   priority?: string;
   link?: string | null;
   guideFile?: GuideFile | null;
+  redeemAction?: {
+    label: string;
+    onPress: () => void;
+  } | null;
   colors: {
     background?: string;
     text: string;
@@ -67,6 +71,7 @@ export default function ContentDetailModal({
   priority,
   link,
   guideFile,
+  redeemAction,
   colors,
 }: ContentDetailModalProps) {
   // ─── Pull-down-to-dismiss ─────────────────────────────────────────────────
@@ -287,6 +292,24 @@ export default function ContentDetailModal({
                     color="#FFFFFF"
                   />
                   <Text style={styles.actionButtonText}>View More Information</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {redeemAction && (
+              <View style={styles.buttonSection}>
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: colors.primary }]}
+                  onPress={redeemAction.onPress}
+                  activeOpacity={0.8}
+                >
+                  <IconSymbol
+                    ios_icon_name="gift.fill"
+                    android_material_icon_name="card-giftcard"
+                    size={20}
+                    color="#FFFFFF"
+                  />
+                  <Text style={styles.actionButtonText}>{redeemAction.label}</Text>
                 </TouchableOpacity>
               </View>
             )}

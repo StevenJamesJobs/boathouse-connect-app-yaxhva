@@ -22,6 +22,8 @@ import { stripFormattingTags } from '@/components/FormattedText';
 import CategoryPill from '@/components/CategoryPill';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRouter } from 'expo-router';
 
 interface MenuItem {
   id: string;
@@ -182,6 +184,8 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  const { user } = useAuth();
+  const router = useRouter();
 
   const pagerRef = useRef<FlatList>(null);
   const categoryScrollRef = useRef<ScrollView>(null);
@@ -834,17 +838,45 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       </Modal>
 
       {/* Content Detail Modal for Menu Items */}
-      {selectedMenuItem && (
-        <ContentDetailModal
-          visible={detailModalVisible}
-          onClose={closeDetailModal}
-          title={`${getLocalizedField(selectedMenuItem, 'name', language)} - ${formatPrice(selectedMenuItem.price)}`}
-          content={buildDetailedDescription(selectedMenuItem)}
-          thumbnailUrl={selectedMenuItem.thumbnail_url}
-          thumbnailShape={selectedMenuItem.thumbnail_shape}
-          colors={colors}
-        />
-      )}
+      {selectedMenuItem && (() => {
+        const trimmed = (selectedMenuItem.price || '').trim();
+        const m = trimmed.match(/^\$?(\d+(?:\.\d{1,2})?)$/);
+        const parsedPrice = m ? parseFloat(m[1]) : NaN;
+        const bucksCost = isFinite(parsedPrice) && parsedPrice > 0 ? Math.ceil(parsedPrice) : null;
+        const isInactive = (selectedMenuItem as any).is_active === false;
+        const showRedeem = user?.role === 'employee' && bucksCost !== null && !isInactive;
+        const item = selectedMenuItem;
+        return (
+          <ContentDetailModal
+            visible={detailModalVisible}
+            onClose={closeDetailModal}
+            title={`${getLocalizedField(item, 'name', language)} - ${formatPrice(item.price)}`}
+            content={buildDetailedDescription(item)}
+            thumbnailUrl={item.thumbnail_url}
+            thumbnailShape={item.thumbnail_shape}
+            colors={colors}
+            redeemAction={
+              showRedeem
+                ? {
+                    label: `Redeem for $${bucksCost}`,
+                    onPress: () => {
+                      closeDetailModal();
+                      router.push({
+                        pathname: '/redeem',
+                        params: {
+                          prefillItemId: item.id,
+                          prefillItemSource: 'menu_items',
+                          prefillItemName: item.name,
+                          prefillItemPrice: item.price,
+                        },
+                      } as any);
+                    },
+                  }
+                : null
+            }
+          />
+        );
+      })()}
     </GestureHandlerRootView>
   );
 }

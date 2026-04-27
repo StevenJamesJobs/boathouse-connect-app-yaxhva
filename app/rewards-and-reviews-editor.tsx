@@ -20,6 +20,9 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { useTranslation } from 'react-i18next';
+import { usePendingApprovals } from '@/hooks/usePendingApprovals';
+import { useUnreadAwards } from '@/hooks/useUnreadAwards';
+import { MessageBadge } from '@/components/MessageBadge';
 
 interface Employee {
   id: string;
@@ -118,6 +121,50 @@ export default function RewardsAndReviewsEditorScreen() {
       flexDirection: 'row',
       gap: 12,
       marginBottom: 20,
+    },
+    quickActionsCard: {
+      backgroundColor: colors.card,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 20,
+      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
+      elevation: 3,
+    },
+    quickActionsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 8,
+    },
+    quickActionButton: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 4,
+    },
+    quickActionIconContainer: {
+      position: 'relative',
+    },
+    quickActionBadge: {
+      position: 'absolute',
+      top: -6,
+      right: -8,
+    },
+    quickActionLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      marginTop: 6,
+      textAlign: 'center',
+    },
+    subTabDot: {
+      position: 'absolute',
+      top: -4,
+      right: -6,
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: '#E74C3C',
     },
     actionButton: {
       flex: 1,
@@ -559,6 +606,8 @@ export default function RewardsAndReviewsEditorScreen() {
 
   const { user } = useAuth();
   const { sendNotification } = useNotification();
+  const { pendingCount } = usePendingApprovals();
+  const { hasNew: managerRecentHasNew, markRecentViewed: markManagerRecentViewed } = useUnreadAwards();
   const [activeTab, setActiveTab] = useState<'rewards' | 'reviews'>('rewards');
   const [loading, setLoading] = useState(false);
 
@@ -1360,33 +1409,54 @@ export default function RewardsAndReviewsEditorScreen() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {activeTab === 'rewards' ? (
           <>
-            {/* Action Buttons Row */}
-            <View style={styles.actionButtonsRow}>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.rewardButton]}
-                onPress={() => setShowRewardModal(true)}
-              >
-                <IconSymbol
-                  ios_icon_name="gift.fill"
-                  android_material_icon_name="card-giftcard"
-                  size={24}
-                  color={colors.text}
-                />
-                <Text style={styles.actionButtonText}>{t('rewards_reviews_editor:reward_bucks_button')}</Text>
-              </TouchableOpacity>
+            {/* Quick Actions Grid: Reward / Deduct / Reset / Approvals */}
+            <View style={styles.quickActionsCard}>
+              <View style={styles.quickActionsRow}>
+                <TouchableOpacity
+                  style={[styles.quickActionButton, { backgroundColor: colors.primary + '20' }]}
+                  onPress={() => {
+                    setIsReward(true);
+                    setShowRewardModal(true);
+                  }}
+                >
+                  <IconSymbol ios_icon_name="gift.fill" android_material_icon_name="card-giftcard" size={24} color={colors.primary} />
+                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>Reward</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[styles.actionButton, styles.resetButton]}
-                onPress={() => setShowResetBucksModal(true)}
-              >
-                <IconSymbol
-                  ios_icon_name="arrow.counterclockwise.circle.fill"
-                  android_material_icon_name="refresh"
-                  size={24}
-                  color={colors.text}
-                />
-                <Text style={styles.actionButtonText}>{t('rewards_reviews_editor:reset_bucks_button')}</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.quickActionButton, { backgroundColor: colors.primary + '20' }]}
+                  onPress={() => {
+                    setIsReward(false);
+                    setShowRewardModal(true);
+                  }}
+                >
+                  <IconSymbol ios_icon_name="minus.circle.fill" android_material_icon_name="remove-circle" size={24} color={colors.primary} />
+                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>Deduct</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.quickActionButton, { backgroundColor: colors.primary + '20' }]}
+                  onPress={() => setShowResetBucksModal(true)}
+                >
+                  <IconSymbol ios_icon_name="arrow.counterclockwise.circle.fill" android_material_icon_name="refresh" size={24} color={colors.primary} />
+                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>Reset</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.quickActionButton, { backgroundColor: colors.primary + '20' }]}
+                  onPress={() => router.push('/manager-approvals' as any)}
+                >
+                  <View style={styles.quickActionIconContainer}>
+                    <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={24} color={colors.primary} />
+                    {pendingCount > 0 && (
+                      <View style={styles.quickActionBadge}>
+                        <MessageBadge count={pendingCount} size="small" />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>Approvals</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* My McLoone's Bucks */}
@@ -1428,18 +1498,24 @@ export default function RewardsAndReviewsEditorScreen() {
                     } else {
                       setShowEmployeeLookup(false);
                       setRewardsSubTab(tab);
+                      if (tab === 'recent') markManagerRecentViewed();
                     }
                   }}
                 >
-                  <IconSymbol
-                    ios_icon_name={tab === 'leaderboard' ? 'trophy.fill' : tab === 'recent' ? 'clock.fill' : 'magnifyingglass'}
-                    android_material_icon_name={tab === 'leaderboard' ? 'emoji-events' : tab === 'recent' ? 'history' : 'search'}
-                    size={14}
-                    color={
-                      (tab === 'lookup' && showEmployeeLookup) || (tab !== 'lookup' && rewardsSubTab === tab && !showEmployeeLookup)
-                        ? '#FFF' : colors.textSecondary
-                    }
-                  />
+                  <View style={{ position: 'relative' }}>
+                    <IconSymbol
+                      ios_icon_name={tab === 'leaderboard' ? 'trophy.fill' : tab === 'recent' ? 'clock.fill' : 'magnifyingglass'}
+                      android_material_icon_name={tab === 'leaderboard' ? 'emoji-events' : tab === 'recent' ? 'history' : 'search'}
+                      size={14}
+                      color={
+                        (tab === 'lookup' && showEmployeeLookup) || (tab !== 'lookup' && rewardsSubTab === tab && !showEmployeeLookup)
+                          ? '#FFF' : colors.textSecondary
+                      }
+                    />
+                    {tab === 'recent' && managerRecentHasNew && !(rewardsSubTab === 'recent' && !showEmployeeLookup) ? (
+                      <View style={styles.subTabDot} />
+                    ) : null}
+                  </View>
                   <Text style={{
                     fontSize: 12,
                     fontWeight: '600',

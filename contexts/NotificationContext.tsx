@@ -7,6 +7,8 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { router } from 'expo-router';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
+import { usePendingApprovals } from '@/hooks/usePendingApprovals';
+import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -262,6 +264,12 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               case 'profile':
                 router.push(`${portalPrefix}/profile`);
                 break;
+              case 'approvals':
+                router.push('/manager-approvals' as any);
+                break;
+              case 'redeem':
+                router.push('/redeem' as any);
+                break;
               default:
                 // Default: just open the app (no specific navigation)
                 break;
@@ -329,11 +337,17 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 function BadgeSyncer() {
   const { unreadCount: unreadMessages } = useUnreadMessages();
   const { unreadCount: unreadQuizzes } = useUnreadQuizzes();
+  const { pendingCount: pendingApprovals } = usePendingApprovals();
+  const { count: unreadAwards } = useUnreadAwards();
 
   useEffect(() => {
-    const total = (unreadMessages || 0) + (unreadQuizzes || 0);
+    const total =
+      (unreadMessages || 0) +
+      (unreadQuizzes || 0) +
+      (pendingApprovals || 0) +
+      (unreadAwards || 0);
     Notifications.setBadgeCountAsync(total).catch(() => {});
-  }, [unreadMessages, unreadQuizzes]);
+  }, [unreadMessages, unreadQuizzes, pendingApprovals, unreadAwards]);
 
   return null;
 }

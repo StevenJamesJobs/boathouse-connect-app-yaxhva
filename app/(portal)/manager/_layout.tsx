@@ -11,6 +11,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { BlurView } from 'expo-blur';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
+import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import { MessageBadge } from '@/components/MessageBadge';
 import { useTranslation } from 'react-i18next';
 
@@ -52,6 +53,7 @@ function ManagerHeader() {
 function FloatingTabBar({ state, descriptors, navigation }: any) {
   const { unreadCount } = useUnreadMessages();
   const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
+  const { pendingCount: pendingApprovals } = usePendingApprovals();
   const colors = useThemeColors();
   const { mode } = useAppTheme();
 
@@ -108,9 +110,9 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
                       <MessageBadge count={unreadCount} size="small" />
                     </View>
                   )}
-                  {isToolsTab && unreadQuizCount > 0 && (
+                  {isToolsTab && (unreadQuizCount + pendingApprovals) > 0 && (
                     <View style={styles.tabBadgePosition}>
-                      <MessageBadge count={unreadQuizCount} size="small" />
+                      <MessageBadge count={unreadQuizCount + pendingApprovals} size="small" />
                     </View>
                   )}
                 </View>

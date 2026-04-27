@@ -9,6 +9,8 @@ import { hexToRgba } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
+import { usePendingApprovals } from '@/hooks/usePendingApprovals';
+import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { MessageBadge } from '@/components/MessageBadge';
 import { useTranslation } from 'react-i18next';
 
@@ -46,6 +48,8 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
   const { user } = useAuth();
   const { unreadCount } = useUnreadMessages();
   const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
+  const { pendingCount: pendingApprovalsCount } = usePendingApprovals();
+  const { hasNew: awardsHasNew } = useUnreadAwards();
   const colors = useThemeColors();
   const { mode } = useAppTheme();
   const { t } = useTranslation();
@@ -77,6 +81,8 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
             const isFocused = tab.name === activeTab;
             const isProfileTab = tab.name === 'profile';
             const isToolsTab = tab.name === 'tools';
+            const isRewardsTab = tab.name === 'rewards';
+            const toolsCount = (unreadQuizCount || 0) + (isManager ? pendingApprovalsCount || 0 : 0);
 
             return (
               <TouchableOpacity
@@ -98,9 +104,14 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
                       <MessageBadge count={unreadCount} size="small" />
                     </View>
                   )}
-                  {isToolsTab && unreadQuizCount > 0 && (
+                  {isToolsTab && toolsCount > 0 && (
                     <View style={styles.tabBadgePosition}>
-                      <MessageBadge count={unreadQuizCount} size="small" />
+                      <MessageBadge count={toolsCount} size="small" />
+                    </View>
+                  )}
+                  {isRewardsTab && awardsHasNew && !isFocused && (
+                    <View style={styles.tabRedDotPosition}>
+                      <View style={styles.tabRedDot} />
                     </View>
                   )}
                 </View>
@@ -161,6 +172,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -6,
     right: -6,
+  },
+  tabRedDotPosition: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+  },
+  tabRedDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E74C3C',
   },
   tabLabel: {
     fontSize: 11,
