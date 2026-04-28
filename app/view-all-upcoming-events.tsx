@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,14 @@ import {
   Image,
   ActivityIndicator,
   Platform,
+  Modal,
+  FlatList,
+  Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -18,11 +25,12 @@ import ContentDetailModal from '@/components/ContentDetailModal';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import MonthlyCalendar from '@/components/MonthlyCalendar';
+import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
 import { eventFallsOnDate } from '@/utils/dateUtils';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchContentImagesBatch } from '@/utils/contentImages';
-import FormattedText from '@/components/FormattedText';
+import { stripFormattingTags } from '@/components/FormattedText';
 
 interface GuideFile {
   id: string;
@@ -61,8 +69,8 @@ export default function ViewAllUpcomingEventsScreen() {
   const [eventsTab, setEventsTab] = useState<'Event' | 'Entertainment'>('Event');
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [contentImagesMap, setContentImagesMap] = useState<Map<string, string[]>>(new Map());
+  const [monthOverlayVisible, setMonthOverlayVisible] = useState(false);
 
-  // Detail modal state
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<{
     title: string;
@@ -85,7 +93,6 @@ export default function ViewAllUpcomingEventsScreen() {
   const loadEvents = async () => {
     try {
       setLoading(true);
-      // Clean up expired events before loading
       try { await supabase.rpc('delete_expired_upcoming_events' as any); } catch {}
 
       const { data, error } = await supabase
@@ -93,26 +100,17 @@ export default function ViewAllUpcomingEventsScreen() {
         .select(`
           *,
           guide_file:guides_and_training!upcoming_events_guide_file_id_fkey(
-            id,
-            title,
-            file_url,
-            file_name,
-            file_type
+            id, title, file_url, file_name, file_type
           )
         `)
         .eq('is_active', true)
         .order('display_order', { ascending: true })
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error loading upcoming events:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('Upcoming events loaded:', data?.length || 0, 'items');
       setEvents(data || []);
 
-      // Batch fetch additional content images
       if (data && data.length > 0) {
         const ids = data.map((e: UpcomingEvent) => e.id);
         const imagesMap = await fetchContentImagesBatch('upcoming_event', ids);
@@ -161,31 +159,130 @@ export default function ViewAllUpcomingEventsScreen() {
     return date.toLocaleString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     });
   };
 
-  const handleBackPress = () => {
-    router.back();
+  const truncate = (text: string | null, max: number = 100) => {
+    if (!text) return '';
+    const stripped = stripFormattingTags(text);
+    if (stripped.length <= max) return stripped;
+    const cut = stripped.substring(0, max);
+    const lastSpace = cut.lastIndexOf(' ');
+    return (lastSpace > 60 ? cut.substring(0, lastSpace) : cut) + '...';
   };
 
-  // Filter events based on date selection or category tab
-  let filteredEvents: UpcomingEvent[];
-  if (selectedDate !== null) {
-    filteredEvents = events.filter(event =>
-      eventFallsOnDate(event.start_date_time, event.end_date_time, selectedDate)
+  const dateFilteredEvents: UpcomingEvent[] | null = selectedDate !== null
+    ? events.filter(event =>
+        eventFallsOnDate(event.start_date_time, event.end_date_time, selectedDate)
+      )
+    : null;
+
+  const eventsByCategory = (cat: 'Event' | 'Entertainment') =>
+    events.filter(event => event.category === cat);
+
+  const handleMonthDateSelect = (date: Date | null) => {
+    setSelectedDate(date);
+    setMonthOverlayVisible(false);
+  };
+
+  // Horizontal swipe between Event / Entertainment pages when no date is selected.
+  const pagerRef = useRef<FlatList>(null);
+  const PAGES = ['Event', 'Entertainment'] as const;
+
+  const handlePagerScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    const next = PAGES[idx];
+    if (next && next !== eventsTab) setEventsTab(next);
+  }, [eventsTab]);
+
+  const goToTab = (tab: 'Event' | 'Entertainment') => {
+    const idx = PAGES.indexOf(tab);
+    pagerRef.current?.scrollToIndex({ index: idx, animated: true });
+  };
+
+  const renderEventCard = (event: UpcomingEvent, index: number) => (
+    <TouchableOpacity
+      key={event.id || index}
+      style={[styles.eventCard, { backgroundColor: colors.card, borderLeftColor: '#4CAF50' }]}
+      onPress={() => openDetailModal(event)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.cardRow}>
+        {event.thumbnail_url && (
+          <Image source={{ uri: getImageUrl(event.thumbnail_url)! }} style={styles.cardImage} />
+        )}
+        <View style={styles.cardContent}>
+          <View style={styles.titleRow}>
+            <Text style={[styles.eventTitle, { color: colors.text }]} numberOfLines={1}>
+              {getLocalizedField(event, 'title', language)}
+            </Text>
+            {selectedDate !== null && (
+              <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '18' }]}>
+                <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>
+                  {event.category === 'Event'
+                    ? t('upcoming_events:events')
+                    : t('upcoming_events:entertainment')}
+                </Text>
+              </View>
+            )}
+          </View>
+          {(event.content || event.message) && (
+            <Text style={[styles.eventMessage, { color: colors.textSecondary }]} numberOfLines={2}>
+              {truncate(getLocalizedField(event, 'content', language) || event.content || event.message)}
+            </Text>
+          )}
+          {event.start_date_time && (
+            <Text style={[styles.eventDate, { color: colors.textSecondary }]}>
+              {formatDateTime(event.start_date_time)}
+              {event.end_date_time ? ` – ${formatDateTime(event.end_date_time)}` : ''}
+            </Text>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderEmptyState = (forTab: 'Event' | 'Entertainment' | 'date') => (
+    <View style={styles.emptyContainer}>
+      <IconSymbol
+        ios_icon_name="calendar"
+        android_material_icon_name="event"
+        size={64}
+        color={colors.textSecondary}
+      />
+      <Text style={[styles.emptyText, { color: colors.text }]}>
+        {forTab === 'date'
+          ? t('upcoming_events:no_events_on_date')
+          : t('upcoming_events:no_events', { type: forTab.toLowerCase() })}
+      </Text>
+      {forTab !== 'date' && (
+        <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+          {t('upcoming_events:check_back', { type: forTab.toLowerCase() })}
+        </Text>
+      )}
+    </View>
+  );
+
+  const renderCategoryPage = ({ item }: { item: 'Event' | 'Entertainment' }) => {
+    const list = eventsByCategory(item);
+    return (
+      <ScrollView
+        style={{ width: SCREEN_WIDTH }}
+        contentContainerStyle={styles.contentContainer}
+        nestedScrollEnabled
+      >
+        {list.length === 0 ? renderEmptyState(item) : list.map((e, i) => renderEventCard(e, i))}
+      </ScrollView>
     );
-  } else {
-    filteredEvents = events.filter(event => event.category === eventsTab);
-  }
+  };
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol
             ios_icon_name="chevron.left"
             android_material_icon_name="chevron-left"
@@ -197,8 +294,8 @@ export default function ViewAllUpcomingEventsScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* Monthly Calendar */}
-      <MonthlyCalendar
+      {/* Week strip with embedded sub-tabs (matches Welcome Events tab styling) */}
+      <WeeklyCalendarStrip
         selectedDate={selectedDate}
         onSelectDate={setSelectedDate}
         colors={{
@@ -209,196 +306,110 @@ export default function ViewAllUpcomingEventsScreen() {
           card: colors.card,
         }}
         events={events}
-      />
-
-      {/* Tabs (only when no date selected) */}
-      {selectedDate === null && (
-        <View style={[styles.tabsContainer, { backgroundColor: colors.card }]}>
-          <TouchableOpacity
-            style={[styles.tab, eventsTab === 'Event' && [styles.activeTab, { backgroundColor: colors.primary }]]}
-            onPress={() => setEventsTab('Event')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Event' && styles.activeTabText]}>
-              {t('upcoming_events:events')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, eventsTab === 'Entertainment' && [styles.activeTab, { backgroundColor: colors.primary }]]}
-            onPress={() => setEventsTab('Entertainment')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && styles.activeTabText]}>
-              {t('upcoming_events:entertainment')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        onMonthExpand={() => setMonthOverlayVisible(true)}
+      >
+        {selectedDate === null && (
+          <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginTop: 8 }]}>
+            <TouchableOpacity
+              style={[styles.subTab, eventsTab === 'Event' && { backgroundColor: colors.primary }]}
+              onPress={() => goToTab('Event')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Event' && { color: '#FFFFFF' }]}>
+                {t('upcoming_events:events')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.subTab, eventsTab === 'Entertainment' && { backgroundColor: colors.primary }]}
+              onPress={() => goToTab('Entertainment')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && { color: '#FFFFFF' }]}>
+                {t('upcoming_events:entertainment')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </WeeklyCalendarStrip>
 
       {loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('upcoming_events:loading')}</Text>
         </View>
-      ) : (
+      ) : selectedDate !== null ? (
+        // Date selected: single vertical scroll, all categories on that date.
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-          {filteredEvents.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <IconSymbol
-                ios_icon_name="calendar"
-                android_material_icon_name="event"
-                size={64}
-                color={colors.textSecondary}
-              />
-              <Text style={[styles.emptyText, { color: colors.text }]}>
-                {selectedDate !== null
-                  ? t('upcoming_events:no_events_on_date')
-                  : t('upcoming_events:no_events', { type: eventsTab.toLowerCase() })}
-              </Text>
-              {selectedDate === null && (
-                <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                  {t('upcoming_events:check_back', { type: eventsTab.toLowerCase() })}
-                </Text>
-              )}
-            </View>
-          ) : (
-            filteredEvents.map((event, index) => (
-              <TouchableOpacity
-                key={event.id || index}
-                style={[styles.eventCard, { backgroundColor: colors.card }]}
-                onPress={() => openDetailModal(event)}
-                activeOpacity={0.7}
-              >
-                {event.thumbnail_shape === 'square' && event.thumbnail_url ? (
-                  <View style={styles.squareLayout}>
-                    <Image
-                      source={{ uri: getImageUrl(event.thumbnail_url)! }}
-                      style={styles.squareImage}
-                    />
-                    <View style={styles.squareContent}>
-                      <Text style={[styles.eventTitle, { color: colors.text }]}>{getLocalizedField(event, 'title', language)}</Text>
-                      {(event.content || event.message) && (
-                        <FormattedText style={[styles.eventMessage, { color: colors.textSecondary }]} numberOfLines={2}>
-                          {getLocalizedField(event, 'content', language) || event.content || event.message}
-                        </FormattedText>
-                      )}
-                      {event.start_date_time && (
-                        <View style={styles.eventMeta}>
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="calendar"
-                              android_material_icon_name="event"
-                              size={14}
-                              color={colors.textSecondary}
-                            />
-                            <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                              {formatDateTime(event.start_date_time)}
-                            </Text>
-                          </View>
-                          {event.end_date_time && (
-                            <View style={styles.metaItem}>
-                              <IconSymbol
-                                ios_icon_name="clock"
-                                android_material_icon_name="schedule"
-                                size={14}
-                                color={colors.textSecondary}
-                              />
-                              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                                {t('upcoming_events:ends', { datetime: formatDateTime(event.end_date_time) })}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      )}
-                      {(event.link || event.guide_file) && (
-                        <View style={styles.actionIndicator}>
-                          <IconSymbol
-                            ios_icon_name="chevron.right"
-                            android_material_icon_name="chevron-right"
-                            size={16}
-                            color={colors.primary}
-                          />
-                          <Text style={[styles.actionText, { color: colors.primary }]}>
-                            {t('upcoming_events:tap_for_details')}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                ) : (
-                  <>
-                    {event.thumbnail_url && (
-                      <Image
-                        source={{ uri: getImageUrl(event.thumbnail_url)! }}
-                        style={styles.bannerImage}
-                      />
-                    )}
-                    <View style={styles.eventContent}>
-                      <Text style={[styles.eventTitle, { color: colors.text }]}>{getLocalizedField(event, 'title', language)}</Text>
-                      {(event.content || event.message) && (
-                        <FormattedText style={[styles.eventMessage, { color: colors.textSecondary }]}>
-                          {getLocalizedField(event, 'content', language) || event.content || event.message}
-                        </FormattedText>
-                      )}
-                      {event.start_date_time && (
-                        <View style={styles.eventMeta}>
-                          <View style={styles.metaItem}>
-                            <IconSymbol
-                              ios_icon_name="calendar"
-                              android_material_icon_name="event"
-                              size={14}
-                              color={colors.textSecondary}
-                            />
-                            <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                              {formatDateTime(event.start_date_time)}
-                            </Text>
-                          </View>
-                          {event.end_date_time && (
-                            <View style={styles.metaItem}>
-                              <IconSymbol
-                                ios_icon_name="clock"
-                                android_material_icon_name="schedule"
-                                size={14}
-                                color={colors.textSecondary}
-                              />
-                              <Text style={[styles.metaText, { color: colors.textSecondary }]}>
-                                {t('upcoming_events:ends', { datetime: formatDateTime(event.end_date_time) })}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      )}
-                      {(event.link || event.guide_file) && (
-                        <View style={styles.actionIndicator}>
-                          <IconSymbol
-                            ios_icon_name="chevron.right"
-                            android_material_icon_name="chevron-right"
-                            size={16}
-                            color={colors.primary}
-                          />
-                          <Text style={[styles.actionText, { color: colors.primary }]}>
-                            {t('upcoming_events:tap_for_details')}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                  </>
-                )}
-                {/* Category badge in date-filtered view */}
-                {selectedDate !== null && (
-                  <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '18' }]}>
-                    <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>
-                      {event.category === 'Event'
-                        ? t('upcoming_events:events')
-                        : t('upcoming_events:entertainment')}
-                    </Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-            ))
-          )}
+          {dateFilteredEvents && dateFilteredEvents.length === 0
+            ? renderEmptyState('date')
+            : dateFilteredEvents?.map((e, i) => renderEventCard(e, i))}
         </ScrollView>
+      ) : (
+        // No date: horizontal pager between Event and Entertainment categories.
+        <FlatList
+          ref={pagerRef}
+          data={PAGES as unknown as ('Event' | 'Entertainment')[]}
+          renderItem={renderCategoryPage}
+          keyExtractor={(item) => item}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={handlePagerScroll}
+          bounces={false}
+          getItemLayout={(_, index) => ({
+            length: SCREEN_WIDTH,
+            offset: SCREEN_WIDTH * index,
+            index,
+          })}
+        />
       )}
+
+      {/* Month overlay */}
+      <Modal
+        visible={monthOverlayVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setMonthOverlayVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.monthOverlay}
+          activeOpacity={1}
+          onPress={() => setMonthOverlayVisible(false)}
+        >
+          <View style={[styles.monthSheet, { backgroundColor: colors.card }]}>
+            <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+              <View style={styles.monthSheetHeader}>
+                <Text style={[styles.monthSheetTitle, { color: colors.text }]}>
+                  {t('upcoming_events:title')}
+                </Text>
+                <TouchableOpacity
+                  onPress={() => setMonthOverlayVisible(false)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <IconSymbol
+                    ios_icon_name="xmark.circle.fill"
+                    android_material_icon_name="cancel"
+                    size={22}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
+              <MonthlyCalendar
+                selectedDate={selectedDate}
+                onSelectDate={handleMonthDateSelect}
+                colors={{
+                  primary: colors.primary,
+                  background: colors.background,
+                  text: colors.text,
+                  textSecondary: colors.darkSecondaryText,
+                  card: colors.card,
+                }}
+                events={events}
+              />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {selectedEvent && (
         <ContentDetailModal
@@ -451,30 +462,23 @@ const styles = StyleSheet.create({
   headerSpacer: {
     width: 40,
   },
-  tabsContainer: {
+  subTabsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
+    borderRadius: 10,
+    padding: 4,
+    gap: 4,
   },
-  tab: {
+  subTab: {
     flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  activeTab: {
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.2)',
-    elevation: 2,
-  },
-  tabText: {
+  subTabText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  activeTabText: {
-    color: '#FFFFFF',
   },
   loadingContainer: {
     flex: 1,
@@ -490,7 +494,7 @@ const styles = StyleSheet.create({
   },
   contentContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: 12,
     paddingBottom: 100,
   },
   emptyContainer: {
@@ -510,76 +514,80 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   eventCard: {
-    borderRadius: 16,
-    marginBottom: 16,
-    overflow: 'hidden',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.2)',
-    elevation: 3,
-  },
-  squareLayout: {
-    flexDirection: 'row',
-    padding: 16,
-    gap: 16,
-  },
-  squareImage: {
-    width: 100,
-    height: 100,
     borderRadius: 12,
+    padding: 12,
+    marginBottom: 10,
+    borderLeftWidth: 4,
+    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.08)',
+    elevation: 2,
+  },
+  cardRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  cardImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
     resizeMode: 'cover',
   },
-  squareContent: {
+  cardContent: {
     flex: 1,
+    justifyContent: 'center',
   },
-  bannerImage: {
-    width: '100%',
-    height: 200,
-    resizeMode: 'cover',
-  },
-  eventContent: {
-    padding: 16,
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+    gap: 8,
   },
   eventTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
   },
   eventMessage: {
-    fontSize: 15,
-    marginBottom: 12,
-    lineHeight: 22,
-  },
-  eventMeta: {
-    gap: 8,
-    marginTop: 8,
-  },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  metaText: {
     fontSize: 13,
+    lineHeight: 18,
   },
-  actionIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    marginTop: 12,
-  },
-  actionText: {
-    fontSize: 13,
-    fontWeight: '600',
+  eventDate: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 4,
   },
   categoryBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    borderRadius: 8,
-    marginLeft: 16,
-    marginBottom: 12,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
   },
   categoryBadgeText: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '600',
+  },
+  monthOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  monthSheet: {
+    borderRadius: 16,
+    overflow: 'hidden',
+    boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.2)',
+    elevation: 8,
+  },
+  monthSheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(128,128,128,0.2)',
+  },
+  monthSheetTitle: {
+    fontSize: 16,
+    fontWeight: '700',
   },
 });

@@ -4,12 +4,23 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+// Module-level so the user's expand choice survives Today-tab re-renders within a single app session.
+// Resets to collapsed on app launch.
+let cachedExpanded = false;
 
 interface Shift {
   id: string;
@@ -40,6 +51,7 @@ export default function UpcomingShiftsCard({ userId, isManager = false, colors }
   const { t } = useTranslation();
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expanded, setExpanded] = useState(cachedExpanded);
 
   useFocusEffect(
     useCallback(() => {
@@ -69,7 +81,6 @@ export default function UpcomingShiftsCard({ userId, isManager = false, colors }
     }
   };
 
-  // Don't render if loading or no shifts
   if (loading && shifts.length === 0) return null;
   if (!loading && shifts.length === 0) return null;
 
@@ -91,10 +102,65 @@ export default function UpcomingShiftsCard({ userId, isManager = false, colors }
     return uniqueRoles[0];
   };
 
+  const toggleExpanded = () => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    const next = !expanded;
+    setExpanded(next);
+    cachedExpanded = next;
+  };
+
+  const renderShiftRow = (shift: Shift, index: number, total: number) => (
+    <View
+      key={shift.id}
+      style={[
+        styles.shiftRow,
+        index < total - 1 && {
+          borderBottomWidth: StyleSheet.hairlineWidth,
+          borderBottomColor: 'rgba(128,128,128,0.12)',
+        },
+      ]}
+    >
+      <Text style={[styles.shiftDate, { color: colors.text }]}>
+        {formatShiftDate(shift.shift_date)}
+      </Text>
+      <Text style={[styles.shiftTime, { color: colors.textSecondary }]}>
+        {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
+      </Text>
+      <View style={styles.shiftMeta}>
+        {shift.is_opener && (
+          <View style={[styles.flagBadge, { backgroundColor: '#4CAF5020' }]}>
+            <Text style={[styles.flagText, { color: '#4CAF50' }]}>O</Text>
+          </View>
+        )}
+        {shift.is_closer && (
+          <View style={[styles.flagBadge, { backgroundColor: '#FF980020' }]}>
+            <Text style={[styles.flagText, { color: '#FF9800' }]}>C</Text>
+          </View>
+        )}
+        {shift.is_training && (
+          <View style={[styles.flagBadge, { backgroundColor: '#2196F320' }]}>
+            <Text style={[styles.flagText, { color: '#2196F3' }]}>T</Text>
+          </View>
+        )}
+        {getPrimaryRole(shift) ? (
+          <View style={[styles.roleBadge, { backgroundColor: colors.primary + '15' }]}>
+            <Text style={[styles.roleText, { color: colors.primary }]}>
+              {getPrimaryRole(shift)}
+            </Text>
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: colors.card }]}>
-      {/* Header row */}
-      <View style={styles.headerRow}>
+      {/* Header row — tap anywhere except Full Schedule to toggle */}
+      <TouchableOpacity
+        style={styles.headerRow}
+        onPress={toggleExpanded}
+        activeOpacity={0.7}
+      >
         <View style={styles.headerLeft}>
           <IconSymbol
             ios_icon_name="calendar.badge.clock"
@@ -105,6 +171,12 @@ export default function UpcomingShiftsCard({ userId, isManager = false, colors }
           <Text style={[styles.headerTitle, { color: colors.text }]}>
             {t('upcoming_shifts.your_next_shifts', 'Your Next Shifts')}
           </Text>
+          <IconSymbol
+            ios_icon_name={expanded ? 'chevron.up' : 'chevron.down'}
+            android_material_icon_name={expanded ? 'expand-less' : 'expand-more'}
+            size={16}
+            color={colors.textSecondary}
+          />
         </View>
         <TouchableOpacity
           style={styles.fullScheduleButton}
@@ -121,54 +193,14 @@ export default function UpcomingShiftsCard({ userId, isManager = false, colors }
             color={colors.primary}
           />
         </TouchableOpacity>
-      </View>
+      </TouchableOpacity>
 
-      {/* Shift rows */}
-      {shifts.map((shift, index) => (
-        <View
-          key={shift.id}
-          style={[
-            styles.shiftRow,
-            index < shifts.length - 1 && {
-              borderBottomWidth: StyleSheet.hairlineWidth,
-              borderBottomColor: 'rgba(128,128,128,0.12)',
-            },
-          ]}
-        >
-          <Text style={[styles.shiftDate, { color: colors.text }]}>
-            {formatShiftDate(shift.shift_date)}
-          </Text>
-          <Text style={[styles.shiftTime, { color: colors.textSecondary }]}>
-            {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
-          </Text>
-          <View style={styles.shiftMeta}>
-            {shift.is_opener && (
-              <View style={[styles.flagBadge, { backgroundColor: '#4CAF5020' }]}>
-                <Text style={[styles.flagText, { color: '#4CAF50' }]}>O</Text>
-              </View>
-            )}
-            {shift.is_closer && (
-              <View style={[styles.flagBadge, { backgroundColor: '#FF980020' }]}>
-                <Text style={[styles.flagText, { color: '#FF9800' }]}>C</Text>
-              </View>
-            )}
-            {shift.is_training && (
-              <View style={[styles.flagBadge, { backgroundColor: '#2196F320' }]}>
-                <Text style={[styles.flagText, { color: '#2196F3' }]}>T</Text>
-              </View>
-            )}
-            {getPrimaryRole(shift) ? (
-              <View style={[styles.roleBadge, { backgroundColor: colors.primary + '15' }]}>
-                <Text style={[styles.roleText, { color: colors.primary }]}>
-                  {getPrimaryRole(shift)}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-      ))}
+      {/* Collapsed: just the next shift inline. Expanded: full list. */}
+      {expanded
+        ? shifts.map((shift, index) => renderShiftRow(shift, index, shifts.length))
+        : renderShiftRow(shifts[0], 0, 1)}
 
-      {/* Manager-only: View Today's Roster */}
+      {/* Manager-only View Today's Roster — always visible */}
       {isManager && (
         <TouchableOpacity
           style={[styles.rosterButton, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.12)' }]}
@@ -200,6 +232,7 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: 12,
     padding: 12,
+    marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,

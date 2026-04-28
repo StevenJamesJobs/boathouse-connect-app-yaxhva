@@ -42,6 +42,8 @@ interface WeeklyCalendarStripProps {
   edgeToEdge?: boolean;
   /** When true, hides the "View Top Events" button even when a date is selected. */
   hideViewTopEvents?: boolean;
+  /** Optional handler for an "expand to month" calendar icon button on the right of the header. */
+  onMonthExpand?: () => void;
 }
 
 export default function WeeklyCalendarStrip({
@@ -53,6 +55,7 @@ export default function WeeklyCalendarStrip({
   children,
   edgeToEdge = false,
   hideViewTopEvents = false,
+  onMonthExpand,
 }: WeeklyCalendarStripProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language || 'en';
@@ -141,6 +144,21 @@ export default function WeeklyCalendarStrip({
                 ios_icon_name="chevron.right"
                 android_material_icon_name="chevron-right"
                 size={14}
+                color={colors.primary}
+              />
+            </TouchableOpacity>
+          )}
+          {onMonthExpand && (
+            <TouchableOpacity
+              onPress={onMonthExpand}
+              style={styles.monthExpandButton}
+              activeOpacity={0.7}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <IconSymbol
+                ios_icon_name="calendar"
+                android_material_icon_name="calendar-month"
+                size={20}
                 color={colors.primary}
               />
             </TouchableOpacity>
@@ -301,6 +319,10 @@ const styles = StyleSheet.create({
   viewAllText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  monthExpandButton: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
   },
   weekRowWithArrows: {
     flexDirection: 'row',

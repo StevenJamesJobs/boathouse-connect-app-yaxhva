@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,13 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  FlatList,
+  Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -55,6 +61,24 @@ export default function EmployeeRewardsScreen() {
   const [activeTab, setActiveTab] = useState<MainTab>('rewards');
   const [rewardsSubTab, setRewardsSubTab] = useState<RewardsSubTab>('leaderboard');
   const [loading, setLoading] = useState(true);
+  const subTabPagerRef = useRef<FlatList>(null);
+  const SUB_PAGES: RewardsSubTab[] = ['leaderboard', 'recent'];
+
+  const goToSubTab = (tab: RewardsSubTab) => {
+    const idx = SUB_PAGES.indexOf(tab);
+    subTabPagerRef.current?.scrollToIndex({ index: idx, animated: true });
+    setRewardsSubTab(tab);
+    if (tab === 'recent') markRecentViewed();
+  };
+
+  const handleSubTabScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    const next = SUB_PAGES[idx];
+    if (next && next !== rewardsSubTab) {
+      setRewardsSubTab(next);
+      if (next === 'recent') markRecentViewed();
+    }
+  };
 
   // Rewards state
   const [myBucks, setMyBucks] = useState(0);
@@ -235,13 +259,12 @@ export default function EmployeeRewardsScreen() {
       </View>
 
       {/* Content */}
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {activeTab === 'rewards' ? (
-          <>
-            {/* Exam Reward Blurb (dismissible) */}
+      {activeTab === 'rewards' ? (
+        <View style={{ flex: 1 }}>
+          {/* Static header — Exam blurb, Bucks card, Sub-Tab Selector */}
+          <View style={styles.subTabHeader}>
             <ExamRewardBlurb />
 
-            {/* My McLoone's Bucks */}
             <View style={[styles.bucksCard, { backgroundColor: colors.card }]}>
               <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={32} color={colors.primary} />
               <Text style={[styles.bucksLabel, { color: colors.textSecondary }]}>My McLoone's Bucks</Text>
@@ -260,14 +283,13 @@ export default function EmployeeRewardsScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Sub-Tab Selector: Leaderboard / Recent Awards */}
             <View style={[styles.subTabContainer, { backgroundColor: colors.card }]}>
               <TouchableOpacity
                 style={[
                   styles.subTab,
                   rewardsSubTab === 'leaderboard' && { backgroundColor: colors.primary },
                 ]}
-                onPress={() => setRewardsSubTab('leaderboard')}
+                onPress={() => goToSubTab('leaderboard')}
               >
                 <IconSymbol
                   ios_icon_name="trophy.fill"
@@ -287,10 +309,7 @@ export default function EmployeeRewardsScreen() {
                   styles.subTab,
                   rewardsSubTab === 'recent' && { backgroundColor: colors.primary },
                 ]}
-                onPress={() => {
-                  setRewardsSubTab('recent');
-                  markRecentViewed();
-                }}
+                onPress={() => goToSubTab('recent')}
               >
                 <View style={{ position: 'relative' }}>
                   <IconSymbol
@@ -311,132 +330,151 @@ export default function EmployeeRewardsScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+          </View>
 
-            {/* Sub-Tab Content */}
-            {rewardsSubTab === 'leaderboard' ? (
-              <View style={styles.section}>
-                {topEmployees.length === 0 ? (
-                  <View style={styles.emptyContainer}>
-                    <IconSymbol ios_icon_name="trophy" android_material_icon_name="emoji-events" size={48} color={colors.textSecondary} />
-                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No leaderboard data yet</Text>
-                  </View>
-                ) : (
-                  topEmployees.map((emp, index) => {
-                    const isCurrentUser = emp.id === user?.id;
-                    return (
-                      <View
-                        key={emp.id}
-                        style={[
-                          styles.leaderboardItem,
-                          { backgroundColor: colors.card },
-                          isCurrentUser && { borderWidth: 2, borderColor: colors.primary },
-                        ]}
-                      >
-                        <View style={[styles.leaderboardRank, { backgroundColor: getRankColor(index) }]}>
-                          <Text style={styles.leaderboardRankText}>
-                            {index < 3 ? ['🥇', '🥈', '🥉'][index] : `#${index + 1}`}
-                          </Text>
-                        </View>
-                        <View style={styles.leaderboardInfo}>
-                          <Text style={[styles.leaderboardName, { color: colors.text }]}>
-                            {emp.name}{isCurrentUser ? ' (You)' : ''}
-                          </Text>
-                          <Text style={[styles.leaderboardJob, { color: colors.textSecondary }]}>{emp.job_title}</Text>
-                        </View>
-                        <Text style={[styles.leaderboardBucks, { color: colors.primary }]}>${emp.mcloones_bucks || 0}</Text>
+          {/* Horizontal pager — sub-tab content swipes between Leaderboard / Recent */}
+          <FlatList
+            ref={subTabPagerRef}
+            data={SUB_PAGES}
+            keyExtractor={(item) => item}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleSubTabScroll}
+            bounces={false}
+            getItemLayout={(_, index) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * index, index })}
+            renderItem={({ item }) => (
+              <ScrollView
+                style={{ width: SCREEN_WIDTH }}
+                contentContainerStyle={styles.contentContainer}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+              >
+                {item === 'leaderboard' ? (
+                  <View style={styles.section}>
+                    {topEmployees.length === 0 ? (
+                      <View style={styles.emptyContainer}>
+                        <IconSymbol ios_icon_name="trophy" android_material_icon_name="emoji-events" size={48} color={colors.textSecondary} />
+                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No leaderboard data yet</Text>
                       </View>
-                    );
-                  })
-                )}
-              </View>
-            ) : (
-              <View style={styles.section}>
-                {recentTransactions.length === 0 ? (
-                  <View style={styles.emptyContainer}>
-                    <IconSymbol ios_icon_name="clock" android_material_icon_name="history" size={48} color={colors.textSecondary} />
-                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No recent awards yet</Text>
-                  </View>
-                ) : (
-                  recentTransactions.map((trans, index) => {
-                    const denied = trans.isDenied;
-                    return (
-                      <View key={trans.id || index} style={[styles.transactionItem, { backgroundColor: colors.card }]}>
-                        <View style={[
-                          styles.transactionIcon,
-                          { backgroundColor: denied ? '#FFEBEE' : trans.amount > 0 ? '#E8F5E9' : '#FFEBEE' },
-                        ]}>
-                          <IconSymbol
-                            ios_icon_name={denied ? 'xmark.circle.fill' : trans.amount > 0 ? 'arrow.up.circle.fill' : 'arrow.down.circle.fill'}
-                            android_material_icon_name={denied ? 'cancel' : trans.amount > 0 ? 'arrow-upward' : 'arrow-downward'}
-                            size={20}
-                            color={denied ? '#F44336' : trans.amount > 0 ? '#4CAF50' : '#F44336'}
-                          />
-                        </View>
-                        <View style={styles.transactionInfo}>
-                          <Text style={[styles.transactionEmployee, { color: colors.text }]}>
-                            {denied ? 'You' : trans.user_name || 'Unknown Employee'}
-                          </Text>
-                          <Text style={[styles.transactionDescription, { color: colors.textSecondary }]}>{trans.description}</Text>
-                          <Text style={[styles.transactionDate, { color: colors.textSecondary }]}>
-                            {new Date(trans.created_at).toLocaleDateString()}
-                          </Text>
-                        </View>
-                        {denied ? (
-                          <View style={styles.deniedPill}>
-                            <Text style={styles.deniedPillText}>DENIED</Text>
-                          </View>
-                        ) : (
-                          <Text
+                    ) : (
+                      topEmployees.map((emp, index) => {
+                        const isCurrentUser = emp.id === user?.id;
+                        return (
+                          <View
+                            key={emp.id}
                             style={[
-                              styles.transactionAmount,
-                              trans.amount > 0 ? styles.positiveAmount : styles.negativeAmount,
+                              styles.leaderboardItem,
+                              { backgroundColor: colors.card },
+                              isCurrentUser && { borderWidth: 2, borderColor: colors.primary },
                             ]}
                           >
-                            {trans.amount > 0 ? '+' : ''}${trans.amount}
-                          </Text>
-                        )}
+                            <View style={[styles.leaderboardRank, { backgroundColor: getRankColor(index) }]}>
+                              <Text style={styles.leaderboardRankText}>
+                                {index < 3 ? ['🥇', '🥈', '🥉'][index] : `#${index + 1}`}
+                              </Text>
+                            </View>
+                            <View style={styles.leaderboardInfo}>
+                              <Text style={[styles.leaderboardName, { color: colors.text }]}>
+                                {emp.name}{isCurrentUser ? ' (You)' : ''}
+                              </Text>
+                              <Text style={[styles.leaderboardJob, { color: colors.textSecondary }]}>{emp.job_title}</Text>
+                            </View>
+                            <Text style={[styles.leaderboardBucks, { color: colors.primary }]}>${emp.mcloones_bucks || 0}</Text>
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
+                ) : (
+                  <View style={styles.section}>
+                    {recentTransactions.length === 0 ? (
+                      <View style={styles.emptyContainer}>
+                        <IconSymbol ios_icon_name="clock" android_material_icon_name="history" size={48} color={colors.textSecondary} />
+                        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No recent awards yet</Text>
                       </View>
-                    );
-                  })
+                    ) : (
+                      recentTransactions.map((trans, index) => {
+                        const denied = trans.isDenied;
+                        return (
+                          <View key={trans.id || index} style={[styles.transactionItem, { backgroundColor: colors.card }]}>
+                            <View style={[
+                              styles.transactionIcon,
+                              { backgroundColor: denied ? '#FFEBEE' : trans.amount > 0 ? '#E8F5E9' : '#FFEBEE' },
+                            ]}>
+                              <IconSymbol
+                                ios_icon_name={denied ? 'xmark.circle.fill' : trans.amount > 0 ? 'arrow.up.circle.fill' : 'arrow.down.circle.fill'}
+                                android_material_icon_name={denied ? 'cancel' : trans.amount > 0 ? 'arrow-upward' : 'arrow-downward'}
+                                size={20}
+                                color={denied ? '#F44336' : trans.amount > 0 ? '#4CAF50' : '#F44336'}
+                              />
+                            </View>
+                            <View style={styles.transactionInfo}>
+                              <Text style={[styles.transactionEmployee, { color: colors.text }]}>
+                                {denied ? 'You' : trans.user_name || 'Unknown Employee'}
+                              </Text>
+                              <Text style={[styles.transactionDescription, { color: colors.textSecondary }]}>{trans.description}</Text>
+                              <Text style={[styles.transactionDate, { color: colors.textSecondary }]}>
+                                {new Date(trans.created_at).toLocaleDateString()}
+                              </Text>
+                            </View>
+                            {denied ? (
+                              <View style={styles.deniedPill}>
+                                <Text style={styles.deniedPillText}>DENIED</Text>
+                              </View>
+                            ) : (
+                              <Text
+                                style={[
+                                  styles.transactionAmount,
+                                  trans.amount > 0 ? styles.positiveAmount : styles.negativeAmount,
+                                ]}
+                              >
+                                {trans.amount > 0 ? '+' : ''}${trans.amount}
+                              </Text>
+                            )}
+                          </View>
+                        );
+                      })
+                    )}
+                  </View>
                 )}
-              </View>
+              </ScrollView>
             )}
-          </>
-        ) : (
-          <>
-            {/* Guest Reviews */}
-            <View style={styles.section}>
-              {reviews.length === 0 ? (
-                <View style={styles.placeholderContainer}>
-                  <IconSymbol
-                    ios_icon_name="star.fill"
-                    android_material_icon_name="rate_review"
-                    size={64}
-                    color={colors.primary}
-                  />
-                  <Text style={[styles.placeholderTitle, { color: colors.text }]}>No Reviews Yet</Text>
-                  <Text style={[styles.placeholderText, { color: colors.textSecondary }]}>
-                    Guest reviews will appear here once they are added by management.
+          />
+        </View>
+      ) : (
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+          <View style={styles.section}>
+            {reviews.length === 0 ? (
+              <View style={styles.placeholderContainer}>
+                <IconSymbol
+                  ios_icon_name="star.fill"
+                  android_material_icon_name="rate_review"
+                  size={64}
+                  color={colors.primary}
+                />
+                <Text style={[styles.placeholderTitle, { color: colors.text }]}>No Reviews Yet</Text>
+                <Text style={[styles.placeholderText, { color: colors.textSecondary }]}>
+                  Guest reviews will appear here once they are added by management.
+                </Text>
+              </View>
+            ) : (
+              reviews.map((review, index) => (
+                <View key={review.id || index} style={[styles.reviewCard, { backgroundColor: colors.card }]}>
+                  <View style={styles.reviewHeader}>
+                    <Text style={[styles.reviewGuestName, { color: colors.text }]}>{review.guest_name}</Text>
+                    {renderStars(review.rating)}
+                  </View>
+                  <Text style={[styles.reviewText, { color: colors.text }]}>{review.review_text}</Text>
+                  <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
+                    {new Date(review.review_date).toLocaleDateString()}
                   </Text>
                 </View>
-              ) : (
-                reviews.map((review, index) => (
-                  <View key={review.id || index} style={[styles.reviewCard, { backgroundColor: colors.card }]}>
-                    <View style={styles.reviewHeader}>
-                      <Text style={[styles.reviewGuestName, { color: colors.text }]}>{review.guest_name}</Text>
-                      {renderStars(review.rating)}
-                    </View>
-                    <Text style={[styles.reviewText, { color: colors.text }]}>{review.review_text}</Text>
-                    <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
-                      {new Date(review.review_date).toLocaleDateString()}
-                    </Text>
-                  </View>
-                ))
-              )}
-            </View>
-          </>
-        )}
-      </ScrollView>
+              ))
+            )}
+          </View>
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -469,6 +507,10 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+  },
+  subTabHeader: {
+    paddingTop: 20,
+    paddingHorizontal: 16,
   },
   contentContainer: {
     flexGrow: 1,

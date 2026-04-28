@@ -6,6 +6,9 @@ import {
   StyleSheet,
   Modal,
   ActivityIndicator,
+  FlatList,
+  Dimensions,
+  Pressable,
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -18,6 +21,10 @@ import { useTranslation } from 'react-i18next';
 import { fetchContentImagesBatch } from '@/utils/contentImages';
 import { stripFormattingTags } from '@/components/FormattedText';
 import { useUnreadContent } from '@/hooks/useUnreadContent';
+
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const PAGE_SIZE = 25;
+const SOURCE_FETCH_LIMIT = 100;
 
 type NotificationType = 'announcement' | 'special_feature' | 'upcoming_event' | 'weekly_special' | 'custom_notification';
 
@@ -105,11 +112,13 @@ export default function NotificationDropdown({
   const router = useRouter();
   const { markAnnouncementViewed, markSpecialFeatureViewed } = useUnreadContent();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (visible) {
+      setDisplayCount(PAGE_SIZE);
       loadNotifications();
     }
   }, [visible]);
@@ -130,7 +139,7 @@ export default function NotificationDropdown({
         .eq('is_active', true)
         .in('visibility', visibilityFilter)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(SOURCE_FETCH_LIMIT);
 
       if (announcements) {
         for (const a of announcements) {
@@ -151,7 +160,7 @@ export default function NotificationDropdown({
         .select('*, guide_file:guides_and_training!special_features_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
         .eq('is_active', true)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(SOURCE_FETCH_LIMIT);
 
       if (features) {
         for (const f of features) {
@@ -172,7 +181,7 @@ export default function NotificationDropdown({
         .select('*, guide_file:guides_and_training!upcoming_events_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
         .eq('is_active', true)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(SOURCE_FETCH_LIMIT);
 
       if (events) {
         for (const e of events) {
@@ -194,7 +203,7 @@ export default function NotificationDropdown({
         .eq('category', 'Weekly Specials')
         .eq('is_active', true)
         .order('created_at', { ascending: false })
-        .limit(5);
+        .limit(SOURCE_FETCH_LIMIT);
 
       if (specials) {
         for (const s of specials) {
@@ -214,7 +223,7 @@ export default function NotificationDropdown({
         .from('custom_notifications') as any)
         .select('id, title, body, created_at, data')
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(SOURCE_FETCH_LIMIT);
 
       // Load this user's quiz dismissals so we can hide the bell entry
       // after they've already tapped it once.
@@ -269,16 +278,13 @@ export default function NotificationDropdown({
         }
       }
 
-      // Sort all by created_at descending, take top 5
+      // Sort all by created_at descending — keep the full pool for paginated load-more.
       items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-      // Fetch images for the top 5
-      const top5 = items.slice(0, 5);
-
-      // Batch fetch images by type
-      const announcementIds = top5.filter(i => i.type === 'announcement').map(i => i.id);
-      const featureIds = top5.filter(i => i.type === 'special_feature').map(i => i.id);
-      const eventIds = top5.filter(i => i.type === 'upcoming_event').map(i => i.id);
+      // Batch fetch images for the entire pool (one query per type, plenty of headroom).
+      const announcementIds = items.filter(i => i.type === 'announcement').map(i => i.id);
+      const featureIds = items.filter(i => i.type === 'special_feature').map(i => i.id);
+      const eventIds = items.filter(i => i.type === 'upcoming_event').map(i => i.id);
 
       const [annImgs, featImgs, evtImgs] = await Promise.all([
         announcementIds.length > 0 ? fetchContentImagesBatch('announcement', announcementIds) : new Map<string, string[]>(),
@@ -286,8 +292,7 @@ export default function NotificationDropdown({
         eventIds.length > 0 ? fetchContentImagesBatch('upcoming_event', eventIds) : new Map<string, string[]>(),
       ]);
 
-      // Attach image URLs
-      for (const item of top5) {
+      for (const item of items) {
         let additionalImgs: string[] | undefined;
         if (item.type === 'announcement') additionalImgs = annImgs.get(item.id) as string[] | undefined;
         else if (item.type === 'special_feature') additionalImgs = featImgs.get(item.id) as string[] | undefined;
@@ -298,7 +303,7 @@ export default function NotificationDropdown({
         }
       }
 
-      setNotifications(top5);
+      setNotifications(items);
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
@@ -423,13 +428,12 @@ export default function NotificationDropdown({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View style={[styles.dropdown, { backgroundColor: colors.card }]}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+      <Pressable style={styles.overlay} onPress={onClose}>
+        <View
+          style={[styles.dropdown, { backgroundColor: colors.card }]}
+          onStartShouldSetResponder={() => true}
+        >
+          <View>
             {/* Header */}
             <View style={styles.header}>
               <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -457,66 +461,84 @@ export default function NotificationDropdown({
                 </Text>
               </View>
             ) : (
-              notifications.map((item, index) => {
-                const config = TYPE_CONFIG[item.type];
-                return (
-                  <TouchableOpacity
-                    key={`${item.type}-${item.id}`}
-                    style={[
-                      styles.notificationItem,
-                      index < notifications.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border || '#F0F0F0' },
-                    ]}
-                    onPress={() => handleItemPress(item)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.iconCircle, { backgroundColor: config.color }]}>
-                      <IconSymbol
-                        ios_icon_name={config.iconIos as any}
-                        android_material_icon_name={config.iconAndroid as any}
-                        size={16}
-                        color="#FFFFFF"
-                      />
+              <FlatList
+                data={notifications.slice(0, displayCount)}
+                keyExtractor={(item) => `${item.type}-${item.id}`}
+                style={{ maxHeight: SCREEN_HEIGHT * 0.6 }}
+                onEndReachedThreshold={0.3}
+                onEndReached={() => {
+                  if (displayCount < notifications.length) {
+                    setDisplayCount((c) => Math.min(c + PAGE_SIZE, notifications.length));
+                  }
+                }}
+                ListFooterComponent={
+                  displayCount < notifications.length ? (
+                    <View style={styles.footerLoading}>
+                      <ActivityIndicator size="small" color={colors.primary} />
                     </View>
-                    <View style={styles.notificationContent}>
-                      <Text style={[styles.notificationTitle, { color: colors.text }]} numberOfLines={1}>
-                        {item.title}
+                  ) : null
+                }
+                renderItem={({ item, index }) => {
+                  const config = TYPE_CONFIG[item.type];
+                  const visibleCount = Math.min(displayCount, notifications.length);
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.notificationItem,
+                        index < visibleCount - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border || '#F0F0F0' },
+                      ]}
+                      onPress={() => handleItemPress(item)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.iconCircle, { backgroundColor: config.color }]}>
+                        <IconSymbol
+                          ios_icon_name={config.iconIos as any}
+                          android_material_icon_name={config.iconAndroid as any}
+                          size={16}
+                          color="#FFFFFF"
+                        />
+                      </View>
+                      <View style={styles.notificationContent}>
+                        <Text style={[styles.notificationTitle, { color: colors.text }]} numberOfLines={1}>
+                          {item.title}
+                        </Text>
+                        <Text style={[styles.notificationSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
+                          {truncate(item.subtitle)}
+                        </Text>
+                      </View>
+                      <Text style={[styles.timeAgo, { color: colors.textSecondary }]}>
+                        {getTimeAgo(item.createdAt)}
                       </Text>
-                      <Text style={[styles.notificationSubtitle, { color: colors.textSecondary }]} numberOfLines={1}>
-                        {truncate(item.subtitle)}
-                      </Text>
-                    </View>
-                    <Text style={[styles.timeAgo, { color: colors.textSecondary }]}>
-                      {getTimeAgo(item.createdAt)}
-                    </Text>
-                    {isManager && (
-                      <TouchableOpacity
-                        style={styles.deleteBtn}
-                        onPress={(e) => {
-                          e.stopPropagation?.();
-                          handleDeleteNotification(item);
-                        }}
-                        disabled={deletingId === item.id}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        {deletingId === item.id ? (
-                          <ActivityIndicator size="small" color={colors.textSecondary} />
-                        ) : (
-                          <IconSymbol
-                            ios_icon_name="xmark.circle.fill"
-                            android_material_icon_name="cancel"
-                            size={18}
-                            color={colors.textSecondary}
-                          />
-                        )}
-                      </TouchableOpacity>
-                    )}
-                  </TouchableOpacity>
-                );
-              })
+                      {isManager && (
+                        <TouchableOpacity
+                          style={styles.deleteBtn}
+                          onPress={(e) => {
+                            e.stopPropagation?.();
+                            handleDeleteNotification(item);
+                          }}
+                          disabled={deletingId === item.id}
+                          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                          {deletingId === item.id ? (
+                            <ActivityIndicator size="small" color={colors.textSecondary} />
+                          ) : (
+                            <IconSymbol
+                              ios_icon_name="xmark.circle.fill"
+                              android_material_icon_name="cancel"
+                              size={18}
+                              color={colors.textSecondary}
+                            />
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </TouchableOpacity>
+                  );
+                }}
+              />
             )}
-          </TouchableOpacity>
+          </View>
         </View>
-      </TouchableOpacity>
+      </Pressable>
     </Modal>
   );
 }
@@ -591,5 +613,9 @@ const styles = StyleSheet.create({
   deleteBtn: {
     padding: 4,
     marginLeft: 4,
+  },
+  footerLoading: {
+    paddingVertical: 16,
+    alignItems: 'center',
   },
 });

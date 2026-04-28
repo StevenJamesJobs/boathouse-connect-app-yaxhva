@@ -200,7 +200,27 @@ export default function EmployeePortalScreen() {
   } | null>(null);
 
   const SECTIONS: ConnectBarTab[] = ['today', 'events', 'specials'];
-  const FLATLIST_PAGES = ['today', 'events', 'specials', 'menu-bridge'] as const;
+  // Flat pager: each leaf (sub-tab) is its own page so horizontal swipes traverse
+  // both top-level Connect bar tabs and their internal sub-tabs in a single sequence.
+  // The section-level static UI (shifts/happening header for Today, calendar strip
+  // for Events) lives OUTSIDE the FlatList — only the cards content swipes.
+  const FLATLIST_PAGES = [
+    'today-announcements',
+    'today-special-features',
+    'events-event',
+    'events-entertainment',
+    'specials',
+    'menu-bridge',
+  ] as const;
+  const MENU_BRIDGE_INDEX = 5;
+  const SECTION_FIRST_LEAF: Record<ConnectBarTab, number> = { today: 0, events: 2, specials: 4 };
+  const pageIndexToSection = (index: number): ConnectBarTab | 'menu-bridge' => {
+    if (index <= 1) return 'today';
+    if (index <= 3) return 'events';
+    if (index === 4) return 'specials';
+    return 'menu-bridge';
+  };
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
   useEffect(() => {
     loadWeeklySpecials();
@@ -346,7 +366,7 @@ export default function EmployeePortalScreen() {
         .eq('is_active', true)
         .in('visibility', ['everyone', 'employees'])
         .order('display_order', { ascending: true })
-        .limit(4);
+        .limit(6);
 
       if (error) throw error;
       setAnnouncements(data || []);
@@ -415,7 +435,7 @@ export default function EmployeePortalScreen() {
         .eq('is_active', true)
         .order('display_order', { ascending: true })
         .order('created_at', { ascending: false })
-        .limit(4);
+        .limit(6);
 
       if (error) throw error;
       setSpecialFeatures(data || []);
@@ -519,16 +539,21 @@ export default function EmployeePortalScreen() {
     });
   };
 
-  // Compute filtered events for the Events section
-  const eventsDisplayList = (() => {
+  // Compute filtered events for the Events section, scoped per-leaf so each
+  // pager page renders its own consistent list during swipes.
+  const computeEventsDisplay = (subTab: 'Event' | 'Entertainment') => {
     if (eventsSelectedDate !== null) {
       return upcomingEvents.filter(event =>
         eventFallsOnDate(event.start_date_time, event.end_date_time, eventsSelectedDate)
       );
     }
-    const filtered = upcomingEvents.filter(event => event.category === eventsTab);
-    return filtered.slice(0, 6);
-  })();
+    return upcomingEvents.filter(event => event.category === subTab).slice(0, 6);
+  };
+
+  // Today's events + entertainment for the "Happening Today" section on the Today tab
+  const todayHappeningList = upcomingEvents.filter(event =>
+    eventFallsOnDate(event.start_date_time, event.end_date_time, new Date())
+  );
 
   const renderEventCard = (event: UpcomingEvent, index: number) => {
     const additionalImages = contentImagesMap.get(event.id);
@@ -581,36 +606,66 @@ export default function EmployeePortalScreen() {
     );
   };
 
-  // Handle section swipe
+  // Handle section swipe across the flat pager (6 leaf pages).
   const handleSectionScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const pageIndex = Math.round(offsetX / SCREEN_WIDTH);
 
-    // If user swiped to the phantom 4th page, navigate to Menu tab
-    if (pageIndex === 3) {
+    // Phantom menu-bridge page hands off to the Menu tab.
+    if (pageIndex === MENU_BRIDGE_INDEX) {
       router.navigate('/(portal)/employee/menus');
-      // Scroll back to specials so if they come back it's in the right position
       setTimeout(() => {
-        sectionListRef.current?.scrollToIndex({ index: 2, animated: false });
+        sectionListRef.current?.scrollToIndex({ index: SECTION_FIRST_LEAF.specials, animated: false });
         setActiveSection('specials');
+        setCurrentPageIndex(SECTION_FIRST_LEAF.specials);
       }, 100);
       return;
     }
 
-    const newTab = SECTIONS[pageIndex];
-    if (newTab && newTab !== activeSection) {
-      setActiveSection(newTab);
-      markTabViewed(newTab);
+    setCurrentPageIndex(pageIndex);
+    const newSection = pageIndexToSection(pageIndex) as ConnectBarTab;
+    if (newSection !== activeSection) {
+      setActiveSection(newSection);
+      markTabViewed(newSection);
     }
-  }, [activeSection, router, markTabViewed]);
+    // Sync sub-tab state from the leaf the user landed on (used for badge tracking).
+    if (pageIndex === 0 && whatsHappeningTab !== 'Announcements') {
+      setWhatsHappeningTab('Announcements');
+      markWelcomeTabViewed('announcements');
+    } else if (pageIndex === 1 && whatsHappeningTab !== 'Special Features') {
+      setWhatsHappeningTab('Special Features');
+      markWelcomeTabViewed('specialFeatures');
+    } else if (pageIndex === 2 && eventsTab !== 'Event') {
+      setEventsTab('Event');
+    } else if (pageIndex === 3 && eventsTab !== 'Entertainment') {
+      setEventsTab('Entertainment');
+    }
+  }, [activeSection, router, markTabViewed, whatsHappeningTab, eventsTab, markWelcomeTabViewed]);
 
-  // Handle ConnectBar tab press
+  // Cross-section header swap mid-swipe: snap activeSection to whichever section
+  // the user has crossed into so the static header doesn't lag the cards.
+  const handleSectionScrollLive = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const pageIndex = Math.round(offsetX / SCREEN_WIDTH);
+    const liveSection = pageIndexToSection(pageIndex);
+    if (liveSection !== 'menu-bridge' && liveSection !== activeSection) {
+      setActiveSection(liveSection as ConnectBarTab);
+      setCurrentPageIndex(pageIndex);
+    }
+  }, [activeSection]);
+
+  // Handle ConnectBar tab press — scroll to the first leaf of that section.
   const handleTabChange = useCallback((tab: ConnectBarTab) => {
     setActiveSection(tab);
+    setCurrentPageIndex(SECTION_FIRST_LEAF[tab]);
     markTabViewed(tab);
-    const index = SECTIONS.indexOf(tab);
-    sectionListRef.current?.scrollToIndex({ index, animated: true });
+    sectionListRef.current?.scrollToIndex({ index: SECTION_FIRST_LEAF[tab], animated: true });
   }, [markTabViewed]);
+
+  // Sub-tab tap handlers — scroll the pager to the matching leaf.
+  const goToLeaf = useCallback((index: number) => {
+    sectionListRef.current?.scrollToIndex({ index, animated: true });
+  }, []);
 
   // ===== RENDER CARD COMPONENTS =====
 
@@ -788,187 +843,182 @@ export default function EmployeePortalScreen() {
 
   // ===== SECTION RENDERERS =====
 
-  const renderTodaySection = () => (
-    <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
-      <ScrollView
-        style={styles.sectionScroll}
-        contentContainerStyle={styles.sectionContent}
-        showsVerticalScrollIndicator={false}
-        nestedScrollEnabled
-      >
-        {/* Upcoming Shifts Card */}
-        <UpcomingShiftsCard
-          userId={user?.id}
-          colors={{
-            primary: colors.primary,
-            background: colors.background,
-            text: colors.text,
-            textSecondary: colors.darkSecondaryText,
-            card: colors.card,
-          }}
-        />
+  // Static section header for the Today section — rendered ABOVE the FlatList so
+  // it stays still while the user swipes between Today's sub-tab leaves.
+  const renderTodayHeader = (activeSubTab: 'Announcements' | 'Special Features') => (
+    <View style={styles.sectionHeaderWrap}>
+      <UpcomingShiftsCard
+        userId={user?.id}
+        colors={{
+          primary: colors.primary,
+          background: colors.background,
+          text: colors.text,
+          textSecondary: colors.darkSecondaryText,
+          card: colors.card,
+        }}
+      />
 
-        {/* Sub-tabs card: Announcements / Special Features */}
-        <View style={[styles.todayTabsCard, { backgroundColor: colors.card }]}>
-          <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginBottom: 0 }]}>
-            <TouchableOpacity
-              style={[styles.subTab, whatsHappeningTab === 'Announcements' && { backgroundColor: colors.primary }]}
-              onPress={() => {
-                setWhatsHappeningTab('Announcements');
-                markWelcomeTabViewed('announcements');
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={styles.subTabLabelRow}>
-                <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Announcements' && { color: '#FFFFFF' }]}>
-                  {t('manager_home.announcements')}
-                </Text>
-                {announcementsHasNew && whatsHappeningTab !== 'Announcements' && (
-                  <View style={styles.subTabBadgeDot} />
-                )}
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.subTab, whatsHappeningTab === 'Special Features' && { backgroundColor: colors.primary }]}
-              onPress={() => {
-                setWhatsHappeningTab('Special Features');
-                markWelcomeTabViewed('specialFeatures');
-              }}
-              activeOpacity={0.7}
-            >
-              <View style={styles.subTabLabelRow}>
-                <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Special Features' && { color: '#FFFFFF' }]}>
-                  {t('manager_home.special_features')}
-                </Text>
-                {specialFeaturesHasNew && whatsHappeningTab !== 'Special Features' && (
-                  <View style={styles.subTabBadgeDot} />
-                )}
-              </View>
-            </TouchableOpacity>
+      {todayHappeningList.length > 0 && (
+        <View style={styles.happeningTodayWrap}>
+          <View style={styles.happeningTodayHeader}>
+            <IconSymbol
+              ios_icon_name="calendar"
+              android_material_icon_name="event"
+              size={16}
+              color={colors.primary}
+            />
+            <Text style={[styles.happeningTodayTitle, { color: colors.text }]}>
+              {t('today_section.happening_today', 'Happening Today')}
+            </Text>
           </View>
+          {todayHappeningList.map((event, index) => renderEventCard(event, index))}
         </View>
+      )}
 
-        {/* Announcements */}
-        {whatsHappeningTab === 'Announcements' && (
-          <>
-            {loadingAnnouncements ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={colors.primary} />
-              </View>
-            ) : announcements.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  {t('manager_home.no_announcements', 'No announcements')}
-                </Text>
-              </View>
-            ) : (
-              announcements.map((a, i) => renderAnnouncementCard(a, i))
-            )}
-          </>
-        )}
-
-        {/* Special Features */}
-        {whatsHappeningTab === 'Special Features' && (
-          <>
-            {/* View All link */}
-            <TouchableOpacity
-              style={styles.viewAllRow}
-              onPress={() => router.push('/view-all-special-features')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.viewAllText, { color: colors.primary }]}>
-                {t('manager_home.view_all', 'View All')}
+      <View style={[styles.todayTabsCard, { backgroundColor: colors.card }]}>
+        <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginBottom: 0 }]}>
+          <TouchableOpacity
+            style={[styles.subTab, activeSubTab === 'Announcements' && { backgroundColor: colors.primary }]}
+            onPress={() => goToLeaf(0)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.subTabLabelRow}>
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, activeSubTab === 'Announcements' && { color: '#FFFFFF' }]}>
+                {t('manager_home.announcements')}
               </Text>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={16}
-                color={colors.primary}
-              />
-            </TouchableOpacity>
-            {loadingFeatures ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={colors.primary} />
-              </View>
-            ) : specialFeatures.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  {t('manager_home.no_features', 'No special features')}
-                </Text>
-              </View>
-            ) : (
-              specialFeatures.map((f, i) => renderFeatureCard(f, i))
-            )}
-          </>
-        )}
-      </ScrollView>
+              {announcementsHasNew && activeSubTab !== 'Announcements' && (
+                <View style={styles.subTabBadgeDot} />
+              )}
+            </View>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.subTab, activeSubTab === 'Special Features' && { backgroundColor: colors.primary }]}
+            onPress={() => goToLeaf(1)}
+            activeOpacity={0.7}
+          >
+            <View style={styles.subTabLabelRow}>
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, activeSubTab === 'Special Features' && { color: '#FFFFFF' }]}>
+                {t('manager_home.special_features')}
+              </Text>
+              {specialFeaturesHasNew && activeSubTab !== 'Special Features' && (
+                <View style={styles.subTabBadgeDot} />
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 
-  const renderEventsSection = () => (
+  // FlatList leaf for Today — only the cards content (announcements OR special features).
+  const renderTodayLeaf = (subTab: 'Announcements' | 'Special Features') => (
     <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
-      {/* Sticky: Calendar strip + Event/Entertainment tabs + View All */}
-      <View style={styles.eventsStickyHeader}>
-        <WeeklyCalendarStrip
-          selectedDate={eventsSelectedDate}
-          onSelectDate={setEventsSelectedDate}
-          colors={{
-            primary: colors.primary,
-            background: colors.background,
-            text: colors.text,
-            textSecondary: colors.darkSecondaryText,
-            card: colors.card,
-          }}
-          events={upcomingEvents}
-          onViewAll={() => router.push('/view-all-upcoming-events')}
-        >
-          {/* Events / Entertainment tabs — nested inside calendar card */}
-          <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginTop: 8 }]}>
-            <TouchableOpacity
-              style={[styles.subTab, eventsTab === 'Event' && { backgroundColor: colors.primary }]}
-              onPress={() => setEventsTab('Event')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Event' && { color: '#FFFFFF' }]}>
-                {t('upcoming_events.events', 'Events')}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.subTab, eventsTab === 'Entertainment' && { backgroundColor: colors.primary }]}
-              onPress={() => setEventsTab('Entertainment')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && { color: '#FFFFFF' }]}>
-                {t('upcoming_events.entertainment', 'Entertainment')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </WeeklyCalendarStrip>
-      </View>
-
-      {/* Scrollable event cards only */}
       <ScrollView
         style={styles.sectionScroll}
         contentContainerStyle={styles.sectionContent}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
       >
-        {loadingEvents ? (
+        {subTab === 'Announcements' ? (
+          loadingAnnouncements ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : announcements.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                {t('manager_home.no_announcements', 'No announcements')}
+              </Text>
+            </View>
+          ) : (
+            announcements.map((a, i) => renderAnnouncementCard(a, i))
+          )
+        ) : loadingFeatures ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color={colors.primary} />
           </View>
-        ) : eventsDisplayList.length === 0 ? (
+        ) : specialFeatures.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {t('employee_home.no_events', 'No events')}
+              {t('manager_home.no_features', 'No special features')}
             </Text>
           </View>
         ) : (
-          eventsDisplayList.map((event, index) => renderEventCard(event, index))
+          specialFeatures.map((f, i) => renderFeatureCard(f, i))
         )}
       </ScrollView>
     </View>
   );
+
+  // Static section header for the Events section.
+  // No paddingHorizontal wrap here — WeeklyCalendarStrip has its own marginHorizontal: 16.
+  const renderEventsHeader = (activeSubTab: 'Event' | 'Entertainment') => (
+    <View>
+      <WeeklyCalendarStrip
+        selectedDate={eventsSelectedDate}
+        onSelectDate={setEventsSelectedDate}
+        colors={{
+          primary: colors.primary,
+          background: colors.background,
+          text: colors.text,
+          textSecondary: colors.darkSecondaryText,
+          card: colors.card,
+        }}
+        events={upcomingEvents}
+        onViewAll={() => router.push('/view-all-upcoming-events')}
+      >
+        <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginTop: 8 }]}>
+          <TouchableOpacity
+            style={[styles.subTab, activeSubTab === 'Event' && { backgroundColor: colors.primary }]}
+            onPress={() => goToLeaf(2)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.subTabText, { color: colors.textSecondary }, activeSubTab === 'Event' && { color: '#FFFFFF' }]}>
+              {t('upcoming_events.events', 'Events')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.subTab, activeSubTab === 'Entertainment' && { backgroundColor: colors.primary }]}
+            onPress={() => goToLeaf(3)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.subTabText, { color: colors.textSecondary }, activeSubTab === 'Entertainment' && { color: '#FFFFFF' }]}>
+              {t('upcoming_events.entertainment', 'Entertainment')}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </WeeklyCalendarStrip>
+    </View>
+  );
+
+  // FlatList leaf for Events — only the cards.
+  const renderEventsLeaf = (subTab: 'Event' | 'Entertainment') => {
+    const displayList = computeEventsDisplay(subTab);
+    return (
+      <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
+        <ScrollView
+          style={styles.sectionScroll}
+          contentContainerStyle={styles.sectionContent}
+          showsVerticalScrollIndicator={false}
+          nestedScrollEnabled
+        >
+          {loadingEvents ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color={colors.primary} />
+            </View>
+          ) : displayList.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                {t('employee_home.no_events', 'No events')}
+              </Text>
+            </View>
+          ) : (
+            displayList.map((event, index) => renderEventCard(event, index))
+          )}
+        </ScrollView>
+      </View>
+    );
+  };
 
   const renderSpecialsSection = () => (
     <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
@@ -997,13 +1047,20 @@ export default function EmployeePortalScreen() {
 
   const renderSection = ({ item }: { item: string }) => {
     switch (item) {
-      case 'today': return renderTodaySection();
-      case 'events': return renderEventsSection();
+      case 'today-announcements': return renderTodayLeaf('Announcements');
+      case 'today-special-features': return renderTodayLeaf('Special Features');
+      case 'events-event': return renderEventsLeaf('Event');
+      case 'events-entertainment': return renderEventsLeaf('Entertainment');
       case 'specials': return renderSpecialsSection();
       case 'menu-bridge': return <View style={{ width: SCREEN_WIDTH }} />;
       default: return null;
     }
   };
+
+  const todayActiveSubTab: 'Announcements' | 'Special Features' =
+    currentPageIndex === 1 ? 'Special Features' : 'Announcements';
+  const eventsActiveSubTab: 'Event' | 'Entertainment' =
+    currentPageIndex === 3 ? 'Entertainment' : 'Event';
 
   return (
     <GestureHandlerRootView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -1025,7 +1082,11 @@ export default function EmployeePortalScreen() {
         </View>
       </View>
 
-      {/* Horizontal Swipeable Sections */}
+      {/* Section static header — stays put while inner cards swipe */}
+      {activeSection === 'today' && renderTodayHeader(todayActiveSubTab)}
+      {activeSection === 'events' && renderEventsHeader(eventsActiveSubTab)}
+
+      {/* Horizontal Swipeable Sections — only the cards swipe */}
       <FlatList
         ref={sectionListRef}
         data={FLATLIST_PAGES as unknown as string[]}
@@ -1034,6 +1095,7 @@ export default function EmployeePortalScreen() {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
+        onScroll={handleSectionScrollLive}
         onMomentumScrollEnd={handleSectionScroll}
         scrollEventThrottle={16}
         bounces={false}
@@ -1238,6 +1300,24 @@ const styles = StyleSheet.create({
   },
   eventsContainer: {
     padding: 12,
+  },
+  sectionHeaderWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+  },
+  happeningTodayWrap: {
+    marginBottom: 12,
+  },
+  happeningTodayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  happeningTodayTitle: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   todayTabsCard: {
     marginBottom: 12,
