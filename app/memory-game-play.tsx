@@ -27,6 +27,7 @@ import MemoryGameBoard from '@/components/game/MemoryGameBoard';
 import GameHUD from '@/components/game/GameHUD';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
+import { notifyLeaderboardPassed } from '@/utils/notificationHelpers';
 
 export default function MemoryGamePlayScreen() {
   const router = useRouter();
@@ -205,6 +206,14 @@ export default function MemoryGamePlayScreen() {
           completed: finalState.isWin,
         });
         setScoreSaved(true);
+        if (finalState.isWin && finalState.score > 0) {
+          notifyLeaderboardPassed(
+            user.id,
+            finalState.score,
+            t('notifications.game_hub_passed_title', { name: user.name }),
+            t('notifications.game_hub_passed_body')
+          );
+        }
       } catch (e) {
         console.error('Error saving score:', e);
       }

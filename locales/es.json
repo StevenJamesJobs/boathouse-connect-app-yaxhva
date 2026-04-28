@@ -102,7 +102,11 @@
     "special_features": "Características Especiales",
     "special_features_desc": "Recibe notificaciones sobre nuevas características especiales",
     "management_updates": "Actualizaciones de Gerencia",
-    "management_updates_desc": "Recibe notificaciones sobre actualizaciones importantes de la gerencia"
+    "management_updates_desc": "Recibe notificaciones sobre actualizaciones importantes de la gerencia",
+    "game_hub": "Centro de Juegos",
+    "game_hub_desc": "Recibe notificaciones cuando alguien te pase en la Tabla de Clasificación",
+    "game_hub_passed_title": "¡{{name}} acaba de pasarte en la Tabla de Clasificación!",
+    "game_hub_passed_body": "¡Es hora de volver al juego!"
   },
   "messages": {
     "title": "Mensajes",

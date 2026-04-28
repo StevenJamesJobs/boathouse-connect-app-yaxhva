@@ -267,6 +267,10 @@ export default function NotificationDropdown({
           if (linkedType === 'redemption_decision') {
             if (cn.data?.targetUserId !== user?.id) continue;
           }
+          // Leaderboard pass entries are per-recipient; hide for everyone else.
+          if (linkedType === 'leaderboard_pass') {
+            if (cn.data?.targetUserId !== user?.id) continue;
+          }
           items.push({
             id: cn.id,
             type: 'custom_notification',
@@ -342,6 +346,12 @@ export default function NotificationDropdown({
         setNotifications((prev) => prev.filter((n) => n.id !== item.id));
         onClose();
         router.push('/manager-approvals' as any);
+        return;
+      }
+      // Leaderboard pass → master leaderboard (mark-viewed clears the badge there)
+      if (data.data?.notificationType === 'leaderboard_pass') {
+        onClose();
+        router.push('/master-leaderboard' as any);
         return;
       }
       // Employee: decision → Redeem (lands on Recent Awards via the page itself)

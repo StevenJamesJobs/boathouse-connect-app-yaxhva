@@ -15,10 +15,12 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
+import { refreshAllUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 
 type LeaderboardTab = 'overall' | 'memory' | 'word_search';
 
@@ -72,6 +74,16 @@ export default function MasterLeaderboardScreen() {
   useEffect(() => {
     loadData(activeTab);
   }, [activeTab]);
+
+  // Mark leaderboard as viewed every time the screen gains focus — clears
+  // the unread-pass badge across all surfaces (app icon, nav, tile, button).
+  useFocusEffect(
+    useCallback(() => {
+      (supabase.rpc as any)('mark_leaderboard_viewed').then(() => {
+        refreshAllUnreadLeaderboardPasses();
+      });
+    }, [])
+  );
 
   const handleTabPress = (tab: LeaderboardTab) => {
     if (tab !== activeTab) setActiveTab(tab);

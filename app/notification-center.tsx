@@ -89,10 +89,16 @@ export default function NotificationCenter() {
         .from('custom_notifications') as any)
         .select('id, title, body, created_at, data')
         .order('created_at', { ascending: false })
-        .limit(20);
+        .limit(40);
 
       if (!error && data) {
-        setSentNotifications(data as SentNotification[]);
+        // Hide auto-fired system notifications (e.g. leaderboard pass)
+        // from the manager-facing Sent History — those are system-driven,
+        // not manager-initiated, and would otherwise flood this view.
+        const filtered = (data as SentNotification[]).filter(
+          (n: any) => n?.data?.notificationType !== 'leaderboard_pass'
+        ).slice(0, 20);
+        setSentNotifications(filtered);
       }
     } catch (err) {
       console.error('Error loading sent history:', err);

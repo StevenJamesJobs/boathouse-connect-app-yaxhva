@@ -102,7 +102,11 @@
     "special_features": "Special Features",
     "special_features_desc": "Get notified about new special features",
     "management_updates": "Management Updates",
-    "management_updates_desc": "Get notified about important updates from management"
+    "management_updates_desc": "Get notified about important updates from management",
+    "game_hub": "Game Hub",
+    "game_hub_desc": "Get notified when someone passes you on the Leaderboard",
+    "game_hub_passed_title": "{{name}} just passed you on the Leaderboards!",
+    "game_hub_passed_body": "Time to get back in there!!"
   },
   "messages": {
     "title": "Messages",

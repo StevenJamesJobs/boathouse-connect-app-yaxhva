@@ -9,6 +9,7 @@ import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
+import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -251,6 +252,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               case 'game_hub':
                 router.push('/game-hub');
                 break;
+              case 'master-leaderboard':
+                router.push('/master-leaderboard' as any);
+                break;
               case 'weekly-quizzes':
                 router.push('/weekly-quizzes' as any);
                 // Fire-and-forget dismissal of the bell entry for this exam
@@ -339,15 +343,17 @@ function BadgeSyncer() {
   const { unreadCount: unreadQuizzes } = useUnreadQuizzes();
   const { pendingCount: pendingApprovals } = usePendingApprovals();
   const { count: unreadAwards } = useUnreadAwards();
+  const { unreadCount: unreadLeaderboardPasses } = useUnreadLeaderboardPasses();
 
   useEffect(() => {
     const total =
       (unreadMessages || 0) +
       (unreadQuizzes || 0) +
       (pendingApprovals || 0) +
-      (unreadAwards || 0);
+      (unreadAwards || 0) +
+      (unreadLeaderboardPasses || 0);
     Notifications.setBadgeCountAsync(total).catch(() => {});
-  }, [unreadMessages, unreadQuizzes, pendingApprovals, unreadAwards]);
+  }, [unreadMessages, unreadQuizzes, pendingApprovals, unreadAwards, unreadLeaderboardPasses]);
 
   return null;
 }

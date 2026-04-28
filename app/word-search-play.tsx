@@ -20,6 +20,8 @@ import * as Haptics from 'expo-haptics';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
+import { notifyLeaderboardPassed } from '@/utils/notificationHelpers';
+import { useTranslation } from 'react-i18next';
 import {
   GridCell,
   WordSearchCategory,
@@ -48,6 +50,7 @@ export default function WordSearchPlayScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{
     category: WordSearchCategory;
     difficulty: WordSearchDifficulty;
@@ -130,7 +133,16 @@ export default function WordSearchPlayScreen() {
         total_words: puzzle.words.length,
         time_seconds: elapsedSeconds,
         completed: phase === 'won',
-      }).then(() => {});
+      }).then(() => {
+        if (phase === 'won' && finalScore > 0) {
+          notifyLeaderboardPassed(
+            user.id,
+            finalScore,
+            t('notifications.game_hub_passed_title', { name: user.name }),
+            t('notifications.game_hub_passed_body')
+          );
+        }
+      });
     }
   }, [phase]);
 

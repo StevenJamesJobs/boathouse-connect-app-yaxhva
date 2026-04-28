@@ -12,6 +12,7 @@ import { BlurView } from 'expo-blur';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
+import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import { MessageBadge } from '@/components/MessageBadge';
 import { useTranslation } from 'react-i18next';
 
@@ -53,7 +54,9 @@ function EmployeeHeader() {
 function FloatingTabBar({ state, descriptors, navigation }: any) {
   const { unreadCount } = useUnreadMessages();
   const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
+  const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
   const { hasNew: awardsHasNew } = useUnreadAwards();
+  const toolsBadgeCount = unreadQuizCount + unreadLeaderboardCount;
   const colors = useThemeColors();
   const { mode } = useAppTheme();
 
@@ -111,9 +114,9 @@ function FloatingTabBar({ state, descriptors, navigation }: any) {
                       <MessageBadge count={unreadCount} size="small" />
                     </View>
                   )}
-                  {isToolsTab && unreadQuizCount > 0 && (
+                  {isToolsTab && toolsBadgeCount > 0 && (
                     <View style={styles.tabBadgePosition}>
-                      <MessageBadge count={unreadQuizCount} size="small" />
+                      <MessageBadge count={toolsBadgeCount} size="small" />
                     </View>
                   )}
                   {isRewardsTab && awardsHasNew && !isFocused && (
