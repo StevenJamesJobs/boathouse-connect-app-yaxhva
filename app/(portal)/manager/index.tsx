@@ -200,7 +200,24 @@ export default function ManagerPortalScreen() {
   } | null>(null);
 
   const SECTIONS: ConnectBarTab[] = ['today', 'events', 'specials'];
-  const FLATLIST_PAGES = ['today', 'events', 'specials', 'menu-bridge'] as const;
+  // Flat pager: each leaf (sub-tab) is its own page so horizontal swipes traverse
+  // both top-level Connect bar tabs and their internal sub-tabs in a single sequence.
+  const FLATLIST_PAGES = [
+    'today-announcements',
+    'today-special-features',
+    'events-event',
+    'events-entertainment',
+    'specials',
+    'menu-bridge',
+  ] as const;
+  const MENU_BRIDGE_INDEX = 5;
+  const SECTION_FIRST_LEAF: Record<ConnectBarTab, number> = { today: 0, events: 2, specials: 4 };
+  const pageIndexToSection = (index: number): ConnectBarTab | 'menu-bridge' => {
+    if (index <= 1) return 'today';
+    if (index <= 3) return 'events';
+    if (index === 4) return 'specials';
+    return 'menu-bridge';
+  };
 
   useEffect(() => {
     loadWeeklySpecials();
@@ -346,7 +363,7 @@ export default function ManagerPortalScreen() {
         .eq('is_active', true)
         .in('visibility', ['everyone', 'managers'])
         .order('display_order', { ascending: true })
-        .limit(4);
+        .limit(6);
 
       if (error) throw error;
       setAnnouncements(data || []);
@@ -415,7 +432,7 @@ export default function ManagerPortalScreen() {
         .eq('is_active', true)
         .order('display_order', { ascending: true })
         .order('created_at', { ascending: false })
-        .limit(4);
+        .limit(6);
 
       if (error) throw error;
       setSpecialFeatures(data || []);
@@ -519,16 +536,21 @@ export default function ManagerPortalScreen() {
     });
   };
 
-  // Compute filtered events for the Events section
-  const eventsDisplayList = (() => {
+  // Compute filtered events for the Events section, scoped per-leaf so each
+  // pager page renders its own consistent list during swipes.
+  const computeEventsDisplay = (subTab: 'Event' | 'Entertainment') => {
     if (eventsSelectedDate !== null) {
       return upcomingEvents.filter(event =>
         eventFallsOnDate(event.start_date_time, event.end_date_time, eventsSelectedDate)
       );
     }
-    const filtered = upcomingEvents.filter(event => event.category === eventsTab);
-    return filtered.slice(0, 6);
-  })();
+    return upcomingEvents.filter(event => event.category === subTab).slice(0, 6);
+  };
+
+  // Today's events + entertainment for the "Happening Today" section on the Today tab
+  const todayHappeningList = upcomingEvents.filter(event =>
+    eventFallsOnDate(event.start_date_time, event.end_date_time, new Date())
+  );
 
   const renderEventCard = (event: UpcomingEvent, index: number) => {
     const additionalImages = contentImagesMap.get(event.id);
@@ -581,36 +603,50 @@ export default function ManagerPortalScreen() {
     );
   };
 
-  // Handle section swipe
+  // Handle section swipe across the flat pager (6 leaf pages).
   const handleSectionScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const pageIndex = Math.round(offsetX / SCREEN_WIDTH);
 
-    // If user swiped to the phantom 4th page, navigate to Menu tab
-    if (pageIndex === 3) {
+    // Phantom menu-bridge page hands off to the Menu tab.
+    if (pageIndex === MENU_BRIDGE_INDEX) {
       router.navigate('/(portal)/manager/menus');
-      // Scroll back to specials so if they come back it's in the right position
       setTimeout(() => {
-        sectionListRef.current?.scrollToIndex({ index: 2, animated: false });
+        sectionListRef.current?.scrollToIndex({ index: SECTION_FIRST_LEAF.specials, animated: false });
         setActiveSection('specials');
       }, 100);
       return;
     }
 
-    const newTab = SECTIONS[pageIndex];
-    if (newTab && newTab !== activeSection) {
-      setActiveSection(newTab);
-      markTabViewed(newTab);
+    const newSection = pageIndexToSection(pageIndex) as ConnectBarTab;
+    if (newSection !== activeSection) {
+      setActiveSection(newSection);
+      markTabViewed(newSection);
     }
-  }, [activeSection, router, markTabViewed]);
+    if (pageIndex === 0 && whatsHappeningTab !== 'Announcements') {
+      setWhatsHappeningTab('Announcements');
+      markWelcomeTabViewed('announcements');
+    } else if (pageIndex === 1 && whatsHappeningTab !== 'Special Features') {
+      setWhatsHappeningTab('Special Features');
+      markWelcomeTabViewed('specialFeatures');
+    } else if (pageIndex === 2 && eventsTab !== 'Event') {
+      setEventsTab('Event');
+    } else if (pageIndex === 3 && eventsTab !== 'Entertainment') {
+      setEventsTab('Entertainment');
+    }
+  }, [activeSection, router, markTabViewed, whatsHappeningTab, eventsTab, markWelcomeTabViewed]);
 
-  // Handle ConnectBar tab press
+  // Handle ConnectBar tab press — scroll to the first leaf of that section.
   const handleTabChange = useCallback((tab: ConnectBarTab) => {
     setActiveSection(tab);
     markTabViewed(tab);
-    const index = SECTIONS.indexOf(tab);
-    sectionListRef.current?.scrollToIndex({ index, animated: true });
+    sectionListRef.current?.scrollToIndex({ index: SECTION_FIRST_LEAF[tab], animated: true });
   }, [markTabViewed]);
+
+  // Sub-tab tap handlers — scroll the pager to the matching leaf.
+  const goToLeaf = useCallback((index: number) => {
+    sectionListRef.current?.scrollToIndex({ index, animated: true });
+  }, []);
 
   // ===== RENDER CARD COMPONENTS =====
 
@@ -788,7 +824,7 @@ export default function ManagerPortalScreen() {
 
   // ===== SECTION RENDERERS =====
 
-  const renderTodaySection = () => (
+  const renderTodaySection = (subTab: 'Announcements' | 'Special Features') => (
     <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
       <ScrollView
         style={styles.sectionScroll}
@@ -809,39 +845,51 @@ export default function ManagerPortalScreen() {
           }}
         />
 
+        {/* Happening Today — events + entertainment scheduled for today */}
+        {todayHappeningList.length > 0 && (
+          <View style={styles.happeningTodayWrap}>
+            <View style={styles.happeningTodayHeader}>
+              <IconSymbol
+                ios_icon_name="calendar"
+                android_material_icon_name="event"
+                size={16}
+                color={colors.primary}
+              />
+              <Text style={[styles.happeningTodayTitle, { color: colors.text }]}>
+                {t('today_section.happening_today', 'Happening Today')}
+              </Text>
+            </View>
+            {todayHappeningList.map((event, index) => renderEventCard(event, index))}
+          </View>
+        )}
+
         {/* Sub-tabs card: Announcements / Special Features */}
         <View style={[styles.todayTabsCard, { backgroundColor: colors.card }]}>
           <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginBottom: 0 }]}>
             <TouchableOpacity
-              style={[styles.subTab, whatsHappeningTab === 'Announcements' && { backgroundColor: colors.primary }]}
-              onPress={() => {
-                setWhatsHappeningTab('Announcements');
-                markWelcomeTabViewed('announcements');
-              }}
+              style={[styles.subTab, subTab === 'Announcements' && { backgroundColor: colors.primary }]}
+              onPress={() => goToLeaf(0)}
               activeOpacity={0.7}
             >
               <View style={styles.subTabLabelRow}>
-                <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Announcements' && { color: '#FFFFFF' }]}>
+                <Text style={[styles.subTabText, { color: colors.textSecondary }, subTab === 'Announcements' && { color: '#FFFFFF' }]}>
                   {t('manager_home.announcements')}
                 </Text>
-                {announcementsHasNew && whatsHappeningTab !== 'Announcements' && (
+                {announcementsHasNew && subTab !== 'Announcements' && (
                   <View style={styles.subTabBadgeDot} />
                 )}
               </View>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.subTab, whatsHappeningTab === 'Special Features' && { backgroundColor: colors.primary }]}
-              onPress={() => {
-                setWhatsHappeningTab('Special Features');
-                markWelcomeTabViewed('specialFeatures');
-              }}
+              style={[styles.subTab, subTab === 'Special Features' && { backgroundColor: colors.primary }]}
+              onPress={() => goToLeaf(1)}
               activeOpacity={0.7}
             >
               <View style={styles.subTabLabelRow}>
-                <Text style={[styles.subTabText, { color: colors.textSecondary }, whatsHappeningTab === 'Special Features' && { color: '#FFFFFF' }]}>
+                <Text style={[styles.subTabText, { color: colors.textSecondary }, subTab === 'Special Features' && { color: '#FFFFFF' }]}>
                   {t('manager_home.special_features')}
                 </Text>
-                {specialFeaturesHasNew && whatsHappeningTab !== 'Special Features' && (
+                {specialFeaturesHasNew && subTab !== 'Special Features' && (
                   <View style={styles.subTabBadgeDot} />
                 )}
               </View>
@@ -850,7 +898,7 @@ export default function ManagerPortalScreen() {
         </View>
 
         {/* Announcements */}
-        {whatsHappeningTab === 'Announcements' && (
+        {subTab === 'Announcements' && (
           <>
             {loadingAnnouncements ? (
               <View style={styles.loadingContainer}>
@@ -869,7 +917,7 @@ export default function ManagerPortalScreen() {
         )}
 
         {/* Special Features */}
-        {whatsHappeningTab === 'Special Features' && (
+        {subTab === 'Special Features' && (
           <>
             {/* View All link */}
             <TouchableOpacity
@@ -906,7 +954,9 @@ export default function ManagerPortalScreen() {
     </View>
   );
 
-  const renderEventsSection = () => (
+  const renderEventsSection = (subTab: 'Event' | 'Entertainment') => {
+    const displayList = computeEventsDisplay(subTab);
+    return (
     <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
       {/* Sticky: Calendar strip + Event/Entertainment tabs + View All */}
       <View style={styles.eventsStickyHeader}>
@@ -926,20 +976,20 @@ export default function ManagerPortalScreen() {
           {/* Events / Entertainment tabs — nested inside calendar card */}
           <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginTop: 8 }]}>
             <TouchableOpacity
-              style={[styles.subTab, eventsTab === 'Event' && { backgroundColor: colors.primary }]}
-              onPress={() => setEventsTab('Event')}
+              style={[styles.subTab, subTab === 'Event' && { backgroundColor: colors.primary }]}
+              onPress={() => goToLeaf(2)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Event' && { color: '#FFFFFF' }]}>
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, subTab === 'Event' && { color: '#FFFFFF' }]}>
                 {t('upcoming_events.events', 'Events')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.subTab, eventsTab === 'Entertainment' && { backgroundColor: colors.primary }]}
-              onPress={() => setEventsTab('Entertainment')}
+              style={[styles.subTab, subTab === 'Entertainment' && { backgroundColor: colors.primary }]}
+              onPress={() => goToLeaf(3)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && { color: '#FFFFFF' }]}>
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, subTab === 'Entertainment' && { color: '#FFFFFF' }]}>
                 {t('upcoming_events.entertainment', 'Entertainment')}
               </Text>
             </TouchableOpacity>
@@ -958,18 +1008,19 @@ export default function ManagerPortalScreen() {
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="small" color={colors.primary} />
           </View>
-        ) : eventsDisplayList.length === 0 ? (
+        ) : displayList.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
               {t('employee_home.no_events', 'No events')}
             </Text>
           </View>
         ) : (
-          eventsDisplayList.map((event, index) => renderEventCard(event, index))
+          displayList.map((event, index) => renderEventCard(event, index))
         )}
       </ScrollView>
     </View>
-  );
+    );
+  };
 
   const renderSpecialsSection = () => (
     <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
@@ -998,8 +1049,10 @@ export default function ManagerPortalScreen() {
 
   const renderSection = ({ item }: { item: string }) => {
     switch (item) {
-      case 'today': return renderTodaySection();
-      case 'events': return renderEventsSection();
+      case 'today-announcements': return renderTodaySection('Announcements');
+      case 'today-special-features': return renderTodaySection('Special Features');
+      case 'events-event': return renderEventsSection('Event');
+      case 'events-entertainment': return renderEventsSection('Entertainment');
       case 'specials': return renderSpecialsSection();
       case 'menu-bridge': return <View style={{ width: SCREEN_WIDTH }} />;
       default: return null;
@@ -1240,6 +1293,20 @@ const styles = StyleSheet.create({
   },
   eventsContainer: {
     padding: 12,
+  },
+  happeningTodayWrap: {
+    marginBottom: 12,
+  },
+  happeningTodayHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 8,
+    paddingHorizontal: 4,
+  },
+  happeningTodayTitle: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   todayTabsCard: {
     marginBottom: 12,
