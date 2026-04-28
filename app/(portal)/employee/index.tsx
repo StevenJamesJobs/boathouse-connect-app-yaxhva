@@ -933,45 +933,27 @@ export default function EmployeePortalScreen() {
           ) : (
             announcements.map((a, i) => renderAnnouncementCard(a, i))
           )
+        ) : loadingFeatures ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : specialFeatures.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              {t('manager_home.no_features', 'No special features')}
+            </Text>
+          </View>
         ) : (
-          <>
-            <TouchableOpacity
-              style={styles.viewAllRow}
-              onPress={() => router.push('/view-all-special-features')}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.viewAllText, { color: colors.primary }]}>
-                {t('manager_home.view_all', 'View All')}
-              </Text>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={16}
-                color={colors.primary}
-              />
-            </TouchableOpacity>
-            {loadingFeatures ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="small" color={colors.primary} />
-              </View>
-            ) : specialFeatures.length === 0 ? (
-              <View style={styles.emptyContainer}>
-                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                  {t('manager_home.no_features', 'No special features')}
-                </Text>
-              </View>
-            ) : (
-              specialFeatures.map((f, i) => renderFeatureCard(f, i))
-            )}
-          </>
+          specialFeatures.map((f, i) => renderFeatureCard(f, i))
         )}
       </ScrollView>
     </View>
   );
 
   // Static section header for the Events section.
+  // No paddingHorizontal wrap here — WeeklyCalendarStrip has its own marginHorizontal: 16.
   const renderEventsHeader = (activeSubTab: 'Event' | 'Entertainment') => (
-    <View style={styles.sectionHeaderWrap}>
+    <View>
       <WeeklyCalendarStrip
         selectedDate={eventsSelectedDate}
         onSelectDate={setEventsSelectedDate}

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,13 @@ import {
   ActivityIndicator,
   Platform,
   Modal,
+  FlatList,
+  Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -168,18 +174,109 @@ export default function ViewAllUpcomingEventsScreen() {
     return (lastSpace > 60 ? cut.substring(0, lastSpace) : cut) + '...';
   };
 
-  let filteredEvents: UpcomingEvent[];
-  if (selectedDate !== null) {
-    filteredEvents = events.filter(event =>
-      eventFallsOnDate(event.start_date_time, event.end_date_time, selectedDate)
-    );
-  } else {
-    filteredEvents = events.filter(event => event.category === eventsTab);
-  }
+  const dateFilteredEvents: UpcomingEvent[] | null = selectedDate !== null
+    ? events.filter(event =>
+        eventFallsOnDate(event.start_date_time, event.end_date_time, selectedDate)
+      )
+    : null;
+
+  const eventsByCategory = (cat: 'Event' | 'Entertainment') =>
+    events.filter(event => event.category === cat);
 
   const handleMonthDateSelect = (date: Date | null) => {
     setSelectedDate(date);
     setMonthOverlayVisible(false);
+  };
+
+  // Horizontal swipe between Event / Entertainment pages when no date is selected.
+  const pagerRef = useRef<FlatList>(null);
+  const PAGES = ['Event', 'Entertainment'] as const;
+
+  const handlePagerScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    const next = PAGES[idx];
+    if (next && next !== eventsTab) setEventsTab(next);
+  }, [eventsTab]);
+
+  const goToTab = (tab: 'Event' | 'Entertainment') => {
+    const idx = PAGES.indexOf(tab);
+    pagerRef.current?.scrollToIndex({ index: idx, animated: true });
+  };
+
+  const renderEventCard = (event: UpcomingEvent, index: number) => (
+    <TouchableOpacity
+      key={event.id || index}
+      style={[styles.eventCard, { backgroundColor: colors.card, borderLeftColor: '#4CAF50' }]}
+      onPress={() => openDetailModal(event)}
+      activeOpacity={0.7}
+    >
+      <View style={styles.cardRow}>
+        {event.thumbnail_url && (
+          <Image source={{ uri: getImageUrl(event.thumbnail_url)! }} style={styles.cardImage} />
+        )}
+        <View style={styles.cardContent}>
+          <View style={styles.titleRow}>
+            <Text style={[styles.eventTitle, { color: colors.text }]} numberOfLines={1}>
+              {getLocalizedField(event, 'title', language)}
+            </Text>
+            {selectedDate !== null && (
+              <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '18' }]}>
+                <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>
+                  {event.category === 'Event'
+                    ? t('upcoming_events:events')
+                    : t('upcoming_events:entertainment')}
+                </Text>
+              </View>
+            )}
+          </View>
+          {(event.content || event.message) && (
+            <Text style={[styles.eventMessage, { color: colors.textSecondary }]} numberOfLines={2}>
+              {truncate(getLocalizedField(event, 'content', language) || event.content || event.message)}
+            </Text>
+          )}
+          {event.start_date_time && (
+            <Text style={[styles.eventDate, { color: colors.textSecondary }]}>
+              {formatDateTime(event.start_date_time)}
+              {event.end_date_time ? ` – ${formatDateTime(event.end_date_time)}` : ''}
+            </Text>
+          )}
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderEmptyState = (forTab: 'Event' | 'Entertainment' | 'date') => (
+    <View style={styles.emptyContainer}>
+      <IconSymbol
+        ios_icon_name="calendar"
+        android_material_icon_name="event"
+        size={64}
+        color={colors.textSecondary}
+      />
+      <Text style={[styles.emptyText, { color: colors.text }]}>
+        {forTab === 'date'
+          ? t('upcoming_events:no_events_on_date')
+          : t('upcoming_events:no_events', { type: forTab.toLowerCase() })}
+      </Text>
+      {forTab !== 'date' && (
+        <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+          {t('upcoming_events:check_back', { type: forTab.toLowerCase() })}
+        </Text>
+      )}
+    </View>
+  );
+
+  const renderCategoryPage = ({ item }: { item: 'Event' | 'Entertainment' }) => {
+    const list = eventsByCategory(item);
+    return (
+      <ScrollView
+        style={{ width: SCREEN_WIDTH }}
+        contentContainerStyle={styles.contentContainer}
+        nestedScrollEnabled
+      >
+        {list.length === 0 ? renderEmptyState(item) : list.map((e, i) => renderEventCard(e, i))}
+      </ScrollView>
+    );
   };
 
   return (
@@ -215,7 +312,7 @@ export default function ViewAllUpcomingEventsScreen() {
           <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginTop: 8 }]}>
             <TouchableOpacity
               style={[styles.subTab, eventsTab === 'Event' && { backgroundColor: colors.primary }]}
-              onPress={() => setEventsTab('Event')}
+              onPress={() => goToTab('Event')}
               activeOpacity={0.7}
             >
               <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Event' && { color: '#FFFFFF' }]}>
@@ -224,7 +321,7 @@ export default function ViewAllUpcomingEventsScreen() {
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.subTab, eventsTab === 'Entertainment' && { backgroundColor: colors.primary }]}
-              onPress={() => setEventsTab('Entertainment')}
+              onPress={() => goToTab('Entertainment')}
               activeOpacity={0.7}
             >
               <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && { color: '#FFFFFF' }]}>
@@ -240,74 +337,31 @@ export default function ViewAllUpcomingEventsScreen() {
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('upcoming_events:loading')}</Text>
         </View>
-      ) : (
+      ) : selectedDate !== null ? (
+        // Date selected: single vertical scroll, all categories on that date.
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-          {filteredEvents.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <IconSymbol
-                ios_icon_name="calendar"
-                android_material_icon_name="event"
-                size={64}
-                color={colors.textSecondary}
-              />
-              <Text style={[styles.emptyText, { color: colors.text }]}>
-                {selectedDate !== null
-                  ? t('upcoming_events:no_events_on_date')
-                  : t('upcoming_events:no_events', { type: eventsTab.toLowerCase() })}
-              </Text>
-              {selectedDate === null && (
-                <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                  {t('upcoming_events:check_back', { type: eventsTab.toLowerCase() })}
-                </Text>
-              )}
-            </View>
-          ) : (
-            filteredEvents.map((event, index) => (
-              <TouchableOpacity
-                key={event.id || index}
-                style={[styles.eventCard, { backgroundColor: colors.card, borderLeftColor: '#4CAF50' }]}
-                onPress={() => openDetailModal(event)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.cardRow}>
-                  {event.thumbnail_url && (
-                    <Image
-                      source={{ uri: getImageUrl(event.thumbnail_url)! }}
-                      style={styles.cardImage}
-                    />
-                  )}
-                  <View style={styles.cardContent}>
-                    <View style={styles.titleRow}>
-                      <Text style={[styles.eventTitle, { color: colors.text }]} numberOfLines={1}>
-                        {getLocalizedField(event, 'title', language)}
-                      </Text>
-                      {selectedDate !== null && (
-                        <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '18' }]}>
-                          <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>
-                            {event.category === 'Event'
-                              ? t('upcoming_events:events')
-                              : t('upcoming_events:entertainment')}
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-                    {(event.content || event.message) && (
-                      <Text style={[styles.eventMessage, { color: colors.textSecondary }]} numberOfLines={2}>
-                        {truncate(getLocalizedField(event, 'content', language) || event.content || event.message)}
-                      </Text>
-                    )}
-                    {event.start_date_time && (
-                      <Text style={[styles.eventDate, { color: colors.textSecondary }]}>
-                        {formatDateTime(event.start_date_time)}
-                        {event.end_date_time ? ` – ${formatDateTime(event.end_date_time)}` : ''}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))
-          )}
+          {dateFilteredEvents && dateFilteredEvents.length === 0
+            ? renderEmptyState('date')
+            : dateFilteredEvents?.map((e, i) => renderEventCard(e, i))}
         </ScrollView>
+      ) : (
+        // No date: horizontal pager between Event and Entertainment categories.
+        <FlatList
+          ref={pagerRef}
+          data={PAGES as unknown as ('Event' | 'Entertainment')[]}
+          renderItem={renderCategoryPage}
+          keyExtractor={(item) => item}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={handlePagerScroll}
+          bounces={false}
+          getItemLayout={(_, index) => ({
+            length: SCREEN_WIDTH,
+            offset: SCREEN_WIDTH * index,
+            index,
+          })}
+        />
       )}
 
       {/* Month overlay */}

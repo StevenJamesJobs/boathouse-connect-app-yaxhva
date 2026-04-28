@@ -429,11 +429,11 @@ export default function NotificationDropdown({
       onRequestClose={onClose}
     >
       <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable
-          style={[styles.dropdown, { backgroundColor: colors.card, maxHeight: SCREEN_HEIGHT * 0.7 }]}
-          onPress={() => {}}
+        <View
+          style={[styles.dropdown, { backgroundColor: colors.card }]}
+          onStartShouldSetResponder={() => true}
         >
-          <View style={{ flexShrink: 1 }}>
+          <View>
             {/* Header */}
             <View style={styles.header}>
               <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -464,7 +464,8 @@ export default function NotificationDropdown({
               <FlatList
                 data={notifications.slice(0, displayCount)}
                 keyExtractor={(item) => `${item.type}-${item.id}`}
-                onEndReachedThreshold={0.5}
+                style={{ maxHeight: SCREEN_HEIGHT * 0.6 }}
+                onEndReachedThreshold={0.3}
                 onEndReached={() => {
                   if (displayCount < notifications.length) {
                     setDisplayCount((c) => Math.min(c + PAGE_SIZE, notifications.length));
@@ -536,7 +537,7 @@ export default function NotificationDropdown({
               />
             )}
           </View>
-        </Pressable>
+        </View>
       </Pressable>
     </Modal>
   );

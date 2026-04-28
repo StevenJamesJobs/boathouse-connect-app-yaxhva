@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,13 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  FlatList,
+  Dimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from 'react-native';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -111,6 +117,10 @@ export default function RewardsAndReviewsEditorScreen() {
     },
     scrollView: {
       flex: 1,
+    },
+    rewardsStaticHeader: {
+      paddingTop: 20,
+      paddingHorizontal: 16,
     },
     contentContainer: {
       paddingTop: 20,
@@ -639,10 +649,25 @@ export default function RewardsAndReviewsEditorScreen() {
   const [editIsReward, setEditIsReward] = useState(true);
 
   // Sub-tab state
-  const [rewardsSubTab, setRewardsSubTab] = useState<'leaderboard' | 'recent'>('leaderboard');
+  const [rewardsSubTab, setRewardsSubTab] = useState<'leaderboard' | 'recent' | 'lookup'>('leaderboard');
+  const subTabPagerRef = useRef<FlatList>(null);
+  const SUB_PAGES = ['leaderboard', 'recent', 'lookup'] as const;
+  const goToSubTab = (tab: typeof SUB_PAGES[number]) => {
+    const idx = SUB_PAGES.indexOf(tab);
+    subTabPagerRef.current?.scrollToIndex({ index: idx, animated: true });
+    setRewardsSubTab(tab);
+    if (tab === 'recent') markManagerRecentViewed();
+  };
+  const handleSubTabScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    const next = SUB_PAGES[idx];
+    if (next && next !== rewardsSubTab) {
+      setRewardsSubTab(next);
+      if (next === 'recent') markManagerRecentViewed();
+    }
+  };
 
   // Employee lookup state
-  const [showEmployeeLookup, setShowEmployeeLookup] = useState(false);
   const [lookupSearchQuery, setLookupSearchQuery] = useState('');
   const [lookupFilteredEmployees, setLookupFilteredEmployees] = useState<Employee[]>([]);
   const [lookupEmployee, setLookupEmployee] = useState<Employee | null>(null);
@@ -1406,9 +1431,9 @@ export default function RewardsAndReviewsEditorScreen() {
       </View>
 
       {/* Content */}
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {activeTab === 'rewards' ? (
-          <>
+      {activeTab === 'rewards' ? (
+        <View style={{ flex: 1 }}>
+          <View style={styles.rewardsStaticHeader}>
             {/* Quick Actions Grid: Reward / Deduct / Reset / Approvals */}
             <View style={styles.quickActionsCard}>
               <View style={styles.quickActionsRow}>
@@ -1476,60 +1501,68 @@ export default function RewardsAndReviewsEditorScreen() {
               boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
               elevation: 3,
             }}>
-              {(['leaderboard', 'recent', 'lookup'] as const).map((tab) => (
-                <TouchableOpacity
-                  key={tab}
-                  style={{
-                    flex: 1,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    paddingVertical: 10,
-                    borderRadius: 10,
-                    gap: 4,
-                    backgroundColor: (tab === 'lookup' ? showEmployeeLookup : rewardsSubTab === tab) && !(!showEmployeeLookup && tab !== 'lookup' && rewardsSubTab !== tab)
-                      ? (tab === 'lookup' && showEmployeeLookup) || (tab !== 'lookup' && rewardsSubTab === tab && !showEmployeeLookup)
-                        ? colors.primary : 'transparent'
-                      : 'transparent',
-                  }}
-                  onPress={() => {
-                    if (tab === 'lookup') {
-                      setShowEmployeeLookup(true);
-                    } else {
-                      setShowEmployeeLookup(false);
-                      setRewardsSubTab(tab);
-                      if (tab === 'recent') markManagerRecentViewed();
-                    }
-                  }}
-                >
-                  <View style={{ position: 'relative' }}>
-                    <IconSymbol
-                      ios_icon_name={tab === 'leaderboard' ? 'trophy.fill' : tab === 'recent' ? 'clock.fill' : 'magnifyingglass'}
-                      android_material_icon_name={tab === 'leaderboard' ? 'emoji-events' : tab === 'recent' ? 'history' : 'search'}
-                      size={14}
-                      color={
-                        (tab === 'lookup' && showEmployeeLookup) || (tab !== 'lookup' && rewardsSubTab === tab && !showEmployeeLookup)
-                          ? '#FFF' : colors.textSecondary
-                      }
-                    />
-                    {tab === 'recent' && managerRecentHasNew && !(rewardsSubTab === 'recent' && !showEmployeeLookup) ? (
-                      <View style={styles.subTabDot} />
-                    ) : null}
-                  </View>
-                  <Text style={{
-                    fontSize: 12,
-                    fontWeight: '600',
-                    color: (tab === 'lookup' && showEmployeeLookup) || (tab !== 'lookup' && rewardsSubTab === tab && !showEmployeeLookup)
-                      ? '#FFF' : colors.textSecondary,
-                  }}>
-                    {tab === 'leaderboard' ? 'Leaderboard' : tab === 'recent' ? 'Recent' : 'Lookup'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {(['leaderboard', 'recent', 'lookup'] as const).map((tab) => {
+                const active = rewardsSubTab === tab;
+                return (
+                  <TouchableOpacity
+                    key={tab}
+                    style={{
+                      flex: 1,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      paddingVertical: 10,
+                      borderRadius: 10,
+                      gap: 4,
+                      backgroundColor: active ? colors.primary : 'transparent',
+                    }}
+                    onPress={() => goToSubTab(tab)}
+                  >
+                    <View style={{ position: 'relative' }}>
+                      <IconSymbol
+                        ios_icon_name={tab === 'leaderboard' ? 'trophy.fill' : tab === 'recent' ? 'clock.fill' : 'magnifyingglass'}
+                        android_material_icon_name={tab === 'leaderboard' ? 'emoji-events' : tab === 'recent' ? 'history' : 'search'}
+                        size={14}
+                        color={active ? '#FFF' : colors.textSecondary}
+                      />
+                      {tab === 'recent' && managerRecentHasNew && !active ? (
+                        <View style={styles.subTabDot} />
+                      ) : null}
+                    </View>
+                    <Text style={{
+                      fontSize: 12,
+                      fontWeight: '600',
+                      color: active ? '#FFF' : colors.textSecondary,
+                    }}>
+                      {tab === 'leaderboard' ? 'Leaderboard' : tab === 'recent' ? 'Recent' : 'Lookup'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            {/* Sub-Tab Content */}
-            {showEmployeeLookup ? (
+          </View>
+
+          {/* Sub-Tab Content — horizontal pager: leaderboard / recent / lookup */}
+          <FlatList
+            ref={subTabPagerRef}
+            data={SUB_PAGES as unknown as string[]}
+            keyExtractor={(item) => item}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={handleSubTabScroll}
+            bounces={false}
+            getItemLayout={(_, index) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * index, index })}
+            style={{ flex: 1 }}
+            renderItem={({ item }) => (
+              <ScrollView
+                style={{ width: SCREEN_WIDTH }}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 100 }}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled
+              >
+            {item === 'lookup' ? (
               <View style={styles.section}>
                 {/* Employee Search */}
                 <TextInput
@@ -1602,7 +1635,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   </>
                 )}
               </View>
-            ) : rewardsSubTab === 'leaderboard' ? (
+            ) : item === 'leaderboard' ? (
               <View style={styles.section}>
                 {topEmployees.length === 0 ? (
                   <Text style={styles.emptyText}>No leaderboard data yet</Text>
@@ -1694,8 +1727,12 @@ export default function RewardsAndReviewsEditorScreen() {
                 )}
               </View>
             )}
-          </>
-        ) : (
+              </ScrollView>
+            )}
+          />
+        </View>
+      ) : (
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
           <>
             {/* Add Review Button */}
             <TouchableOpacity
@@ -1755,8 +1792,8 @@ export default function RewardsAndReviewsEditorScreen() {
               )}
             </View>
           </>
-        )}
-      </ScrollView>
+        </ScrollView>
+      )}
 
       {/* Loading Overlay */}
       {loading && (
