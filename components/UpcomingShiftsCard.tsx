@@ -200,8 +200,8 @@ export default function UpcomingShiftsCard({ userId, isManager = false, colors }
         ? shifts.map((shift, index) => renderShiftRow(shift, index, shifts.length))
         : renderShiftRow(shifts[0], 0, 1)}
 
-      {/* Manager-only View Today's Roster — only visible when expanded */}
-      {expanded && isManager && (
+      {/* Manager-only View Today's Roster — always visible */}
+      {isManager && (
         <TouchableOpacity
           style={[styles.rosterButton, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.12)' }]}
           onPress={() => router.push('/todays-roster')}

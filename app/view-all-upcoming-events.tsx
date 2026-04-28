@@ -194,21 +194,10 @@ export default function ViewAllUpcomingEventsScreen() {
           />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>{t('upcoming_events:title')}</Text>
-        <TouchableOpacity
-          onPress={() => setMonthOverlayVisible(true)}
-          style={styles.monthButton}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <IconSymbol
-            ios_icon_name="calendar"
-            android_material_icon_name="calendar-month"
-            size={22}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
+        <View style={styles.headerSpacer} />
       </View>
 
-      {/* Week strip */}
+      {/* Week strip with embedded sub-tabs (matches Welcome Events tab styling) */}
       <WeeklyCalendarStrip
         selectedDate={selectedDate}
         onSelectDate={setSelectedDate}
@@ -220,31 +209,31 @@ export default function ViewAllUpcomingEventsScreen() {
           card: colors.card,
         }}
         events={events}
-      />
-
-      {/* Tabs (only when no date selected) */}
-      {selectedDate === null && (
-        <View style={[styles.tabsContainer, { backgroundColor: colors.card }]}>
-          <TouchableOpacity
-            style={[styles.tab, eventsTab === 'Event' && [styles.activeTab, { backgroundColor: colors.primary }]]}
-            onPress={() => setEventsTab('Event')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Event' && styles.activeTabText]}>
-              {t('upcoming_events:events')}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, eventsTab === 'Entertainment' && [styles.activeTab, { backgroundColor: colors.primary }]]}
-            onPress={() => setEventsTab('Entertainment')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && styles.activeTabText]}>
-              {t('upcoming_events:entertainment')}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        onMonthExpand={() => setMonthOverlayVisible(true)}
+      >
+        {selectedDate === null && (
+          <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginTop: 8 }]}>
+            <TouchableOpacity
+              style={[styles.subTab, eventsTab === 'Event' && { backgroundColor: colors.primary }]}
+              onPress={() => setEventsTab('Event')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Event' && { color: '#FFFFFF' }]}>
+                {t('upcoming_events:events')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.subTab, eventsTab === 'Entertainment' && { backgroundColor: colors.primary }]}
+              onPress={() => setEventsTab('Entertainment')}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && { color: '#FFFFFF' }]}>
+                {t('upcoming_events:entertainment')}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </WeeklyCalendarStrip>
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -416,34 +405,26 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: 'center',
   },
-  monthButton: {
-    padding: 8,
-    marginRight: -8,
+  headerSpacer: {
+    width: 40,
   },
-  tabsContainer: {
+  subTabsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 8,
+    borderRadius: 10,
+    padding: 4,
+    gap: 4,
   },
-  tab: {
+  subTab: {
     flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 10,
+    paddingHorizontal: 12,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  activeTab: {
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.2)',
-    elevation: 2,
-  },
-  tabText: {
+  subTabText: {
     fontSize: 14,
     fontWeight: '600',
-  },
-  activeTabText: {
-    color: '#FFFFFF',
   },
   loadingContainer: {
     flex: 1,

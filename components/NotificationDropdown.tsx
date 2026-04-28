@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   FlatList,
   Dimensions,
+  Pressable,
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -427,13 +428,12 @@ export default function NotificationDropdown({
       animationType="fade"
       onRequestClose={onClose}
     >
-      <TouchableOpacity
-        style={styles.overlay}
-        activeOpacity={1}
-        onPress={onClose}
-      >
-        <View style={[styles.dropdown, { backgroundColor: colors.card }]}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+      <Pressable style={styles.overlay} onPress={onClose}>
+        <Pressable
+          style={[styles.dropdown, { backgroundColor: colors.card, maxHeight: SCREEN_HEIGHT * 0.7 }]}
+          onPress={() => {}}
+        >
+          <View style={{ flexShrink: 1 }}>
             {/* Header */}
             <View style={styles.header}>
               <Text style={[styles.headerTitle, { color: colors.text }]}>
@@ -464,7 +464,6 @@ export default function NotificationDropdown({
               <FlatList
                 data={notifications.slice(0, displayCount)}
                 keyExtractor={(item) => `${item.type}-${item.id}`}
-                style={{ maxHeight: SCREEN_HEIGHT * 0.65 }}
                 onEndReachedThreshold={0.5}
                 onEndReached={() => {
                   if (displayCount < notifications.length) {
@@ -536,9 +535,9 @@ export default function NotificationDropdown({
                 }}
               />
             )}
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
+          </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 }
