@@ -52,6 +52,11 @@ interface MenuItem {
   is_active: boolean;
   name_es?: string | null;
   description_es?: string | null;
+  location?: string | null;
+  location_es?: string | null;
+  glass_price?: string | null;
+  bottle_price?: string | null;
+  member_bottle_price?: string | null;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -125,6 +130,11 @@ export default function MenuEditorScreen() {
     display_order: 0,
     name_es: '',
     description_es: '',
+    location: '',
+    location_es: '',
+    glass_price: '',
+    bottle_price: '',
+    member_bottle_price: '',
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -380,7 +390,11 @@ export default function MenuEditorScreen() {
   };
 
   const handleSave = async () => {
-    if (!formData.name || !formData.price) {
+    const isWine = formData.category === 'Wine';
+    // Wines validate on glass OR bottle price (members may not order all tiers);
+    // non-wines still require the legacy single price.
+    const winePriceMissing = isWine && !formData.glass_price && !formData.bottle_price;
+    if (!formData.name || (!isWine && !formData.price) || winePriceMissing) {
       Alert.alert(t('common:error'), t('menu_editor:error_fill_fields'));
       return;
     }
@@ -404,7 +418,7 @@ export default function MenuEditorScreen() {
 
       if (editingItem) {
         // Update existing item using database function
-        const { data, error } = await supabase.rpc('update_menu_item', {
+        const { data, error } = await (supabase.rpc as any)('update_menu_item', {
           p_user_id: user.id,
           p_menu_item_id: editingItem.id,
           p_name: formData.name,
@@ -421,6 +435,10 @@ export default function MenuEditorScreen() {
           p_thumbnail_url: thumbnailUrl,
           p_thumbnail_shape: formData.thumbnail_shape,
           p_display_order: formData.display_order,
+          p_location: isWine ? (formData.location || null) : null,
+          p_glass_price: isWine ? (formData.glass_price || null) : null,
+          p_bottle_price: isWine ? (formData.bottle_price || null) : null,
+          p_member_bottle_price: isWine ? (formData.member_bottle_price || null) : null,
         });
 
         if (error) {
@@ -431,15 +449,16 @@ export default function MenuEditorScreen() {
         Alert.alert(t('common:success'), t('menu_editor:updated_success'));
 
         // Save Spanish translations
-        if (formData.name_es || formData.description_es) {
+        if (formData.name_es || formData.description_es || formData.location_es) {
           await saveTranslations('menu_items', editingItem.id, {
             name_es: formData.name_es,
             description_es: formData.description_es,
+            ...(isWine ? { location_es: formData.location_es } : {}),
           });
         }
       } else {
         // Create new item using database function
-        const { data, error } = await supabase.rpc('create_menu_item', {
+        const { data, error } = await (supabase.rpc as any)('create_menu_item', {
           p_user_id: user.id,
           p_name: formData.name,
           p_description: formData.description || null,
@@ -455,6 +474,10 @@ export default function MenuEditorScreen() {
           p_thumbnail_url: thumbnailUrl,
           p_thumbnail_shape: formData.thumbnail_shape,
           p_display_order: formData.display_order,
+          p_location: isWine ? (formData.location || null) : null,
+          p_glass_price: isWine ? (formData.glass_price || null) : null,
+          p_bottle_price: isWine ? (formData.bottle_price || null) : null,
+          p_member_bottle_price: isWine ? (formData.member_bottle_price || null) : null,
         });
 
         if (error) {
@@ -465,7 +488,7 @@ export default function MenuEditorScreen() {
         Alert.alert(t('common:success'), t('menu_editor:created_success'));
 
         // Save Spanish translations for newly created item
-        if (formData.name_es || formData.description_es) {
+        if (formData.name_es || formData.description_es || formData.location_es) {
           const { data: newItem } = await supabase
             .from('menu_items')
             .select('id')
@@ -476,6 +499,7 @@ export default function MenuEditorScreen() {
             await saveTranslations('menu_items', newItem.id, {
               name_es: formData.name_es,
               description_es: formData.description_es,
+              ...(isWine ? { location_es: formData.location_es } : {}),
             });
           }
         }
@@ -690,6 +714,11 @@ export default function MenuEditorScreen() {
       display_order: 0,
       name_es: '',
       description_es: '',
+      location: '',
+      location_es: '',
+      glass_price: '',
+      bottle_price: '',
+      member_bottle_price: '',
     });
     setSelectedImageUri(null);
     setShowSpanish(false);
@@ -714,6 +743,11 @@ export default function MenuEditorScreen() {
       display_order: item.display_order,
       name_es: item.name_es || '',
       description_es: item.description_es || '',
+      location: item.location || '',
+      location_es: item.location_es || '',
+      glass_price: item.glass_price || '',
+      bottle_price: item.bottle_price || '',
+      member_bottle_price: item.member_bottle_price || '',
     });
     setShowSpanish(false);
     setSelectedImageUri(null);
@@ -745,6 +779,18 @@ export default function MenuEditorScreen() {
     }
     // Otherwise add $ at the beginning
     return `$${price}`;
+  };
+
+  // Compact price label for the editor preview card. Wines collapse to
+  // "Glass / Bottle" tiers; non-wines fall back to the legacy single price.
+  const formatItemPriceLabel = (item: MenuItem) => {
+    if (item.category === 'Wine') {
+      const parts: string[] = [];
+      if (item.glass_price) parts.push(`Gl ${formatPrice(item.glass_price)}`);
+      if (item.bottle_price) parts.push(`Btl ${formatPrice(item.bottle_price)}`);
+      if (parts.length > 0) return parts.join(' / ');
+    }
+    return formatPrice(item.price);
   };
 
   return (
@@ -920,7 +966,7 @@ export default function MenuEditorScreen() {
                     <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.squareImage} />
                     <View style={styles.squareContent}>
                       <View style={styles.squareHeader}>
-                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                        <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>
                         <Text style={styles.menuItemName} numberOfLines={1}>{getLocalizedField(item, 'name', language)}</Text>
                       </View>
                       {item.description && (
@@ -945,7 +991,7 @@ export default function MenuEditorScreen() {
                     {item.thumbnail_url && <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.menuItemImageBanner} />}
                     <View style={styles.menuItemContent}>
                       <View style={styles.menuItemHeader}>
-                        <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                        <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>
                         <Text style={styles.menuItemName} numberOfLines={1}>{getLocalizedField(item, 'name', language)}</Text>
                       </View>
                       {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
@@ -1053,7 +1099,7 @@ export default function MenuEditorScreen() {
                           <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.squareImage} />
                           <View style={styles.squareContent}>
                             <View style={styles.squareHeader}>
-                              <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                              <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>
                               <Text style={styles.menuItemName} numberOfLines={1}>{getLocalizedField(item, 'name', language)}</Text>
                             </View>
                             {item.description && (
@@ -1078,7 +1124,7 @@ export default function MenuEditorScreen() {
                           {item.thumbnail_url && <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.menuItemImageBanner} />}
                           <View style={styles.menuItemContent}>
                             <View style={styles.menuItemHeader}>
-                              <Text style={styles.menuItemPrice}>{formatPrice(item.price)}</Text>
+                              <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>
                               <Text style={styles.menuItemName} numberOfLines={1}>{getLocalizedField(item, 'name', language)}</Text>
                             </View>
                             {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
@@ -1300,22 +1346,25 @@ export default function MenuEditorScreen() {
                 )}
               </View>
 
-              {/* Price + Display Order — side by side */}
+              {/* Price + Display Order — side by side. Wines hide the legacy
+                  single Price field (replaced by Glass/Bottle/Member below). */}
               <View style={styles.priceOrderRow}>
-                <View style={styles.priceOrderCol}>
-                  <Text style={styles.formLabel}>{t('menu_editor:price_label')}</Text>
-                  <View style={styles.inputWithAdornment}>
-                    <Text style={styles.inputAdornment}>$</Text>
-                    <TextInput
-                      style={styles.inputAdornmentField}
-                      placeholder={t('menu_editor:price_placeholder')}
-                      placeholderTextColor="#999999"
-                      value={formData.price}
-                      onChangeText={(text) => setFormData({ ...formData, price: text })}
-                      keyboardType="decimal-pad"
-                    />
+                {formData.category !== 'Wine' && (
+                  <View style={styles.priceOrderCol}>
+                    <Text style={styles.formLabel}>{t('menu_editor:price_label')}</Text>
+                    <View style={styles.inputWithAdornment}>
+                      <Text style={styles.inputAdornment}>$</Text>
+                      <TextInput
+                        style={styles.inputAdornmentField}
+                        placeholder={t('menu_editor:price_placeholder')}
+                        placeholderTextColor="#999999"
+                        value={formData.price}
+                        onChangeText={(text) => setFormData({ ...formData, price: text })}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
                   </View>
-                </View>
+                )}
                 <View style={styles.priceOrderCol}>
                   <Text style={styles.formLabel}>{t('menu_editor:display_order_label')}</Text>
                   <View style={styles.inputWithAdornment}>
@@ -1334,6 +1383,76 @@ export default function MenuEditorScreen() {
                   </View>
                 </View>
               </View>
+
+              {/* Wine-specific fields: location + 3 prices.
+                  Source-of-truth for auto-generated quiz/game questions. */}
+              {formData.category === 'Wine' && (
+                <>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Location</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="e.g. Napa Valley, California"
+                      placeholderTextColor="#999999"
+                      value={formData.location}
+                      onChangeText={(text) => setFormData({ ...formData, location: text })}
+                    />
+                    {showSpanish && (
+                      <TextInput
+                        style={[styles.input, { marginTop: 8 }]}
+                        placeholder="Ubicación (Spanish)"
+                        placeholderTextColor="#999999"
+                        value={formData.location_es}
+                        onChangeText={(text) => setFormData({ ...formData, location_es: text })}
+                      />
+                    )}
+                  </View>
+                  <View style={styles.priceOrderRow}>
+                    <View style={styles.priceOrderCol}>
+                      <Text style={styles.formLabel}>Glass Price</Text>
+                      <View style={styles.inputWithAdornment}>
+                        <Text style={styles.inputAdornment}>$</Text>
+                        <TextInput
+                          style={styles.inputAdornmentField}
+                          placeholder="12"
+                          placeholderTextColor="#999999"
+                          value={formData.glass_price}
+                          onChangeText={(text) => setFormData({ ...formData, glass_price: text })}
+                          keyboardType="decimal-pad"
+                        />
+                      </View>
+                    </View>
+                    <View style={styles.priceOrderCol}>
+                      <Text style={styles.formLabel}>Bottle Price</Text>
+                      <View style={styles.inputWithAdornment}>
+                        <Text style={styles.inputAdornment}>$</Text>
+                        <TextInput
+                          style={styles.inputAdornmentField}
+                          placeholder="45"
+                          placeholderTextColor="#999999"
+                          value={formData.bottle_price}
+                          onChangeText={(text) => setFormData({ ...formData, bottle_price: text })}
+                          keyboardType="decimal-pad"
+                        />
+                      </View>
+                    </View>
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Member Bottle Price</Text>
+                    <View style={styles.inputWithAdornment}>
+                      <Text style={styles.inputAdornment}>$</Text>
+                      <TextInput
+                        style={styles.inputAdornmentField}
+                        placeholder="40"
+                        placeholderTextColor="#999999"
+                        value={formData.member_bottle_price}
+                        onChangeText={(text) => setFormData({ ...formData, member_bottle_price: text })}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+                  </View>
+                </>
+              )}
 
               {/* Category */}
               <View style={styles.formGroup}>

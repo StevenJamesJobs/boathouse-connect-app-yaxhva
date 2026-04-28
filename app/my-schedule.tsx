@@ -292,78 +292,98 @@ function DayRow({ day, shifts, isToday, colors, t, formatTime, getShiftDuration 
     return null;
   };
 
-  return (
-    <View style={styles.dayRow}>
-      {/* Date square — left */}
-      <View
-        style={[
-          styles.dateSquare,
-          {
-            backgroundColor: isToday ? colors.primary : colors.card,
-            borderColor: isToday ? colors.primary : colors.border || 'rgba(128,128,128,0.15)',
-          },
-        ]}
-      >
-        <Text
-          style={[
-            styles.dateSquareDay,
-            { color: isToday ? '#FFFFFF' : colors.primary },
-          ]}
-        >
-          {dayName}
-        </Text>
-        <Text
-          style={[
-            styles.dateSquareNumber,
-            { color: isToday ? '#FFFFFF' : colors.primary },
-          ]}
-        >
-          {dayNumber}
-        </Text>
-      </View>
+  const dateBoxBg = isToday ? colors.primary : colors.card;
+  const dateBoxBorder = isToday
+    ? colors.primary
+    : colors.border || 'rgba(128,128,128,0.15)';
+  const dateBoxTextColor = isToday ? '#FFFFFF' : colors.primary;
+  const accentColor = isToday ? colors.primary : 'transparent';
 
-      {/* Content — right */}
-      <View style={styles.dayContent}>
-        {hasShifts ? (
-          shifts.map((shift) => {
-            const tag = getShiftTag(shift);
-            const primaryRole = shift.roles.length > 0 ? shift.roles[0] : null;
-            return (
-              <View
-                key={shift.id}
-                style={[styles.shiftCard, { backgroundColor: colors.card }]}
-              >
-                <View style={styles.shiftCardMain}>
-                  <Text style={[styles.shiftTimeText, { color: colors.text }]}>
-                    {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
-                  </Text>
-                  {primaryRole && (
-                    <Text style={[styles.shiftRoleText, { color: colors.textSecondary }]}>
-                      {primaryRole}
-                    </Text>
-                  )}
-                  {tag && (
-                    <Text style={[styles.shiftTagText, { color: colors.textSecondary }]}>
-                      {tag}
-                    </Text>
-                  )}
-                </View>
-                <View style={styles.shiftDurationBadge}>
-                  <Text style={[styles.shiftDurationText, { color: colors.textSecondary }]}>
-                    {getShiftDuration(shift.start_time, shift.end_time)}
-                  </Text>
-                </View>
-              </View>
-            );
-          })
-        ) : (
-          <View style={[styles.emptyDayCard, { backgroundColor: colors.card }]}>
+  const renderDateBox = (dimmed: boolean) => (
+    <View
+      style={[
+        styles.dateBox,
+        {
+          backgroundColor: dateBoxBg,
+          borderColor: dateBoxBorder,
+          opacity: dimmed ? 0.35 : 1,
+        },
+      ]}
+    >
+      <Text style={[styles.dateBoxDay, { color: dateBoxTextColor }]}>
+        {dayName}
+      </Text>
+      <Text style={[styles.dateBoxNumber, { color: dateBoxTextColor }]}>
+        {dayNumber}
+      </Text>
+    </View>
+  );
+
+  if (!hasShifts) {
+    return (
+      <View style={styles.dayShiftStack}>
+        <View
+          style={[
+            styles.itemCard,
+            {
+              backgroundColor: colors.card,
+              borderLeftColor: accentColor,
+            },
+          ]}
+        >
+          {renderDateBox(false)}
+          <View style={styles.itemCardContent}>
             <Text style={[styles.emptyDayText, { color: colors.textSecondary }]}>
               {t('my_schedule.not_scheduled', 'Not scheduled')}
             </Text>
           </View>
-        )}
+        </View>
       </View>
+    );
+  }
+
+  return (
+    <View style={styles.dayShiftStack}>
+      {shifts.map((shift, idx) => {
+        const tag = getShiftTag(shift);
+        const primaryRole = shift.roles.length > 0 ? shift.roles[0] : null;
+        return (
+          <View
+            key={shift.id}
+            style={[
+              styles.itemCard,
+              {
+                backgroundColor: colors.card,
+                borderLeftColor: accentColor,
+              },
+            ]}
+          >
+            {renderDateBox(idx > 0)}
+            <View style={styles.itemCardContent}>
+              <View style={styles.shiftCardMain}>
+                <Text style={[styles.shiftTimeText, { color: colors.text }]}>
+                  {formatTime(shift.start_time)} - {formatTime(shift.end_time)}
+                </Text>
+                {primaryRole && (
+                  <Text style={[styles.shiftRoleText, { color: colors.textSecondary }]}>
+                    {primaryRole}
+                  </Text>
+                )}
+                {tag && (
+                  <Text style={[styles.shiftTagText, { color: colors.textSecondary }]}>
+                    {tag}
+                  </Text>
+                )}
+              </View>
+              <View style={styles.shiftDurationBadge}>
+                <Text style={[styles.shiftDurationText, { color: colors.textSecondary }]}>
+                  {getShiftDuration(shift.start_time, shift.end_time)}
+                </Text>
+              </View>
+            </View>
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -440,44 +460,46 @@ const styles = StyleSheet.create({
   loadingIndicator: {
     marginTop: 40,
   },
-  dayRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    marginBottom: 10,
-    gap: 10,
-  },
-  dateSquare: {
-    width: 56,
-    borderRadius: 12,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-  },
-  dateSquareDay: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  dateSquareNumber: {
-    fontSize: 22,
-    fontWeight: '800',
-    marginTop: 2,
-  },
-  dayContent: {
-    flex: 1,
+  dayShiftStack: {
     gap: 6,
+    marginBottom: 10,
   },
-  shiftCard: {
+  itemCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 12,
+    gap: 12,
     borderRadius: 12,
+    borderLeftWidth: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
     shadowRadius: 3,
     elevation: 1,
+  },
+  dateBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dateBoxDay: {
+    fontSize: 13,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  dateBoxNumber: {
+    fontSize: 28,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  itemCardContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   shiftCardMain: {
     flex: 1,
@@ -504,11 +526,6 @@ const styles = StyleSheet.create({
   shiftDurationText: {
     fontSize: 12,
     fontWeight: '600',
-  },
-  emptyDayCard: {
-    padding: 14,
-    borderRadius: 12,
-    justifyContent: 'center',
   },
   emptyDayText: {
     fontSize: 13,

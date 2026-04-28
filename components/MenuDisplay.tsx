@@ -44,6 +44,11 @@ interface MenuItem {
   thumbnail_shape: string;
   display_order: number;
   is_active: boolean;
+  location?: string | null;
+  location_es?: string | null;
+  glass_price?: string | null;
+  bottle_price?: string | null;
+  member_bottle_price?: string | null;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -396,6 +401,19 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const buildDetailedDescription = (item: MenuItem) => {
     let description = getLocalizedField(item, 'description', language) || item.description || '';
 
+    if (item.category === 'Wine') {
+      const loc = getLocalizedField(item, 'location', language) || item.location;
+      if (loc) description = `📍 ${loc}\n\n${description}`.trim();
+
+      const priceLines: string[] = [];
+      if (item.glass_price) priceLines.push(`Glass: ${formatPrice(item.glass_price)}`);
+      if (item.bottle_price) priceLines.push(`Bottle: ${formatPrice(item.bottle_price)}`);
+      if (item.member_bottle_price) priceLines.push(`Member Bottle: ${formatPrice(item.member_bottle_price)}`);
+      if (priceLines.length > 0) {
+        description += `\n\n${priceLines.join('\n')}`;
+      }
+    }
+
     const dietaryInfo = [];
     if (item.is_gluten_free) dietaryInfo.push('Gluten Free');
     if (item.is_gluten_free_available) dietaryInfo.push('Gluten Free Available');
@@ -456,7 +474,10 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   };
 
   // Render a single menu item card (compact style matching Welcome page)
-  const renderMenuCard = (item: MenuItem, categoryColor: string) => (
+  const renderMenuCard = (item: MenuItem, categoryColor: string) => {
+    const isWine = item.category === 'Wine';
+    const localizedLocation = isWine ? getLocalizedField(item, 'location', language) : '';
+    return (
     <TouchableOpacity
       key={item.id}
       style={[
@@ -481,10 +502,35 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
               {getLocalizedField(item, 'name', language)}
             </Text>
-            <Text style={[styles.cardPrice, { color: colors.primary }]}>
-              {formatPrice(item.price)}
-            </Text>
+            {isWine ? (
+              <View style={styles.winePriceStack}>
+                {item.glass_price ? (
+                  <Text style={[styles.winePriceLine, { color: colors.primary }]}>
+                    Gl {formatPrice(item.glass_price)}
+                  </Text>
+                ) : null}
+                {item.bottle_price ? (
+                  <Text style={[styles.winePriceLine, { color: colors.primary }]}>
+                    Btl {formatPrice(item.bottle_price)}
+                  </Text>
+                ) : null}
+                {item.member_bottle_price ? (
+                  <Text style={[styles.winePriceLine, { color: colors.textSecondary }]}>
+                    Mbr {formatPrice(item.member_bottle_price)}
+                  </Text>
+                ) : null}
+              </View>
+            ) : (
+              <Text style={[styles.cardPrice, { color: colors.primary }]}>
+                {formatPrice(item.price)}
+              </Text>
+            )}
           </View>
+          {isWine && localizedLocation ? (
+            <Text style={[styles.wineLocation, { color: colors.textSecondary }]} numberOfLines={1}>
+              📍 {localizedLocation}
+            </Text>
+          ) : null}
           {(item.category === 'Weekly Specials' && (item.available_for_lunch || item.available_for_dinner)) || item.is_gluten_free || item.is_gluten_free_available ||
             item.is_vegetarian || item.is_vegetarian_available ? (
             <View style={styles.tagsRow}>
@@ -528,7 +574,8 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         </View>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   // Render a single page of menu items (for swipe pager)
   const renderPage = ({ item: page, index }: { item: PageConfig; index: number }) => {
@@ -850,7 +897,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
           <ContentDetailModal
             visible={detailModalVisible}
             onClose={closeDetailModal}
-            title={`${getLocalizedField(item, 'name', language)} - ${formatPrice(item.price)}`}
+            title={
+              item.category === 'Wine'
+                ? getLocalizedField(item, 'name', language)
+                : `${getLocalizedField(item, 'name', language)} - ${formatPrice(item.price)}`
+            }
             content={buildDetailedDescription(item)}
             thumbnailUrl={item.thumbnail_url}
             thumbnailShape={item.thumbnail_shape}
@@ -1037,6 +1088,20 @@ const createStyles = (colors: any) =>
     cardPrice: {
       fontSize: 15,
       fontWeight: '600',
+    },
+    winePriceStack: {
+      alignItems: 'flex-end',
+    },
+    winePriceLine: {
+      fontSize: 12,
+      fontWeight: '700',
+      lineHeight: 14,
+    },
+    wineLocation: {
+      fontSize: 12,
+      marginTop: 1,
+      marginBottom: 2,
+      fontStyle: 'italic',
     },
     cardSubtitle: {
       fontSize: 13,

@@ -142,6 +142,70 @@ export async function sendSpecialFeatureNotification(
 }
 
 /**
+ * Notify users who got passed on the master Game Hub leaderboard.
+ * Calls get_passed_users_on_leaderboard RPC (which already filters
+ * recipients by their game_hub_enabled preference) and fires a push
+ * to the resulting list. No-op when no one was passed.
+ *
+ * Caller passes localized title/body — recipient locale isn't known here.
+ * Fire-and-forget; errors are swallowed so the post-game UI isn't blocked.
+ */
+export async function notifyLeaderboardPassed(
+  playerUserId: string,
+  scoreJustEarned: number,
+  title: string,
+  body: string
+): Promise<void> {
+  if (!playerUserId || scoreJustEarned <= 0) return;
+  try {
+    const { data, error } = await (supabase.rpc as any)('get_passed_users_on_leaderboard', {
+      p_user_id: playerUserId,
+      p_new_score: scoreJustEarned,
+    });
+    if (error) {
+      console.error('[notifyLeaderboardPassed] RPC error:', error);
+      return;
+    }
+    const passed = (data ?? []) as Array<{ user_id: string; name: string }>;
+    if (passed.length === 0) return;
+
+    // Write per-recipient shade rows so each passed user sees the entry in
+    // their personal notification dropdown. data.targetUserId scopes the row
+    // to that user; data.notificationType excludes it from manager Sent History.
+    const shadeRows = passed.map((p) => ({
+      title,
+      body,
+      sent_by: playerUserId,
+      data: {
+        type: 'custom',
+        notificationType: 'leaderboard_pass',
+        destination: 'master-leaderboard',
+        targetUserId: p.user_id,
+      },
+    }));
+    const { error: insertError } = await (supabase.from('custom_notifications') as any).insert(shadeRows);
+    if (insertError) {
+      console.error('[notifyLeaderboardPassed] shade insert error:', insertError);
+      // Continue to push even if shade insert failed.
+    }
+
+    await sendNotification({
+      userIds: passed.map((p) => p.user_id),
+      notificationType: 'custom',
+      title,
+      body,
+      data: {
+        type: 'custom',
+        notificationType: 'leaderboard_pass',
+        destination: 'master-leaderboard',
+      },
+    });
+  } catch (err) {
+    console.error('[notifyLeaderboardPassed] unexpected error:', err);
+  }
+}
+
+/**
  * Send a custom notification (manager only)
  * Supports optional job_titles filtering for targeted notifications
  */

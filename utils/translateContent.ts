@@ -80,7 +80,7 @@ const TRANSLATION_RPC_MAP: Record<string, { rpc: string; paramMap: Record<string
   },
   menu_items: {
     rpc: 'update_menu_item_translations',
-    paramMap: { name_es: 'p_name_es', description_es: 'p_description_es' },
+    paramMap: { name_es: 'p_name_es', description_es: 'p_description_es', location_es: 'p_location_es' },
   },
   guides_and_training: {
     rpc: 'update_guide_translations',

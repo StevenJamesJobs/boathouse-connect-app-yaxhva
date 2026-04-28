@@ -13,12 +13,20 @@ import {
   ScrollView,
   Image,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useAppTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
+import { MessageBadge } from '@/components/MessageBadge';
+import { hexToRgba } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useFocusEffect } from '@react-navigation/native';
+import { BlurView } from 'expo-blur';
+import { useTranslation } from 'react-i18next';
 
 interface GameCard {
   title: string;
@@ -58,9 +66,119 @@ const GAME_CARDS: GameCard[] = [
 
 const RANK_MEDALS = ['🥇', '🥈', '🥉'];
 
+interface NavTab {
+  route: string;
+  labelKey: string;
+  iosIcon: string;
+  androidIcon: string;
+}
+
+const EMPLOYEE_NAV_TABS: NavTab[] = [
+  { route: '/(portal)/employee', labelKey: 'tabs.welcome', iosIcon: 'house.fill', androidIcon: 'home' },
+  { route: '/(portal)/employee/menus', labelKey: 'tabs.menus', iosIcon: 'fork.knife', androidIcon: 'restaurant' },
+  { route: '/(portal)/employee/tools', labelKey: 'tabs.tools', iosIcon: 'wrench.and.screwdriver.fill', androidIcon: 'build' },
+  { route: '/(portal)/employee/rewards', labelKey: 'tabs.rewards', iosIcon: 'star.fill', androidIcon: 'star' },
+  { route: '/(portal)/employee/profile', labelKey: 'tabs.profile', iosIcon: 'person.fill', androidIcon: 'person' },
+];
+
+const MANAGER_NAV_TABS: NavTab[] = [
+  { route: '/(portal)/manager', labelKey: 'tabs.welcome', iosIcon: 'house.fill', androidIcon: 'home' },
+  { route: '/(portal)/manager/menus', labelKey: 'tabs.menus', iosIcon: 'fork.knife', androidIcon: 'restaurant' },
+  { route: '/(portal)/manager/tools', labelKey: 'tabs.tools', iosIcon: 'wrench.and.screwdriver.fill', androidIcon: 'build' },
+  { route: '/(portal)/manager/manage', labelKey: 'tabs.manage', iosIcon: 'slider.horizontal.3', androidIcon: 'tune' },
+  { route: '/(portal)/manager/profile', labelKey: 'tabs.profile', iosIcon: 'person.fill', androidIcon: 'person' },
+];
+
+function GameHubBottomNav() {
+  const router = useRouter();
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const colors = useThemeColors();
+  const { mode } = useAppTheme();
+
+  const tabs = user?.role === 'manager' ? MANAGER_NAV_TABS : EMPLOYEE_NAV_TABS;
+
+  const blurBgColor = Platform.select({
+    ios: hexToRgba(colors.tabBarBackground, 0.6),
+    android: hexToRgba(colors.tabBarBackground, 0.9),
+    web: hexToRgba(colors.tabBarBackground, 0.85),
+  });
+
+  return (
+    <View style={navStyles.container}>
+      <BlurView
+        intensity={80}
+        tint={mode === 'dark' ? 'dark' : 'light'}
+        style={[navStyles.blur, { backgroundColor: blurBgColor }]}
+      >
+        <View style={navStyles.row}>
+          {tabs.map((tab) => (
+            <TouchableOpacity
+              key={tab.route}
+              style={navStyles.tabBtn}
+              onPress={() => router.replace(tab.route as any)}
+            >
+              <IconSymbol
+                ios_icon_name={tab.iosIcon as any}
+                android_material_icon_name={tab.androidIcon as any}
+                size={24}
+                color={colors.tabBarInactive}
+              />
+              <Text style={[navStyles.label, { color: colors.tabBarInactive }]} numberOfLines={1}>
+                {t(tab.labelKey)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </BlurView>
+    </View>
+  );
+}
+
+const navStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    bottom: 20,
+    left: 10,
+    right: 10,
+    alignItems: 'center',
+  },
+  blur: {
+    width: '100%',
+    maxWidth: 500,
+    borderRadius: 30,
+    overflow: 'hidden',
+    borderWidth: 1.5,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+    boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.2), 0px 4px 16px rgba(0, 0, 0, 0.15)',
+    elevation: 20,
+  },
+  row: {
+    flexDirection: 'row',
+    paddingHorizontal: 6,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'space-around',
+  },
+  tabBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 6,
+    paddingHorizontal: 2,
+  },
+  label: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 3,
+    textAlign: 'center',
+  },
+});
+
 export default function GameHubScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
   const [topLeaders, setTopLeaders] = useState<LeaderboardEntry[]>([]);
   const [loadingLeaders, setLoadingLeaders] = useState(true);
 
@@ -100,7 +218,7 @@ export default function GameHubScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 120 }]}>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Test your knowledge of the menu with fun, interactive games.
         </Text>
@@ -184,10 +302,17 @@ export default function GameHubScreen() {
             activeOpacity={0.7}
           >
             <Text style={[styles.viewAllText, { color: '#F59E0B' }]}>View Full Leaderboard</Text>
+            {unreadLeaderboardCount > 0 && (
+              <View style={{ marginLeft: 4 }}>
+                <MessageBadge count={unreadLeaderboardCount} size="small" />
+              </View>
+            )}
             <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color="#F59E0B" />
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      <GameHubBottomNav />
     </View>
   );
 }

@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
+import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import { MessageBadge } from '@/components/MessageBadge';
 
 // ─── Grid layout constants (matching Manage page) ────────────────────────────
@@ -37,6 +38,7 @@ export default function ManagerToolsScreen() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const { pendingCount } = usePendingApprovals();
+  const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
 
   // Get job titles array from user
   const jobTitles = user?.jobTitles || [];
@@ -86,6 +88,7 @@ export default function ManagerToolsScreen() {
 
   const renderGridItem = (item: GridItem) => {
     const showApprovalsBadge = item.id === 'rewards-reviews' && pendingCount > 0;
+    const showGameHubBadge = item.id === 'game-hub' && unreadLeaderboardCount > 0;
     return (
       <TouchableOpacity
         key={item.id}
@@ -103,6 +106,11 @@ export default function ManagerToolsScreen() {
           {showApprovalsBadge && (
             <View style={styles.tileBadge}>
               <MessageBadge count={pendingCount} size="small" />
+            </View>
+          )}
+          {showGameHubBadge && (
+            <View style={styles.tileBadge}>
+              <MessageBadge count={unreadLeaderboardCount} size="small" />
             </View>
           )}
         </View>

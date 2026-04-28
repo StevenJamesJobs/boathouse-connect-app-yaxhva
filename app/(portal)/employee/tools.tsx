@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { hasAnyQuizEligibleRole } from '@/app/weekly-quizzes';
 import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
+import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 
 // ─── Grid layout constants (matching Manage page) ────────────────────────────
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -61,13 +62,14 @@ export default function EmployeeToolsScreen() {
 
   const canSeeWeeklyQuizzes = hasAnyQuizEligibleRole(jobTitles);
   const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
+  const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
 
   // ─── Build flat tile list ────────────────────────────────────────────────────
 
   // Fixed top row: Guides & Training → Game Hub → Weekly Quizzes (when eligible)
   const allItems: GridItem[] = [
     { id: 'guides-training', label: t('employee_tools.guides_training'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training' },
-    { id: 'game-hub', label: t('employee_tools.game_hub'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub' },
+    { id: 'game-hub', label: t('employee_tools.game_hub'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub', badge: unreadLeaderboardCount > 0 },
   ];
   if (canSeeWeeklyQuizzes) {
     allItems.push({ id: 'weekly-quizzes', label: t('employee_tools.weekly_quizzes'), iosIcon: 'questionmark.circle.fill', androidIcon: 'quiz', route: '/weekly-quizzes', badge: unreadQuizCount > 0 });

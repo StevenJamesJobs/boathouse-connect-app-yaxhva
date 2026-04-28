@@ -10,10 +10,10 @@ import {
   Alert,
   StyleProp,
   ViewStyle,
-  useColorScheme,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/IconSymbol';
+import { useAppTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { JOB_TITLES } from '@/constants/jobTitles';
 import EmployeePickerModal from '@/components/EmployeePickerModal';
@@ -157,8 +157,8 @@ export default function ShiftEditForm({
   onClose,
   onSaved,
 }: ShiftEditFormProps) {
-  const colorScheme = useColorScheme();
-  const pickerTheme: 'light' | 'dark' = colorScheme === 'dark' ? 'dark' : 'light';
+  const { mode: themeMode } = useAppTheme();
+  const pickerTheme: 'light' | 'dark' = themeMode === 'dark' ? 'dark' : 'light';
   const [saving, setSaving] = useState(false);
 
   const [shiftDate, setShiftDate] = useState<Date>(new Date());
@@ -480,6 +480,7 @@ export default function ShiftEditForm({
                 mode="date"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 themeVariant={pickerTheme}
+                textColor={colors.text}
                 onChange={(_event, date) => {
                   if (Platform.OS === 'android') setShowDatePicker(false);
                   if (date) setShiftDate(date);
@@ -516,6 +517,7 @@ export default function ShiftEditForm({
                 mode="time"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 themeVariant={pickerTheme}
+                textColor={colors.text}
                 minuteInterval={5}
                 onChange={(_event, date) => {
                   if (Platform.OS === 'android') setShowStartTimePicker(false);
@@ -553,6 +555,7 @@ export default function ShiftEditForm({
                 mode="time"
                 display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                 themeVariant={pickerTheme}
+                textColor={colors.text}
                 minuteInterval={5}
                 onChange={(_event, date) => {
                   if (Platform.OS === 'android') setShowEndTimePicker(false);

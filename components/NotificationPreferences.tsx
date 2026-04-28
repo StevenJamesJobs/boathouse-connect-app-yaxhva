@@ -24,6 +24,7 @@ interface NotificationPreferencesData {
   events_enabled: boolean;
   special_features_enabled: boolean;
   custom_notifications_enabled: boolean;
+  game_hub_enabled: boolean;
 }
 
 export default function NotificationPreferences({ variant = 'employee' }: NotificationPreferencesProps) {
@@ -39,6 +40,7 @@ export default function NotificationPreferences({ variant = 'employee' }: Notifi
     events_enabled: true,
     special_features_enabled: true,
     custom_notifications_enabled: true,
+    game_hub_enabled: true,
   });
 
   useEffect(() => {
@@ -69,6 +71,7 @@ export default function NotificationPreferences({ variant = 'employee' }: Notifi
           events_enabled: data.events_enabled,
           special_features_enabled: data.special_features_enabled,
           custom_notifications_enabled: data.custom_notifications_enabled,
+          game_hub_enabled: data.game_hub_enabled ?? true,
         });
       }
     } catch (error) {
@@ -145,6 +148,13 @@ export default function NotificationPreferences({ variant = 'employee' }: Notifi
       icon: 'bell.fill',
       androidIcon: 'notifications',
       description: t('notifications.management_updates_desc'),
+    },
+    {
+      key: 'game_hub_enabled' as keyof NotificationPreferencesData,
+      label: t('notifications.game_hub'),
+      icon: 'gamecontroller.fill',
+      androidIcon: 'sports-esports',
+      description: t('notifications.game_hub_desc'),
     },
   ];
 
