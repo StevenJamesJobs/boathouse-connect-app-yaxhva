@@ -4,7 +4,7 @@
  * Includes Reset All, and Employee Score Lookup.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -38,7 +38,10 @@ interface UserScoreResult {
   memory_games: number;
   word_search_score: number;
   word_search_games: number;
+  picture_this_score: number;
+  picture_this_games: number;
   total_score: number;
+  is_test_user: boolean;
 }
 
 const EDITOR_CARDS: EditorCard[] = [
@@ -58,6 +61,14 @@ const EDITOR_CARDS: EditorCard[] = [
     route: '/word-search-editor',
     color: '#10B981',
   },
+  {
+    title: 'Picture This! Editor',
+    description: 'Reset Picture This! leaderboards by category or all at once',
+    iosIcon: 'photo.fill',
+    androidIcon: 'photo-camera',
+    route: '/picture-this-editor',
+    color: '#EC4899',
+  },
 ];
 
 export default function GameHubEditorScreen() {
@@ -71,6 +82,42 @@ export default function GameHubEditorScreen() {
   const [searchResults, setSearchResults] = useState<UserScoreResult[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
+  const [togglingTestId, setTogglingTestId] = useState<string | null>(null);
+
+  const handleToggleTestUser = async (user: UserScoreResult) => {
+    const willBeTest = !user.is_test_user;
+    Alert.alert(
+      willBeTest ? `Mark ${user.name} as test user?` : `Remove test-user flag from ${user.name}?`,
+      willBeTest
+        ? `${user.name} will be excluded from ALL game leaderboards (Memory, Word Search, Picture This!) and will not trigger leaderboard pass notifications. Their scores will keep saving but stay hidden from public leaderboards.`
+        : `${user.name} will appear back on game leaderboards and will trigger pass notifications normally.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: willBeTest ? 'Mark Test User' : 'Remove Test Flag',
+          style: willBeTest ? 'default' : 'destructive',
+          onPress: async () => {
+            setTogglingTestId(user.user_id);
+            try {
+              const { error } = await (supabase.rpc as any)('set_user_test_flag', {
+                p_user_id: user.user_id,
+                p_is_test: willBeTest,
+              });
+              if (error) throw error;
+              setSearchResults(prev => prev.map(r =>
+                r.user_id === user.user_id ? { ...r, is_test_user: willBeTest } : r,
+              ));
+            } catch (err) {
+              console.error('[GameHubEditor] toggle test user error:', err);
+              Alert.alert('Error', 'Failed to update test-user flag.');
+            } finally {
+              setTogglingTestId(null);
+            }
+          },
+        },
+      ],
+    );
+  };
 
   const handleResetAllScores = () => {
     Alert.alert(
@@ -102,6 +149,15 @@ export default function GameHubEditorScreen() {
                 throw err2;
               }
 
+              const { error: err3 } = await (supabase.rpc as any)('reset_picture_this_scores', {
+                p_category: null,
+                p_difficulty: null,
+              });
+              if (err3) {
+                console.error('Error resetting picture this scores:', err3);
+                throw err3;
+              }
+
               Alert.alert('Done', 'All game scores have been reset.');
             } catch (err) {
               console.error('Reset all scores error:', err);
@@ -115,8 +171,24 @@ export default function GameHubEditorScreen() {
     );
   };
 
-  const handleSearchUser = async () => {
-    const query = searchQuery.trim();
+  // Live search — debounce typing by 250ms, then run the lookup automatically.
+  // Empty query clears results.
+  useEffect(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) {
+      setSearchResults([]);
+      setHasSearched(false);
+      return;
+    }
+    const t = setTimeout(() => {
+      handleSearchUser(trimmed);
+    }, 250);
+    return () => clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
+
+  const handleSearchUser = async (queryArg?: string) => {
+    const query = (queryArg ?? searchQuery).trim();
     if (!query) return;
 
     setSearching(true);
@@ -125,7 +197,7 @@ export default function GameHubEditorScreen() {
       // Find users matching the search
       const { data: users, error } = await (supabase
         .from('users') as any)
-        .select('id, name, profile_picture_url')
+        .select('id, name, profile_picture_url, is_test_user')
         .ilike('name', `%${query}%`)
         .eq('is_active', true)
         .limit(10) as any;
@@ -153,8 +225,16 @@ export default function GameHubEditorScreen() {
           .eq('user_id', user.id)
           .eq('completed', true);
 
+        // Picture This scores
+        const { data: ptScores } = await (supabase
+          .from('picture_this_scores') as any)
+          .select('score')
+          .eq('user_id', user.id)
+          .eq('completed', true);
+
         const memoryTotal = (memoryScores || []).reduce((sum: number, s: any) => sum + s.score, 0);
         const wsTotal = (wsScores || []).reduce((sum: number, s: any) => sum + s.score, 0);
+        const ptTotal = (ptScores || []).reduce((sum: number, s: any) => sum + s.score, 0);
 
         results.push({
           user_id: user.id,
@@ -164,7 +244,10 @@ export default function GameHubEditorScreen() {
           memory_games: (memoryScores || []).length,
           word_search_score: wsTotal,
           word_search_games: (wsScores || []).length,
-          total_score: memoryTotal + wsTotal,
+          picture_this_score: ptTotal,
+          picture_this_games: (ptScores || []).length,
+          total_score: memoryTotal + wsTotal + ptTotal,
+          is_test_user: !!user.is_test_user,
         });
       }
 
@@ -179,7 +262,7 @@ export default function GameHubEditorScreen() {
   const handleResetUserScores = (user: UserScoreResult) => {
     Alert.alert(
       `Reset ${user.name}'s Scores`,
-      `This will delete all game scores for ${user.name} (Memory: ${user.memory_games} games, Word Search: ${user.word_search_games} games). This cannot be undone.`,
+      `This will delete all game scores for ${user.name} (Memory: ${user.memory_games}, Word Search: ${user.word_search_games}, Picture This!: ${user.picture_this_games}). This cannot be undone.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -202,9 +285,13 @@ export default function GameHubEditorScreen() {
                 .delete()
                 .eq('user_id', user.user_id);
 
-              if (memError || wsError) {
-                // If direct delete fails (no RLS policy), try via SQL
-                console.error('Direct delete failed, errors:', memError, wsError);
+              const { error: ptError } = await (supabase
+                .from('picture_this_scores') as any)
+                .delete()
+                .eq('user_id', user.user_id);
+
+              if (memError || wsError || ptError) {
+                console.error('Direct delete failed, errors:', memError, wsError, ptError);
                 Alert.alert('Error', 'Failed to reset scores. Check permissions.');
               } else {
                 Alert.alert('Done', `${user.name}'s scores have been reset.`);
@@ -238,41 +325,17 @@ export default function GameHubEditorScreen() {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           Manage game content and leaderboards for all staff games.
         </Text>
 
-        {EDITOR_CARDS.map((card) => (
-          <TouchableOpacity
-            key={card.route}
-            style={[styles.card, { backgroundColor: colors.card }]}
-            onPress={() => router.push(card.route as any)}
-            activeOpacity={0.75}
-          >
-            <View style={[styles.iconContainer, { backgroundColor: card.color + '18' }]}>
-              <IconSymbol
-                ios_icon_name={card.iosIcon as any}
-                android_material_icon_name={card.androidIcon as any}
-                size={30}
-                color={card.color}
-              />
-            </View>
-            <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{card.title}</Text>
-              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{card.description}</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={18}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-        ))}
-
-        {/* Employee Score Lookup */}
-        <View style={[styles.lookupSection, { borderTopColor: colors.border }]}>
+        {/* Employee Score Lookup — placed FIRST so keyboard can't bury results */}
+        <View style={styles.lookupSectionTop}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>Employee Score Lookup</Text>
           <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
             Search for an employee to view and reset their individual game scores.
@@ -286,10 +349,12 @@ export default function GameHubEditorScreen() {
               placeholderTextColor={colors.textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}
-              onSubmitEditing={handleSearchUser}
+              onSubmitEditing={() => handleSearchUser()}
               returnKeyType="search"
+              autoCorrect={false}
+              autoCapitalize="words"
             />
-            <TouchableOpacity onPress={handleSearchUser} disabled={searching}>
+            <TouchableOpacity onPress={() => handleSearchUser()} disabled={searching}>
               {searching ? (
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
@@ -327,36 +392,102 @@ export default function GameHubEditorScreen() {
                 <View style={[styles.scoreChip, { backgroundColor: '#6366F1' + '15' }]}>
                   <Text style={[styles.scoreChipLabel, { color: '#6366F1' }]}>Memory</Text>
                   <Text style={[styles.scoreChipValue, { color: '#6366F1' }]}>
-                    {user.memory_score.toLocaleString()} ({user.memory_games} games)
+                    {user.memory_score.toLocaleString()} ({user.memory_games})
                   </Text>
                 </View>
                 <View style={[styles.scoreChip, { backgroundColor: '#10B981' + '15' }]}>
                   <Text style={[styles.scoreChipLabel, { color: '#10B981' }]}>Word Search</Text>
                   <Text style={[styles.scoreChipValue, { color: '#10B981' }]}>
-                    {user.word_search_score.toLocaleString()} ({user.word_search_games} games)
+                    {user.word_search_score.toLocaleString()} ({user.word_search_games})
+                  </Text>
+                </View>
+                <View style={[styles.scoreChip, { backgroundColor: '#EC4899' + '15' }]}>
+                  <Text style={[styles.scoreChipLabel, { color: '#EC4899' }]}>Picture This!</Text>
+                  <Text style={[styles.scoreChipValue, { color: '#EC4899' }]}>
+                    {user.picture_this_score.toLocaleString()} ({user.picture_this_games})
                   </Text>
                 </View>
               </View>
 
-              {(user.memory_games > 0 || user.word_search_games > 0) && (
+              {user.is_test_user && (
+                <View style={styles.testBanner}>
+                  <Text style={styles.testBannerText}>🧪 Test user — excluded from leaderboards</Text>
+                </View>
+              )}
+
+              <View style={styles.userActions}>
                 <TouchableOpacity
-                  style={[styles.resetUserBtn, { borderColor: '#EF4444' }]}
-                  onPress={() => handleResetUserScores(user)}
-                  disabled={resettingUserId === user.user_id}
+                  style={[
+                    styles.testToggleBtn,
+                    user.is_test_user
+                      ? { borderColor: '#F59E0B', backgroundColor: '#F59E0B15' }
+                      : { borderColor: colors.border, backgroundColor: colors.background },
+                  ]}
+                  onPress={() => handleToggleTestUser(user)}
+                  disabled={togglingTestId === user.user_id}
                 >
-                  {resettingUserId === user.user_id ? (
-                    <ActivityIndicator size="small" color="#EF4444" />
+                  {togglingTestId === user.user_id ? (
+                    <ActivityIndicator size="small" color="#F59E0B" />
                   ) : (
-                    <>
-                      <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="refresh" size={14} color="#EF4444" />
-                      <Text style={styles.resetUserBtnText}>Reset All Scores</Text>
-                    </>
+                    <Text style={[
+                      styles.testToggleText,
+                      { color: user.is_test_user ? '#F59E0B' : colors.textSecondary },
+                    ]}>
+                      🧪 {user.is_test_user ? 'Test User: ON' : 'Mark as Test User'}
+                    </Text>
                   )}
                 </TouchableOpacity>
-              )}
+
+                {(user.memory_games > 0 || user.word_search_games > 0 || user.picture_this_games > 0) && (
+                  <TouchableOpacity
+                    style={[styles.resetUserBtn, { borderColor: '#EF4444' }]}
+                    onPress={() => handleResetUserScores(user)}
+                    disabled={resettingUserId === user.user_id}
+                  >
+                    {resettingUserId === user.user_id ? (
+                      <ActivityIndicator size="small" color="#EF4444" />
+                    ) : (
+                      <>
+                        <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="refresh" size={14} color="#EF4444" />
+                        <Text style={styles.resetUserBtnText}>Reset All Scores</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                )}
+              </View>
             </View>
           ))}
         </View>
+
+        {/* Game Editors */}
+        <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 8 }]}>Game Editors</Text>
+        {EDITOR_CARDS.map((card) => (
+          <TouchableOpacity
+            key={card.route}
+            style={[styles.card, { backgroundColor: colors.card }]}
+            onPress={() => router.push(card.route as any)}
+            activeOpacity={0.75}
+          >
+            <View style={[styles.iconContainer, { backgroundColor: card.color + '18' }]}>
+              <IconSymbol
+                ios_icon_name={card.iosIcon as any}
+                android_material_icon_name={card.androidIcon as any}
+                size={30}
+                color={card.color}
+              />
+            </View>
+            <View style={styles.cardText}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{card.title}</Text>
+              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{card.description}</Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={18}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+        ))}
 
         {/* Reset All Scores */}
         <View style={[styles.resetSection, { borderTopColor: colors.border }]}>
@@ -416,12 +547,10 @@ const styles = StyleSheet.create({
   cardTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
   cardDesc: { fontSize: 12, lineHeight: 17 },
 
-  // Employee Score Lookup
-  lookupSection: {
-    marginTop: 10,
-    paddingTop: 20,
-    borderTopWidth: 1,
+  // Employee Score Lookup (now placed at top of screen — no top divider)
+  lookupSectionTop: {
     gap: 10,
+    marginBottom: 4,
   },
   sectionTitle: { fontSize: 16, fontWeight: '700' },
   sectionDesc: { fontSize: 13, lineHeight: 18 },
@@ -460,16 +589,36 @@ const styles = StyleSheet.create({
   userInfo: { flex: 1 },
   userName: { fontSize: 16, fontWeight: '700' },
   userTotal: { fontSize: 14, fontWeight: '600', marginTop: 2 },
-  scoreBreakdown: { flexDirection: 'row', gap: 8, marginBottom: 10 },
+  scoreBreakdown: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 10 },
   scoreChip: {
-    flex: 1,
+    flexBasis: '31%',
+    flexGrow: 1,
     borderRadius: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
+    paddingVertical: 7,
+    paddingHorizontal: 8,
     alignItems: 'center',
   },
-  scoreChipLabel: { fontSize: 11, fontWeight: '700', marginBottom: 2 },
-  scoreChipValue: { fontSize: 12, fontWeight: '600' },
+  scoreChipLabel: { fontSize: 10, fontWeight: '700', marginBottom: 2 },
+  scoreChipValue: { fontSize: 11, fontWeight: '600' },
+  testBanner: {
+    backgroundColor: '#F59E0B20',
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginBottom: 8,
+    alignItems: 'center',
+  },
+  testBannerText: { fontSize: 11, fontWeight: '700', color: '#B45309' },
+  userActions: { gap: 8 },
+  testToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderRadius: 10,
+    paddingVertical: 8,
+  },
+  testToggleText: { fontSize: 13, fontWeight: '700' },
   resetUserBtn: {
     flexDirection: 'row',
     alignItems: 'center',

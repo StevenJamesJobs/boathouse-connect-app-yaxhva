@@ -22,7 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { refreshAllUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 
-type LeaderboardTab = 'overall' | 'memory' | 'word_search';
+type LeaderboardTab = 'overall' | 'memory' | 'word_search' | 'picture_this';
 
 interface MasterLeaderboardEntry {
   user_id: string;
@@ -35,13 +35,15 @@ interface MasterLeaderboardEntry {
 const TABS: { key: LeaderboardTab; label: string; icon: { ios: string; android: string } }[] = [
   { key: 'overall', label: 'Overall', icon: { ios: 'trophy.fill', android: 'emoji-events' } },
   { key: 'memory', label: 'Memory', icon: { ios: 'gamecontroller.fill', android: 'sports-esports' } },
-  { key: 'word_search', label: 'Word Search', icon: { ios: 'textformat.abc', android: 'spellcheck' } },
+  { key: 'word_search', label: 'Word', icon: { ios: 'textformat.abc', android: 'spellcheck' } },
+  { key: 'picture_this', label: 'Picture', icon: { ios: 'photo.fill', android: 'photo-camera' } },
 ];
 
 const RPC_MAP: Record<LeaderboardTab, string> = {
   overall: 'get_master_leaderboard_overall',
   memory: 'get_master_leaderboard_memory',
   word_search: 'get_master_leaderboard_word_search',
+  picture_this: 'get_master_leaderboard_picture_this',
 };
 
 const RANK_EMOJIS = ['🥇', '🥈', '🥉'];
@@ -195,7 +197,9 @@ export default function MasterLeaderboardScreen() {
             ? 'Total points from all games combined'
             : activeTab === 'memory'
             ? 'Total points from Menu Memory Game'
-            : 'Total points from Word Search puzzles'}
+            : activeTab === 'word_search'
+            ? 'Total points from Word Search puzzles'
+            : 'Total points from Picture This!'}
         </Text>
       </View>
 
