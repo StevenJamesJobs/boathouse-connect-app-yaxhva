@@ -62,6 +62,14 @@ const GAME_CARDS: GameCard[] = [
     route: '/word-search-game',
     color: '#10B981',
   },
+  {
+    title: 'Picture This!',
+    description: 'Choose the correct ingredients, prices, and more from menu pictures',
+    iosIcon: 'photo.fill',
+    androidIcon: 'photo-camera',
+    route: '/picture-this-game',
+    color: '#EC4899',
+  },
 ];
 
 const RANK_MEDALS = ['🥇', '🥈', '🥉'];
