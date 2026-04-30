@@ -3,20 +3,20 @@
     "name": "Boathouse Connect",
     "slug": "BoathouseConnect",
     "owner": "stevenjamesjobs",
-    "version": "2.0.2",
+    "version": "2.1.0",
     "orientation": "portrait",
-    "icon": "./assets/images/SpringAppClip.png",
+    "icon": "./assets/images/MayMothersDayAppClip.png",
     "scheme": "boathouseconnect",
     "userInterfaceStyle": "automatic",
     "splash": {
-      "image": "./assets/images/splash-placeholder.png",
+      "image": "./assets/images/MayMotherDaySplashScreen.png",
       "resizeMode": "cover",
       "backgroundColor": "#87CEEB"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.stevenjamesjobs.mcloonesboathouseconnect",
-      "buildNumber": "2.0.2",
+      "buildNumber": "2.1.0",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": ["remote-notification"],
@@ -27,11 +27,11 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/SpringAppClip.png",
+        "foregroundImage": "./assets/images/MayMothersDayAppClip.png",
         "backgroundColor": "#ffffff"
       },
       "package": "com.mcloonesboathouse.GPboathouseconnect",
-      "versionCode": 173,
+      "versionCode": 174,
       "googleServicesFile": "./google-services.json",
       "permissions": [
         "INTERNET",
@@ -59,11 +59,11 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#87CEEB",
-          "image": "./assets/images/splash-placeholder.png",
+          "image": "./assets/images/MayMotherDaySplashScreen.png",
           "imageResizeMode": "cover",
           "dark": {
             "backgroundColor": "#87CEEB",
-            "image": "./assets/images/splash-placeholder.png",
+            "image": "./assets/images/MayMotherDaySplashScreen.png",
             "imageResizeMode": "cover"
           }
         }
@@ -71,7 +71,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/SpringAppClip.png",
+          "icon": "./assets/images/MayMothersDayAppClip.png",
           "color": "#ffffff",
           "sounds": [],
           "mode": "production"

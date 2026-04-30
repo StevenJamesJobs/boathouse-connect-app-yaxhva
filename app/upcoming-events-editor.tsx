@@ -344,7 +344,7 @@ export default function UpcomingEventsEditorScreen() {
       return;
     }
 
-    if (!editingEvent && events.length >= 25) {
+    if (!editingEvent && events.length >= 40) {
       Alert.alert(t('upcoming_events_editor:limit_reached_title'), t('upcoming_events_editor:limit_reached_msg'));
       return;
     }
@@ -773,19 +773,19 @@ export default function UpcomingEventsEditorScreen() {
         </Text>
       </View>
 
-      <TouchableOpacity 
-        style={[styles.addNewItemButton, events.length >= 25 && styles.addNewItemButtonDisabled]} 
+      <TouchableOpacity
+        style={[styles.addNewItemButton, events.length >= 40 && styles.addNewItemButtonDisabled]}
         onPress={openAddModal}
-        disabled={events.length >= 25}
+        disabled={events.length >= 40}
       >
         <IconSymbol
           ios_icon_name="plus.circle.fill"
           android_material_icon_name="add-circle"
           size={24}
-          color={events.length >= 25 ? colors.textSecondary : colors.text}
+          color={events.length >= 40 ? colors.textSecondary : colors.text}
         />
-        <Text style={[styles.addNewItemButtonText, events.length >= 25 && styles.addNewItemButtonTextDisabled]}>
-          {events.length >= 25 ? t('upcoming_events_editor:limit_reached') : t('upcoming_events_editor:add_button')}
+        <Text style={[styles.addNewItemButtonText, events.length >= 40 && styles.addNewItemButtonTextDisabled]}>
+          {events.length >= 40 ? t('upcoming_events_editor:limit_reached') : t('upcoming_events_editor:add_button')}
         </Text>
       </TouchableOpacity>
 

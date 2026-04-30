@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Dimensions, Image } from "react-native";
 
-const splashImage = require("../assets/images/Spring-SplashScreen.jpg");
+const splashImage = require("../assets/images/MayMotherDaySplashScreen.png");
 const { width, height } = Dimensions.get("screen");
 
 interface AnimatedSplashProps {
