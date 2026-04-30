@@ -16,6 +16,7 @@ import {
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   WORD_SEARCH_CATEGORIES,
@@ -28,37 +29,38 @@ import BottomNavBar from '@/components/BottomNavBar';
 
 type PickerStep = 'difficulty' | 'playmode';
 
-const CATEGORY_LABELS: Record<WordSearchCategory, string> = {
-  weekly_specials: 'Weekly Specials',
-  lunch: 'Lunch',
-  dinner: 'Dinner',
-  happy_hour: 'Happy Hour',
-  libations: 'Libations',
+const CATEGORY_LABEL_KEYS: Record<WordSearchCategory, string> = {
+  weekly_specials: 'word_search:cat_weekly_specials',
+  lunch: 'word_search:cat_lunch',
+  dinner: 'word_search:cat_dinner',
+  happy_hour: 'word_search:cat_happy_hour',
+  libations: 'word_search:cat_libations',
 };
 
-const CATEGORY_DESCS: Record<WordSearchCategory, string> = {
-  weekly_specials: "Find ingredients from this week's specials",
-  lunch: 'Discover what goes into every lunch dish',
-  dinner: 'Explore ingredients across the dinner menu',
-  happy_hour: 'Learn happy hour food & drink ingredients',
-  libations: 'Search for cocktail & libation ingredients',
+const CATEGORY_DESC_KEYS: Record<WordSearchCategory, string> = {
+  weekly_specials: 'word_search:cat_weekly_specials_desc',
+  lunch: 'word_search:cat_lunch_desc',
+  dinner: 'word_search:cat_dinner_desc',
+  happy_hour: 'word_search:cat_happy_hour_desc',
+  libations: 'word_search:cat_libations_desc',
 };
 
-const DIFFICULTIES: { value: WordSearchDifficulty; label: string; desc: string; color: string }[] = [
-  { value: 'easy',   label: '🟢 Easy',   desc: '1 item • 10×10 grid', color: '#10B981' },
-  { value: 'medium', label: '🟡 Medium', desc: '2 items • 12×12 grid', color: '#F59E0B' },
-  { value: 'hard',   label: '🔴 Hard',   desc: '4 items • 15×15 grid', color: '#EF4444' },
+const DIFFICULTIES: { value: WordSearchDifficulty; emoji: string; labelKey: string; descKey: string; color: string }[] = [
+  { value: 'easy',   emoji: '🟢', labelKey: 'word_search:difficulty_easy',   descKey: 'word_search:difficulty_easy_desc',   color: '#10B981' },
+  { value: 'medium', emoji: '🟡', labelKey: 'word_search:difficulty_medium', descKey: 'word_search:difficulty_medium_desc', color: '#F59E0B' },
+  { value: 'hard',   emoji: '🔴', labelKey: 'word_search:difficulty_hard',   descKey: 'word_search:difficulty_hard_desc',   color: '#EF4444' },
 ];
 
-const PLAY_MODES: { value: WordSearchPlayMode; label: string; desc: string }[] = [
-  { value: 'free',  label: '🔓 Free Play', desc: 'No time limit — learn at your own pace' },
-  { value: 'timed', label: '⏱ Timed Mode', desc: 'Race the clock for bonus points!' },
+const PLAY_MODES: { value: WordSearchPlayMode; emoji: string; labelKey: string; descKey: string }[] = [
+  { value: 'free',  emoji: '🔓', labelKey: 'word_search:play_mode_free',  descKey: 'word_search:play_mode_free_desc' },
+  { value: 'timed', emoji: '⏱', labelKey: 'word_search:play_mode_timed', descKey: 'word_search:play_mode_timed_desc' },
 ];
 
 export default function WordSearchGameScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   const [selectedCategory, setSelectedCategory] = useState<WordSearchCategory | null>(null);
   const [pickerStep, setPickerStep] = useState<PickerStep>('difficulty');
@@ -97,24 +99,24 @@ export default function WordSearchGameScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Word Search</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('word_search:hub_title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         {/* Intro Card */}
         <View style={[styles.introCard, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}>
-          <Text style={[styles.introTitle, { color: colors.primary }]}>🔤 Menu Word Search!</Text>
+          <Text style={[styles.introTitle, { color: colors.primary }]}>🔤 {t('word_search:intro_title')}</Text>
           <Text style={[styles.introDesc, { color: colors.textSecondary }]}>
-            Find ingredient words hidden in the grid. Learn what&apos;s in every dish while you search!
+            {t('word_search:intro_desc')}
           </Text>
           <Text style={[styles.introTip, { color: colors.textSecondary }]}>
-            💡 Each ingredient shows its full name, but you only need to find the key word in the grid (e.g. "Shiitake" for Shiitake Mushrooms).
+            {t('word_search:intro_tip')}
           </Text>
         </View>
 
         {/* Category Cards */}
-        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>CHOOSE A CATEGORY</Text>
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('word_search:choose_category')}</Text>
         {WORD_SEARCH_CATEGORIES.map((cat) => {
           const info = WORD_SEARCH_CATEGORY_INFO[cat];
           return (
@@ -134,10 +136,10 @@ export default function WordSearchGameScreen() {
               </View>
               <View style={styles.categoryText}>
                 <Text style={[styles.categoryTitle, { color: colors.text }]}>
-                  {CATEGORY_LABELS[cat]}
+                  {t(CATEGORY_LABEL_KEYS[cat])}
                 </Text>
                 <Text style={[styles.categoryDesc, { color: colors.textSecondary }]}>
-                  {CATEGORY_DESCS[cat]}
+                  {t(CATEGORY_DESC_KEYS[cat])}
                 </Text>
               </View>
               <IconSymbol
@@ -157,7 +159,7 @@ export default function WordSearchGameScreen() {
           activeOpacity={0.75}
         >
           <IconSymbol ios_icon_name="trophy.fill" android_material_icon_name="emoji-events" size={22} color={colors.primary} />
-          <Text style={[styles.leaderboardBtnText, { color: colors.primary }]}>View Leaderboard</Text>
+          <Text style={[styles.leaderboardBtnText, { color: colors.primary }]}>{t('word_search:view_leaderboard')}</Text>
           <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color={colors.primary} />
         </TouchableOpacity>
       </ScrollView>
@@ -168,9 +170,9 @@ export default function WordSearchGameScreen() {
           <Pressable style={[styles.modalCard, { backgroundColor: colors.card }]} onPress={() => {}}>
             {pickerStep === 'difficulty' ? (
               <>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Choose Difficulty</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>{t('word_search:choose_difficulty')}</Text>
                 <Text style={[styles.modalSub, { color: colors.textSecondary }]}>
-                  {selectedCategory ? CATEGORY_LABELS[selectedCategory] : ''}
+                  {selectedCategory ? t(CATEGORY_LABEL_KEYS[selectedCategory]) : ''}
                 </Text>
                 {DIFFICULTIES.map((d) => (
                   <TouchableOpacity
@@ -179,16 +181,16 @@ export default function WordSearchGameScreen() {
                     onPress={() => handleDifficultySelect(d.value)}
                     activeOpacity={0.75}
                   >
-                    <Text style={[styles.optionLabel, { color: d.color }]}>{d.label}</Text>
-                    <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>{d.desc}</Text>
+                    <Text style={[styles.optionLabel, { color: d.color }]}>{d.emoji} {t(d.labelKey)}</Text>
+                    <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>{t(d.descKey)}</Text>
                   </TouchableOpacity>
                 ))}
               </>
             ) : (
               <>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Choose Play Mode</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>{t('word_search:choose_play_mode')}</Text>
                 <Text style={[styles.modalSub, { color: colors.textSecondary }]}>
-                  {selectedDifficulty.charAt(0).toUpperCase() + selectedDifficulty.slice(1)} difficulty
+                  {t('word_search:difficulty_suffix', { difficulty: t(`word_search:difficulty_${selectedDifficulty}`) })}
                 </Text>
                 {PLAY_MODES.map((pm) => (
                   <TouchableOpacity
@@ -197,17 +199,17 @@ export default function WordSearchGameScreen() {
                     onPress={() => handlePlayModeSelect(pm.value)}
                     activeOpacity={0.75}
                   >
-                    <Text style={[styles.optionLabel, { color: colors.primary }]}>{pm.label}</Text>
-                    <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>{pm.desc}</Text>
+                    <Text style={[styles.optionLabel, { color: colors.primary }]}>{pm.emoji} {t(pm.labelKey)}</Text>
+                    <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>{t(pm.descKey)}</Text>
                   </TouchableOpacity>
                 ))}
                 <TouchableOpacity onPress={() => setPickerStep('difficulty')} style={styles.backOption}>
-                  <Text style={[styles.backOptionText, { color: colors.textSecondary }]}>← Back to Difficulty</Text>
+                  <Text style={[styles.backOptionText, { color: colors.textSecondary }]}>{t('word_search:back_to_difficulty')}</Text>
                 </TouchableOpacity>
               </>
             )}
             <TouchableOpacity onPress={() => setShowPicker(false)} style={styles.cancelBtn}>
-              <Text style={[styles.cancelText, { color: colors.textSecondary }]}>Cancel</Text>
+              <Text style={[styles.cancelText, { color: colors.textSecondary }]}>{t('word_search:cancel')}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>

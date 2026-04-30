@@ -4,8 +4,10 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { IconSymbol } from '@/components/IconSymbol';
 import { WordSearchCategory, WordSearchDifficulty, WordSearchPlayMode } from '@/types/game';
 import { formatTime } from '@/utils/game/wordSearchEngine';
 
@@ -20,20 +22,21 @@ interface WordSearchHUDProps {
   isComplete: boolean;
   onTimeExpired?: () => void;
   onTick?: (secondsElapsed: number) => void;
+  onBack?: () => void;
 }
 
-const CATEGORY_LABELS: Record<WordSearchCategory, string> = {
-  weekly_specials: 'Weekly Specials',
-  lunch: 'Lunch',
-  dinner: 'Dinner',
-  happy_hour: 'Happy Hour',
-  libations: 'Libations',
+const CATEGORY_LABEL_KEYS: Record<WordSearchCategory, string> = {
+  weekly_specials: 'word_search_hud:cat_weekly_specials',
+  lunch: 'word_search_hud:cat_lunch',
+  dinner: 'word_search_hud:cat_dinner',
+  happy_hour: 'word_search_hud:cat_happy_hour',
+  libations: 'word_search_hud:cat_libations',
 };
 
-const DIFFICULTY_LABELS: Record<WordSearchDifficulty, string> = {
-  easy: 'Easy',
-  medium: 'Medium',
-  hard: 'Hard',
+const DIFFICULTY_LABEL_KEYS: Record<WordSearchDifficulty, string> = {
+  easy: 'word_search_hud:diff_easy',
+  medium: 'word_search_hud:diff_medium',
+  hard: 'word_search_hud:diff_hard',
 };
 
 const DIFFICULTY_COLORS: Record<WordSearchDifficulty, string> = {
@@ -53,8 +56,10 @@ export default function WordSearchHUD({
   isComplete,
   onTimeExpired,
   onTick,
+  onBack,
 }: WordSearchHUDProps) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const [secondsElapsed, setSecondsElapsed] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const secondsRef = useRef(0);
@@ -95,19 +100,29 @@ export default function WordSearchHUD({
 
   return (
     <View style={[styles.container, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-      {/* Row 1: Category + Difficulty */}
+      {/* Row 1: Back + Category + Difficulty */}
       <View style={styles.topRow}>
+        {onBack && (
+          <TouchableOpacity onPress={onBack} style={styles.backButton} hitSlop={10}>
+            <IconSymbol
+              ios_icon_name="chevron.left"
+              android_material_icon_name="arrow-back"
+              size={22}
+              color={colors.text}
+            />
+          </TouchableOpacity>
+        )}
         <Text style={[styles.categoryLabel, { color: colors.text }]} numberOfLines={1}>
-          {CATEGORY_LABELS[category]}
+          {t(CATEGORY_LABEL_KEYS[category])}
         </Text>
         <View style={[styles.diffPill, { backgroundColor: DIFFICULTY_COLORS[difficulty] + '22' }]}>
           <Text style={[styles.diffText, { color: DIFFICULTY_COLORS[difficulty] }]}>
-            {DIFFICULTY_LABELS[difficulty]}
+            {t(DIFFICULTY_LABEL_KEYS[difficulty])}
           </Text>
         </View>
         <View style={[styles.modePill, { backgroundColor: colors.primary + '15' }]}>
           <Text style={[styles.modeText, { color: colors.primary }]}>
-            {playMode === 'timed' ? '⏱ Timed' : '🔓 Free'}
+            {playMode === 'timed' ? t('word_search_hud:mode_timed') : t('word_search_hud:mode_free')}
           </Text>
         </View>
       </View>
@@ -148,6 +163,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  backButton: {
+    paddingRight: 4,
   },
   categoryLabel: {
     fontSize: 15,

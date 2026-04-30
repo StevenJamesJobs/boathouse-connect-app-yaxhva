@@ -29,8 +29,8 @@ import { BlurView } from 'expo-blur';
 import { useTranslation } from 'react-i18next';
 
 interface GameCard {
-  title: string;
-  description: string;
+  titleKey: string;
+  descKey: string;
   iosIcon: string;
   androidIcon: string;
   route: string;
@@ -47,24 +47,24 @@ interface LeaderboardEntry {
 
 const GAME_CARDS: GameCard[] = [
   {
-    title: 'Menu Memory Game',
-    description: 'Match wine pairings, ingredients & dishes, and cocktails across multiple difficulty levels',
+    titleKey: 'game_hub_cards:memory_title',
+    descKey: 'game_hub_cards:memory_desc',
     iosIcon: 'gamecontroller.fill',
     androidIcon: 'sports-esports',
     route: '/menu-memory-game',
     color: '#6366F1',
   },
   {
-    title: 'Word Search',
-    description: 'Find hidden menu items, ingredients, and specials in word search puzzles',
+    titleKey: 'game_hub_cards:word_search_title',
+    descKey: 'game_hub_cards:word_search_desc',
     iosIcon: 'textformat.abc',
     androidIcon: 'spellcheck',
     route: '/word-search-game',
     color: '#10B981',
   },
   {
-    title: 'Picture This!',
-    description: 'Choose the correct ingredients, prices, and more from menu pictures',
+    titleKey: 'game_hub_cards:picture_this_title',
+    descKey: 'game_hub_cards:picture_this_desc',
     iosIcon: 'photo.fill',
     androidIcon: 'photo-camera',
     route: '/picture-this-game',
@@ -186,6 +186,7 @@ const navStyles = StyleSheet.create({
 export default function GameHubScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const { t } = useTranslation();
   const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
   const [topLeaders, setTopLeaders] = useState<LeaderboardEntry[]>([]);
   const [loadingLeaders, setLoadingLeaders] = useState(true);
@@ -222,13 +223,13 @@ export default function GameHubScreen() {
             color={colors.primary}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Game Hub</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('game_hub_ui:title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 120 }]}>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Test your knowledge of the menu with fun, interactive games.
+          {t('game_hub_ui:subtitle')}
         </Text>
 
         {GAME_CARDS.map((card) => (
@@ -247,8 +248,8 @@ export default function GameHubScreen() {
               />
             </View>
             <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{card.title}</Text>
-              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{card.description}</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t(card.titleKey)}</Text>
+              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{t(card.descKey)}</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -266,8 +267,8 @@ export default function GameHubScreen() {
               <Text style={styles.trophyIcon}>🏆</Text>
             </View>
             <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>Leaderboard</Text>
-              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>Top players across all games</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('game_hub_ui:leaderboard_title')}</Text>
+              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{t('game_hub_ui:leaderboard_subtitle')}</Text>
             </View>
           </View>
 
@@ -299,7 +300,7 @@ export default function GameHubScreen() {
             </View>
           ) : (
             <Text style={[styles.noScoresText, { color: colors.textSecondary }]}>
-              No scores yet — be the first!
+              {t('game_hub_ui:no_scores')}
             </Text>
           )}
 
@@ -309,7 +310,7 @@ export default function GameHubScreen() {
             onPress={() => router.push('/master-leaderboard')}
             activeOpacity={0.7}
           >
-            <Text style={[styles.viewAllText, { color: '#F59E0B' }]}>View Full Leaderboard</Text>
+            <Text style={[styles.viewAllText, { color: '#F59E0B' }]}>{t('game_hub_ui:view_full_leaderboard')}</Text>
             {unreadLeaderboardCount > 0 && (
               <View style={{ marginLeft: 4 }}>
                 <MessageBadge count={unreadLeaderboardCount} size="small" />

@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -23,28 +24,29 @@ import {
   WordSearchCategory,
 } from '@/types/game';
 
-const CATEGORY_LABELS: Record<WordSearchCategory, string> = {
-  weekly_specials: 'Weekly Specials',
-  lunch: 'Lunch',
-  dinner: 'Dinner',
-  happy_hour: 'Happy Hour',
-  libations: 'Libations',
+const CATEGORY_LABEL_KEYS: Record<WordSearchCategory, string> = {
+  weekly_specials: 'word_search:cat_weekly_specials',
+  lunch: 'word_search:cat_lunch',
+  dinner: 'word_search:cat_dinner',
+  happy_hour: 'word_search:cat_happy_hour',
+  libations: 'word_search:cat_libations',
 };
 
 export default function WordSearchEditorScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const { t } = useTranslation();
   const [resetting, setResetting] = useState<string | null>(null);
 
   const confirmReset = (category: WordSearchCategory | null) => {
-    const label = category ? CATEGORY_LABELS[category] : 'ALL categories';
+    const label = category ? t(CATEGORY_LABEL_KEYS[category]) : t('ws_editor:all_categories');
     Alert.alert(
-      'Reset Scores',
-      `Are you sure you want to reset all Word Search scores for ${label}? This cannot be undone.`,
+      t('ws_editor:confirm_title'),
+      t('ws_editor:confirm_msg', { label }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('ws_editor:cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('ws_editor:reset_btn'),
           style: 'destructive',
           onPress: () => resetScores(category),
         },
@@ -60,9 +62,10 @@ export default function WordSearchEditorScreen() {
         p_category: category ?? null,
       });
       if (error) throw error;
-      Alert.alert('Success', `Word Search scores for ${category ? CATEGORY_LABELS[category] : 'all categories'} have been reset.`);
+      const label = category ? t(CATEGORY_LABEL_KEYS[category]) : t('ws_editor:all_categories_long');
+      Alert.alert(t('ws_editor:success'), t('ws_editor:success_msg', { label }));
     } catch {
-      Alert.alert('Error', 'Failed to reset scores. Please try again.');
+      Alert.alert(t('ws_editor:error'), t('ws_editor:error_msg'));
     } finally {
       setResetting(null);
     }
@@ -75,7 +78,7 @@ export default function WordSearchEditorScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Word Search Editor</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('ws_editor:title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -84,14 +87,14 @@ export default function WordSearchEditorScreen() {
         <View style={[styles.infoCard, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}>
           <IconSymbol ios_icon_name="info.circle.fill" android_material_icon_name="info" size={18} color={colors.primary} />
           <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            Word Search puzzles are automatically generated from the menu database. No manual content needed — puzzles update automatically when menu items change.
+            {t('ws_editor:info')}
           </Text>
         </View>
 
         {/* Scoreboard Management */}
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Scoreboard Management</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('ws_editor:scoreboard_management')}</Text>
         <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
-          Reset leaderboards for individual categories or clear all scores at once.
+          {t('ws_editor:scoreboard_desc')}
         </Text>
 
         {WORD_SEARCH_CATEGORIES.map((cat) => {
@@ -108,7 +111,7 @@ export default function WordSearchEditorScreen() {
                 />
               </View>
               <Text style={[styles.resetLabel, { color: colors.text }]}>
-                {CATEGORY_LABELS[cat]}
+                {t(CATEGORY_LABEL_KEYS[cat])}
               </Text>
               <TouchableOpacity
                 style={[
@@ -121,7 +124,7 @@ export default function WordSearchEditorScreen() {
                 {isResetting ? (
                   <ActivityIndicator size="small" color="#EF4444" />
                 ) : (
-                  <Text style={[styles.resetBtnText, { color: '#EF4444' }]}>Reset</Text>
+                  <Text style={[styles.resetBtnText, { color: '#EF4444' }]}>{t('ws_editor:reset_btn')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -139,7 +142,7 @@ export default function WordSearchEditorScreen() {
           ) : (
             <>
               <IconSymbol ios_icon_name="trash.fill" android_material_icon_name="delete" size={18} color="#EF4444" />
-              <Text style={styles.resetAllText}>Reset All Word Search Scores</Text>
+              <Text style={styles.resetAllText}>{t('ws_editor:reset_all_btn')}</Text>
             </>
           )}
         </TouchableOpacity>

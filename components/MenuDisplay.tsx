@@ -49,6 +49,10 @@ interface MenuItem {
   glass_price?: string | null;
   bottle_price?: string | null;
   member_bottle_price?: string | null;
+  flavor_profile?: string | null;
+  flavor_profile_es?: string | null;
+  unique_selling_points?: string | null;
+  unique_selling_points_es?: string | null;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -411,6 +415,17 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       if (item.member_bottle_price) priceLines.push(`Member Bottle: ${formatPrice(item.member_bottle_price)}`);
       if (priceLines.length > 0) {
         description += `\n\n${priceLines.join('\n')}`;
+      }
+
+      const flavor = getLocalizedField(item, 'flavor_profile', language);
+      if (flavor && flavor.trim()) {
+        const label = language === 'es' ? 'Sabor / Sensorial Clave' : 'Flavor / Key Sensory';
+        description += `\n\n🍇 ${label}:\n${flavor}`;
+      }
+      const usp = getLocalizedField(item, 'unique_selling_points', language);
+      if (usp && usp.trim()) {
+        const label = language === 'es' ? 'Puntos de Venta Únicos' : 'Unique Selling Points';
+        description += `\n\n✨ ${label}:\n${usp}`;
       }
     }
 
@@ -909,7 +924,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             redeemAction={
               showRedeem
                 ? {
-                    label: `Redeem for $${bucksCost}`,
+                    label: t('rewards_ui:redeem_for', { amount: bucksCost }),
                     onPress: () => {
                       closeDetailModal();
                       router.push({

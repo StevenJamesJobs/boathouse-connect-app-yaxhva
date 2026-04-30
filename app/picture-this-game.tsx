@@ -17,6 +17,7 @@ import {
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import {
   PictureThisCategory,
@@ -28,8 +29,8 @@ type PickerStep = 'difficulty' | 'playmode';
 
 interface CategoryInfo {
   key: PictureThisCategory;
-  label: string;
-  desc: string;
+  labelKey: string;
+  descKey: string;
   icon: { ios: string; android: string };
   color: string;
   difficulties: PictureThisDifficulty[];
@@ -38,60 +39,61 @@ interface CategoryInfo {
 const CATEGORIES: CategoryInfo[] = [
   {
     key: 'food',
-    label: 'Lunch & Dinner Menu',
-    desc: 'Identify ingredients in our food menu items',
+    labelKey: 'picture_this:cat_food',
+    descKey: 'picture_this:cat_food_desc',
     icon: { ios: 'fork.knife', android: 'restaurant' },
     color: '#EF4444',
     difficulties: ['easy', 'medium', 'hard'],
   },
   {
     key: 'libations',
-    label: 'Libations',
-    desc: 'Cocktails, martinis, sangria, and ABV drinks',
+    labelKey: 'picture_this:cat_libations',
+    descKey: 'picture_this:cat_libations_desc',
     icon: { ios: 'wineglass.fill', android: 'local-bar' },
     color: '#8B5CF6',
     difficulties: ['easy', 'medium', 'hard'],
   },
   {
     key: 'wine',
-    label: 'Wine',
-    desc: 'Match wines to their location and price',
+    labelKey: 'picture_this:cat_wine',
+    descKey: 'picture_this:cat_wine_desc',
     icon: { ios: 'wineglass', android: 'wine-bar' },
     color: '#A21CAF',
     difficulties: ['medium', 'hard'],
   },
   {
     key: 'menu_prices',
-    label: 'Menu Prices',
-    desc: 'Match prices across the entire menu',
+    labelKey: 'picture_this:cat_menu_prices',
+    descKey: 'picture_this:cat_menu_prices_desc',
     icon: { ios: 'dollarsign.circle.fill', android: 'attach-money' },
     color: '#0891B2',
     difficulties: ['only'],
   },
 ];
 
-const DIFFICULTY_INFO: Record<PictureThisDifficulty, { label: string; desc: string; color: string }> = {
-  easy:   { label: '🟢 Easy',    desc: 'Pick the correct ingredient • 3 lives',                color: '#10B981' },
-  medium: { label: '🟡 Medium',  desc: 'Pick 2 correct ingredients • 4 lives',                 color: '#F59E0B' },
-  hard:   { label: '🔴 Hard',    desc: 'Pick the full ingredient list • 5 lives',              color: '#EF4444' },
-  only:   { label: '💎 Expert',  desc: 'Match prices across the menu • 4 lives • most points', color: '#0891B2' },
+const DIFFICULTY_INFO: Record<PictureThisDifficulty, { labelKey: string; descKey: string; color: string }> = {
+  easy:   { labelKey: 'picture_this:diff_easy',   descKey: 'picture_this:diff_easy_desc',   color: '#10B981' },
+  medium: { labelKey: 'picture_this:diff_medium', descKey: 'picture_this:diff_medium_desc', color: '#F59E0B' },
+  hard:   { labelKey: 'picture_this:diff_hard',   descKey: 'picture_this:diff_hard_desc',   color: '#EF4444' },
+  only:   { labelKey: 'picture_this:diff_expert', descKey: 'picture_this:diff_expert_desc', color: '#0891B2' },
 };
 
-const DIFFICULTY_DESC_BY_CATEGORY: Partial<Record<PictureThisCategory, Partial<Record<PictureThisDifficulty, string>>>> = {
+const DIFFICULTY_DESC_OVERRIDE: Partial<Record<PictureThisCategory, Partial<Record<PictureThisDifficulty, string>>>> = {
   wine: {
-    medium: 'Match name + location • 4 lives',
-    hard:   'Pick the correct price • 5 lives',
+    medium: 'picture_this:diff_wine_medium_desc',
+    hard:   'picture_this:diff_wine_hard_desc',
   },
 };
 
-const PLAY_MODES: { value: PictureThisPlayMode; label: string; desc: string }[] = [
-  { value: 'lives', label: '❤️ Lives Mode',   desc: 'Wrong answers cost a life. Bonuses every 5 questions!' },
-  { value: 'timed', label: '⏱ Beat the Clock', desc: '2 minutes — answer as many as you can correctly!' },
+const PLAY_MODES: { value: PictureThisPlayMode; labelKey: string; descKey: string }[] = [
+  { value: 'lives', labelKey: 'picture_this:mode_lives', descKey: 'picture_this:mode_lives_desc' },
+  { value: 'timed', labelKey: 'picture_this:mode_timed', descKey: 'picture_this:mode_timed_desc' },
 ];
 
 export default function PictureThisGameScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryInfo | null>(null);
   const [pickerStep, setPickerStep] = useState<PickerStep>('difficulty');
@@ -125,10 +127,10 @@ export default function PictureThisGameScreen() {
 
   const renderDifficultyDesc = (difficulty: PictureThisDifficulty): string => {
     if (selectedCategory) {
-      const override = DIFFICULTY_DESC_BY_CATEGORY[selectedCategory.key]?.[difficulty];
-      if (override) return override;
+      const overrideKey = DIFFICULTY_DESC_OVERRIDE[selectedCategory.key]?.[difficulty];
+      if (overrideKey) return t(overrideKey);
     }
-    return DIFFICULTY_INFO[difficulty].desc;
+    return t(DIFFICULTY_INFO[difficulty].descKey);
   };
 
   return (
@@ -137,22 +139,22 @@ export default function PictureThisGameScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Picture This!</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('picture_this:hub_title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={[styles.introCard, { backgroundColor: '#EC489915', borderColor: '#EC489940' }]}>
-          <Text style={[styles.introTitle, { color: '#EC4899' }]}>📸 Picture This!</Text>
+          <Text style={[styles.introTitle, { color: '#EC4899' }]}>{t('picture_this:intro_title')}</Text>
           <Text style={[styles.introDesc, { color: colors.textSecondary }]}>
-            Spot the correct ingredients, prices, and more from menu pictures. Choose a category, pick your difficulty, and play with Lives or Beat the Clock!
+            {t('picture_this:intro_desc')}
           </Text>
           <Text style={[styles.introTip, { color: colors.textSecondary }]}>
-            💡 Wrong answers cost a life (or seconds), so read each option carefully — you can&apos;t move on until you pick correctly.
+            {t('picture_this:intro_tip')}
           </Text>
         </View>
 
-        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>CHOOSE A CATEGORY</Text>
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('picture_this:choose_category')}</Text>
         {CATEGORIES.map((cat) => (
           <TouchableOpacity
             key={cat.key}
@@ -169,8 +171,8 @@ export default function PictureThisGameScreen() {
               />
             </View>
             <View style={styles.categoryText}>
-              <Text style={[styles.categoryTitle, { color: colors.text }]}>{cat.label}</Text>
-              <Text style={[styles.categoryDesc, { color: colors.textSecondary }]}>{cat.desc}</Text>
+              <Text style={[styles.categoryTitle, { color: colors.text }]}>{t(cat.labelKey)}</Text>
+              <Text style={[styles.categoryDesc, { color: colors.textSecondary }]}>{t(cat.descKey)}</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -187,7 +189,7 @@ export default function PictureThisGameScreen() {
           activeOpacity={0.75}
         >
           <IconSymbol ios_icon_name="trophy.fill" android_material_icon_name="emoji-events" size={22} color={colors.primary} />
-          <Text style={[styles.leaderboardBtnText, { color: colors.primary }]}>View Leaderboard</Text>
+          <Text style={[styles.leaderboardBtnText, { color: colors.primary }]}>{t('picture_this:view_leaderboard')}</Text>
           <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color={colors.primary} />
         </TouchableOpacity>
       </ScrollView>
@@ -197,8 +199,8 @@ export default function PictureThisGameScreen() {
           <Pressable style={[styles.modalCard, { backgroundColor: colors.card }]} onPress={() => {}}>
             {pickerStep === 'difficulty' ? (
               <>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Choose Difficulty</Text>
-                <Text style={[styles.modalSub, { color: colors.textSecondary }]}>{selectedCategory?.label}</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>{t('picture_this:choose_difficulty')}</Text>
+                <Text style={[styles.modalSub, { color: colors.textSecondary }]}>{selectedCategory ? t(selectedCategory.labelKey) : ''}</Text>
                 {selectedCategory?.difficulties.map((d) => {
                   const info = DIFFICULTY_INFO[d];
                   return (
@@ -208,7 +210,7 @@ export default function PictureThisGameScreen() {
                       onPress={() => handleDifficultySelect(d)}
                       activeOpacity={0.75}
                     >
-                      <Text style={[styles.optionLabel, { color: info.color }]}>{info.label}</Text>
+                      <Text style={[styles.optionLabel, { color: info.color }]}>{t(info.labelKey)}</Text>
                       <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>
                         {renderDifficultyDesc(d)}
                       </Text>
@@ -218,9 +220,9 @@ export default function PictureThisGameScreen() {
               </>
             ) : (
               <>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Choose Play Mode</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>{t('picture_this:choose_play_mode')}</Text>
                 <Text style={[styles.modalSub, { color: colors.textSecondary }]}>
-                  {DIFFICULTY_INFO[selectedDifficulty].label.replace(/^[^A-Za-z]+/, '')}
+                  {t(DIFFICULTY_INFO[selectedDifficulty].labelKey).replace(/^[^A-Za-zÀ-ÿ¿¡]+/, '')}
                 </Text>
                 {PLAY_MODES.map((pm) => (
                   <TouchableOpacity
@@ -229,17 +231,17 @@ export default function PictureThisGameScreen() {
                     onPress={() => handlePlayModeSelect(pm.value)}
                     activeOpacity={0.75}
                   >
-                    <Text style={[styles.optionLabel, { color: colors.primary }]}>{pm.label}</Text>
-                    <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>{pm.desc}</Text>
+                    <Text style={[styles.optionLabel, { color: colors.primary }]}>{t(pm.labelKey)}</Text>
+                    <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>{t(pm.descKey)}</Text>
                   </TouchableOpacity>
                 ))}
                 <TouchableOpacity onPress={() => setPickerStep('difficulty')} style={styles.backOption}>
-                  <Text style={[styles.backOptionText, { color: colors.textSecondary }]}>← Back to Difficulty</Text>
+                  <Text style={[styles.backOptionText, { color: colors.textSecondary }]}>{t('picture_this:back_to_difficulty')}</Text>
                 </TouchableOpacity>
               </>
             )}
             <TouchableOpacity onPress={() => setShowPicker(false)} style={styles.cancelBtn}>
-              <Text style={[styles.cancelText, { color: colors.textSecondary }]}>Cancel</Text>
+              <Text style={[styles.cancelText, { color: colors.textSecondary }]}>{t('picture_this:cancel')}</Text>
             </TouchableOpacity>
           </Pressable>
         </Pressable>

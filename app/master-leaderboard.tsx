@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
@@ -32,11 +33,11 @@ interface MasterLeaderboardEntry {
   games_played: number;
 }
 
-const TABS: { key: LeaderboardTab; label: string; icon: { ios: string; android: string } }[] = [
-  { key: 'overall', label: 'Overall', icon: { ios: 'trophy.fill', android: 'emoji-events' } },
-  { key: 'memory', label: 'Memory', icon: { ios: 'gamecontroller.fill', android: 'sports-esports' } },
-  { key: 'word_search', label: 'Word', icon: { ios: 'textformat.abc', android: 'spellcheck' } },
-  { key: 'picture_this', label: 'Picture', icon: { ios: 'photo.fill', android: 'photo-camera' } },
+const TABS: { key: LeaderboardTab; labelKey: string; icon: { ios: string; android: string } }[] = [
+  { key: 'overall', labelKey: 'master_leaderboard:tab_overall', icon: { ios: 'trophy.fill', android: 'emoji-events' } },
+  { key: 'memory', labelKey: 'master_leaderboard:tab_memory', icon: { ios: 'gamecontroller.fill', android: 'sports-esports' } },
+  { key: 'word_search', labelKey: 'master_leaderboard:tab_word', icon: { ios: 'textformat.abc', android: 'spellcheck' } },
+  { key: 'picture_this', labelKey: 'master_leaderboard:tab_picture', icon: { ios: 'photo.fill', android: 'photo-camera' } },
 ];
 
 const RPC_MAP: Record<LeaderboardTab, string> = {
@@ -50,6 +51,7 @@ const RANK_EMOJIS = ['🥇', '🥈', '🥉'];
 
 export default function MasterLeaderboardScreen() {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
 
@@ -153,7 +155,7 @@ export default function MasterLeaderboardScreen() {
             color={colors.primary}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>🏆 Leaderboard</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('master_leaderboard:title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -183,7 +185,7 @@ export default function MasterLeaderboardScreen() {
                   isActive && { fontWeight: '700' },
                 ]}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </Text>
             </TouchableOpacity>
           );
@@ -194,12 +196,12 @@ export default function MasterLeaderboardScreen() {
       <View style={styles.subtitleRow}>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
           {activeTab === 'overall'
-            ? 'Total points from all games combined'
+            ? t('master_leaderboard:subtitle_overall')
             : activeTab === 'memory'
-            ? 'Total points from Menu Memory Game'
+            ? t('master_leaderboard:subtitle_memory')
             : activeTab === 'word_search'
-            ? 'Total points from Word Search puzzles'
-            : 'Total points from Picture This!'}
+            ? t('master_leaderboard:subtitle_word')
+            : t('master_leaderboard:subtitle_picture')}
         </Text>
       </View>
 
@@ -211,7 +213,7 @@ export default function MasterLeaderboardScreen() {
       ) : entries.length === 0 ? (
         <View style={styles.emptyBox}>
           <Text style={styles.emptyEmoji}>🏆</Text>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No scores yet!</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('master_leaderboard:no_scores')}</Text>
           <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
             Play some games to climb the leaderboard.
           </Text>
@@ -219,7 +221,7 @@ export default function MasterLeaderboardScreen() {
             style={[styles.playBtn, { backgroundColor: colors.primary }]}
             onPress={() => router.push('/game-hub')}
           >
-            <Text style={styles.playBtnText}>Play Now</Text>
+            <Text style={styles.playBtnText}>{t('master_leaderboard:play_now')}</Text>
           </TouchableOpacity>
         </View>
       ) : (

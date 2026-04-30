@@ -40,6 +40,11 @@ export interface PictureThisQuestion {
   itemName: string;
   imageUrl: string;
   prompt: string;
+  // Translation key + params for the prompt — when present, the play screen
+  // renders `t(promptKey, promptParams)` so Spanish-preferred users see a
+  // translated question. Falls back to `prompt` when absent.
+  promptKey?: string;
+  promptParams?: Record<string, string>;
   choices: QuestionChoice[]; // length 4
   correctIndex: number;
   // When true, the play screen hides the item name overlay (used for Wine
@@ -187,6 +192,8 @@ export function generateIngredientEasy(
     itemName: item.name,
     imageUrl: item.thumbnail_url,
     prompt: `Which of these is an ingredient in the ${item.name.trim()}?`,
+    promptKey: 'picture_this:prompt_ingredient_easy',
+    promptParams: { item: item.name.trim() },
     choices,
     correctIndex,
     reviewDescription: item.description ?? undefined,
@@ -252,6 +259,8 @@ export function generateIngredientMedium(
     itemName: item.name,
     imageUrl: item.thumbnail_url,
     prompt: `Which two ingredients are in the ${item.name.trim()}?`,
+    promptKey: 'picture_this:prompt_ingredient_medium',
+    promptParams: { item: item.name.trim() },
     choices,
     correctIndex,
     reviewDescription: item.description ?? undefined,
@@ -310,6 +319,8 @@ export function generateIngredientHard(
     itemName: item.name,
     imageUrl: item.thumbnail_url,
     prompt: `Which is the correct ingredient list for the ${item.name.trim()}?`,
+    promptKey: 'picture_this:prompt_ingredient_hard',
+    promptParams: { item: item.name.trim() },
     choices,
     correctIndex,
     reviewDescription: item.description ?? undefined,
@@ -357,6 +368,7 @@ export function generateWineMedium(item: MenuItem, pool: MenuItem[]): PictureThi
     itemName: item.name,
     imageUrl: item.thumbnail_url,
     prompt: `Which name and location matches this wine?`,
+    promptKey: 'picture_this:prompt_wine_medium',
     choices,
     correctIndex,
     hideItemName: true,
@@ -417,6 +429,12 @@ export function generateWineHard(item: MenuItem, pool: MenuItem[]): PictureThisQ
     itemName: item.name,
     imageUrl: item.thumbnail_url,
     prompt: `What is the ${promptType} price for ${item.name.trim()}?`,
+    promptKey: priceType === 'glass'
+      ? 'picture_this:prompt_price_glass'
+      : priceType === 'bottle'
+      ? 'picture_this:prompt_price_bottle'
+      : 'picture_this:prompt_price_member',
+    promptParams: { item: item.name.trim() },
     choices,
     correctIndex,
     reviewDescription: item.description ?? undefined,
@@ -437,6 +455,8 @@ export function generateMenuPrice(item: MenuItem, pool: MenuItem[]): PictureThis
   let correct: number | null = null;
   let priceType: PriceType | 'price' = 'price';
   let promptText = `What is the price for ${item.name.trim()}?`;
+  let promptKey = 'picture_this:prompt_price';
+  let promptParams: Record<string, string> = { item: item.name.trim() };
 
   if (isWine) {
     const availableTypes: PriceType[] = [];
@@ -451,9 +471,17 @@ export function generateMenuPrice(item: MenuItem, pool: MenuItem[]): PictureThis
       parsePrice(item.member_bottle_price);
     const promptLabel = priceType === 'glass' ? 'glass' : priceType === 'bottle' ? 'bottle' : 'member bottle';
     promptText = `What is the ${promptLabel} price for ${item.name.trim()}?`;
+    promptKey = priceType === 'glass'
+      ? 'picture_this:prompt_price_glass'
+      : priceType === 'bottle'
+      ? 'picture_this:prompt_price_bottle'
+      : 'picture_this:prompt_price_member';
+    promptParams = { item: item.name.trim() };
   } else {
     correct = parsePrice(item.price);
     promptText = `What is the price for ${item.name.trim()}?`;
+    promptKey = 'picture_this:prompt_price';
+    promptParams = { item: item.name.trim() };
   }
   if (correct === null) return null;
 
@@ -504,6 +532,8 @@ export function generateMenuPrice(item: MenuItem, pool: MenuItem[]): PictureThis
     itemName: item.name,
     imageUrl: item.thumbnail_url,
     prompt: promptText,
+    promptKey,
+    promptParams,
     choices,
     correctIndex,
     reviewDescription: item.description ?? undefined,

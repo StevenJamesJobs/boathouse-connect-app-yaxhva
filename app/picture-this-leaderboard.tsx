@@ -19,6 +19,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
@@ -36,20 +37,20 @@ interface Entry {
 
 interface CategoryTab {
   key: PictureThisCategory;
-  label: string;
+  labelKey: string;
   color: string;
 }
 
 const CATEGORY_TABS: CategoryTab[] = [
-  { key: 'food',         label: 'Food',     color: '#EF4444' },
-  { key: 'libations',    label: 'Drinks',   color: '#8B5CF6' },
-  { key: 'wine',         label: 'Wine',     color: '#A21CAF' },
-  { key: 'menu_prices',  label: 'Prices',   color: '#0891B2' },
+  { key: 'food',         labelKey: 'picture_this:leaderboard_food',    color: '#EF4444' },
+  { key: 'libations',    labelKey: 'picture_this:leaderboard_drinks',  color: '#8B5CF6' },
+  { key: 'wine',         labelKey: 'picture_this:leaderboard_wine',    color: '#A21CAF' },
+  { key: 'menu_prices',  labelKey: 'picture_this:leaderboard_prices',  color: '#0891B2' },
 ];
 
-const PLAY_MODES: { key: PictureThisPlayMode; label: string; emoji: string }[] = [
-  { key: 'lives', label: 'Lives Mode', emoji: '❤️' },
-  { key: 'timed', label: 'Timed Mode', emoji: '⏱' },
+const PLAY_MODES: { key: PictureThisPlayMode; labelKey: string }[] = [
+  { key: 'lives', labelKey: 'picture_this:leaderboard_lives' },
+  { key: 'timed', labelKey: 'picture_this:leaderboard_timed' },
 ];
 
 const RANK_EMOJIS = ['🥇', '🥈', '🥉'];
@@ -58,6 +59,7 @@ export default function PictureThisLeaderboardScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   const [activePlayMode, setActivePlayMode] = useState<PictureThisPlayMode>('lives');
   const [activeCategory, setActiveCategory] = useState<PictureThisCategory>('food');
@@ -132,8 +134,8 @@ export default function PictureThisLeaderboardScreen() {
     );
   };
 
-  const activeCategoryLabel = CATEGORY_TABS.find(c => c.key === activeCategory)?.label ?? '';
-  const activeModeLabel = PLAY_MODES.find(m => m.key === activePlayMode)?.label ?? '';
+  const activeCategoryLabel = t(CATEGORY_TABS.find(c => c.key === activeCategory)?.labelKey ?? '');
+  const activeModeLabel = t(PLAY_MODES.find(m => m.key === activePlayMode)?.labelKey ?? '');
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -141,7 +143,7 @@ export default function PictureThisLeaderboardScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>📸 Picture This!</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>{t('picture_this:leaderboard_title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -163,7 +165,7 @@ export default function PictureThisLeaderboardScreen() {
                 { color: active ? '#fff' : colors.textSecondary },
                 active && { fontWeight: '700' },
               ]}>
-                {pm.emoji} {pm.label}
+                {t(pm.labelKey)}
               </Text>
             </TouchableOpacity>
           );
@@ -195,7 +197,7 @@ export default function PictureThisLeaderboardScreen() {
                   { color: active ? '#fff' : colors.textSecondary },
                   active && { fontWeight: '700' },
                 ]}>
-                  {cat.label}
+                  {t(cat.labelKey)}
                 </Text>
               </TouchableOpacity>
             );
@@ -216,9 +218,9 @@ export default function PictureThisLeaderboardScreen() {
       ) : entries.length === 0 ? (
         <View style={styles.emptyBox}>
           <Text style={styles.emptyEmoji}>📸</Text>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>No scores yet!</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('picture_this:leaderboard_no_scores')}</Text>
           <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
-            Be the first to score in {activeCategoryLabel} • {activeModeLabel}.
+            {t('picture_this:leaderboard_be_first')} {activeCategoryLabel} • {activeModeLabel}
           </Text>
           <TouchableOpacity
             style={[styles.playBtn, { backgroundColor: colors.primary }]}

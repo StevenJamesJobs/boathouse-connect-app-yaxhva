@@ -279,7 +279,7 @@ export default function EmployeeRewardsScreen() {
                   size={16}
                   color="#FFF"
                 />
-                <Text style={styles.redeemBtnText}>Redeem</Text>
+                <Text style={styles.redeemBtnText}>{t('rewards_ui:redeem')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -301,7 +301,7 @@ export default function EmployeeRewardsScreen() {
                   styles.subTabText,
                   { color: rewardsSubTab === 'leaderboard' ? '#FFF' : colors.textSecondary },
                 ]}>
-                  Leaderboard
+                  {t('rewards_ui:tab_leaderboard')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -326,7 +326,7 @@ export default function EmployeeRewardsScreen() {
                   styles.subTabText,
                   { color: rewardsSubTab === 'recent' ? '#FFF' : colors.textSecondary },
                 ]}>
-                  Recent Awards
+                  {t('rewards_ui:tab_recent')}
                 </Text>
               </TouchableOpacity>
             </View>

@@ -17,6 +17,7 @@ import {
 const SCREEN_WIDTH = Dimensions.get('window').width;
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -33,45 +34,45 @@ type ShiftPeriod = 'AM' | 'PM';
 
 interface OptionCardData {
   type: RedemptionType;
-  title: string;
+  titleKey: string;
   costLabel: string;
   iosIcon: string;
   androidIcon: string;
-  description: string;
+  descriptionKey: string;
 }
 
 const OPTIONS: OptionCardData[] = [
   {
     type: 'food_beverage',
-    title: 'Food & Beverages',
+    titleKey: 'rewards_ui:redeem_food_title',
     costLabel: 'Item price',
     iosIcon: 'fork.knife',
     androidIcon: 'restaurant',
-    description: 'Search the menu (including weekly specials).',
+    descriptionKey: 'rewards_ui:redeem_food_desc',
   },
   {
     type: 'section',
-    title: 'Choose Your Own Section',
+    titleKey: 'rewards_ui:redeem_section_title',
     costLabel: '$10',
     iosIcon: 'mappin.and.ellipse',
     androidIcon: 'place',
-    description: 'Pick your section for a chosen shift.',
+    descriptionKey: 'rewards_ui:redeem_section_desc',
   },
   {
     type: 'side_work',
-    title: 'Choose Your Own Side Work',
+    titleKey: 'rewards_ui:redeem_sidework_title',
     costLabel: '$5',
     iosIcon: 'list.bullet.clipboard',
     androidIcon: 'assignment',
-    description: 'Pick your side work for a chosen shift.',
+    descriptionKey: 'rewards_ui:redeem_sidework_desc',
   },
   {
     type: 'side_work_free',
-    title: 'Side Work Free Shift',
+    titleKey: 'rewards_ui:redeem_freeshift_title',
     costLabel: '$25',
     iosIcon: 'sparkles',
     androidIcon: 'auto_awesome',
-    description: 'Skip side work for a chosen shift.',
+    descriptionKey: 'rewards_ui:redeem_freeshift_desc',
   },
 ];
 
@@ -84,6 +85,7 @@ export default function EmployeeRedeemScreen() {
     prefillItemPrice?: string;
   }>();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const { sendNotification } = useNotification();
 
@@ -235,7 +237,8 @@ export default function EmployeeRedeemScreen() {
         return;
       }
 
-      const optionLabel = OPTIONS.find((o) => o.type === activeOption)?.title ?? 'Redemption';
+      const optionMatch = OPTIONS.find((o) => o.type === activeOption);
+      const optionLabel = optionMatch ? t(optionMatch.titleKey) : 'Redemption';
       const notifTitle = '💰 Redemption Request';
       const notifBody = `${user.name || 'An employee'} requested ${optionLabel} ($${requestedBucks}).`;
 
@@ -343,8 +346,8 @@ export default function EmployeeRedeemScreen() {
               />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.optionTitle, { color: colors.text }]}>{opt.title}</Text>
-              <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>{opt.description}</Text>
+              <Text style={[styles.optionTitle, { color: colors.text }]}>{t(opt.titleKey)}</Text>
+              <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>{t(opt.descriptionKey)}</Text>
             </View>
             <Text style={[styles.optionCost, { color: colors.primary }]}>{opt.costLabel}</Text>
           </TouchableOpacity>
@@ -390,7 +393,7 @@ export default function EmployeeRedeemScreen() {
           <View style={[styles.modalSheet, { backgroundColor: colors.background }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>
-                {OPTIONS.find((o) => o.type === activeOption)?.title}
+                {(() => { const m = OPTIONS.find((o) => o.type === activeOption); return m ? t(m.titleKey) : ''; })()}
               </Text>
               <TouchableOpacity onPress={resetForm}>
                 <IconSymbol ios_icon_name="xmark" android_material_icon_name="close" size={22} color={colors.text} />
@@ -488,7 +491,7 @@ export default function EmployeeRedeemScreen() {
             ) : (
               <>
                 <Text style={[styles.confirmLine, { color: colors.text }]}>
-                  {OPTIONS.find((o) => o.type === activeOption)?.title} — ${requestedBucks}
+                  {(() => { const m = OPTIONS.find((o) => o.type === activeOption); return m ? t(m.titleKey) : ''; })()} — ${requestedBucks}
                 </Text>
                 <Text style={[styles.confirmLine, { color: colors.textSecondary }]}>
                   {shiftDate.toLocaleDateString()} {shiftPeriod}

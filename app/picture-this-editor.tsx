@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -21,32 +22,33 @@ import { PictureThisCategory } from '@/utils/game/pictureThisGenerator';
 
 interface CategoryRow {
   key: PictureThisCategory;
-  label: string;
+  labelKey: string;
   icon: { ios: string; android: string };
   color: string;
 }
 
 const CATEGORIES: CategoryRow[] = [
-  { key: 'food',         label: 'Lunch & Dinner', icon: { ios: 'fork.knife', android: 'restaurant' },              color: '#EF4444' },
-  { key: 'libations',    label: 'Libations',      icon: { ios: 'wineglass.fill', android: 'local-bar' },           color: '#8B5CF6' },
-  { key: 'wine',         label: 'Wine',           icon: { ios: 'wineglass', android: 'wine-bar' },                 color: '#A21CAF' },
-  { key: 'menu_prices',  label: 'Menu Prices',    icon: { ios: 'dollarsign.circle.fill', android: 'attach-money' }, color: '#0891B2' },
+  { key: 'food',         labelKey: 'pt_editor:cat_food',         icon: { ios: 'fork.knife', android: 'restaurant' },              color: '#EF4444' },
+  { key: 'libations',    labelKey: 'pt_editor:cat_libations',    icon: { ios: 'wineglass.fill', android: 'local-bar' },           color: '#8B5CF6' },
+  { key: 'wine',         labelKey: 'pt_editor:cat_wine',         icon: { ios: 'wineglass', android: 'wine-bar' },                 color: '#A21CAF' },
+  { key: 'menu_prices',  labelKey: 'pt_editor:cat_menu_prices',  icon: { ios: 'dollarsign.circle.fill', android: 'attach-money' }, color: '#0891B2' },
 ];
 
 export default function PictureThisEditorScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const { t } = useTranslation();
   const [resetting, setResetting] = useState<string | null>(null);
 
   const confirmReset = (category: PictureThisCategory | null) => {
-    const label = category ? (CATEGORIES.find(c => c.key === category)?.label ?? category) : 'ALL Picture This!';
+    const label = category ? t(CATEGORIES.find(c => c.key === category)!.labelKey) : t('pt_editor:all_categories');
     Alert.alert(
-      'Reset Scores',
-      `Are you sure you want to reset ${label} scores? This cannot be undone.`,
+      t('pt_editor:confirm_title'),
+      t('pt_editor:confirm_msg', { label }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('pt_editor:cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('pt_editor:reset_btn'),
           style: 'destructive',
           onPress: () => resetScores(category),
         },
@@ -63,11 +65,11 @@ export default function PictureThisEditorScreen() {
         p_difficulty: null,
       });
       if (error) throw error;
-      const label = category ? (CATEGORIES.find(c => c.key === category)?.label ?? category) : 'all categories';
-      Alert.alert('Success', `Picture This! scores for ${label} have been reset.`);
+      const label = category ? t(CATEGORIES.find(c => c.key === category)!.labelKey) : t('pt_editor:all_categories');
+      Alert.alert(t('pt_editor:success'), t('pt_editor:success_msg', { label }));
     } catch (err) {
       console.error('[PictureThisEditor] reset error:', err);
-      Alert.alert('Error', 'Failed to reset scores. Please try again.');
+      Alert.alert(t('pt_editor:error'), t('pt_editor:error_msg'));
     } finally {
       setResetting(null);
     }
@@ -79,7 +81,7 @@ export default function PictureThisEditorScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Picture This! Editor</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('pt_editor:title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -87,13 +89,13 @@ export default function PictureThisEditorScreen() {
         <View style={[styles.infoCard, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}>
           <IconSymbol ios_icon_name="info.circle.fill" android_material_icon_name="info" size={18} color={colors.primary} />
           <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            Picture This! questions are auto-generated from the menu database. No manual content needed — questions update whenever the menu changes.
+            {t('pt_editor:info')}
           </Text>
         </View>
 
-        <Text style={[styles.sectionTitle, { color: colors.text }]}>Scoreboard Management</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('pt_editor:scoreboard_management')}</Text>
         <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
-          Reset leaderboards for individual categories or clear all scores at once.
+          {t('pt_editor:scoreboard_desc')}
         </Text>
 
         {CATEGORIES.map(cat => {
@@ -108,7 +110,7 @@ export default function PictureThisEditorScreen() {
                   color={cat.color}
                 />
               </View>
-              <Text style={[styles.resetLabel, { color: colors.text }]}>{cat.label}</Text>
+              <Text style={[styles.resetLabel, { color: colors.text }]}>{t(cat.labelKey)}</Text>
               <TouchableOpacity
                 style={[styles.resetBtn, { borderColor: '#EF444450', backgroundColor: '#EF444410' }]}
                 onPress={() => confirmReset(cat.key)}
@@ -117,7 +119,7 @@ export default function PictureThisEditorScreen() {
                 {isResetting ? (
                   <ActivityIndicator size="small" color="#EF4444" />
                 ) : (
-                  <Text style={[styles.resetBtnText, { color: '#EF4444' }]}>Reset</Text>
+                  <Text style={[styles.resetBtnText, { color: '#EF4444' }]}>{t('pt_editor:reset_btn')}</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -134,13 +136,13 @@ export default function PictureThisEditorScreen() {
           ) : (
             <>
               <IconSymbol ios_icon_name="trash.fill" android_material_icon_name="delete" size={18} color="#EF4444" />
-              <Text style={styles.resetAllText}>Reset All Picture This! Scores</Text>
+              <Text style={styles.resetAllText}>{t('pt_editor:reset_all_btn')}</Text>
             </>
           )}
         </TouchableOpacity>
 
         <Text style={[styles.tip, { color: colors.textSecondary }]}>
-          💡 To mark a user as a test user (excluded from all leaderboards), use the Game Hub Editor&apos;s Employee Score Lookup.
+          {t('pt_editor:tip')}
         </Text>
       </ScrollView>
     </View>

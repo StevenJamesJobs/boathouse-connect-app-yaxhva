@@ -57,11 +57,58 @@ interface MenuItem {
   glass_price?: string | null;
   bottle_price?: string | null;
   member_bottle_price?: string | null;
+  flavor_profile?: string | null;
+  flavor_profile_es?: string | null;
+  unique_selling_points?: string | null;
+  unique_selling_points_es?: string | null;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 const CATEGORIES = ['Weekly Specials', 'Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
+
+const CATEGORY_TRANSLATION_KEYS: { [key: string]: string } = {
+  'Weekly Specials': 'menu_display.weekly_specials',
+  'Lunch': 'menu_display.lunch',
+  'Dinner': 'menu_display.dinner',
+  'Libations': 'menu_display.libations',
+  'Wine': 'menu_display.wine',
+  'Happy Hour': 'menu_display.happy_hour',
+};
+
+const SUBCATEGORY_TRANSLATION_KEYS: { [key: string]: string } = {
+  'Starters': 'menu_display.starters',
+  'Raw Bar': 'menu_display.raw_bar',
+  'Soups': 'menu_display.soups',
+  'Tacos': 'menu_display.tacos',
+  'Salads': 'menu_display.salads',
+  'Burgers': 'menu_display.burgers',
+  'Sandwiches': 'menu_display.sandwiches',
+  'Sides': 'menu_display.sides',
+  'Entrees': 'menu_display.entrees',
+  'Pasta': 'menu_display.pasta',
+  'Signature Cocktails': 'menu_display.signature_cocktails',
+  'Martinis': 'menu_display.martinis',
+  'Sangria': 'menu_display.sangria',
+  'Low ABV': 'menu_display.low_abv',
+  'Zero ABV': 'menu_display.zero_abv',
+  'Draft Beer': 'menu_display.draft_beer',
+  'Bottle & Cans': 'menu_display.bottle_and_cans',
+  'Sparkling': 'menu_display.sparkling',
+  'Rose': 'menu_display.rose',
+  'Chardonnay': 'menu_display.chardonnay',
+  'Pinot Grigio': 'menu_display.pinot_grigio',
+  'Sauvignon Blanc': 'menu_display.sauvignon_blanc',
+  'Interesting Whites': 'menu_display.interesting_whites',
+  'Cabernet Sauvignon': 'menu_display.cabernet_sauvignon',
+  'Pinot Noir': 'menu_display.pinot_noir',
+  'Merlot': 'menu_display.merlot',
+  'Italian Reds': 'menu_display.italian_reds',
+  'Interesting Reds': 'menu_display.interesting_reds',
+  'Appetizers': 'menu_display.appetizers',
+  'Drinks': 'menu_display.drinks',
+  'Spirits': 'menu_display.spirits',
+};
 
 const SUBCATEGORIES: { [key: string]: string[] } = {
   'Weekly Specials': [],
@@ -135,6 +182,10 @@ export default function MenuEditorScreen() {
     glass_price: '',
     bottle_price: '',
     member_bottle_price: '',
+    flavor_profile: '',
+    flavor_profile_es: '',
+    unique_selling_points: '',
+    unique_selling_points_es: '',
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -368,17 +419,30 @@ export default function MenuEditorScreen() {
   };
 
   const handleAutoTranslate = async () => {
-    if (!formData.name && !formData.description) {
+    const isWine = formData.category === 'Wine';
+    const hasAny = formData.name || formData.description ||
+      (isWine && (formData.flavor_profile || formData.unique_selling_points));
+    if (!hasAny) {
       Alert.alert(t('common:error'), t('translation_section:no_content_to_translate'));
       return;
     }
     setTranslating(true);
     try {
-      const results = await translateTexts([formData.name, formData.description]);
+      const inputs = [
+        formData.name,
+        formData.description,
+        isWine ? formData.flavor_profile : '',
+        isWine ? formData.unique_selling_points : '',
+      ];
+      const results = await translateTexts(inputs);
       setFormData(prev => ({
         ...prev,
         name_es: results[0] || '',
         description_es: results[1] || '',
+        ...(isWine ? {
+          flavor_profile_es: results[2] || '',
+          unique_selling_points_es: results[3] || '',
+        } : {}),
       }));
       setShowSpanish(true);
     } catch (err) {
@@ -439,6 +503,10 @@ export default function MenuEditorScreen() {
           p_glass_price: isWine ? (formData.glass_price || null) : null,
           p_bottle_price: isWine ? (formData.bottle_price || null) : null,
           p_member_bottle_price: isWine ? (formData.member_bottle_price || null) : null,
+          p_flavor_profile: isWine ? (formData.flavor_profile || null) : null,
+          p_flavor_profile_es: isWine ? (formData.flavor_profile_es || null) : null,
+          p_unique_selling_points: isWine ? (formData.unique_selling_points || null) : null,
+          p_unique_selling_points_es: isWine ? (formData.unique_selling_points_es || null) : null,
         });
 
         if (error) {
@@ -478,6 +546,10 @@ export default function MenuEditorScreen() {
           p_glass_price: isWine ? (formData.glass_price || null) : null,
           p_bottle_price: isWine ? (formData.bottle_price || null) : null,
           p_member_bottle_price: isWine ? (formData.member_bottle_price || null) : null,
+          p_flavor_profile: isWine ? (formData.flavor_profile || null) : null,
+          p_flavor_profile_es: isWine ? (formData.flavor_profile_es || null) : null,
+          p_unique_selling_points: isWine ? (formData.unique_selling_points || null) : null,
+          p_unique_selling_points_es: isWine ? (formData.unique_selling_points_es || null) : null,
         });
 
         if (error) {
@@ -719,6 +791,10 @@ export default function MenuEditorScreen() {
       glass_price: '',
       bottle_price: '',
       member_bottle_price: '',
+      flavor_profile: '',
+      flavor_profile_es: '',
+      unique_selling_points: '',
+      unique_selling_points_es: '',
     });
     setSelectedImageUri(null);
     setShowSpanish(false);
@@ -748,6 +824,10 @@ export default function MenuEditorScreen() {
       glass_price: item.glass_price || '',
       bottle_price: item.bottle_price || '',
       member_bottle_price: item.member_bottle_price || '',
+      flavor_profile: item.flavor_profile || '',
+      flavor_profile_es: item.flavor_profile_es || '',
+      unique_selling_points: item.unique_selling_points || '',
+      unique_selling_points_es: item.unique_selling_points_es || '',
     });
     setShowSpanish(false);
     setSelectedImageUri(null);
@@ -880,7 +960,7 @@ export default function MenuEditorScreen() {
             <CategoryPill
               key={index}
               size="lg"
-              label={category}
+              label={CATEGORY_TRANSLATION_KEYS[category] ? t(CATEGORY_TRANSLATION_KEYS[category]) : category}
               selected={selectedCategory === category}
               onPress={() => navigateToPage(category)}
               onLayout={(e) => {
@@ -907,7 +987,7 @@ export default function MenuEditorScreen() {
             <CategoryPill
               key={index}
               size="sm"
-              label={subcategory}
+              label={SUBCATEGORY_TRANSLATION_KEYS[subcategory] ? t(SUBCATEGORY_TRANSLATION_KEYS[subcategory]) : subcategory}
               selected={selectedSubcategory === subcategory}
               onPress={() => navigateToPage(selectedCategory, subcategory)}
               onLayout={(e) => {
@@ -1451,6 +1531,52 @@ export default function MenuEditorScreen() {
                       />
                     </View>
                   </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Flavor / Key Sensory</Text>
+                    <TextInput
+                      style={[styles.input, styles.textArea]}
+                      placeholder="e.g. Crisp green apple, citrus, mineral finish"
+                      placeholderTextColor="#999999"
+                      value={formData.flavor_profile}
+                      onChangeText={(text) => setFormData({ ...formData, flavor_profile: text })}
+                      multiline
+                      numberOfLines={3}
+                    />
+                    {showSpanish && (
+                      <TextInput
+                        style={[styles.input, styles.textArea, { marginTop: 8 }]}
+                        placeholder="Sabor / Sensorial Clave (Spanish)"
+                        placeholderTextColor="#999999"
+                        value={formData.flavor_profile_es}
+                        onChangeText={(text) => setFormData({ ...formData, flavor_profile_es: text })}
+                        multiline
+                        numberOfLines={3}
+                      />
+                    )}
+                  </View>
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Unique Selling Points</Text>
+                    <TextInput
+                      style={[styles.input, styles.textArea]}
+                      placeholder="e.g. Family-owned estate, biodynamic, limited 200 cases"
+                      placeholderTextColor="#999999"
+                      value={formData.unique_selling_points}
+                      onChangeText={(text) => setFormData({ ...formData, unique_selling_points: text })}
+                      multiline
+                      numberOfLines={3}
+                    />
+                    {showSpanish && (
+                      <TextInput
+                        style={[styles.input, styles.textArea, { marginTop: 8 }]}
+                        placeholder="Puntos de Venta Únicos (Spanish)"
+                        placeholderTextColor="#999999"
+                        value={formData.unique_selling_points_es}
+                        onChangeText={(text) => setFormData({ ...formData, unique_selling_points_es: text })}
+                        multiline
+                        numberOfLines={3}
+                      />
+                    )}
+                  </View>
                 </>
               )}
 
@@ -1466,7 +1592,7 @@ export default function MenuEditorScreen() {
                     <CategoryPill
                       key={index}
                       size="sm"
-                      label={category}
+                      label={CATEGORY_TRANSLATION_KEYS[category] ? t(CATEGORY_TRANSLATION_KEYS[category]) : category}
                       selected={formData.category === category}
                       onPress={() => setFormData({ ...formData, category, subcategory: '' })}
                     />
@@ -1487,7 +1613,7 @@ export default function MenuEditorScreen() {
                       <CategoryPill
                         key={index}
                         size="sm"
-                        label={subcategory}
+                        label={SUBCATEGORY_TRANSLATION_KEYS[subcategory] ? t(SUBCATEGORY_TRANSLATION_KEYS[subcategory]) : subcategory}
                         selected={formData.subcategory === subcategory}
                         onPress={() => setFormData({ ...formData, subcategory })}
                       />
