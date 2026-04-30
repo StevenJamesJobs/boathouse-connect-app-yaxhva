@@ -1445,7 +1445,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   }}
                 >
                   <IconSymbol ios_icon_name="gift.fill" android_material_icon_name="card-giftcard" size={24} color={colors.primary} />
-                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>Reward</Text>
+                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('rewards_ui:manager_reward')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1456,7 +1456,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   }}
                 >
                   <IconSymbol ios_icon_name="minus.circle.fill" android_material_icon_name="remove-circle" size={24} color={colors.primary} />
-                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>Deduct</Text>
+                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('rewards_ui:manager_deduct')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1464,7 +1464,7 @@ export default function RewardsAndReviewsEditorScreen() {
                   onPress={() => setShowResetBucksModal(true)}
                 >
                   <IconSymbol ios_icon_name="arrow.counterclockwise.circle.fill" android_material_icon_name="refresh" size={24} color={colors.primary} />
-                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>Reset</Text>
+                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('rewards_ui:manager_reset')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1479,7 +1479,7 @@ export default function RewardsAndReviewsEditorScreen() {
                       </View>
                     )}
                   </View>
-                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>Approvals</Text>
+                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('rewards_ui:manager_approvals')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1534,7 +1534,7 @@ export default function RewardsAndReviewsEditorScreen() {
                       fontWeight: '600',
                       color: active ? '#FFF' : colors.textSecondary,
                     }}>
-                      {tab === 'leaderboard' ? 'Leaderboard' : tab === 'recent' ? 'Recent' : 'Lookup'}
+                      {tab === 'leaderboard' ? t('rewards_ui:tab_leaderboard') : tab === 'recent' ? t('rewards_ui:tab_recent_short') : t('rewards_ui:tab_lookup')}
                     </Text>
                   </TouchableOpacity>
                 );

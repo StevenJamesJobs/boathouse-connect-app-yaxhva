@@ -17,13 +17,14 @@ import {
   Image,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 
 interface EditorCard {
-  title: string;
-  description: string;
+  titleKey: string;
+  descKey: string;
   iosIcon: string;
   androidIcon: string;
   route: string;
@@ -46,24 +47,24 @@ interface UserScoreResult {
 
 const EDITOR_CARDS: EditorCard[] = [
   {
-    title: 'Menu Memory Game Editor',
-    description: 'Manage wine pairings, game content, and reset leaderboards',
+    titleKey: 'game_hub_editor:memory_editor_title',
+    descKey: 'game_hub_editor:memory_editor_desc',
     iosIcon: 'gamecontroller.fill',
     androidIcon: 'sports-esports',
     route: '/memory-game-editor',
     color: '#6366F1',
   },
   {
-    title: 'Word Search Editor',
-    description: 'Reset word search leaderboards by category or all at once',
+    titleKey: 'game_hub_editor:ws_editor_title',
+    descKey: 'game_hub_editor:ws_editor_desc',
     iosIcon: 'textformat.abc',
     androidIcon: 'spellcheck',
     route: '/word-search-editor',
     color: '#10B981',
   },
   {
-    title: 'Picture This! Editor',
-    description: 'Reset Picture This! leaderboards by category or all at once',
+    titleKey: 'game_hub_editor:pt_editor_title',
+    descKey: 'game_hub_editor:pt_editor_desc',
     iosIcon: 'photo.fill',
     androidIcon: 'photo-camera',
     route: '/picture-this-editor',
@@ -74,6 +75,7 @@ const EDITOR_CARDS: EditorCard[] = [
 export default function GameHubEditorScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const { t } = useTranslation();
   const [resettingAll, setResettingAll] = useState(false);
 
   // Employee Lookup state
@@ -87,14 +89,16 @@ export default function GameHubEditorScreen() {
   const handleToggleTestUser = async (user: UserScoreResult) => {
     const willBeTest = !user.is_test_user;
     Alert.alert(
-      willBeTest ? `Mark ${user.name} as test user?` : `Remove test-user flag from ${user.name}?`,
       willBeTest
-        ? `${user.name} will be excluded from ALL game leaderboards (Memory, Word Search, Picture This!) and will not trigger leaderboard pass notifications. Their scores will keep saving but stay hidden from public leaderboards.`
-        : `${user.name} will appear back on game leaderboards and will trigger pass notifications normally.`,
+        ? t('game_hub_editor:test_modal_title_mark', { name: user.name })
+        : t('game_hub_editor:test_modal_title_unmark', { name: user.name }),
+      willBeTest
+        ? t('game_hub_editor:test_modal_msg_mark')
+        : t('game_hub_editor:test_modal_msg_unmark'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('game_hub_editor:cancel'), style: 'cancel' },
         {
-          text: willBeTest ? 'Mark Test User' : 'Remove Test Flag',
+          text: willBeTest ? t('game_hub_editor:mark_btn') : t('game_hub_editor:unmark_btn'),
           style: willBeTest ? 'default' : 'destructive',
           onPress: async () => {
             setTogglingTestId(user.user_id);
@@ -109,7 +113,7 @@ export default function GameHubEditorScreen() {
               ));
             } catch (err) {
               console.error('[GameHubEditor] toggle test user error:', err);
-              Alert.alert('Error', 'Failed to update test-user flag.');
+              Alert.alert(t('game_hub_editor:error'), t('game_hub_editor:test_flag_error'));
             } finally {
               setTogglingTestId(null);
             }
@@ -121,12 +125,12 @@ export default function GameHubEditorScreen() {
 
   const handleResetAllScores = () => {
     Alert.alert(
-      'Reset ALL Game Scores',
-      'This will permanently delete every score for both Menu Memory Game and Word Search across all players. This cannot be undone.',
+      t('game_hub_editor:reset_all_modal_title'),
+      t('game_hub_editor:reset_all_modal_msg'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('game_hub_editor:cancel'), style: 'cancel' },
         {
-          text: 'Reset Everything',
+          text: t('game_hub_editor:reset_everything_btn'),
           style: 'destructive',
           onPress: async () => {
             setResettingAll(true);
@@ -158,10 +162,10 @@ export default function GameHubEditorScreen() {
                 throw err3;
               }
 
-              Alert.alert('Done', 'All game scores have been reset.');
+              Alert.alert(t('game_hub_editor:done'), t('game_hub_editor:all_reset_msg'));
             } catch (err) {
               console.error('Reset all scores error:', err);
-              Alert.alert('Error', 'Something went wrong. Try again.');
+              Alert.alert(t('game_hub_editor:error'), t('game_hub_editor:generic_error'));
             } finally {
               setResettingAll(false);
             }
@@ -261,20 +265,16 @@ export default function GameHubEditorScreen() {
 
   const handleResetUserScores = (user: UserScoreResult) => {
     Alert.alert(
-      `Reset ${user.name}'s Scores`,
-      `This will delete all game scores for ${user.name} (Memory: ${user.memory_games}, Word Search: ${user.word_search_games}, Picture This!: ${user.picture_this_games}). This cannot be undone.`,
+      t('game_hub_editor:reset_all_modal_title'),
+      t('game_hub_editor:reset_all_modal_msg'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('game_hub_editor:cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('game_hub_editor:reset_everything_btn'),
           style: 'destructive',
           onPress: async () => {
             setResettingUserId(user.user_id);
             try {
-              // Delete from game_scores using SECURITY DEFINER function
-              // We need a per-user reset — let's do direct delete via RPC workaround
-              // Since we don't have a per-user RPC, use direct delete with a dummy neq
-              // Actually, better to create individual delete via direct supabase
               const { error: memError } = await (supabase
                 .from('game_scores') as any)
                 .delete()
@@ -292,15 +292,14 @@ export default function GameHubEditorScreen() {
 
               if (memError || wsError || ptError) {
                 console.error('Direct delete failed, errors:', memError, wsError, ptError);
-                Alert.alert('Error', 'Failed to reset scores. Check permissions.');
+                Alert.alert(t('game_hub_editor:error'), t('game_hub_editor:generic_error'));
               } else {
-                Alert.alert('Done', `${user.name}'s scores have been reset.`);
-                // Refresh search results
+                Alert.alert(t('game_hub_editor:done'), t('game_hub_editor:all_reset_msg'));
                 handleSearchUser();
               }
             } catch (err) {
               console.error('Reset user scores error:', err);
-              Alert.alert('Error', 'Something went wrong.');
+              Alert.alert(t('game_hub_editor:error'), t('game_hub_editor:generic_error'));
             }
             setResettingUserId(null);
           },
@@ -321,7 +320,7 @@ export default function GameHubEditorScreen() {
             color={colors.primary}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Game Hub Editor</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('game_hub_editor:title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -331,21 +330,21 @@ export default function GameHubEditorScreen() {
         keyboardDismissMode="on-drag"
       >
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          Manage game content and leaderboards for all staff games.
+          {t('game_hub_editor:subtitle')}
         </Text>
 
         {/* Employee Score Lookup — placed FIRST so keyboard can't bury results */}
         <View style={styles.lookupSectionTop}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Employee Score Lookup</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('game_hub_editor:lookup_title')}</Text>
           <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
-            Search for an employee to view and reset their individual game scores.
+            {t('game_hub_editor:lookup_desc')}
           </Text>
 
           <View style={[styles.searchRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
             <IconSymbol ios_icon_name="magnifyingglass" android_material_icon_name="search" size={20} color={colors.textSecondary} />
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search by name..."
+              placeholder={t('game_hub_editor:search_placeholder')}
               placeholderTextColor={colors.textSecondary}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -365,7 +364,7 @@ export default function GameHubEditorScreen() {
 
           {/* Search Results */}
           {hasSearched && searchResults.length === 0 && !searching && (
-            <Text style={[styles.noResults, { color: colors.textSecondary }]}>No employees found.</Text>
+            <Text style={[styles.noResults, { color: colors.textSecondary }]}>{t('game_hub_editor:no_employees')}</Text>
           )}
 
           {searchResults.map(user => (
@@ -383,26 +382,26 @@ export default function GameHubEditorScreen() {
                 <View style={styles.userInfo}>
                   <Text style={[styles.userName, { color: colors.text }]}>{user.name}</Text>
                   <Text style={[styles.userTotal, { color: colors.primary }]}>
-                    Total: {user.total_score.toLocaleString()} pts
+                    {t('game_hub_editor:total_label', { total: user.total_score.toLocaleString() })}
                   </Text>
                 </View>
               </View>
 
               <View style={styles.scoreBreakdown}>
                 <View style={[styles.scoreChip, { backgroundColor: '#6366F1' + '15' }]}>
-                  <Text style={[styles.scoreChipLabel, { color: '#6366F1' }]}>Memory</Text>
+                  <Text style={[styles.scoreChipLabel, { color: '#6366F1' }]}>{t('game_hub_editor:chip_memory')}</Text>
                   <Text style={[styles.scoreChipValue, { color: '#6366F1' }]}>
                     {user.memory_score.toLocaleString()} ({user.memory_games})
                   </Text>
                 </View>
                 <View style={[styles.scoreChip, { backgroundColor: '#10B981' + '15' }]}>
-                  <Text style={[styles.scoreChipLabel, { color: '#10B981' }]}>Word Search</Text>
+                  <Text style={[styles.scoreChipLabel, { color: '#10B981' }]}>{t('game_hub_editor:chip_word_search')}</Text>
                   <Text style={[styles.scoreChipValue, { color: '#10B981' }]}>
                     {user.word_search_score.toLocaleString()} ({user.word_search_games})
                   </Text>
                 </View>
                 <View style={[styles.scoreChip, { backgroundColor: '#EC4899' + '15' }]}>
-                  <Text style={[styles.scoreChipLabel, { color: '#EC4899' }]}>Picture This!</Text>
+                  <Text style={[styles.scoreChipLabel, { color: '#EC4899' }]}>{t('game_hub_editor:chip_picture_this')}</Text>
                   <Text style={[styles.scoreChipValue, { color: '#EC4899' }]}>
                     {user.picture_this_score.toLocaleString()} ({user.picture_this_games})
                   </Text>
@@ -411,7 +410,7 @@ export default function GameHubEditorScreen() {
 
               {user.is_test_user && (
                 <View style={styles.testBanner}>
-                  <Text style={styles.testBannerText}>🧪 Test user — excluded from leaderboards</Text>
+                  <Text style={styles.testBannerText}>{t('game_hub_editor:test_user_excluded')}</Text>
                 </View>
               )}
 
@@ -433,7 +432,7 @@ export default function GameHubEditorScreen() {
                       styles.testToggleText,
                       { color: user.is_test_user ? '#F59E0B' : colors.textSecondary },
                     ]}>
-                      🧪 {user.is_test_user ? 'Test User: ON' : 'Mark as Test User'}
+                      🧪 {user.is_test_user ? t('game_hub_editor:test_user_on') : t('game_hub_editor:mark_test_user')}
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -449,7 +448,7 @@ export default function GameHubEditorScreen() {
                     ) : (
                       <>
                         <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="refresh" size={14} color="#EF4444" />
-                        <Text style={styles.resetUserBtnText}>Reset All Scores</Text>
+                        <Text style={styles.resetUserBtnText}>{t('game_hub_editor:reset_user_scores')}</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -460,7 +459,7 @@ export default function GameHubEditorScreen() {
         </View>
 
         {/* Game Editors */}
-        <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 8 }]}>Game Editors</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 8 }]}>{t('game_hub_editor:game_editors_section')}</Text>
         {EDITOR_CARDS.map((card) => (
           <TouchableOpacity
             key={card.route}
@@ -477,8 +476,8 @@ export default function GameHubEditorScreen() {
               />
             </View>
             <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{card.title}</Text>
-              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{card.description}</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t(card.titleKey)}</Text>
+              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{t(card.descKey)}</Text>
             </View>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -491,9 +490,9 @@ export default function GameHubEditorScreen() {
 
         {/* Reset All Scores */}
         <View style={[styles.resetSection, { borderTopColor: colors.border }]}>
-          <Text style={[styles.sectionTitle, { color: colors.text }]}>Danger Zone</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('game_hub_editor:danger_zone')}</Text>
           <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
-            Reset all scores across both games for every player.
+            {t('game_hub_editor:danger_desc')}
           </Text>
           <TouchableOpacity
             style={[styles.resetAllBtn, resettingAll && { opacity: 0.6 }]}
@@ -503,7 +502,7 @@ export default function GameHubEditorScreen() {
             {resettingAll ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={styles.resetAllBtnText}>Reset All Game Scores</Text>
+              <Text style={styles.resetAllBtnText}>{t('game_hub_editor:reset_all_scores')}</Text>
             )}
           </TouchableOpacity>
         </View>

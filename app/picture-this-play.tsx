@@ -4,7 +4,7 @@
  * mode, writes score on completion, shows end-of-game review.
  */
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,8 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import ConfettiCannon from 'react-native-confetti-cannon';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,22 +40,31 @@ import {
   milestoneBonus,
 } from '@/utils/game/pictureThisGenerator';
 
+const LIVES_QUESTION_CAP = 40;
+const TIMED_METER_TARGET = 50;
+const COMPLETION_BONUS = 500;
+const PERFECT_RUN_BONUS = 1000;
+const STREAK_BONUS_PER_TIER = 25;
+
+type EndReason = 'lives' | 'time' | 'exhausted' | 'completed';
+
 interface AnsweredQuestion {
   question: PictureThisQuestion;
   firstSelectedIndex: number; // index of the first answer the player chose
   wrongAttempts: number[]; // indices the player chose wrongly before getting it right
 }
 
-const CATEGORY_LABEL: Record<PictureThisCategory, string> = {
-  food: 'Lunch & Dinner',
-  libations: 'Libations',
-  wine: 'Wine',
-  menu_prices: 'Menu Prices',
+const CATEGORY_LABEL_KEY: Record<PictureThisCategory, string> = {
+  food: 'picture_this:cat_food',
+  libations: 'picture_this:cat_libations',
+  wine: 'picture_this:cat_wine',
+  menu_prices: 'picture_this:cat_menu_prices',
 };
 
 export default function PictureThisPlayScreen() {
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { user } = useAuth();
   const params = useLocalSearchParams<{ category: string; difficulty: string; playMode: string }>();
 
@@ -85,12 +96,35 @@ export default function PictureThisPlayScreen() {
   const [timeRemaining, setTimeRemaining] = useState(TIMED_SECONDS);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  const [currentStreak, setCurrentStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+
   const [showResults, setShowResults] = useState(false);
+  const [endReason, setEndReason] = useState<EndReason | null>(null);
+  const [completionBonus, setCompletionBonus] = useState(0);
+  const [perfectBonus, setPerfectBonus] = useState(0);
   const [scoreSaved, setScoreSaved] = useState(false);
   const [milestoneToast, setMilestoneToast] = useState<string | null>(null);
   const toastAnim = useRef(new RNAnimated.Value(0)).current;
+  const meterAnim = useRef(new RNAnimated.Value(0)).current;
 
-  const totalScore = score + bonusPoints;
+  const totalScore = score + bonusPoints + completionBonus + perfectBonus;
+  const meterTarget = playMode === 'lives' ? LIVES_QUESTION_CAP : TIMED_METER_TARGET;
+  const meterMilestones = useMemo(() => {
+    const arr: number[] = [];
+    for (let i = 5; i <= meterTarget; i += 5) arr.push(i);
+    return arr;
+  }, [meterTarget]);
+
+  // Animate meter fill
+  useEffect(() => {
+    const pct = Math.min(1, questionsCorrect / meterTarget);
+    RNAnimated.timing(meterAnim, {
+      toValue: pct,
+      duration: 350,
+      useNativeDriver: false,
+    }).start();
+  }, [questionsCorrect, meterTarget, meterAnim]);
 
   // ─── Load pool ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -124,7 +158,7 @@ export default function PictureThisPlayScreen() {
 
   // Keep finishGame stable across renders via a ref so the timer's setInterval
   // always invokes the latest version (which reads the latest state).
-  const finishGameRef = useRef<(reason: 'lives' | 'time' | 'exhausted') => void>(() => {});
+  const finishGameRef = useRef<(reason: EndReason) => void>(() => {});
 
   // ─── Timer ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -196,6 +230,8 @@ export default function PictureThisPlayScreen() {
     if (!isCorrect) {
       setCurrentWrongs(prev => prev.includes(idx) ? prev : [...prev, idx]);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      // Any wrong attempt breaks the streak (in either mode)
+      setCurrentStreak(0);
 
       if (playMode === 'lives') {
         const newLives = lives - 1;
@@ -224,19 +260,39 @@ export default function PictureThisPlayScreen() {
     setScore(prev => prev + pointsPer);
     setQuestionsCorrect(newCorrect);
 
-    // Lives mode milestones
-    if (playMode === 'lives') {
-      const { bonusPoints: bp, restoreLife } = milestoneBonus(newCorrect);
-      if (bp > 0) {
-        setBonusPoints(prev => prev + bp);
-      }
-      if (restoreLife && lives < startingLives) {
-        setLives(prev => Math.min(startingLives, prev + 1));
-      }
-      if (bp > 0) {
-        const lifeMsg = restoreLife && lives < startingLives ? ' • +1 ❤️' : '';
-        showToast(`🎉 ${newCorrect} correct! +${bp} bonus${lifeMsg}`);
-      }
+    // Streak: only counts if no wrong attempts on this question
+    const cleanQuestion = currentWrongs.length === 0;
+    const newStreak = cleanQuestion ? currentStreak + 1 : 0;
+    setCurrentStreak(newStreak);
+    if (newStreak > bestStreak) setBestStreak(newStreak);
+
+    // Milestone bonus — applies to BOTH modes (life restore gated to lives below)
+    const { bonusPoints: milestoneBp, restoreLife } = milestoneBonus(newCorrect);
+    let toastBp = 0;
+    let lifeAdded = false;
+    if (milestoneBp > 0) {
+      setBonusPoints(prev => prev + milestoneBp);
+      toastBp += milestoneBp;
+    }
+    if (playMode === 'lives' && restoreLife && lives < startingLives) {
+      setLives(prev => Math.min(startingLives, prev + 1));
+      lifeAdded = true;
+    }
+
+    // Streak bonus — every 5 in a row → +25
+    let streakBp = 0;
+    if (newStreak > 0 && newStreak % 5 === 0) {
+      streakBp = STREAK_BONUS_PER_TIER;
+      setBonusPoints(prev => prev + streakBp);
+    }
+
+    // Toast — merge milestone + streak + life messages
+    if (toastBp > 0 || streakBp > 0) {
+      const parts: string[] = [];
+      if (toastBp > 0) parts.push(t('picture_this:toast_correct', { count: newCorrect, points: toastBp }));
+      if (streakBp > 0) parts.push(t('picture_this:toast_streak', { count: newStreak, points: streakBp }));
+      if (lifeAdded) parts.push(t('picture_this:toast_life'));
+      showToast(parts.join(' • '));
     }
 
     // Record + advance
@@ -249,6 +305,14 @@ export default function PictureThisPlayScreen() {
       },
     ]);
 
+    // Lives-mode 40-question hard cap → completion
+    if (playMode === 'lives' && newCorrect >= LIVES_QUESTION_CAP) {
+      setTimeout(() => {
+        finishGame('completed');
+      }, 800);
+      return;
+    }
+
     setTimeout(() => {
       nextQuestion();
     }, 800);
@@ -257,14 +321,29 @@ export default function PictureThisPlayScreen() {
   // ─── Finish + save ──────────────────────────────────────────────────────
   // Sync ref to latest finishGame on every render so the timer can call current logic.
   // (Defined here so it captures the ref above; assignment runs each render below.)
-  const finishGame = useCallback(async (_reason: 'lives' | 'time' | 'exhausted') => {
+  const finishGame = useCallback(async (reason: EndReason) => {
     if (timerRef.current) clearInterval(timerRef.current);
+    setEndReason(reason);
+
+    // Completion bonuses (Lives mode, reached 40 correct)
+    let extraCompletion = 0;
+    let extraPerfect = 0;
+    if (reason === 'completed') {
+      extraCompletion = COMPLETION_BONUS;
+      setCompletionBonus(COMPLETION_BONUS);
+      // Perfect run = 40 correct with no wrong attempt ever (current streak still 40)
+      if (currentStreak >= LIVES_QUESTION_CAP) {
+        extraPerfect = PERFECT_RUN_BONUS;
+        setPerfectBonus(PERFECT_RUN_BONUS);
+      }
+    }
+
     setShowResults(true);
 
     if (!user?.id) return;
 
     try {
-      const finalTotalScore = totalScore;
+      const finalTotalScore = score + bonusPoints + extraCompletion + extraPerfect;
       const finalCorrect = questionsCorrect;
       const elapsed = playMode === 'timed' ? TIMED_SECONDS - timeRemaining : undefined;
 
@@ -276,7 +355,7 @@ export default function PictureThisPlayScreen() {
         score: finalTotalScore,
         questions_correct: finalCorrect,
         questions_total: history.length,
-        bonus_points: bonusPoints,
+        bonus_points: bonusPoints + extraCompletion + extraPerfect,
         time_seconds: elapsed,
         lives_remaining: playMode === 'lives' ? lives : 0,
         completed: true,
@@ -295,7 +374,7 @@ export default function PictureThisPlayScreen() {
       console.error('[PictureThis] save score error:', err);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id, category, difficulty, playMode, totalScore, questionsCorrect, bonusPoints, timeRemaining, lives, history.length]);
+  }, [user?.id, category, difficulty, playMode, score, bonusPoints, currentStreak, questionsCorrect, timeRemaining, lives, history.length]);
 
   // Keep ref in sync with the latest finishGame on every render
   finishGameRef.current = finishGame;
@@ -305,7 +384,7 @@ export default function PictureThisPlayScreen() {
     return (
       <View style={[styles.container, styles.center, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading menu items…</Text>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('picture_this:loading_items')}</Text>
       </View>
     );
   }
@@ -314,13 +393,13 @@ export default function PictureThisPlayScreen() {
     return (
       <View style={[styles.container, styles.center, { backgroundColor: colors.background }]}>
         <Text style={styles.errorEmoji}>📷</Text>
-        <Text style={[styles.errorTitle, { color: colors.text }]}>Can&apos;t start the game</Text>
+        <Text style={[styles.errorTitle, { color: colors.text }]}>{t('picture_this:cant_start')}</Text>
         <Text style={[styles.errorText, { color: colors.textSecondary }]}>{poolError}</Text>
         <TouchableOpacity
           style={[styles.errorBtn, { backgroundColor: colors.primary }]}
           onPress={() => router.back()}
         >
-          <Text style={styles.errorBtnText}>Back</Text>
+          <Text style={styles.errorBtnText}>{t('picture_this:back')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -346,7 +425,7 @@ export default function PictureThisPlayScreen() {
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-          {CATEGORY_LABEL[category]}
+          {t(CATEGORY_LABEL_KEY[category])}
         </Text>
         <View style={[styles.modeBadge, { backgroundColor: playMode === 'timed' ? '#F5A62330' : colors.primary + '20' }]}>
           <Text style={{ fontSize: 16, color: playMode === 'timed' ? '#F5A623' : colors.primary }}>
@@ -359,26 +438,63 @@ export default function PictureThisPlayScreen() {
       <View style={[styles.hud, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
         {playMode === 'lives' ? (
           <View style={styles.hudCell}>
-            <Text style={styles.hudLabel}>LIVES</Text>
+            <Text style={styles.hudLabel}>{t('picture_this:hud_lives')}</Text>
             <Text style={[styles.hudValue, { color: lives <= 1 ? '#EF4444' : colors.text }]}>
               {'❤️'.repeat(lives)}{'🖤'.repeat(Math.max(0, startingLives - lives))}
             </Text>
           </View>
         ) : (
           <View style={styles.hudCell}>
-            <Text style={styles.hudLabel}>TIME</Text>
+            <Text style={styles.hudLabel}>{t('picture_this:hud_time')}</Text>
             <Text style={[styles.hudValue, { color: timeRemaining <= 15 ? '#EF4444' : colors.text }]}>
               {Math.floor(timeRemaining / 60)}:{(timeRemaining % 60).toString().padStart(2, '0')}
             </Text>
           </View>
         )}
         <View style={styles.hudCell}>
-          <Text style={styles.hudLabel}>SCORE</Text>
+          <Text style={styles.hudLabel}>{t('picture_this:hud_score')}</Text>
           <Text style={[styles.hudValue, { color: colors.primary }]}>{totalScore.toLocaleString()}</Text>
         </View>
         <View style={styles.hudCell}>
-          <Text style={styles.hudLabel}>CORRECT</Text>
-          <Text style={[styles.hudValue, { color: colors.text }]}>{questionsCorrect}</Text>
+          <Text style={styles.hudLabel}>{t('picture_this:hud_correct')}</Text>
+          <Text style={[styles.hudValue, { color: colors.text }]}>
+            {playMode === 'lives' ? `${questionsCorrect} / ${LIVES_QUESTION_CAP}` : questionsCorrect}
+          </Text>
+        </View>
+      </View>
+
+      {/* Milestone meter */}
+      <View style={[styles.meterWrap, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+        {currentStreak >= 5 && (
+          <Text style={styles.streakBadge}>{t('picture_this:streak_badge', { count: currentStreak })}</Text>
+        )}
+        <View style={[styles.meterTrack, { backgroundColor: colors.border + '60' }]}>
+          <RNAnimated.View
+            style={[
+              styles.meterFill,
+              {
+                backgroundColor: colors.primary,
+                width: meterAnim.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] }),
+              },
+            ]}
+          />
+          {meterMilestones.map(m => {
+            const passed = questionsCorrect >= m;
+            const isLifeTier = playMode === 'lives' && m % 10 === 0;
+            const left = `${(m / meterTarget) * 100}%`;
+            return (
+              <View key={m} style={[styles.meterTickWrap, { left: left as any }]} pointerEvents="none">
+                {isLifeTier ? (
+                  <Text style={[styles.meterTickHeart, { opacity: passed ? 1 : 0.45 }]}>❤️</Text>
+                ) : (
+                  <View style={[
+                    styles.meterTickDot,
+                    { backgroundColor: passed ? '#fff' : colors.textSecondary },
+                  ]} />
+                )}
+              </View>
+            );
+          })}
         </View>
       </View>
 
@@ -406,7 +522,11 @@ export default function PictureThisPlayScreen() {
           />
         </View>
 
-        <Text style={[styles.prompt, { color: colors.text }]}>{currentQuestion.prompt}</Text>
+        <Text style={[styles.prompt, { color: colors.text }]}>
+          {currentQuestion.promptKey
+            ? t(currentQuestion.promptKey, currentQuestion.promptParams || {})
+            : currentQuestion.prompt}
+        </Text>
 
         {/* Choices */}
         <View style={styles.choices}>
@@ -458,34 +578,68 @@ export default function PictureThisPlayScreen() {
       {/* Results modal — fixed header + score, scrollable review, sticky bottom buttons */}
       <Modal visible={showResults} transparent animationType="fade" onRequestClose={() => router.back()}>
         <View style={styles.modalOverlay}>
+          {endReason === 'completed' && (
+            <ConfettiCannon
+              count={180}
+              origin={{ x: -10, y: 0 }}
+              fadeOut
+              autoStart
+              fallSpeed={2800}
+              explosionSpeed={400}
+            />
+          )}
           <View style={[styles.resultsCard, { backgroundColor: colors.card }]}>
             <View style={styles.resultsHeader}>
-              <Text style={styles.resultEmoji}>{questionsCorrect > 0 ? '🎉' : '💔'}</Text>
+              <Text style={styles.resultEmoji}>
+                {endReason === 'completed'
+                  ? (perfectBonus > 0 ? '🏆' : '🎉')
+                  : (questionsCorrect > 0 ? '🎉' : '💔')}
+              </Text>
               <Text style={[styles.resultTitle, { color: colors.text }]}>
-                {playMode === 'timed' ? "Time's Up!" : 'Game Over'}
+                {endReason === 'completed'
+                  ? (perfectBonus > 0 ? t('picture_this:results_perfect') : t('picture_this:results_complete'))
+                  : (playMode === 'timed' ? t('picture_this:results_times_up') : t('picture_this:results_game_over'))}
               </Text>
 
               <View style={[styles.scoreBox, { backgroundColor: colors.background }]}>
                 <View style={styles.scoreRow}>
-                  <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>Questions Correct</Text>
+                  <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>{t('picture_this:questions_correct')}</Text>
                   <Text style={[styles.scoreValue, { color: colors.text }]}>{questionsCorrect}</Text>
                 </View>
                 <View style={styles.scoreRow}>
-                  <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>Accuracy</Text>
+                  <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>{t('picture_this:accuracy')}</Text>
                   <Text style={[styles.scoreValue, { color: colors.text }]}>{accuracy}%</Text>
                 </View>
+                {bestStreak > 0 && (
+                  <View style={styles.scoreRow}>
+                    <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>{t('picture_this:best_streak')}</Text>
+                    <Text style={[styles.scoreValue, { color: colors.text }]}>{bestStreak}</Text>
+                  </View>
+                )}
                 <View style={styles.scoreRow}>
-                  <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>Base Points</Text>
+                  <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>{t('picture_this:base_points')}</Text>
                   <Text style={[styles.scoreValue, { color: colors.text }]}>{score.toLocaleString()}</Text>
                 </View>
                 {bonusPoints > 0 && (
                   <View style={styles.scoreRow}>
-                    <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>Bonus Points</Text>
+                    <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>{t('picture_this:bonus_points')}</Text>
                     <Text style={[styles.scoreValue, { color: '#F59E0B' }]}>+{bonusPoints.toLocaleString()}</Text>
                   </View>
                 )}
+                {completionBonus > 0 && (
+                  <View style={styles.scoreRow}>
+                    <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>{t('picture_this:completion_bonus')}</Text>
+                    <Text style={[styles.scoreValue, { color: '#F59E0B' }]}>+{completionBonus.toLocaleString()}</Text>
+                  </View>
+                )}
+                {perfectBonus > 0 && (
+                  <View style={styles.scoreRow}>
+                    <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>{t('picture_this:perfect_bonus')}</Text>
+                    <Text style={[styles.scoreValue, { color: '#F59E0B' }]}>+{perfectBonus.toLocaleString()}</Text>
+                  </View>
+                )}
                 <View style={[styles.scoreRow, styles.totalRow]}>
-                  <Text style={[styles.totalLabel, { color: colors.primary }]}>Total Score</Text>
+                  <Text style={[styles.totalLabel, { color: colors.primary }]}>{t('picture_this:total_score')}</Text>
                   <Text style={[styles.totalValue, { color: colors.primary }]}>{totalScore.toLocaleString()}</Text>
                 </View>
               </View>
@@ -493,7 +647,7 @@ export default function PictureThisPlayScreen() {
               {!scoreSaved && user?.id && (
                 <View style={styles.savingRow}>
                   <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={[styles.savingText, { color: colors.textSecondary }]}>Saving score…</Text>
+                  <Text style={[styles.savingText, { color: colors.textSecondary }]}>{t('picture_this:saving_score')}</Text>
                 </View>
               )}
             </View>
@@ -505,7 +659,7 @@ export default function PictureThisPlayScreen() {
                 contentContainerStyle={styles.reviewScrollContent}
                 showsVerticalScrollIndicator
               >
-                <Text style={[styles.reviewTitle, { color: colors.text }]}>Review Your Answers</Text>
+                <Text style={[styles.reviewTitle, { color: colors.text }]}>{t('picture_this:review_title')}</Text>
                 {history.map((entry, i) => {
                   const correctIdx = entry.question.correctIndex;
                   const correctText = entry.question.choices[correctIdx].text;
@@ -518,7 +672,9 @@ export default function PictureThisPlayScreen() {
                           {entry.question.itemName}
                         </Text>
                         <Text style={[styles.reviewPrompt, { color: colors.textSecondary }]} numberOfLines={2}>
-                          {entry.question.prompt}
+                          {entry.question.promptKey
+                            ? t(entry.question.promptKey, entry.question.promptParams || {})
+                            : entry.question.prompt}
                         </Text>
                         <View style={styles.reviewAnswerRow}>
                           <Text style={styles.reviewCheckmark}>
@@ -552,7 +708,7 @@ export default function PictureThisPlayScreen() {
                 })}
               >
                 <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="replay" size={18} color="#fff" />
-                <Text style={styles.actionBtnText}>Play Again</Text>
+                <Text style={styles.actionBtnText}>{t('picture_this:play_again')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -560,14 +716,14 @@ export default function PictureThisPlayScreen() {
                 onPress={() => router.replace('/picture-this-leaderboard')}
               >
                 <IconSymbol ios_icon_name="trophy.fill" android_material_icon_name="emoji-events" size={18} color="#fff" />
-                <Text style={styles.actionBtnText}>View Leaderboard</Text>
+                <Text style={styles.actionBtnText}>{t('picture_this:view_leaderboard')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={[styles.secondaryBtn, { borderColor: colors.border }]}
                 onPress={() => router.replace('/picture-this-game')}
               >
-                <Text style={[styles.secondaryBtnText, { color: colors.text }]}>Back to Picture This!</Text>
+                <Text style={[styles.secondaryBtnText, { color: colors.text }]}>{t('picture_this:back_to_hub')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -615,6 +771,48 @@ const styles = StyleSheet.create({
   hudCell: { flex: 1, alignItems: 'center' },
   hudLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.8, color: '#888', marginBottom: 2 },
   hudValue: { fontSize: 16, fontWeight: '700' },
+
+  meterWrap: {
+    paddingHorizontal: 16,
+    paddingTop: 18,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+  },
+  streakBadge: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#F59E0B',
+    textAlign: 'right',
+    marginBottom: 4,
+  },
+  meterTrack: {
+    height: 14,
+    borderRadius: 999,
+    overflow: 'visible',
+    position: 'relative',
+  },
+  meterFill: {
+    height: '100%',
+    borderRadius: 999,
+  },
+  meterTickWrap: {
+    position: 'absolute',
+    top: -2,
+    width: 18,
+    marginLeft: -9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 18,
+  },
+  meterTickDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  meterTickHeart: {
+    fontSize: 14,
+    lineHeight: 16,
+  },
 
   playArea: { padding: 16, paddingBottom: 40 },
   imageBox: {

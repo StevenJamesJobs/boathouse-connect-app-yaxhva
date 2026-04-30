@@ -15,8 +15,10 @@ import {
   Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  ScrollView,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAuth } from '@/contexts/AuthContext';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -31,16 +33,17 @@ import {
 const SCREEN_WIDTH = Dimensions.get('window').width;
 const RANK_EMOJIS = ['🥇', '🥈', '🥉'];
 
-const CATEGORY_LABELS: Record<WordSearchCategory, string> = {
-  weekly_specials: 'Weekly\nSpecials',
-  lunch: 'Lunch',
-  dinner: 'Dinner',
-  happy_hour: 'Happy\nHour',
-  libations: 'Libations',
+const CATEGORY_LABEL_KEYS: Record<WordSearchCategory, string> = {
+  weekly_specials: 'word_search:cat_weekly_specials',
+  lunch: 'word_search:cat_lunch',
+  dinner: 'word_search:cat_dinner',
+  happy_hour: 'word_search:cat_happy_hour',
+  libations: 'word_search:cat_libations',
 };
 
 export default function WordSearchLeaderboardScreen() {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
   const pagerRef = useRef<FlatList>(null);
@@ -109,10 +112,12 @@ export default function WordSearchLeaderboardScreen() {
         )}
         <View style={styles.entryText}>
           <Text style={[styles.entryName, { color: isMe ? colors.primary : colors.text }]} numberOfLines={1}>
-            {item.name} {isMe ? '(You)' : ''}
+            {item.name} {isMe ? `(${t('word_search:you')})` : ''}
           </Text>
           <Text style={[styles.entryGames, { color: colors.textSecondary }]}>
-            {item.games_played} puzzle{item.games_played !== 1 ? 's' : ''} completed
+            {item.games_played === 1
+              ? t('word_search:puzzles_completed_count', { count: item.games_played })
+              : t('word_search:puzzles_completed_count_plural', { count: item.games_played })}
           </Text>
         </View>
         <Text style={[styles.entryScore, { color: colors.primary }]}>{item.best_score}</Text>
@@ -133,15 +138,15 @@ export default function WordSearchLeaderboardScreen() {
           ) : entries.length === 0 ? (
             <View style={styles.emptyBox}>
               <Text style={styles.emptyEmoji}>🏆</Text>
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No scores yet!</Text>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('word_search:no_scores_yet')}</Text>
               <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
-                Be the first to complete a {cat.replace(/_/g, ' ')} puzzle.
+                {t('word_search:be_first_to', { category: t(CATEGORY_LABEL_KEYS[cat]) })}
               </Text>
               <TouchableOpacity
                 style={[styles.beFirstBtn, { backgroundColor: colors.primary }]}
                 onPress={() => router.push('/word-search-game')}
               >
-                <Text style={styles.beFirstBtnText}>Play Now</Text>
+                <Text style={styles.beFirstBtnText}>{t('word_search:play_now')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -166,49 +171,41 @@ export default function WordSearchLeaderboardScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>🏆 Word Search Scores</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('word_search:scores_title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      {/* Category Tab Selector */}
+      {/* Category Pills (matches Picture This! leaderboard) */}
       <View style={[styles.tabBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <FlatList
-          data={WORD_SEARCH_CATEGORIES}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          keyExtractor={(c) => c}
-          contentContainerStyle={styles.tabContent}
-          renderItem={({ item: cat }) => {
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabContent}>
+          {WORD_SEARCH_CATEGORIES.map((cat) => {
             const info = WORD_SEARCH_CATEGORY_INFO[cat];
             const isActive = cat === activeCategory;
             return (
               <TouchableOpacity
+                key={cat}
                 style={[
                   styles.tab,
-                  isActive && { backgroundColor: colors.primary + '18', borderColor: colors.primary },
-                  !isActive && { borderColor: 'transparent' },
+                  isActive
+                    ? { backgroundColor: info.color, borderColor: info.color }
+                    : { borderColor: colors.border, backgroundColor: colors.background },
                 ]}
                 onPress={() => handleTabPress(cat)}
               >
-                <IconSymbol
-                  ios_icon_name={info.icon.ios as any}
-                  android_material_icon_name={info.icon.android as any}
-                  size={14}
-                  color={isActive ? colors.primary : colors.textSecondary}
-                />
                 <Text
                   style={[
                     styles.tabText,
-                    { color: isActive ? colors.primary : colors.textSecondary },
+                    { color: isActive ? '#fff' : colors.textSecondary },
+                    isActive && { fontWeight: '700' },
                   ]}
-                  numberOfLines={2}
+                  numberOfLines={1}
                 >
-                  {CATEGORY_LABELS[cat]}
+                  {t(CATEGORY_LABEL_KEYS[cat])}
                 </Text>
               </TouchableOpacity>
             );
-          }}
-        />
+          })}
+        </ScrollView>
       </View>
 
       {/* Pager */}
@@ -246,18 +243,16 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingVertical: 8,
   },
-  tabContent: { paddingHorizontal: 12, gap: 6 },
+  tabContent: { paddingHorizontal: 12, gap: 8 },
   tab: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 7,
-    borderRadius: 10,
+    borderRadius: 999,
     borderWidth: 1.5,
-    minWidth: 70,
+    minWidth: 72,
+    alignItems: 'center',
   },
-  tabText: { fontSize: 11, fontWeight: '600', textAlign: 'center', flexShrink: 1 },
+  tabText: { fontSize: 13, fontWeight: '600' },
   listContent: { padding: 16, gap: 10, paddingBottom: 40 },
   entry: {
     flexDirection: 'row',

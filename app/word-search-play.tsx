@@ -283,15 +283,8 @@ export default function WordSearchPlayScreen() {
         isComplete={phase !== 'playing'}
         onTimeExpired={handleTimeExpired}
         onTick={handleTick}
+        onBack={() => router.replace('/word-search-game')}
       />
-
-      {/* Back button */}
-      <TouchableOpacity
-        style={[styles.backChip, { backgroundColor: colors.card }]}
-        onPress={() => router.replace('/word-search-game')}
-      >
-        <Text style={[styles.backChipText, { color: colors.textSecondary }]}>← Categories</Text>
-      </TouchableOpacity>
 
       {/* Grid — does not scroll, sized to content */}
       <View style={styles.gridContainer}>
@@ -348,16 +341,6 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   loadingText: { fontSize: 15 },
-  backChip: {
-    alignSelf: 'flex-start',
-    marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  backChipText: { fontSize: 13, fontWeight: '500' },
   gridContainer: {
     paddingHorizontal: 16,
     paddingVertical: 6,

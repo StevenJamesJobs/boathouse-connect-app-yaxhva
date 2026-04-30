@@ -11,6 +11,7 @@ import {
   extractLibationWords,
   getDifficultyConfig,
 } from '@/utils/game/wordSearchEngine';
+import { stripFormattingTags } from '@/components/FormattedText';
 
 export interface RawWordItem {
   searchWord: string;
@@ -71,7 +72,9 @@ async function fetchMenuItemWords(
     const allWords: RawWordItem[] = [];
     for (const item of picked) {
       if (!item.description) continue;
-      const words = extractIngredientWords(item.description, item.name);
+      const cleanName = stripFormattingTags(item.name);
+      const cleanDesc = stripFormattingTags(item.description);
+      const words = extractIngredientWords(cleanDesc, cleanName);
       allWords.push(...words);
     }
 
@@ -113,7 +116,7 @@ async function fetchLibationWords(itemCount: number): Promise<RawWordItem[]> {
         const ingArray = Array.isArray(recipe.ingredients)
           ? (recipe.ingredients as Array<{ amount: string; ingredient: string }>)
           : [];
-        const words = extractLibationWords(ingArray, recipe.name);
+        const words = extractLibationWords(ingArray, stripFormattingTags(recipe.name));
         allWords.push(...words);
       }
     }
@@ -124,7 +127,9 @@ async function fetchLibationWords(itemCount: number): Promise<RawWordItem[]> {
       const supplement = shuffled.slice(0, itemCount);
       for (const item of supplement) {
         if (!item.description) continue;
-        const words = extractIngredientWords(item.description, item.name);
+        const cleanName = stripFormattingTags(item.name);
+      const cleanDesc = stripFormattingTags(item.description);
+      const words = extractIngredientWords(cleanDesc, cleanName);
         allWords.push(...words);
       }
     }
