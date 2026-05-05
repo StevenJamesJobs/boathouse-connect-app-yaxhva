@@ -158,18 +158,29 @@ export default function ManagerPortalScreen() {
     specialsHasNew,
     announcementsHasNew,
     specialFeaturesHasNew,
+    eventsEventHasNew,
+    eventsEntertainmentHasNew,
     lastViewedAnnouncements,
     lastViewedSpecialFeatures,
+    lastViewedEvents,
     viewedAnnouncementIds,
     viewedSpecialFeatureIds,
+    viewedEventIds,
     newContentCount,
     markTabViewed,
     markWelcomeTabViewed,
     markAnnouncementViewed,
     markSpecialFeatureViewed,
+    markEventViewed,
+    markEventsTabVisited,
+    markAllEventsViewed,
   } = useUnreadContent();
   const sectionListRef = useRef<FlatList>(null);
   const isScrollingRef = useRef(false);
+  const lastMarkedSectionRef = useRef<ConnectBarTab>('today');
+
+  // Today header collapse state — only active when there are Happening Today events
+  const [todayHeaderCollapsed, setTodayHeaderCollapsed] = useState(false);
 
   // Events section state (calendar + tabs - managed here for sticky layout)
   const [eventsSelectedDate, setEventsSelectedDate] = useState<Date | null>(null);
@@ -568,17 +579,20 @@ export default function ManagerPortalScreen() {
       <TouchableOpacity
         key={event.id}
         style={[styles.card, { backgroundColor: colors.card, borderLeftColor: '#4CAF50' }]}
-        onPress={() => openDetailModal({
-          title: getLocalizedField(event, 'title', language),
-          content: getLocalizedField(event, 'content', language) || event.content || event.message || '',
-          thumbnailUrl: event.thumbnail_url,
-          thumbnailShape: event.thumbnail_shape,
-          imageUrls,
-          startDateTime: event.start_date_time,
-          endDateTime: event.end_date_time,
-          link: event.link,
-          guideFile: event.guide_file || null,
-        })}
+        onPress={() => {
+          markEventViewed(event.id);
+          openDetailModal({
+            title: getLocalizedField(event, 'title', language),
+            content: getLocalizedField(event, 'content', language) || event.content || event.message || '',
+            thumbnailUrl: event.thumbnail_url,
+            thumbnailShape: event.thumbnail_shape,
+            imageUrls,
+            startDateTime: event.start_date_time,
+            endDateTime: event.end_date_time,
+            link: event.link,
+            guideFile: event.guide_file || null,
+          });
+        }}
         activeOpacity={0.7}
       >
         <View style={styles.cardRow}>
@@ -589,9 +603,17 @@ export default function ManagerPortalScreen() {
             />
           )}
           <View style={styles.cardContent}>
-            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
-              {getLocalizedField(event, 'title', language)}
-            </Text>
+            <View style={styles.cardTitleRow}>
+              <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+                {getLocalizedField(event, 'title', language)}
+              </Text>
+              {!viewedEventIds.has(event.id) &&
+                (!lastViewedEvents || new Date(event.created_at) > new Date(lastViewedEvents)) && (
+                  <View style={styles.newPill}>
+                    <Text style={styles.newPillText}>NEW</Text>
+                  </View>
+                )}
+            </View>
             <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
               {truncateText(getLocalizedField(event, 'content', language) || event.content || event.message)}
             </Text>
@@ -623,7 +645,8 @@ export default function ManagerPortalScreen() {
 
     setCurrentPageIndex(pageIndex);
     const newSection = pageIndexToSection(pageIndex) as ConnectBarTab;
-    if (newSection !== activeSection) {
+    if (newSection !== lastMarkedSectionRef.current) {
+      lastMarkedSectionRef.current = newSection;
       setActiveSection(newSection);
       markTabViewed(newSection);
     }
@@ -633,12 +656,14 @@ export default function ManagerPortalScreen() {
     } else if (pageIndex === 1 && whatsHappeningTab !== 'Special Features') {
       setWhatsHappeningTab('Special Features');
       markWelcomeTabViewed('specialFeatures');
-    } else if (pageIndex === 2 && eventsTab !== 'Event') {
-      setEventsTab('Event');
-    } else if (pageIndex === 3 && eventsTab !== 'Entertainment') {
-      setEventsTab('Entertainment');
+    } else if (pageIndex === 2) {
+      if (eventsTab !== 'Event') setEventsTab('Event');
+      markEventsTabVisited('Event');
+    } else if (pageIndex === 3) {
+      if (eventsTab !== 'Entertainment') setEventsTab('Entertainment');
+      markEventsTabVisited('Entertainment');
     }
-  }, [activeSection, router, markTabViewed, whatsHappeningTab, eventsTab, markWelcomeTabViewed]);
+  }, [router, markTabViewed, whatsHappeningTab, eventsTab, markWelcomeTabViewed, markEventsTabVisited]);
 
   const handleSectionScrollLive = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const offsetX = event.nativeEvent.contentOffset.x;
@@ -651,16 +676,20 @@ export default function ManagerPortalScreen() {
   }, [activeSection]);
 
   const handleTabChange = useCallback((tab: ConnectBarTab) => {
+    lastMarkedSectionRef.current = tab;
     setActiveSection(tab);
     setCurrentPageIndex(SECTION_FIRST_LEAF[tab]);
     markTabViewed(tab);
+    if (tab === 'events') markEventsTabVisited('Event');
     sectionListRef.current?.scrollToIndex({ index: SECTION_FIRST_LEAF[tab], animated: true });
-  }, [markTabViewed]);
+  }, [markTabViewed, markEventsTabVisited]);
 
   // Sub-tab tap handlers — scroll the pager to the matching leaf.
   const goToLeaf = useCallback((index: number) => {
     sectionListRef.current?.scrollToIndex({ index, animated: true });
-  }, []);
+    if (index === 2) markEventsTabVisited('Event');
+    else if (index === 3) markEventsTabVisited('Entertainment');
+  }, [markEventsTabVisited]);
 
   // ===== RENDER CARD COMPONENTS =====
 
@@ -838,35 +867,78 @@ export default function ManagerPortalScreen() {
 
   // ===== SECTION RENDERERS =====
 
-  const renderTodayHeader = (activeSubTab: 'Announcements' | 'Special Features') => (
+  const renderTodayHeader = (activeSubTab: 'Announcements' | 'Special Features') => {
+    const showGrabber = todayHappeningList.length > 0;
+    const isCollapsed = todayHeaderCollapsed && showGrabber;
+    return (
     <View style={styles.sectionHeaderWrap}>
-      <UpcomingShiftsCard
-        userId={user?.id}
-        isManager={true}
-        colors={{
-          primary: colors.primary,
-          background: colors.background,
-          text: colors.text,
-          textSecondary: colors.darkSecondaryText,
-          card: colors.card,
-        }}
-      />
+      {!isCollapsed && (
+        <>
+          <UpcomingShiftsCard
+            userId={user?.id}
+            isManager={true}
+            colors={{
+              primary: colors.primary,
+              background: colors.background,
+              text: colors.text,
+              textSecondary: colors.darkSecondaryText,
+              card: colors.card,
+            }}
+          />
+          {todayHappeningList.length > 0 && (
+            <View style={styles.happeningTodayWrap}>
+              <View style={styles.happeningTodayHeader}>
+                <IconSymbol
+                  ios_icon_name="calendar"
+                  android_material_icon_name="event"
+                  size={16}
+                  color={colors.primary}
+                />
+                <Text style={[styles.happeningTodayTitle, { color: colors.text }]}>
+                  {t('today_section.happening_today', 'Happening Today')}
+                </Text>
+                {todayHappeningList.length > 3 && (
+                  <TouchableOpacity onPress={() => router.push('/view-all-upcoming-events')} activeOpacity={0.7} style={styles.happeningTodayMoreLink}>
+                    <Text style={[styles.happeningTodayMoreText, { color: colors.primary }]}>
+                      {todayHappeningList.length} total →
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              {todayHappeningList.slice(0, 3).map((event, index) => renderEventCard(event, index))}
+              {todayHappeningList.length > 3 && (
+                <TouchableOpacity
+                  style={[styles.happeningTodayMoreButton, { borderColor: colors.primary + '30' }]}
+                  onPress={() => router.push('/view-all-upcoming-events')}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.happeningTodayMoreButtonText, { color: colors.primary }]}>
+                    +{todayHappeningList.length - 3} {t('today_section.more_today', 'more today')} →
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+        </>
+      )}
 
-      {todayHappeningList.length > 0 && (
-        <View style={styles.happeningTodayWrap}>
-          <View style={styles.happeningTodayHeader}>
-            <IconSymbol
-              ios_icon_name="calendar"
-              android_material_icon_name="event"
-              size={16}
-              color={colors.primary}
-            />
-            <Text style={[styles.happeningTodayTitle, { color: colors.text }]}>
-              {t('today_section.happening_today', 'Happening Today')}
-            </Text>
-          </View>
-          {todayHappeningList.map((event, index) => renderEventCard(event, index))}
-        </View>
+      {showGrabber && (
+        <TouchableOpacity
+          style={[styles.collapseGrabber, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}
+          onPress={() => setTodayHeaderCollapsed(prev => !prev)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.collapseGrabberPill, { backgroundColor: colors.primary + '60' }]} />
+          <Text style={[styles.collapseGrabberLabel, { color: colors.primary }]}>
+            {isCollapsed ? 'Show Shifts & Today' : 'Hide Shifts & Today'}
+          </Text>
+          <IconSymbol
+            ios_icon_name={isCollapsed ? 'chevron.down' : 'chevron.up'}
+            android_material_icon_name={isCollapsed ? 'expand-more' : 'expand-less'}
+            size={13}
+            color={colors.primary}
+          />
+        </TouchableOpacity>
       )}
 
       <View style={[styles.todayTabsCard, { backgroundColor: colors.card }]}>
@@ -902,7 +974,8 @@ export default function ManagerPortalScreen() {
         </View>
       </View>
     </View>
-  );
+    );
+  };
 
   const renderTodayLeaf = (subTab: 'Announcements' | 'Special Features') => (
     <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
@@ -944,7 +1017,16 @@ export default function ManagerPortalScreen() {
   );
 
   // No paddingHorizontal wrap — WeeklyCalendarStrip has its own marginHorizontal: 16.
-  const renderEventsHeader = (activeSubTab: 'Event' | 'Entertainment') => (
+  const renderEventsHeader = (activeSubTab: 'Event' | 'Entertainment') => {
+    const hasNewAdded = eventsSelectedDate === null && (['Event', 'Entertainment'] as const).some(cat => {
+      const items = upcomingEvents.filter(e => e.category === cat);
+      return items.slice(6).some(e =>
+        !viewedEventIds.has(e.id) &&
+        !!lastViewedEvents &&
+        new Date(e.created_at) > new Date(lastViewedEvents)
+      );
+    });
+    return (
     <View>
       <WeeklyCalendarStrip
         selectedDate={eventsSelectedDate}
@@ -958,6 +1040,7 @@ export default function ManagerPortalScreen() {
         }}
         events={upcomingEvents}
         onViewAll={() => router.push('/view-all-upcoming-events')}
+        onNewAdded={hasNewAdded ? async () => { await markAllEventsViewed(); router.push('/view-all-upcoming-events'); } : undefined}
       >
         <View style={[styles.subTabsContainer, { backgroundColor: colors.background, marginTop: 8 }]}>
           <TouchableOpacity
@@ -965,23 +1048,34 @@ export default function ManagerPortalScreen() {
             onPress={() => goToLeaf(2)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.subTabText, { color: colors.textSecondary }, activeSubTab === 'Event' && { color: '#FFFFFF' }]}>
-              {t('upcoming_events.events', 'Events')}
-            </Text>
+            <View style={styles.subTabLabelRow}>
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, activeSubTab === 'Event' && { color: '#FFFFFF' }]}>
+                {t('upcoming_events.events', 'Events')}
+              </Text>
+              {eventsEventHasNew && activeSubTab !== 'Event' && (
+                <View style={styles.subTabBadgeDot} />
+              )}
+            </View>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.subTab, activeSubTab === 'Entertainment' && { backgroundColor: colors.primary }]}
             onPress={() => goToLeaf(3)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.subTabText, { color: colors.textSecondary }, activeSubTab === 'Entertainment' && { color: '#FFFFFF' }]}>
-              {t('upcoming_events.entertainment', 'Entertainment')}
-            </Text>
+            <View style={styles.subTabLabelRow}>
+              <Text style={[styles.subTabText, { color: colors.textSecondary }, activeSubTab === 'Entertainment' && { color: '#FFFFFF' }]}>
+                {t('upcoming_events.entertainment', 'Entertainment')}
+              </Text>
+              {eventsEntertainmentHasNew && activeSubTab !== 'Entertainment' && (
+                <View style={styles.subTabBadgeDot} />
+              )}
+            </View>
           </TouchableOpacity>
         </View>
       </WeeklyCalendarStrip>
     </View>
-  );
+    );
+  };
 
   const renderEventsLeaf = (subTab: 'Event' | 'Entertainment') => {
     const displayList = computeEventsDisplay(subTab);
@@ -1310,6 +1404,47 @@ const styles = StyleSheet.create({
   happeningTodayTitle: {
     fontSize: 14,
     fontWeight: '700',
+    flex: 1,
+  },
+  happeningTodayMoreLink: {
+    marginLeft: 'auto',
+  },
+  happeningTodayMoreText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  happeningTodayMoreButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  happeningTodayMoreButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  collapseGrabber: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 6,
+    gap: 7,
+  },
+  collapseGrabberPill: {
+    width: 24,
+    height: 3,
+    borderRadius: 2,
+  },
+  collapseGrabberLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   todayTabsCard: {
     marginBottom: 12,

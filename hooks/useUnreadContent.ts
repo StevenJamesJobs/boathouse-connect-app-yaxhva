@@ -10,8 +10,12 @@ const STORAGE_KEYS = {
   specials: 'lastViewed_specials',
   announcements: 'lastViewed_announcements',
   specialFeatures: 'lastViewed_specialFeatures',
+  eventsContent: 'lastViewed_eventsContent',
+  eventsEventTab: 'lastVisited_eventsEventTab',
+  eventsEntertainmentTab: 'lastVisited_eventsEntertainmentTab',
   viewedAnnouncementIds: 'viewed_announcement_ids',
   viewedSpecialFeatureIds: 'viewed_special_feature_ids',
+  viewedEventIds: 'viewed_event_ids',
 } as const;
 
 export type WelcomeTab = 'announcements' | 'specialFeatures';
@@ -32,12 +36,18 @@ interface UnreadContentResult {
   announcementsHasNew: boolean;
   /** Special Features tab on the Welcome screen segmented control */
   specialFeaturesHasNew: boolean;
+  /** Events sub-tab badge on the Events section segmented control */
+  eventsEventHasNew: boolean;
+  /** Entertainment sub-tab badge on the Events section segmented control */
+  eventsEntertainmentHasNew: boolean;
   /** ISO timestamp set on first install — items created before this don't get NEW pills. Never advances on tab tap. */
   lastViewedAnnouncements: string | null;
   lastViewedSpecialFeatures: string | null;
+  lastViewedEvents: string | null;
   /** Per-item viewed sets — an item ID is added when the user opens its detail modal. */
   viewedAnnouncementIds: Set<string>;
   viewedSpecialFeatureIds: Set<string>;
+  viewedEventIds: Set<string>;
   hasAnyNew: boolean;
   newContentCount: number;
   markTabViewed: (tab: ConnectBarTab) => Promise<void>;
@@ -46,6 +56,11 @@ interface UnreadContentResult {
   /** Mark an individual content item as viewed (clears its NEW pill). Call when opening the detail modal. */
   markAnnouncementViewed: (id: string) => Promise<void>;
   markSpecialFeatureViewed: (id: string) => Promise<void>;
+  markEventViewed: (id: string) => Promise<void>;
+  /** Clears the Events/Entertainment sub-tab dot for the given category when user visits that sub-tab. */
+  markEventsTabVisited: (category: 'Event' | 'Entertainment') => Promise<void>;
+  /** Advances ALL event timestamps to now — used when "New Added" is tapped to mass-dismiss event badges. */
+  markAllEventsViewed: () => Promise<void>;
   refresh: () => void;
 }
 
@@ -55,23 +70,31 @@ export function useUnreadContent(): UnreadContentResult {
   const [specialsHasNew, setSpecialsHasNew] = useState(false);
   const [announcementsHasNew, setAnnouncementsHasNew] = useState(false);
   const [specialFeaturesHasNew, setSpecialFeaturesHasNew] = useState(false);
+  const [eventsEventHasNew, setEventsEventHasNew] = useState(false);
+  const [eventsEntertainmentHasNew, setEventsEntertainmentHasNew] = useState(false);
   const [lastViewedAnnouncements, setLastViewedAnnouncements] = useState<string | null>(null);
   const [lastViewedSpecialFeatures, setLastViewedSpecialFeatures] = useState<string | null>(null);
+  const [lastViewedEvents, setLastViewedEvents] = useState<string | null>(null);
   const [viewedAnnouncementIds, setViewedAnnouncementIds] = useState<Set<string>>(() => new Set());
   const [viewedSpecialFeatureIds, setViewedSpecialFeatureIds] = useState<Set<string>>(() => new Set());
+  const [viewedEventIds, setViewedEventIds] = useState<Set<string>>(() => new Set());
   const [newContentCount, setNewContentCount] = useState(0);
 
   const checkUnread = useCallback(async () => {
     try {
       // Load last-viewed timestamps + per-item viewed sets
-      const [todayTs, eventsTs, specialsTs, announcementsTs, specialFeaturesTs, annViewedRaw, sfViewedRaw] = await Promise.all([
+      const [todayTs, eventsTs, specialsTs, announcementsTs, specialFeaturesTs, eventsContentTs, evtEventTabTs, evtEntTabTs, annViewedRaw, sfViewedRaw, evtViewedRaw] = await Promise.all([
         AsyncStorage.getItem(STORAGE_KEYS.today),
         AsyncStorage.getItem(STORAGE_KEYS.events),
         AsyncStorage.getItem(STORAGE_KEYS.specials),
         AsyncStorage.getItem(STORAGE_KEYS.announcements),
         AsyncStorage.getItem(STORAGE_KEYS.specialFeatures),
+        AsyncStorage.getItem(STORAGE_KEYS.eventsContent),
+        AsyncStorage.getItem(STORAGE_KEYS.eventsEventTab),
+        AsyncStorage.getItem(STORAGE_KEYS.eventsEntertainmentTab),
         AsyncStorage.getItem(STORAGE_KEYS.viewedAnnouncementIds),
         AsyncStorage.getItem(STORAGE_KEYS.viewedSpecialFeatureIds),
+        AsyncStorage.getItem(STORAGE_KEYS.viewedEventIds),
       ]);
 
       // Bootstrap cutoff on first ever load — items that already exist at install
@@ -79,6 +102,7 @@ export function useUnreadContent(): UnreadContentResult {
       // never advanced; per-item viewedSet is the source of truth for clearing NEW.
       let effectiveAnnouncementsTs = announcementsTs;
       let effectiveSpecialFeaturesTs = specialFeaturesTs;
+      let effectiveEventsContentTs = eventsContentTs;
       if (!effectiveAnnouncementsTs) {
         effectiveAnnouncementsTs = new Date().toISOString();
         await AsyncStorage.setItem(STORAGE_KEYS.announcements, effectiveAnnouncementsTs);
@@ -87,8 +111,13 @@ export function useUnreadContent(): UnreadContentResult {
         effectiveSpecialFeaturesTs = new Date().toISOString();
         await AsyncStorage.setItem(STORAGE_KEYS.specialFeatures, effectiveSpecialFeaturesTs);
       }
+      if (!effectiveEventsContentTs) {
+        effectiveEventsContentTs = new Date().toISOString();
+        await AsyncStorage.setItem(STORAGE_KEYS.eventsContent, effectiveEventsContentTs);
+      }
       setLastViewedAnnouncements(effectiveAnnouncementsTs);
       setLastViewedSpecialFeatures(effectiveSpecialFeaturesTs);
+      setLastViewedEvents(effectiveEventsContentTs);
 
       const parseIds = (raw: string | null): Set<string> => {
         if (!raw) return new Set();
@@ -101,8 +130,10 @@ export function useUnreadContent(): UnreadContentResult {
       };
       const annViewed = parseIds(annViewedRaw);
       const sfViewed = parseIds(sfViewedRaw);
+      const evtViewed = parseIds(evtViewedRaw);
       setViewedAnnouncementIds(annViewed);
       setViewedSpecialFeatureIds(sfViewed);
+      setViewedEventIds(evtViewed);
 
       // Tab dot logic: any active item created after cutoff that the user hasn't opened yet.
       // We must fetch IDs (not just counts) so we can filter against the local viewed set.
@@ -140,14 +171,25 @@ export function useUnreadContent(): UnreadContentResult {
       setAnnouncementsHasNew(annTabUnviewed > 0);
       setSpecialFeaturesHasNew(sfTabUnviewed > 0);
 
-      // Check "Events" tab: upcoming_events
+      // Check "Events" tab: upcoming_events (per-item + per-category tracking)
       const eventsCutoff = eventsTs || new Date(0).toISOString();
+      const evtCutoff = effectiveEventsContentTs;
       const eventsRes = await (supabase.from('upcoming_events') as any)
-        .select('id', { count: 'exact', head: true })
+        .select('id, category, created_at')
         .eq('is_active', true)
-        .gt('created_at', eventsCutoff);
-      const eventsCount = eventsRes.count || 0;
+        .gt('created_at', evtCutoff);
+      const eventRows = ((eventsRes.data as { id: string; category: string; created_at: string }[] | null) ?? []);
+      const unviewedEvents = eventRows.filter((r) => !evtViewed.has(r.id));
+      // Sub-tab badges use the per-tab visit timestamp so swiping to a sub-tab clears its dot
+      // independently from item-level NEW pills (which use evtCutoff + viewedEventIds).
+      const evtEventTabCutoff = evtEventTabTs && evtEventTabTs > evtCutoff ? evtEventTabTs : evtCutoff;
+      const evtEntTabCutoff = evtEntTabTs && evtEntTabTs > evtCutoff ? evtEntTabTs : evtCutoff;
+      const eventEventUnviewed = unviewedEvents.filter((r) => r.category === 'Event' && new Date(r.created_at) > new Date(evtEventTabCutoff)).length;
+      const eventEntertainmentUnviewed = unviewedEvents.filter((r) => r.category === 'Entertainment' && new Date(r.created_at) > new Date(evtEntTabCutoff)).length;
+      const eventsCount = eventEventUnviewed + eventEntertainmentUnviewed;
       setEventsHasNew(eventsCount > 0);
+      setEventsEventHasNew(eventEventUnviewed > 0);
+      setEventsEntertainmentHasNew(eventEntertainmentUnviewed > 0);
 
       // Check "Specials" tab: menu_items with category "Weekly Specials"
       const specialsCutoff = specialsTs || new Date(0).toISOString();
@@ -223,6 +265,39 @@ export function useUnreadContent(): UnreadContentResult {
     setTimeout(() => checkUnread(), 0);
   }, [checkUnread]);
 
+  const markEventViewed = useCallback(async (id: string) => {
+    if (!id) return;
+    setViewedEventIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      AsyncStorage.setItem(STORAGE_KEYS.viewedEventIds, JSON.stringify(Array.from(next))).catch(() => {});
+      return next;
+    });
+    setTimeout(() => checkUnread(), 0);
+  }, [checkUnread]);
+
+  const markEventsTabVisited = useCallback(async (category: 'Event' | 'Entertainment') => {
+    const now = new Date().toISOString();
+    const key = category === 'Event' ? STORAGE_KEYS.eventsEventTab : STORAGE_KEYS.eventsEntertainmentTab;
+    await AsyncStorage.setItem(key, now);
+    if (category === 'Event') setEventsEventHasNew(false);
+    else setEventsEntertainmentHasNew(false);
+  }, []);
+
+  const markAllEventsViewed = useCallback(async () => {
+    const now = new Date().toISOString();
+    await Promise.all([
+      AsyncStorage.setItem(STORAGE_KEYS.eventsContent, now),
+      AsyncStorage.setItem(STORAGE_KEYS.eventsEventTab, now),
+      AsyncStorage.setItem(STORAGE_KEYS.eventsEntertainmentTab, now),
+    ]);
+    setLastViewedEvents(now);
+    setEventsEventHasNew(false);
+    setEventsEntertainmentHasNew(false);
+    setEventsHasNew(false);
+  }, []);
+
   useEffect(() => {
     checkUnread();
     listeners.add(checkUnread);
@@ -274,16 +349,23 @@ export function useUnreadContent(): UnreadContentResult {
     specialsHasNew,
     announcementsHasNew,
     specialFeaturesHasNew,
+    eventsEventHasNew,
+    eventsEntertainmentHasNew,
     lastViewedAnnouncements,
     lastViewedSpecialFeatures,
+    lastViewedEvents,
     viewedAnnouncementIds,
     viewedSpecialFeatureIds,
+    viewedEventIds,
     hasAnyNew: todayHasNew || eventsHasNew || specialsHasNew,
     newContentCount,
     markTabViewed,
     markWelcomeTabViewed,
     markAnnouncementViewed,
     markSpecialFeatureViewed,
+    markEventViewed,
+    markEventsTabVisited,
+    markAllEventsViewed,
     refresh: checkUnread,
   };
 }

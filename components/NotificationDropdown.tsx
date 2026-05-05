@@ -128,6 +128,14 @@ export default function NotificationDropdown({
       setLoading(true);
       const items: NotificationItem[] = [];
 
+      // Load shade dismissals so we can filter out dismissed items
+      const { data: dismissals } = await (supabase
+        .from('shade_dismissals') as any)
+        .select('notification_type, item_id');
+      const dismissedSet = new Set(
+        (dismissals || []).map((d: any) => `${d.notification_type}:${d.item_id}`)
+      );
+
       // Fetch announcements
       const visibilityFilter = visibility === 'managers'
         ? ['everyone', 'managers']
@@ -282,13 +290,16 @@ export default function NotificationDropdown({
         }
       }
 
-      // Sort all by created_at descending — keep the full pool for paginated load-more.
-      items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      // Remove items that have been dismissed via the shade or Sent History
+      const visibleItems = items.filter(item => !dismissedSet.has(`${item.type}:${item.id}`));
 
-      // Batch fetch images for the entire pool (one query per type, plenty of headroom).
-      const announcementIds = items.filter(i => i.type === 'announcement').map(i => i.id);
-      const featureIds = items.filter(i => i.type === 'special_feature').map(i => i.id);
-      const eventIds = items.filter(i => i.type === 'upcoming_event').map(i => i.id);
+      // Sort all by created_at descending — keep the full pool for paginated load-more.
+      visibleItems.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      // Batch fetch images for the visible pool (one query per type).
+      const announcementIds = visibleItems.filter(i => i.type === 'announcement').map(i => i.id);
+      const featureIds = visibleItems.filter(i => i.type === 'special_feature').map(i => i.id);
+      const eventIds = visibleItems.filter(i => i.type === 'upcoming_event').map(i => i.id);
 
       const [annImgs, featImgs, evtImgs] = await Promise.all([
         announcementIds.length > 0 ? fetchContentImagesBatch('announcement', announcementIds) : new Map<string, string[]>(),
@@ -296,7 +307,7 @@ export default function NotificationDropdown({
         eventIds.length > 0 ? fetchContentImagesBatch('upcoming_event', eventIds) : new Map<string, string[]>(),
       ]);
 
-      for (const item of items) {
+      for (const item of visibleItems) {
         let additionalImgs: string[] | undefined;
         if (item.type === 'announcement') additionalImgs = annImgs.get(item.id) as string[] | undefined;
         else if (item.type === 'special_feature') additionalImgs = featImgs.get(item.id) as string[] | undefined;
@@ -307,7 +318,7 @@ export default function NotificationDropdown({
         }
       }
 
-      setNotifications(items);
+      setNotifications(visibleItems);
     } catch (error) {
       console.error('Error loading notifications:', error);
     } finally {
@@ -395,20 +406,19 @@ export default function NotificationDropdown({
   const handleDeleteNotification = async (item: NotificationItem) => {
     setDeletingId(item.id);
     try {
-      if (item.type === 'custom_notification') {
-        await (supabase.from('custom_notifications') as any).delete().eq('id', item.id);
-      } else if (item.type === 'announcement') {
-        await (supabase.from('announcements') as any).update({ is_active: false }).eq('id', item.id);
-      } else if (item.type === 'special_feature') {
-        await (supabase.from('special_features') as any).update({ is_active: false }).eq('id', item.id);
-      } else if (item.type === 'upcoming_event') {
-        await (supabase.from('upcoming_events') as any).update({ is_active: false }).eq('id', item.id);
-      } else if (item.type === 'weekly_special') {
-        await (supabase.from('menu_items') as any).update({ is_active: false }).eq('id', item.id);
-      }
+      await (supabase.from('shade_dismissals') as any)
+        .insert({
+          notification_type: item.type,
+          item_id: item.id,
+          dismissed_by: user?.id,
+        });
       setNotifications(prev => prev.filter(n => !(n.id === item.id && n.type === item.type)));
-    } catch (err) {
-      console.error('Error deleting notification:', err);
+    } catch (err: any) {
+      if (err?.code === '23505') {
+        setNotifications(prev => prev.filter(n => !(n.id === item.id && n.type === item.type)));
+      } else {
+        console.error('Error dismissing notification:', err);
+      }
     }
     setDeletingId(null);
   };

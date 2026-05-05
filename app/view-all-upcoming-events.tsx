@@ -31,6 +31,7 @@ import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchContentImagesBatch } from '@/utils/contentImages';
 import { stripFormattingTags } from '@/components/FormattedText';
+import { useUnreadContent } from '@/hooks/useUnreadContent';
 
 interface GuideFile {
   id: string;
@@ -85,9 +86,18 @@ export default function ViewAllUpcomingEventsScreen() {
   } | null>(null);
 
   const colors = useThemeColors();
+  const {
+    viewedEventIds,
+    lastViewedEvents,
+    markEventViewed,
+    markEventsTabVisited,
+    eventsEventHasNew,
+    eventsEntertainmentHasNew,
+  } = useUnreadContent();
 
   useEffect(() => {
     loadEvents();
+    markEventsTabVisited('Event');
   }, []);
 
   const loadEvents = async () => {
@@ -124,6 +134,7 @@ export default function ViewAllUpcomingEventsScreen() {
   };
 
   const openDetailModal = (event: UpcomingEvent) => {
+    markEventViewed(event.id);
     const additionalImages = contentImagesMap.get(event.id) || [];
     const imageUrls = [
       ...(event.thumbnail_url ? [event.thumbnail_url] : []),
@@ -195,12 +206,16 @@ export default function ViewAllUpcomingEventsScreen() {
   const handlePagerScroll = useCallback((event: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     const next = PAGES[idx];
-    if (next && next !== eventsTab) setEventsTab(next);
-  }, [eventsTab]);
+    if (next && next !== eventsTab) {
+      setEventsTab(next);
+      markEventsTabVisited(next);
+    }
+  }, [eventsTab, markEventsTabVisited]);
 
   const goToTab = (tab: 'Event' | 'Entertainment') => {
     const idx = PAGES.indexOf(tab);
     pagerRef.current?.scrollToIndex({ index: idx, animated: true });
+    markEventsTabVisited(tab);
   };
 
   const renderEventCard = (event: UpcomingEvent, index: number) => (
@@ -219,6 +234,12 @@ export default function ViewAllUpcomingEventsScreen() {
             <Text style={[styles.eventTitle, { color: colors.text }]} numberOfLines={1}>
               {getLocalizedField(event, 'title', language)}
             </Text>
+            {!viewedEventIds.has(event.id) &&
+              (!lastViewedEvents || new Date(event.created_at) > new Date(lastViewedEvents)) && (
+                <View style={styles.newPill}>
+                  <Text style={styles.newPillText}>NEW</Text>
+                </View>
+              )}
             {selectedDate !== null && (
               <View style={[styles.categoryBadge, { backgroundColor: colors.primary + '18' }]}>
                 <Text style={[styles.categoryBadgeText, { color: colors.primary }]}>
@@ -315,18 +336,28 @@ export default function ViewAllUpcomingEventsScreen() {
               onPress={() => goToTab('Event')}
               activeOpacity={0.7}
             >
-              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Event' && { color: '#FFFFFF' }]}>
-                {t('upcoming_events:events')}
-              </Text>
+              <View style={styles.subTabLabelRow}>
+                <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Event' && { color: '#FFFFFF' }]}>
+                  {t('upcoming_events:events')}
+                </Text>
+                {eventsEventHasNew && eventsTab !== 'Event' && (
+                  <View style={styles.subTabBadgeDot} />
+                )}
+              </View>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.subTab, eventsTab === 'Entertainment' && { backgroundColor: colors.primary }]}
               onPress={() => goToTab('Entertainment')}
               activeOpacity={0.7}
             >
-              <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && { color: '#FFFFFF' }]}>
-                {t('upcoming_events:entertainment')}
-              </Text>
+              <View style={styles.subTabLabelRow}>
+                <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && { color: '#FFFFFF' }]}>
+                  {t('upcoming_events:entertainment')}
+                </Text>
+                {eventsEntertainmentHasNew && eventsTab !== 'Entertainment' && (
+                  <View style={styles.subTabBadgeDot} />
+                )}
+              </View>
             </TouchableOpacity>
           </View>
         )}
@@ -476,9 +507,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  subTabLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  subTabBadgeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+  },
   subTabText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  newPill: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  newPillText: {
+    fontSize: 9,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    letterSpacing: 0.5,
   },
   loadingContainer: {
     flex: 1,

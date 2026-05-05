@@ -383,7 +383,19 @@ export default function AnnouncementEditorScreen() {
           throw error;
         }
         console.log('Announcement created successfully');
-        
+
+        // Look up the newly created announcement's ID for shade dismissal linking
+        let sourceItemId: string | undefined;
+        try {
+          const { data: created } = await (supabase.from('announcements') as any)
+            .select('id')
+            .eq('title', formData.title)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          sourceItemId = created?.id;
+        } catch {}
+
         // Always log to Sent History (single source of truth — edge function no longer logs)
         try {
           await (supabase.from('custom_notifications') as any).insert({
@@ -394,6 +406,7 @@ export default function AnnouncementEditorScreen() {
               notificationType: 'announcement',
               notificationSkipped: !shouldSendNotification,
               priority: formData.priority,
+              source_item_id: sourceItemId || null,
             },
           });
         } catch (err) {

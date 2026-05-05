@@ -578,16 +578,6 @@ export default function PictureThisPlayScreen() {
       {/* Results modal — fixed header + score, scrollable review, sticky bottom buttons */}
       <Modal visible={showResults} transparent animationType="fade" onRequestClose={() => router.back()}>
         <View style={styles.modalOverlay}>
-          {endReason === 'completed' && (
-            <ConfettiCannon
-              count={180}
-              origin={{ x: -10, y: 0 }}
-              fadeOut
-              autoStart
-              fallSpeed={2800}
-              explosionSpeed={400}
-            />
-          )}
           <View style={[styles.resultsCard, { backgroundColor: colors.card }]}>
             <View style={styles.resultsHeader}>
               <Text style={styles.resultEmoji}>
@@ -727,6 +717,18 @@ export default function PictureThisPlayScreen() {
               </TouchableOpacity>
             </View>
           </View>
+          {endReason === 'completed' && (
+            <View style={styles.confettiOverlay} pointerEvents="none">
+              <ConfettiCannon
+                count={180}
+                origin={{ x: -10, y: 0 }}
+                fadeOut
+                autoStart
+                fallSpeed={2800}
+                explosionSpeed={400}
+              />
+            </View>
+          )}
         </View>
       </Modal>
     </View>
@@ -868,6 +870,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 14,
+  },
+  confettiOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   resultsCard: {
     width: '100%',

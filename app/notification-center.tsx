@@ -126,6 +126,27 @@ export default function NotificationCenter() {
           onPress: async () => {
             setDeletingId(notif.id);
             try {
+              // Dismiss the linked source item from the shade (if we know its ID)
+              const linkedType = notif.data?.notificationType;
+              const sourceId = notif.data?.source_item_id;
+              const typeMap: Record<string, string> = {
+                announcement: 'announcement',
+                event: 'upcoming_event',
+                special_feature: 'special_feature',
+                weekly_special: 'weekly_special',
+              };
+              if (sourceId && linkedType && typeMap[linkedType]) {
+                await (supabase.from('shade_dismissals') as any)
+                  .insert({ notification_type: typeMap[linkedType], item_id: sourceId, dismissed_by: user?.id })
+                  .then(() => {}, () => {});
+              }
+
+              // Also dismiss the custom_notification row itself from the shade
+              await (supabase.from('shade_dismissals') as any)
+                .insert({ notification_type: 'custom_notification', item_id: notif.id, dismissed_by: user?.id })
+                .then(() => {}, () => {});
+
+              // Delete the custom_notifications row (removes from Sent History)
               const { error } = await (supabase
                 .from('custom_notifications') as any)
                 .delete()

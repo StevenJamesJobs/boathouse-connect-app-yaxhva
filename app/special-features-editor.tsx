@@ -395,7 +395,19 @@ export default function SpecialFeaturesEditorScreen() {
           throw error;
         }
         console.log('Special feature created successfully');
-        
+
+        // Look up the newly created feature's ID for shade dismissal linking
+        let sourceItemId: string | undefined;
+        try {
+          const { data: created } = await (supabase.from('special_features') as any)
+            .select('id')
+            .eq('title', formData.title)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          sourceItemId = created?.id;
+        } catch {}
+
         // Always log to Sent History (single source of truth — edge function no longer logs)
         try {
           await (supabase.from('custom_notifications') as any).insert({
@@ -406,6 +418,7 @@ export default function SpecialFeaturesEditorScreen() {
               notificationType: 'special_feature',
               notificationSkipped: !shouldSendNotification,
               startDateTime: startDateTime?.toISOString() || null,
+              source_item_id: sourceItemId || null,
             },
           });
         } catch (err) {

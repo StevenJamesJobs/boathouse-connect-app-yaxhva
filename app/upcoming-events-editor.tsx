@@ -344,7 +344,7 @@ export default function UpcomingEventsEditorScreen() {
       return;
     }
 
-    if (!editingEvent && events.length >= 40) {
+    if (!editingEvent && events.length >= 100) {
       Alert.alert(t('upcoming_events_editor:limit_reached_title'), t('upcoming_events_editor:limit_reached_msg'));
       return;
     }
@@ -428,7 +428,19 @@ export default function UpcomingEventsEditorScreen() {
           throw error;
         }
         console.log('Upcoming event created successfully');
-        
+
+        // Look up the newly created event's ID for shade dismissal linking
+        let sourceItemId: string | undefined;
+        try {
+          const { data: created } = await (supabase.from('upcoming_events') as any)
+            .select('id')
+            .eq('title', formData.title)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
+          sourceItemId = created?.id;
+        } catch {}
+
         // Always log to Sent History (single source of truth — edge function no longer logs)
         try {
           await (supabase.from('custom_notifications') as any).insert({
@@ -440,6 +452,7 @@ export default function UpcomingEventsEditorScreen() {
               notificationSkipped: !shouldSendNotification,
               category: formData.category,
               startDateTime: startDateTime?.toISOString() || null,
+              source_item_id: sourceItemId || null,
             },
           });
         } catch (err) {
@@ -774,18 +787,18 @@ export default function UpcomingEventsEditorScreen() {
       </View>
 
       <TouchableOpacity
-        style={[styles.addNewItemButton, events.length >= 40 && styles.addNewItemButtonDisabled]}
+        style={[styles.addNewItemButton, events.length >= 100 && styles.addNewItemButtonDisabled]}
         onPress={openAddModal}
-        disabled={events.length >= 40}
+        disabled={events.length >= 100}
       >
         <IconSymbol
           ios_icon_name="plus.circle.fill"
           android_material_icon_name="add-circle"
           size={24}
-          color={events.length >= 40 ? colors.textSecondary : colors.text}
+          color={events.length >= 100 ? colors.textSecondary : colors.text}
         />
-        <Text style={[styles.addNewItemButtonText, events.length >= 40 && styles.addNewItemButtonTextDisabled]}>
-          {events.length >= 40 ? t('upcoming_events_editor:limit_reached') : t('upcoming_events_editor:add_button')}
+        <Text style={[styles.addNewItemButtonText, events.length >= 100 && styles.addNewItemButtonTextDisabled]}>
+          {events.length >= 100 ? t('upcoming_events_editor:limit_reached') : t('upcoming_events_editor:add_button')}
         </Text>
       </TouchableOpacity>
 
