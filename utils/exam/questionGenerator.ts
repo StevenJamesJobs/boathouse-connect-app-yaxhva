@@ -195,6 +195,15 @@ interface ChecklistItem {
   checklist_type: string;
 }
 
+interface WineItem {
+  id: string;
+  name: string;
+  location: string | null;
+  glass_price: string | null;
+  bottle_price: string | null;
+  member_bottle_price: string | null;
+}
+
 async function fetchMenuItems(): Promise<MenuItem[]> {
   const { data, error } = await supabase
     .from('menu_items')
@@ -279,6 +288,15 @@ async function fetchHostChecklistItems(): Promise<ChecklistItem[]> {
       checklist_type: cat?.type || 'unknown',
     };
   }).filter((item: ChecklistItem) => item.category_name !== 'Unknown');
+}
+
+async function fetchWineItems(): Promise<WineItem[]> {
+  const { data, error } = await (supabase.from('menu_items') as any)
+    .select('id, name, location, glass_price, bottle_price, member_bottle_price')
+    .eq('is_active', true)
+    .eq('category', 'Wine');
+  if (error || !data) return [];
+  return data as WineItem[];
 }
 
 async function fetchBartenderChecklistItems(): Promise<ChecklistItem[]> {
@@ -652,6 +670,239 @@ function libationIngredientQuestion(recipes: LibationRecipe[], rng: () => number
 }
 
 // =============================================
+// DIFFICULTY-TIER INGREDIENT / PRICE QUESTIONS
+// =============================================
+
+function menuIngredientMediumQuestion(items: MenuItem[], rng: () => number): QuestionCandidate | null {
+  const withDesc = items.filter(i => i.description && extractIngredientsFromDescription(i.description).length >= 2);
+  if (withDesc.length < 4) return null;
+
+  const target = seededPick(withDesc, 1, rng)[0];
+  const myIngs = extractIngredientsFromDescription(target.description!);
+  if (myIngs.length < 2) return null;
+
+  const [c1, c2] = seededPick(myIngs, 2, rng);
+  const correct = `${c1}, ${c2}`;
+  const mySet = new Set(myIngs.map(i => i.toLowerCase()));
+  const otherIngs = [...new Set(
+    withDesc
+      .filter(m => m.id !== target.id)
+      .flatMap(m => extractIngredientsFromDescription(m.description || ''))
+      .filter(i => !mySet.has(i.toLowerCase())),
+  )];
+  if (otherIngs.length < 4) return null;
+
+  const [w1, w2, w3, w4] = seededPick(otherIngs, 4, rng);
+  const distractors = [`${c1}, ${w1}`, `${c2}, ${w2}`, `${w3}, ${w4}`];
+  const { options, correctLetter } = shuffleOptions(correct, distractors, rng);
+  const nameEs = target.name_es || target.name;
+
+  return {
+    question_text: `Which two ingredients are in the ${target.name}?`,
+    option_a: options[0], option_b: options[1], option_c: options[2], option_d: options[3],
+    correct_option: correctLetter,
+    source_type: 'auto', source_table: 'menu_items', templateId: 'menu_ingredient_medium',
+    question_text_es: `¿Cuáles son dos ingredientes del ${nameEs}?`,
+    option_a_es: options[0], option_b_es: options[1], option_c_es: options[2], option_d_es: options[3],
+  };
+}
+
+function menuIngredientHardQuestion(items: MenuItem[], rng: () => number): QuestionCandidate | null {
+  const withDesc = items.filter(i => i.description && extractIngredientsFromDescription(i.description).length >= 3);
+  if (withDesc.length < 4) return null;
+
+  const target = seededPick(withDesc, 1, rng)[0];
+  const myIngs = extractIngredientsFromDescription(target.description!);
+  if (myIngs.length < 3) return null;
+
+  const correct = myIngs.join(', ');
+  const mySet = new Set(myIngs.map(i => i.toLowerCase()));
+  const otherIngs = [...new Set(
+    withDesc
+      .filter(m => m.id !== target.id)
+      .flatMap(m => extractIngredientsFromDescription(m.description || ''))
+      .filter(i => !mySet.has(i.toLowerCase())),
+  )];
+  if (otherIngs.length < myIngs.length) return null;
+
+  const distractors: string[] = [];
+  let attempts = 0;
+  const used = new Set<string>([correct]);
+  while (distractors.length < 3 && attempts < 20) {
+    attempts++;
+    const swapCount = rng() < 0.5 ? 1 : 2;
+    const indices = seededPick([...Array(myIngs.length).keys()], Math.min(swapCount, myIngs.length), rng);
+    const replacements = seededPick(otherIngs, indices.length, rng);
+    if (replacements.length < indices.length) continue;
+    const variant = [...myIngs];
+    indices.forEach((idx, i) => { variant[idx] = replacements[i]; });
+    const variantText = variant.join(', ');
+    if (used.has(variantText)) continue;
+    used.add(variantText);
+    distractors.push(variantText);
+  }
+  if (distractors.length < 3) return null;
+
+  const { options, correctLetter } = shuffleOptions(correct, distractors, rng);
+  const nameEs = target.name_es || target.name;
+
+  return {
+    question_text: `Which is the correct ingredient list for the ${target.name}?`,
+    option_a: options[0], option_b: options[1], option_c: options[2], option_d: options[3],
+    correct_option: correctLetter,
+    source_type: 'auto', source_table: 'menu_items', templateId: 'menu_ingredient_hard',
+    question_text_es: `¿Cuál es la lista de ingredientes correcta para el ${nameEs}?`,
+    option_a_es: options[0], option_b_es: options[1], option_c_es: options[2], option_d_es: options[3],
+  };
+}
+
+function libationIngredientMediumQuestion(recipes: LibationRecipe[], rng: () => number): QuestionCandidate | null {
+  const withIngs = recipes.filter(r => r.ingredients && Array.isArray(r.ingredients) && r.ingredients.length >= 2);
+  if (withIngs.length < 4) return null;
+
+  const target = seededPick(withIngs, 1, rng)[0];
+  const myIngs = target.ingredients!.map(i => i.ingredient);
+  if (myIngs.length < 2) return null;
+
+  const [c1, c2] = seededPick(myIngs, 2, rng);
+  const correct = `${c1}, ${c2}`;
+  const mySet = new Set(myIngs.map(i => i.toLowerCase()));
+  const otherIngs = [...new Set(
+    withIngs
+      .filter(r => r.id !== target.id)
+      .flatMap(r => (r.ingredients || []).map(i => i.ingredient))
+      .filter(i => !mySet.has(i.toLowerCase())),
+  )];
+  if (otherIngs.length < 4) return null;
+
+  const [w1, w2, w3, w4] = seededPick(otherIngs, 4, rng);
+  const distractors = [`${c1}, ${w1}`, `${c2}, ${w2}`, `${w3}, ${w4}`];
+  const { options, correctLetter } = shuffleOptions(correct, distractors, rng);
+
+  return {
+    question_text: `Which two ingredients are in the ${target.name}?`,
+    option_a: options[0], option_b: options[1], option_c: options[2], option_d: options[3],
+    correct_option: correctLetter,
+    source_type: 'auto', source_table: 'libation_recipes', templateId: 'libation_ingredient_medium',
+    question_text_es: `¿Cuáles son dos ingredientes del ${target.name}?`,
+    option_a_es: options[0], option_b_es: options[1], option_c_es: options[2], option_d_es: options[3],
+  };
+}
+
+function libationIngredientHardQuestion(recipes: LibationRecipe[], rng: () => number): QuestionCandidate | null {
+  const withIngs = recipes.filter(r => r.ingredients && Array.isArray(r.ingredients) && r.ingredients.length >= 3);
+  if (withIngs.length < 4) return null;
+
+  const target = seededPick(withIngs, 1, rng)[0];
+  const myIngs = target.ingredients!.map(i => i.ingredient);
+  if (myIngs.length < 3) return null;
+
+  const correct = myIngs.join(', ');
+  const mySet = new Set(myIngs.map(i => i.toLowerCase()));
+  const otherIngs = [...new Set(
+    withIngs
+      .filter(r => r.id !== target.id)
+      .flatMap(r => (r.ingredients || []).map(i => i.ingredient))
+      .filter(i => !mySet.has(i.toLowerCase())),
+  )];
+  if (otherIngs.length < myIngs.length) return null;
+
+  const distractors: string[] = [];
+  let attempts = 0;
+  const used = new Set<string>([correct]);
+  while (distractors.length < 3 && attempts < 20) {
+    attempts++;
+    const swapCount = rng() < 0.5 ? 1 : 2;
+    const indices = seededPick([...Array(myIngs.length).keys()], Math.min(swapCount, myIngs.length), rng);
+    const replacements = seededPick(otherIngs, indices.length, rng);
+    if (replacements.length < indices.length) continue;
+    const variant = [...myIngs];
+    indices.forEach((idx, i) => { variant[idx] = replacements[i]; });
+    const variantText = variant.join(', ');
+    if (used.has(variantText)) continue;
+    used.add(variantText);
+    distractors.push(variantText);
+  }
+  if (distractors.length < 3) return null;
+
+  const { options, correctLetter } = shuffleOptions(correct, distractors, rng);
+
+  return {
+    question_text: `Which is the correct ingredient list for the ${target.name}?`,
+    option_a: options[0], option_b: options[1], option_c: options[2], option_d: options[3],
+    correct_option: correctLetter,
+    source_type: 'auto', source_table: 'libation_recipes', templateId: 'libation_ingredient_hard',
+    question_text_es: `¿Cuál es la lista de ingredientes correcta para el ${target.name}?`,
+    option_a_es: options[0], option_b_es: options[1], option_c_es: options[2], option_d_es: options[3],
+  };
+}
+
+function wineNameLocationQuestion(wines: WineItem[], rng: () => number): QuestionCandidate | null {
+  const withLoc = wines.filter(w => w.location && w.location.trim().length > 0);
+  if (withLoc.length < 4) return null;
+
+  const target = seededPick(withLoc, 1, rng)[0];
+  const correct = `${target.name} — ${target.location}`;
+  const wrongLocs = seededPick(withLoc.filter(w => w.location !== target.location).map(w => w.location!), 2, rng);
+  const wrongNames = seededPick(withLoc.filter(w => w.name !== target.name).map(w => w.name), 2, rng);
+
+  const distractors: string[] = [];
+  if (wrongLocs[0]) distractors.push(`${target.name} — ${wrongLocs[0]}`);
+  if (wrongNames[0] && target.location) distractors.push(`${wrongNames[0]} — ${target.location}`);
+  if (wrongLocs[1] && wrongNames[1]) distractors.push(`${wrongNames[1]} — ${wrongLocs[1]}`);
+  else if (wrongLocs[1]) distractors.push(`${target.name} — ${wrongLocs[1]}`);
+
+  const filtered = distractors.filter(d => d !== correct);
+  if (filtered.length < 3) return null;
+
+  const { options, correctLetter } = shuffleOptions(correct, filtered.slice(0, 3), rng);
+
+  return {
+    question_text: `Which name and region correctly match this wine?`,
+    option_a: options[0], option_b: options[1], option_c: options[2], option_d: options[3],
+    correct_option: correctLetter,
+    source_type: 'auto', source_table: 'menu_items', templateId: 'wine_name_location',
+    question_text_es: `¿Qué nombre y región corresponden correctamente a este vino?`,
+    option_a_es: options[0], option_b_es: options[1], option_c_es: options[2], option_d_es: options[3],
+  };
+}
+
+function winePriceQuestion(wines: WineItem[], rng: () => number): QuestionCandidate | null {
+  type PriceField = 'glass_price' | 'bottle_price' | 'member_bottle_price';
+  const withPrice = wines.filter(w => w.glass_price || w.bottle_price || w.member_bottle_price);
+  if (withPrice.length < 4) return null;
+
+  const target = seededPick(withPrice, 1, rng)[0];
+  const priceFields: PriceField[] = [];
+  if (target.glass_price) priceFields.push('glass_price');
+  if (target.bottle_price) priceFields.push('bottle_price');
+  if (target.member_bottle_price) priceFields.push('member_bottle_price');
+  const field = priceFields[Math.floor(rng() * priceFields.length)];
+  const correct = target[field]!;
+  const label = field === 'glass_price' ? 'glass' : field === 'bottle_price' ? 'bottle' : 'member bottle';
+  const labelEs = field === 'glass_price' ? 'copa' : field === 'bottle_price' ? 'botella' : 'botella de miembro';
+
+  const otherPrices = [...new Set(
+    withPrice
+      .filter(w => w.id !== target.id && w[field] && w[field] !== correct)
+      .map(w => w[field]!),
+  )];
+  if (otherPrices.length < 3) return null;
+
+  const distractors = seededPick(otherPrices, 3, rng);
+  const { options, correctLetter } = shuffleOptions(correct, distractors, rng);
+
+  return {
+    question_text: `What is the ${label} price for ${target.name}?`,
+    option_a: options[0], option_b: options[1], option_c: options[2], option_d: options[3],
+    correct_option: correctLetter,
+    source_type: 'auto', source_table: 'menu_items', templateId: 'wine_price',
+    question_text_es: `¿Cuál es el precio de ${labelEs} para ${target.name}?`,
+    option_a_es: options[0], option_b_es: options[1], option_c_es: options[2], option_d_es: options[3],
+  };
+}
+
+// =============================================
 // PICTURE QUESTION TEMPLATE
 // =============================================
 
@@ -875,6 +1126,8 @@ export async function generateQuizQuestions(
     () => menuCategoryQuestion(menuItems, rng),
     () => menuGlutenFreeQuestion(menuItems, rng),
     () => menuVegetarianQuestion(menuItems, rng),
+    () => menuIngredientMediumQuestion(menuItems, rng),
+    () => menuIngredientHardQuestion(menuItems, rng),
   ];
 
   // Libation/cocktail questions — Server and Bartender only
@@ -882,6 +1135,7 @@ export async function generateQuizQuestions(
     const cocktails = await fetchCocktails();
     const libations = await fetchLibationRecipes();
     const winePairings = await fetchWinePairings();
+    const wineItems = await fetchWineItems();
 
     menuGenerators.push(
       () => cocktailSpiritQuestion(cocktails, rng),
@@ -889,6 +1143,10 @@ export async function generateQuizQuestions(
       () => libationGarnishQuestion(libations, rng),
       () => winePairingQuestion(winePairings, rng),
       () => libationIngredientQuestion(libations, rng),
+      () => libationIngredientMediumQuestion(libations, rng),
+      () => libationIngredientHardQuestion(libations, rng),
+      () => wineNameLocationQuestion(wineItems, rng),
+      () => winePriceQuestion(wineItems, rng),
     );
   }
 

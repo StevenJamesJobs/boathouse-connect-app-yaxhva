@@ -55,6 +55,7 @@ export default function MyScheduleScreen() {
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentPageIndex, setCurrentPageIndex] = useState(INITIAL_INDEX);
+  const [lastUploadAt, setLastUploadAt] = useState<string | null>(null);
   const pagerRef = useRef<FlatList>(null);
 
   // The anchor week is the week containing today (Sunday). Pages are offsets from it.
@@ -93,6 +94,13 @@ export default function MyScheduleScreen() {
 
       if (error) throw error;
       setShifts(data || []);
+
+      const { data: uploadData } = await (supabase as any)
+        .from('schedule_uploads')
+        .select('created_at')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      setLastUploadAt(uploadData?.[0]?.created_at ?? null);
     } catch (error) {
       console.error('Error loading schedule:', error);
     } finally {
@@ -232,12 +240,19 @@ export default function MyScheduleScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Disclaimer banner */}
-      <View style={[styles.disclaimerBanner, { backgroundColor: '#FFF3E0', borderColor: '#FFB74D' }]}>
-        <IconSymbol ios_icon_name="exclamationmark.triangle.fill" android_material_icon_name="warning" size={14} color="#F57C00" />
-        <Text style={styles.disclaimerText}>
-          {t('my_schedule.disclaimer', 'Schedules are released on a week to week basis and may not reflect recent Shift Releases or Shift Swap & Trade changes. Always double check with Restaurant 365!')}
-        </Text>
+      {/* Last updated + R365 note */}
+      <View style={[styles.disclaimerBanner, { backgroundColor: colors.card, borderColor: colors.border }]}>
+        <IconSymbol ios_icon_name="clock.fill" android_material_icon_name="schedule" size={14} color={colors.primary} />
+        <View style={{ flex: 1 }}>
+          {lastUploadAt && (
+            <Text style={[styles.lastUpdatedText, { color: colors.text }]}>
+              {t('my_schedule.last_updated', 'Last Updated')} {new Date(lastUploadAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} {t('my_schedule.at', 'at')} {new Date(lastUploadAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+            </Text>
+          )}
+          <Text style={[styles.disclaimerText, { color: colors.textSecondary, marginTop: lastUploadAt ? 2 : 0 }]}>
+            {t('my_schedule.r365_note', 'Please see R365 for any Shift Offers, Trades, Approvals and Changes to your schedule after the date above.')}
+          </Text>
+        </View>
       </View>
 
       {loading ? (
@@ -445,17 +460,20 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     padding: 12,
     borderRadius: 10,
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     marginHorizontal: 16,
     marginTop: 10,
     gap: 8,
   },
+  lastUpdatedText: {
+    fontSize: 13,
+    fontWeight: '700',
+    lineHeight: 18,
+  },
   disclaimerText: {
-    flex: 1,
     fontSize: 11.5,
     lineHeight: 16,
-    color: '#E65100',
-    fontWeight: '500',
+    fontWeight: '400',
   },
   loadingIndicator: {
     marginTop: 40,

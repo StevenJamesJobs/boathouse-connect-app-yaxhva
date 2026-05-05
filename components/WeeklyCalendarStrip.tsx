@@ -37,6 +37,8 @@ interface WeeklyCalendarStripProps {
   };
   events: UpcomingEvent[];
   onViewAll?: () => void;
+  /** When provided, shows a "New Added" pill button to the left of "View All". */
+  onNewAdded?: () => void;
   children?: React.ReactNode;
   /** When true, removes the card container styling (margins, border radius, shadow) for edge-to-edge layouts. */
   edgeToEdge?: boolean;
@@ -52,6 +54,7 @@ export default function WeeklyCalendarStrip({
   colors,
   events,
   onViewAll,
+  onNewAdded,
   children,
   edgeToEdge = false,
   hideViewTopEvents = false,
@@ -128,6 +131,17 @@ export default function WeeklyCalendarStrip({
             >
               <Text style={[styles.viewTopButtonText, { color: colors.primary }]}>
                 {t('upcoming_events.view_top_events')}
+              </Text>
+            </TouchableOpacity>
+          )}
+          {onNewAdded && (
+            <TouchableOpacity
+              style={[styles.newAddedButton, { backgroundColor: '#EF444415', borderColor: '#EF444440' }]}
+              onPress={onNewAdded}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.newAddedText, { color: '#EF4444' }]}>
+                ✦ New Added
               </Text>
             </TouchableOpacity>
           )}
@@ -310,6 +324,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+  },
+  newAddedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  newAddedText: {
+    fontSize: 12,
+    fontWeight: '700',
   },
   viewAllButton: {
     flexDirection: 'row',
