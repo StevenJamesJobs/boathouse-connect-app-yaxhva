@@ -9,7 +9,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   Modal,
   Dimensions,
@@ -17,12 +16,14 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import WeatherDetailModal from '@/components/WeatherDetailModal';
 
@@ -31,6 +32,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import FormattedText from '@/components/FormattedText';
 import { stripFormattingTags } from '@/components/FormattedText';
 import { fetchContentImagesBatch, ContentType } from '@/utils/contentImages';
+import { getImageUrl } from '@/utils/imageUrl';
 import WelcomeHeader from '@/components/WelcomeHeader';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import ConnectBar, { ConnectBarTab } from '@/components/ConnectBar';
@@ -60,6 +62,7 @@ interface MenuItem {
   thumbnail_shape: string;
   display_order: number;
   is_active: boolean;
+  updated_at?: string;
 }
 
 interface GuideFile {
@@ -84,6 +87,7 @@ interface Announcement {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  updated_at?: string;
   link: string | null;
   guide_file_id: string | null;
   guide_file?: GuideFile | null;
@@ -103,6 +107,7 @@ interface UpcomingEvent {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  updated_at?: string;
   link: string | null;
   guide_file_id: string | null;
   guide_file?: GuideFile | null;
@@ -123,6 +128,7 @@ interface SpecialFeature {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  updated_at?: string;
   link: string | null;
   guide_file_id: string | null;
   guide_file?: GuideFile | null;
@@ -133,7 +139,7 @@ export default function EmployeePortalScreen() {
   const { user } = useAuth();
   const { t } = useTranslation();
   const router = useRouter();
-  const params = useLocalSearchParams();
+  const params = useLocalSearchParams<{ openAnnouncementId?: string; openEventId?: string; openFeatureId?: string }>();
   const { unreadCount } = useUnreadMessages();
   const { language } = useLanguage();
   const [weeklySpecials, setWeeklySpecials] = useState<MenuItem[]>([]);
@@ -233,29 +239,109 @@ export default function EmployeePortalScreen() {
   };
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
-  useEffect(() => {
-    loadWeeklySpecials();
-    loadAnnouncements();
-    loadUpcomingEvents();
-    loadSpecialFeatures();
-  }, []);
+  const loadAllContent = async () => {
+    setLoadingSpecials(true);
+    setLoadingAnnouncements(true);
+    setLoadingEvents(true);
+    setLoadingFeatures(true);
 
-  // Reload data when language changes
-  useEffect(() => {
-    loadWeeklySpecials();
-    loadAnnouncements();
-    loadUpcomingEvents();
-    loadSpecialFeatures();
-  }, [language]);
+    try {
+      const [specialsResult, announcementsResult, eventsResult, featuresResult] = await Promise.all([
+        supabase
+          .from('menu_items')
+          .select('*')
+          .eq('category', 'Weekly Specials')
+          .eq('is_active', true)
+          .order('display_order', { ascending: true }),
+        supabase
+          .from('announcements')
+          .select(`
+            *,
+            guide_file:guides_and_training!announcements_guide_file_id_fkey(
+              id, title, file_url, file_name, file_type
+            )
+          `)
+          .eq('is_active', true)
+          .in('visibility', ['everyone', 'employees'])
+          .order('display_order', { ascending: true })
+          .limit(6),
+        (async () => {
+          try { await supabase.rpc('delete_expired_upcoming_events' as any); } catch {}
+          return supabase
+            .from('upcoming_events')
+            .select(`
+              *,
+              guide_file:guides_and_training!upcoming_events_guide_file_id_fkey(
+                id, title, file_url, file_name, file_type
+              )
+            `)
+            .eq('is_active', true)
+            .order('display_order', { ascending: true })
+            .order('created_at', { ascending: false });
+        })(),
+        supabase
+          .from('special_features')
+          .select(`
+            *,
+            guide_file:guides_and_training!special_features_guide_file_id_fkey(
+              id, title, file_url, file_name, file_type
+            )
+          `)
+          .eq('is_active', true)
+          .order('display_order', { ascending: true })
+          .order('created_at', { ascending: false })
+          .limit(6),
+      ]);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      loadWeeklySpecials();
-      loadAnnouncements();
-      loadUpcomingEvents();
-      loadSpecialFeatures();
-    }, [])
-  );
+      const specials = specialsResult.data || [];
+      const anns = announcementsResult.data || [];
+      const events = eventsResult.data || [];
+      const features = featuresResult.data || [];
+
+      setWeeklySpecials(specials as MenuItem[]);
+      setAnnouncements(anns as Announcement[]);
+      setUpcomingEvents(events as UpcomingEvent[]);
+      setSpecialFeatures(features as SpecialFeature[]);
+
+      const newImagesMap = new Map<string, string[]>();
+      const imagePromises: Promise<void>[] = [];
+
+      if (anns.length > 0) {
+        imagePromises.push(
+          fetchContentImagesBatch('announcement', anns.map((a: any) => a.id))
+            .then(m => m.forEach((urls, id) => newImagesMap.set(id, urls)))
+        );
+      }
+      if (events.length > 0) {
+        imagePromises.push(
+          fetchContentImagesBatch('upcoming_event', events.map((e: any) => e.id))
+            .then(m => m.forEach((urls, id) => newImagesMap.set(id, urls)))
+        );
+      }
+      if (features.length > 0) {
+        imagePromises.push(
+          fetchContentImagesBatch('special_feature', features.map((f: any) => f.id))
+            .then(m => m.forEach((urls, id) => newImagesMap.set(id, urls)))
+        );
+      }
+
+      await Promise.all(imagePromises);
+      setContentImagesMap(newImagesMap);
+    } catch (error) {
+      console.error('Error loading content:', error);
+    } finally {
+      setLoadingSpecials(false);
+      setLoadingAnnouncements(false);
+      setLoadingEvents(false);
+      setLoadingFeatures(false);
+    }
+  };
+
+  useEffect(() => { loadAllContent(); }, []);
+
+  useEffect(() => { loadAllContent(); }, [language]);
+
+  useFocusEffect(React.useCallback(() => { loadAllContent(); }, []));
 
   // Handle deep link params from notification taps
   useEffect(() => {
@@ -280,9 +366,9 @@ export default function EmployeePortalScreen() {
               title: getLocalizedField(data, 'title', language),
               content: getLocalizedField(data, 'content', language) || data.content,
               thumbnailUrl: data.thumbnail_url,
-              thumbnailShape: data.thumbnail_shape,
+              thumbnailShape: data.thumbnail_shape || undefined,
               imageUrls: allImgs,
-              priority: data.priority,
+              priority: data.priority || undefined,
               link: data.link,
               guideFile: data.guide_file,
             });
@@ -303,7 +389,7 @@ export default function EmployeePortalScreen() {
               title: getLocalizedField(data, 'title', language),
               content: getLocalizedField(data, 'content', language) || data.content,
               thumbnailUrl: data.thumbnail_url,
-              thumbnailShape: data.thumbnail_shape,
+              thumbnailShape: data.thumbnail_shape || undefined,
               imageUrls: allImgs,
               startDateTime: data.start_date_time,
               endDateTime: data.end_date_time,
@@ -327,7 +413,7 @@ export default function EmployeePortalScreen() {
               title: getLocalizedField(data, 'title', language),
               content: getLocalizedField(data, 'content', language) || data.content,
               thumbnailUrl: data.thumbnail_url,
-              thumbnailShape: data.thumbnail_shape,
+              thumbnailShape: data.thumbnail_shape || undefined,
               imageUrls: allImgs,
               startDateTime: data.start_date_time,
               endDateTime: data.end_date_time,
@@ -343,128 +429,6 @@ export default function EmployeePortalScreen() {
 
     openDeepLinkItem();
   }, [params.openAnnouncementId, params.openEventId, params.openFeatureId]);
-
-  const loadWeeklySpecials = async () => {
-    try {
-      setLoadingSpecials(true);
-      const { data, error } = await supabase
-        .from('menu_items')
-        .select('*')
-        .eq('category', 'Weekly Specials')
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
-
-      if (error) throw error;
-      setWeeklySpecials(data || []);
-    } catch (error) {
-      console.error('Error loading weekly specials:', error);
-    } finally {
-      setLoadingSpecials(false);
-    }
-  };
-
-  const loadAnnouncements = async () => {
-    try {
-      setLoadingAnnouncements(true);
-      const { data, error } = await supabase
-        .from('announcements')
-        .select(`
-          *,
-          guide_file:guides_and_training!announcements_guide_file_id_fkey(
-            id, title, file_url, file_name, file_type
-          )
-        `)
-        .eq('is_active', true)
-        .in('visibility', ['everyone', 'employees'])
-        .order('display_order', { ascending: true })
-        .limit(6);
-
-      if (error) throw error;
-      setAnnouncements(data || []);
-      if (data && data.length > 0) {
-        const ids = data.map((a: any) => a.id);
-        const imagesMap = await fetchContentImagesBatch('announcement', ids);
-        setContentImagesMap(prev => {
-          const newMap = new Map(prev);
-          imagesMap.forEach((urls, id) => newMap.set(id, urls));
-          return newMap;
-        });
-      }
-    } catch (error) {
-      console.error('Error loading announcements:', error);
-    } finally {
-      setLoadingAnnouncements(false);
-    }
-  };
-
-  const loadUpcomingEvents = async () => {
-    try {
-      setLoadingEvents(true);
-      // Clean up expired events before loading
-      try { await supabase.rpc('delete_expired_upcoming_events' as any); } catch {}
-      const { data, error } = await supabase
-        .from('upcoming_events')
-        .select(`
-          *,
-          guide_file:guides_and_training!upcoming_events_guide_file_id_fkey(
-            id, title, file_url, file_name, file_type
-          )
-        `)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true })
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setUpcomingEvents(data || []);
-      if (data && data.length > 0) {
-        const ids = data.map((e: any) => e.id);
-        const imagesMap = await fetchContentImagesBatch('upcoming_event', ids);
-        setContentImagesMap(prev => {
-          const newMap = new Map(prev);
-          imagesMap.forEach((urls, id) => newMap.set(id, urls));
-          return newMap;
-        });
-      }
-    } catch (error) {
-      console.error('Error loading upcoming events:', error);
-    } finally {
-      setLoadingEvents(false);
-    }
-  };
-
-  const loadSpecialFeatures = async () => {
-    try {
-      setLoadingFeatures(true);
-      const { data, error } = await supabase
-        .from('special_features')
-        .select(`
-          *,
-          guide_file:guides_and_training!special_features_guide_file_id_fkey(
-            id, title, file_url, file_name, file_type
-          )
-        `)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true })
-        .order('created_at', { ascending: false })
-        .limit(6);
-
-      if (error) throw error;
-      setSpecialFeatures(data || []);
-      if (data && data.length > 0) {
-        const ids = data.map((f: any) => f.id);
-        const imagesMap = await fetchContentImagesBatch('special_feature', ids);
-        setContentImagesMap(prev => {
-          const newMap = new Map(prev);
-          imagesMap.forEach((urls, id) => newMap.set(id, urls));
-          return newMap;
-        });
-      }
-    } catch (error) {
-      console.error('Error loading special features:', error);
-    } finally {
-      setLoadingFeatures(false);
-    }
-  };
 
   const openDetailModal = (item: {
     title: string;
@@ -490,17 +454,12 @@ export default function EmployeePortalScreen() {
   const openWeatherDetail = () => setWeatherDetailVisible(true);
   const closeWeatherDetail = () => setWeatherDetailVisible(false);
 
-  const getImageUrl = (url: string | null) => {
-    if (!url) return null;
-    return `${url}?t=${Date.now()}`;
-  };
-
-  const buildImageUrls = (id: string, thumbnailUrl: string | null): string[] | undefined => {
+  const buildImageUrls = (id: string, thumbnailUrl: string | null, updatedAt?: string): string[] | undefined => {
     const additionalImages = contentImagesMap.get(id);
     if (!additionalImages || additionalImages.length === 0) return undefined;
     const images: string[] = [];
-    if (thumbnailUrl) images.push(thumbnailUrl);
-    images.push(...additionalImages);
+    if (thumbnailUrl) images.push(getImageUrl(thumbnailUrl, updatedAt)!);
+    images.push(...additionalImages.map(url => getImageUrl(url, updatedAt)!));
     return images;
   };
 
@@ -571,8 +530,8 @@ export default function EmployeePortalScreen() {
     let imageUrls: string[] | undefined;
     if (additionalImages && additionalImages.length > 0) {
       imageUrls = [];
-      if (event.thumbnail_url) imageUrls.push(event.thumbnail_url);
-      imageUrls.push(...additionalImages);
+      if (event.thumbnail_url) imageUrls.push(getImageUrl(event.thumbnail_url, event.updated_at)!);
+      imageUrls.push(...additionalImages.map(url => getImageUrl(url, event.updated_at)!));
     }
 
     return (
@@ -598,8 +557,9 @@ export default function EmployeePortalScreen() {
         <View style={styles.cardRow}>
           {event.thumbnail_url && (
             <Image
-              source={{ uri: getImageUrl(event.thumbnail_url)! }}
+              source={getImageUrl(event.thumbnail_url, event.updated_at)!}
               style={styles.cardImage}
+              contentFit="cover"
             />
           )}
           <View style={styles.cardContent}>
@@ -696,6 +656,27 @@ export default function EmployeePortalScreen() {
     else if (index === 3) markEventsTabVisited('Entertainment');
   }, [markEventsTabVisited]);
 
+  // Forward horizontal swipes on the static Today header to the FlatList pager.
+  const advanceLeaf = useCallback((delta: 1 | -1) => {
+    const target = Math.max(0, Math.min(FLATLIST_PAGES.length - 1, currentPageIndex + delta));
+    if (target !== currentPageIndex) {
+      sectionListRef.current?.scrollToIndex({ index: target, animated: true });
+    }
+  }, [currentPageIndex]);
+
+  const todayHeaderSwipeGesture = Gesture.Pan()
+    .activeOffsetX([-15, 15])
+    .failOffsetY([-15, 15])
+    .onEnd((event) => {
+      const distanceThreshold = SCREEN_WIDTH * 0.25;
+      const velocityThreshold = 500;
+      if (event.translationX < -distanceThreshold || event.velocityX < -velocityThreshold) {
+        runOnJS(advanceLeaf)(1);
+      } else if (event.translationX > distanceThreshold || event.velocityX > velocityThreshold) {
+        runOnJS(advanceLeaf)(-1);
+      }
+    });
+
   // ===== RENDER CARD COMPONENTS =====
 
   const renderAnnouncementCard = (announcement: Announcement, index: number) => (
@@ -709,7 +690,7 @@ export default function EmployeePortalScreen() {
           content: getLocalizedField(announcement, 'content', language) || announcement.content || announcement.message || '',
           thumbnailUrl: announcement.thumbnail_url,
           thumbnailShape: announcement.thumbnail_shape,
-          imageUrls: buildImageUrls(announcement.id, announcement.thumbnail_url),
+          imageUrls: buildImageUrls(announcement.id, announcement.thumbnail_url, announcement.updated_at),
           priority: announcement.priority,
           link: announcement.link,
           guideFile: announcement.guide_file || null,
@@ -720,8 +701,9 @@ export default function EmployeePortalScreen() {
       <View style={styles.cardRow}>
         {announcement.thumbnail_url && (
           <Image
-            source={{ uri: getImageUrl(announcement.thumbnail_url)! }}
+            source={getImageUrl(announcement.thumbnail_url, announcement.updated_at)!}
             style={styles.cardImage}
+            contentFit="cover"
           />
         )}
         <View style={styles.cardContent}>
@@ -760,7 +742,7 @@ export default function EmployeePortalScreen() {
           content: getLocalizedField(feature, 'content', language) || feature.content || feature.message || '',
           thumbnailUrl: feature.thumbnail_url,
           thumbnailShape: feature.thumbnail_shape,
-          imageUrls: buildImageUrls(feature.id, feature.thumbnail_url),
+          imageUrls: buildImageUrls(feature.id, feature.thumbnail_url, feature.updated_at),
           startDateTime: feature.start_date_time,
           endDateTime: feature.end_date_time,
           link: feature.link,
@@ -772,8 +754,9 @@ export default function EmployeePortalScreen() {
       <View style={styles.cardRow}>
         {feature.thumbnail_url && (
           <Image
-            source={{ uri: getImageUrl(feature.thumbnail_url)! }}
+            source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
             style={styles.cardImage}
+            contentFit="cover"
           />
         )}
         <View style={styles.cardContent}>
@@ -816,8 +799,9 @@ export default function EmployeePortalScreen() {
       <View style={styles.cardRow}>
         {item.thumbnail_url && (
           <Image
-            source={{ uri: getImageUrl(item.thumbnail_url)! }}
+            source={getImageUrl(item.thumbnail_url, item.updated_at)!}
             style={styles.cardImage}
+            contentFit="cover"
           />
         )}
         <View style={styles.cardContent}>
@@ -1178,7 +1162,11 @@ export default function EmployeePortalScreen() {
       </View>
 
       {/* Section static header — stays put while inner cards swipe */}
-      {activeSection === 'today' && renderTodayHeader(todayActiveSubTab)}
+      {activeSection === 'today' && (
+        <GestureDetector gesture={todayHeaderSwipeGesture}>
+          <View collapsable={false}>{renderTodayHeader(todayActiveSubTab)}</View>
+        </GestureDetector>
+      )}
       {activeSection === 'events' && renderEventsHeader(eventsActiveSubTab)}
 
       {/* Horizontal Swipeable Sections — only the cards swipe */}
@@ -1329,7 +1317,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 10,
-    resizeMode: 'cover',
   },
   cardContent: {
     flex: 1,

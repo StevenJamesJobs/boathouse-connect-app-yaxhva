@@ -6,10 +6,10 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   Platform,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -20,6 +20,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchContentImagesBatch } from '@/utils/contentImages';
+import { getImageUrl } from '@/utils/imageUrl';
 import FormattedText from '@/components/FormattedText';
 
 interface GuideFile {
@@ -44,6 +45,7 @@ interface SpecialFeature {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  updated_at?: string;
   link: string | null;
   guide_file_id: string | null;
   guide_file?: GuideFile | null;
@@ -121,8 +123,8 @@ export default function ViewAllSpecialFeaturesScreen() {
   const openDetailModal = (feature: SpecialFeature) => {
     const additionalImages = contentImagesMap.get(feature.id) || [];
     const imageUrls = [
-      ...(feature.thumbnail_url ? [feature.thumbnail_url] : []),
-      ...additionalImages,
+      ...(feature.thumbnail_url ? [getImageUrl(feature.thumbnail_url, feature.updated_at)!] : []),
+      ...additionalImages.map(url => getImageUrl(url, feature.updated_at)!),
     ];
     setSelectedFeature({
       title: getLocalizedField(feature, 'title', language),
@@ -141,11 +143,6 @@ export default function ViewAllSpecialFeaturesScreen() {
   const closeDetailModal = () => {
     setDetailModalVisible(false);
     setSelectedFeature(null);
-  };
-
-  const getImageUrl = (url: string | null) => {
-    if (!url) return null;
-    return `${url}?t=${Date.now()}`;
   };
 
   const formatDateTime = (dateTime: string | null) => {
@@ -211,8 +208,9 @@ export default function ViewAllSpecialFeaturesScreen() {
                 <View style={styles.squareLayout}>
                 {feature.thumbnail_url && (
                   <Image
-                    source={{ uri: getImageUrl(feature.thumbnail_url) }}
+                    source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
                     style={styles.squareImage}
+                    contentFit="cover"
                   />
                 )}
                 <View style={styles.squareContent}>
@@ -363,7 +361,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 8,
-    resizeMode: 'cover',
   },
   squareContent: {
     flex: 1,

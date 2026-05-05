@@ -1,7 +1,6 @@
 import React, { useRef, useState, useCallback } from 'react';
 import {
   View,
-  Image,
   FlatList,
   Dimensions,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   ViewStyle,
   Text,
 } from 'react-native';
+import { Image } from 'expo-image';
 
 interface ImageCarouselProps {
   images: string[];
@@ -46,9 +46,9 @@ export default function ImageCarousel({
   const renderItem = useCallback(
     ({ item }: { item: string }) => (
       <Image
-        source={{ uri: item }}
+        source={item}
         style={imageStyle as any}
-        resizeMode="cover"
+        contentFit="cover"
       />
     ),
     [imageStyle]
@@ -66,13 +66,13 @@ export default function ImageCarousel({
     return (
       <View style={[styles.container, style]}>
         <Image
-          source={{ uri: images[0] }}
+          source={images[0]}
           style={
             thumbnailShape === 'square'
               ? styles.squareImage
               : styles.bannerImage
           }
-          resizeMode="cover"
+          contentFit="cover"
         />
       </View>
     );
