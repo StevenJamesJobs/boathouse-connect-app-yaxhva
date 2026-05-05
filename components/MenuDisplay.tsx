@@ -6,13 +6,13 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Image,
   Modal,
   ActivityIndicator,
   Dimensions,
   TextInput,
   FlatList,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
@@ -22,6 +22,7 @@ import { stripFormattingTags } from '@/components/FormattedText';
 import CategoryPill from '@/components/CategoryPill';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getImageUrl } from '@/utils/imageUrl';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 
@@ -53,6 +54,7 @@ interface MenuItem {
   flavor_profile_es?: string | null;
   unique_selling_points?: string | null;
   unique_selling_points_es?: string | null;
+  updated_at?: string;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -392,11 +394,6 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     return option ? option.label : filterKey;
   };
 
-  const getImageUrl = (url: string | null) => {
-    if (!url) return null;
-    return `${url}?t=${Date.now()}`;
-  };
-
   const formatPrice = (price: string) => {
     if (price.includes('$')) return price;
     return `$${price}`;
@@ -508,8 +505,9 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       <View style={styles.cardRow}>
         {item.thumbnail_url && (
           <Image
-            source={{ uri: getImageUrl(item.thumbnail_url)! }}
+            source={getImageUrl(item.thumbnail_url, item.updated_at)!}
             style={styles.cardImage}
+            contentFit="cover"
           />
         )}
         <View style={styles.cardContent}>
@@ -1082,7 +1080,6 @@ const createStyles = (colors: any) =>
       width: 80,
       height: 80,
       borderRadius: 10,
-      resizeMode: 'cover',
     },
     cardContent: {
       flex: 1,

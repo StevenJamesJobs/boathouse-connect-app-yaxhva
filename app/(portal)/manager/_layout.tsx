@@ -5,15 +5,12 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { useAppTheme } from '@/contexts/ThemeContext';
-import { hexToRgba } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
-import { BlurView } from 'expo-blur';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
-import { MessageBadge } from '@/components/MessageBadge';
+import PortalTabBar from '@/components/PortalTabBar';
 import { useTranslation } from 'react-i18next';
 
 function ManagerHeader() {
@@ -51,89 +48,19 @@ function ManagerHeader() {
   );
 }
 
-function FloatingTabBar({ state, descriptors, navigation }: any) {
+function ManagerTabBar(props: any) {
   const { unreadCount } = useUnreadMessages();
   const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
   const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
   const { pendingCount: pendingApprovals } = usePendingApprovals();
   const toolsBadgeCount = unreadQuizCount + pendingApprovals + unreadLeaderboardCount;
-  const colors = useThemeColors();
-  const { mode } = useAppTheme();
-
-  const blurBgColor = Platform.select({
-    ios: hexToRgba(colors.tabBarBackground, 0.80),
-    android: hexToRgba(colors.tabBarBackground, 0.95),
-    web: hexToRgba(colors.tabBarBackground, 0.90),
-  });
 
   return (
-    <View style={styles.floatingTabBarContainer}>
-      <BlurView
-        intensity={80}
-        tint={mode === 'dark' ? 'dark' : 'light'}
-        style={[styles.blurContainer, { backgroundColor: blurBgColor }]}
-      >
-        <View style={styles.tabBarContent}>
-          {state.routes.map((route: any, index: number) => {
-            const { options } = descriptors[route.key];
-            const label = options.tabBarLabel ?? options.title ?? route.name;
-            const isFocused = state.index === index;
-            const isProfileTab = route.name === 'profile';
-            const isToolsTab = route.name === 'tools';
-
-            const onPress = () => {
-              const event = navigation.emit({
-                type: 'tabPress',
-                target: route.key,
-                canPreventDefault: true,
-              });
-
-              if (!isFocused && !event.defaultPrevented) {
-                navigation.navigate(route.name);
-              }
-            };
-
-            return (
-              <TouchableOpacity
-                key={index}
-                accessibilityRole="button"
-                accessibilityState={isFocused ? { selected: true } : {}}
-                accessibilityLabel={options.tabBarAccessibilityLabel}
-                testID={options.tabBarTestID}
-                onPress={onPress}
-                style={styles.tabButton}
-              >
-                <View style={styles.iconContainer}>
-                  {options.tabBarIcon && options.tabBarIcon({
-                    color: isFocused ? colors.tabBarActive : colors.tabBarInactive,
-                    size: 22,
-                  })}
-                  {isProfileTab && unreadCount > 0 && (
-                    <View style={styles.tabBadgePosition}>
-                      <MessageBadge count={unreadCount} size="small" />
-                    </View>
-                  )}
-                  {isToolsTab && toolsBadgeCount > 0 && (
-                    <View style={styles.tabBadgePosition}>
-                      <MessageBadge count={toolsBadgeCount} size="small" />
-                    </View>
-                  )}
-                </View>
-                <Text
-                  style={[
-                    styles.tabLabel,
-                    { color: isFocused ? colors.tabBarActive : colors.tabBarInactive }
-                  ]}
-                  numberOfLines={1}
-                >
-                  {label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </BlurView>
-    </View>
+    <PortalTabBar
+      {...props}
+      role="manager"
+      badges={{ messages: unreadCount, tools: toolsBadgeCount }}
+    />
   );
 }
 
@@ -143,7 +70,7 @@ export default function ManagerLayout() {
     <>
       <ManagerHeader />
       <Tabs
-        tabBar={(props) => <FloatingTabBar {...props} />}
+        tabBar={(props) => <ManagerTabBar {...props} />}
         screenOptions={{
           headerShown: false,
         }}
@@ -251,50 +178,5 @@ const styles = StyleSheet.create({
   },
   logoutButton: {
     padding: 8,
-  },
-  floatingTabBarContainer: {
-    position: 'absolute',
-    bottom: 20,
-    left: 10,
-    right: 10,
-    alignItems: 'center',
-  },
-  blurContainer: {
-    width: '100%',
-    maxWidth: 500,
-    borderRadius: 30,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.2)',
-    boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.3)',
-    elevation: 8,
-  },
-  tabBarContent: {
-    flexDirection: 'row',
-    paddingHorizontal: 6,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  tabButton: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 2,
-  },
-  iconContainer: {
-    position: 'relative',
-  },
-  tabBadgePosition: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-  },
-  tabLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 3,
-    textAlign: 'center',
   },
 });

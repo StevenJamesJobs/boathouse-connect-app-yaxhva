@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   Platform,
   Modal,
@@ -17,6 +16,7 @@ import {
 } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -30,6 +30,7 @@ import { eventFallsOnDate } from '@/utils/dateUtils';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchContentImagesBatch } from '@/utils/contentImages';
+import { getImageUrl } from '@/utils/imageUrl';
 import { stripFormattingTags } from '@/components/FormattedText';
 import { useUnreadContent } from '@/hooks/useUnreadContent';
 
@@ -55,6 +56,7 @@ interface UpcomingEvent {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  updated_at?: string;
   link: string | null;
   guide_file_id: string | null;
   guide_file?: GuideFile | null;
@@ -137,8 +139,8 @@ export default function ViewAllUpcomingEventsScreen() {
     markEventViewed(event.id);
     const additionalImages = contentImagesMap.get(event.id) || [];
     const imageUrls = [
-      ...(event.thumbnail_url ? [event.thumbnail_url] : []),
-      ...additionalImages,
+      ...(event.thumbnail_url ? [getImageUrl(event.thumbnail_url, event.updated_at)!] : []),
+      ...additionalImages.map(url => getImageUrl(url, event.updated_at)!),
     ];
     setSelectedEvent({
       title: getLocalizedField(event, 'title', language),
@@ -157,11 +159,6 @@ export default function ViewAllUpcomingEventsScreen() {
   const closeDetailModal = () => {
     setDetailModalVisible(false);
     setSelectedEvent(null);
-  };
-
-  const getImageUrl = (url: string | null) => {
-    if (!url) return null;
-    return `${url}?t=${Date.now()}`;
   };
 
   const formatDateTime = (dateTime: string | null) => {
@@ -227,7 +224,7 @@ export default function ViewAllUpcomingEventsScreen() {
     >
       <View style={styles.cardRow}>
         {event.thumbnail_url && (
-          <Image source={{ uri: getImageUrl(event.thumbnail_url)! }} style={styles.cardImage} />
+          <Image source={getImageUrl(event.thumbnail_url, event.updated_at)!} style={styles.cardImage} contentFit="cover" />
         )}
         <View style={styles.cardContent}>
           <View style={styles.titleRow}>
@@ -583,7 +580,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 10,
-    resizeMode: 'cover',
   },
   cardContent: {
     flex: 1,

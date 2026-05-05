@@ -3,16 +3,17 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
+import { Image } from 'expo-image';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedField } from '@/utils/translateContent';
 import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
 import { eventFallsOnDate } from '@/utils/dateUtils';
 import FormattedText from '@/components/FormattedText';
 import { stripFormattingTags } from '@/components/FormattedText';
+import { getImageUrl } from '@/utils/imageUrl';
 
 export interface GuideFile {
   id: string;
@@ -36,6 +37,7 @@ export interface UpcomingEvent {
   display_order: number;
   is_active: boolean;
   created_at: string;
+  updated_at?: string;
   link: string | null;
   guide_file_id: string | null;
   guide_file?: GuideFile | null;
@@ -83,11 +85,6 @@ export default function UpcomingEventsSection({
   const { t } = useTranslation();
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [eventsTab, setEventsTab] = useState<'Event' | 'Entertainment'>('Event');
-
-  const getImageUrl = (url: string | null) => {
-    if (!url) return null;
-    return `${url}?t=${Date.now()}`;
-  };
 
   const formatDateTime = (dateTime: string | null) => {
     if (!dateTime) return null;
@@ -162,8 +159,9 @@ export default function UpcomingEventsSection({
       {event.thumbnail_shape === 'square' && event.thumbnail_url ? (
         <View style={styles.eventSquareLayout}>
           <Image
-            source={{ uri: getImageUrl(event.thumbnail_url)! }}
+            source={getImageUrl(event.thumbnail_url, event.updated_at)!}
             style={styles.eventSquareImage}
+            contentFit="cover"
           />
           <View style={styles.eventSquareContent}>
             <Text style={[styles.eventTitle, { color: colors.text }]}>{getLocalizedField(event, 'title', language || 'en')}</Text>
@@ -183,8 +181,9 @@ export default function UpcomingEventsSection({
         <>
           {event.thumbnail_url && (
             <Image
-              source={{ uri: getImageUrl(event.thumbnail_url)! }}
+              source={getImageUrl(event.thumbnail_url, event.updated_at)!}
               style={styles.eventBannerImage}
+              contentFit="cover"
             />
           )}
           <View style={styles.eventContent}>
@@ -328,7 +327,6 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 8,
-    resizeMode: 'cover',
   },
   eventSquareContent: {
     flex: 1,
@@ -337,7 +335,6 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 120,
     borderRadius: 8,
-    resizeMode: 'cover',
     marginBottom: 8,
   },
   eventContent: {

@@ -29,6 +29,8 @@ yarn-error.*
 
 .natively/
 
+supabase/.temp/
+
 android/
 ios/
 

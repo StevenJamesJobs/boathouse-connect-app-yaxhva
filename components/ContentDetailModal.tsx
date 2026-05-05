@@ -208,26 +208,16 @@ export default function ContentDetailModal({
     }
   };
 
-  // Helper function to get image URL with cache busting (same as cocktails-az.tsx)
-  const getImageUrl = (url: string | null) => {
-    if (!url) return null;
-    return `${url}?t=${Date.now()}`;
-  };
-
   const startDateTimeFormatted = formatDateTime(startDateTime || null);
   const endDateTimeFormatted = formatDateTime(endDateTime || null);
   const priorityColor = priority ? getPriorityColor(priority) : colors.textSecondary;
   const priorityUpperCase = priority ? getPriorityLabel(priority).toUpperCase() : '';
-  const imageUrl = getImageUrl(thumbnailUrl || null);
 
-  // Build combined image array: additional images first (if provided), otherwise just the thumbnail
   const allImages: string[] = [];
   if (imageUrls && imageUrls.length > 0) {
-    // Use the additional images array (which may include the thumbnail as first item)
-    allImages.push(...imageUrls.map(url => getImageUrl(url) || url));
-  } else if (imageUrl) {
-    // Fallback to single thumbnail
-    allImages.push(imageUrl);
+    allImages.push(...imageUrls);
+  } else if (thumbnailUrl) {
+    allImages.push(thumbnailUrl);
   }
 
   return (
