@@ -924,16 +924,19 @@ export default function ManagerPortalScreen() {
 
       {showGrabber && (
         <TouchableOpacity
-          style={styles.collapseGrabber}
+          style={[styles.collapseGrabber, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '30' }]}
           onPress={() => setTodayHeaderCollapsed(prev => !prev)}
           activeOpacity={0.7}
         >
-          <View style={[styles.collapseGrabberPill, { backgroundColor: colors.border }]} />
+          <View style={[styles.collapseGrabberPill, { backgroundColor: colors.primary + '60' }]} />
+          <Text style={[styles.collapseGrabberLabel, { color: colors.primary }]}>
+            {isCollapsed ? 'Show Shifts & Today' : 'Hide Shifts & Today'}
+          </Text>
           <IconSymbol
             ios_icon_name={isCollapsed ? 'chevron.down' : 'chevron.up'}
             android_material_icon_name={isCollapsed ? 'expand-more' : 'expand-less'}
-            size={12}
-            color={colors.textSecondary}
+            size={13}
+            color={colors.primary}
           />
         </TouchableOpacity>
       )}
@@ -1426,14 +1429,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    gap: 6,
-    marginBottom: 2,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    borderWidth: 1,
+    marginBottom: 6,
+    gap: 7,
   },
   collapseGrabberPill: {
-    width: 36,
-    height: 4,
+    width: 24,
+    height: 3,
     borderRadius: 2,
+  },
+  collapseGrabberLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    letterSpacing: 0.2,
   },
   todayTabsCard: {
     marginBottom: 12,
