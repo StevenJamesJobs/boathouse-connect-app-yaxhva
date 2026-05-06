@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const GOOGLE_MAPS_QUERY = "McLoone's Boathouse, 9 Cherry Lane, West Orange, NJ 07052";
-const DEFAULT_REVIEWS_LIMIT = 5;
+const DEFAULT_REVIEWS_LIMIT = 10;
 const BACKFILL_REVIEWS_LIMIT = 15;
 
 async function translateBatch(texts: string[], apiKey: string): Promise<string[]> {
