@@ -1365,7 +1365,21 @@
     "review_deleted": "Review deleted successfully",
     "review_delete_error": "Failed to delete review",
     "error_guest_name": "Please enter guest name",
-    "error_review_text": "Please enter review text"
+    "error_review_text": "Please enter review text",
+    "refresh_google_reviews": "Refresh Google",
+    "refreshing_reviews": "Importing...",
+    "refresh_success_title": "Reviews Imported",
+    "refresh_success_message": "{{count}} reviews imported from Google",
+    "refresh_error": "Failed to import Google reviews",
+    "owner_reply_label": "Owner Reply:",
+    "hidden_review_badge": "(hidden)",
+    "hide_review_title": "Hide Review",
+    "show_review_title": "Show Review",
+    "hide_review_confirm": "Hide this Google review from employees?",
+    "show_review_confirm": "Show this Google review to employees?",
+    "review_hidden": "Review hidden",
+    "review_shown": "Review shown",
+    "review_visibility_error": "Failed to update review visibility"
   },
   "translation_section": {
     "spanish_section_title": "Spanish Translation (Optional)",

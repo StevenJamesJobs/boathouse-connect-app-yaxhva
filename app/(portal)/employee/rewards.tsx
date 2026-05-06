@@ -12,6 +12,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import { Image } from 'expo-image';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { useRouter } from 'expo-router';
@@ -20,6 +21,8 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/translateContent';
 import ExamRewardBlurb from '@/components/ExamRewardBlurb';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 
@@ -49,12 +52,29 @@ interface GuestReview {
   review_date: string;
 }
 
+interface GoogleReview {
+  id: string;
+  author_title: string;
+  author_image: string | null;
+  review_rating: number;
+  review_text: string | null;
+  review_text_es: string | null;
+  review_datetime_utc: string;
+  owner_answer: string | null;
+  owner_answer_es: string | null;
+}
+
+type ReviewItem =
+  | (GuestReview & { source: 'manual' })
+  | (GoogleReview & { source: 'google' });
+
 type MainTab = 'rewards' | 'reviews';
 type RewardsSubTab = 'leaderboard' | 'recent';
 
 export default function EmployeeRewardsScreen() {
   const { user } = useAuth();
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const colors = useThemeColors();
   const router = useRouter();
   const { hasNew: awardsHasNew, markRecentViewed } = useUnreadAwards();
@@ -87,6 +107,7 @@ export default function EmployeeRewardsScreen() {
 
   // Reviews state
   const [reviews, setReviews] = useState<GuestReview[]>([]);
+  const [googleReviews, setGoogleReviews] = useState<GoogleReview[]>([]);
 
   const fetchRewardsData = useCallback(async () => {
     try {
@@ -200,10 +221,37 @@ export default function EmployeeRewardsScreen() {
     }
   }, []);
 
+  const fetchGoogleReviews = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('google_reviews')
+        .select('id, author_title, author_image, review_rating, review_text, review_text_es, review_datetime_utc, owner_answer, owner_answer_es')
+        .eq('is_published', true)
+        .order('review_datetime_utc', { ascending: false });
+
+      if (!error && data) {
+        setGoogleReviews(data as GoogleReview[]);
+      }
+    } catch (error) {
+      console.error('Error fetching Google reviews:', error);
+    }
+  }, []);
+
+  const allReviews: ReviewItem[] = React.useMemo(() => {
+    const manual: ReviewItem[] = reviews.map((r) => ({ ...r, source: 'manual' as const }));
+    const google: ReviewItem[] = googleReviews.map((r) => ({ ...r, source: 'google' as const }));
+    return [...manual, ...google].sort((a, b) => {
+      const dateA = a.source === 'manual' ? a.review_date : a.review_datetime_utc;
+      const dateB = b.source === 'manual' ? b.review_date : b.review_datetime_utc;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
+  }, [reviews, googleReviews]);
+
   useEffect(() => {
     fetchRewardsData();
     fetchReviews();
-  }, [fetchRewardsData, fetchReviews]);
+    fetchGoogleReviews();
+  }, [fetchRewardsData, fetchReviews, fetchGoogleReviews]);
 
   const getRankColor = (index: number) => {
     if (index === 0) return '#FFD700'; // Gold
@@ -445,7 +493,7 @@ export default function EmployeeRewardsScreen() {
       ) : (
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
           <View style={styles.section}>
-            {reviews.length === 0 ? (
+            {allReviews.length === 0 ? (
               <View style={styles.placeholderContainer}>
                 <IconSymbol
                   ios_icon_name="star.fill"
@@ -459,16 +507,66 @@ export default function EmployeeRewardsScreen() {
                 </Text>
               </View>
             ) : (
-              reviews.map((review, index) => (
+              allReviews.map((review, index) => (
                 <View key={review.id || index} style={[styles.reviewCard, { backgroundColor: colors.card }]}>
-                  <View style={styles.reviewHeader}>
-                    <Text style={[styles.reviewGuestName, { color: colors.text }]}>{review.guest_name}</Text>
-                    {renderStars(review.rating)}
-                  </View>
-                  <Text style={[styles.reviewText, { color: colors.text }]}>{review.review_text}</Text>
-                  <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
-                    {new Date(review.review_date).toLocaleDateString()}
-                  </Text>
+                  {review.source === 'google' ? (
+                    <>
+                      <View style={styles.reviewHeader}>
+                        <View style={styles.googleReviewAuthorRow}>
+                          {review.author_image ? (
+                            <Image
+                              source={review.author_image}
+                              style={styles.authorPhoto}
+                              contentFit="cover"
+                            />
+                          ) : (
+                            <View style={[styles.authorPhotoFallback, { backgroundColor: colors.primary + '20' }]}>
+                              <IconSymbol
+                                ios_icon_name="person.fill"
+                                android_material_icon_name="person"
+                                size={18}
+                                color={colors.primary}
+                              />
+                            </View>
+                          )}
+                          <Text style={[styles.reviewGuestName, { color: colors.text, flex: 1 }]}>{review.author_title}</Text>
+                          <View style={styles.googleBadge}>
+                            <Text style={styles.googleBadgeText}>G</Text>
+                          </View>
+                        </View>
+                        {renderStars(review.review_rating)}
+                      </View>
+                      {review.review_text ? (
+                        <Text style={[styles.reviewText, { color: colors.text }]}>
+                          {getLocalizedField(review, 'review_text', language)}
+                        </Text>
+                      ) : null}
+                      {review.owner_answer ? (
+                        <View style={[styles.ownerReplyContainer, { borderLeftColor: colors.primary }]}>
+                          <Text style={[styles.ownerReplyLabel, { color: colors.primary }]}>
+                            {t('rewards_reviews_editor:owner_reply_label')}
+                          </Text>
+                          <Text style={[styles.ownerReplyText, { color: colors.text }]}>
+                            {getLocalizedField(review, 'owner_answer', language)}
+                          </Text>
+                        </View>
+                      ) : null}
+                      <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
+                        {new Date(review.review_datetime_utc).toLocaleDateString()}
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <View style={styles.reviewHeader}>
+                        <Text style={[styles.reviewGuestName, { color: colors.text }]}>{review.guest_name}</Text>
+                        {renderStars(review.rating)}
+                      </View>
+                      <Text style={[styles.reviewText, { color: colors.text }]}>{review.review_text}</Text>
+                      <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
+                        {new Date(review.review_date).toLocaleDateString()}
+                      </Text>
+                    </>
+                  )}
                 </View>
               ))
             )}
@@ -720,6 +818,54 @@ const styles = StyleSheet.create({
   },
   reviewDate: {
     fontSize: 12,
+  },
+  googleReviewAuthorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  authorPhoto: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+  },
+  authorPhotoFallback: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleBadge: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleBadgeText: {
+    fontSize: 13,
+    fontWeight: 'bold' as const,
+    color: '#4285F4',
+  },
+  ownerReplyContainer: {
+    borderLeftWidth: 3,
+    paddingLeft: 12,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  ownerReplyLabel: {
+    fontSize: 12,
+    fontWeight: '600' as const,
+    marginBottom: 4,
+  },
+  ownerReplyText: {
+    fontSize: 13,
+    lineHeight: 18,
   },
   placeholderContainer: {
     flex: 1,

@@ -1365,7 +1365,21 @@
     "review_deleted": "Reseña eliminada exitosamente",
     "review_delete_error": "Error al eliminar la reseña",
     "error_guest_name": "Por favor ingresa el nombre del invitado",
-    "error_review_text": "Por favor ingresa el texto de la reseña"
+    "error_review_text": "Por favor ingresa el texto de la reseña",
+    "refresh_google_reviews": "Actualizar Google",
+    "refreshing_reviews": "Importando...",
+    "refresh_success_title": "Reseñas Importadas",
+    "refresh_success_message": "{{count}} reseñas importadas de Google",
+    "refresh_error": "Error al importar reseñas de Google",
+    "owner_reply_label": "Respuesta del Propietario:",
+    "hidden_review_badge": "(oculto)",
+    "hide_review_title": "Ocultar Reseña",
+    "show_review_title": "Mostrar Reseña",
+    "hide_review_confirm": "¿Ocultar esta reseña de Google de los empleados?",
+    "show_review_confirm": "¿Mostrar esta reseña de Google a los empleados?",
+    "review_hidden": "Reseña ocultada",
+    "review_shown": "Reseña mostrada",
+    "review_visibility_error": "Error al actualizar la visibilidad de la reseña"
   },
   "translation_section": {
     "spanish_section_title": "Traducción al Español (Opcional)",

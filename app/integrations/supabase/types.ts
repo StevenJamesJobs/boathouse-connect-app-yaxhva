@@ -696,6 +696,54 @@ export type Database = {
           },
         ]
       }
+      google_reviews: {
+        Row: {
+          author_image: string | null
+          author_title: string
+          id: string
+          imported_at: string
+          is_published: boolean
+          owner_answer: string | null
+          owner_answer_es: string | null
+          review_datetime_utc: string
+          review_id: string
+          review_rating: number
+          review_text: string | null
+          review_text_es: string | null
+          updated_at: string
+        }
+        Insert: {
+          author_image?: string | null
+          author_title: string
+          id?: string
+          imported_at?: string
+          is_published?: boolean
+          owner_answer?: string | null
+          owner_answer_es?: string | null
+          review_datetime_utc: string
+          review_id: string
+          review_rating: number
+          review_text?: string | null
+          review_text_es?: string | null
+          updated_at?: string
+        }
+        Update: {
+          author_image?: string | null
+          author_title?: string
+          id?: string
+          imported_at?: string
+          is_published?: boolean
+          owner_answer?: string | null
+          owner_answer_es?: string | null
+          review_datetime_utc?: string
+          review_id?: string
+          review_rating?: number
+          review_text?: string | null
+          review_text_es?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       guest_reviews: {
         Row: {
           created_at: string | null

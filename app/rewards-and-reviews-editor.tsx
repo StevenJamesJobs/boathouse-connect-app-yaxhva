@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import { Image } from 'expo-image';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { useRouter } from 'expo-router';
@@ -26,6 +27,8 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/translateContent';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { MessageBadge } from '@/components/MessageBadge';
@@ -59,8 +62,26 @@ interface GuestReview {
   created_at: string;
 }
 
+interface GoogleReview {
+  id: string;
+  author_title: string;
+  author_image: string | null;
+  review_rating: number;
+  review_text: string | null;
+  review_text_es: string | null;
+  review_datetime_utc: string;
+  owner_answer: string | null;
+  owner_answer_es: string | null;
+  is_published: boolean;
+}
+
+type ReviewItem =
+  | (GuestReview & { source: 'manual' })
+  | (GoogleReview & { source: 'google' });
+
 export default function RewardsAndReviewsEditorScreen() {
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const router = useRouter();
   const colors = useThemeColors();
 
@@ -377,6 +398,55 @@ export default function RewardsAndReviewsEditorScreen() {
       fontSize: 12,
       color: colors.textSecondary,
     },
+    googleReviewAuthorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 8,
+    },
+    authorPhoto: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+    },
+    authorPhotoFallback: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    googleBadge: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: '#FFFFFF',
+      borderWidth: 1,
+      borderColor: '#E0E0E0',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    googleBadgeText: {
+      fontSize: 13,
+      fontWeight: 'bold' as const,
+      color: '#4285F4',
+    },
+    ownerReplyContainer: {
+      borderLeftWidth: 3,
+      paddingLeft: 12,
+      marginBottom: 8,
+      marginTop: 4,
+    },
+    ownerReplyLabel: {
+      fontSize: 12,
+      fontWeight: '600' as const,
+      marginBottom: 4,
+    },
+    ownerReplyText: {
+      fontSize: 13,
+      lineHeight: 18,
+      color: colors.text,
+    },
     loadingOverlay: {
       position: 'absolute',
       top: 0,
@@ -676,6 +746,8 @@ export default function RewardsAndReviewsEditorScreen() {
   // Reviews state
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviews, setReviews] = useState<GuestReview[]>([]);
+  const [googleReviews, setGoogleReviews] = useState<GoogleReview[]>([]);
+  const [refreshingGoogle, setRefreshingGoogle] = useState(false);
   const [editingReview, setEditingReview] = useState<GuestReview | null>(null);
   const [reviewForm, setReviewForm] = useState({
     guest_name: '',
@@ -792,11 +864,37 @@ export default function RewardsAndReviewsEditorScreen() {
     }
   }, []);
 
+  const fetchGoogleReviews = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('google_reviews')
+        .select('id, author_title, author_image, review_rating, review_text, review_text_es, review_datetime_utc, owner_answer, owner_answer_es, is_published')
+        .order('review_datetime_utc', { ascending: false });
+
+      if (!error && data) {
+        setGoogleReviews(data as GoogleReview[]);
+      }
+    } catch (error) {
+      console.error('Error fetching Google reviews:', error);
+    }
+  }, []);
+
+  const allReviews: ReviewItem[] = useMemo(() => {
+    const manual: ReviewItem[] = reviews.map((r) => ({ ...r, source: 'manual' as const }));
+    const google: ReviewItem[] = googleReviews.map((r) => ({ ...r, source: 'google' as const }));
+    return [...manual, ...google].sort((a, b) => {
+      const dateA = a.source === 'manual' ? a.review_date : a.review_datetime_utc;
+      const dateB = b.source === 'manual' ? b.review_date : b.review_datetime_utc;
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    });
+  }, [reviews, googleReviews]);
+
   useEffect(() => {
     fetchEmployees();
     fetchRewardsData();
     fetchReviews();
-  }, [fetchEmployees, fetchRewardsData, fetchReviews]);
+    fetchGoogleReviews();
+  }, [fetchEmployees, fetchRewardsData, fetchReviews, fetchGoogleReviews]);
 
   useEffect(() => {
     if (searchQuery) {
@@ -1390,6 +1488,58 @@ export default function RewardsAndReviewsEditorScreen() {
     );
   };
 
+  const handleHideGoogleReview = (review: GoogleReview) => {
+    const newPublished = !review.is_published;
+    Alert.alert(
+      newPublished ? t('rewards_reviews_editor:show_review_title') : t('rewards_reviews_editor:hide_review_title'),
+      newPublished ? t('rewards_reviews_editor:show_review_confirm') : t('rewards_reviews_editor:hide_review_confirm'),
+      [
+        { text: t('common:cancel'), style: 'cancel' },
+        {
+          text: newPublished ? t('rewards_reviews_editor:show_action') : t('rewards_reviews_editor:hide_action'),
+          onPress: async () => {
+            try {
+              setLoading(true);
+              const { error } = await supabase
+                .from('google_reviews')
+                .update({ is_published: newPublished })
+                .eq('id', review.id);
+              if (error) throw error;
+              Alert.alert(t('common:success'), newPublished ? t('rewards_reviews_editor:review_shown') : t('rewards_reviews_editor:review_hidden'));
+              fetchGoogleReviews();
+            } catch (error: any) {
+              console.error('Error toggling Google review visibility:', error);
+              Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:review_visibility_error'));
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleRefreshGoogleReviews = async () => {
+    try {
+      setRefreshingGoogle(true);
+      const { data, error } = await supabase.functions.invoke('import-google-reviews', {
+        body: { source: 'manual', user_id: user?.id },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Import failed');
+      Alert.alert(
+        t('rewards_reviews_editor:refresh_success_title'),
+        t('rewards_reviews_editor:refresh_success_message', { count: data.reviews_upserted })
+      );
+      fetchGoogleReviews();
+    } catch (error: any) {
+      console.error('Error refreshing Google reviews:', error);
+      Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:refresh_error'));
+    } finally {
+      setRefreshingGoogle(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -1734,59 +1884,145 @@ export default function RewardsAndReviewsEditorScreen() {
       ) : (
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
           <>
-            {/* Add Review Button */}
-            <TouchableOpacity
-              style={styles.rewardButton}
-              onPress={() => {
-                resetReviewForm();
-                setShowReviewModal(true);
-              }}
-            >
-              <IconSymbol
-                ios_icon_name="plus.circle.fill"
-                android_material_icon_name="add-circle"
-                size={24}
-                color={colors.text}
-              />
-              <Text style={styles.rewardButtonText}>{t('rewards_reviews_editor:add_review_button')}</Text>
-            </TouchableOpacity>
+            {/* Action Buttons Row */}
+            <View style={styles.actionButtonsRow}>
+              <TouchableOpacity
+                style={[styles.actionButton, styles.rewardButton]}
+                onPress={() => {
+                  resetReviewForm();
+                  setShowReviewModal(true);
+                }}
+              >
+                <IconSymbol
+                  ios_icon_name="plus.circle.fill"
+                  android_material_icon_name="add-circle"
+                  size={24}
+                  color={colors.text}
+                />
+                <Text style={styles.actionButtonText}>{t('rewards_reviews_editor:add_review_button')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.actionButton, { backgroundColor: '#4285F4' }]}
+                onPress={handleRefreshGoogleReviews}
+                disabled={refreshingGoogle}
+              >
+                {refreshingGoogle ? (
+                  <ActivityIndicator size="small" color="#FFF" />
+                ) : (
+                  <IconSymbol
+                    ios_icon_name="arrow.clockwise"
+                    android_material_icon_name="refresh"
+                    size={24}
+                    color="#FFF"
+                  />
+                )}
+                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>
+                  {refreshingGoogle ? t('rewards_reviews_editor:refreshing_reviews') : t('rewards_reviews_editor:refresh_google_reviews')}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
-            {/* Reviews List */}
+            {/* All Reviews List */}
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>{t('rewards_reviews_editor:guest_reviews_title')}</Text>
-              {reviews.length === 0 ? (
+              {allReviews.length === 0 ? (
                 <Text style={styles.emptyText}>{t('rewards_reviews_editor:no_reviews')}</Text>
               ) : (
-                reviews.map((review, index) => (
-                  <View key={index} style={styles.reviewCard}>
-                    <View style={styles.reviewHeader}>
-                      <View style={styles.reviewHeaderLeft}>
-                        <Text style={styles.reviewGuestName}>{review.guest_name}</Text>
-                        {renderStars(review.rating)}
-                      </View>
-                      <View style={styles.reviewActions}>
-                        <TouchableOpacity onPress={() => handleEditReview(review)}>
-                          <IconSymbol
-                            ios_icon_name="pencil.circle.fill"
-                            android_material_icon_name="edit"
-                            size={28}
-                            color={colors.primary}
-                          />
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => handleDeleteReview(review.id)}>
-                          <IconSymbol
-                            ios_icon_name="trash.circle.fill"
-                            android_material_icon_name="delete"
-                            size={28}
-                            color="#F44336"
-                          />
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                    <Text style={styles.reviewText}>{review.review_text}</Text>
-                    <Text style={styles.reviewDate}>
-                      {new Date(review.review_date).toLocaleDateString()}
-                    </Text>
+                allReviews.map((review, index) => (
+                  <View key={review.id || index} style={styles.reviewCard}>
+                    {review.source === 'google' ? (
+                      <>
+                        <View style={styles.reviewHeader}>
+                          <View style={styles.reviewHeaderLeft}>
+                            <View style={styles.googleReviewAuthorRow}>
+                              {review.author_image ? (
+                                <Image
+                                  source={review.author_image}
+                                  style={styles.authorPhoto}
+                                  contentFit="cover"
+                                />
+                              ) : (
+                                <View style={[styles.authorPhotoFallback, { backgroundColor: colors.primary + '20' }]}>
+                                  <IconSymbol
+                                    ios_icon_name="person.fill"
+                                    android_material_icon_name="person"
+                                    size={18}
+                                    color={colors.primary}
+                                  />
+                                </View>
+                              )}
+                              <Text style={[styles.reviewGuestName, { flex: 1, marginBottom: 0 }]}>{review.author_title}</Text>
+                              <View style={styles.googleBadge}>
+                                <Text style={styles.googleBadgeText}>G</Text>
+                              </View>
+                            </View>
+                            {renderStars(review.review_rating)}
+                          </View>
+                          <View style={styles.reviewActions}>
+                            <TouchableOpacity onPress={() => handleHideGoogleReview(review)}>
+                              <IconSymbol
+                                ios_icon_name={review.is_published ? 'eye.fill' : 'eye.slash.fill'}
+                                android_material_icon_name={review.is_published ? 'visibility' : 'visibility-off'}
+                                size={28}
+                                color={review.is_published ? '#4CAF50' : '#FF9800'}
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        {!review.is_published && (
+                          <Text style={styles.hiddenBadge}>{t('rewards_reviews_editor:hidden_review_badge')}</Text>
+                        )}
+                        {review.review_text ? (
+                          <Text style={styles.reviewText}>
+                            {getLocalizedField(review, 'review_text', language)}
+                          </Text>
+                        ) : null}
+                        {review.owner_answer ? (
+                          <View style={[styles.ownerReplyContainer, { borderLeftColor: colors.primary }]}>
+                            <Text style={[styles.ownerReplyLabel, { color: colors.primary }]}>
+                              {t('rewards_reviews_editor:owner_reply_label')}
+                            </Text>
+                            <Text style={styles.ownerReplyText}>
+                              {getLocalizedField(review, 'owner_answer', language)}
+                            </Text>
+                          </View>
+                        ) : null}
+                        <Text style={styles.reviewDate}>
+                          {new Date(review.review_datetime_utc).toLocaleDateString()}
+                        </Text>
+                      </>
+                    ) : (
+                      <>
+                        <View style={styles.reviewHeader}>
+                          <View style={styles.reviewHeaderLeft}>
+                            <Text style={styles.reviewGuestName}>{review.guest_name}</Text>
+                            {renderStars(review.rating)}
+                          </View>
+                          <View style={styles.reviewActions}>
+                            <TouchableOpacity onPress={() => handleEditReview(review)}>
+                              <IconSymbol
+                                ios_icon_name="pencil.circle.fill"
+                                android_material_icon_name="edit"
+                                size={28}
+                                color={colors.primary}
+                              />
+                            </TouchableOpacity>
+                            <TouchableOpacity onPress={() => handleDeleteReview(review.id)}>
+                              <IconSymbol
+                                ios_icon_name="trash.circle.fill"
+                                android_material_icon_name="delete"
+                                size={28}
+                                color="#F44336"
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                        <Text style={styles.reviewText}>{review.review_text}</Text>
+                        <Text style={styles.reviewDate}>
+                          {new Date(review.review_date).toLocaleDateString()}
+                        </Text>
+                      </>
+                    )}
                   </View>
                 ))
               )}
