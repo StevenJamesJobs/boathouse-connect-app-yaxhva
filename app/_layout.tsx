@@ -98,7 +98,7 @@ const errorStyles = StyleSheet.create({
 function RootLayoutNav() {
   console.log('[RootLayout] Component rendering, Platform:', Platform.OS);
 
-  const { mode, colors: themeColors } = useAppTheme();
+  const { resolvedMode, colors: themeColors } = useAppTheme();
   const networkState = useNetworkState();
   const segments = useSegments();
   const router = useRouter();
@@ -184,8 +184,8 @@ function RootLayoutNav() {
   }
 
   const navigationTheme: Theme = {
-    ...(mode === 'dark' ? DarkTheme : DefaultTheme),
-    dark: mode === 'dark',
+    ...(resolvedMode === 'dark' ? DarkTheme : DefaultTheme),
+    dark: resolvedMode === 'dark',
     colors: {
       primary: themeColors.primary,
       background: themeColors.background,
@@ -200,7 +200,7 @@ function RootLayoutNav() {
 
   return (
     <View style={{ flex: 1 }}>
-      <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={resolvedMode === 'dark' ? 'light' : 'dark'} />
       <ThemeProvider value={navigationTheme}>
         <WidgetProvider>
           <NotificationProvider>

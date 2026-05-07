@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   ThemeColorSet,
@@ -13,6 +14,7 @@ const MODE_STORAGE_KEY = '@app_theme_mode';
 interface ThemeContextType {
   palette: ThemePaletteId;
   mode: ThemeMode;
+  resolvedMode: 'light' | 'dark';
   colors: ThemeColorSet;
   setPalette: (palette: ThemePaletteId) => Promise<void>;
   setMode: (mode: ThemeMode) => Promise<void>;
@@ -21,6 +23,7 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType>({
   palette: 'ocean',
   mode: 'light',
+  resolvedMode: 'light',
   colors: themePalettes.ocean.light,
   setPalette: async () => {},
   setMode: async () => {},
@@ -29,9 +32,9 @@ const ThemeContext = createContext<ThemeContextType>({
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [palette, setPaletteState] = useState<ThemePaletteId>('ocean');
   const [mode, setModeState] = useState<ThemeMode>('light');
+  const systemColorScheme = useColorScheme();
 
   useEffect(() => {
-    // Load saved theme preferences on startup
     Promise.all([
       AsyncStorage.getItem(PALETTE_STORAGE_KEY),
       AsyncStorage.getItem(MODE_STORAGE_KEY),
@@ -39,13 +42,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       if (savedPalette && savedPalette in themePalettes) {
         setPaletteState(savedPalette as ThemePaletteId);
       }
-      if (savedMode === 'light' || savedMode === 'dark') {
+      if (savedMode === 'light' || savedMode === 'dark' || savedMode === 'auto') {
         setModeState(savedMode);
       }
     });
   }, []);
 
-  const colors = themePalettes[palette][mode];
+  const resolvedMode: 'light' | 'dark' =
+    mode === 'auto' ? (systemColorScheme === 'dark' ? 'dark' : 'light') : mode;
+
+  const colors = themePalettes[palette][resolvedMode];
 
   const setPalette = async (newPalette: ThemePaletteId) => {
     setPaletteState(newPalette);
@@ -58,7 +64,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <ThemeContext.Provider value={{ palette, mode, colors, setPalette, setMode }}>
+    <ThemeContext.Provider value={{ palette, mode, resolvedMode, colors, setPalette, setMode }}>
       {children}
     </ThemeContext.Provider>
   );

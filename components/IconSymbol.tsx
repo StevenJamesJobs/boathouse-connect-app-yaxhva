@@ -22,6 +22,7 @@ const ICON_MAP: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   'cloud.rain.fill': 'cloud',
   'sun.max': 'wb-sunny',
   'sun.max.fill': 'wb-sunny',
+  'circle.lefthalf.filled': 'brightness-auto',
   'cloud': 'cloud',
   'cloud.fill': 'cloud',
   

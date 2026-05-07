@@ -22,7 +22,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 export default function AppearanceScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { palette, mode, setPalette, setMode } = useAppTheme();
+  const { palette, mode, resolvedMode, setPalette, setMode } = useAppTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -55,7 +55,7 @@ export default function AppearanceScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* Light / Dark Toggle */}
+      {/* Light / Dark / Auto Toggle */}
       <View style={[styles.modeToggleContainer, { backgroundColor: colors.card }]}>
         <TouchableOpacity
           style={[
@@ -103,6 +103,29 @@ export default function AppearanceScreen() {
             {t('appearance.dark_mode')}
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.modeButton,
+            mode === 'auto' && [styles.modeButtonActive, { backgroundColor: colors.primary }],
+          ]}
+          onPress={() => handleModeToggle('auto')}
+          activeOpacity={0.7}
+        >
+          <IconSymbol
+            ios_icon_name="circle.lefthalf.filled"
+            android_material_icon_name="brightness-auto"
+            size={20}
+            color={mode === 'auto' ? '#FFFFFF' : colors.textSecondary}
+          />
+          <Text
+            style={[
+              styles.modeButtonText,
+              { color: mode === 'auto' ? '#FFFFFF' : colors.textSecondary },
+            ]}
+          >
+            {t('appearance.auto_mode')}
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Theme Palette Grid */}
@@ -114,7 +137,7 @@ export default function AppearanceScreen() {
         {THEME_PALETTE_IDS.map((id) => {
           const pal = themePalettes[id];
           const isSelected = palette === id;
-          const previewColors = pal[mode];
+          const previewColors = pal[resolvedMode];
 
           return (
             <TouchableOpacity
