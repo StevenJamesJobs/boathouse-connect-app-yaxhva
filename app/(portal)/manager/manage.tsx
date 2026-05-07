@@ -67,7 +67,6 @@ export default function ManagerManageScreen() {
   const employeeItems: GridItem[] = [
     { id: 'guides', label: t('manager_manage.grid_guides'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training-editor' },
     { id: 'game-hub', label: t('manager_manage.grid_game_hub'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub-editor' },
-    { id: 'weekly-quizzes', label: 'Weekly Quizzes', iosIcon: 'questionmark.circle.fill', androidIcon: 'quiz', route: '/quiz-hub-editor' },
     { id: 'assistant-editors', label: t('manager_manage.grid_assistant_editors'), iosIcon: 'person.crop.rectangle.stack.fill', androidIcon: 'groups', route: '/assistant-editors' },
   ];
 

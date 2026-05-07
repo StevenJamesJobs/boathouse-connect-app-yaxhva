@@ -32,6 +32,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
 import CategoryPill from '@/components/CategoryPill';
+import SeasonSelector, { type Season } from '@/components/SeasonSelector';
 
 interface MenuItem {
   id: string;
@@ -119,6 +120,9 @@ const SUBCATEGORIES: { [key: string]: string[] } = {
   'Happy Hour': ['Appetizers', 'Drinks', 'Spirits'],
 };
 
+// Libation subcategories managed via Summer Libation Recipes Editor when season='summer'
+const COCKTAIL_SUBCATEGORIES = new Set(['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV']);
+
 // Build flat page sequence for horizontal swipe navigation (mirrors MenuDisplay)
 interface PageConfig {
   category: string;
@@ -143,6 +147,7 @@ export default function MenuEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { language } = useLanguage();
+  const [season, setSeason] = useState<Season>('summer');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -186,6 +191,7 @@ export default function MenuEditorScreen() {
     flavor_profile_es: '',
     unique_selling_points: '',
     unique_selling_points_es: '',
+    item_season: 'both' as 'winter' | 'summer' | 'both',
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
@@ -196,19 +202,21 @@ export default function MenuEditorScreen() {
 
   useEffect(() => {
     loadMenuItems();
-  }, []);
+    setCurrentPageIndex(0);
+    pagerRef.current?.scrollToIndex({ index: 0, animated: false });
+  }, [season]);
 
   const loadMenuItems = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('menu_items')
+      const { data, error } = await (supabase
+        .from('menu_items') as any)
         .select('*')
+        .in('season', [season, 'both'])
         .order('display_order', { ascending: true });
 
       if (error) throw error;
-      console.log('Loaded menu items:', data);
-      setMenuItems(data || []);
+      setMenuItems((data || []) as MenuItem[]);
     } catch (error) {
       console.error('Error loading menu items:', error);
       Alert.alert(t('common:error'), t('menu_editor:load_error'));
@@ -507,6 +515,7 @@ export default function MenuEditorScreen() {
           p_flavor_profile_es: isWine ? (formData.flavor_profile_es || null) : null,
           p_unique_selling_points: isWine ? (formData.unique_selling_points || null) : null,
           p_unique_selling_points_es: isWine ? (formData.unique_selling_points_es || null) : null,
+          p_season: formData.item_season,
         });
 
         if (error) {
@@ -550,6 +559,7 @@ export default function MenuEditorScreen() {
           p_flavor_profile_es: isWine ? (formData.flavor_profile_es || null) : null,
           p_unique_selling_points: isWine ? (formData.unique_selling_points || null) : null,
           p_unique_selling_points_es: isWine ? (formData.unique_selling_points_es || null) : null,
+          p_season: formData.item_season,
         });
 
         if (error) {
@@ -795,6 +805,7 @@ export default function MenuEditorScreen() {
       flavor_profile_es: '',
       unique_selling_points: '',
       unique_selling_points_es: '',
+      item_season: season === 'summer' ? 'summer' : season === 'winter' ? 'winter' : 'both',
     });
     setSelectedImageUri(null);
     setShowSpanish(false);
@@ -828,6 +839,7 @@ export default function MenuEditorScreen() {
       flavor_profile_es: item.flavor_profile_es || '',
       unique_selling_points: item.unique_selling_points || '',
       unique_selling_points_es: item.unique_selling_points_es || '',
+      item_season: ((item as any).season as 'winter' | 'summer' | 'both') || 'both',
     });
     setShowSpanish(false);
     setSelectedImageUri(null);
@@ -887,6 +899,11 @@ export default function MenuEditorScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('menu_editor:title')}</Text>
         <View style={styles.backButton} />
+      </View>
+
+      {/* Season Selector */}
+      <View style={styles.seasonSelectorContainer}>
+        <SeasonSelector selectedSeason={season} onSeasonChange={setSeason} />
       </View>
 
       {/* Search Bar + Add Button */}
@@ -999,6 +1016,21 @@ export default function MenuEditorScreen() {
             />
           ))}
         </ScrollView>
+      )}
+
+      {/* Summer Libation cocktails redirect banner */}
+      {season === 'summer' && selectedCategory === 'Libations' && selectedSubcategory && COCKTAIL_SUBCATEGORIES.has(selectedSubcategory) && !searchQuery && (
+        <TouchableOpacity
+          style={styles.libationBanner}
+          onPress={() => router.push('/summer-libation-recipes-editor' as any)}
+          activeOpacity={0.7}
+        >
+          <IconSymbol ios_icon_name="info.circle.fill" android_material_icon_name="info" size={20} color={colors.primary} />
+          <Text style={styles.libationBannerText}>
+            {t('menu_editor:summer_libation_banner')}
+          </Text>
+          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={18} color={colors.primary} />
+        </TouchableOpacity>
       )}
 
       {/* Menu Items List */}
@@ -1683,6 +1715,30 @@ export default function MenuEditorScreen() {
                 </View>
               )}
 
+              {/* Season Tag */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>{t('menu_editor:season_label')}</Text>
+                <View style={styles.seasonTagRow}>
+                  {(['winter', 'both', 'summer'] as const).map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[
+                        styles.seasonTagOption,
+                        formData.item_season === s && { backgroundColor: colors.primary },
+                      ]}
+                      onPress={() => setFormData({ ...formData, item_season: s })}
+                    >
+                      <Text style={[
+                        styles.seasonTagText,
+                        { color: formData.item_season === s ? '#FFFFFF' : colors.text },
+                      ]}>
+                        {t(`menu_editor:season_${s}`)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
               {/* Dietary Options */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{t('menu_editor:dietary_label')}</Text>
@@ -1848,6 +1904,44 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
+  },
+  seasonSelectorContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  libationBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary + '10',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    borderRadius: 12,
+    padding: 12,
+    gap: 8,
+  },
+  libationBannerText: {
+    flex: 1,
+    fontSize: 13,
+    color: colors.text,
+    lineHeight: 18,
+  },
+  seasonTagRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  seasonTagOption: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  seasonTagText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   searchRow: {
     flexDirection: 'row',

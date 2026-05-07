@@ -25,6 +25,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { getImageUrl } from '@/utils/imageUrl';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
+import SeasonSelector, { type Season } from '@/components/SeasonSelector';
 
 interface MenuItem {
   id: string;
@@ -100,6 +101,20 @@ for (const category of CATEGORIES) {
 
 // Phantom bridge page used when swipe-to-welcome is enabled
 const WELCOME_BRIDGE_PAGE: PageConfig = { category: '__welcome-bridge__', subcategory: null };
+
+// Libation subcategories that pull from summer_libation_recipes when season='summer'
+const COCKTAIL_SUBCATEGORIES = new Set(['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV']);
+
+// Map summer_libation_recipes.category → menu SUBCATEGORIES names
+// Featured → Signature Cocktails so they appear at the top of that page
+const SUMMER_LIB_CATEGORY_MAP: Record<string, string> = {
+  'Featured': 'Signature Cocktails',
+  'Signature Cocktails': 'Signature Cocktails',
+  'Martinis': 'Martinis',
+  'Sangrias': 'Sangria',
+  'Low ABV': 'Low ABV',
+  'No ABV': 'Zero ABV',
+};
 
 // Filter options
 const FILTER_OPTIONS = [
@@ -185,6 +200,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   }, [hasBridge]);
   const bridgeOffset = hasBridge ? 1 : 0;
 
+  const [season, setSeason] = useState<Season>('summer');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -263,7 +279,9 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
 
   useEffect(() => {
     loadMenuItems();
-  }, []);
+    setCurrentPageIndex(bridgeOffset);
+    pagerRef.current?.scrollToIndex({ index: bridgeOffset, animated: false });
+  }, [season]);
 
   // Filter items for a given page
   const getItemsForPage = useCallback((page: PageConfig): MenuItem[] => {
@@ -339,14 +357,50 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const loadMenuItems = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('menu_items')
+      const { data, error } = await (supabase
+        .from('menu_items') as any)
         .select('*')
         .eq('is_active', true)
+        .in('season', [season, 'both'])
         .order('display_order', { ascending: true });
 
       if (error) throw error;
-      setMenuItems(data || []);
+      let items: MenuItem[] = data || [];
+
+      if (season === 'summer') {
+        const { data: slrData } = await (supabase
+          .from('summer_libation_recipes' as any) as any)
+          .select('*')
+          .eq('is_active', true)
+          .order('display_order', { ascending: true });
+
+        if (slrData) {
+          const mapped: MenuItem[] = slrData.map((r: any) => ({
+            id: `slr-${r.id}`,
+            name: r.name,
+            name_es: null,
+            description: r.ingredients?.map((i: any) => i.ingredient).join(', ') || null,
+            description_es: null,
+            price: r.price,
+            category: 'Libations',
+            subcategory: SUMMER_LIB_CATEGORY_MAP[r.category] || r.category,
+            available_for_lunch: false,
+            available_for_dinner: false,
+            is_gluten_free: false,
+            is_gluten_free_available: false,
+            is_vegetarian: false,
+            is_vegetarian_available: false,
+            thumbnail_url: r.thumbnail_url,
+            thumbnail_shape: 'square',
+            display_order: r.category === 'Featured' ? -1000 + r.display_order : r.display_order,
+            is_active: true,
+          }));
+          items = [...items, ...mapped];
+          items.sort((a, b) => a.display_order - b.display_order);
+        }
+      }
+
+      setMenuItems(items);
     } catch (error) {
       console.error('Error loading menu items:', error);
     } finally {
@@ -632,8 +686,13 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      {/* Fixed Header Area: Search + Filter + Category/Subcategory pills */}
+      {/* Fixed Header Area: Season toggle + Search + Filter + Category/Subcategory pills */}
       <View style={styles.headerArea}>
+        {/* Season Selector */}
+        <View style={styles.seasonSelectorContainer}>
+          <SeasonSelector selectedSeason={season} onSeasonChange={setSeason} />
+        </View>
+
         {/* Search Bar and Filter Button */}
         <View style={styles.searchFilterContainer}>
           <View style={styles.searchContainer}>
@@ -953,6 +1012,10 @@ const createStyles = (colors: any) =>
     },
     headerArea: {
       paddingTop: 20,
+    },
+    seasonSelectorContainer: {
+      paddingHorizontal: 16,
+      marginBottom: 12,
     },
     // Search & Filter
     searchFilterContainer: {

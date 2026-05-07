@@ -20,7 +20,7 @@ import { useFocusEffect } from '@react-navigation/native';
 interface ExamSummary {
   id: string;
   exam_type: ExamType;
-  status: 'draft' | 'active' | 'closed';
+  status: 'draft' | 'active' | 'paused' | 'closed';
   time_limit_seconds: number;
   questionCount: number;
   completedCount: number;
@@ -53,7 +53,7 @@ export default function QuizHubEditorScreen() {
           .from('exams' as any) as any)
           .select('*')
           .eq('exam_type', examType)
-          .in('status', ['draft', 'active'])
+          .in('status', ['draft', 'active', 'paused'])
           .order('created_at', { ascending: false })
           .limit(1);
 
@@ -70,7 +70,7 @@ export default function QuizHubEditorScreen() {
           let completedCount = 0;
           let totalEmployees = 0;
 
-          if (exam.status === 'active') {
+          if (exam.status === 'active' || exam.status === 'paused') {
             try {
               const { data: completionData } = await (supabase.rpc as any)('get_exam_completion_status', {
                 p_exam_id: exam.id,
@@ -117,6 +117,7 @@ export default function QuizHubEditorScreen() {
     switch (status) {
       case 'draft': return '#F59E0B';
       case 'active': return '#10B981';
+      case 'paused': return '#F59E0B';
       case 'closed': return '#EF4444';
       default: return colors.textSecondary;
     }
@@ -172,7 +173,7 @@ export default function QuizHubEditorScreen() {
         </View>
 
         {/* Progress bar for active exams */}
-        {exam?.status === 'active' && exam.totalEmployees > 0 && (
+        {(exam?.status === 'active' || exam?.status === 'paused') && exam.totalEmployees > 0 && (
           <View style={styles.cardBottom}>
             <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
               <View

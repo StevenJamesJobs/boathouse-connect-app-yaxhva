@@ -90,7 +90,7 @@ export default function WeeklyQuizzesScreen() {
         const { data: examData } = await (supabase.from('exams' as any) as any)
           .select('id, time_limit_seconds, status, close_at')
           .eq('exam_type', examType)
-          .eq('status', 'active')
+          .in('status', ['active', 'paused'])
           .order('activated_at', { ascending: false })
           .limit(1);
 
@@ -201,6 +201,7 @@ export default function WeeklyQuizzesScreen() {
               key={q.examType}
               titleLabel={q.titleLabel}
               activeExam={q.activeExam}
+              isPaused={q.activeExam?.status === 'paused'}
               result={q.result}
               questionCount={q.questionCount}
               rewardPerCorrect={rewardPerCorrect}

@@ -96,7 +96,35 @@ export default function BartenderAssistantEditorScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Libation Recipes Editor */}
+        {/* Summer Libation Recipes Editor */}
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: colors.card }]}
+          onPress={() => router.push('/summer-libation-recipes-editor')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.cardContent}>
+            <IconSymbol
+              ios_icon_name="sun.max.fill"
+              android_material_icon_name="wb-sunny"
+              size={28}
+              color={colors.primary}
+            />
+            <View style={styles.cardText}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.summer_libation_recipes_editor')}</Text>
+              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                {t('bartender_assistant_editor.summer_libation_recipes_editor_desc')}
+              </Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </View>
+        </TouchableOpacity>
+
+        {/* Winter Libation Recipes Editor */}
         <TouchableOpacity
           style={[styles.card, { backgroundColor: colors.card }]}
           onPress={() => router.push('/libation-recipes-editor')}
@@ -104,15 +132,15 @@ export default function BartenderAssistantEditorScreen() {
         >
           <View style={styles.cardContent}>
             <IconSymbol
-              ios_icon_name="wineglass"
-              android_material_icon_name="local-bar"
+              ios_icon_name="snowflake"
+              android_material_icon_name="ac-unit"
               size={28}
               color={colors.primary}
             />
             <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.libation_recipes_editor')}</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.winter_libation_recipes_editor')}</Text>
               <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                {t('bartender_assistant_editor.libation_recipes_editor_desc')}
+                {t('bartender_assistant_editor.winter_libation_recipes_editor_desc')}
               </Text>
             </View>
             <IconSymbol

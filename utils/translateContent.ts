@@ -90,6 +90,10 @@ const TRANSLATION_RPC_MAP: Record<string, { rpc: string; paramMap: Record<string
     rpc: 'update_libation_recipe_translations',
     paramMap: { procedure_es: 'p_procedure_es' },
   },
+  summer_libation_recipes: {
+    rpc: 'update_summer_libation_recipe_translations',
+    paramMap: { procedure_es: 'p_procedure_es' },
+  },
   cocktails: {
     rpc: 'update_cocktail_translations',
     paramMap: { procedure_es: 'p_procedure_es' },

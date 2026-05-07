@@ -19,6 +19,7 @@ export interface WeeklyQuizCardProps {
   questionCount: number;
   rewardPerCorrect?: number; // $ per correct standard question (default 1)
   eligibleQuizCount?: number; // total number of weekly quizzes this user is eligible for
+  isPaused?: boolean;
   closeAt?: string | null; // ISO timestamp for when the quiz auto-closes
   onTakeQuiz: (examId: string) => void;
   onReviewAnswers: (result: WeeklyQuizCardResult) => void;
@@ -29,6 +30,7 @@ export default function WeeklyQuizCard({
   activeExam,
   result,
   questionCount,
+  isPaused = false,
   rewardPerCorrect = 1,
   eligibleQuizCount = 1,
   closeAt = null,
@@ -62,6 +64,31 @@ export default function WeeklyQuizCard({
           {isSpanish
             ? '¡No hay un examen activo en este momento. Vuelve pronto!'
             : "There's no active quiz right now. Check back soon!"}
+        </Text>
+      </View>
+    );
+  }
+
+  // Paused state
+  if (isPaused && !result) {
+    return (
+      <View style={[styles.examEmptyCard, { backgroundColor: colors.card }]}>
+        <View style={[styles.examActiveBadge, { backgroundColor: '#F59E0B20' }]}>
+          <IconSymbol
+            ios_icon_name="pause.circle.fill"
+            android_material_icon_name="pause-circle-filled"
+            size={20}
+            color="#F59E0B"
+          />
+          <Text style={[styles.examActiveBadgeText, { color: '#F59E0B' }]}>
+            {isSpanish ? 'Examen en Pausa' : 'Quiz Paused'}
+          </Text>
+        </View>
+        <Text style={[styles.examEmptyTitle, { color: colors.text }]}>{titleLabel}</Text>
+        <Text style={[styles.examEmptyDesc, { color: colors.textSecondary }]}>
+          {isSpanish
+            ? 'Este examen está en pausa actualmente. ¡Vuelve pronto!'
+            : 'This quiz is currently paused. Check back soon!'}
         </Text>
       </View>
     );

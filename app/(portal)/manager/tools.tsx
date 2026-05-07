@@ -61,27 +61,29 @@ export default function ManagerToolsScreen() {
                                  jobTitles.includes('Manager') ||
                                  jobTitles.includes('Runner');
 
-  // ─── Build flat tile list ────────────────────────────────────────────────────
+  // ─── Build tile lists ────────────────────────────────────────────────────────
 
-  const allItems: GridItem[] = [
-    // Fixed top row: Guides & Training → Game Hub → Rewards & Reviews
+  const fixedItems: GridItem[] = [
     { id: 'guides-training', label: t('manager_tools.guides_training'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training' },
     { id: 'game-hub', label: t('employee_tools.game_hub'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub' },
-    { id: 'rewards-reviews', label: t('manager_tools.rewards_reviews'), iosIcon: 'gift.fill', androidIcon: 'card-giftcard', route: '/rewards-and-reviews-editor' },
+    { id: 'weekly-quizzes', label: 'Weekly Quizzes', iosIcon: 'questionmark.circle.fill', androidIcon: 'quiz', route: '/quiz-hub-editor' },
   ];
 
-  // Role-based assistants fill remaining positions
   if (canSeeServerAssistant) {
-    allItems.push({ id: 'check-outs-calculator', label: 'Check Outs Calculator', iosIcon: 'dollarsign.circle.fill', androidIcon: 'calculate', route: '/check-out-calculator' });
+    fixedItems.push({ id: 'check-outs-calculator', label: 'Check Outs Calculator', iosIcon: 'dollarsign.circle.fill', androidIcon: 'calculate', route: '/check-out-calculator' });
   }
+  fixedItems.push({ id: 'rewards-reviews', label: t('manager_tools.rewards_reviews'), iosIcon: 'gift.fill', androidIcon: 'card-giftcard', route: '/rewards-and-reviews-editor' });
+
+  // Assistants section (visually distinct)
+  const assistantItems: GridItem[] = [];
   if (canSeeBarAssistant) {
-    allItems.push({ id: 'bartender', label: t('employee_tools.bartender_assistant'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant' });
+    assistantItems.push({ id: 'bartender', label: t('employee_tools.bartender_assistant'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant' });
   }
   if (canSeeHostAssistant) {
-    allItems.push({ id: 'host', label: t('employee_tools.host_assistant'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/host-assistant' });
+    assistantItems.push({ id: 'host', label: t('employee_tools.host_assistant'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/host-assistant' });
   }
   if (canSeeKitchenAssistant) {
-    allItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
+    assistantItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
   }
 
   // ─── Grid rendering ─────────────────────────────────────────────────────────
@@ -130,8 +132,34 @@ export default function ManagerToolsScreen() {
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         <View style={styles.gridContainer}>
-          {allItems.map(renderGridItem)}
+          {fixedItems.map(renderGridItem)}
         </View>
+
+        {assistantItems.length > 0 && (
+          <>
+            <Text style={[styles.sectionHeader, { color: colors.text }]}>Assistants</Text>
+            <View style={styles.assistantsRow}>
+              {assistantItems.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={[styles.assistantButton, { backgroundColor: colors.primary + '20' }]}
+                  onPress={() => router.push(item.route as any)}
+                  activeOpacity={0.7}
+                >
+                  <IconSymbol
+                    ios_icon_name={item.iosIcon as any}
+                    android_material_icon_name={item.androidIcon as any}
+                    size={24}
+                    color={colors.primary}
+                  />
+                  <Text style={[styles.assistantLabel, { color: colors.text }]} numberOfLines={2}>
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -193,5 +221,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 16,
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 24,
+    marginBottom: 12,
+  },
+  assistantsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  assistantButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+  },
+  assistantLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    marginTop: 6,
+    textAlign: 'center',
   },
 });

@@ -34,7 +34,7 @@ interface Exam {
   id: string;
   exam_type: string;
   cycle_key: string;
-  status: 'draft' | 'active' | 'closed';
+  status: 'draft' | 'active' | 'paused' | 'closed';
   time_limit_seconds: number;
   created_by: string;
   activated_at: string | null;
@@ -149,7 +149,7 @@ export default function ExamEditorScreen() {
         .from('exams' as any) as any)
         .select('*')
         .eq('exam_type', examType)
-        .in('status', ['draft', 'active'])
+        .in('status', ['draft', 'active', 'paused'])
         .order('created_at', { ascending: false })
         .limit(1);
 
@@ -161,7 +161,7 @@ export default function ExamEditorScreen() {
         setNotifyOnActivate(Boolean(exam.notify_on_activate));
         setRewardsEnabled(exam.rewards_enabled !== false);
         await fetchQuestions(exam.id);
-        if (exam.status === 'active') {
+        if (exam.status === 'active' || exam.status === 'paused') {
           await fetchCompletionData(exam.id);
         }
       } else {
@@ -180,7 +180,7 @@ export default function ExamEditorScreen() {
   // Tick a countdown re-render once per second while a close_at is active,
   // so the "Closes in …" label updates live.
   useEffect(() => {
-    if (!closeAt || !currentExam || currentExam.status === 'closed') {
+    if (!closeAt || !currentExam || currentExam.status === 'closed' || currentExam.status === 'paused') {
       if (countdownIntervalRef.current) {
         clearInterval(countdownIntervalRef.current);
         countdownIntervalRef.current = null;
@@ -401,6 +401,48 @@ export default function ExamEditorScreen() {
             } catch (err) {
               console.error('Activate error:', err);
             }
+          },
+        },
+      ]
+    );
+  };
+
+  const handlePause = () => {
+    if (!currentExam) return;
+    Alert.alert(
+      'Pause Quiz',
+      'This will pause the quiz. Employees won\'t be able to take it until you resume. In-progress attempts are preserved.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Pause',
+          onPress: async () => {
+            await (supabase
+              .from('exams' as any) as any)
+              .update({ status: 'paused' })
+              .eq('id', currentExam.id);
+            await fetchCurrentExam();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleResume = () => {
+    if (!currentExam) return;
+    Alert.alert(
+      'Resume Quiz',
+      'This will make the quiz live again for employees.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Resume',
+          onPress: async () => {
+            await (supabase
+              .from('exams' as any) as any)
+              .update({ status: 'active' })
+              .eq('id', currentExam.id);
+            await fetchCurrentExam();
           },
         },
       ]
@@ -765,6 +807,7 @@ export default function ExamEditorScreen() {
     switch (status) {
       case 'draft': return '#F59E0B';
       case 'active': return '#10B981';
+      case 'paused': return '#F59E0B';
       case 'closed': return '#EF4444';
       default: return colors.textSecondary;
     }
@@ -884,7 +927,7 @@ export default function ExamEditorScreen() {
       </View>
 
       {/* Tab Selector (only show when there's an active exam) */}
-      {currentExam?.status === 'active' && (
+      {(currentExam?.status === 'active' || currentExam?.status === 'paused') && (
         <View style={styles.tabWrapper}>
           <View style={[styles.tabContainer, { backgroundColor: colors.card }]}>
             <TouchableOpacity
@@ -1104,7 +1147,7 @@ export default function ExamEditorScreen() {
                       { backgroundColor: timeLimit === secs ? colors.primary : colors.background, borderColor: colors.border },
                     ]}
                     onPress={() => handleUpdateTimeLimit(secs)}
-                    disabled={currentExam.status === 'active'}
+                    disabled={currentExam.status === 'active' || currentExam.status === 'paused'}
                   >
                     <Text style={[
                       styles.timeLimitOptionText,
@@ -1134,16 +1177,16 @@ export default function ExamEditorScreen() {
                     <TouchableOpacity
                       style={[styles.sourceChip, { backgroundColor: q.is_bonus ? '#F59E0B20' : colors.primary + '15' }]}
                       onPress={() => {
-                        if (currentExam.status === 'draft' && !q.is_bonus) {
+                        if ((currentExam.status === 'draft' || currentExam.status === 'paused') && !q.is_bonus) {
                           setCategoryPickerForQuestion(q);
                         }
                       }}
-                      disabled={currentExam.status !== 'draft' || q.is_bonus}
+                      disabled={(currentExam.status !== 'draft' && currentExam.status !== 'paused') || q.is_bonus}
                     >
                       <Text style={[styles.sourceChipText, { color: q.is_bonus ? '#F59E0B' : colors.primary }]}>
                         {getSourceLabel(q)}
                       </Text>
-                      {currentExam.status === 'draft' && !q.is_bonus && (
+                      {(currentExam.status === 'draft' || currentExam.status === 'paused') && !q.is_bonus && (
                         <IconSymbol
                           ios_icon_name="chevron.down"
                           android_material_icon_name="expand-more"
@@ -1168,7 +1211,7 @@ export default function ExamEditorScreen() {
                     )}
                   </View>
                   <View style={styles.questionActions}>
-                    {currentExam.status === 'draft' && (
+                    {(currentExam.status === 'draft' || currentExam.status === 'paused') && (
                       <>
                         {q.source_type === 'auto' && (
                           <TouchableOpacity
@@ -1237,8 +1280,8 @@ export default function ExamEditorScreen() {
               </View>
             ))}
 
-            {/* Add Buttons (draft only) */}
-            {currentExam.status === 'draft' && (
+            {/* Add Buttons (draft or paused) */}
+            {(currentExam.status === 'draft' || currentExam.status === 'paused') && (
               <>
                 <TouchableOpacity
                   style={[styles.addQuestionButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
@@ -1283,13 +1326,41 @@ export default function ExamEditorScreen() {
               )}
 
               {currentExam.status === 'active' && (
-                <TouchableOpacity
-                  style={[styles.closeButton, { borderColor: '#EF4444' }]}
-                  onPress={handleClose}
-                >
-                  <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={20} color="#EF4444" />
-                  <Text style={[styles.closeButtonText, { color: '#EF4444' }]}>Close Quiz</Text>
-                </TouchableOpacity>
+                <>
+                  <TouchableOpacity
+                    style={[styles.pauseButton, { backgroundColor: '#F59E0B' }]}
+                    onPress={handlePause}
+                  >
+                    <IconSymbol ios_icon_name="pause.circle.fill" android_material_icon_name="pause-circle-filled" size={22} color="#FFF" />
+                    <Text style={styles.pauseButtonText}>Pause Quiz</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.closeButton, { borderColor: '#EF4444' }]}
+                    onPress={handleClose}
+                  >
+                    <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={20} color="#EF4444" />
+                    <Text style={[styles.closeButtonText, { color: '#EF4444' }]}>Close Quiz</Text>
+                  </TouchableOpacity>
+                </>
+              )}
+
+              {currentExam.status === 'paused' && (
+                <>
+                  <TouchableOpacity
+                    style={[styles.activateButton, { backgroundColor: '#10B981' }]}
+                    onPress={handleResume}
+                  >
+                    <IconSymbol ios_icon_name="play.circle.fill" android_material_icon_name="play-circle-filled" size={22} color="#FFF" />
+                    <Text style={styles.activateButtonText}>Resume Quiz</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.closeButton, { borderColor: '#EF4444' }]}
+                    onPress={handleClose}
+                  >
+                    <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={20} color="#EF4444" />
+                    <Text style={[styles.closeButtonText, { color: '#EF4444' }]}>Close Quiz</Text>
+                  </TouchableOpacity>
+                </>
               )}
 
               <TouchableOpacity
@@ -2092,6 +2163,15 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   activateButtonText: { color: '#FFF', fontSize: 17, fontWeight: '700' },
+  pauseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    paddingVertical: 16,
+    gap: 8,
+  },
+  pauseButtonText: { color: '#FFF', fontSize: 17, fontWeight: '700' },
   closeButton: {
     flexDirection: 'row',
     alignItems: 'center',
