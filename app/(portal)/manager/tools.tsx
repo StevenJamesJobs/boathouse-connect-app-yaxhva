@@ -76,14 +76,14 @@ export default function ManagerToolsScreen() {
 
   // Assistants section (visually distinct)
   const assistantItems: GridItem[] = [];
-  if (canSeeBarAssistant) {
-    assistantItems.push({ id: 'bartender', label: t('employee_tools.bartender_assistant'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant' });
+  if (canSeeKitchenAssistant) {
+    assistantItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
   }
   if (canSeeHostAssistant) {
     assistantItems.push({ id: 'host', label: t('employee_tools.host_assistant'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/host-assistant' });
   }
-  if (canSeeKitchenAssistant) {
-    assistantItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
+  if (canSeeBarAssistant) {
+    assistantItems.push({ id: 'bartender', label: t('employee_tools.bartender_assistant'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant' });
   }
 
   // ─── Grid rendering ─────────────────────────────────────────────────────────

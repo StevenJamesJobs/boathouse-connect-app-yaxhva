@@ -12,13 +12,15 @@ import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 
 // Configure how notifications are handled when app is in foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+if (Platform.OS !== 'web') {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+}
 
 interface NotificationContextType {
   expoPushToken: string | null;
@@ -46,6 +48,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     console.log('[NotificationContext] useEffect triggered', { hasUser: !!user });
     if (user) {
+      if (Platform.OS === 'web') return;
+
       console.log('[NotificationContext] User found, registering for push notifications...');
       registerForPushNotificationsAsync().then(token => {
         if (token) {

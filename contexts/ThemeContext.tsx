@@ -21,16 +21,16 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  palette: 'ocean',
+  palette: 'winterchill',
   mode: 'light',
   resolvedMode: 'light',
-  colors: themePalettes.ocean.light,
+  colors: themePalettes.winterchill.light,
   setPalette: async () => {},
   setMode: async () => {},
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [palette, setPaletteState] = useState<ThemePaletteId>('ocean');
+  const [palette, setPaletteState] = useState<ThemePaletteId>('winterchill');
   const [mode, setModeState] = useState<ThemeMode>('light');
   const systemColorScheme = useColorScheme();
 
