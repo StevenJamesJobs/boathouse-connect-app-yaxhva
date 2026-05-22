@@ -32,6 +32,7 @@
     "eas": "^0.1.0",
     "expo": "~54.0.1",
     "expo-blur": "^15.0.6",
+    "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.8",
     "expo-device": "~7.0.1",
     "expo-document-picker": "^13.1.6",

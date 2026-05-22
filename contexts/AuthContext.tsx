@@ -12,8 +12,10 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const STORAGE_KEY = '@mcloones_auth';
-const REMEMBER_ME_KEY = '@mcloones_remember_me';
+const STORAGE_KEY = '@mrc_auth';
+const REMEMBER_ME_KEY = '@mrc_remember_me';
+const OLD_STORAGE_KEY = '@mcloones_auth';
+const OLD_REMEMBER_ME_KEY = '@mcloones_remember_me';
 
 // Lazy-load AsyncStorage to avoid SSR issues
 let AsyncStorage: any = null;
@@ -74,14 +76,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         jobTitle: jobTitleDisplay,
         jobTitles: jobTitlesArray,
         phoneNumber: userData.phone_number || '',
-        role: userData.role as 'employee' | 'manager',
+        role: userData.role as 'employee' | 'manager' | 'owner',
+        organizationId: userData.organization_id,
         profilePictureUrl: userData.profile_picture_url || undefined,
         badgeTitle: userData.badge_title || undefined,
         mcloonesBucks: userData.mcloones_bucks || 0,
         quickTools: userData.quick_tools ? (Array.isArray(userData.quick_tools) ? userData.quick_tools : JSON.parse(userData.quick_tools)) : undefined,
+        forcePasswordChange: userData.force_password_change || false,
       };
 
-      console.log('[AuthContext] User data fetched successfully, job titles:', user.jobTitles);
+      console.log('[AuthContext] User data fetched successfully, org:', user.organizationId, 'job titles:', user.jobTitles);
       return user;
     } catch (error) {
       console.log('[AuthContext] Exception fetching user from database:', error);
@@ -104,9 +108,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       
+      // One-time migration from old storage keys
+      const oldRememberMe = await AsyncStorage.getItem(OLD_REMEMBER_ME_KEY);
+      if (oldRememberMe !== null) {
+        const oldAuth = await AsyncStorage.getItem(OLD_STORAGE_KEY);
+        if (oldAuth) await AsyncStorage.setItem(STORAGE_KEY, oldAuth);
+        await AsyncStorage.setItem(REMEMBER_ME_KEY, oldRememberMe);
+        await AsyncStorage.removeItem(OLD_STORAGE_KEY);
+        await AsyncStorage.removeItem(OLD_REMEMBER_ME_KEY);
+        console.log('[AuthContext] Migrated storage keys from legacy format');
+      }
+
       const rememberMe = await AsyncStorage.getItem(REMEMBER_ME_KEY);
       console.log('[AuthContext] Remember me setting:', rememberMe);
-      
+
       if (rememberMe === 'true') {
         const storedAuth = await AsyncStorage.getItem(STORAGE_KEY);
         if (storedAuth) {
@@ -120,7 +135,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (freshUser) {
               // Update storage with fresh data
               await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
-              
+
+              // Update cached org branding
+              if (freshUser.organizationId) {
+                try {
+                  const { data: orgData } = await supabase
+                    .from('organizations')
+                    .select('name, logo_url')
+                    .eq('id', freshUser.organizationId)
+                    .single();
+                  if (orgData) {
+                    await AsyncStorage.setItem('@mrc_last_org', JSON.stringify({
+                      orgId: freshUser.organizationId,
+                      orgName: orgData.name,
+                      logoUrl: orgData.logo_url,
+                    }));
+                  }
+                } catch {}
+              }
+
               console.log('[AuthContext] Setting authenticated state with fresh user data');
               setAuthState({
                 user: freshUser,
@@ -232,6 +265,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: passwordValid, error: verifyError } = await supabase.rpc('verify_password', {
         user_id: userData.id,
         password: password,
+        p_organization_id: null,
       });
 
       if (verifyError) {
@@ -265,11 +299,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         jobTitle: jobTitleDisplay,
         jobTitles: jobTitlesArray,
         phoneNumber: userData.phone_number || '',
-        role: userData.role as 'employee' | 'manager',
+        role: userData.role as 'employee' | 'manager' | 'owner',
+        organizationId: userData.organization_id,
         profilePictureUrl: userData.profile_picture_url || undefined,
         badgeTitle: userData.badge_title || undefined,
         mcloonesBucks: userData.mcloones_bucks || 0,
         quickTools: userData.quick_tools ? (Array.isArray(userData.quick_tools) ? userData.quick_tools : JSON.parse(userData.quick_tools)) : undefined,
+        forcePasswordChange: userData.force_password_change || false,
       };
 
       // Store auth state if AsyncStorage is available
@@ -288,6 +324,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: false,
         isAuthenticated: true,
       });
+
+      // Cache org branding for login screen (hybrid approach)
+      if (AsyncStorage && userData.organization_id) {
+        try {
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('name, logo_url')
+            .eq('id', userData.organization_id)
+            .single();
+          if (orgData) {
+            await AsyncStorage.setItem('@mrc_last_org', JSON.stringify({
+              orgId: userData.organization_id,
+              orgName: orgData.name,
+              logoUrl: orgData.logo_url,
+            }));
+          }
+        } catch {}
+      }
 
       console.log('[AuthContext] Login successful for user:', user.name, 'Role:', user.role);
       return true;

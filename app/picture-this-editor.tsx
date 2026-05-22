@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { PictureThisCategory } from '@/utils/game/pictureThisGenerator';
 
 interface CategoryRow {
@@ -38,6 +39,7 @@ export default function PictureThisEditorScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { t } = useTranslation();
+  const { organizationId } = useOrganization();
   const [resetting, setResetting] = useState<string | null>(null);
 
   const confirmReset = (category: PictureThisCategory | null) => {
@@ -60,9 +62,10 @@ export default function PictureThisEditorScreen() {
     const key = category ?? 'all';
     setResetting(key);
     try {
-      const { error } = await (supabase.rpc as any)('reset_picture_this_scores', {
+      const { error } = await supabase.rpc('reset_picture_this_scores', {
         p_category: category ?? null,
         p_difficulty: null,
+        p_organization_id: organizationId,
       });
       if (error) throw error;
       const label = category ? t(CATEGORIES.find(c => c.key === category)!.labelKey) : t('pt_editor:all_categories');

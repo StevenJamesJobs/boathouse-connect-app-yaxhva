@@ -3,6 +3,7 @@ import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 const KEY_EMPLOYEE = (userId: string) => `lastViewedAwards_${userId}`;
 const KEY_MANAGER = (userId: string) => `lastViewedManagerRecent_${userId}`;
@@ -28,8 +29,9 @@ export function refreshAllUnreadAwards() {
  */
 export function useUnreadAwards() {
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const [count, setCount] = useState(0);
-  const isManager = user?.role === 'manager';
+  const isManager = user?.role === 'manager' || user?.role === 'owner';
   const hasNew = count > 0;
 
   const check = useCallback(async () => {
@@ -46,11 +48,13 @@ export function useUnreadAwards() {
       }
 
       if (isManager) {
-        const { count: c } = await supabase
+        let query = supabase
           .from('rewards_transactions')
           .select('id', { count: 'exact', head: true })
           .eq('is_visible', true)
           .gt('created_at', cutoff);
+        if (organizationId) query = query.eq('organization_id', organizationId);
+        const { count: c } = await query;
         setCount(c || 0);
         return;
       }
@@ -65,7 +69,7 @@ export function useUnreadAwards() {
     } catch (err) {
       console.error('Error checking unread awards:', err);
     }
-  }, [user?.id, isManager]);
+  }, [user?.id, isManager, organizationId]);
 
   const markRecentViewed = useCallback(async () => {
     if (!user?.id) return;

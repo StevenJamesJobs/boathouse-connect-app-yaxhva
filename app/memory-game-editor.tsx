@@ -17,6 +17,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { PlayMode } from '@/types/game';
 
 interface WinePairing {
@@ -34,6 +35,7 @@ export default function MemoryGameEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { organizationId } = useOrganization();
   const [activeTab, setActiveTab] = useState<'pairings' | 'scoreboard'>('pairings');
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>('all');
   const [pairings, setPairings] = useState<WinePairing[]>([]);
@@ -49,12 +51,13 @@ export default function MemoryGameEditorScreen() {
     const { data, error } = await supabase
       .from('wine_pairings' as any)
       .select('*')
+      .eq('organization_id', organizationId)
       .order('display_order');
     if (!error && data) {
       setPairings(data as any[]);
     }
     setLoading(false);
-  }, []);
+  }, [organizationId]);
 
   useEffect(() => {
     fetchPairings();
@@ -72,6 +75,7 @@ export default function MemoryGameEditorScreen() {
         entree: newEntree.trim(),
         hint: newHint.trim() || null,
         display_order: nextOrder,
+        organization_id: organizationId,
       });
     if (error) {
       Alert.alert(t('common.error'), error.message);
@@ -142,9 +146,10 @@ export default function MemoryGameEditorScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await (supabase.rpc as any)('reset_game_scores', {
+            await supabase.rpc('reset_game_scores', {
               p_game_mode: mode || null,
               p_play_mode: playModeFilter || null,
+              p_organization_id: organizationId,
             });
             Alert.alert('', t('memory_game.reset_success'));
           } catch (e) {

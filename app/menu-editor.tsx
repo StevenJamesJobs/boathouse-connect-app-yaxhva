@@ -29,10 +29,12 @@ import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/tra
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
 import CategoryPill from '@/components/CategoryPill';
 import SeasonSelector, { type Season } from '@/components/SeasonSelector';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface MenuItem {
   id: string;
@@ -146,7 +148,9 @@ export default function MenuEditorScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const [season, setSeason] = useState<Season>('summer');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
@@ -212,6 +216,7 @@ export default function MenuEditorScreen() {
       const { data, error } = await (supabase
         .from('menu_items') as any)
         .select('*')
+        .eq('organization_id', organizationId)
         .in('season', [season, 'both'])
         .order('display_order', { ascending: true });
 
@@ -490,8 +495,9 @@ export default function MenuEditorScreen() {
 
       if (editingItem) {
         // Update existing item using database function
-        const { data, error } = await (supabase.rpc as any)('update_menu_item', {
+        const { data, error } = await supabase.rpc('update_menu_item', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_menu_item_id: editingItem.id,
           p_name: formData.name,
           p_description: formData.description || null,
@@ -531,12 +537,13 @@ export default function MenuEditorScreen() {
             name_es: formData.name_es,
             description_es: formData.description_es,
             ...(isWine ? { location_es: formData.location_es } : {}),
-          });
+          }, organizationId);
         }
       } else {
         // Create new item using database function
-        const { data, error } = await (supabase.rpc as any)('create_menu_item', {
+        const { data, error } = await supabase.rpc('create_menu_item', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_name: formData.name,
           p_description: formData.description || null,
           p_price: formData.price,
@@ -574,6 +581,7 @@ export default function MenuEditorScreen() {
           const { data: newItem } = await supabase
             .from('menu_items')
             .select('id')
+            .eq('organization_id', organizationId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
@@ -582,7 +590,7 @@ export default function MenuEditorScreen() {
               name_es: formData.name_es,
               description_es: formData.description_es,
               ...(isWine ? { location_es: formData.location_es } : {}),
-            });
+            }, organizationId);
           }
         }
       }
@@ -614,6 +622,7 @@ export default function MenuEditorScreen() {
               // Delete using database function
               const { error } = await supabase.rpc('delete_menu_item', {
                 p_user_id: user.id,
+                p_organization_id: organizationId,
                 p_menu_item_id: item.id,
               });
 

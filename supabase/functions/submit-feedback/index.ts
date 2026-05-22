@@ -66,7 +66,7 @@ serve(async (req) => {
     console.log('Authenticated user:', user.id);
 
     // Parse the request body
-    const { title, description } = await req.json();
+    const { title, description, organization_id } = await req.json();
 
     // Validate input
     if (!title || !title.trim()) {
@@ -92,6 +92,7 @@ serve(async (req) => {
         description: description.trim(),
         created_at: new Date().toISOString(),
         is_deleted: false,
+        ...(organization_id ? { organization_id } : {}),
       })
       .select()
       .single();

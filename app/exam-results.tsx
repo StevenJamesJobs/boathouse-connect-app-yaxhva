@@ -14,6 +14,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { formatTime } from '@/utils/exam/examEngine';
 import { useTranslation } from 'react-i18next';
 import QuestionReviewList from '@/components/QuestionReviewList';
@@ -44,6 +45,8 @@ export default function ExamResultsScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId, organization } = useOrganization();
+  const currencyName = organization.reward_currency_name;
   const { i18n } = useTranslation();
   const isSpanish = i18n.language === 'es';
   const params = useLocalSearchParams<{
@@ -219,7 +222,7 @@ export default function ExamResultsScreen() {
           {!isPreview && (
             <View style={[styles.totalBucksRow, { backgroundColor: '#10B98115' }]}>
               <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={22} color="#10B981" />
-              <Text style={styles.totalBucksText}>{isSpanish ? `+$${totalBucks} McLoone's Bucks Ganados!` : `+$${totalBucks} McLoone's Bucks Earned!`}</Text>
+              <Text style={styles.totalBucksText}>{isSpanish ? `+$${totalBucks} ${currencyName} Ganados!` : `+$${totalBucks} ${currencyName} Earned!`}</Text>
             </View>
           )}
         </View>

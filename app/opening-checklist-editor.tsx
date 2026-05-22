@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -36,6 +37,7 @@ interface ChecklistCategory {
 export default function OpeningChecklistEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { organizationId } = useOrganization();
   const colors = useThemeColors();
 
   const styles = StyleSheet.create({
@@ -303,6 +305,7 @@ export default function OpeningChecklistEditorScreen() {
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('checklist_categories')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('checklist_type', 'opening')
         .eq('is_active', true)
         .order('display_order');
@@ -316,6 +319,7 @@ export default function OpeningChecklistEditorScreen() {
       const { data: itemsData, error: itemsError } = await supabase
         .from('checklist_items')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('display_order');
 
@@ -425,6 +429,7 @@ export default function OpeningChecklistEditorScreen() {
             checklist_type: 'opening',
             name: categoryName.trim(),
             display_order: maxOrder + 1,
+            organization_id: organizationId,
           });
 
         if (error) throw error;
@@ -502,13 +507,14 @@ export default function OpeningChecklistEditorScreen() {
         // Create new item
         const category = categories.find(c => c.id === selectedCategoryId);
         const maxOrder = category ? Math.max(...category.items.map(i => i.display_order), 0) : 0;
-        
+
         const { error } = await supabase
           .from('checklist_items')
           .insert({
             category_id: selectedCategoryId,
             text: itemText.trim(),
             display_order: maxOrder + 1,
+            organization_id: organizationId,
           });
 
         if (error) throw error;

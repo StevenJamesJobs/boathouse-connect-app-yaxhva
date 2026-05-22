@@ -23,8 +23,10 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { notifyLeaderboardPassed } from '@/utils/notificationHelpers';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import {
   PictureThisCategory,
   PictureThisDifficulty,
@@ -66,6 +68,7 @@ export default function PictureThisPlayScreen() {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const params = useLocalSearchParams<{ category: string; difficulty: string; playMode: string }>();
 
   const category = (params.category || 'food') as PictureThisCategory;
@@ -349,6 +352,7 @@ export default function PictureThisPlayScreen() {
 
       await (supabase.from('picture_this_scores') as any).insert({
         user_id: user.id,
+        organization_id: organizationId,
         category,
         difficulty,
         play_mode: playMode,
@@ -368,6 +372,7 @@ export default function PictureThisPlayScreen() {
           finalTotalScore,
           `${user.name} passed you on the leaderboard!`,
           'A new Picture This! score just bumped them above you.',
+          organizationId,
         );
       }
     } catch (err) {

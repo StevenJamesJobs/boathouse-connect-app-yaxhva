@@ -9,9 +9,11 @@ export type Season = 'winter' | 'summer';
 interface SeasonSelectorProps {
   selectedSeason: Season;
   onSeasonChange: (season: Season) => void;
+  menu1Label?: string;
+  menu2Label?: string;
 }
 
-export default function SeasonSelector({ selectedSeason, onSeasonChange }: SeasonSelectorProps) {
+export default function SeasonSelector({ selectedSeason, onSeasonChange, menu1Label, menu2Label }: SeasonSelectorProps) {
   const colors = useThemeColors();
   const { t } = useTranslation();
 
@@ -27,7 +29,7 @@ export default function SeasonSelector({ selectedSeason, onSeasonChange }: Seaso
           size={16} color={selectedSeason === 'winter' ? colors.primary : colors.textSecondary}
         />
         <Text style={[styles.label, { color: selectedSeason === 'winter' ? colors.text : colors.textSecondary }]}>
-          {t('season_selector.winter')}
+          {menu1Label || t('season_selector.winter')}
         </Text>
       </TouchableOpacity>
       <TouchableOpacity
@@ -40,7 +42,7 @@ export default function SeasonSelector({ selectedSeason, onSeasonChange }: Seaso
           size={16} color={selectedSeason === 'summer' ? colors.primary : colors.textSecondary}
         />
         <Text style={[styles.label, { color: selectedSeason === 'summer' ? colors.text : colors.textSecondary }]}>
-          {t('season_selector.summer')}
+          {menu2Label || t('season_selector.summer')}
         </Text>
       </TouchableOpacity>
     </View>

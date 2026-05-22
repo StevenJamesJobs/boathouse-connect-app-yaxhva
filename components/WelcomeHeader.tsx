@@ -79,7 +79,7 @@ export default function WelcomeHeader({
   const profilePictureUrl = getProfilePictureUrl(user?.profilePictureUrl);
 
   const handleProfilePress = () => {
-    if (user?.role === 'manager') {
+    if (user?.role === 'manager' || user?.role === 'owner') {
       router.push('/(portal)/manager/profile' as any);
     } else {
       router.push('/(portal)/employee/profile' as any);

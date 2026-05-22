@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import * as WebBrowser from 'expo-web-browser';
@@ -42,6 +43,7 @@ interface MessageThread {
 }
 
 export default function MessageDetailScreen() {
+  const { organizationId } = useOrganization();
   const { t } = useTranslation('message_detail');
   const { user } = useAuth();
   const router = useRouter();

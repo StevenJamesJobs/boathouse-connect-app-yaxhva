@@ -23,8 +23,10 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
 import RichTextToolbar from '@/components/RichTextToolbar';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface LibationRecipe {
   id: string;
@@ -58,6 +60,7 @@ export default function LibationRecipesEditorScreen() {
   const { user } = useAuth();
   const colors = useThemeColors();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const procedureInputRef = useRef<TextInput>(null);
   const [procedureSelection, setProcedureSelection] = useState({ start: 0, end: 0 });
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
@@ -89,6 +92,7 @@ export default function LibationRecipesEditorScreen() {
       const { data, error } = await supabase
         .from('libation_recipes')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('category', { ascending: true })
         .order('display_order', { ascending: true });
@@ -252,6 +256,7 @@ export default function LibationRecipesEditorScreen() {
         console.log('Updating libation recipe:', editingRecipe.id);
         const { data, error } = await supabase.rpc('update_libation_recipe', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_recipe_id: editingRecipe.id,
           p_name: name.trim(),
           p_price: price.trim(),
@@ -270,7 +275,7 @@ export default function LibationRecipesEditorScreen() {
         }
         console.log('Libation recipe updated successfully');
         if (procedureEs.trim()) {
-          await saveTranslations('libation_recipes', editingRecipe.id, { procedure_es: procedureEs });
+          await saveTranslations('libation_recipes', editingRecipe.id, { procedure_es: procedureEs }, organizationId);
         }
         Alert.alert(t('common.success'), t('libation_editor.recipe_updated'));
       } else {
@@ -278,6 +283,7 @@ export default function LibationRecipesEditorScreen() {
         console.log('Adding new libation recipe');
         const { data, error } = await supabase.rpc('insert_libation_recipe', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_name: name.trim(),
           p_price: price.trim(),
           p_category: category,
@@ -299,10 +305,11 @@ export default function LibationRecipesEditorScreen() {
           .from('libation_recipes')
           .select('id')
           .eq('name', name.trim())
+          .eq('organization_id', organizationId)
           .order('created_at', { ascending: false })
           .limit(1);
         if (newRecipes?.[0] && procedureEs.trim()) {
-          await saveTranslations('libation_recipes', newRecipes[0].id, { procedure_es: procedureEs });
+          await saveTranslations('libation_recipes', newRecipes[0].id, { procedure_es: procedureEs }, organizationId);
         }
         Alert.alert(t('common.success'), t('libation_editor.recipe_added'));
       }
@@ -335,6 +342,7 @@ export default function LibationRecipesEditorScreen() {
             // Use RPC function to delete (same pattern as cocktails editor)
             const { error } = await supabase.rpc('delete_libation_recipe', {
               p_user_id: user.id,
+              p_organization_id: organizationId,
               p_recipe_id: recipe.id,
             });
 

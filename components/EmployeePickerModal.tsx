@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 export interface PickedEmployee {
   id: string;
@@ -54,6 +55,7 @@ export default function EmployeePickerModal({
   onSelect,
   onClose,
 }: EmployeePickerModalProps) {
+  const { organizationId } = useOrganization();
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,6 +69,7 @@ export default function EmployeePickerModal({
       const { data, error } = await supabase
         .from('users')
         .select('id, name, job_title, job_titles, is_active')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name', { ascending: true });
       if (cancelled) return;

@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -137,6 +138,7 @@ interface SpecialFeature {
 export default function EmployeePortalScreen() {
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ openAnnouncementId?: string; openEventId?: string; openFeatureId?: string }>();
@@ -250,6 +252,7 @@ export default function EmployeePortalScreen() {
         supabase
           .from('menu_items')
           .select('*')
+          .eq('organization_id', organizationId)
           .eq('category', 'Weekly Specials')
           .eq('is_active', true)
           .order('display_order', { ascending: true }),
@@ -261,12 +264,13 @@ export default function EmployeePortalScreen() {
               id, title, file_url, file_name, file_type
             )
           `)
+          .eq('organization_id', organizationId)
           .eq('is_active', true)
           .in('visibility', ['everyone', 'employees'])
           .order('display_order', { ascending: true })
           .limit(6),
         (async () => {
-          try { await supabase.rpc('delete_expired_upcoming_events' as any); } catch {}
+          try { await supabase.rpc('delete_expired_upcoming_events', { p_organization_id: organizationId }); } catch {}
           return supabase
             .from('upcoming_events')
             .select(`
@@ -275,6 +279,7 @@ export default function EmployeePortalScreen() {
                 id, title, file_url, file_name, file_type
               )
             `)
+            .eq('organization_id', organizationId)
             .eq('is_active', true)
             .order('display_order', { ascending: true })
             .order('created_at', { ascending: false });
@@ -287,6 +292,7 @@ export default function EmployeePortalScreen() {
               id, title, file_url, file_name, file_type
             )
           `)
+          .eq('organization_id', organizationId)
           .eq('is_active', true)
           .order('display_order', { ascending: true })
           .order('created_at', { ascending: false })

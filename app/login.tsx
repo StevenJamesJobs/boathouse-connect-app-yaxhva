@@ -30,8 +30,20 @@ export default function LoginScreen() {
   const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [cachedOrg, setCachedOrg] = useState<{ orgId: string; orgName: string; logoUrl: string | null } | null>(null);
   const router = useRouter();
   const { login, isAuthenticated, user } = useAuth();
+
+  useEffect(() => {
+    async function loadCachedOrg() {
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        const cached = await AsyncStorage.getItem('@mrc_last_org');
+        if (cached) setCachedOrg(JSON.parse(cached));
+      } catch {}
+    }
+    loadCachedOrg();
+  }, []);
 
   // Animation values - use useRef to avoid re-renders
   const logoScale = useRef(new Animated.Value(0)).current;
@@ -82,7 +94,7 @@ export default function LoginScreen() {
       console.log('[iOS Login] Already authenticated, redirecting to portal');
       const timeout = setTimeout(() => {
         try {
-          if (user.role === 'manager') {
+          if (user.role === 'manager' || user.role === 'owner') {
             router.replace('/(portal)/manager');
           } else {
             router.replace('/(portal)/employee');
@@ -157,11 +169,26 @@ export default function LoginScreen() {
             },
           ]}
         >
-          <Image
-            source={require('@/assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
+          {cachedOrg?.logoUrl ? (
+            <Image
+              source={{ uri: cachedOrg.logoUrl }}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          ) : cachedOrg ? (
+            <Text style={styles.orgNameText}>{cachedOrg.orgName}</Text>
+          ) : (
+            <Image
+              source={require('@/assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          )}
+          {cachedOrg && (
+            <Text style={styles.welcomeBackText}>
+              {t('login.welcome_back', { orgName: cachedOrg.orgName })}
+            </Text>
+          )}
         </Animated.View>
 
         {/* Form Section */}
@@ -267,6 +294,17 @@ export default function LoginScreen() {
           <Text style={styles.forgotPasswordText}>
             {t('login.forgot_password')}
           </Text>
+
+          {/* Join / Owner Links */}
+          <View style={styles.linksContainer}>
+            <TouchableOpacity onPress={() => router.push('/join')}>
+              <Text style={styles.linkText}>{t('login.join_restaurant')}</Text>
+            </TouchableOpacity>
+            <Text style={styles.linkSeparator}>or</Text>
+            <TouchableOpacity onPress={() => router.push('/onboarding/signup')}>
+              <Text style={styles.linkText}>{t('login.owner_signup')}</Text>
+            </TouchableOpacity>
+          </View>
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -362,5 +400,31 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: splashColors.textSecondary,
     fontStyle: 'italic',
+  },
+  orgNameText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: splashColors.text,
+    textAlign: 'center',
+  },
+  welcomeBackText: {
+    fontSize: 16,
+    color: splashColors.text,
+    textAlign: 'center',
+    marginTop: 12,
+  },
+  linksContainer: {
+    alignItems: 'center',
+    marginTop: 24,
+  },
+  linkText: {
+    fontSize: 14,
+    color: splashColors.primary,
+    textAlign: 'center',
+  },
+  linkSeparator: {
+    fontSize: 13,
+    color: splashColors.textSecondary,
+    marginVertical: 6,
   },
 });

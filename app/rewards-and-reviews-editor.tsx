@@ -25,6 +25,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -685,6 +686,8 @@ export default function RewardsAndReviewsEditorScreen() {
 
 
   const { user } = useAuth();
+  const { organizationId, organization } = useOrganization();
+  const currencyName = organization.reward_currency_name;
   const { sendNotification } = useNotification();
   const { pendingCount } = usePendingApprovals();
   const { hasNew: managerRecentHasNew, markRecentViewed: markManagerRecentViewed } = useUnreadAwards();
@@ -762,6 +765,7 @@ export default function RewardsAndReviewsEditorScreen() {
       const { data, error } = await supabase
         .from('users')
         .select('id, username, name, job_title, mcloones_bucks')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name', { ascending: true });
 
@@ -770,7 +774,7 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
-  }, []);
+  }, [organizationId]);
 
   const fetchRewardsData = useCallback(async () => {
     try {
@@ -791,6 +795,7 @@ export default function RewardsAndReviewsEditorScreen() {
       const { data: topData, error: topError } = await supabase
         .from('users')
         .select('id, name, job_title, mcloones_bucks')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('mcloones_bucks', { ascending: false })
         .limit(10);
@@ -804,6 +809,7 @@ export default function RewardsAndReviewsEditorScreen() {
       const { data: transData, error: transError } = await supabase
         .from('rewards_transactions')
         .select('id, user_id, amount, description, is_visible, created_at')
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -847,13 +853,14 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error) {
       console.error('Error fetching rewards data:', error);
     }
-  }, [user?.id]);
+  }, [user?.id, organizationId]);
 
   const fetchReviews = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('guest_reviews')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('display_order', { ascending: true })
         .order('review_date', { ascending: false });
 
@@ -862,13 +869,14 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
-  }, []);
+  }, [organizationId]);
 
   const fetchGoogleReviews = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('google_reviews')
         .select('id, author_title, author_image, review_rating, review_text, review_text_es, review_datetime_utc, owner_answer, owner_answer_es, is_published')
+        .eq('organization_id', organizationId)
         .order('review_datetime_utc', { ascending: false });
 
       if (!error && data) {
@@ -877,7 +885,7 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error) {
       console.error('Error fetching Google reviews:', error);
     }
-  }, []);
+  }, [organizationId]);
 
   const allReviews: ReviewItem[] = useMemo(() => {
     const manual: ReviewItem[] = reviews.map((r) => ({ ...r, source: 'manual' as const }));
@@ -987,6 +995,7 @@ export default function RewardsAndReviewsEditorScreen() {
         description: rewardDescription,
         is_visible: isVisible,
         created_by: user?.id,
+        organization_id: organizationId,
       });
 
       if (error) throw error;
@@ -1032,7 +1041,7 @@ export default function RewardsAndReviewsEditorScreen() {
 
     Alert.alert(
       t('rewards_reviews_editor:reset_user_title'),
-      t('rewards_reviews_editor:reset_user_confirm', { name: resetSelectedEmployee.name }),
+      t('rewards_reviews_editor:reset_user_confirm', { name: resetSelectedEmployee.name, currencyName }),
       [
         { text: t('rewards_reviews_editor:reset_cancel'), style: 'cancel' },
         {
@@ -1096,7 +1105,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 console.log('Verified user bucks after reset:', verifyData);
               }
 
-              Alert.alert(t('common:success'), t('rewards_reviews_editor:reset_success', { name: resetSelectedEmployee.name }));
+              Alert.alert(t('common:success'), t('rewards_reviews_editor:reset_success', { name: resetSelectedEmployee.name, currencyName }));
               setShowResetBucksModal(false);
               setResetSelectedEmployee(null);
               setResetSearchQuery('');
@@ -1117,7 +1126,7 @@ export default function RewardsAndReviewsEditorScreen() {
   const handleResetAllUsers = async () => {
     Alert.alert(
       t('rewards_reviews_editor:reset_all_confirm_title'),
-      t('rewards_reviews_editor:reset_all_confirm'),
+      t('rewards_reviews_editor:reset_all_confirm', { currencyName }),
       [
         { text: t('rewards_reviews_editor:reset_cancel'), style: 'cancel' },
         {
@@ -1144,6 +1153,7 @@ export default function RewardsAndReviewsEditorScreen() {
               const { data: allUsers, error: fetchError } = await supabase
                 .from('users')
                 .select('id')
+                .eq('organization_id', organizationId)
                 .eq('is_active', true);
 
               if (fetchError) {
@@ -1187,6 +1197,7 @@ export default function RewardsAndReviewsEditorScreen() {
               const { data: verifyData, error: verifyError } = await supabase
                 .from('users')
                 .select('id, name, mcloones_bucks')
+                .eq('organization_id', organizationId)
                 .eq('is_active', true);
 
               if (verifyError) {
@@ -1199,7 +1210,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 }
               }
 
-              Alert.alert(t('common:success'), t('rewards_reviews_editor:reset_all_success'));
+              Alert.alert(t('common:success'), t('rewards_reviews_editor:reset_all_success', { currencyName }));
               setShowResetBucksModal(false);
               setResetSelectedEmployee(null);
               setResetSearchQuery('');
@@ -1263,6 +1274,7 @@ export default function RewardsAndReviewsEditorScreen() {
         p_transaction_id: editingTransaction.id,
         p_new_amount: finalAmount,
         p_new_description: editDescription,
+        p_organization_id: organizationId,
       });
 
       if (error) {
@@ -1407,6 +1419,7 @@ export default function RewardsAndReviewsEditorScreen() {
           review_date: reviewForm.review_date,
           display_order: reviewForm.display_order,
           created_by: user?.id,
+          organization_id: organizationId,
         });
 
         if (error) throw error;
@@ -1523,7 +1536,7 @@ export default function RewardsAndReviewsEditorScreen() {
     try {
       setRefreshingGoogle(true);
       const { data, error } = await supabase.functions.invoke('import-google-reviews', {
-        body: { source: 'manual', user_id: user?.id },
+        body: { source: 'manual', user_id: user?.id, organization_id: organizationId },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Import failed');
@@ -1634,10 +1647,10 @@ export default function RewardsAndReviewsEditorScreen() {
               </View>
             </View>
 
-            {/* My McLoone's Bucks */}
+            {/* My Bucks */}
             <View style={styles.bucksCard}>
               <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={32} color={colors.primary} />
-              <Text style={styles.bucksLabel}>{t('rewards_reviews_editor:my_bucks_label')}</Text>
+              <Text style={styles.bucksLabel}>{t('rewards_reviews_editor:my_bucks_label', { currencyName })}</Text>
               <Text style={styles.bucksAmount}>${myBucks}</Text>
             </View>
 
@@ -1750,7 +1763,7 @@ export default function RewardsAndReviewsEditorScreen() {
                       <Text style={[styles.leaderboardName, { fontSize: 18, color: colors.text, marginBottom: 4 }]}>{lookupEmployee.name}</Text>
                       <Text style={[styles.leaderboardJob, { color: colors.textSecondary, marginBottom: 8 }]}>{lookupEmployee.job_title}</Text>
                       <Text style={[styles.bucksAmount, { fontSize: 36 }]}>${lookupEmployee.mcloones_bucks || 0}</Text>
-                      <Text style={[styles.bucksLabel, { marginTop: 2 }]}>McLoone's Bucks Balance</Text>
+                      <Text style={[styles.bucksLabel, { marginTop: 2 }]}>{currencyName} Balance</Text>
                     </View>
 
                     {/* Employee Transactions */}
@@ -2167,7 +2180,7 @@ export default function RewardsAndReviewsEditorScreen() {
                     <Text style={{ color: isReward ? '#4CAF50' : '#F44336', fontWeight: 'bold' }}>
                       {isReward ? '+' : '-'}${rewardAmount}
                     </Text>
-                    {' '}{t('rewards_reviews_editor:amount_preview_suffix')}
+                    {' '}{t('rewards_reviews_editor:amount_preview_suffix', { currencyName })}
                   </Text>
                 )}
               </View>
@@ -2230,7 +2243,7 @@ export default function RewardsAndReviewsEditorScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('rewards_reviews_editor:reset_modal_title')}</Text>
+              <Text style={styles.modalTitle}>{t('rewards_reviews_editor:reset_modal_title', { currencyName })}</Text>
               <TouchableOpacity
                 onPress={() => {
                   setShowResetBucksModal(false);
@@ -2316,7 +2329,7 @@ export default function RewardsAndReviewsEditorScreen() {
               <View style={styles.resetSection}>
                 <Text style={styles.resetSectionTitle}>{t('rewards_reviews_editor:reset_all_title')}</Text>
                 <Text style={styles.resetAllWarning}>
-                  {t('rewards_reviews_editor:reset_all_warning')}
+                  {t('rewards_reviews_editor:reset_all_warning', { currencyName })}
                 </Text>
 
                 <TouchableOpacity
@@ -2438,7 +2451,7 @@ export default function RewardsAndReviewsEditorScreen() {
                     <Text style={{ color: editIsReward ? '#4CAF50' : '#F44336', fontWeight: 'bold' }}>
                       {editIsReward ? '+' : '-'}${editAmount}
                     </Text>
-                    {' '}{t('rewards_reviews_editor:amount_preview_suffix')}
+                    {' '}{t('rewards_reviews_editor:amount_preview_suffix', { currencyName })}
                   </Text>
                 )}
               </View>

@@ -24,6 +24,7 @@ import { MessageBadge } from '@/components/MessageBadge';
 import { hexToRgba } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { useTranslation } from 'react-i18next';
@@ -104,7 +105,7 @@ function GameHubBottomNav() {
   const colors = useThemeColors();
   const { mode } = useAppTheme();
 
-  const tabs = user?.role === 'manager' ? MANAGER_NAV_TABS : EMPLOYEE_NAV_TABS;
+  const tabs = (user?.role === 'manager' || user?.role === 'owner') ? MANAGER_NAV_TABS : EMPLOYEE_NAV_TABS;
 
   const blurBgColor = Platform.select({
     ios: hexToRgba(colors.tabBarBackground, 0.6),
@@ -188,6 +189,7 @@ export default function GameHubScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
+  const { organizationId } = useOrganization();
   const [topLeaders, setTopLeaders] = useState<LeaderboardEntry[]>([]);
   const [loadingLeaders, setLoadingLeaders] = useState(true);
 
@@ -196,8 +198,9 @@ export default function GameHubScreen() {
       const fetchTopLeaders = async () => {
         setLoadingLeaders(true);
         try {
-          const { data, error } = await (supabase.rpc as any)('get_master_leaderboard_overall', {
+          const { data, error } = await supabase.rpc('get_master_leaderboard_overall', {
             p_limit: 3,
+            p_organization_id: organizationId,
           });
           if (!error && data) {
             setTopLeaders(data as LeaderboardEntry[]);

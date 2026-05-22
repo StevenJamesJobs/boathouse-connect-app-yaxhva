@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { GameMode, PlayMode, GAME_MODE_INFO, LeaderboardEntry } from '@/types/game';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 
 export default function MemoryGameLeaderboardScreen() {
@@ -22,6 +23,7 @@ export default function MemoryGameLeaderboardScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const [activePlayMode, setActivePlayMode] = useState<PlayMode>('lives');
   const [activeMode, setActiveMode] = useState<GameMode>('wine_pairings');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
@@ -34,10 +36,11 @@ export default function MemoryGameLeaderboardScreen() {
   const loadLeaderboard = async () => {
     setLoading(true);
     try {
-      const { data, error } = await (supabase.rpc as any)('get_game_leaderboard', {
+      const { data, error } = await supabase.rpc('get_game_leaderboard', {
         p_game_mode: activeMode,
         p_limit: 20,
         p_play_mode: activePlayMode,
+        p_organization_id: organizationId,
       });
 
       if (!error && data) {

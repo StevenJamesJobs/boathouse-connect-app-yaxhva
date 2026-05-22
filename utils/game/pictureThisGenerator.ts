@@ -67,13 +67,14 @@ const PRICE_RANGES = {
 };
 
 // ─── Pool loaders ──────────────────────────────────────────────────────────
-export async function loadPool(category: PictureThisCategory): Promise<MenuItem[]> {
+export async function loadPool(category: PictureThisCategory, organizationId?: string): Promise<MenuItem[]> {
   let query = (supabase.from('menu_items') as any)
     .select(
       'id, name, description, category, subcategory, thumbnail_url, price, glass_price, bottle_price, member_bottle_price, location, display_order'
     )
     .eq('is_active', true)
     .not('thumbnail_url', 'is', null);
+  if (organizationId) query = query.eq('organization_id', organizationId);
 
   if (category === 'food') {
     query = query.in('category', ['Lunch', 'Dinner', 'Weekly Specials']);

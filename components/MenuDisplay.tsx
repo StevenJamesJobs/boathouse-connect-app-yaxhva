@@ -24,6 +24,7 @@ import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getImageUrl } from '@/utils/imageUrl';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRouter } from 'expo-router';
 import SeasonSelector, { type Season } from '@/components/SeasonSelector';
 
@@ -192,6 +193,7 @@ interface MenuDisplayProps {
 export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayProps) {
   const { t } = useTranslation();
   const { language } = useLanguage();
+  const { organizationId, organization } = useOrganization();
 
   // Build pages array — prepend phantom bridge page when swipe-to-welcome is enabled
   const hasBridge = !!onSwipeToWelcome;
@@ -200,7 +202,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   }, [hasBridge]);
   const bridgeOffset = hasBridge ? 1 : 0;
 
-  const [season, setSeason] = useState<Season>('summer');
+  const [season, setSeason] = useState<Season>(organization.menu_count === 1 ? 'winter' : 'summer');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -360,6 +362,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       const { data, error } = await (supabase
         .from('menu_items') as any)
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .in('season', [season, 'both'])
         .order('display_order', { ascending: true });
@@ -371,6 +374,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         const { data: slrData } = await (supabase
           .from('summer_libation_recipes' as any) as any)
           .select('*')
+          .eq('organization_id', organizationId)
           .eq('is_active', true)
           .order('display_order', { ascending: true });
 
@@ -688,10 +692,17 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     <GestureHandlerRootView style={styles.container}>
       {/* Fixed Header Area: Season toggle + Search + Filter + Category/Subcategory pills */}
       <View style={styles.headerArea}>
-        {/* Season Selector */}
-        <View style={styles.seasonSelectorContainer}>
-          <SeasonSelector selectedSeason={season} onSeasonChange={setSeason} />
-        </View>
+        {/* Season Selector — hidden when org only has one menu */}
+        {organization.menu_count === 2 && (
+          <View style={styles.seasonSelectorContainer}>
+            <SeasonSelector
+              selectedSeason={season}
+              onSeasonChange={setSeason}
+              menu1Label={organization.menu_1_name}
+              menu2Label={organization.menu_2_name}
+            />
+          </View>
+        )}
 
         {/* Search Bar and Filter Button */}
         <View style={styles.searchFilterContainer}>

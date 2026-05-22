@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -36,6 +37,7 @@ interface ChecklistCategory {
 export default function BartenderOpeningChecklistEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { organizationId } = useOrganization();
   const colors = useThemeColors();
 
   const styles = StyleSheet.create({
@@ -110,6 +112,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('bartender_checklist_categories')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('checklist_type', 'opening')
         .eq('is_active', true)
         .order('display_order');
@@ -122,6 +125,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
       const { data: itemsData, error: itemsError } = await supabase
         .from('bartender_checklist_items')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('display_order');
 
@@ -227,6 +231,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
             checklist_type: 'opening',
             name: categoryName.trim(),
             display_order: maxOrder + 1,
+            organization_id: organizationId,
           });
 
         if (error) throw error;
@@ -309,6 +314,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
             category_id: selectedCategoryId,
             text: itemText.trim(),
             display_order: maxOrder + 1,
+            organization_id: organizationId,
           });
 
         if (error) throw error;

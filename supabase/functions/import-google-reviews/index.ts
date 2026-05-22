@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
 
-const GOOGLE_MAPS_QUERY = "McLoone's Boathouse, 9 Cherry Lane, West Orange, NJ 07052";
+const DEFAULT_GOOGLE_MAPS_QUERY = "McLoone's Boathouse, 9 Cherry Lane, West Orange, NJ 07052";
 const DEFAULT_REVIEWS_LIMIT = 10;
 const BACKFILL_REVIEWS_LIMIT = 15;
 
@@ -85,7 +85,7 @@ serve(async (req) => {
         .select('role')
         .eq('id', body.user_id)
         .single();
-      if (userData?.role === 'manager') {
+      if (userData?.role === 'manager' || userData?.role === 'owner') {
         isAuthorized = true;
         source = 'manual';
       }
@@ -98,14 +98,34 @@ serve(async (req) => {
       );
     }
 
+    // Resolve organization and its Google Maps query
+    const organizationId = body.organization_id;
+    let googleMapsQuery = DEFAULT_GOOGLE_MAPS_QUERY;
+
+    if (organizationId) {
+      const adminClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      );
+      const { data: orgData } = await adminClient
+        .from('organizations')
+        .select('google_maps_query')
+        .eq('id', organizationId)
+        .single();
+      if (orgData?.google_maps_query) {
+        googleMapsQuery = orgData.google_maps_query;
+      }
+    }
+
     const isBackfill = body.backfill === true;
     const reviewsLimit = isBackfill ? BACKFILL_REVIEWS_LIMIT : DEFAULT_REVIEWS_LIMIT;
 
-    console.log(`Import started: source=${source}, limit=${reviewsLimit}, backfill=${isBackfill}`);
+    console.log(`Import started: source=${source}, limit=${reviewsLimit}, backfill=${isBackfill}, org=${organizationId}`);
 
     // --- Fetch reviews from Outscraper ---
     const outscrapterUrl = new URL('https://api.app.outscraper.com/maps/reviews-v3');
-    outscrapterUrl.searchParams.set('query', GOOGLE_MAPS_QUERY);
+    outscrapterUrl.searchParams.set('query', googleMapsQuery);
     outscrapterUrl.searchParams.set('reviewsLimit', String(reviewsLimit));
     outscrapterUrl.searchParams.set('sort', 'newest');
     outscrapterUrl.searchParams.set('language', 'en');
@@ -186,6 +206,7 @@ serve(async (req) => {
         owner_answer: r.owner_answer || null,
         owner_answer_es: ownerAnswersEs[i] || null,
         updated_at: new Date().toISOString(),
+        ...(organizationId ? { organization_id: organizationId } : {}),
       });
     }
 

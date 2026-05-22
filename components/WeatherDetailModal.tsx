@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
+import { useOrganization } from '../contexts/OrganizationContext';
 
 interface DayForecast {
   date: string;
@@ -57,7 +58,6 @@ interface WeatherDetailModalProps {
 }
 
 const WEATHER_API_KEY = '6e3db8832cf34a5bbc5182329251711';
-const LOCATION = 'West Orange, NJ'; // Zip code 07003
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const DISMISS_THRESHOLD = 120;
 
@@ -68,6 +68,8 @@ export default function WeatherDetailModal({
   colors,
 }: WeatherDetailModalProps) {
   const { t } = useTranslation();
+  const { organization } = useOrganization();
+  const location = organization?.weather_location || 'Unknown';
   const [weatherData, setWeatherData] = useState<WeatherDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +130,7 @@ export default function WeatherDetailModal({
       // the standard forecast first, then make individual calls for extra days
       // using the `dt` parameter to get 4 future days total.
       const response = await fetch(
-        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=3&aqi=no&alerts=no&lang=${langParam}`
+        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(location)}&days=3&aqi=no&alerts=no&lang=${langParam}`
       );
 
       if (!response.ok) {
@@ -191,7 +193,7 @@ export default function WeatherDetailModal({
         console.log(`Fetching extra forecast for day +${offset}: ${dateStr}`);
         extraDayPromises.push(
           fetch(
-            `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&dt=${dateStr}&aqi=no&alerts=no&lang=${langParam}`
+            `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(location)}&dt=${dateStr}&aqi=no&alerts=no&lang=${langParam}`
           )
             .then(r => r.ok ? r.json() : null)
             .then(d => d?.forecast?.forecastday?.[0] ?? null)
@@ -315,7 +317,7 @@ export default function WeatherDetailModal({
                 <>
                   {/* Title */}
                   <Text style={[styles.title, { color: colors.text }]}>{t('weather.details_title')}</Text>
-                  <Text style={[styles.location, { color: colors.textSecondary }]}>West Orange, NJ</Text>
+                  <Text style={[styles.location, { color: colors.textSecondary }]}>{location}</Text>
 
                   {/* Current Weather Section */}
                   <View style={[styles.currentWeatherSection, { backgroundColor: colors.primary + '15', borderColor: colors.primary + '30' }]}>

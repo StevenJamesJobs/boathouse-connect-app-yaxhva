@@ -26,6 +26,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import FormattedText from '@/components/FormattedText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface Cocktail {
   id: string;
@@ -46,6 +47,7 @@ export default function CocktailsAZScreen() {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const colors = useThemeColors();
+  const { organizationId } = useOrganization();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,6 +94,7 @@ export default function CocktailsAZScreen() {
       const { data, error } = await supabase
         .from('cocktails')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name', { ascending: true });
 

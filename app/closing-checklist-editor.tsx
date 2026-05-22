@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -36,6 +37,7 @@ interface ChecklistCategory {
 export default function ClosingChecklistEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
+  const { organizationId } = useOrganization();
   const colors = useThemeColors();
 
   const styles = StyleSheet.create({
@@ -284,6 +286,7 @@ export default function ClosingChecklistEditorScreen() {
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('checklist_categories')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('checklist_type', 'closing')
         .order('display_order');
 
@@ -292,6 +295,7 @@ export default function ClosingChecklistEditorScreen() {
       const { data: itemsData, error: itemsError } = await supabase
         .from('checklist_items')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('display_order');
 
       if (itemsError) throw itemsError;
@@ -381,6 +385,7 @@ export default function ClosingChecklistEditorScreen() {
             checklist_type: 'closing',
             name: categoryName.trim(),
             display_order: maxOrder + 1,
+            organization_id: organizationId,
           });
 
         if (error) throw error;
@@ -454,6 +459,7 @@ export default function ClosingChecklistEditorScreen() {
             category_id: selectedCategoryId,
             text: itemText.trim(),
             display_order: maxOrder + 1,
+            organization_id: organizationId,
           });
 
         if (error) throw error;

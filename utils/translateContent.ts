@@ -116,7 +116,8 @@ const TRANSLATION_RPC_MAP: Record<string, { rpc: string; paramMap: Record<string
 export async function saveTranslations(
   table: string,
   id: string,
-  translations: Record<string, string>
+  translations: Record<string, string>,
+  organizationId: string | null = null
 ): Promise<boolean> {
   try {
     const rpcConfig = TRANSLATION_RPC_MAP[table];
@@ -125,8 +126,8 @@ export async function saveTranslations(
       return false;
     }
 
-    // Build RPC parameters: always include p_id, map translation fields to RPC params
-    const rpcParams: Record<string, string | null> = { p_id: id };
+    // Build RPC parameters: always include p_id and p_organization_id, map translation fields to RPC params
+    const rpcParams: Record<string, string | null> = { p_id: id, p_organization_id: organizationId };
     for (const [fieldName, paramName] of Object.entries(rpcConfig.paramMap)) {
       const value = translations[fieldName];
       rpcParams[paramName] = value && value.trim() ? value : null;

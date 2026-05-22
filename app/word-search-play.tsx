@@ -19,6 +19,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { notifyLeaderboardPassed } from '@/utils/notificationHelpers';
 import { useTranslation } from 'react-i18next';
@@ -43,6 +44,7 @@ import { getWordsForCategory } from '@/utils/game/wordSearchDataAdapters';
 import WordSearchGrid from '@/components/game/WordSearchGrid';
 import WordSearchWordList from '@/components/game/WordSearchWordList';
 import WordSearchHUD from '@/components/game/WordSearchHUD';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 type GamePhase = 'loading' | 'playing' | 'won' | 'lost';
 
@@ -50,6 +52,7 @@ export default function WordSearchPlayScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { t } = useTranslation();
   const params = useLocalSearchParams<{
     category: WordSearchCategory;
@@ -125,6 +128,7 @@ export default function WordSearchPlayScreen() {
 
       supabase.from('word_search_scores').insert({
         user_id: user.id,
+        organization_id: organizationId,
         category,
         difficulty,
         play_mode: playMode,
@@ -139,7 +143,8 @@ export default function WordSearchPlayScreen() {
             user.id,
             finalScore,
             t('notifications.game_hub_passed_title', { name: user.name }),
-            t('notifications.game_hub_passed_body')
+            t('notifications.game_hub_passed_body'),
+            organizationId
           );
         }
       });

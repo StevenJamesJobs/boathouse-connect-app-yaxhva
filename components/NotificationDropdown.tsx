@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { fetchContentImagesBatch } from '@/utils/contentImages';
 import { stripFormattingTags } from '@/components/FormattedText';
 import { useUnreadContent } from '@/hooks/useUnreadContent';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PAGE_SIZE = 25;
@@ -111,6 +112,7 @@ export default function NotificationDropdown({
   const { user } = useAuth();
   const router = useRouter();
   const { markAnnouncementViewed, markSpecialFeatureViewed } = useUnreadContent();
+  const { organizationId } = useOrganization();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [displayCount, setDisplayCount] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
@@ -144,6 +146,7 @@ export default function NotificationDropdown({
       const { data: announcements } = await supabase
         .from('announcements')
         .select('*, guide_file:guides_and_training!announcements_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .in('visibility', visibilityFilter)
         .order('created_at', { ascending: false })
@@ -166,6 +169,7 @@ export default function NotificationDropdown({
       const { data: features } = await supabase
         .from('special_features')
         .select('*, guide_file:guides_and_training!special_features_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(SOURCE_FETCH_LIMIT);
@@ -187,6 +191,7 @@ export default function NotificationDropdown({
       const { data: events } = await supabase
         .from('upcoming_events')
         .select('*, guide_file:guides_and_training!upcoming_events_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(SOURCE_FETCH_LIMIT);
@@ -208,6 +213,7 @@ export default function NotificationDropdown({
       const { data: specials } = await supabase
         .from('menu_items')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('category', 'Weekly Specials')
         .eq('is_active', true)
         .order('created_at', { ascending: false })
@@ -230,6 +236,7 @@ export default function NotificationDropdown({
       const { data: customNotifs } = await (supabase
         .from('custom_notifications') as any)
         .select('id, title, body, created_at, data')
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
         .limit(SOURCE_FETCH_LIMIT);
 
@@ -270,7 +277,7 @@ export default function NotificationDropdown({
           }
           // Redemption shade entries are role/user-targeted
           if (linkedType === 'redemption_requested') {
-            if (user?.role !== 'manager') continue;
+            if (user?.role !== 'manager' && user?.role !== 'owner') continue;
           }
           if (linkedType === 'redemption_decision') {
             if (cn.data?.targetUserId !== user?.id) continue;
@@ -371,7 +378,7 @@ export default function NotificationDropdown({
         // Drop the row so the badge clears
         (supabase.from('custom_notifications') as any).delete().eq('id', item.id).then(() => {}, () => {});
         onClose();
-        const portalPrefix = user?.role === 'manager' ? '/(portal)/manager' : '/(portal)/employee';
+        const portalPrefix = (user?.role === 'manager' || user?.role === 'owner') ? '/(portal)/manager' : '/(portal)/employee';
         router.push(`${portalPrefix}/rewards` as any);
         return;
       }

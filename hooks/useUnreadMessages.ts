@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { AppState, AppStateStatus } from 'react-native';
 
 // Global event system so any screen can trigger an immediate refresh
@@ -19,6 +20,7 @@ export function refreshAllUnreadCounts() {
 
 export function useUnreadMessages() {
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -32,6 +34,7 @@ export function useUnreadMessages() {
     try {
       const { data, error } = await supabase.rpc('get_unread_message_count', {
         user_id: user.id,
+        p_organization_id: organizationId,
       });
 
       if (!error && data !== null) {

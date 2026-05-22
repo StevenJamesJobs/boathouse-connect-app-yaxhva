@@ -7,9 +7,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-function buildSchedulePrompt(employeeNames: string[]): string {
+function buildSchedulePrompt(employeeNames: string[], restaurantName?: string): string {
   const nameList = employeeNames.map((n) => `  - ${n}`).join('\n');
-  return `You are parsing a Restaurant 365 (R365) Weekly Schedule PDF for McLoone's Boathouse restaurant.
+  const displayName = restaurantName || "McLoone's Boathouse";
+  return `You are parsing a Restaurant 365 (R365) Weekly Schedule PDF for ${displayName} restaurant.
 
 IMPORTANT: This PDF uses a calendar-grid visual layout. You MUST read employee names from the VISUAL rendering of the PDF (what a human would see), NOT from any hidden text layer. Look at the actual printed text in the leftmost column of each row.
 
@@ -88,8 +89,8 @@ interface ParseRequest {
   file_url: string;
   upload_id: string;
   media_type?: string; // 'application/pdf' | 'image/jpeg' | 'image/png'
-  // For multi-image uploads (multiple pages as separate images)
   additional_image_urls?: string[];
+  organization_id?: string;
 }
 
 // Normalize unicode quotes/apostrophes and special chars for comparison
@@ -162,7 +163,8 @@ async function processScheduleInBackground(
   file_url: string,
   upload_id: string,
   media_type: string,
-  additional_image_urls: string[]
+  additional_image_urls: string[],
+  organizationId?: string
 ): Promise<void> {
   try {
     console.log(`[bg] Starting schedule parse for upload ${upload_id}`);
@@ -203,20 +205,33 @@ async function processScheduleInBackground(
     }
 
     // Fetch all users BEFORE calling Claude so we can include names in the prompt
-    const { data: users, error: usersError } = await supabase
-      .from('users')
-      .select('id, name, username');
+    let usersQuery = supabase.from('users').select('id, name, username');
+    if (organizationId) {
+      usersQuery = usersQuery.eq('organization_id', organizationId);
+    }
+    const { data: users, error: usersError } = await usersQuery;
 
     if (usersError) {
       console.error('Error fetching users:', usersError);
       throw new Error('Failed to fetch users for matching');
     }
 
+    // Look up organization name for the AI prompt
+    let restaurantName: string | undefined;
+    if (organizationId) {
+      const { data: orgData } = await supabase
+        .from('organizations')
+        .select('name')
+        .eq('id', organizationId)
+        .single();
+      if (orgData?.name) restaurantName = orgData.name;
+    }
+
     // Build prompt with known employee names for better matching
     const employeeNames = (users || [])
       .filter((u: { name: string }) => u.name && u.name.trim())
       .map((u: { name: string }) => u.name.trim());
-    const prompt = buildSchedulePrompt(employeeNames);
+    const prompt = buildSchedulePrompt(employeeNames, restaurantName);
 
     console.log(`Sending to Claude with ${employeeNames.length} known employee names, format: ${media_type}`);
 
@@ -360,17 +375,22 @@ async function processScheduleInBackground(
         is_opener: shift.is_opener || false,
         is_training: shift.is_training || false,
         room_assignment: shift.room_assignment || null,
+        ...(organizationId ? { organization_id: organizationId } : {}),
       });
     }
 
     // Check for existing uploads for the same week and mark as replaced
-    const { data: existingUploads } = await supabase
+    let existingQuery = supabase
       .from('schedule_uploads')
       .select('id')
       .eq('week_start', week_start)
       .eq('week_end', week_end)
       .eq('status', 'completed')
       .neq('id', upload_id);
+    if (organizationId) {
+      existingQuery = existingQuery.eq('organization_id', organizationId);
+    }
+    const { data: existingUploads } = await existingQuery;
 
     if (existingUploads && existingUploads.length > 0) {
       const existingIds = existingUploads.map((u: { id: string }) => u.id);
@@ -471,6 +491,7 @@ serve(async (req) => {
     upload_id = body.upload_id || '';
     const media_type = body.media_type || 'application/pdf';
     const additional_image_urls = body.additional_image_urls || [];
+    const organizationId = body.organization_id;
 
     if (!anthropicApiKey) {
       throw new Error('ANTHROPIC_API_KEY not configured');
@@ -487,7 +508,8 @@ serve(async (req) => {
       file_url,
       upload_id,
       media_type,
-      additional_image_urls
+      additional_image_urls,
+      organizationId
     );
 
     // @ts-ignore EdgeRuntime is a Supabase Edge Runtime global

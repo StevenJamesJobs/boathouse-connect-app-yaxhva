@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -43,6 +44,7 @@ interface RecipientGroup {
 export default function ComposeMessageScreen() {
   const { t } = useTranslation('compose');
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { sendNotification } = useNotification();
   const router = useRouter();
   const params = useLocalSearchParams();
@@ -120,6 +122,7 @@ export default function ComposeMessageScreen() {
       const { data, error } = await supabase
         .from('users')
         .select('id, name, job_title, job_titles, role')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .neq('id', user?.id || '')
         .order('name');
@@ -144,7 +147,7 @@ export default function ComposeMessageScreen() {
 
     // Default group for employees: All Managers
     if (user?.role === 'employee') {
-      const managers = allUsers.filter(u => u.role === 'manager');
+      const managers = allUsers.filter(u => u.role === 'manager' || u.role === 'owner');
       if (managers.length > 0) {
         groups.push({
           id: 'all-managers',
@@ -157,7 +160,7 @@ export default function ComposeMessageScreen() {
     }
 
     // Default group for managers: All Employees
-    if (user?.role === 'manager') {
+    if (user?.role === 'manager' || user?.role === 'owner') {
       const allCount = allUsers.length;
       
       groups.push({
@@ -399,6 +402,7 @@ export default function ComposeMessageScreen() {
           file_name: fileName,
           thread_id: threadId,
           parent_message_id: parentMessageId,
+          organization_id: organizationId,
         })
         .select()
         .single();
@@ -409,6 +413,7 @@ export default function ComposeMessageScreen() {
       const recipients = selectedRecipients.map(recipient => ({
         message_id: messageData.id,
         recipient_id: recipient.id,
+        organization_id: organizationId,
       }));
 
       const { error: recipientsError } = await supabase
@@ -512,7 +517,7 @@ export default function ComposeMessageScreen() {
             <View style={styles.selectedRecipients}>
               {selectedRecipients.map((recipient, index) => (
                 <View key={index} style={[styles.recipientChip, { backgroundColor: colors.highlight }]}>
-                  <Text style={[styles.recipientChipText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]} numberOfLines={1}>
+                  <Text style={[styles.recipientChipText, { color: (user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF' }]} numberOfLines={1}>
                     {recipient.name}
                   </Text>
                   <TouchableOpacity onPress={() => handleRemoveRecipient(recipient.id)}>
@@ -520,7 +525,7 @@ export default function ComposeMessageScreen() {
                       ios_icon_name="xmark.circle.fill"
                       android_material_icon_name="cancel"
                       size={18}
-                      color={user?.role === 'manager' ? colors.text : '#FFFFFF'}
+                      color={(user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF'}
                     />
                   </TouchableOpacity>
                 </View>
@@ -592,7 +597,7 @@ export default function ComposeMessageScreen() {
           )}
 
           {/* Attach File (Manager Only) */}
-          {user?.role === 'manager' && (
+          {(user?.role === 'manager' || user?.role === 'owner') && (
             <TouchableOpacity
               style={[styles.attachButton, { backgroundColor: colors.card, borderColor: colors.border, marginTop: 10 }]}
               onPress={handlePickFile}
@@ -644,7 +649,7 @@ export default function ComposeMessageScreen() {
             style={[styles.cancelButton, { backgroundColor: colors.textSecondary }]}
             onPress={() => router.back()}
           >
-            <Text style={[styles.cancelButtonText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
+            <Text style={[styles.cancelButtonText, { color: (user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF' }]}>
               {t('common:cancel', { defaultValue: 'Cancel' })}
             </Text>
           </TouchableOpacity>
@@ -655,9 +660,9 @@ export default function ComposeMessageScreen() {
           >
             {sending ? (
               <View style={styles.sendingContainer}>
-                <ActivityIndicator color={user?.role === 'manager' ? colors.text : '#FFFFFF'} />
+                <ActivityIndicator color={(user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF'} />
                 {(uploadingImage || uploadingFile) && (
-                  <Text style={[styles.uploadingText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
+                  <Text style={[styles.uploadingText, { color: (user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF' }]}>
                     {t('uploading', { defaultValue: 'Uploading...' })}
                   </Text>
                 )}
@@ -668,9 +673,9 @@ export default function ComposeMessageScreen() {
                   ios_icon_name="paperplane.fill"
                   android_material_icon_name="send"
                   size={20}
-                  color={user?.role === 'manager' ? colors.text : '#FFFFFF'}
+                  color={(user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF'}
                 />
-                <Text style={[styles.sendButtonText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
+                <Text style={[styles.sendButtonText, { color: (user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF' }]}>
                   {t('common:send', { defaultValue: 'Send' })}
                 </Text>
               </>
@@ -791,7 +796,7 @@ export default function ComposeMessageScreen() {
               style={[styles.doneButton, { backgroundColor: colors.primary || colors.highlight }]}
               onPress={() => setShowRecipientPicker(false)}
             >
-              <Text style={[styles.doneButtonText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
+              <Text style={[styles.doneButtonText, { color: (user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF' }]}>
                 {t('done', { count: selectedRecipients.length })}
               </Text>
             </TouchableOpacity>

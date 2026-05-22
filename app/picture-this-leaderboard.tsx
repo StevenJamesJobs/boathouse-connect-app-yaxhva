@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import BottomNavBar from '@/components/BottomNavBar';
 import { PictureThisCategory, PictureThisPlayMode } from '@/utils/game/pictureThisGenerator';
@@ -59,6 +60,7 @@ export default function PictureThisLeaderboardScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { t } = useTranslation();
 
   const [activePlayMode, setActivePlayMode] = useState<PictureThisPlayMode>('lives');
@@ -71,12 +73,13 @@ export default function PictureThisLeaderboardScreen() {
     (async () => {
       setLoading(true);
       try {
-        const { data, error } = await (supabase.rpc as any)(
+        const { data, error } = await supabase.rpc(
           'get_picture_this_leaderboard_filtered',
           {
             p_category: activeCategory,
             p_play_mode: activePlayMode,
             p_limit: 20,
+            p_organization_id: organizationId,
           },
         );
         if (cancelled) return;

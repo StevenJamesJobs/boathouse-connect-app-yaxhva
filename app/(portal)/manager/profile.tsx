@@ -16,6 +16,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -43,6 +44,7 @@ export default function ManagerProfileScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user, refreshUser } = useAuth();
+  const { organizationId } = useOrganization();
   const router = useRouter();
   const { unreadCount } = useUnreadMessages();
   const [email, setEmail] = useState(user?.email || '');
@@ -68,8 +70,9 @@ export default function ManagerProfileScreen() {
   const loadGameScore = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const { data, error } = await (supabase.rpc as any)('get_user_total_game_score', {
+      const { data, error } = await supabase.rpc('get_user_total_game_score', {
         p_user_id: user.id,
+        p_organization_id: organizationId,
       });
       if (!error && data !== null) {
         setTotalGameScore(Number(data));
@@ -123,6 +126,7 @@ export default function ManagerProfileScreen() {
         user_id: user.id,
         new_email: email,
         new_phone_number: phoneNumber,
+        p_organization_id: organizationId,
       });
 
       if (error) {
@@ -231,6 +235,7 @@ export default function ManagerProfileScreen() {
       const { error: updateError } = await supabase.rpc('update_profile_picture', {
         user_id: user.id,
         picture_url: urlData.publicUrl,
+        p_organization_id: organizationId,
       });
 
       if (updateError) {
@@ -257,6 +262,7 @@ export default function ManagerProfileScreen() {
       await supabase.rpc('update_quick_tools', {
         user_id: user?.id,
         tools: JSON.stringify(toolIds),
+        p_organization_id: organizationId,
       });
       await refreshUser();
       setShowToolSelector(false);

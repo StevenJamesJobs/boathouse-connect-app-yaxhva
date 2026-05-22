@@ -25,6 +25,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import FormattedText from '@/components/FormattedText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface LibationRecipe {
   id: string;
@@ -58,6 +59,7 @@ export default function LibationRecipesScreen() {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const colors = useThemeColors();
+  const { organizationId } = useOrganization();
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecipe, setSelectedRecipe] = useState<LibationRecipe | null>(null);
@@ -75,6 +77,7 @@ export default function LibationRecipesScreen() {
       const { data, error } = await supabase
         .from('libation_recipes')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('display_order', { ascending: true });
 

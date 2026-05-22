@@ -28,9 +28,9 @@ export default function PortalIndex() {
     return <Redirect href="/login" />;
   }
 
-  // Redirect to appropriate portal based on role
+  // Redirect to appropriate portal based on role (owners get manager portal)
   console.log('[Portal Index] Redirecting to portal for role:', user.role);
-  if (user.role === 'manager') {
+  if (user.role === 'manager' || user.role === 'owner') {
     return <Redirect href="/(portal)/manager" />;
   } else {
     return <Redirect href="/(portal)/employee" />;

@@ -17,6 +17,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -45,6 +46,7 @@ interface Message {
 
 export default function MessagesScreen() {
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const router = useRouter();
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'inbox' | 'sent'>('inbox');
@@ -58,7 +60,7 @@ export default function MessagesScreen() {
   const [selectedMessages, setSelectedMessages] = useState<Set<string>>(new Set());
 
   const colors = useThemeColors();
-  const isManager = user?.role === 'manager';
+  const isManager = user?.role === 'manager' || user?.role === 'owner';
 
   const loadInboxMessages = useCallback(async () => {
     if (!user?.id) return;
@@ -280,6 +282,7 @@ export default function MessagesScreen() {
 
     const { data, error } = await supabase.rpc('get_unread_message_count', {
       user_id: user.id,
+      p_organization_id: organizationId,
     });
 
     if (!error && data !== null) {
@@ -734,9 +737,9 @@ export default function MessagesScreen() {
             ios_icon_name="plus.circle.fill"
             android_material_icon_name="add-circle"
             size={24}
-            color={user?.role === 'manager' ? colors.text : '#FFFFFF'}
+            color={(user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF'}
           />
-          <Text style={[styles.composeButtonText, { color: user?.role === 'manager' ? colors.text : '#FFFFFF' }]}>
+          <Text style={[styles.composeButtonText, { color: (user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF' }]}>
             {t('messages.send_new_message')}
           </Text>
         </TouchableOpacity>

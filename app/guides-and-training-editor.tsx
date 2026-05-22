@@ -19,6 +19,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -28,6 +29,7 @@ import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-nativ
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface GuideItem {
   id: string;
@@ -52,8 +54,10 @@ export default function GuidesAndTrainingEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const colors = useThemeColors();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const [guides, setGuides] = useState<GuideItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -99,6 +103,7 @@ export default function GuidesAndTrainingEditorScreen() {
       const { data, error } = await supabase
         .from('guides_and_training')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('category', { ascending: true })
         .order('display_order', { ascending: true });
 
@@ -369,7 +374,7 @@ export default function GuidesAndTrainingEditorScreen() {
           await saveTranslations('guides_and_training', editingGuide.id, {
             title_es: formData.title_es,
             description_es: formData.description_es,
-          });
+          }, organizationId);
         }
       } else {
         console.log('Creating new guide');
@@ -385,6 +390,7 @@ export default function GuidesAndTrainingEditorScreen() {
             file_name: fileName,
             display_order: formData.display_order,
             created_by: user.id,
+            organization_id: organizationId,
           });
 
         if (error) {
@@ -398,6 +404,7 @@ export default function GuidesAndTrainingEditorScreen() {
           const { data: newItem } = await supabase
             .from('guides_and_training')
             .select('id')
+            .eq('organization_id', organizationId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
@@ -405,7 +412,7 @@ export default function GuidesAndTrainingEditorScreen() {
             await saveTranslations('guides_and_training', newItem.id, {
               title_es: formData.title_es,
               description_es: formData.description_es,
-            });
+            }, organizationId);
           }
         }
       }

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTranslation } from 'react-i18next';
 import { formatTime, formatCountdown, getCountdownUrgency } from '@/utils/exam/examEngine';
 
@@ -38,6 +39,8 @@ export default function WeeklyQuizCard({
   onReviewAnswers,
 }: WeeklyQuizCardProps) {
   const colors = useThemeColors();
+  const { organization } = useOrganization();
+  const currencyName = organization.reward_currency_name;
   const { i18n } = useTranslation();
   const isSpanish = i18n.language === 'es';
 
@@ -122,7 +125,7 @@ export default function WeeklyQuizCard({
             {isSpanish ? 'Ganados' : 'Earned'}
           </Text>
           <Text style={[styles.examBucksValue, { color: '#10B981' }]}>
-            +${result.bucks_awarded} McLoone&apos;s Bucks
+            +${result.bucks_awarded} {currencyName}
           </Text>
         </View>
         <TouchableOpacity

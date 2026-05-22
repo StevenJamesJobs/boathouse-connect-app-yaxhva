@@ -13,9 +13,11 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { getExamTypeName } from '@/utils/exam/questionGenerator';
 import type { ExamType } from '@/utils/exam/questionGenerator';
 import { useFocusEffect } from '@react-navigation/native';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface ExamSummary {
   id: string;
@@ -39,6 +41,7 @@ export default function QuizHubEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { organizationId } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [exams, setExams] = useState<Map<ExamType, ExamSummary | null>>(new Map());
 
@@ -52,6 +55,7 @@ export default function QuizHubEditorScreen() {
         const { data, error } = await (supabase
           .from('exams' as any) as any)
           .select('*')
+          .eq('organization_id', organizationId)
           .eq('exam_type', examType)
           .in('status', ['draft', 'active', 'paused'])
           .order('created_at', { ascending: false })
@@ -72,9 +76,10 @@ export default function QuizHubEditorScreen() {
 
           if (exam.status === 'active' || exam.status === 'paused') {
             try {
-              const { data: completionData } = await (supabase.rpc as any)('get_exam_completion_status', {
+              const { data: completionData } = await supabase.rpc('get_exam_completion_status', {
                 p_exam_id: exam.id,
                 p_exam_type: examType,
+                p_organization_id: organizationId,
               });
 
               if (completionData) {

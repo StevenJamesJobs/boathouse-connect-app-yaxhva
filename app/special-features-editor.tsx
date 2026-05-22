@@ -30,9 +30,11 @@ import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/tra
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { fetchContentImages, saveContentImages, uploadImageToStorage, deleteContentImages } from '@/utils/contentImages';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface SpecialFeature {
   id: string;
@@ -68,7 +70,9 @@ export default function SpecialFeaturesEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { sendNotification } = useNotification();
+  const { organizationId } = useOrganization();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const [features, setFeatures] = useState<SpecialFeature[]>([]);
   const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -127,6 +131,7 @@ export default function SpecialFeaturesEditorScreen() {
       const { data, error } = await supabase
         .from('guides_and_training')
         .select('id, title, category, file_name')
+        .eq('organization_id', organizationId)
         .in('category', GUIDE_CATEGORIES)
         .eq('is_active', true)
         .order('category', { ascending: true })
@@ -136,7 +141,7 @@ export default function SpecialFeaturesEditorScreen() {
         console.error('Error loading guide files:', error);
         throw error;
       }
-      
+
       console.log('Guide files loaded successfully:', data?.length || 0, 'items');
       setGuideFiles(data || []);
     } catch (error) {
@@ -146,7 +151,7 @@ export default function SpecialFeaturesEditorScreen() {
 
   const cleanupExpiredFeatures = async () => {
     try {
-      const { data, error } = await supabase.rpc('delete_expired_special_features');
+      const { data, error } = await supabase.rpc('delete_expired_special_features', { p_organization_id: organizationId });
       if (error) {
         console.error('Error cleaning up expired features:', error);
       } else {
@@ -165,6 +170,7 @@ export default function SpecialFeaturesEditorScreen() {
       const { data, error } = await supabase
         .from('special_features')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('display_order', { ascending: true });
 
       if (error) {
@@ -336,6 +342,7 @@ export default function SpecialFeaturesEditorScreen() {
         console.log('Updating special feature:', editingFeature.id);
         const { error } = await supabase.rpc('update_special_feature', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_feature_id: editingFeature.id,
           p_title: formData.title,
           p_message: formData.message,
@@ -360,7 +367,7 @@ export default function SpecialFeaturesEditorScreen() {
           await saveTranslations('special_features', editingFeature.id, {
             title_es: formData.title_es,
             content_es: formData.message_es,
-          });
+          }, organizationId);
         }
 
         // Upload new additional images and save all to content_images
@@ -379,6 +386,7 @@ export default function SpecialFeaturesEditorScreen() {
         console.log('Creating new special feature');
         const { error } = await supabase.rpc('create_special_feature', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_title: formData.title,
           p_message: formData.message,
           p_thumbnail_url: thumbnailUrl,
@@ -402,6 +410,7 @@ export default function SpecialFeaturesEditorScreen() {
           const { data: created } = await (supabase.from('special_features') as any)
             .select('id')
             .eq('title', formData.title)
+            .eq('organization_id', organizationId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
@@ -414,6 +423,7 @@ export default function SpecialFeaturesEditorScreen() {
             title: '⭐ New Special Feature',
             body: formData.title,
             sent_by: user?.id,
+            organization_id: organizationId,
             data: {
               notificationType: 'special_feature',
               notificationSkipped: !shouldSendNotification,
@@ -449,6 +459,7 @@ export default function SpecialFeaturesEditorScreen() {
           const { data: newItem } = await supabase
             .from('special_features')
             .select('id')
+            .eq('organization_id', organizationId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
@@ -456,7 +467,7 @@ export default function SpecialFeaturesEditorScreen() {
             await saveTranslations('special_features', newItem.id, {
               title_es: formData.title_es,
               content_es: formData.message_es,
-            });
+            }, organizationId);
           }
         }
 
@@ -465,6 +476,7 @@ export default function SpecialFeaturesEditorScreen() {
           const { data: newItem } = await supabase
             .from('special_features')
             .select('id')
+            .eq('organization_id', organizationId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
@@ -511,6 +523,7 @@ export default function SpecialFeaturesEditorScreen() {
               
               const { error } = await supabase.rpc('delete_special_feature', {
                 p_user_id: user.id,
+                p_organization_id: organizationId,
                 p_feature_id: feature.id,
               });
 

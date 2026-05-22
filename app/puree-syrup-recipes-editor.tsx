@@ -24,7 +24,9 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface PureeSyrupRecipe {
   id: string;
@@ -48,6 +50,7 @@ export default function PureeSyrupRecipesEditorScreen() {
   const { user } = useAuth();
   const colors = useThemeColors();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const procedureInputRef = useRef<TextInput>(null);
   const [procedureSelection, setProcedureSelection] = useState({ start: 0, end: 0 });
   const [recipes, setRecipes] = useState<PureeSyrupRecipe[]>([]);
@@ -76,6 +79,7 @@ export default function PureeSyrupRecipesEditorScreen() {
       const { data, error } = await supabase
         .from('puree_syrup_recipes')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('category', { ascending: true })
         .order('display_order', { ascending: true });
@@ -234,6 +238,7 @@ export default function PureeSyrupRecipesEditorScreen() {
         console.log('Updating puree syrup recipe:', editingRecipe.id);
         const { data, error } = await supabase.rpc('update_puree_syrup_recipe', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_recipe_id: editingRecipe.id,
           p_name: name.trim(),
           p_category: category,
@@ -249,7 +254,7 @@ export default function PureeSyrupRecipesEditorScreen() {
         }
         console.log('Puree syrup recipe updated successfully');
         if (procedureEs.trim()) {
-          await saveTranslations('puree_syrup_recipes', editingRecipe.id, { procedure_es: procedureEs });
+          await saveTranslations('puree_syrup_recipes', editingRecipe.id, { procedure_es: procedureEs }, organizationId);
         }
         Alert.alert(t('common:success'), t('puree_editor:updated_success'));
       } else {
@@ -257,6 +262,7 @@ export default function PureeSyrupRecipesEditorScreen() {
         console.log('Adding new puree syrup recipe');
         const { data, error } = await supabase.rpc('insert_puree_syrup_recipe', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_name: name.trim(),
           p_category: category,
           p_ingredients: validIngredients,
@@ -274,10 +280,11 @@ export default function PureeSyrupRecipesEditorScreen() {
           .from('puree_syrup_recipes')
           .select('id')
           .eq('name', name.trim())
+          .eq('organization_id', organizationId)
           .order('created_at', { ascending: false })
           .limit(1);
         if (newItems?.[0] && procedureEs.trim()) {
-          await saveTranslations('puree_syrup_recipes', newItems[0].id, { procedure_es: procedureEs });
+          await saveTranslations('puree_syrup_recipes', newItems[0].id, { procedure_es: procedureEs }, organizationId);
         }
         Alert.alert(t('common:success'), t('puree_editor:created_success'));
       }
@@ -309,6 +316,7 @@ export default function PureeSyrupRecipesEditorScreen() {
             console.log('Deleting puree syrup recipe:', recipe.id);
             const { error } = await supabase.rpc('delete_puree_syrup_recipe', {
               p_user_id: user.id,
+              p_organization_id: organizationId,
               p_recipe_id: recipe.id,
             });
 

@@ -22,6 +22,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchContentImagesBatch } from '@/utils/contentImages';
 import { getImageUrl } from '@/utils/imageUrl';
 import FormattedText from '@/components/FormattedText';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface GuideFile {
   id: string;
@@ -56,6 +57,7 @@ export default function ViewAllSpecialFeaturesScreen() {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const colors = useThemeColors();
+  const { organizationId } = useOrganization();
   const [features, setFeatures] = useState<SpecialFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [contentImagesMap, setContentImagesMap] = useState<Map<string, string[]>>(new Map());
@@ -95,6 +97,7 @@ export default function ViewAllSpecialFeaturesScreen() {
             file_type
           )
         `)
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('display_order', { ascending: true })
         .order('created_at', { ascending: false });

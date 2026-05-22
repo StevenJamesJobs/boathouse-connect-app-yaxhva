@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform, AppState } from 'react-native';
 import { useAuth } from './AuthContext';
+import { useOrganization } from './OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { router } from 'expo-router';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
@@ -44,6 +45,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const notificationListener = useRef<Notifications.Subscription>();
   const responseListener = useRef<Notifications.Subscription>();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
 
   useEffect(() => {
     console.log('[NotificationContext] useEffect triggered', { hasUser: !!user });
@@ -166,6 +168,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           p_user_id: user.id,
           p_token: token,
           p_device_type: deviceType,
+          p_organization_id: organizationId,
         });
 
       if (error) {
@@ -182,7 +185,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   function handleNotificationDeepLink(data: Record<string, any>) {
     console.log('[NotificationContext] Deep linking with data:', data);
-    const portalPrefix = user?.role === 'manager' ? '/(portal)/manager' : '/(portal)/employee';
+    const portalPrefix = (user?.role === 'manager' || user?.role === 'owner') ? '/(portal)/manager' : '/(portal)/employee';
 
     try {
       switch (data.type) {
@@ -304,6 +307,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       const { data, error } = await supabase.functions.invoke('send-push-notification', {
         body: {
           userIds: params.userIds,
+          organizationId,
           notificationType: params.notificationType,
           title: params.title,
           body: params.body,

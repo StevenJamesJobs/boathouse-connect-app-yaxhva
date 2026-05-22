@@ -30,9 +30,11 @@ import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-nativ
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { fetchContentImages, saveContentImages, uploadImageToStorage, deleteContentImages } from '@/utils/contentImages';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface UpcomingEvent {
   id: string;
@@ -69,7 +71,9 @@ export default function UpcomingEventsEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { sendNotification } = useNotification();
+  const { organizationId } = useOrganization();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -129,6 +133,7 @@ export default function UpcomingEventsEditorScreen() {
       const { data, error } = await supabase
         .from('guides_and_training')
         .select('id, title, category, file_name')
+        .eq('organization_id', organizationId)
         .in('category', GUIDE_CATEGORIES)
         .eq('is_active', true)
         .order('category', { ascending: true })
@@ -138,7 +143,7 @@ export default function UpcomingEventsEditorScreen() {
         console.error('Error loading guide files:', error);
         throw error;
       }
-      
+
       console.log('Guide files loaded successfully:', data?.length || 0, 'items');
       setGuideFiles(data || []);
     } catch (error) {
@@ -167,7 +172,7 @@ export default function UpcomingEventsEditorScreen() {
 
   const cleanupExpiredEvents = async () => {
     try {
-      const { data, error } = await supabase.rpc('delete_expired_upcoming_events');
+      const { data, error } = await supabase.rpc('delete_expired_upcoming_events', { p_organization_id: organizationId });
       if (error) {
         console.error('Error cleaning up expired events:', error);
       } else {
@@ -177,6 +182,7 @@ export default function UpcomingEventsEditorScreen() {
           const { data: freshEvents } = await supabase
             .from('upcoming_events')
             .select('*')
+            .eq('organization_id', organizationId)
             .order('display_order', { ascending: true });
           if (freshEvents) {
             await resequenceDisplayOrders(freshEvents);
@@ -196,6 +202,7 @@ export default function UpcomingEventsEditorScreen() {
       const { data, error } = await supabase
         .from('upcoming_events')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('display_order', { ascending: true });
 
       if (error) {
@@ -367,6 +374,7 @@ export default function UpcomingEventsEditorScreen() {
         console.log('Updating upcoming event:', editingEvent.id);
         const { error } = await supabase.rpc('update_upcoming_event', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_event_id: editingEvent.id,
           p_title: formData.title,
           p_message: formData.message,
@@ -392,7 +400,7 @@ export default function UpcomingEventsEditorScreen() {
           await saveTranslations('upcoming_events', editingEvent.id, {
             title_es: formData.title_es,
             content_es: formData.message_es,
-          });
+          }, organizationId);
         }
 
         // Upload new additional images and save all to content_images
@@ -411,6 +419,7 @@ export default function UpcomingEventsEditorScreen() {
         console.log('Creating new upcoming event');
         const { error } = await supabase.rpc('create_upcoming_event', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_title: formData.title,
           p_message: formData.message,
           p_thumbnail_url: thumbnailUrl,
@@ -435,6 +444,7 @@ export default function UpcomingEventsEditorScreen() {
           const { data: created } = await (supabase.from('upcoming_events') as any)
             .select('id')
             .eq('title', formData.title)
+            .eq('organization_id', organizationId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
@@ -447,6 +457,7 @@ export default function UpcomingEventsEditorScreen() {
             title: '📅 New Event',
             body: formData.title,
             sent_by: user?.id,
+            organization_id: organizationId,
             data: {
               notificationType: 'event',
               notificationSkipped: !shouldSendNotification,
@@ -484,6 +495,7 @@ export default function UpcomingEventsEditorScreen() {
           const { data: newItem } = await supabase
             .from('upcoming_events')
             .select('id')
+            .eq('organization_id', organizationId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
@@ -491,7 +503,7 @@ export default function UpcomingEventsEditorScreen() {
             await saveTranslations('upcoming_events', newItem.id, {
               title_es: formData.title_es,
               content_es: formData.message_es,
-            });
+            }, organizationId);
 
             // Upload and save additional images for newly created item
             if (newAdditionalImageUris.length > 0) {
@@ -538,6 +550,7 @@ export default function UpcomingEventsEditorScreen() {
               
               const { error } = await supabase.rpc('delete_upcoming_event', {
                 p_user_id: user.id,
+                p_organization_id: organizationId,
                 p_event_id: event.id,
               });
 

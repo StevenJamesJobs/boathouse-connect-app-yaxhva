@@ -23,8 +23,10 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
 import RichTextToolbar from '@/components/RichTextToolbar';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface LibationRecipe {
   id: string;
@@ -58,6 +60,7 @@ export default function SummerLibationRecipesEditorScreen() {
   const { user } = useAuth();
   const colors = useThemeColors();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const procedureInputRef = useRef<TextInput>(null);
   const [procedureSelection, setProcedureSelection] = useState({ start: 0, end: 0 });
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
@@ -87,6 +90,7 @@ export default function SummerLibationRecipesEditorScreen() {
       const { data, error } = await supabase
         .from('summer_libation_recipes')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('category', { ascending: true })
         .order('display_order', { ascending: true });
@@ -234,6 +238,7 @@ export default function SummerLibationRecipesEditorScreen() {
       if (editingRecipe) {
         const { data, error } = await supabase.rpc('update_summer_libation_recipe', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_recipe_id: editingRecipe.id,
           p_name: name.trim(),
           p_price: price.trim(),
@@ -251,12 +256,13 @@ export default function SummerLibationRecipesEditorScreen() {
           throw error;
         }
         if (procedureEs.trim()) {
-          await saveTranslations('summer_libation_recipes', editingRecipe.id, { procedure_es: procedureEs });
+          await saveTranslations('summer_libation_recipes', editingRecipe.id, { procedure_es: procedureEs }, organizationId);
         }
         Alert.alert(t('common.success'), t('summer_libation_editor.recipe_updated'));
       } else {
         const { data, error } = await supabase.rpc('insert_summer_libation_recipe', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_name: name.trim(),
           p_price: price.trim(),
           p_category: category,
@@ -276,10 +282,11 @@ export default function SummerLibationRecipesEditorScreen() {
           .from('summer_libation_recipes')
           .select('id')
           .eq('name', name.trim())
+          .eq('organization_id', organizationId)
           .order('created_at', { ascending: false })
           .limit(1);
         if (newRecipes?.[0] && procedureEs.trim()) {
-          await saveTranslations('summer_libation_recipes', newRecipes[0].id, { procedure_es: procedureEs });
+          await saveTranslations('summer_libation_recipes', newRecipes[0].id, { procedure_es: procedureEs }, organizationId);
         }
         Alert.alert(t('common.success'), t('summer_libation_editor.recipe_added'));
       }
@@ -310,6 +317,7 @@ export default function SummerLibationRecipesEditorScreen() {
 
             const { error } = await supabase.rpc('delete_summer_libation_recipe', {
               p_user_id: user.id,
+              p_organization_id: organizationId,
               p_recipe_id: recipe.id,
             });
 
