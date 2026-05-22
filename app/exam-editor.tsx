@@ -22,11 +22,11 @@ import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { generateQuizQuestions, generatePhotoQuestion, getCurrentWeekKey, getExamTypeName } from '@/utils/exam/questionGenerator';
 import type { ExamType } from '@/utils/exam/questionGenerator';
 import { formatTime, formatCountdown, getCountdownUrgency } from '@/utils/exam/examEngine';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
@@ -92,7 +92,8 @@ export default function ExamEditorScreen() {
   const colors = useThemeColors();
   const { mode } = useAppTheme();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
+  const currencyName = organization.reward_currency_name;
   const params = useLocalSearchParams<{ type: string }>();
   const examType = (params.type || 'server') as ExamType;
 
@@ -141,7 +142,7 @@ export default function ExamEditorScreen() {
       // Auto-close any active exams whose close_at has passed. Fire-and-forget
       // — if it fails we still show the (now slightly stale) data below.
       try {
-        await (supabase.rpc as any)('close_expired_exams');
+        await supabase.rpc('close_expired_exams', { p_organization_id: organizationId });
       } catch (cleanupErr) {
         console.warn('close_expired_exams cleanup failed:', cleanupErr);
       }
@@ -215,9 +216,10 @@ export default function ExamEditorScreen() {
 
   const fetchCompletionData = async (examId: string) => {
     try {
-      const { data, error } = await (supabase.rpc as any)('get_exam_completion_status', {
+      const { data, error } = await supabase.rpc('get_exam_completion_status', {
         p_exam_id: examId,
         p_exam_type: examType,
+        p_organization_id: organizationId,
       });
 
       if (!error && data) {
@@ -833,7 +835,7 @@ export default function ExamEditorScreen() {
 
     Alert.alert(
       'Allow Retake',
-      `This will reset ${entry.name}'s quiz result and allow them to retake the quiz. Their McLoone's Bucks from this quiz will NOT be revoked. Continue?`,
+      `This will reset ${entry.name}'s quiz result and allow them to retake the quiz. Their ${currencyName} from this quiz will NOT be revoked. Continue?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -1119,11 +1121,11 @@ export default function ExamEditorScreen() {
                 </View>
               )}
 
-              {/* No Rewards toggle — draft only. Off = no McLoone's Bucks awarded for this quiz. */}
+              {/* No Rewards toggle — draft only. Off = no reward currency awarded for this quiz. */}
               {currentExam.status === 'draft' && (
                 <View style={styles.statusRow}>
                   <View style={styles.notifyLabelCol}>
-                    <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Award McLoone's Bucks</Text>
+                    <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Award {currencyName}</Text>
                     <Text style={[styles.notifyDesc, { color: colors.textSecondary }]}>
                       Off for training-only quizzes (e.g. New Menu)
                     </Text>

@@ -168,6 +168,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           p_user_id: user.id,
           p_token: token,
           p_device_type: deviceType,
+          p_organization_id: organizationId,
         });
 
       if (error) {

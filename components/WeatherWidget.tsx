@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, Image, TouchableOpacity } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import { useOrganization } from '../contexts/OrganizationContext';
 
 interface WeatherData {
   currentTemp: number;
@@ -21,10 +22,11 @@ interface WeatherWidgetProps {
 }
 
 const WEATHER_API_KEY = '6e3db8832cf34a5bbc5182329251711';
-const LOCATION = 'West Orange, NJ'; // McLoone's Boathouse location - zip code 07003
 
 export default function WeatherWidget({ textColor, secondaryTextColor, language = 'en', onPress }: WeatherWidgetProps) {
   const { t } = useTranslation();
+  const { organization } = useOrganization();
+  const location = organization?.weather_location || 'Unknown';
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +81,7 @@ export default function WeatherWidget({ textColor, secondaryTextColor, language 
 
       const langParam = language === 'es' ? 'es' : 'en';
       const response = await fetch(
-        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(LOCATION)}&days=1&aqi=no&alerts=no&lang=${langParam}`
+        `https://api.weatherapi.com/v1/forecast.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(location)}&days=1&aqi=no&alerts=no&lang=${langParam}`
       );
 
       if (!response.ok) {
@@ -107,7 +109,7 @@ export default function WeatherWidget({ textColor, secondaryTextColor, language 
     } finally {
       setLoading(false);
     }
-  }, [language, t]);
+  }, [language, t, location]);
 
   useEffect(() => {
     fetchWeather();

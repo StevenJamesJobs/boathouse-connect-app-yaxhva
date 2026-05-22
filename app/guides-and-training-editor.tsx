@@ -19,6 +19,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -53,6 +54,7 @@ export default function GuidesAndTrainingEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const colors = useThemeColors();
   const { language } = useLanguage();
   const { organizationId } = useOrganization();
@@ -372,7 +374,7 @@ export default function GuidesAndTrainingEditorScreen() {
           await saveTranslations('guides_and_training', editingGuide.id, {
             title_es: formData.title_es,
             description_es: formData.description_es,
-          });
+          }, organizationId);
         }
       } else {
         console.log('Creating new guide');
@@ -410,7 +412,7 @@ export default function GuidesAndTrainingEditorScreen() {
             await saveTranslations('guides_and_training', newItem.id, {
               title_es: formData.title_es,
               description_es: formData.description_es,
-            });
+            }, organizationId);
           }
         }
       }

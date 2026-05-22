@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { getExamTypeName } from '@/utils/exam/questionGenerator';
 import type { ExamType } from '@/utils/exam/questionGenerator';
 import { useFocusEffect } from '@react-navigation/native';
@@ -75,9 +76,10 @@ export default function QuizHubEditorScreen() {
 
           if (exam.status === 'active' || exam.status === 'paused') {
             try {
-              const { data: completionData } = await (supabase.rpc as any)('get_exam_completion_status', {
+              const { data: completionData } = await supabase.rpc('get_exam_completion_status', {
                 p_exam_id: exam.id,
                 p_exam_type: examType,
+                p_organization_id: organizationId,
               });
 
               if (completionData) {

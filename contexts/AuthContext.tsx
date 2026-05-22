@@ -247,6 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { data: passwordValid, error: verifyError } = await supabase.rpc('verify_password', {
         user_id: userData.id,
         password: password,
+        p_organization_id: null,
       });
 
       if (verifyError) {

@@ -328,6 +328,7 @@ export default function AnnouncementEditorScreen() {
         console.log('Updating announcement:', editingAnnouncement.id);
         const { error } = await supabase.rpc('update_announcement', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_announcement_id: editingAnnouncement.id,
           p_title: formData.title,
           p_message: formData.message,
@@ -352,7 +353,7 @@ export default function AnnouncementEditorScreen() {
           await saveTranslations('announcements', editingAnnouncement.id, {
             title_es: formData.title_es,
             content_es: formData.message_es,
-          });
+          }, organizationId);
         }
 
         // Upload new additional images and save all to content_images
@@ -371,6 +372,7 @@ export default function AnnouncementEditorScreen() {
         console.log('Creating new announcement');
         const { error } = await supabase.rpc('create_announcement', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_title: formData.title,
           p_message: formData.message,
           p_thumbnail_url: thumbnailUrl,
@@ -452,7 +454,7 @@ export default function AnnouncementEditorScreen() {
           await saveTranslations('announcements', newItem.id, {
             title_es: formData.title_es,
             content_es: formData.message_es,
-          });
+          }, organizationId);
         }
 
         // Upload and save additional images for newly created item
@@ -498,6 +500,7 @@ export default function AnnouncementEditorScreen() {
               
               const { error } = await supabase.rpc('delete_announcement', {
                 p_user_id: user.id,
+                p_organization_id: organizationId,
                 p_announcement_id: announcement.id,
               });
 

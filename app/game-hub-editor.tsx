@@ -105,9 +105,10 @@ export default function GameHubEditorScreen() {
           onPress: async () => {
             setTogglingTestId(user.user_id);
             try {
-              const { error } = await (supabase.rpc as any)('set_user_test_flag', {
+              const { error } = await supabase.rpc('set_user_test_flag', {
                 p_user_id: user.user_id,
                 p_is_test: willBeTest,
+                p_organization_id: organizationId,
               });
               if (error) throw error;
               setSearchResults(prev => prev.map(r =>
@@ -138,26 +139,29 @@ export default function GameHubEditorScreen() {
             setResettingAll(true);
             try {
               // Use SECURITY DEFINER RPCs (bypasses RLS)
-              const { error: err1 } = await (supabase.rpc as any)('reset_game_scores', {
+              const { error: err1 } = await supabase.rpc('reset_game_scores', {
                 p_game_mode: null,
                 p_play_mode: null,
+                p_organization_id: organizationId,
               });
               if (err1) {
                 console.error('Error resetting game scores:', err1);
                 throw err1;
               }
 
-              const { error: err2 } = await (supabase.rpc as any)('reset_word_search_scores', {
+              const { error: err2 } = await supabase.rpc('reset_word_search_scores', {
                 p_category: null,
+                p_organization_id: organizationId,
               });
               if (err2) {
                 console.error('Error resetting word search scores:', err2);
                 throw err2;
               }
 
-              const { error: err3 } = await (supabase.rpc as any)('reset_picture_this_scores', {
+              const { error: err3 } = await supabase.rpc('reset_picture_this_scores', {
                 p_category: null,
                 p_difficulty: null,
+                p_organization_id: organizationId,
               });
               if (err3) {
                 console.error('Error resetting picture this scores:', err3);

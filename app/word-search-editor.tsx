@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import {
   WORD_SEARCH_CATEGORIES,
   WORD_SEARCH_CATEGORY_INFO,
@@ -36,6 +37,7 @@ export default function WordSearchEditorScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { t } = useTranslation();
+  const { organizationId } = useOrganization();
   const [resetting, setResetting] = useState<string | null>(null);
 
   const confirmReset = (category: WordSearchCategory | null) => {
@@ -60,6 +62,7 @@ export default function WordSearchEditorScreen() {
     try {
       const { error } = await supabase.rpc('reset_word_search_scores', {
         p_category: category ?? null,
+        p_organization_id: organizationId,
       });
       if (error) throw error;
       const label = category ? t(CATEGORY_LABEL_KEYS[category]) : t('ws_editor:all_categories_long');

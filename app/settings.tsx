@@ -18,6 +18,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { hexToRgba, themePalettes } from '@/styles/commonStyles';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useLanguage, SupportedLanguage } from '@/contexts/LanguageContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { BlurView } from 'expo-blur';
@@ -29,6 +30,7 @@ export default function SettingsScreen() {
   const colors = useThemeColors();
   const { palette, mode } = useAppTheme();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { language, setLanguage } = useLanguage();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -87,6 +89,7 @@ export default function SettingsScreen() {
       const { data: verifyData, error: verifyError } = await supabase.rpc('verify_password', {
         user_id: user.id,
         password: currentPassword,
+        p_organization_id: organizationId,
       });
       if (verifyError) {
         Alert.alert(t('common.error'), t('profile.error_verify_password'));
@@ -99,6 +102,7 @@ export default function SettingsScreen() {
       const { error: updateError } = await supabase.rpc('update_password', {
         user_id: user.id,
         new_password: newPassword,
+        p_organization_id: organizationId,
       });
       if (updateError) throw updateError;
       Alert.alert(t('common.success'), t('profile.password_changed'));

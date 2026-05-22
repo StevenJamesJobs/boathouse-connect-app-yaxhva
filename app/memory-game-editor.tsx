@@ -146,9 +146,10 @@ export default function MemoryGameEditorScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await (supabase.rpc as any)('reset_game_scores', {
+            await supabase.rpc('reset_game_scores', {
               p_game_mode: mode || null,
               p_play_mode: playModeFilter || null,
+              p_organization_id: organizationId,
             });
             Alert.alert('', t('memory_game.reset_success'));
           } catch (e) {

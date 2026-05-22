@@ -74,7 +74,8 @@ type RewardsSubTab = 'leaderboard' | 'recent';
 
 export default function EmployeeRewardsScreen() {
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
+  const currencyName = organization.reward_currency_name;
   const { t } = useTranslation();
   const { language } = useLanguage();
   const colors = useThemeColors();
@@ -321,7 +322,7 @@ export default function EmployeeRewardsScreen() {
 
             <View style={[styles.bucksCard, { backgroundColor: colors.card }]}>
               <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={32} color={colors.primary} />
-              <Text style={[styles.bucksLabel, { color: colors.textSecondary }]}>My McLoone's Bucks</Text>
+              <Text style={[styles.bucksLabel, { color: colors.textSecondary }]}>My {currencyName}</Text>
               <Text style={[styles.bucksAmount, { color: colors.primary }]}>${myBucks}</Text>
               <TouchableOpacity
                 style={[styles.redeemBtn, { backgroundColor: colors.primary }]}

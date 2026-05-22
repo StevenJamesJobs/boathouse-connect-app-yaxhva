@@ -282,6 +282,7 @@ export default function MessagesScreen() {
 
     const { data, error } = await supabase.rpc('get_unread_message_count', {
       user_id: user.id,
+      p_organization_id: organizationId,
     });
 
     if (!error && data !== null) {

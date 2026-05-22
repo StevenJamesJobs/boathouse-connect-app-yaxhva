@@ -26,6 +26,7 @@ import { generateCards } from '@/utils/game/gameDataAdapters';
 import MemoryGameBoard from '@/components/game/MemoryGameBoard';
 import GameHUD from '@/components/game/GameHUD';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { notifyLeaderboardPassed } from '@/utils/notificationHelpers';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -214,7 +215,8 @@ export default function MemoryGamePlayScreen() {
             user.id,
             finalState.score,
             t('notifications.game_hub_passed_title', { name: user.name }),
-            t('notifications.game_hub_passed_body')
+            t('notifications.game_hub_passed_body'),
+            organizationId
           );
         }
       } catch (e) {

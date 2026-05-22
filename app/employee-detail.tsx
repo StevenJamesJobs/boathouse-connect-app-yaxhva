@@ -19,9 +19,9 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import * as ImagePicker from 'expo-image-picker';
 import { JOB_TITLES } from '@/constants/jobTitles';
-import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface Employee {
   id: string;
@@ -42,7 +42,8 @@ export default function EmployeeDetailScreen() {
   const router = useRouter();
   const { employeeId } = useLocalSearchParams();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
+  const defaultPassword = organization.default_password;
   const { t } = useTranslation('employee_detail');
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -130,6 +131,7 @@ export default function EmployeeDetailScreen() {
         p_job_title: employee.job_titles[0], // Use first job title for backward compatibility
         p_phone_number: employee.phone_number || '',
         p_role: employee.role,
+        p_organization_id: organizationId,
       });
 
       if (error) {
@@ -143,6 +145,7 @@ export default function EmployeeDetailScreen() {
       const { error: updateError } = await supabase.rpc('update_user_job_titles', {
         p_user_id: employee.id,
         p_job_titles: employee.job_titles,
+        p_organization_id: organizationId,
       });
 
       if (updateError) {
@@ -168,7 +171,7 @@ export default function EmployeeDetailScreen() {
 
     Alert.alert(
       t('reset_password'),
-      t('reset_password_confirm', { name: employee.name }),
+      t('reset_password_confirm', { name: employee.name, defaultPassword }),
       [
         { text: t('common:cancel'), style: 'cancel' },
         {
@@ -178,12 +181,13 @@ export default function EmployeeDetailScreen() {
             try {
               const { error } = await supabase.rpc('update_password', {
                 user_id: employee.id,
-                new_password: 'boathouseconnect',
+                new_password: defaultPassword,
+                p_organization_id: organizationId,
               });
               if (error) throw error;
               Alert.alert(
                 t('common:success'),
-                t('reset_password_success')
+                t('reset_password_success', { defaultPassword })
               );
             } catch (error) {
               console.error('Error resetting password:', error);
@@ -488,7 +492,7 @@ export default function EmployeeDetailScreen() {
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{t('password_management')}</Text>
           <Text style={styles.sectionDescription}>
-            {t('reset_password_desc')}
+            {t('reset_password_desc', { defaultPassword })}
           </Text>
           <TouchableOpacity style={styles.resetButton} onPress={handleResetPassword}>
             <IconSymbol

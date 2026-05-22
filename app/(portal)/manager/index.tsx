@@ -270,7 +270,7 @@ export default function ManagerPortalScreen() {
           .order('display_order', { ascending: true })
           .limit(6),
         (async () => {
-          try { await supabase.rpc('delete_expired_upcoming_events' as any); } catch {}
+          try { await supabase.rpc('delete_expired_upcoming_events', { p_organization_id: organizationId }); } catch {}
           return supabase
             .from('upcoming_events')
             .select(`

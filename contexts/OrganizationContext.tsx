@@ -1,107 +1,120 @@
-
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import { supabase } from '@/app/integrations/supabase/client';
-import { Organization } from '@/types/user';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
+import { supabase } from '@/app/integrations/supabase/client';
+
+/** Organization-level settings surfaced to every screen via useOrganization(). */
+export interface Organization {
+  /** Human-readable organization name (e.g. "McLoone's Boathouse"). */
+  name: string;
+  /** Display name for the reward currency (e.g. "McLoone's Bucks"). */
+  reward_currency_name: string;
+  /** Default password shown in the employee-editor reset flow. */
+  default_password: string;
+  /** Location string used for weather widgets. */
+  weather_location: string;
+}
 
 interface OrganizationContextType {
-  organization: Organization | null;
   organizationId: string | null;
+  /** Org-level settings. Always non-null once loading completes (falls back to defaults). */
+  organization: Organization;
   isLoading: boolean;
-  refreshOrganization: () => Promise<void>;
 }
 
-const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined);
+/** Sensible defaults used when no org-specific override is found. */
+const DEFAULT_ORG: Organization = {
+  name: "McLoone's Boathouse",
+  reward_currency_name: "McLoone's Bucks",
+  default_password: 'boathouseconnect',
+  weather_location: 'Long Branch, NJ',
+};
 
-function mapDbOrgToOrganization(data: any): Organization {
-  return {
-    id: data.id,
-    name: data.name,
-    slug: data.slug,
-    logoUrl: data.logo_url,
-    address: data.address,
-    city: data.city,
-    state: data.state,
-    zip: data.zip,
-    latitude: data.latitude ? Number(data.latitude) : null,
-    longitude: data.longitude ? Number(data.longitude) : null,
-    weatherLocation: data.weather_location,
-    googleMapsQuery: data.google_maps_query,
-    rewardCurrencyName: data.reward_currency_name,
-    joinCode: data.join_code,
-    allowSelfSignup: data.allow_self_signup,
-    menuCount: data.menu_count,
-    menu1Name: data.menu_1_name,
-    menu2Name: data.menu_2_name,
-    defaultPassword: data.default_password,
-    ownerId: data.owner_id,
-  };
-}
+const OrganizationContext = createContext<OrganizationContextType>({
+  organizationId: null,
+  organization: DEFAULT_ORG,
+  isLoading: true,
+});
 
-export function OrganizationProvider({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated } = useAuth();
-  const [organization, setOrganization] = useState<Organization | null>(null);
+export function OrganizationProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [organization, setOrganization] = useState<Organization>(DEFAULT_ORG);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchOrganization = useCallback(async () => {
-    if (!user?.organizationId) {
-      setOrganization(null);
+  useEffect(() => {
+    if (!user?.id) {
+      setOrganizationId(null);
+      setOrganization(DEFAULT_ORG);
       setIsLoading(false);
       return;
     }
 
-    try {
-      const { data, error } = await supabase
-        .from('organizations')
-        .select('*')
-        .eq('id', user.organizationId)
-        .single();
+    let cancelled = false;
 
-      if (error) {
-        console.log('[OrgContext] Error fetching organization:', error.message);
-        setOrganization(null);
-      } else {
-        setOrganization(mapDbOrgToOrganization(data));
+    async function fetchOrg() {
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('organization_id')
+          .eq('id', user!.id)
+          .single();
+
+        if (cancelled) return;
+
+        if (error || !data?.organization_id) {
+          console.error('[OrganizationContext] Error fetching organization_id:', error);
+          setOrganizationId(null);
+          setOrganization(DEFAULT_ORG);
+          setIsLoading(false);
+          return;
+        }
+
+        setOrganizationId(data.organization_id);
+
+        const { data: orgData, error: orgError } = await supabase
+          .from('organizations')
+          .select('name, reward_currency_name, default_password, weather_location')
+          .eq('id', data.organization_id)
+          .single();
+
+        if (!cancelled) {
+          if (orgError || !orgData) {
+            console.error('[OrganizationContext] Error fetching organization:', orgError);
+            setOrganization(DEFAULT_ORG);
+          } else {
+            setOrganization({
+              name: orgData.name || DEFAULT_ORG.name,
+              reward_currency_name: orgData.reward_currency_name || DEFAULT_ORG.reward_currency_name,
+              default_password: orgData.default_password || DEFAULT_ORG.default_password,
+              weather_location: orgData.weather_location || DEFAULT_ORG.weather_location,
+            });
+          }
+          setIsLoading(false);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          console.error('[OrganizationContext] Exception fetching organization_id:', err);
+          setOrganizationId(null);
+          setOrganization(DEFAULT_ORG);
+          setIsLoading(false);
+        }
       }
-    } catch (err) {
-      console.error('[OrgContext] Unexpected error:', err);
-      setOrganization(null);
-    } finally {
-      setIsLoading(false);
     }
-  }, [user?.organizationId]);
 
-  useEffect(() => {
-    if (isAuthenticated && user?.organizationId) {
-      fetchOrganization();
-    } else {
-      setOrganization(null);
-      setIsLoading(!isAuthenticated ? true : false);
-    }
-  }, [isAuthenticated, user?.organizationId, fetchOrganization]);
+    fetchOrg();
 
-  const refreshOrganization = useCallback(async () => {
-    await fetchOrganization();
-  }, [fetchOrganization]);
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   return (
-    <OrganizationContext.Provider
-      value={{
-        organization,
-        organizationId: organization?.id ?? user?.organizationId ?? null,
-        isLoading,
-        refreshOrganization,
-      }}
-    >
+    <OrganizationContext.Provider value={{ organizationId, organization, isLoading }}>
       {children}
     </OrganizationContext.Provider>
   );
 }
 
 export function useOrganization() {
-  const context = useContext(OrganizationContext);
-  if (context === undefined) {
-    throw new Error('useOrganization must be used within an OrganizationProvider');
-  }
-  return context;
+  return useContext(OrganizationContext);
 }

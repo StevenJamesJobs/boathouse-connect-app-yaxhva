@@ -25,6 +25,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -32,7 +33,6 @@ import { getLocalizedField } from '@/utils/translateContent';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { MessageBadge } from '@/components/MessageBadge';
-import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface Employee {
   id: string;
@@ -686,7 +686,8 @@ export default function RewardsAndReviewsEditorScreen() {
 
 
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
+  const currencyName = organization.reward_currency_name;
   const { sendNotification } = useNotification();
   const { pendingCount } = usePendingApprovals();
   const { hasNew: managerRecentHasNew, markRecentViewed: markManagerRecentViewed } = useUnreadAwards();
@@ -1040,7 +1041,7 @@ export default function RewardsAndReviewsEditorScreen() {
 
     Alert.alert(
       t('rewards_reviews_editor:reset_user_title'),
-      t('rewards_reviews_editor:reset_user_confirm', { name: resetSelectedEmployee.name }),
+      t('rewards_reviews_editor:reset_user_confirm', { name: resetSelectedEmployee.name, currencyName }),
       [
         { text: t('rewards_reviews_editor:reset_cancel'), style: 'cancel' },
         {
@@ -1104,7 +1105,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 console.log('Verified user bucks after reset:', verifyData);
               }
 
-              Alert.alert(t('common:success'), t('rewards_reviews_editor:reset_success', { name: resetSelectedEmployee.name }));
+              Alert.alert(t('common:success'), t('rewards_reviews_editor:reset_success', { name: resetSelectedEmployee.name, currencyName }));
               setShowResetBucksModal(false);
               setResetSelectedEmployee(null);
               setResetSearchQuery('');
@@ -1125,7 +1126,7 @@ export default function RewardsAndReviewsEditorScreen() {
   const handleResetAllUsers = async () => {
     Alert.alert(
       t('rewards_reviews_editor:reset_all_confirm_title'),
-      t('rewards_reviews_editor:reset_all_confirm'),
+      t('rewards_reviews_editor:reset_all_confirm', { currencyName }),
       [
         { text: t('rewards_reviews_editor:reset_cancel'), style: 'cancel' },
         {
@@ -1209,7 +1210,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 }
               }
 
-              Alert.alert(t('common:success'), t('rewards_reviews_editor:reset_all_success'));
+              Alert.alert(t('common:success'), t('rewards_reviews_editor:reset_all_success', { currencyName }));
               setShowResetBucksModal(false);
               setResetSelectedEmployee(null);
               setResetSearchQuery('');
@@ -1273,6 +1274,7 @@ export default function RewardsAndReviewsEditorScreen() {
         p_transaction_id: editingTransaction.id,
         p_new_amount: finalAmount,
         p_new_description: editDescription,
+        p_organization_id: organizationId,
       });
 
       if (error) {
@@ -1645,10 +1647,10 @@ export default function RewardsAndReviewsEditorScreen() {
               </View>
             </View>
 
-            {/* My McLoone's Bucks */}
+            {/* My Bucks */}
             <View style={styles.bucksCard}>
               <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={32} color={colors.primary} />
-              <Text style={styles.bucksLabel}>{t('rewards_reviews_editor:my_bucks_label')}</Text>
+              <Text style={styles.bucksLabel}>{t('rewards_reviews_editor:my_bucks_label', { currencyName })}</Text>
               <Text style={styles.bucksAmount}>${myBucks}</Text>
             </View>
 
@@ -1761,7 +1763,7 @@ export default function RewardsAndReviewsEditorScreen() {
                       <Text style={[styles.leaderboardName, { fontSize: 18, color: colors.text, marginBottom: 4 }]}>{lookupEmployee.name}</Text>
                       <Text style={[styles.leaderboardJob, { color: colors.textSecondary, marginBottom: 8 }]}>{lookupEmployee.job_title}</Text>
                       <Text style={[styles.bucksAmount, { fontSize: 36 }]}>${lookupEmployee.mcloones_bucks || 0}</Text>
-                      <Text style={[styles.bucksLabel, { marginTop: 2 }]}>McLoone's Bucks Balance</Text>
+                      <Text style={[styles.bucksLabel, { marginTop: 2 }]}>{currencyName} Balance</Text>
                     </View>
 
                     {/* Employee Transactions */}
@@ -2178,7 +2180,7 @@ export default function RewardsAndReviewsEditorScreen() {
                     <Text style={{ color: isReward ? '#4CAF50' : '#F44336', fontWeight: 'bold' }}>
                       {isReward ? '+' : '-'}${rewardAmount}
                     </Text>
-                    {' '}{t('rewards_reviews_editor:amount_preview_suffix')}
+                    {' '}{t('rewards_reviews_editor:amount_preview_suffix', { currencyName })}
                   </Text>
                 )}
               </View>
@@ -2241,7 +2243,7 @@ export default function RewardsAndReviewsEditorScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('rewards_reviews_editor:reset_modal_title')}</Text>
+              <Text style={styles.modalTitle}>{t('rewards_reviews_editor:reset_modal_title', { currencyName })}</Text>
               <TouchableOpacity
                 onPress={() => {
                   setShowResetBucksModal(false);
@@ -2327,7 +2329,7 @@ export default function RewardsAndReviewsEditorScreen() {
               <View style={styles.resetSection}>
                 <Text style={styles.resetSectionTitle}>{t('rewards_reviews_editor:reset_all_title')}</Text>
                 <Text style={styles.resetAllWarning}>
-                  {t('rewards_reviews_editor:reset_all_warning')}
+                  {t('rewards_reviews_editor:reset_all_warning', { currencyName })}
                 </Text>
 
                 <TouchableOpacity
@@ -2449,7 +2451,7 @@ export default function RewardsAndReviewsEditorScreen() {
                     <Text style={{ color: editIsReward ? '#4CAF50' : '#F44336', fontWeight: 'bold' }}>
                       {editIsReward ? '+' : '-'}${editAmount}
                     </Text>
-                    {' '}{t('rewards_reviews_editor:amount_preview_suffix')}
+                    {' '}{t('rewards_reviews_editor:amount_preview_suffix', { currencyName })}
                   </Text>
                 )}
               </View>

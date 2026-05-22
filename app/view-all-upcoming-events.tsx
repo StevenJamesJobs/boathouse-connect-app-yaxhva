@@ -29,6 +29,7 @@ import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
 import { eventFallsOnDate } from '@/utils/dateUtils';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { fetchContentImagesBatch } from '@/utils/contentImages';
 import { getImageUrl } from '@/utils/imageUrl';
 import { stripFormattingTags } from '@/components/FormattedText';
@@ -68,6 +69,7 @@ export default function ViewAllUpcomingEventsScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventsTab, setEventsTab] = useState<'Event' | 'Entertainment'>('Event');
@@ -107,7 +109,7 @@ export default function ViewAllUpcomingEventsScreen() {
   const loadEvents = async () => {
     try {
       setLoading(true);
-      try { await supabase.rpc('delete_expired_upcoming_events' as any); } catch {}
+      try { await supabase.rpc('delete_expired_upcoming_events', { p_organization_id: organizationId }); } catch {}
 
       const { data, error } = await supabase
         .from('upcoming_events')

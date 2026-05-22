@@ -30,6 +30,7 @@ import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/tra
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { fetchContentImages, saveContentImages, uploadImageToStorage, deleteContentImages } from '@/utils/contentImages';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
@@ -71,6 +72,7 @@ export default function SpecialFeaturesEditorScreen() {
   const { sendNotification } = useNotification();
   const { organizationId } = useOrganization();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const [features, setFeatures] = useState<SpecialFeature[]>([]);
   const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -149,7 +151,7 @@ export default function SpecialFeaturesEditorScreen() {
 
   const cleanupExpiredFeatures = async () => {
     try {
-      const { data, error } = await supabase.rpc('delete_expired_special_features');
+      const { data, error } = await supabase.rpc('delete_expired_special_features', { p_organization_id: organizationId });
       if (error) {
         console.error('Error cleaning up expired features:', error);
       } else {
@@ -340,6 +342,7 @@ export default function SpecialFeaturesEditorScreen() {
         console.log('Updating special feature:', editingFeature.id);
         const { error } = await supabase.rpc('update_special_feature', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_feature_id: editingFeature.id,
           p_title: formData.title,
           p_message: formData.message,
@@ -364,7 +367,7 @@ export default function SpecialFeaturesEditorScreen() {
           await saveTranslations('special_features', editingFeature.id, {
             title_es: formData.title_es,
             content_es: formData.message_es,
-          });
+          }, organizationId);
         }
 
         // Upload new additional images and save all to content_images
@@ -383,6 +386,7 @@ export default function SpecialFeaturesEditorScreen() {
         console.log('Creating new special feature');
         const { error } = await supabase.rpc('create_special_feature', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_title: formData.title,
           p_message: formData.message,
           p_thumbnail_url: thumbnailUrl,
@@ -463,7 +467,7 @@ export default function SpecialFeaturesEditorScreen() {
             await saveTranslations('special_features', newItem.id, {
               title_es: formData.title_es,
               content_es: formData.message_es,
-            });
+            }, organizationId);
           }
         }
 
@@ -519,6 +523,7 @@ export default function SpecialFeaturesEditorScreen() {
               
               const { error } = await supabase.rpc('delete_special_feature', {
                 p_user_id: user.id,
+                p_organization_id: organizationId,
                 p_feature_id: feature.id,
               });
 

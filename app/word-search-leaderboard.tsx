@@ -21,6 +21,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import {
@@ -46,6 +47,7 @@ export default function WordSearchLeaderboardScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const pagerRef = useRef<FlatList>(null);
 
   const [activeCategory, setActiveCategory] = useState<WordSearchCategory>('weekly_specials');
@@ -58,6 +60,7 @@ export default function WordSearchLeaderboardScreen() {
     const { data, error } = await supabase.rpc('get_word_search_leaderboard', {
       p_category: cat,
       p_limit: 20,
+      p_organization_id: organizationId,
     });
     setLoading((prev) => ({ ...prev, [cat]: false }));
     if (!error && data) {

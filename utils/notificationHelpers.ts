@@ -64,20 +64,22 @@ export async function sendMessageNotification(
 }
 
 /**
- * Send a notification when McLoone's Bucks are awarded
+ * Send a notification when reward currency is awarded.
+ * @param currencyName  Display name for the org's reward currency (e.g. "McLoone's Bucks").
  */
 export async function sendRewardNotification(
   userId: string,
   amount: number,
   description?: string,
-  organizationId?: string
+  organizationId?: string,
+  currencyName: string = 'Bucks'
 ): Promise<void> {
   await sendNotification({
     userIds: [userId],
     organizationId,
     notificationType: 'reward',
-    title: '🎉 McLoone\'s Bucks Earned!',
-    body: `You earned $${amount} McLoone's Bucks!${description ? ` ${description}` : ''}`,
+    title: `\u{1F389} ${currencyName} Earned!`,
+    body: `You earned $${amount} ${currencyName}!${description ? ` ${description}` : ''}`,
     data: {
       amount,
       type: 'reward',
@@ -170,9 +172,10 @@ export async function notifyLeaderboardPassed(
 ): Promise<void> {
   if (!playerUserId || scoreJustEarned <= 0) return;
   try {
-    const { data, error } = await (supabase.rpc as any)('get_passed_users_on_leaderboard', {
+    const { data, error } = await supabase.rpc('get_passed_users_on_leaderboard', {
       p_user_id: playerUserId,
       p_new_score: scoreJustEarned,
+      p_organization_id: organizationId,
     });
     if (error) {
       console.error('[notifyLeaderboardPassed] RPC error:', error);

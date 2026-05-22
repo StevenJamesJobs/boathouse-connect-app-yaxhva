@@ -12,12 +12,14 @@ import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import PortalTabBar from '@/components/PortalTabBar';
 import { useTranslation } from 'react-i18next';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 function ManagerHeader() {
   const router = useRouter();
   const { logout } = useAuth();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { organization } = useOrganization();
 
   const handleLogout = async () => {
     await logout();
@@ -33,7 +35,7 @@ function ManagerHeader() {
           size={22}
           color={colors.primary}
         />
-        <Text style={[styles.cornerBrandText, { color: colors.text }]}>MB Connect</Text>
+        <Text style={[styles.cornerBrandText, { color: colors.text }]}>{organization?.name || 'MyResto Connect'}</Text>
       </View>
       <Text style={[styles.headerTitle, { color: colors.text }]}>{t('header.manager_portal')}</Text>
       <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>

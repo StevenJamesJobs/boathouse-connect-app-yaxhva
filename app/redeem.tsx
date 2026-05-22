@@ -22,6 +22,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { MenuItemSearchPicker, PickedMenuItem } from '@/components/MenuItemSearchPicker';
 import { RedemptionRequestCard, RedemptionRequestRow, RedemptionType } from '@/components/RedemptionRequestCard';
@@ -88,6 +89,8 @@ export default function EmployeeRedeemScreen() {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { organizationId, organization } = useOrganization();
+  const currencyName = organization.reward_currency_name;
   const { sendNotification } = useNotification();
   const { organizationId } = useOrganization();
 
@@ -222,7 +225,7 @@ export default function EmployeeRedeemScreen() {
       const isFood = activeOption === 'food_beverage';
       const dateStr = isFood ? null : shiftDate.toISOString().slice(0, 10);
 
-      const { data: requestId, error } = await (supabase.rpc as any)('submit_redemption_request', {
+      const { data: requestId, error } = await supabase.rpc('submit_redemption_request', {
         p_user_id: user.id,
         p_request_type: activeOption,
         p_bucks_amount: requestedBucks,
@@ -232,6 +235,7 @@ export default function EmployeeRedeemScreen() {
         p_shift_date: dateStr,
         p_shift_period: isFood ? null : shiftPeriod,
         p_comment: isFood ? null : comment || null,
+        p_organization_id: organizationId,
       });
 
       if (error) {
@@ -306,7 +310,7 @@ export default function EmployeeRedeemScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={[styles.balanceCard, { backgroundColor: colors.card }]}>
-          <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>Available McLoone&apos;s Bucks</Text>
+          <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>Available {currencyName}</Text>
           <Text style={[styles.balanceAmount, { color: colors.primary }]}>${available}</Text>
           {reservedBucks > 0 && (
             <Text style={[styles.reservedText, { color: colors.textSecondary }]}>

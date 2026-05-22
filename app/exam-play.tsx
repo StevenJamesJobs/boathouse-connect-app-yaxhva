@@ -15,6 +15,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import * as Haptics from 'expo-haptics';
 import {
@@ -35,7 +36,6 @@ import {
 import { getExamTypeName } from '@/utils/exam/questionGenerator';
 import { getEligibleQuizTypes } from '@/app/weekly-quizzes';
 import { useTranslation } from 'react-i18next';
-import { useOrganization } from '@/contexts/OrganizationContext';
 
 type Phase = 'loading' | 'intro' | 'playing' | 'feedback' | 'completed';
 
@@ -45,7 +45,8 @@ export default function ExamPlayScreen() {
   const { i18n } = useTranslation();
   const isSpanish = i18n.language === 'es';
   const { user, refreshUser } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
+  const currencyName = organization.reward_currency_name;
   const params = useLocalSearchParams<{ examId: string; preview: string }>();
   const examId = params.examId || '';
   const isPreview = params.preview === 'true';
@@ -234,9 +235,10 @@ export default function ExamPlayScreen() {
 
     if (!isPreview && user?.id) {
       try {
-        const { data, error } = await (supabase.rpc as any)('start_exam_attempt', {
+        const { data, error } = await supabase.rpc('start_exam_attempt', {
           p_exam_id: examId,
           p_user_id: user.id,
+          p_organization_id: organizationId,
         });
 
         if (error) {
@@ -354,7 +356,7 @@ export default function ExamPlayScreen() {
     try {
       const results = calculateResults(state, rewardPerCorrect, rewardsEnabled);
 
-      await (supabase.rpc as any)('submit_exam_and_award_bucks', {
+      await supabase.rpc('submit_exam_and_award_bucks', {
         p_exam_id: examId,
         p_user_id: user.id,
         p_answers: JSON.stringify(state.answers),
@@ -363,9 +365,10 @@ export default function ExamPlayScreen() {
         p_bucks_awarded: results.totalBucksAwarded,
         p_time_seconds: results.timeSeconds,
         p_is_timed_out: state.isTimedOut,
+        p_organization_id: organizationId,
       });
 
-      // Refresh user to update McLoone's Bucks balance
+      // Refresh user to update reward currency balance
       await refreshUser();
     } catch (err) {
       console.error('Submit results error:', err);
@@ -453,8 +456,8 @@ export default function ExamPlayScreen() {
               <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={20} color="#10B981" />
               <Text style={[styles.introInfoText, { color: colors.text }]}>
                 {isSpanish
-                  ? `Gana $${rewardPerCorrect.toFixed(2)} McLoone's Bucks por respuesta correcta`
-                  : `Earn $${rewardPerCorrect.toFixed(2)} McLoone's Bucks per correct answer`}
+                  ? `Gana $${rewardPerCorrect.toFixed(2)} ${currencyName} por respuesta correcta`
+                  : `Earn $${rewardPerCorrect.toFixed(2)} ${currencyName} per correct answer`}
               </Text>
             </View>
 
@@ -527,7 +530,7 @@ export default function ExamPlayScreen() {
             </View>
 
             <View style={[styles.bucksEarned, { backgroundColor: '#10B98115' }]}>
-              <Text style={styles.bucksEarnedText}>+${results.totalBucksAwarded} McLoone's Bucks</Text>
+              <Text style={styles.bucksEarnedText}>+${results.totalBucksAwarded} {currencyName}</Text>
             </View>
 
             {submitting && (

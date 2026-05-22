@@ -19,8 +19,8 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
-import { JOB_TITLES } from '@/constants/jobTitles';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { JOB_TITLES } from '@/constants/jobTitles';
 
 interface Employee {
   id: string;
@@ -43,7 +43,7 @@ export default function EmployeeEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation('employee_editor');
   const colors = useThemeColors();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
@@ -62,7 +62,7 @@ export default function EmployeeEditorScreen() {
     job_titles: [] as string[],
     phone_number: '',
     role: 'employee',
-    password: 'boathouseconnect',
+    password: organization?.default_password || 'changeme',
   });
 
   useEffect(() => {
@@ -148,6 +148,7 @@ export default function EmployeeEditorScreen() {
         p_phone_number: newEmployee.phone_number,
         p_role: newEmployee.role,
         p_password: newEmployee.password,
+        p_organization_id: organizationId,
       });
 
       if (error) {
@@ -161,6 +162,7 @@ export default function EmployeeEditorScreen() {
       const { error: updateError } = await supabase.rpc('update_user_job_titles', {
         p_user_id: data,
         p_job_titles: newEmployee.job_titles,
+        p_organization_id: organizationId,
       });
 
       if (updateError) {
@@ -178,7 +180,7 @@ export default function EmployeeEditorScreen() {
         job_titles: [],
         phone_number: '',
         role: 'employee',
-        password: 'boathouseconnect',
+        password: organization?.default_password || 'changeme',
       });
       fetchEmployees();
     } catch (error: any) {
@@ -206,6 +208,7 @@ export default function EmployeeEditorScreen() {
       const { error } = await supabase.rpc('update_user_active_status', {
         p_user_id: employee.id,
         p_is_active: newStatus,
+        p_organization_id: organizationId,
       });
 
       if (error) {
@@ -582,7 +585,7 @@ export default function EmployeeEditorScreen() {
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>{t('default_password_label')}</Text>
                 <View style={[styles.formInput, styles.formInputDisabled]}>
-                  <Text style={styles.formInputTextDisabled}>boathouseconnect</Text>
+                  <Text style={styles.formInputTextDisabled}>{organization?.default_password || 'changeme'}</Text>
                 </View>
                 <Text style={styles.formNote}>
                   {t('default_password_note')}

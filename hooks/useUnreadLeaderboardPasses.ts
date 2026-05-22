@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { AppState, AppStateStatus } from 'react-native';
 
 // Mirrors useUnreadQuizzes — global event so any screen can broadcast a refresh
@@ -19,6 +20,7 @@ export function refreshAllUnreadLeaderboardPasses() {
  */
 export function useUnreadLeaderboardPasses() {
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -29,7 +31,7 @@ export function useUnreadLeaderboardPasses() {
       return;
     }
     try {
-      const { data, error } = await (supabase.rpc as any)('get_unread_leaderboard_pass_count');
+      const { data, error } = await supabase.rpc('get_unread_leaderboard_pass_count', { p_organization_id: organizationId });
       if (error) {
         console.error('Error loading leaderboard pass count:', error);
         return;
@@ -40,7 +42,7 @@ export function useUnreadLeaderboardPasses() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, organizationId]);
 
   useEffect(() => {
     loadUnreadCount();

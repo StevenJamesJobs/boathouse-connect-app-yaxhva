@@ -24,6 +24,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
 
@@ -60,6 +61,7 @@ export default function CocktailsAZEditorScreen() {
   const { language } = useLanguage();
   const { organizationId } = useOrganization();
   const colors = useThemeColors();
+  const { organizationId } = useOrganization();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
   const [loading, setLoading] = useState(false);
@@ -269,6 +271,7 @@ export default function CocktailsAZEditorScreen() {
         console.log('Updating cocktail:', editingCocktail.id);
         const { data, error } = await supabase.rpc('update_cocktail', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_cocktail_id: editingCocktail.id,
           p_name: name.trim(),
           p_alcohol_type: alcoholType,
@@ -284,7 +287,7 @@ export default function CocktailsAZEditorScreen() {
         }
         console.log('Cocktail updated successfully');
         if (procedureEs.trim()) {
-          await saveTranslations('cocktails', editingCocktail.id, { procedure_es: procedureEs });
+          await saveTranslations('cocktails', editingCocktail.id, { procedure_es: procedureEs }, organizationId);
         }
         Alert.alert(t('common.success'), t('cocktails_editor.cocktail_updated'));
       } else {
@@ -292,6 +295,7 @@ export default function CocktailsAZEditorScreen() {
         console.log('Adding new cocktail');
         const { data, error } = await supabase.rpc('insert_cocktail', {
           p_user_id: user.id,
+          p_organization_id: organizationId,
           p_name: name.trim(),
           p_alcohol_type: alcoholType,
           p_ingredients: ingredients.trim(),
@@ -313,7 +317,7 @@ export default function CocktailsAZEditorScreen() {
           .order('created_at', { ascending: false })
           .limit(1);
         if (newItems?.[0] && procedureEs.trim()) {
-          await saveTranslations('cocktails', newItems[0].id, { procedure_es: procedureEs });
+          await saveTranslations('cocktails', newItems[0].id, { procedure_es: procedureEs }, organizationId);
         }
         Alert.alert(t('common.success'), t('cocktails_editor.cocktail_added'));
       }
@@ -346,6 +350,7 @@ export default function CocktailsAZEditorScreen() {
             // Use RPC function to delete (same pattern as profile update)
             const { error } = await supabase.rpc('delete_cocktail', {
               p_user_id: user.id,
+              p_organization_id: organizationId,
               p_cocktail_id: cocktail.id,
             });
 

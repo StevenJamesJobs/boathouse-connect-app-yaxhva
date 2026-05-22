@@ -31,9 +31,10 @@ interface NotificationPreferencesData {
 export default function NotificationPreferences({ variant = 'employee' }: NotificationPreferencesProps) {
   const themeColors = useThemeColors();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
+  const currencyName = organization.reward_currency_name;
   const { t } = useTranslation();
-  
+
   const [loading, setLoading] = useState(true);
   const [preferences, setPreferences] = useState<NotificationPreferencesData>({
     messages_enabled: true,
@@ -94,6 +95,7 @@ export default function NotificationPreferences({ variant = 'employee' }: Notifi
       const { error } = await supabase.rpc('upsert_notification_preferences', {
         p_user_id: user.id,
         [`p_${key}`]: value,
+        p_organization_id: organizationId,
       });
 
       if (error) {
@@ -118,10 +120,10 @@ export default function NotificationPreferences({ variant = 'employee' }: Notifi
     },
     {
       key: 'rewards_enabled' as keyof NotificationPreferencesData,
-      label: t('notifications.mcloones_bucks'),
+      label: t('notifications.mcloones_bucks', { currencyName }),
       icon: 'dollarsign.circle.fill',
       androidIcon: 'attach-money',
-      description: t('notifications.mcloones_bucks_desc'),
+      description: t('notifications.mcloones_bucks_desc', { currencyName }),
     },
     {
       key: 'announcements_enabled' as keyof NotificationPreferencesData,

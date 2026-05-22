@@ -15,6 +15,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { RedemptionRequestCard, RedemptionRequestRow } from '@/components/RedemptionRequestCard';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -90,10 +91,11 @@ export default function ManagerApprovalsScreen() {
     setWorking(true);
     try {
       const rpc = mode === 'approve' ? 'approve_redemption_request' : 'deny_redemption_request';
-      const { error } = await (supabase.rpc as any)(rpc, {
+      const { error } = await supabase.rpc(rpc, {
         p_request_id: row.id,
         p_manager_id: user.id,
         p_reason: withReason,
+        p_organization_id: organizationId,
       });
       if (error) {
         Alert.alert(`Could not ${mode}`, error.message);

@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { refreshAllUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 
@@ -54,6 +55,7 @@ export default function MasterLeaderboardScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
 
   const [activeTab, setActiveTab] = useState<LeaderboardTab>('overall');
   const [entries, setEntries] = useState<MasterLeaderboardEntry[]>([]);
@@ -62,7 +64,7 @@ export default function MasterLeaderboardScreen() {
   const loadData = useCallback(async (tab: LeaderboardTab) => {
     setLoading(true);
     try {
-      const { data, error } = await (supabase.rpc as any)(RPC_MAP[tab], { p_limit: 20 });
+      const { data, error } = await supabase.rpc(RPC_MAP[tab], { p_limit: 20, p_organization_id: organizationId });
       if (!error && data) {
         setEntries(data as MasterLeaderboardEntry[]);
       } else {
@@ -83,7 +85,7 @@ export default function MasterLeaderboardScreen() {
   // the unread-pass badge across all surfaces (app icon, nav, tile, button).
   useFocusEffect(
     useCallback(() => {
-      (supabase.rpc as any)('mark_leaderboard_viewed').then(() => {
+      supabase.rpc('mark_leaderboard_viewed', { p_organization_id: organizationId }).then(() => {
         refreshAllUnreadLeaderboardPasses();
       });
     }, [])
