@@ -35,6 +35,7 @@ import {
 import { getExamTypeName } from '@/utils/exam/questionGenerator';
 import { getEligibleQuizTypes } from '@/app/weekly-quizzes';
 import { useTranslation } from 'react-i18next';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 type Phase = 'loading' | 'intro' | 'playing' | 'feedback' | 'completed';
 
@@ -44,6 +45,7 @@ export default function ExamPlayScreen() {
   const { i18n } = useTranslation();
   const isSpanish = i18n.language === 'es';
   const { user, refreshUser } = useAuth();
+  const { organizationId } = useOrganization();
   const params = useLocalSearchParams<{ examId: string; preview: string }>();
   const examId = params.examId || '';
   const isPreview = params.preview === 'true';

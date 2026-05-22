@@ -24,6 +24,7 @@ import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getImageUrl } from '@/utils/imageUrl';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRouter } from 'expo-router';
 import SeasonSelector, { type Season } from '@/components/SeasonSelector';
 
@@ -192,6 +193,7 @@ interface MenuDisplayProps {
 export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayProps) {
   const { t } = useTranslation();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
 
   // Build pages array — prepend phantom bridge page when swipe-to-welcome is enabled
   const hasBridge = !!onSwipeToWelcome;
@@ -360,6 +362,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       const { data, error } = await (supabase
         .from('menu_items') as any)
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .in('season', [season, 'both'])
         .order('display_order', { ascending: true });
@@ -371,6 +374,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         const { data: slrData } = await (supabase
           .from('summer_libation_recipes' as any) as any)
           .select('*')
+          .eq('organization_id', organizationId)
           .eq('is_active', true)
           .order('display_order', { ascending: true });
 

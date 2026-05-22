@@ -33,7 +33,7 @@ export default function SettingsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const isManager = user?.role === 'manager';
+  const isManager = user?.role === 'manager' || user?.role === 'owner';
 
   const blurBgColor = Platform.select({
     ios: hexToRgba(colors.tabBarBackground, isManager ? 0.80 : 0.60),
@@ -208,7 +208,7 @@ export default function SettingsScreen() {
           </TouchableOpacity>
           {notificationPrefsExpanded && (
             <View style={styles.expandedContent}>
-              <NotificationPreferences variant={user?.role === 'manager' ? 'manager' : 'employee'} />
+              <NotificationPreferences variant={(user?.role === 'manager' || user?.role === 'owner') ? 'manager' : 'employee'} />
             </View>
           )}
         </View>

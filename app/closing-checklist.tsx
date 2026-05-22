@@ -10,6 +10,7 @@ import {
   Alert,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -33,6 +34,7 @@ interface ChecklistCategory {
 export default function ClosingChecklistScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { t } = useTranslation();
   const [categories, setCategories] = useState<ChecklistCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +56,7 @@ export default function ClosingChecklistScreen() {
       const { data: categoriesData, error: categoriesError } = await supabase
         .from('checklist_categories')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('checklist_type', 'closing')
         .eq('is_active', true)
         .order('display_order');
@@ -66,6 +69,7 @@ export default function ClosingChecklistScreen() {
       const { data: itemsData, error: itemsError } = await supabase
         .from('checklist_items')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('display_order');
 
@@ -158,6 +162,7 @@ export default function ClosingChecklistScreen() {
             checklist_item_id: itemId,
             completed: true,
             completed_date: today,
+            organization_id: organizationId,
           }, {
             onConflict: 'user_id,checklist_item_id,completed_date',
           });

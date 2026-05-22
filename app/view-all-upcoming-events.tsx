@@ -33,6 +33,7 @@ import { fetchContentImagesBatch } from '@/utils/contentImages';
 import { getImageUrl } from '@/utils/imageUrl';
 import { stripFormattingTags } from '@/components/FormattedText';
 import { useUnreadContent } from '@/hooks/useUnreadContent';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface GuideFile {
   id: string;
@@ -88,6 +89,7 @@ export default function ViewAllUpcomingEventsScreen() {
   } | null>(null);
 
   const colors = useThemeColors();
+  const { organizationId } = useOrganization();
   const {
     viewedEventIds,
     lastViewedEvents,
@@ -115,6 +117,7 @@ export default function ViewAllUpcomingEventsScreen() {
             id, title, file_url, file_name, file_type
           )
         `)
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('display_order', { ascending: true })
         .order('created_at', { ascending: false });

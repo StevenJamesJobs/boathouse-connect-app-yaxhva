@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface PureeSyrupRecipe {
   id: string;
@@ -48,6 +49,7 @@ export default function PureeSyrupRecipesEditorScreen() {
   const { user } = useAuth();
   const colors = useThemeColors();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const procedureInputRef = useRef<TextInput>(null);
   const [procedureSelection, setProcedureSelection] = useState({ start: 0, end: 0 });
   const [recipes, setRecipes] = useState<PureeSyrupRecipe[]>([]);
@@ -76,6 +78,7 @@ export default function PureeSyrupRecipesEditorScreen() {
       const { data, error } = await supabase
         .from('puree_syrup_recipes')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('category', { ascending: true })
         .order('display_order', { ascending: true });
@@ -274,6 +277,7 @@ export default function PureeSyrupRecipesEditorScreen() {
           .from('puree_syrup_recipes')
           .select('id')
           .eq('name', name.trim())
+          .eq('organization_id', organizationId)
           .order('created_at', { ascending: false })
           .limit(1);
         if (newItems?.[0] && procedureEs.trim()) {

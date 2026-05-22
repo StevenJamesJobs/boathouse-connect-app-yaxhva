@@ -15,6 +15,7 @@ import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import WeeklyQuizCard, { WeeklyQuizCardResult } from '@/components/WeeklyQuizCard';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 type ExamType = 'server' | 'bartender' | 'host';
 
@@ -57,6 +58,7 @@ export default function WeeklyQuizzesScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
 
   const [loading, setLoading] = useState(true);
   const [quizzes, setQuizzes] = useState<QuizEntry[]>([]);
@@ -89,6 +91,7 @@ export default function WeeklyQuizzesScreen() {
         // Get active exam for this type
         const { data: examData } = await (supabase.from('exams' as any) as any)
           .select('id, time_limit_seconds, status, close_at')
+          .eq('organization_id', organizationId)
           .eq('exam_type', examType)
           .in('status', ['active', 'paused'])
           .order('activated_at', { ascending: false })

@@ -82,7 +82,7 @@ export default function LoginScreen() {
       console.log('[iOS Login] Already authenticated, redirecting to portal');
       const timeout = setTimeout(() => {
         try {
-          if (user.role === 'manager') {
+          if (user.role === 'manager' || user.role === 'owner') {
             router.replace('/(portal)/manager');
           } else {
             router.replace('/(portal)/employee');

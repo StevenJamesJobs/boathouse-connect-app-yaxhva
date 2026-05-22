@@ -15,6 +15,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { JOB_TITLES } from '@/constants/jobTitles';
 import EmployeePickerModal from '@/components/EmployeePickerModal';
 
@@ -109,12 +110,14 @@ function weekBounds(date: Date): { start: string; end: string } {
  */
 async function resolveUploadIdForDate(
   shiftDate: string,
-  currentUserId: string | undefined
+  currentUserId: string | undefined,
+  organizationId: string
 ): Promise<string> {
   // Look for a completed upload whose week contains shiftDate
   const { data: existing, error: findErr } = await supabase
     .from('schedule_uploads')
     .select('id')
+    .eq('organization_id', organizationId)
     .lte('week_start', shiftDate)
     .gte('week_end', shiftDate)
     .eq('status', 'completed')
@@ -129,6 +132,7 @@ async function resolveUploadIdForDate(
   const { data: created, error: createErr } = await supabase
     .from('schedule_uploads')
     .insert({
+      organization_id: organizationId,
       uploaded_by: currentUserId,
       file_url: '',
       file_name: 'Manual Entry',
@@ -158,6 +162,7 @@ export default function ShiftEditForm({
   onSaved,
 }: ShiftEditFormProps) {
   const { mode: themeMode } = useAppTheme();
+  const { organizationId } = useOrganization();
   const pickerTheme: 'light' | 'dark' = themeMode === 'dark' ? 'dark' : 'light';
   const [saving, setSaving] = useState(false);
 
@@ -266,10 +271,11 @@ export default function ShiftEditForm({
       // ADD mode
       let targetUploadId = uploadId;
       if (!targetUploadId) {
-        targetUploadId = await resolveUploadIdForDate(dateStr, currentUserId);
+        targetUploadId = await resolveUploadIdForDate(dateStr, currentUserId, organizationId);
       }
 
       const { error: insertErr } = await supabase.from('staff_schedules').insert({
+        organization_id: organizationId,
         upload_id: targetUploadId,
         user_id: selectedEmployee.id,
         employee_name: selectedEmployee.name,

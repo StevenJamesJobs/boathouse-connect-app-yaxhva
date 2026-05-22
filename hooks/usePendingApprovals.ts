@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -17,13 +18,14 @@ export function refreshAllPendingApprovals() {
  */
 export function usePendingApprovals() {
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const [pendingCount, setPendingCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
-  const isManager = user?.role === 'manager';
+  const isManager = user?.role === 'manager' || user?.role === 'owner';
 
   const loadCount = useCallback(async () => {
-    if (!isManager) {
+    if (!isManager || !organizationId) {
       setPendingCount(0);
       setLoading(false);
       return;
@@ -34,7 +36,8 @@ export function usePendingApprovals() {
       const { data, error } = await (supabase
         .from('redemption_requests' as any) as any)
         .select('id, request_type, shift_date')
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .eq('organization_id', organizationId);
 
       if (error) {
         console.error('Error loading pending approvals:', error);
@@ -49,7 +52,7 @@ export function usePendingApprovals() {
     } finally {
       setLoading(false);
     }
-  }, [isManager]);
+  }, [isManager, organizationId]);
 
   useEffect(() => {
     loadCount();

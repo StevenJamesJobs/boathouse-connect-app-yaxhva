@@ -17,6 +17,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { RedemptionRequestCard, RedemptionRequestRow } from '@/components/RedemptionRequestCard';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 const TYPE_LABELS: Record<string, string> = {
   food_beverage: 'Food & Beverages',
@@ -29,6 +30,7 @@ export default function ManagerApprovalsScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { sendNotification } = useNotification();
 
   const [rows, setRows] = useState<RedemptionRequestRow[]>([]);
@@ -45,6 +47,7 @@ export default function ManagerApprovalsScreen() {
       const { data: reqs } = await (supabase
         .from('redemption_requests' as any) as any)
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
@@ -122,6 +125,7 @@ export default function ManagerApprovalsScreen() {
           title: decisionTitle,
           body: decisionBody,
           sent_by: user.id,
+          organization_id: organizationId,
           data: {
             type: 'custom',
             destination: 'redeem',

@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { formatTime } from '@/utils/exam/examEngine';
 import { useTranslation } from 'react-i18next';
 import QuestionReviewList from '@/components/QuestionReviewList';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface QuestionReview {
   id: string;
@@ -44,6 +45,7 @@ export default function ExamResultsScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { i18n } = useTranslation();
   const isSpanish = i18n.language === 'es';
   const params = useLocalSearchParams<{

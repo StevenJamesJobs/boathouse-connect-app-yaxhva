@@ -35,15 +35,18 @@ const CONTENT_TYPE_TO_BUCKET: Record<ContentType, string> = {
  */
 export async function fetchContentImages(
   contentType: ContentType,
-  contentId: string
+  contentId: string,
+  organizationId?: string
 ): Promise<string[]> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('content_images')
       .select('image_url')
       .eq('content_type', contentType)
       .eq('content_id', contentId)
       .order('display_order', { ascending: true });
+    if (organizationId) query = query.eq('organization_id', organizationId);
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching content images:', error);
@@ -63,18 +66,21 @@ export async function fetchContentImages(
  */
 export async function fetchContentImagesBatch(
   contentType: ContentType,
-  contentIds: string[]
+  contentIds: string[],
+  organizationId?: string
 ): Promise<Map<string, string[]>> {
   const result = new Map<string, string[]>();
   if (contentIds.length === 0) return result;
 
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('content_images')
       .select('content_id, image_url')
       .eq('content_type', contentType)
       .in('content_id', contentIds)
       .order('display_order', { ascending: true });
+    if (organizationId) query = query.eq('organization_id', organizationId);
+    const { data, error } = await query;
 
     if (error) {
       console.error('Error fetching content images batch:', error);
@@ -105,15 +111,18 @@ export async function fetchContentImagesBatch(
 export async function saveContentImages(
   contentType: ContentType,
   contentId: string,
-  imageUrls: string[]
+  imageUrls: string[],
+  organizationId?: string
 ): Promise<boolean> {
   try {
     // Delete all existing images for this content item
-    const { error: deleteError } = await supabase
+    let deleteQuery = supabase
       .from('content_images')
       .delete()
       .eq('content_type', contentType)
       .eq('content_id', contentId);
+    if (organizationId) deleteQuery = deleteQuery.eq('organization_id', organizationId);
+    const { error: deleteError } = await deleteQuery;
 
     if (deleteError) {
       console.error('Error deleting old content images:', deleteError);
@@ -127,6 +136,7 @@ export async function saveContentImages(
         content_id: contentId,
         image_url: url,
         display_order: index,
+        ...(organizationId ? { organization_id: organizationId } : {}),
       }));
 
       const { error: insertError } = await supabase
@@ -203,14 +213,17 @@ export async function uploadImageToStorage(
  */
 export async function deleteContentImages(
   contentType: ContentType,
-  contentId: string
+  contentId: string,
+  organizationId?: string
 ): Promise<void> {
   try {
-    const { error } = await supabase
+    let query = supabase
       .from('content_images')
       .delete()
       .eq('content_type', contentType)
       .eq('content_id', contentId);
+    if (organizationId) query = query.eq('organization_id', organizationId);
+    const { error } = await query;
 
     if (error) {
       console.error('Error deleting content images:', error);

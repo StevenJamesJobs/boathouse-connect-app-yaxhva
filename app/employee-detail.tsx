@@ -21,6 +21,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { JOB_TITLES } from '@/constants/jobTitles';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface Employee {
   id: string;
@@ -41,6 +42,7 @@ export default function EmployeeDetailScreen() {
   const router = useRouter();
   const { employeeId } = useLocalSearchParams();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { t } = useTranslation('employee_detail');
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);

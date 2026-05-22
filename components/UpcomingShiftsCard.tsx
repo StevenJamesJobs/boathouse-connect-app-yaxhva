@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -49,6 +50,7 @@ interface UpcomingShiftsCardProps {
 export default function UpcomingShiftsCard({ userId, isManager = false, colors }: UpcomingShiftsCardProps) {
   const router = useRouter();
   const { t } = useTranslation();
+  const { organizationId } = useOrganization();
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(cachedExpanded);

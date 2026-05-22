@@ -16,6 +16,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -43,6 +44,7 @@ export default function ManagerProfileScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user, refreshUser } = useAuth();
+  const { organizationId } = useOrganization();
   const router = useRouter();
   const { unreadCount } = useUnreadMessages();
   const [email, setEmail] = useState(user?.email || '');

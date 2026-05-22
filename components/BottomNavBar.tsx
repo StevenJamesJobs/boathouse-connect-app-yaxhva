@@ -54,7 +54,7 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
   const { mode } = useAppTheme();
   const { t } = useTranslation();
 
-  const isManager = user?.role === 'manager';
+  const isManager = user?.role === 'manager' || user?.role === 'owner';
   const tabs = isManager ? MANAGER_TABS : EMPLOYEE_TABS;
   const portalPath = isManager ? '/(portal)/manager' : '/(portal)/employee';
 

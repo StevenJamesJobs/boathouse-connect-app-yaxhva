@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { ConnectBarTab } from '@/components/ConnectBar';
 
 const STORAGE_KEYS = {
@@ -65,6 +66,7 @@ interface UnreadContentResult {
 }
 
 export function useUnreadContent(): UnreadContentResult {
+  const { organizationId } = useOrganization();
   const [todayHasNew, setTodayHasNew] = useState(false);
   const [eventsHasNew, setEventsHasNew] = useState(false);
   const [specialsHasNew, setSpecialsHasNew] = useState(false);
@@ -140,23 +142,24 @@ export function useUnreadContent(): UnreadContentResult {
       const annCutoff = effectiveAnnouncementsTs;
       const sfCutoff = effectiveSpecialFeaturesTs;
       const todayCutoff = todayTs || new Date(0).toISOString();
+      const orgFilter = (q: any) => organizationId ? q.eq('organization_id', organizationId) : q;
       const [todayAnnRes, todaySfRes, annTabRes, sfTabRes] = await Promise.all([
-        (supabase.from('announcements') as any)
+        orgFilter((supabase.from('announcements') as any)
           .select('id')
           .eq('is_active', true)
-          .gt('created_at', todayCutoff),
-        (supabase.from('special_features') as any)
+          .gt('created_at', todayCutoff)),
+        orgFilter((supabase.from('special_features') as any)
           .select('id')
           .eq('is_active', true)
-          .gt('created_at', todayCutoff),
-        (supabase.from('announcements') as any)
+          .gt('created_at', todayCutoff)),
+        orgFilter((supabase.from('announcements') as any)
           .select('id')
           .eq('is_active', true)
-          .gt('created_at', annCutoff),
-        (supabase.from('special_features') as any)
+          .gt('created_at', annCutoff)),
+        orgFilter((supabase.from('special_features') as any)
           .select('id')
           .eq('is_active', true)
-          .gt('created_at', sfCutoff),
+          .gt('created_at', sfCutoff)),
       ]);
       const todayAnnUnviewed = ((todayAnnRes.data as { id: string }[] | null) ?? [])
         .filter((r) => !annViewed.has(r.id)).length;
@@ -174,10 +177,12 @@ export function useUnreadContent(): UnreadContentResult {
       // Check "Events" tab: upcoming_events (per-item + per-category tracking)
       const eventsCutoff = eventsTs || new Date(0).toISOString();
       const evtCutoff = effectiveEventsContentTs;
-      const eventsRes = await (supabase.from('upcoming_events') as any)
+      let eventsQuery = (supabase.from('upcoming_events') as any)
         .select('id, category, created_at')
         .eq('is_active', true)
         .gt('created_at', evtCutoff);
+      if (organizationId) eventsQuery = eventsQuery.eq('organization_id', organizationId);
+      const eventsRes = await eventsQuery;
       const eventRows = ((eventsRes.data as { id: string; category: string; created_at: string }[] | null) ?? []);
       const unviewedEvents = eventRows.filter((r) => !evtViewed.has(r.id));
       // Sub-tab badges use the per-tab visit timestamp so swiping to a sub-tab clears its dot
@@ -193,10 +198,12 @@ export function useUnreadContent(): UnreadContentResult {
 
       // Check "Specials" tab: menu_items with category "Weekly Specials"
       const specialsCutoff = specialsTs || new Date(0).toISOString();
-      const specialsRes = await (supabase.from('menu_items') as any)
+      let specialsQuery = (supabase.from('menu_items') as any)
         .select('id', { count: 'exact', head: true })
         .eq('category', 'Weekly Specials')
         .gt('created_at', specialsCutoff);
+      if (organizationId) specialsQuery = specialsQuery.eq('organization_id', organizationId);
+      const specialsRes = await specialsQuery;
       const specialsCount = specialsRes.count || 0;
       setSpecialsHasNew(specialsCount > 0);
 

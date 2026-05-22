@@ -20,6 +20,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
@@ -73,6 +74,7 @@ type RewardsSubTab = 'leaderboard' | 'recent';
 
 export default function EmployeeRewardsScreen() {
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { t } = useTranslation();
   const { language } = useLanguage();
   const colors = useThemeColors();
@@ -130,6 +132,7 @@ export default function EmployeeRewardsScreen() {
       const { data: topData, error: topError } = await supabase
         .from('users')
         .select('id, name, job_title, mcloones_bucks')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('mcloones_bucks', { ascending: false })
         .limit(10);
@@ -142,6 +145,7 @@ export default function EmployeeRewardsScreen() {
       const { data: transData, error: transError } = await supabase
         .from('rewards_transactions')
         .select('id, user_id, amount, description, is_visible, created_at')
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
         .limit(15);
 
@@ -209,6 +213,7 @@ export default function EmployeeRewardsScreen() {
       const { data, error } = await supabase
         .from('guest_reviews')
         .select('id, guest_name, rating, review_text, review_date')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('display_order', { ascending: true })
         .order('review_date', { ascending: false });
@@ -226,6 +231,7 @@ export default function EmployeeRewardsScreen() {
       const { data, error } = await supabase
         .from('google_reviews')
         .select('id, author_title, author_image, review_rating, review_text, review_text_es, review_datetime_utc, owner_answer, owner_answer_es')
+        .eq('organization_id', organizationId)
         .eq('is_published', true)
         .order('review_datetime_utc', { ascending: false });
 

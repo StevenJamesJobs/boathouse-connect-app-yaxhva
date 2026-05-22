@@ -4,26 +4,28 @@ import { WINE_PAIRINGS } from './winePairings';
 import { supabase } from '@/app/integrations/supabase/client';
 
 // Generate card pairs for a specific game mode and pair count
-export async function generateCards(mode: GameMode, pairCount: number): Promise<CardData[]> {
+export async function generateCards(mode: GameMode, pairCount: number, organizationId?: string): Promise<CardData[]> {
   switch (mode) {
     case 'wine_pairings':
-      return await generateWinePairingCards(pairCount);
+      return await generateWinePairingCards(pairCount, organizationId);
     case 'ingredients_dishes':
-      return await generateIngredientDishCards(pairCount);
+      return await generateIngredientDishCards(pairCount, organizationId);
     case 'cocktail_ingredients':
-      return await generateCocktailCards(pairCount);
+      return await generateCocktailCards(pairCount, organizationId);
   }
 }
 
 // Mode 1: Wine & Entree Pairings (from DB with static fallback)
-async function generateWinePairingCards(pairCount: number): Promise<CardData[]> {
+async function generateWinePairingCards(pairCount: number, organizationId?: string): Promise<CardData[]> {
   // Try fetching from DB first
   try {
-    const { data: dbPairings, error } = await supabase
-      .from('wine_pairings' as any)
+    let query = (supabase
+      .from('wine_pairings' as any) as any)
       .select('wine, entree, hint')
       .eq('is_active', true)
       .order('display_order');
+    if (organizationId) query = query.eq('organization_id', organizationId);
+    const { data: dbPairings, error } = await query;
 
     if (!error && dbPairings && dbPairings.length > 0) {
       const selected = selectRandom(dbPairings as any[], pairCount);
@@ -61,17 +63,19 @@ async function generateWinePairingCards(pairCount: number): Promise<CardData[]> 
 }
 
 // Mode 2: Ingredients to Dishes (from menu_items table)
-async function generateIngredientDishCards(pairCount: number): Promise<CardData[]> {
-  const { data: menuItems, error } = await supabase
+async function generateIngredientDishCards(pairCount: number, organizationId?: string): Promise<CardData[]> {
+  let menuQuery = supabase
     .from('menu_items')
     .select('id, name, description')
     .eq('is_active', true)
     .in('category', ['Dinner', 'Lunch'])
-    .not('description', 'is', null) as { data: { id: string; name: string; description: string | null }[] | null; error: any };
+    .not('description', 'is', null);
+  if (organizationId) menuQuery = menuQuery.eq('organization_id', organizationId);
+  const { data: menuItems, error } = await menuQuery as { data: { id: string; name: string; description: string | null }[] | null; error: any };
 
   if (error || !menuItems || menuItems.length === 0) {
     // Fallback to wine pairings if menu data unavailable
-    return generateWinePairingCards(pairCount);
+    return generateWinePairingCards(pairCount, organizationId);
   }
 
   // Parse descriptions to extract key ingredients
@@ -102,20 +106,26 @@ async function generateIngredientDishCards(pairCount: number): Promise<CardData[
 }
 
 // Mode 3: Cocktail Ingredients to Cocktails (from cocktails + libation_recipes)
-async function generateCocktailCards(pairCount: number): Promise<CardData[]> {
+async function generateCocktailCards(pairCount: number, organizationId?: string): Promise<CardData[]> {
   // Fetch from both tables
   type CocktailRow = { id: string; name: string; ingredients: string | null; alcohol_type: string };
   type LibationRow = { id: string; name: string; ingredients: any; category: string };
 
+  let cocktailQuery = supabase
+    .from('cocktails')
+    .select('id, name, ingredients, alcohol_type')
+    .eq('is_active', true);
+  if (organizationId) cocktailQuery = cocktailQuery.eq('organization_id', organizationId);
+
+  let libationQuery = supabase
+    .from('libation_recipes')
+    .select('id, name, ingredients, category')
+    .eq('is_active', true);
+  if (organizationId) libationQuery = libationQuery.eq('organization_id', organizationId);
+
   const [cocktailsResult, libationsResult] = await Promise.all([
-    supabase
-      .from('cocktails')
-      .select('id, name, ingredients, alcohol_type')
-      .eq('is_active', true) as unknown as { data: CocktailRow[] | null; error: any },
-    supabase
-      .from('libation_recipes')
-      .select('id, name, ingredients, category')
-      .eq('is_active', true) as unknown as { data: LibationRow[] | null; error: any },
+    cocktailQuery as unknown as { data: CocktailRow[] | null; error: any },
+    libationQuery as unknown as { data: LibationRow[] | null; error: any },
   ]);
 
   const allPairs: { ingredient: string; cocktail: string; id: string }[] = [];
@@ -143,7 +153,7 @@ async function generateCocktailCards(pairCount: number): Promise<CardData[]> {
   }
 
   if (allPairs.length === 0) {
-    return generateWinePairingCards(pairCount);
+    return generateWinePairingCards(pairCount, organizationId);
   }
 
   const selected = selectRandom(allPairs, pairCount);

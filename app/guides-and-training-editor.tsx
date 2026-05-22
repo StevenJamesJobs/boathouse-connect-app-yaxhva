@@ -28,6 +28,7 @@ import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-nativ
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface GuideItem {
   id: string;
@@ -54,6 +55,7 @@ export default function GuidesAndTrainingEditorScreen() {
   const { user } = useAuth();
   const colors = useThemeColors();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const [guides, setGuides] = useState<GuideItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -99,6 +101,7 @@ export default function GuidesAndTrainingEditorScreen() {
       const { data, error } = await supabase
         .from('guides_and_training')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('category', { ascending: true })
         .order('display_order', { ascending: true });
 
@@ -385,6 +388,7 @@ export default function GuidesAndTrainingEditorScreen() {
             file_name: fileName,
             display_order: formData.display_order,
             created_by: user.id,
+            organization_id: organizationId,
           });
 
         if (error) {
@@ -398,6 +402,7 @@ export default function GuidesAndTrainingEditorScreen() {
           const { data: newItem } = await supabase
             .from('guides_and_training')
             .select('id')
+            .eq('organization_id', organizationId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();

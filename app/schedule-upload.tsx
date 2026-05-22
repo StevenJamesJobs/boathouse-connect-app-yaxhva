@@ -14,6 +14,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -37,6 +38,7 @@ export default function ScheduleUploadScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { t } = useTranslation();
 
   const [uploads, setUploads] = useState<ScheduleUpload[]>([]);
@@ -89,6 +91,7 @@ export default function ScheduleUploadScreen() {
       const { data, error } = await supabase
         .from('schedule_uploads')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -143,6 +146,7 @@ export default function ScheduleUploadScreen() {
         week_start: new Date().toISOString().split('T')[0],
         week_end: new Date().toISOString().split('T')[0],
         status: 'processing',
+        organization_id: organizationId,
       })
       .select()
       .single();
@@ -157,6 +161,7 @@ export default function ScheduleUploadScreen() {
         upload_id: uploadRecord.id,
         media_type: mediaType,
         additional_image_urls: additionalImageUrls,
+        organization_id: organizationId,
       },
     });
 

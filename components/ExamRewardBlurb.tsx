@@ -4,6 +4,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { getExamTypeName } from '@/utils/exam/questionGenerator';
 
 interface UndismissedResult {
@@ -16,6 +17,7 @@ interface UndismissedResult {
 export default function ExamRewardBlurb() {
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const [result, setResult] = useState<UndismissedResult | null>(null);
 
   useEffect(() => {
@@ -57,6 +59,7 @@ export default function ExamRewardBlurb() {
       const { data: examData } = await (supabase
         .from('exams' as any) as any)
         .select('exam_type')
+        .eq('organization_id', organizationId)
         .eq('id', undismissed.exam_id)
         .single();
 

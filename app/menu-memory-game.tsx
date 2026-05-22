@@ -15,6 +15,7 @@ import BottomNavBar from '@/components/BottomNavBar';
 import { GameMode, PlayMode, GAME_MODE_INFO } from '@/types/game';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface ModeStats {
   best_score: number;
@@ -27,6 +28,7 @@ export default function MenuMemoryGameScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const [modeStats, setModeStats] = useState<Record<GameMode, ModeStats | null>>({
     wine_pairings: null,
     ingredients_dishes: null,

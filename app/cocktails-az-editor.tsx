@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface Cocktail {
   id: string;
@@ -57,6 +58,7 @@ export default function CocktailsAZEditorScreen() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const colors = useThemeColors();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
@@ -114,6 +116,7 @@ export default function CocktailsAZEditorScreen() {
       const { data, error } = await supabase
         .from('cocktails')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name', { ascending: true });
 
@@ -306,6 +309,7 @@ export default function CocktailsAZEditorScreen() {
           .from('cocktails')
           .select('id')
           .eq('name', name.trim())
+          .eq('organization_id', organizationId)
           .order('created_at', { ascending: false })
           .limit(1);
         if (newItems?.[0] && procedureEs.trim()) {

@@ -28,12 +28,14 @@ import GameHUD from '@/components/game/GameHUD';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { notifyLeaderboardPassed } from '@/utils/notificationHelpers';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 export default function MemoryGamePlayScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const params = useLocalSearchParams<{ mode: string; difficulty: string; play_mode: string }>();
 
   const mode = (params.mode || 'wine_pairings') as GameMode;
@@ -195,6 +197,7 @@ export default function MemoryGamePlayScreen() {
         const elapsed = getElapsedSeconds(finalState.startTime);
         await (supabase.from('game_scores') as any).insert({
           user_id: user.id,
+          organization_id: organizationId,
           game_mode: mode,
           play_mode: playMode,
           difficulty: difficultyLevel,

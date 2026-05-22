@@ -27,21 +27,22 @@ export interface RawWordItem {
  */
 export async function getWordsForCategory(
   category: WordSearchCategory,
-  difficulty: WordSearchDifficulty
+  difficulty: WordSearchDifficulty,
+  organizationId?: string
 ): Promise<RawWordItem[]> {
   const config = getDifficultyConfig(difficulty);
 
   switch (category) {
     case 'weekly_specials':
-      return fetchMenuItemWords('Weekly Specials', config.itemCount);
+      return fetchMenuItemWords('Weekly Specials', config.itemCount, organizationId);
     case 'lunch':
-      return fetchMenuItemWords('Lunch', config.itemCount);
+      return fetchMenuItemWords('Lunch', config.itemCount, organizationId);
     case 'dinner':
-      return fetchMenuItemWords('Dinner', config.itemCount);
+      return fetchMenuItemWords('Dinner', config.itemCount, organizationId);
     case 'happy_hour':
-      return fetchMenuItemWords('Happy Hour', config.itemCount);
+      return fetchMenuItemWords('Happy Hour', config.itemCount, organizationId);
     case 'libations':
-      return fetchLibationWords(config.itemCount);
+      return fetchLibationWords(config.itemCount, organizationId);
     default:
       return [];
   }
@@ -51,15 +52,18 @@ export async function getWordsForCategory(
 
 async function fetchMenuItemWords(
   category: string,
-  itemCount: number
+  itemCount: number,
+  organizationId?: string
 ): Promise<RawWordItem[]> {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from('menu_items')
       .select('name, description')
       .eq('is_active', true)
       .eq('category', category)
       .not('description', 'is', null);
+    if (organizationId) query = query.eq('organization_id', organizationId);
+    const { data, error } = await query;
 
     if (error || !data || data.length === 0) {
       return getFallbackWords();
@@ -88,22 +92,26 @@ async function fetchMenuItemWords(
 
 // ─── Libations Fetcher ────────────────────────────────────────────────────────
 
-async function fetchLibationWords(itemCount: number): Promise<RawWordItem[]> {
+async function fetchLibationWords(itemCount: number, organizationId?: string): Promise<RawWordItem[]> {
   try {
     // Primary: libation_recipes (JSONB ingredients — cleanest data)
-    const { data: recipes, error: recipeError } = await supabase
+    let recipeQuery = supabase
       .from('libation_recipes')
       .select('name, ingredients, category')
       .eq('is_active', true)
       .not('ingredients', 'is', null);
+    if (organizationId) recipeQuery = recipeQuery.eq('organization_id', organizationId);
+    const { data: recipes, error: recipeError } = await recipeQuery;
 
     // Secondary: menu_items with Libations category
-    const { data: menuLibations, error: menuError } = await supabase
+    let menuQuery = supabase
       .from('menu_items')
       .select('name, description')
       .eq('is_active', true)
       .eq('category', 'Libations')
       .not('description', 'is', null);
+    if (organizationId) menuQuery = menuQuery.eq('organization_id', organizationId);
+    const { data: menuLibations, error: menuError } = await menuQuery;
 
     const allWords: RawWordItem[] = [];
 

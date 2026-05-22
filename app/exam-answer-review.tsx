@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { formatTime } from '@/utils/exam/examEngine';
 import QuestionReviewList, { QuestionReviewEntry } from '@/components/QuestionReviewList';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface AnswerRecord {
   question_id: string;
@@ -28,6 +29,7 @@ export default function ExamAnswerReviewScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { i18n } = useTranslation();
   const isSpanish = i18n.language === 'es';
   const params = useLocalSearchParams<{ examId: string; userId: string }>();
@@ -46,7 +48,7 @@ export default function ExamAnswerReviewScreen() {
 
   useEffect(() => {
     // Manager-only guard
-    if (user && user.role !== 'manager') {
+    if (user && user.role !== 'manager' && user.role !== 'owner') {
       router.back();
       return;
     }

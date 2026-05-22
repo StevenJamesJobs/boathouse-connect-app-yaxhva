@@ -25,6 +25,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import FormattedText from '@/components/FormattedText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface PureeSyrupRecipe {
   id: string;
@@ -48,6 +49,7 @@ export default function PureeSyrupRecipesScreen() {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const colors = useThemeColors();
+  const { organizationId } = useOrganization();
   const [recipes, setRecipes] = useState<PureeSyrupRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecipe, setSelectedRecipe] = useState<PureeSyrupRecipe | null>(null);
@@ -65,6 +67,7 @@ export default function PureeSyrupRecipesScreen() {
       const { data, error } = await supabase
         .from('puree_syrup_recipes')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('display_order', { ascending: true });
 

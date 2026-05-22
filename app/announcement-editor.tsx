@@ -29,6 +29,7 @@ import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/tra
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { fetchContentImages, saveContentImages, uploadImageToStorage, deleteContentImages } from '@/utils/contentImages';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
@@ -70,6 +71,7 @@ export default function AnnouncementEditorScreen() {
   const { user } = useAuth();
   const { sendNotification } = useNotification();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,6 +127,7 @@ export default function AnnouncementEditorScreen() {
       const { data, error } = await supabase
         .from('guides_and_training')
         .select('id, title, category, file_name')
+        .eq('organization_id', organizationId)
         .in('category', GUIDE_CATEGORIES)
         .eq('is_active', true)
         .order('category', { ascending: true })
@@ -150,6 +153,7 @@ export default function AnnouncementEditorScreen() {
       const { data, error } = await supabase
         .from('announcements')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('display_order', { ascending: true });
 
       if (error) {
@@ -390,6 +394,7 @@ export default function AnnouncementEditorScreen() {
           const { data: created } = await (supabase.from('announcements') as any)
             .select('id')
             .eq('title', formData.title)
+            .eq('organization_id', organizationId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
@@ -402,6 +407,7 @@ export default function AnnouncementEditorScreen() {
             title: '📢 New Announcement',
             body: formData.title,
             sent_by: user?.id,
+            organization_id: organizationId,
             data: {
               notificationType: 'announcement',
               notificationSkipped: !shouldSendNotification,
@@ -436,6 +442,7 @@ export default function AnnouncementEditorScreen() {
         const { data: newItem } = await supabase
           .from('announcements')
           .select('id')
+          .eq('organization_id', organizationId)
           .order('created_at', { ascending: false })
           .limit(1)
           .single();

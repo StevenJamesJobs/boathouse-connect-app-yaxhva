@@ -25,6 +25,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { MenuItemSearchPicker, PickedMenuItem } from '@/components/MenuItemSearchPicker';
 import { RedemptionRequestCard, RedemptionRequestRow, RedemptionType } from '@/components/RedemptionRequestCard';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 const SECTION_COST = 10;
 const SIDE_WORK_COST = 5;
@@ -88,6 +89,7 @@ export default function EmployeeRedeemScreen() {
   const { t } = useTranslation();
   const { user } = useAuth();
   const { sendNotification } = useNotification();
+  const { organizationId } = useOrganization();
 
   const [balance, setBalance] = useState(0);
   const [pending, setPending] = useState<RedemptionRequestRow[]>([]);
@@ -248,6 +250,7 @@ export default function EmployeeRedeemScreen() {
           title: notifTitle,
           body: notifBody,
           sent_by: user.id,
+          organization_id: organizationId,
           data: {
             type: 'custom',
             destination: 'approvals',
@@ -266,7 +269,8 @@ export default function EmployeeRedeemScreen() {
         const { data: managers } = await supabase
           .from('users')
           .select('id')
-          .eq('role', 'manager')
+          .eq('organization_id', organizationId)
+          .in('role', ['manager', 'owner'])
           .eq('is_active', true);
         const managerIds = (managers || []).map((m: any) => m.id);
         if (managerIds.length > 0) {

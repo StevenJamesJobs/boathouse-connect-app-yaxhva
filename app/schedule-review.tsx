@@ -20,6 +20,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTranslation } from 'react-i18next';
 import ShiftEditForm from '@/components/ShiftEditForm';
 
@@ -61,6 +62,7 @@ export default function ScheduleReviewScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { organizationId } = useOrganization();
   const { upload_id } = useLocalSearchParams<{ upload_id: string }>();
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -134,6 +136,7 @@ export default function ScheduleReviewScreen() {
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('id, name, username')
+        .eq('organization_id', organizationId)
         .order('name', { ascending: true });
 
       if (userError) throw userError;

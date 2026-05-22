@@ -20,6 +20,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 const JOB_TITLE_OPTIONS = [
   'Banquet Captain',
@@ -48,6 +49,7 @@ export default function NotificationCenter() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const DESTINATION_OPTIONS = [
@@ -88,6 +90,7 @@ export default function NotificationCenter() {
       const { data, error } = await (supabase
         .from('custom_notifications') as any)
         .select('id, title, body, created_at, data')
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
         .limit(40);
 
@@ -137,13 +140,13 @@ export default function NotificationCenter() {
               };
               if (sourceId && linkedType && typeMap[linkedType]) {
                 await (supabase.from('shade_dismissals') as any)
-                  .insert({ notification_type: typeMap[linkedType], item_id: sourceId, dismissed_by: user?.id })
+                  .insert({ notification_type: typeMap[linkedType], item_id: sourceId, dismissed_by: user?.id, organization_id: organizationId })
                   .then(() => {}, () => {});
               }
 
               // Also dismiss the custom_notification row itself from the shade
               await (supabase.from('shade_dismissals') as any)
-                .insert({ notification_type: 'custom_notification', item_id: notif.id, dismissed_by: user?.id })
+                .insert({ notification_type: 'custom_notification', item_id: notif.id, dismissed_by: user?.id, organization_id: organizationId })
                 .then(() => {}, () => {});
 
               // Delete the custom_notifications row (removes from Sent History)
@@ -246,13 +249,14 @@ export default function NotificationCenter() {
           title,
           body,
           sent_by: user?.id,
+          organization_id: organizationId,
           data: { ...extraData, notificationType: 'custom' },
         });
       } catch (err) {
         console.error('Failed to log notification:', err);
       }
 
-      await sendCustomNotification(title, body, Object.keys(extraData).length > 0 ? extraData : undefined);
+      await sendCustomNotification(title, body, Object.keys(extraData).length > 0 ? extraData : undefined, organizationId);
 
       Alert.alert(
         t('notification_center.sent_title'),

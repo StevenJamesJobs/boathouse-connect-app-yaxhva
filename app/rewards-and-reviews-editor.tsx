@@ -32,6 +32,7 @@ import { getLocalizedField } from '@/utils/translateContent';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { MessageBadge } from '@/components/MessageBadge';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface Employee {
   id: string;
@@ -685,6 +686,7 @@ export default function RewardsAndReviewsEditorScreen() {
 
 
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { sendNotification } = useNotification();
   const { pendingCount } = usePendingApprovals();
   const { hasNew: managerRecentHasNew, markRecentViewed: markManagerRecentViewed } = useUnreadAwards();
@@ -762,6 +764,7 @@ export default function RewardsAndReviewsEditorScreen() {
       const { data, error } = await supabase
         .from('users')
         .select('id, username, name, job_title, mcloones_bucks')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('name', { ascending: true });
 
@@ -770,7 +773,7 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
-  }, []);
+  }, [organizationId]);
 
   const fetchRewardsData = useCallback(async () => {
     try {
@@ -791,6 +794,7 @@ export default function RewardsAndReviewsEditorScreen() {
       const { data: topData, error: topError } = await supabase
         .from('users')
         .select('id, name, job_title, mcloones_bucks')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('mcloones_bucks', { ascending: false })
         .limit(10);
@@ -804,6 +808,7 @@ export default function RewardsAndReviewsEditorScreen() {
       const { data: transData, error: transError } = await supabase
         .from('rewards_transactions')
         .select('id, user_id, amount, description, is_visible, created_at')
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -847,13 +852,14 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error) {
       console.error('Error fetching rewards data:', error);
     }
-  }, [user?.id]);
+  }, [user?.id, organizationId]);
 
   const fetchReviews = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('guest_reviews')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('display_order', { ascending: true })
         .order('review_date', { ascending: false });
 
@@ -862,13 +868,14 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
-  }, []);
+  }, [organizationId]);
 
   const fetchGoogleReviews = useCallback(async () => {
     try {
       const { data, error } = await supabase
         .from('google_reviews')
         .select('id, author_title, author_image, review_rating, review_text, review_text_es, review_datetime_utc, owner_answer, owner_answer_es, is_published')
+        .eq('organization_id', organizationId)
         .order('review_datetime_utc', { ascending: false });
 
       if (!error && data) {
@@ -877,7 +884,7 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error) {
       console.error('Error fetching Google reviews:', error);
     }
-  }, []);
+  }, [organizationId]);
 
   const allReviews: ReviewItem[] = useMemo(() => {
     const manual: ReviewItem[] = reviews.map((r) => ({ ...r, source: 'manual' as const }));
@@ -987,6 +994,7 @@ export default function RewardsAndReviewsEditorScreen() {
         description: rewardDescription,
         is_visible: isVisible,
         created_by: user?.id,
+        organization_id: organizationId,
       });
 
       if (error) throw error;
@@ -1144,6 +1152,7 @@ export default function RewardsAndReviewsEditorScreen() {
               const { data: allUsers, error: fetchError } = await supabase
                 .from('users')
                 .select('id')
+                .eq('organization_id', organizationId)
                 .eq('is_active', true);
 
               if (fetchError) {
@@ -1187,6 +1196,7 @@ export default function RewardsAndReviewsEditorScreen() {
               const { data: verifyData, error: verifyError } = await supabase
                 .from('users')
                 .select('id, name, mcloones_bucks')
+                .eq('organization_id', organizationId)
                 .eq('is_active', true);
 
               if (verifyError) {
@@ -1407,6 +1417,7 @@ export default function RewardsAndReviewsEditorScreen() {
           review_date: reviewForm.review_date,
           display_order: reviewForm.display_order,
           created_by: user?.id,
+          organization_id: organizationId,
         });
 
         if (error) throw error;
@@ -1523,7 +1534,7 @@ export default function RewardsAndReviewsEditorScreen() {
     try {
       setRefreshingGoogle(true);
       const { data, error } = await supabase.functions.invoke('import-google-reviews', {
-        body: { source: 'manual', user_id: user?.id },
+        body: { source: 'manual', user_id: user?.id, organization_id: organizationId },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Import failed');

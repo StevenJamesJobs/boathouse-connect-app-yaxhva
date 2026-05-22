@@ -16,6 +16,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { getExamTypeName } from '@/utils/exam/questionGenerator';
 import type { ExamType } from '@/utils/exam/questionGenerator';
 import { useFocusEffect } from '@react-navigation/native';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface ExamSummary {
   id: string;
@@ -39,6 +40,7 @@ export default function QuizHubEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { organizationId } = useOrganization();
   const [loading, setLoading] = useState(true);
   const [exams, setExams] = useState<Map<ExamType, ExamSummary | null>>(new Map());
 
@@ -52,6 +54,7 @@ export default function QuizHubEditorScreen() {
         const { data, error } = await (supabase
           .from('exams' as any) as any)
           .select('*')
+          .eq('organization_id', organizationId)
           .eq('exam_type', examType)
           .in('status', ['draft', 'active', 'paused'])
           .order('created_at', { ascending: false })

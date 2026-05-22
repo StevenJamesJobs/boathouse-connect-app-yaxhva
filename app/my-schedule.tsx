@@ -15,6 +15,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { getWeekStartDate, getWeekDays, addWeeks, isSameDay } from '@/utils/dateUtils';
@@ -50,6 +51,7 @@ export default function MyScheduleScreen() {
   const router = useRouter();
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { t } = useTranslation();
 
   const [shifts, setShifts] = useState<Shift[]>([]);
@@ -98,6 +100,7 @@ export default function MyScheduleScreen() {
       const { data: uploadData } = await (supabase as any)
         .from('schedule_uploads')
         .select('created_at')
+        .eq('organization_id', organizationId)
         .order('created_at', { ascending: false })
         .limit(1);
       setLastUploadAt(uploadData?.[0]?.created_at ?? null);

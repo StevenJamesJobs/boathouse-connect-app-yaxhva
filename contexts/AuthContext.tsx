@@ -12,8 +12,10 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const STORAGE_KEY = '@mcloones_auth';
-const REMEMBER_ME_KEY = '@mcloones_remember_me';
+const STORAGE_KEY = '@mrc_auth';
+const REMEMBER_ME_KEY = '@mrc_remember_me';
+const OLD_STORAGE_KEY = '@mcloones_auth';
+const OLD_REMEMBER_ME_KEY = '@mcloones_remember_me';
 
 // Lazy-load AsyncStorage to avoid SSR issues
 let AsyncStorage: any = null;
@@ -74,14 +76,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         jobTitle: jobTitleDisplay,
         jobTitles: jobTitlesArray,
         phoneNumber: userData.phone_number || '',
-        role: userData.role as 'employee' | 'manager',
+        role: userData.role as 'employee' | 'manager' | 'owner',
+        organizationId: userData.organization_id,
         profilePictureUrl: userData.profile_picture_url || undefined,
         badgeTitle: userData.badge_title || undefined,
         mcloonesBucks: userData.mcloones_bucks || 0,
         quickTools: userData.quick_tools ? (Array.isArray(userData.quick_tools) ? userData.quick_tools : JSON.parse(userData.quick_tools)) : undefined,
+        forcePasswordChange: userData.force_password_change || false,
       };
 
-      console.log('[AuthContext] User data fetched successfully, job titles:', user.jobTitles);
+      console.log('[AuthContext] User data fetched successfully, org:', user.organizationId, 'job titles:', user.jobTitles);
       return user;
     } catch (error) {
       console.log('[AuthContext] Exception fetching user from database:', error);
@@ -104,9 +108,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       
+      // One-time migration from old storage keys
+      const oldRememberMe = await AsyncStorage.getItem(OLD_REMEMBER_ME_KEY);
+      if (oldRememberMe !== null) {
+        const oldAuth = await AsyncStorage.getItem(OLD_STORAGE_KEY);
+        if (oldAuth) await AsyncStorage.setItem(STORAGE_KEY, oldAuth);
+        await AsyncStorage.setItem(REMEMBER_ME_KEY, oldRememberMe);
+        await AsyncStorage.removeItem(OLD_STORAGE_KEY);
+        await AsyncStorage.removeItem(OLD_REMEMBER_ME_KEY);
+        console.log('[AuthContext] Migrated storage keys from legacy format');
+      }
+
       const rememberMe = await AsyncStorage.getItem(REMEMBER_ME_KEY);
       console.log('[AuthContext] Remember me setting:', rememberMe);
-      
+
       if (rememberMe === 'true') {
         const storedAuth = await AsyncStorage.getItem(STORAGE_KEY);
         if (storedAuth) {
@@ -265,11 +280,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         jobTitle: jobTitleDisplay,
         jobTitles: jobTitlesArray,
         phoneNumber: userData.phone_number || '',
-        role: userData.role as 'employee' | 'manager',
+        role: userData.role as 'employee' | 'manager' | 'owner',
+        organizationId: userData.organization_id,
         profilePictureUrl: userData.profile_picture_url || undefined,
         badgeTitle: userData.badge_title || undefined,
         mcloonesBucks: userData.mcloones_bucks || 0,
         quickTools: userData.quick_tools ? (Array.isArray(userData.quick_tools) ? userData.quick_tools : JSON.parse(userData.quick_tools)) : undefined,
+        forcePasswordChange: userData.force_password_change || false,
       };
 
       // Store auth state if AsyncStorage is available

@@ -6,7 +6,7 @@ import { hexToRgba } from '@/styles/commonStyles';
 import { BlurView } from 'expo-blur';
 import { MessageBadge } from '@/components/MessageBadge';
 
-export type PortalRole = 'manager' | 'employee';
+export type PortalRole = 'manager' | 'employee' | 'owner';
 
 export interface PortalTabBarBadges {
   messages: number;
@@ -25,7 +25,7 @@ interface PortalTabBarProps {
 export default function PortalTabBar({ state, descriptors, navigation, role, badges }: PortalTabBarProps) {
   const colors = useThemeColors();
   const { mode } = useAppTheme();
-  const isManager = role === 'manager';
+  const isManager = role === 'manager' || role === 'owner';
 
   const blurBgColor = Platform.select({
     ios: hexToRgba(colors.tabBarBackground, isManager ? 0.80 : 0.60),

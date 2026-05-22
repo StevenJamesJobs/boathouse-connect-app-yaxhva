@@ -104,7 +104,7 @@ function GameHubBottomNav() {
   const colors = useThemeColors();
   const { mode } = useAppTheme();
 
-  const tabs = user?.role === 'manager' ? MANAGER_NAV_TABS : EMPLOYEE_NAV_TABS;
+  const tabs = (user?.role === 'manager' || user?.role === 'owner') ? MANAGER_NAV_TABS : EMPLOYEE_NAV_TABS;
 
   const blurBgColor = Platform.select({
     ios: hexToRgba(colors.tabBarBackground, 0.6),

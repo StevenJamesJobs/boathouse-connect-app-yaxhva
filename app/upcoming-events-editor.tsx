@@ -33,6 +33,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchContentImages, saveContentImages, uploadImageToStorage, deleteContentImages } from '@/utils/contentImages';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface UpcomingEvent {
   id: string;
@@ -69,6 +70,7 @@ export default function UpcomingEventsEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { sendNotification } = useNotification();
+  const { organizationId } = useOrganization();
   const { language } = useLanguage();
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
@@ -129,6 +131,7 @@ export default function UpcomingEventsEditorScreen() {
       const { data, error } = await supabase
         .from('guides_and_training')
         .select('id, title, category, file_name')
+        .eq('organization_id', organizationId)
         .in('category', GUIDE_CATEGORIES)
         .eq('is_active', true)
         .order('category', { ascending: true })
@@ -138,7 +141,7 @@ export default function UpcomingEventsEditorScreen() {
         console.error('Error loading guide files:', error);
         throw error;
       }
-      
+
       console.log('Guide files loaded successfully:', data?.length || 0, 'items');
       setGuideFiles(data || []);
     } catch (error) {
@@ -177,6 +180,7 @@ export default function UpcomingEventsEditorScreen() {
           const { data: freshEvents } = await supabase
             .from('upcoming_events')
             .select('*')
+            .eq('organization_id', organizationId)
             .order('display_order', { ascending: true });
           if (freshEvents) {
             await resequenceDisplayOrders(freshEvents);
@@ -196,6 +200,7 @@ export default function UpcomingEventsEditorScreen() {
       const { data, error } = await supabase
         .from('upcoming_events')
         .select('*')
+        .eq('organization_id', organizationId)
         .order('display_order', { ascending: true });
 
       if (error) {
@@ -435,6 +440,7 @@ export default function UpcomingEventsEditorScreen() {
           const { data: created } = await (supabase.from('upcoming_events') as any)
             .select('id')
             .eq('title', formData.title)
+            .eq('organization_id', organizationId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();
@@ -447,6 +453,7 @@ export default function UpcomingEventsEditorScreen() {
             title: '📅 New Event',
             body: formData.title,
             sent_by: user?.id,
+            organization_id: organizationId,
             data: {
               notificationType: 'event',
               notificationSkipped: !shouldSendNotification,
@@ -484,6 +491,7 @@ export default function UpcomingEventsEditorScreen() {
           const { data: newItem } = await supabase
             .from('upcoming_events')
             .select('id')
+            .eq('organization_id', organizationId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();

@@ -33,6 +33,7 @@ import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
 import CategoryPill from '@/components/CategoryPill';
 import SeasonSelector, { type Season } from '@/components/SeasonSelector';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface MenuItem {
   id: string;
@@ -146,6 +147,7 @@ export default function MenuEditorScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { language } = useLanguage();
   const [season, setSeason] = useState<Season>('summer');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -212,6 +214,7 @@ export default function MenuEditorScreen() {
       const { data, error } = await (supabase
         .from('menu_items') as any)
         .select('*')
+        .eq('organization_id', organizationId)
         .in('season', [season, 'both'])
         .order('display_order', { ascending: true });
 
@@ -574,6 +577,7 @@ export default function MenuEditorScreen() {
           const { data: newItem } = await supabase
             .from('menu_items')
             .select('id')
+            .eq('organization_id', organizationId)
             .order('created_at', { ascending: false })
             .limit(1)
             .single();

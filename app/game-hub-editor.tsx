@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface EditorCard {
   titleKey: string;
@@ -76,6 +77,7 @@ export default function GameHubEditorScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { t } = useTranslation();
+  const { organizationId } = useOrganization();
   const [resettingAll, setResettingAll] = useState(false);
 
   // Employee Lookup state
@@ -202,6 +204,7 @@ export default function GameHubEditorScreen() {
       const { data: users, error } = await (supabase
         .from('users') as any)
         .select('id, name, profile_picture_url, is_test_user')
+        .eq('organization_id', organizationId)
         .ilike('name', `%${query}%`)
         .eq('is_active', true)
         .limit(10) as any;

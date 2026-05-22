@@ -25,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
 import RichTextToolbar from '@/components/RichTextToolbar';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface LibationRecipe {
   id: string;
@@ -58,6 +59,7 @@ export default function SummerLibationRecipesEditorScreen() {
   const { user } = useAuth();
   const colors = useThemeColors();
   const { language } = useLanguage();
+  const { organizationId } = useOrganization();
   const procedureInputRef = useRef<TextInput>(null);
   const [procedureSelection, setProcedureSelection] = useState({ start: 0, end: 0 });
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
@@ -87,6 +89,7 @@ export default function SummerLibationRecipesEditorScreen() {
       const { data, error } = await supabase
         .from('summer_libation_recipes')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('category', { ascending: true })
         .order('display_order', { ascending: true });
@@ -276,6 +279,7 @@ export default function SummerLibationRecipesEditorScreen() {
           .from('summer_libation_recipes')
           .select('id')
           .eq('name', name.trim())
+          .eq('organization_id', organizationId)
           .order('created_at', { ascending: false })
           .limit(1);
         if (newRecipes?.[0] && procedureEs.trim()) {

@@ -26,7 +26,7 @@ export default function Index() {
   if (isAuthenticated && user) {
     // Redirect to appropriate portal based on role
     console.log('[Index] Authenticated, redirecting to portal for role:', user.role);
-    if (user.role === 'manager') {
+    if (user.role === 'manager' || user.role === 'owner') {
       return <Redirect href="/(portal)/manager" />;
     } else {
       return <Redirect href="/(portal)/employee" />;

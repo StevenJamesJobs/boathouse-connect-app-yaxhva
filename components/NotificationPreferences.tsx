@@ -11,6 +11,7 @@ import { IconSymbol } from './IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTranslation } from 'react-i18next';
 
 interface NotificationPreferencesProps {
@@ -30,6 +31,7 @@ interface NotificationPreferencesData {
 export default function NotificationPreferences({ variant = 'employee' }: NotificationPreferencesProps) {
   const themeColors = useThemeColors();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const { t } = useTranslation();
   
   const [loading, setLoading] = useState(true);

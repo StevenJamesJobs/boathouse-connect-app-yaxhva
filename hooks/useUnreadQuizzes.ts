@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { AppState, AppStateStatus } from 'react-native';
 import { getEligibleQuizTypes } from '@/app/weekly-quizzes';
 
@@ -20,6 +21,7 @@ export function refreshAllUnreadQuizzes() {
  */
 export function useUnreadQuizzes() {
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -37,12 +39,13 @@ export function useUnreadQuizzes() {
         return;
       }
 
-      // Find active exams for the eligible types
-      const { data: activeExams } = await (supabase
+      let examsQuery = (supabase
         .from('exams' as any) as any)
         .select('id')
         .in('exam_type', eligibleTypes)
         .eq('status', 'active');
+      if (organizationId) examsQuery = examsQuery.eq('organization_id', organizationId);
+      const { data: activeExams } = await examsQuery;
 
       if (!activeExams || activeExams.length === 0) {
         setUnreadCount(0);
@@ -71,7 +74,7 @@ export function useUnreadQuizzes() {
     } finally {
       setLoading(false);
     }
-  }, [user?.id, user?.jobTitles]);
+  }, [user?.id, user?.jobTitles, organizationId]);
 
   useEffect(() => {
     loadUnreadCount();

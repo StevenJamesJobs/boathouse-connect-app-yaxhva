@@ -8,12 +8,13 @@
 import { supabase } from '@/app/integrations/supabase/client';
 
 interface SendNotificationParams {
-  userIds?: string[]; // Specific users (if not provided, sends to all)
+  userIds?: string[];
+  organizationId?: string;
   notificationType: 'message' | 'reward' | 'announcement' | 'event' | 'special_feature' | 'custom';
   title: string;
   body: string;
   data?: Record<string, any>;
-  jobTitles?: string[]; // Filter recipients by job titles
+  jobTitles?: string[];
 }
 
 /**
@@ -45,10 +46,12 @@ export async function sendMessageNotification(
   senderName: string,
   messagePreview: string,
   messageId: string,
-  threadId?: string
+  threadId?: string,
+  organizationId?: string
 ): Promise<void> {
   await sendNotification({
     userIds: recipientIds,
+    organizationId,
     notificationType: 'message',
     title: `New message from ${senderName}`,
     body: messagePreview.substring(0, 100), // Limit preview length
@@ -66,10 +69,12 @@ export async function sendMessageNotification(
 export async function sendRewardNotification(
   userId: string,
   amount: number,
-  description?: string
+  description?: string,
+  organizationId?: string
 ): Promise<void> {
   await sendNotification({
     userIds: [userId],
+    organizationId,
     notificationType: 'reward',
     title: '🎉 McLoone\'s Bucks Earned!',
     body: `You earned $${amount} McLoone's Bucks!${description ? ` ${description}` : ''}`,
@@ -86,9 +91,11 @@ export async function sendRewardNotification(
 export async function sendAnnouncementNotification(
   title: string,
   announcementId: string,
-  preview?: string
+  preview?: string,
+  organizationId?: string
 ): Promise<void> {
   await sendNotification({
+    organizationId,
     notificationType: 'announcement',
     title: '📢 New Announcement',
     body: preview || title,
@@ -105,13 +112,15 @@ export async function sendAnnouncementNotification(
 export async function sendEventNotification(
   eventTitle: string,
   eventId: string,
-  eventDate?: string
+  eventDate?: string,
+  organizationId?: string
 ): Promise<void> {
   const body = eventDate 
     ? `${eventTitle} - ${eventDate}`
     : eventTitle;
 
   await sendNotification({
+    organizationId,
     notificationType: 'event',
     title: '📅 New Event Added',
     body: body,
@@ -128,9 +137,11 @@ export async function sendEventNotification(
 export async function sendSpecialFeatureNotification(
   featureTitle: string,
   featureId: string,
-  description?: string
+  description?: string,
+  organizationId?: string
 ): Promise<void> {
   await sendNotification({
+    organizationId,
     notificationType: 'special_feature',
     title: '✨ New Special Feature',
     body: description || featureTitle,
@@ -154,7 +165,8 @@ export async function notifyLeaderboardPassed(
   playerUserId: string,
   scoreJustEarned: number,
   title: string,
-  body: string
+  body: string,
+  organizationId?: string
 ): Promise<void> {
   if (!playerUserId || scoreJustEarned <= 0) return;
   try {
@@ -191,6 +203,7 @@ export async function notifyLeaderboardPassed(
 
     await sendNotification({
       userIds: passed.map((p) => p.user_id),
+      organizationId,
       notificationType: 'custom',
       title,
       body,
@@ -212,12 +225,14 @@ export async function notifyLeaderboardPassed(
 export async function sendCustomNotification(
   title: string,
   body: string,
-  data?: Record<string, any>
+  data?: Record<string, any>,
+  organizationId?: string
 ): Promise<void> {
   // Extract job_titles from data to pass as top-level param for edge function filtering
   const jobTitles = data?.job_titles as string[] | undefined;
 
   await sendNotification({
+    organizationId,
     notificationType: 'custom',
     title: title,
     body: body,

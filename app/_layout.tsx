@@ -19,6 +19,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { WidgetProvider } from "@/contexts/WidgetContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { OrganizationProvider } from "@/contexts/OrganizationContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ThemeProvider as AppThemeProvider, useAppTheme } from "@/contexts/ThemeContext";
@@ -164,7 +165,7 @@ function RootLayoutNav() {
         } else if (isAuthenticated && (onLogin || onIndex)) {
           // Redirect to appropriate portal based on role when on login or index
           console.log('[RootLayout] Redirecting to portal - authenticated as', user?.role);
-          if (user?.role === 'manager') {
+          if (user?.role === 'manager' || user?.role === 'owner') {
             router.replace('/(portal)/manager');
           } else {
             router.replace('/(portal)/employee');
@@ -234,7 +235,9 @@ export default function RootLayout() {
       <LanguageProvider>
         <AppThemeProvider>
           <AuthProvider>
-            <RootLayoutNav />
+            <OrganizationProvider>
+              <RootLayoutNav />
+            </OrganizationProvider>
           </AuthProvider>
         </AppThemeProvider>
       </LanguageProvider>

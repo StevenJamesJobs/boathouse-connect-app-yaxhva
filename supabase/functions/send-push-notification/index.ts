@@ -9,6 +9,7 @@ const corsHeaders = {
 
 interface NotificationRequest {
   userIds?: string[]; // Specific users (if not provided, sends to all)
+  organizationId?: string; // Scope notifications to a specific organization
   notificationType: 'message' | 'reward' | 'announcement' | 'event' | 'special_feature' | 'custom';
   title: string;
   body: string;
@@ -53,9 +54,9 @@ serve(async (req) => {
 
     // Parse request body
     const requestData: NotificationRequest = await req.json();
-    const { userIds, notificationType, title, body, data, jobTitles } = requestData;
+    const { userIds, organizationId, notificationType, title, body, data, jobTitles } = requestData;
 
-    console.log('Processing notification request:', { notificationType, title, userIds, jobTitles });
+    console.log('Processing notification request:', { notificationType, title, userIds, jobTitles, organizationId });
 
     // Get recipient user IDs
     let recipientIds: string[] = [];
@@ -65,11 +66,16 @@ serve(async (req) => {
       recipientIds = userIds;
     } else if (jobTitles && jobTitles.length > 0) {
       // Send to users matching specific job titles
-      // job_titles is a JSONB array column on users table
-      const { data: matchingUsers, error: usersError } = await supabaseClient
+      let query = supabaseClient
         .from('users')
         .select('id, job_titles, job_title')
         .eq('is_active', true);
+
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
+
+      const { data: matchingUsers, error: usersError } = await query;
 
       if (usersError) {
         throw usersError;
@@ -85,10 +91,16 @@ serve(async (req) => {
 
       console.log(`Found ${recipientIds.length} users matching job titles: ${jobTitles.join(', ')}`);
     } else {
-      // Send to all users (for announcements, events, etc.)
-      const { data: allUsers, error: usersError } = await supabaseClient
+      // Send to all users in the organization (for announcements, events, etc.)
+      let query = supabaseClient
         .from('users')
         .select('id');
+
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
+
+      const { data: allUsers, error: usersError } = await query;
 
       if (usersError) {
         throw usersError;

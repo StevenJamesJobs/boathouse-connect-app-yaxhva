@@ -27,6 +27,7 @@ import * as Sharing from 'expo-sharing';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
+import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface GuideItem {
   id: string;
@@ -53,6 +54,7 @@ export default function GuidesAndTrainingScreen() {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const colors = useThemeColors();
+  const { organizationId } = useOrganization();
   const [guides, setGuides] = useState<GuideItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -90,6 +92,7 @@ export default function GuidesAndTrainingScreen() {
       const { data, error } = await supabase
         .from('guides_and_training')
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('is_active', true)
         .order('category', { ascending: true })
         .order('display_order', { ascending: true });

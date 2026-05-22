@@ -17,6 +17,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
 import ManagerTabBarStatic from '@/components/ManagerTabBarStatic';
 import ShiftEditForm, { ShiftLike } from '@/components/ShiftEditForm';
@@ -55,6 +56,7 @@ export default function TodaysRosterScreen() {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
 
   // Build the ±30 day window anchored on today (stable for the lifetime of the screen).
   const days = useMemo(() => {
@@ -90,6 +92,7 @@ export default function TodaysRosterScreen() {
         .select(
           'id, upload_id, employee_name, user_id, shift_date, start_time, end_time, roles, is_closer, is_opener, is_training, room_assignment'
         )
+        .eq('organization_id', organizationId)
         .eq('shift_date', iso)
         .order('start_time', { ascending: true });
       if (error) throw error;

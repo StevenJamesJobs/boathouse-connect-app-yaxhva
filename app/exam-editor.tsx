@@ -26,6 +26,7 @@ import { generateQuizQuestions, generatePhotoQuestion, getCurrentWeekKey, getExa
 import type { ExamType } from '@/utils/exam/questionGenerator';
 import { formatTime, formatCountdown, getCountdownUrgency } from '@/utils/exam/examEngine';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
@@ -91,6 +92,7 @@ export default function ExamEditorScreen() {
   const colors = useThemeColors();
   const { mode } = useAppTheme();
   const { user } = useAuth();
+  const { organizationId } = useOrganization();
   const params = useLocalSearchParams<{ type: string }>();
   const examType = (params.type || 'server') as ExamType;
 
@@ -148,6 +150,7 @@ export default function ExamEditorScreen() {
       const { data, error } = await (supabase
         .from('exams' as any) as any)
         .select('*')
+        .eq('organization_id', organizationId)
         .eq('exam_type', examType)
         .in('status', ['draft', 'active', 'paused'])
         .order('created_at', { ascending: false })
@@ -244,6 +247,7 @@ export default function ExamEditorScreen() {
           status: 'draft',
           time_limit_seconds: 300,
           created_by: user?.id,
+          organization_id: organizationId,
         })
         .select()
         .single();
@@ -260,6 +264,7 @@ export default function ExamEditorScreen() {
               status: 'draft',
               time_limit_seconds: 300,
               created_by: user?.id,
+              organization_id: organizationId,
             })
             .select()
             .single();
@@ -344,6 +349,7 @@ export default function ExamEditorScreen() {
               await (supabase
                 .from('exams' as any) as any)
                 .update({ status: 'closed', closed_at: new Date().toISOString() })
+                .eq('organization_id', organizationId)
                 .eq('exam_type', examType)
                 .eq('status', 'active');
 
@@ -387,7 +393,8 @@ export default function ExamEditorScreen() {
                       destination: 'weekly-quizzes',
                       exam_id: currentExam.id,
                       job_titles: targetJobTitles,
-                    }
+                    },
+                    organizationId
                   );
                 } catch (pushErr) {
                   // Non-fatal: activation still succeeded.
@@ -863,6 +870,7 @@ export default function ExamEditorScreen() {
                       destination: 'weekly-quizzes',
                       exam_id: currentExam.id,
                     },
+                    organization_id: organizationId,
                   },
                 });
                 // Log to Sent History so the manager has a record (single-user push)
@@ -870,6 +878,7 @@ export default function ExamEditorScreen() {
                   title: 'Take 2! 🎯',
                   body: `Cleared ${entry.name} to retake the quiz.`,
                   sent_by: user?.id,
+                  organization_id: organizationId,
                   data: {
                     notificationType: 'custom',
                     destination: 'weekly-quizzes',
