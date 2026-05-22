@@ -1,7 +1,13 @@
 import React, { useEffect, useRef } from "react";
 import { Animated, StyleSheet, Dimensions, Image } from "react-native";
+import { IS_MCLOONES } from "@/constants/buildVariant";
 
-const splashImage = require("../assets/images/MayMotherDaySplashScreen.png");
+const mcloonesImage = require("../assets/images/MayMotherDaySplashScreen.png");
+// TODO: Replace with MyResto Connect charcoal splash when asset is ready
+const publicImage = require("../assets/images/MayMotherDaySplashScreen.png");
+
+const splashImage = IS_MCLOONES ? mcloonesImage : publicImage;
+const splashBgColor = IS_MCLOONES ? "#87CEEB" : "#2E3B4E";
 const { width, height } = Dimensions.get("screen");
 
 interface AnimatedSplashProps {
@@ -40,7 +46,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     zIndex: 999,
     elevation: 999,
-    backgroundColor: "#87CEEB",
+    backgroundColor: splashBgColor,
   },
   image: {
     width,

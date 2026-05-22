@@ -158,12 +158,24 @@ function RootLayoutNav() {
     // Use setTimeout to avoid navigation during render
     const navigationTimeout = setTimeout(() => {
       try {
+        // Force password change redirect — takes priority over portal redirect
+        if (isAuthenticated && user?.forcePasswordChange) {
+          const inChangePassword = segments[0] === 'change-password';
+          if (!inChangePassword) {
+            console.log('[RootLayout] Redirecting to change-password — force password change');
+            router.replace('/change-password');
+            return; // don't fall through to portal redirect
+          }
+        }
+
         if (!isAuthenticated && inPortal) {
           // Redirect to login if not authenticated and trying to access portal
           console.log('[RootLayout] Redirecting to login - not authenticated');
           router.replace('/login');
         } else if (isAuthenticated && (onLogin || onIndex)) {
           // Redirect to appropriate portal based on role when on login or index
+          // Note: onboarding, join, and change-password routes are not matched
+          // by onLogin/onIndex so authenticated users on those routes stay put.
           console.log('[RootLayout] Redirecting to portal - authenticated as', user?.role);
           if (user?.role === 'manager' || user?.role === 'owner') {
             router.replace('/(portal)/manager');
@@ -177,7 +189,7 @@ function RootLayoutNav() {
     }, 100);
 
     return () => clearTimeout(navigationTimeout);
-  }, [isAuthenticated, isLoading, segments, loaded, user?.role, router]);
+  }, [isAuthenticated, isLoading, segments, loaded, user?.role, user?.forcePasswordChange, router]);
 
   if (!loaded || isLoading) {
     console.log('[RootLayout] Still loading, returning null');
@@ -209,6 +221,9 @@ function RootLayoutNav() {
               <Stack screenOptions={{ headerShown: false }}>
                 <Stack.Screen name="index" />
                 <Stack.Screen name="login" />
+                <Stack.Screen name="onboarding" />
+                <Stack.Screen name="join" />
+                <Stack.Screen name="change-password" options={{ gestureEnabled: false }} />
                 <Stack.Screen name="(portal)" />
                 <Stack.Screen name="exam-play" options={{ gestureEnabled: false }} />
                 <Stack.Screen name="picture-this-play" options={{ gestureEnabled: false }} />

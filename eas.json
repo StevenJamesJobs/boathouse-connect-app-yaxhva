@@ -23,6 +23,18 @@
       "env": {
         "EXPO_NO_TELEMETRY": "1"
       }
+    },
+    "production-mcloones": {
+      "extends": "production",
+      "env": {
+        "APP_VARIANT": "mcloones"
+      }
+    },
+    "production-public": {
+      "extends": "production",
+      "env": {
+        "APP_VARIANT": "public"
+      }
     }
   },
   "submit": {

@@ -135,7 +135,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (freshUser) {
               // Update storage with fresh data
               await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
-              
+
+              // Update cached org branding
+              if (freshUser.organizationId) {
+                try {
+                  const { data: orgData } = await supabase
+                    .from('organizations')
+                    .select('name, logo_url')
+                    .eq('id', freshUser.organizationId)
+                    .single();
+                  if (orgData) {
+                    await AsyncStorage.setItem('@mrc_last_org', JSON.stringify({
+                      orgId: freshUser.organizationId,
+                      orgName: orgData.name,
+                      logoUrl: orgData.logo_url,
+                    }));
+                  }
+                } catch {}
+              }
+
               console.log('[AuthContext] Setting authenticated state with fresh user data');
               setAuthState({
                 user: freshUser,
@@ -306,6 +324,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isLoading: false,
         isAuthenticated: true,
       });
+
+      // Cache org branding for login screen (hybrid approach)
+      if (AsyncStorage && userData.organization_id) {
+        try {
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('name, logo_url')
+            .eq('id', userData.organization_id)
+            .single();
+          if (orgData) {
+            await AsyncStorage.setItem('@mrc_last_org', JSON.stringify({
+              orgId: userData.organization_id,
+              orgName: orgData.name,
+              logoUrl: orgData.logo_url,
+            }));
+          }
+        } catch {}
+      }
 
       console.log('[AuthContext] Login successful for user:', user.name, 'Role:', user.role);
       return true;
