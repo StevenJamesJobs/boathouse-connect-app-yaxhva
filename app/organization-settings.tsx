@@ -25,6 +25,14 @@ import JobTitlesManager from '@/components/JobTitlesManager';
 import AssistantsManager from '@/components/AssistantsManager';
 import { supabase } from '@/app/integrations/supabase/client';
 
+type SettingsTab = 'branding' | 'jobs-tools' | 'access';
+
+const TABS: { key: SettingsTab; label: string }[] = [
+  { key: 'branding', label: 'Branding' },
+  { key: 'jobs-tools', label: 'Jobs & Tools' },
+  { key: 'access', label: 'Access' },
+];
+
 export default function OrganizationSettingsScreen() {
   const router = useRouter();
   const colors = useThemeColors();
@@ -32,6 +40,7 @@ export default function OrganizationSettingsScreen() {
   const { organizationId, organization, refreshOrganization } = useOrganization();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
+  const [activeTab, setActiveTab] = useState<SettingsTab>('branding');
   const [saving, setSaving] = useState(false);
   const [regeneratingCode, setRegeneratingCode] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -260,6 +269,8 @@ export default function OrganizationSettingsScreen() {
     }
   };
 
+  const showSaveButton = activeTab === 'branding' || activeTab === 'access';
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -285,284 +296,311 @@ export default function OrganizationSettingsScreen() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        {/* Branding Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Branding</Text>
+      {/* Tab Bar */}
+      <View style={styles.tabBar}>
+        {TABS.map(tab => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+            onPress={() => setActiveTab(tab.key)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
 
-          {/* Logo Upload */}
-          <View style={[styles.fieldContainer, { alignItems: 'center' }]}>
-            <TouchableOpacity
-              style={styles.logoUploadArea}
-              onPress={handlePickLogo}
-              disabled={uploadingLogo}
-              activeOpacity={0.7}
-            >
-              {uploadingLogo ? (
-                <ActivityIndicator size="large" color={colors.primary} />
-              ) : logoPreview ? (
-                <Image
-                  source={{ uri: logoPreview }}
-                  style={styles.logoImage}
-                  resizeMode="contain"
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        {/* ─── Branding Tab ──────────────────────────────────────────── */}
+        {activeTab === 'branding' && (
+          <>
+            {/* Branding Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Branding</Text>
+
+              {/* Logo Upload */}
+              <View style={[styles.fieldContainer, { alignItems: 'center' }]}>
+                <TouchableOpacity
+                  style={styles.logoUploadArea}
+                  onPress={handlePickLogo}
+                  disabled={uploadingLogo}
+                  activeOpacity={0.7}
+                >
+                  {uploadingLogo ? (
+                    <ActivityIndicator size="large" color={colors.primary} />
+                  ) : logoPreview ? (
+                    <Image
+                      source={{ uri: logoPreview }}
+                      style={styles.logoImage}
+                      resizeMode="contain"
+                    />
+                  ) : (
+                    <View style={styles.logoPlaceholder}>
+                      <IconSymbol
+                        ios_icon_name="camera.fill"
+                        android_material_icon_name="photo-camera"
+                        size={32}
+                        color={colors.textSecondary}
+                      />
+                      <Text style={[styles.logoPlaceholderText, { color: colors.textSecondary }]}>
+                        Add Logo
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+                <View style={styles.logoActions}>
+                  <TouchableOpacity onPress={handlePickLogo} disabled={uploadingLogo}>
+                    <Text style={[styles.logoActionText, { color: colors.primary }]}>
+                      {logoPreview ? 'Change Logo' : 'Upload Logo'}
+                    </Text>
+                  </TouchableOpacity>
+                  {logoPreview && (
+                    <TouchableOpacity onPress={handleRemoveLogo}>
+                      <Text style={[styles.logoActionText, { color: '#E53935' }]}>Remove</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+                <Text style={styles.fieldHint}>Displayed on the login screen and app header</Text>
+              </View>
+
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Restaurant Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder="Your restaurant name"
+                  placeholderTextColor={colors.textSecondary}
                 />
-              ) : (
-                <View style={styles.logoPlaceholder}>
-                  <IconSymbol
-                    ios_icon_name="camera.fill"
-                    android_material_icon_name="photo-camera"
-                    size={32}
-                    color={colors.textSecondary}
+              </View>
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Reward Currency Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={rewardCurrencyName}
+                  onChangeText={setRewardCurrencyName}
+                  placeholder="e.g. Bucks, Points, Stars"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+            </View>
+
+            {/* Location Section */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Location</Text>
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Address</Text>
+                <TextInput
+                  style={styles.input}
+                  value={address}
+                  onChangeText={setAddress}
+                  placeholder="Street address"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+              <View style={styles.row}>
+                <View style={[styles.fieldContainer, { flex: 2 }]}>
+                  <Text style={styles.fieldLabel}>City</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={city}
+                    onChangeText={setCity}
+                    placeholder="City"
+                    placeholderTextColor={colors.textSecondary}
                   />
-                  <Text style={[styles.logoPlaceholderText, { color: colors.textSecondary }]}>
-                    Add Logo
-                  </Text>
+                </View>
+                <View style={[styles.fieldContainer, { flex: 1, marginLeft: 12 }]}>
+                  <Text style={styles.fieldLabel}>State</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={state}
+                    onChangeText={setState}
+                    placeholder="NJ"
+                    placeholderTextColor={colors.textSecondary}
+                    maxLength={2}
+                    autoCapitalize="characters"
+                  />
+                </View>
+                <View style={[styles.fieldContainer, { flex: 1, marginLeft: 12 }]}>
+                  <Text style={styles.fieldLabel}>ZIP</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={zip}
+                    onChangeText={setZip}
+                    placeholder="07052"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="number-pad"
+                    maxLength={5}
+                  />
+                </View>
+              </View>
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Weather Location</Text>
+                <TextInput
+                  style={styles.input}
+                  value={weatherLocation}
+                  onChangeText={setWeatherLocation}
+                  placeholder="e.g. Long Branch, NJ"
+                  placeholderTextColor={colors.textSecondary}
+                />
+                <Text style={styles.fieldHint}>Used for the weather widget on the home screen</Text>
+              </View>
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Google Maps Search</Text>
+                <TextInput
+                  style={styles.input}
+                  value={googleMapsQuery}
+                  onChangeText={setGoogleMapsQuery}
+                  placeholder="e.g. McLoone's Boathouse West Orange NJ"
+                  placeholderTextColor={colors.textSecondary}
+                />
+                <Text style={styles.fieldHint}>Used to find your restaurant for Google Reviews</Text>
+              </View>
+            </View>
+
+            {/* Menu Configuration */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Menu Configuration</Text>
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Number of Menus</Text>
+                <View style={styles.segmentedControl}>
+                  <TouchableOpacity
+                    style={[styles.segment, menuCount === 1 && styles.segmentActive]}
+                    onPress={() => setMenuCount(1)}
+                  >
+                    <Text style={[styles.segmentText, menuCount === 1 && styles.segmentTextActive]}>
+                      1 Menu
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.segment, menuCount === 2 && styles.segmentActive]}
+                    onPress={() => setMenuCount(2)}
+                  >
+                    <Text style={[styles.segmentText, menuCount === 2 && styles.segmentTextActive]}>
+                      2 Menus
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Menu 1 Name</Text>
+                <TextInput
+                  style={styles.input}
+                  value={menu1Name}
+                  onChangeText={setMenu1Name}
+                  placeholder="e.g. Winter, Lunch, Main"
+                  placeholderTextColor={colors.textSecondary}
+                />
+              </View>
+              {menuCount === 2 && (
+                <View style={styles.fieldContainer}>
+                  <Text style={styles.fieldLabel}>Menu 2 Name</Text>
+                  <TextInput
+                    style={styles.input}
+                    value={menu2Name}
+                    onChangeText={setMenu2Name}
+                    placeholder="e.g. Summer, Dinner, Seasonal"
+                    placeholderTextColor={colors.textSecondary}
+                  />
                 </View>
               )}
-            </TouchableOpacity>
-            <View style={styles.logoActions}>
-              <TouchableOpacity onPress={handlePickLogo} disabled={uploadingLogo}>
-                <Text style={[styles.logoActionText, { color: colors.primary }]}>
-                  {logoPreview ? 'Change Logo' : 'Upload Logo'}
-                </Text>
-              </TouchableOpacity>
-              {logoPreview && (
-                <TouchableOpacity onPress={handleRemoveLogo}>
-                  <Text style={[styles.logoActionText, { color: '#E53935' }]}>Remove</Text>
-                </TouchableOpacity>
-              )}
             </View>
-            <Text style={styles.fieldHint}>Displayed on the login screen and app header</Text>
-          </View>
+          </>
+        )}
 
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Restaurant Name</Text>
-            <TextInput
-              style={styles.input}
-              value={name}
-              onChangeText={setName}
-              placeholder="Your restaurant name"
-              placeholderTextColor={colors.textSecondary}
-            />
-          </View>
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Reward Currency Name</Text>
-            <TextInput
-              style={styles.input}
-              value={rewardCurrencyName}
-              onChangeText={setRewardCurrencyName}
-              placeholder="e.g. Bucks, Points, Stars"
-              placeholderTextColor={colors.textSecondary}
-            />
-          </View>
-        </View>
+        {/* ─── Jobs & Tools Tab ───────────────────────────────────────── */}
+        {activeTab === 'jobs-tools' && (
+          <>
+            <JobTitlesManager colors={colors} />
+            <AssistantsManager colors={colors} />
+          </>
+        )}
 
-        {/* Location Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Location</Text>
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Address</Text>
-            <TextInput
-              style={styles.input}
-              value={address}
-              onChangeText={setAddress}
-              placeholder="Street address"
-              placeholderTextColor={colors.textSecondary}
-            />
-          </View>
-          <View style={styles.row}>
-            <View style={[styles.fieldContainer, { flex: 2 }]}>
-              <Text style={styles.fieldLabel}>City</Text>
-              <TextInput
-                style={styles.input}
-                value={city}
-                onChangeText={setCity}
-                placeholder="City"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-            <View style={[styles.fieldContainer, { flex: 1, marginLeft: 12 }]}>
-              <Text style={styles.fieldLabel}>State</Text>
-              <TextInput
-                style={styles.input}
-                value={state}
-                onChangeText={setState}
-                placeholder="NJ"
-                placeholderTextColor={colors.textSecondary}
-                maxLength={2}
-                autoCapitalize="characters"
-              />
-            </View>
-            <View style={[styles.fieldContainer, { flex: 1, marginLeft: 12 }]}>
-              <Text style={styles.fieldLabel}>ZIP</Text>
-              <TextInput
-                style={styles.input}
-                value={zip}
-                onChangeText={setZip}
-                placeholder="07052"
-                placeholderTextColor={colors.textSecondary}
-                keyboardType="number-pad"
-                maxLength={5}
-              />
-            </View>
-          </View>
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Weather Location</Text>
-            <TextInput
-              style={styles.input}
-              value={weatherLocation}
-              onChangeText={setWeatherLocation}
-              placeholder="e.g. Long Branch, NJ"
-              placeholderTextColor={colors.textSecondary}
-            />
-            <Text style={styles.fieldHint}>Used for the weather widget on the home screen</Text>
-          </View>
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Google Maps Search</Text>
-            <TextInput
-              style={styles.input}
-              value={googleMapsQuery}
-              onChangeText={setGoogleMapsQuery}
-              placeholder="e.g. McLoone's Boathouse West Orange NJ"
-              placeholderTextColor={colors.textSecondary}
-            />
-            <Text style={styles.fieldHint}>Used to find your restaurant for Google Reviews</Text>
-          </View>
-        </View>
+        {/* ─── Access Tab ─────────────────────────────────────────────── */}
+        {activeTab === 'access' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Employee Access</Text>
 
-        {/* Menu Configuration */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Menu Configuration</Text>
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Number of Menus</Text>
-            <View style={styles.segmentedControl}>
-              <TouchableOpacity
-                style={[styles.segment, menuCount === 1 && styles.segmentActive]}
-                onPress={() => setMenuCount(1)}
-              >
-                <Text style={[styles.segmentText, menuCount === 1 && styles.segmentTextActive]}>
-                  1 Menu
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.segment, menuCount === 2 && styles.segmentActive]}
-                onPress={() => setMenuCount(2)}
-              >
-                <Text style={[styles.segmentText, menuCount === 2 && styles.segmentTextActive]}>
-                  2 Menus
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Menu 1 Name</Text>
-            <TextInput
-              style={styles.input}
-              value={menu1Name}
-              onChangeText={setMenu1Name}
-              placeholder="e.g. Winter, Lunch, Main"
-              placeholderTextColor={colors.textSecondary}
-            />
-          </View>
-          {menuCount === 2 && (
+            {/* Join Code */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Menu 2 Name</Text>
-              <TextInput
-                style={styles.input}
-                value={menu2Name}
-                onChangeText={setMenu2Name}
-                placeholder="e.g. Summer, Dinner, Seasonal"
-                placeholderTextColor={colors.textSecondary}
-              />
-            </View>
-          )}
-        </View>
-
-        {/* Employee Access Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Employee Access</Text>
-
-          {/* Join Code */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Join Code</Text>
-            <View style={styles.joinCodeRow}>
-              <View style={styles.joinCodeDisplay}>
-                <Text style={styles.joinCodeText}>{organization.join_code || '—'}</Text>
-              </View>
-              <TouchableOpacity style={styles.joinCodeAction} onPress={copyJoinCode}>
-                <IconSymbol
-                  ios_icon_name="doc.on.doc"
-                  android_material_icon_name="content-copy"
-                  size={20}
-                  color={colors.primary}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.joinCodeAction}
-                onPress={handleRegenerateJoinCode}
-                disabled={regeneratingCode}
-              >
-                {regeneratingCode ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
+              <Text style={styles.fieldLabel}>Join Code</Text>
+              <View style={styles.joinCodeRow}>
+                <View style={styles.joinCodeDisplay}>
+                  <Text style={styles.joinCodeText}>{organization.join_code || '—'}</Text>
+                </View>
+                <TouchableOpacity style={styles.joinCodeAction} onPress={copyJoinCode}>
                   <IconSymbol
-                    ios_icon_name="arrow.clockwise"
-                    android_material_icon_name="refresh"
+                    ios_icon_name="doc.on.doc"
+                    android_material_icon_name="content-copy"
                     size={20}
                     color={colors.primary}
                   />
-                )}
-              </TouchableOpacity>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.joinCodeAction}
+                  onPress={handleRegenerateJoinCode}
+                  disabled={regeneratingCode}
+                >
+                  {regeneratingCode ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <IconSymbol
+                      ios_icon_name="arrow.clockwise"
+                      android_material_icon_name="refresh"
+                      size={20}
+                      color={colors.primary}
+                    />
+                  )}
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.fieldHint}>Share this code with employees so they can join your restaurant</Text>
             </View>
-            <Text style={styles.fieldHint}>Share this code with employees so they can join your restaurant</Text>
-          </View>
 
-          {/* Self Signup Toggle */}
-          <View style={styles.switchRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.fieldLabel}>Allow Self-Signup</Text>
-              <Text style={styles.fieldHint}>Employees can create their own accounts using the join code</Text>
+            {/* Self Signup Toggle */}
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Allow Self-Signup</Text>
+                <Text style={styles.fieldHint}>Employees can create their own accounts using the join code</Text>
+              </View>
+              <Switch
+                value={allowSelfSignup}
+                onValueChange={setAllowSelfSignup}
+                trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                thumbColor={allowSelfSignup ? colors.primary : colors.textSecondary}
+              />
             </View>
-            <Switch
-              value={allowSelfSignup}
-              onValueChange={setAllowSelfSignup}
-              trackColor={{ false: colors.border, true: colors.primary + '80' }}
-              thumbColor={allowSelfSignup ? colors.primary : colors.textSecondary}
-            />
+
+            {/* Default Password */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Default Password</Text>
+              <TextInput
+                style={styles.input}
+                value={defaultPassword}
+                onChangeText={setDefaultPassword}
+                placeholder="Default password for new accounts"
+                placeholderTextColor={colors.textSecondary}
+              />
+              <Text style={styles.fieldHint}>Used when managers create accounts for employees</Text>
+            </View>
           </View>
+        )}
 
-          {/* Default Password */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Default Password</Text>
-            <TextInput
-              style={styles.input}
-              value={defaultPassword}
-              onChangeText={setDefaultPassword}
-              placeholder="Default password for new accounts"
-              placeholderTextColor={colors.textSecondary}
-            />
-            <Text style={styles.fieldHint}>Used when managers create accounts for employees</Text>
-          </View>
-        </View>
-
-        {/* Job Titles */}
-        <JobTitlesManager colors={colors} />
-
-        {/* Tools & Assistants */}
-        <AssistantsManager colors={colors} />
-
-        {/* Save Button */}
-        <TouchableOpacity
-          style={[styles.saveButton, saving && { opacity: 0.6 }]}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save Changes</Text>
-          )}
-        </TouchableOpacity>
+        {/* Save Button — only on tabs with form fields */}
+        {showSaveButton && (
+          <TouchableOpacity
+            style={[styles.saveButton, saving && { opacity: 0.6 }]}
+            onPress={handleSave}
+            disabled={saving}
+          >
+            {saving ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save Changes</Text>
+            )}
+          </TouchableOpacity>
+        )}
 
         <View style={{ height: 60 }} />
       </ScrollView>
@@ -584,8 +622,6 @@ function createStyles(colors: any) {
       paddingTop: Platform.OS === 'ios' ? 60 : 16,
       paddingBottom: 12,
       backgroundColor: colors.card,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
     },
     backButton: {
       padding: 8,
@@ -602,6 +638,32 @@ function createStyles(colors: any) {
       fontSize: 16,
       fontWeight: '600',
       color: colors.primary,
+    },
+    tabBar: {
+      flexDirection: 'row',
+      backgroundColor: colors.card,
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      gap: 4,
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: 8,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    tabActive: {
+      backgroundColor: colors.primary,
+    },
+    tabText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    tabTextActive: {
+      color: '#fff',
     },
     scrollContent: {
       padding: 16,
