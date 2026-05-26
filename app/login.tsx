@@ -5,6 +5,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  Pressable,
   StyleSheet,
   Image,
   KeyboardAvoidingView,
@@ -14,7 +15,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, Link } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -297,13 +298,17 @@ export default function LoginScreen() {
 
           {/* Join / Owner Links */}
           <View style={styles.linksContainer}>
-            <TouchableOpacity onPress={() => router.push('/join')}>
-              <Text style={styles.linkText}>{t('login.join_restaurant')}</Text>
-            </TouchableOpacity>
+            <Link href="/join" asChild>
+              <Pressable>
+                <Text style={styles.linkText}>{t('login.join_restaurant')}</Text>
+              </Pressable>
+            </Link>
             <Text style={styles.linkSeparator}>or</Text>
-            <TouchableOpacity onPress={() => router.push('/onboarding/signup')}>
-              <Text style={styles.linkText}>{t('login.owner_signup')}</Text>
-            </TouchableOpacity>
+            <Link href="/onboarding/signup" asChild>
+              <Pressable>
+                <Text style={styles.linkText}>{t('login.owner_signup')}</Text>
+              </Pressable>
+            </Link>
           </View>
         </Animated.View>
       </ScrollView>

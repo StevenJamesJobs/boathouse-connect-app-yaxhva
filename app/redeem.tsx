@@ -22,7 +22,6 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganization } from '../contexts/OrganizationContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { MenuItemSearchPicker, PickedMenuItem } from '@/components/MenuItemSearchPicker';
 import { RedemptionRequestCard, RedemptionRequestRow, RedemptionType } from '@/components/RedemptionRequestCard';
@@ -92,7 +91,6 @@ export default function EmployeeRedeemScreen() {
   const { organizationId, organization } = useOrganization();
   const currencyName = organization.reward_currency_name;
   const { sendNotification } = useNotification();
-  const { organizationId } = useOrganization();
 
   const [balance, setBalance] = useState(0);
   const [pending, setPending] = useState<RedemptionRequestRow[]>([]);

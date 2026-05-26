@@ -119,19 +119,22 @@ export default function ChangePasswordScreen() {
       // Refresh user data so forcePasswordChange becomes false
       await refreshUser();
 
-      Alert.alert('Success', 'Your password has been updated.', [
-        {
-          text: 'OK',
-          onPress: () => {
-            // Navigate to appropriate portal based on role
-            if (user.role === 'manager' || user.role === 'owner') {
-              router.replace('/(portal)/manager');
-            } else {
-              router.replace('/(portal)/employee');
-            }
-          },
-        },
-      ]);
+      const navigateToPortal = () => {
+        if (user.role === 'manager' || user.role === 'owner') {
+          router.replace('/(portal)/manager');
+        } else {
+          router.replace('/(portal)/employee');
+        }
+      };
+
+      if (Platform.OS === 'web') {
+        window.alert('Your password has been updated.');
+        navigateToPortal();
+      } else {
+        Alert.alert('Success', 'Your password has been updated.', [
+          { text: 'OK', onPress: navigateToPortal },
+        ]);
+      }
     } catch (e: any) {
       console.error('[ChangePassword] Error:', e);
       setError(e?.message || 'Something went wrong. Please try again.');

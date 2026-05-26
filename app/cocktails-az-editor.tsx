@@ -24,9 +24,8 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useOrganization } from '../contexts/OrganizationContext';
-import { translateTexts, saveTranslations } from '@/utils/translateContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { translateTexts, saveTranslations } from '@/utils/translateContent';
 
 interface Cocktail {
   id: string;
@@ -61,7 +60,6 @@ export default function CocktailsAZEditorScreen() {
   const { language } = useLanguage();
   const { organizationId } = useOrganization();
   const colors = useThemeColors();
-  const { organizationId } = useOrganization();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
   const [loading, setLoading] = useState(false);
