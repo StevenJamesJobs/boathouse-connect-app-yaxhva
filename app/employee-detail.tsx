@@ -21,7 +21,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import * as ImagePicker from 'expo-image-picker';
-import { JOB_TITLES } from '@/constants/jobTitles';
+import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
 
 interface Employee {
   id: string;
@@ -36,13 +36,12 @@ interface Employee {
   profile_picture_url?: string;
 }
 
-const JOB_TITLE_OPTIONS = JOB_TITLES;
-
 export default function EmployeeDetailScreen() {
   const router = useRouter();
   const { employeeId } = useLocalSearchParams();
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
+  const { activeJobTitles: JOB_TITLE_OPTIONS } = useOrgJobTitles();
   const defaultPassword = organization.default_password;
   const { t } = useTranslation('employee_detail');
   const colors = useThemeColors();

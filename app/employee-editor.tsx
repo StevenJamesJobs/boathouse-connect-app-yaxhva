@@ -20,7 +20,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { JOB_TITLES } from '@/constants/jobTitles';
+import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
 
 interface Employee {
   id: string;
@@ -35,8 +35,6 @@ interface Employee {
   profile_picture_url?: string;
 }
 
-const JOB_TITLE_OPTIONS = JOB_TITLES;
-
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function EmployeeEditorScreen() {
@@ -44,6 +42,7 @@ export default function EmployeeEditorScreen() {
   const { t } = useTranslation('employee_editor');
   const colors = useThemeColors();
   const { organizationId, organization } = useOrganization();
+  const { activeJobTitles: JOB_TITLE_OPTIONS } = useOrgJobTitles();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);

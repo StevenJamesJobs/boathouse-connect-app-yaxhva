@@ -14,6 +14,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { hasAnyQuizEligibleRole } from '@/app/weekly-quizzes';
+import { useToolVisibility } from '@/hooks/useToolVisibility';
 import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 
@@ -39,27 +40,8 @@ export default function EmployeeToolsScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
 
-  // Get job titles array from user
   const jobTitles = user?.jobTitles || [];
-
-  // Role-based visibility checks
-  const canSeeServerAssistant = jobTitles.includes('Server') ||
-                                jobTitles.includes('Lead Server') ||
-                                jobTitles.includes('Manager');
-
-  const canSeeBarAssistant = jobTitles.includes('Bartender') ||
-                             jobTitles.includes('Manager') ||
-                             jobTitles.includes('Lead Server') ||
-                             jobTitles.includes('Banquet Captain');
-
-  const canSeeHostAssistant = jobTitles.includes('Host') || jobTitles.includes('Manager');
-
-  const canSeeKitchenAssistant = jobTitles.includes('Busser') ||
-                                 jobTitles.includes('Chef') ||
-                                 jobTitles.includes('Kitchen') ||
-                                 jobTitles.includes('Manager') ||
-                                 jobTitles.includes('Runner');
-
+  const { canSee } = useToolVisibility();
   const canSeeWeeklyQuizzes = hasAnyQuizEligibleRole(jobTitles);
   const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
   const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
@@ -76,16 +58,16 @@ export default function EmployeeToolsScreen() {
   }
 
   // Role-based assistants fill remaining rows
-  if (canSeeServerAssistant) {
+  if (canSee('check_outs')) {
     allItems.push({ id: 'check-outs-calculator', label: 'Check Outs Calculator', iosIcon: 'dollarsign.circle.fill', androidIcon: 'calculate', route: '/check-out-calculator' });
   }
-  if (canSeeBarAssistant) {
+  if (canSee('bartender')) {
     allItems.push({ id: 'bartender', label: t('employee_tools.bartender_assistant'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant' });
   }
-  if (canSeeHostAssistant) {
+  if (canSee('host')) {
     allItems.push({ id: 'host', label: t('employee_tools.host_assistant'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/host-assistant' });
   }
-  if (canSeeKitchenAssistant) {
+  if (canSee('kitchen')) {
     allItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
   }
 

@@ -13,6 +13,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
+import { useToolVisibility } from '@/hooks/useToolVisibility';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import { MessageBadge } from '@/components/MessageBadge';
@@ -40,26 +41,7 @@ export default function ManagerToolsScreen() {
   const { pendingCount } = usePendingApprovals();
   const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
 
-  // Get job titles array from user
-  const jobTitles = user?.jobTitles || [];
-
-  // Role-based visibility checks
-  const canSeeServerAssistant = jobTitles.includes('Server') ||
-                                jobTitles.includes('Lead Server') ||
-                                jobTitles.includes('Manager');
-
-  const canSeeBarAssistant = jobTitles.includes('Bartender') ||
-                             jobTitles.includes('Manager') ||
-                             jobTitles.includes('Lead Server') ||
-                             jobTitles.includes('Banquet Captain');
-
-  const canSeeHostAssistant = jobTitles.includes('Host') || jobTitles.includes('Manager');
-
-  const canSeeKitchenAssistant = jobTitles.includes('Busser') ||
-                                 jobTitles.includes('Chef') ||
-                                 jobTitles.includes('Kitchen') ||
-                                 jobTitles.includes('Manager') ||
-                                 jobTitles.includes('Runner');
+  const { canSee } = useToolVisibility();
 
   // ─── Build tile lists ────────────────────────────────────────────────────────
 
@@ -69,20 +51,20 @@ export default function ManagerToolsScreen() {
     { id: 'weekly-quizzes', label: 'Weekly Quizzes', iosIcon: 'questionmark.circle.fill', androidIcon: 'quiz', route: '/quiz-hub-editor' },
   ];
 
-  if (canSeeServerAssistant) {
+  if (canSee('check_outs')) {
     fixedItems.push({ id: 'check-outs-calculator', label: 'Check Outs Calculator', iosIcon: 'dollarsign.circle.fill', androidIcon: 'calculate', route: '/check-out-calculator' });
   }
   fixedItems.push({ id: 'rewards-reviews', label: t('manager_tools.rewards_reviews'), iosIcon: 'gift.fill', androidIcon: 'card-giftcard', route: '/rewards-and-reviews-editor' });
 
   // Assistants section (visually distinct)
   const assistantItems: GridItem[] = [];
-  if (canSeeKitchenAssistant) {
+  if (canSee('kitchen')) {
     assistantItems.push({ id: 'kitchen', label: t('employee_tools.kitchen_assistant'), iosIcon: 'flame.fill', androidIcon: 'local-fire-department', route: '/kitchen-assistant' });
   }
-  if (canSeeHostAssistant) {
+  if (canSee('host')) {
     assistantItems.push({ id: 'host', label: t('employee_tools.host_assistant'), iosIcon: 'person.2.fill', androidIcon: 'people', route: '/host-assistant' });
   }
-  if (canSeeBarAssistant) {
+  if (canSee('bartender')) {
     assistantItems.push({ id: 'bartender', label: t('employee_tools.bartender_assistant'), iosIcon: 'wineglass.fill', androidIcon: 'local-bar', route: '/bartender-assistant' });
   }
 
