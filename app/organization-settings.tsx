@@ -21,6 +21,8 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import JobTitlesManager from '@/components/JobTitlesManager';
+import AssistantsManager from '@/components/AssistantsManager';
 import { supabase } from '@/app/integrations/supabase/client';
 
 export default function OrganizationSettingsScreen() {
@@ -542,6 +544,12 @@ export default function OrganizationSettingsScreen() {
             <Text style={styles.fieldHint}>Used when managers create accounts for employees</Text>
           </View>
         </View>
+
+        {/* Job Titles */}
+        <JobTitlesManager colors={colors} />
+
+        {/* Tools & Assistants */}
+        <AssistantsManager colors={colors} />
 
         {/* Save Button */}
         <TouchableOpacity
