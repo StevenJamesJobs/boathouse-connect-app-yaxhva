@@ -324,7 +324,7 @@ export default function ScheduleUploadScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await supabase.from('schedule_uploads').delete().eq('id', upload.id);
+              await supabase.from('schedule_uploads').delete().eq('id', upload.id).eq('organization_id', organizationId);
               loadUploads();
             } catch (error) {
               console.error('Delete error:', error);

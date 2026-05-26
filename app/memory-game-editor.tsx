@@ -95,7 +95,8 @@ export default function MemoryGameEditorScreen() {
         entree: pairing.entree,
         hint: pairing.hint,
       })
-      .eq('id', pairing.id);
+      .eq('id', pairing.id)
+      .eq('organization_id', organizationId);
     if (error) {
       Alert.alert(t('common.error'), error.message);
     } else {
@@ -114,7 +115,7 @@ export default function MemoryGameEditorScreen() {
           text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
-            await supabase.from('wine_pairings' as any).delete().eq('id', pairing.id);
+            await (supabase.from('wine_pairings' as any) as any).delete().eq('id', pairing.id).eq('organization_id', organizationId);
             fetchPairings();
           },
         },
@@ -125,7 +126,8 @@ export default function MemoryGameEditorScreen() {
   const handleToggleActive = async (pairing: WinePairing) => {
     await (supabase.from('wine_pairings' as any) as any)
       .update({ is_active: !pairing.is_active })
-      .eq('id', pairing.id);
+      .eq('id', pairing.id)
+      .eq('organization_id', organizationId);
     fetchPairings();
   };
 

@@ -159,6 +159,7 @@ export default function UpcomingEventsEditorScreen() {
             .from('upcoming_events')
             .update({ display_order: index })
             .eq('id', event.id)
+            .eq('organization_id', organizationId)
         );
       }
     });
@@ -601,8 +602,8 @@ export default function UpcomingEventsEditorScreen() {
     // Persist to Supabase
     try {
       await Promise.all([
-        supabase.from('upcoming_events').update({ display_order: aboveOrder }).eq('id', events[index].id),
-        supabase.from('upcoming_events').update({ display_order: currentOrder }).eq('id', events[index - 1].id),
+        supabase.from('upcoming_events').update({ display_order: aboveOrder }).eq('id', events[index].id).eq('organization_id', organizationId),
+        supabase.from('upcoming_events').update({ display_order: currentOrder }).eq('id', events[index - 1].id).eq('organization_id', organizationId),
       ]);
     } catch (error) {
       console.error('Error moving event up:', error);
@@ -623,8 +624,8 @@ export default function UpcomingEventsEditorScreen() {
     // Persist to Supabase
     try {
       await Promise.all([
-        supabase.from('upcoming_events').update({ display_order: belowOrder }).eq('id', events[index].id),
-        supabase.from('upcoming_events').update({ display_order: currentOrder }).eq('id', events[index + 1].id),
+        supabase.from('upcoming_events').update({ display_order: belowOrder }).eq('id', events[index].id).eq('organization_id', organizationId),
+        supabase.from('upcoming_events').update({ display_order: currentOrder }).eq('id', events[index + 1].id).eq('organization_id', organizationId),
       ]);
     } catch (error) {
       console.error('Error moving event down:', error);
@@ -646,6 +647,7 @@ export default function UpcomingEventsEditorScreen() {
           .from('upcoming_events')
           .update({ display_order: index })
           .eq('id', event.id)
+          .eq('organization_id', organizationId)
       );
       await Promise.all(updates);
       console.log('Drag reorder persisted successfully');

@@ -301,6 +301,7 @@ export default function ExamEditorScreen() {
 
     const questionsToInsert = generatedQuestions.map((q, index) => ({
       exam_id: examId,
+      organization_id: organizationId,
       question_order: index + 1,
       question_text: q.question_text,
       option_a: q.option_a,
@@ -328,7 +329,7 @@ export default function ExamEditorScreen() {
   const handleUpdateTimeLimit = async (newSeconds: number) => {
     if (!currentExam) return;
     setTimeLimit(newSeconds);
-    await (supabase.from('exams' as any) as any).update({ time_limit_seconds: newSeconds }).eq('id', currentExam.id);
+    await (supabase.from('exams' as any) as any).update({ time_limit_seconds: newSeconds }).eq('id', currentExam.id).eq('organization_id', organizationId);
   };
 
   // Activate quiz
@@ -376,7 +377,7 @@ export default function ExamEditorScreen() {
                   // requires re-arming and we don't double-notify on reopen.
                   notify_on_activate: false,
                 })
-                .eq('id', currentExam.id);
+                .eq('id', currentExam.id).eq('organization_id', organizationId);
 
               // Fire push if the manager armed the toggle
               if (notifyOnActivate) {
@@ -429,7 +430,7 @@ export default function ExamEditorScreen() {
             await (supabase
               .from('exams' as any) as any)
               .update({ status: 'paused' })
-              .eq('id', currentExam.id);
+              .eq('id', currentExam.id).eq('organization_id', organizationId);
             await fetchCurrentExam();
           },
         },
@@ -450,7 +451,7 @@ export default function ExamEditorScreen() {
             await (supabase
               .from('exams' as any) as any)
               .update({ status: 'active' })
-              .eq('id', currentExam.id);
+              .eq('id', currentExam.id).eq('organization_id', organizationId);
             await fetchCurrentExam();
           },
         },
@@ -466,7 +467,7 @@ export default function ExamEditorScreen() {
       await (supabase
         .from('exams' as any) as any)
         .update({ close_at: next ? next.toISOString() : null })
-        .eq('id', currentExam.id);
+        .eq('id', currentExam.id).eq('organization_id', organizationId);
     } catch (err) {
       console.error('Update close_at error:', err);
     }
@@ -482,7 +483,7 @@ export default function ExamEditorScreen() {
       await (supabase
         .from('exams' as any) as any)
         .update({ rewards_enabled: next })
-        .eq('id', currentExam.id);
+        .eq('id', currentExam.id).eq('organization_id', organizationId);
     } catch (err) {
       console.error('Toggle rewards_enabled error:', err);
     }
@@ -497,7 +498,7 @@ export default function ExamEditorScreen() {
       await (supabase
         .from('exam_questions' as any) as any)
         .update({ category_label: newLabel })
-        .eq('id', q.id);
+        .eq('id', q.id).eq('organization_id', organizationId);
       setQuestions(prev =>
         prev.map(qq => (qq.id === q.id ? { ...qq, category_label: newLabel } : qq))
       );
@@ -515,7 +516,7 @@ export default function ExamEditorScreen() {
       await (supabase
         .from('exams' as any) as any)
         .update({ notify_on_activate: next })
-        .eq('id', currentExam.id);
+        .eq('id', currentExam.id).eq('organization_id', organizationId);
     } catch (err) {
       console.error('Toggle notify_on_activate error:', err);
     }
@@ -537,7 +538,7 @@ export default function ExamEditorScreen() {
             await (supabase
               .from('exams' as any) as any)
               .update({ status: 'closed', closed_at: new Date().toISOString() })
-              .eq('id', currentExam.id);
+              .eq('id', currentExam.id).eq('organization_id', organizationId);
 
             setCurrentExam(null);
             setQuestions([]);
@@ -563,7 +564,7 @@ export default function ExamEditorScreen() {
               await (supabase
                 .from('exams' as any) as any)
                 .update({ status: 'closed', closed_at: new Date().toISOString() })
-                .eq('id', currentExam.id);
+                .eq('id', currentExam.id).eq('organization_id', organizationId);
             }
             setCurrentExam(null);
             setQuestions([]);
@@ -591,6 +592,7 @@ export default function ExamEditorScreen() {
 
     const { error } = await (supabase.from('exam_questions' as any) as any).insert({
       exam_id: currentExam.id,
+      organization_id: organizationId,
       question_order: nextOrder,
       question_text: customText.trim(),
       option_a: customA.trim(),
@@ -627,7 +629,7 @@ export default function ExamEditorScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await (supabase.from('exam_questions' as any) as any).delete().eq('id', question.id);
+            await (supabase.from('exam_questions' as any) as any).delete().eq('id', question.id).eq('organization_id', organizationId);
             if (currentExam) await fetchQuestions(currentExam.id);
           },
         },
@@ -685,7 +687,8 @@ export default function ExamEditorScreen() {
             option_d_es: newQuestion.option_d_es || null,
             question_image_url: newQuestion.question_image_url ?? null,
           })
-          .eq('id', question.id);
+          .eq('id', question.id)
+          .eq('organization_id', organizationId);
 
         if (error) {
           Alert.alert('Error', error.message);
@@ -717,7 +720,8 @@ export default function ExamEditorScreen() {
         bucks_value: editingQuestion.bucks_value,
         question_image_url: editingQuestion.question_image_url ?? null,
       })
-      .eq('id', editingQuestion.id);
+      .eq('id', editingQuestion.id)
+      .eq('organization_id', organizationId);
 
     if (error) {
       Alert.alert('Error', error.message);

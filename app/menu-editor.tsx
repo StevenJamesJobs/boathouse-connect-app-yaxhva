@@ -671,8 +671,8 @@ export default function MenuEditorScreen() {
     setMenuItems(newMenuItems);
     try {
       await Promise.all([
-        supabase.from('menu_items').update({ display_order: aboveOrder }).eq('id', currentItem.id),
-        supabase.from('menu_items').update({ display_order: currentOrder }).eq('id', aboveItem.id),
+        supabase.from('menu_items').update({ display_order: aboveOrder }).eq('id', currentItem.id).eq('organization_id', organizationId),
+        supabase.from('menu_items').update({ display_order: currentOrder }).eq('id', aboveItem.id).eq('organization_id', organizationId),
       ]);
     } catch (error) {
       console.error('Error moving menu item up:', error);
@@ -698,8 +698,8 @@ export default function MenuEditorScreen() {
     setMenuItems(newMenuItems);
     try {
       await Promise.all([
-        supabase.from('menu_items').update({ display_order: belowOrder }).eq('id', currentItem.id),
-        supabase.from('menu_items').update({ display_order: currentOrder }).eq('id', belowItem.id),
+        supabase.from('menu_items').update({ display_order: belowOrder }).eq('id', currentItem.id).eq('organization_id', organizationId),
+        supabase.from('menu_items').update({ display_order: currentOrder }).eq('id', belowItem.id).eq('organization_id', organizationId),
       ]);
     } catch (error) {
       console.error('Error moving menu item down:', error);
@@ -775,7 +775,7 @@ export default function MenuEditorScreen() {
     setMenuItems(newMenuItems);
     try {
       const updates = reorderedData.map((item, index) =>
-        supabase.from('menu_items').update({ display_order: index }).eq('id', item.id)
+        supabase.from('menu_items').update({ display_order: index }).eq('id', item.id).eq('organization_id', organizationId)
       );
       await Promise.all(updates);
       console.log('Drag reorder persisted successfully');

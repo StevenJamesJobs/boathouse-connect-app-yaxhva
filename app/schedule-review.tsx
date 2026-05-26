@@ -113,6 +113,7 @@ export default function ScheduleReviewScreen() {
         .from('schedule_uploads')
         .select('week_start, week_end')
         .eq('id', upload_id)
+        .eq('organization_id', organizationId)
         .single();
 
       if (uploadData) {
@@ -261,7 +262,8 @@ export default function ScheduleReviewScreen() {
       await supabase
         .from('schedule_uploads')
         .update({ unmatched_employees: newUnmatched })
-        .eq('id', upload_id);
+        .eq('id', upload_id)
+        .eq('organization_id', organizationId);
 
       // Reload data
       await loadData();
@@ -291,14 +293,15 @@ export default function ScheduleReviewScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await supabase.from('staff_schedules').delete().eq('id', shift.id);
+              await supabase.from('staff_schedules').delete().eq('id', shift.id).eq('organization_id', organizationId);
 
               // Update count
               const newCount = shifts.length - 1;
               await supabase
                 .from('schedule_uploads')
                 .update({ parsed_shifts_count: newCount })
-                .eq('id', upload_id);
+                .eq('id', upload_id)
+                .eq('organization_id', organizationId);
 
               await loadData();
             } catch (error) {
