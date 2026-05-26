@@ -567,8 +567,8 @@ export default function SpecialFeaturesEditorScreen() {
     setFeatures(newFeatures);
     try {
       await Promise.all([
-        supabase.from('special_features').update({ display_order: aboveOrder }).eq('id', features[index].id),
-        supabase.from('special_features').update({ display_order: currentOrder }).eq('id', features[index - 1].id),
+        supabase.from('special_features').update({ display_order: aboveOrder }).eq('id', features[index].id).eq('organization_id', organizationId),
+        supabase.from('special_features').update({ display_order: currentOrder }).eq('id', features[index - 1].id).eq('organization_id', organizationId),
       ]);
     } catch (error) {
       console.error('Error moving feature up:', error);
@@ -587,8 +587,8 @@ export default function SpecialFeaturesEditorScreen() {
     setFeatures(newFeatures);
     try {
       await Promise.all([
-        supabase.from('special_features').update({ display_order: belowOrder }).eq('id', features[index].id),
-        supabase.from('special_features').update({ display_order: currentOrder }).eq('id', features[index + 1].id),
+        supabase.from('special_features').update({ display_order: belowOrder }).eq('id', features[index].id).eq('organization_id', organizationId),
+        supabase.from('special_features').update({ display_order: currentOrder }).eq('id', features[index + 1].id).eq('organization_id', organizationId),
       ]);
     } catch (error) {
       console.error('Error moving feature down:', error);
@@ -608,6 +608,7 @@ export default function SpecialFeaturesEditorScreen() {
           .from('special_features')
           .update({ display_order: index })
           .eq('id', item.id)
+          .eq('organization_id', organizationId)
       );
       await Promise.all(updates);
       console.log('Drag reorder persisted successfully');

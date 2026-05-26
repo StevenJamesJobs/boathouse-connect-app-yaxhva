@@ -359,7 +359,8 @@ export default function GuidesAndTrainingEditorScreen() {
             display_order: formData.display_order,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', editingGuide.id);
+          .eq('id', editingGuide.id)
+          .eq('organization_id', organizationId);
 
         if (error) {
           console.error('Error updating guide:', error);
@@ -439,7 +440,8 @@ export default function GuidesAndTrainingEditorScreen() {
               const { error } = await supabase
                 .from('guides_and_training')
                 .delete()
-                .eq('id', guide.id);
+                .eq('id', guide.id)
+                .eq('organization_id', organizationId);
 
               if (error) {
                 console.error('Error deleting guide:', error);
@@ -484,8 +486,8 @@ export default function GuidesAndTrainingEditorScreen() {
     setGuides(newGuides);
     try {
       await Promise.all([
-        supabase.from('guides_and_training').update({ display_order: aboveOrder }).eq('id', currentItem.id),
-        supabase.from('guides_and_training').update({ display_order: currentOrder }).eq('id', aboveItem.id),
+        supabase.from('guides_and_training').update({ display_order: aboveOrder }).eq('id', currentItem.id).eq('organization_id', organizationId),
+        supabase.from('guides_and_training').update({ display_order: currentOrder }).eq('id', aboveItem.id).eq('organization_id', organizationId),
       ]);
     } catch (error) {
       console.error('Error moving guide up:', error);
@@ -508,8 +510,8 @@ export default function GuidesAndTrainingEditorScreen() {
     setGuides(newGuides);
     try {
       await Promise.all([
-        supabase.from('guides_and_training').update({ display_order: belowOrder }).eq('id', currentItem.id),
-        supabase.from('guides_and_training').update({ display_order: currentOrder }).eq('id', belowItem.id),
+        supabase.from('guides_and_training').update({ display_order: belowOrder }).eq('id', currentItem.id).eq('organization_id', organizationId),
+        supabase.from('guides_and_training').update({ display_order: currentOrder }).eq('id', belowItem.id).eq('organization_id', organizationId),
       ]);
     } catch (error) {
       console.error('Error moving guide down:', error);
@@ -529,7 +531,7 @@ export default function GuidesAndTrainingEditorScreen() {
     setGuides(newGuides);
     try {
       const updates = reorderedData.map((item, index) =>
-        supabase.from('guides_and_training').update({ display_order: index }).eq('id', item.id)
+        supabase.from('guides_and_training').update({ display_order: index }).eq('id', item.id).eq('organization_id', organizationId)
       );
       await Promise.all(updates);
       console.log('Drag reorder persisted successfully');

@@ -546,8 +546,8 @@ export default function AnnouncementEditorScreen() {
     setAnnouncements(newAnnouncements);
     try {
       await Promise.all([
-        supabase.from('announcements').update({ display_order: aboveOrder }).eq('id', announcements[index].id),
-        supabase.from('announcements').update({ display_order: currentOrder }).eq('id', announcements[index - 1].id),
+        supabase.from('announcements').update({ display_order: aboveOrder }).eq('id', announcements[index].id).eq('organization_id', organizationId),
+        supabase.from('announcements').update({ display_order: currentOrder }).eq('id', announcements[index - 1].id).eq('organization_id', organizationId),
       ]);
     } catch (error) {
       console.error('Error moving announcement up:', error);
@@ -566,8 +566,8 @@ export default function AnnouncementEditorScreen() {
     setAnnouncements(newAnnouncements);
     try {
       await Promise.all([
-        supabase.from('announcements').update({ display_order: belowOrder }).eq('id', announcements[index].id),
-        supabase.from('announcements').update({ display_order: currentOrder }).eq('id', announcements[index + 1].id),
+        supabase.from('announcements').update({ display_order: belowOrder }).eq('id', announcements[index].id).eq('organization_id', organizationId),
+        supabase.from('announcements').update({ display_order: currentOrder }).eq('id', announcements[index + 1].id).eq('organization_id', organizationId),
       ]);
     } catch (error) {
       console.error('Error moving announcement down:', error);
@@ -587,6 +587,7 @@ export default function AnnouncementEditorScreen() {
           .from('announcements')
           .update({ display_order: index })
           .eq('id', item.id)
+          .eq('organization_id', organizationId)
       );
       await Promise.all(updates);
       console.log('Drag reorder persisted successfully');
