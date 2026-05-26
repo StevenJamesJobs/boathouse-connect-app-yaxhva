@@ -24,7 +24,6 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useOrganization } from '../contexts/OrganizationContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
 

@@ -30,7 +30,6 @@ import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/tra
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useOrganization } from '../contexts/OrganizationContext';
 import { fetchContentImages, saveContentImages, uploadImageToStorage, deleteContentImages } from '@/utils/contentImages';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
@@ -72,7 +71,6 @@ export default function SpecialFeaturesEditorScreen() {
   const { sendNotification } = useNotification();
   const { organizationId } = useOrganization();
   const { language } = useLanguage();
-  const { organizationId } = useOrganization();
   const [features, setFeatures] = useState<SpecialFeature[]>([]);
   const [guideFiles, setGuideFiles] = useState<GuideFile[]>([]);
   const [loading, setLoading] = useState(true);

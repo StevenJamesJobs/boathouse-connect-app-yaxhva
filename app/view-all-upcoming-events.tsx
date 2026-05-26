@@ -29,7 +29,6 @@ import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
 import { eventFallsOnDate } from '@/utils/dateUtils';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useOrganization } from '../contexts/OrganizationContext';
 import { fetchContentImagesBatch } from '@/utils/contentImages';
 import { getImageUrl } from '@/utils/imageUrl';
 import { stripFormattingTags } from '@/components/FormattedText';
@@ -91,7 +90,6 @@ export default function ViewAllUpcomingEventsScreen() {
   } | null>(null);
 
   const colors = useThemeColors();
-  const { organizationId } = useOrganization();
   const {
     viewedEventIds,
     lastViewedEvents,

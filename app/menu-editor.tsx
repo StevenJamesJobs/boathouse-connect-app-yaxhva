@@ -29,7 +29,6 @@ import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/tra
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { useOrganization } from '../contexts/OrganizationContext';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
 import CategoryPill from '@/components/CategoryPill';
@@ -150,7 +149,6 @@ export default function MenuEditorScreen() {
   const { user } = useAuth();
   const { organizationId } = useOrganization();
   const { language } = useLanguage();
-  const { organizationId } = useOrganization();
   const [season, setSeason] = useState<Season>('summer');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);

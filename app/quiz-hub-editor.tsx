@@ -13,7 +13,6 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
-import { useOrganization } from '../contexts/OrganizationContext';
 import { getExamTypeName } from '@/utils/exam/questionGenerator';
 import type { ExamType } from '@/utils/exam/questionGenerator';
 import { useFocusEffect } from '@react-navigation/native';

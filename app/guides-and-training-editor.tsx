@@ -29,7 +29,6 @@ import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-nativ
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
-import { useOrganization } from '@/contexts/OrganizationContext';
 
 interface GuideItem {
   id: string;
@@ -57,7 +56,6 @@ export default function GuidesAndTrainingEditorScreen() {
   const { organizationId } = useOrganization();
   const colors = useThemeColors();
   const { language } = useLanguage();
-  const { organizationId } = useOrganization();
   const [guides, setGuides] = useState<GuideItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);

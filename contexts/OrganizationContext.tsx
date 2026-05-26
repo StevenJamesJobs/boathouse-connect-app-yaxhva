@@ -118,7 +118,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user?.id]);
+  }, [user?.id, user?.organizationId]);
 
   return (
     <OrganizationContext.Provider value={{ organizationId, organization, isLoading }}>

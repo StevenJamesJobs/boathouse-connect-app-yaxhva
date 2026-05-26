@@ -14,7 +14,6 @@ import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganization } from '../contexts/OrganizationContext';
 import WeeklyQuizCard, { WeeklyQuizCardResult } from '@/components/WeeklyQuizCard';
 import { useOrganization } from '@/contexts/OrganizationContext';
 
