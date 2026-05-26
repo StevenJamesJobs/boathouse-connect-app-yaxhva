@@ -72,7 +72,7 @@ export default function ManagerManageScreen() {
 
   const managementItems: GridItem[] = [
     { id: 'employees', label: 'Employees', iosIcon: 'person.2.fill', androidIcon: 'people', route: '/employee-editor' },
-    { id: 'schedules', label: 'Schedules', iosIcon: 'calendar.badge.clock', androidIcon: 'event', route: '/schedule-upload' },
+    { id: 'schedules', label: 'Schedules', iosIcon: 'calendar.badge.clock', androidIcon: 'event', route: '/manual-schedule' },
     { id: 'menu-editor', label: t('manager_manage.grid_menu'), iosIcon: 'fork.knife', androidIcon: 'restaurant', route: '/menu-editor' },
     { id: 'notifications', label: t('manager_manage.grid_notifications'), iosIcon: 'bell.fill', androidIcon: 'notifications', route: '/notification-center' },
     ...(user?.role === 'owner' ? [{

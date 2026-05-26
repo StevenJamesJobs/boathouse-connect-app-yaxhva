@@ -46,6 +46,8 @@ interface WeeklyCalendarStripProps {
   hideViewTopEvents?: boolean;
   /** Optional handler for an "expand to month" calendar icon button on the right of the header. */
   onMonthExpand?: () => void;
+  /** Called whenever the displayed week changes (arrow navigation or selectedDate sync). */
+  onWeekChange?: (weekStart: Date, weekEnd: Date) => void;
 }
 
 export default function WeeklyCalendarStrip({
@@ -59,6 +61,7 @@ export default function WeeklyCalendarStrip({
   edgeToEdge = false,
   hideViewTopEvents = false,
   onMonthExpand,
+  onWeekChange,
 }: WeeklyCalendarStripProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language || 'en';
@@ -76,6 +79,13 @@ export default function WeeklyCalendarStrip({
       setCurrentWeekStart(targetWeekStart);
     }
   }, [selectedDate]);
+
+  useEffect(() => {
+    if (onWeekChange) {
+      const days = getWeekDays(currentWeekStart);
+      onWeekChange(days[0], days[6]);
+    }
+  }, [currentWeekStart]);
 
   const weekDays = getWeekDays(currentWeekStart);
 
