@@ -11,8 +11,11 @@ import {
   KeyboardAvoidingView,
   Platform,
   Switch,
+  Image,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -29,6 +32,8 @@ export default function OrganizationSettingsScreen() {
 
   const [saving, setSaving] = useState(false);
   const [regeneratingCode, setRegeneratingCode] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
   // Form state — initialized from organization context
   const [name, setName] = useState('');
@@ -59,7 +64,100 @@ export default function OrganizationSettingsScreen() {
     setMenu1Name(organization.menu_1_name);
     setMenu2Name(organization.menu_2_name);
     setDefaultPassword(organization.default_password);
+    setLogoPreview(organization.logo_url);
   }, [organization]);
+
+  const handlePickLogo = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Required', 'Please grant photo library access to upload a logo.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        await uploadLogo(result.assets[0].uri);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick image.');
+    }
+  };
+
+  const uploadLogo = async (uri: string) => {
+    if (!organizationId) return;
+    setUploadingLogo(true);
+    try {
+      const base64 = await FileSystem.readAsStringAsync(uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      const byteCharacters = atob(base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+
+      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${organizationId}/logo_${Date.now()}.${fileExt}`;
+
+      let contentType = 'image/jpeg';
+      if (fileExt === 'png') contentType = 'image/png';
+      else if (fileExt === 'webp') contentType = 'image/webp';
+
+      const { error: uploadError } = await supabase.storage
+        .from('organization-logos')
+        .upload(fileName, byteArray, { contentType, upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('organization-logos')
+        .getPublicUrl(fileName);
+
+      await (supabase
+        .from('organizations' as any)
+        .update({ logo_url: urlData.publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', organizationId) as any);
+
+      setLogoPreview(urlData.publicUrl);
+      await refreshOrganization();
+      Alert.alert('Done', 'Logo updated successfully.');
+    } catch (err: any) {
+      Alert.alert('Error', err.message || 'Failed to upload logo.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  };
+
+  const handleRemoveLogo = () => {
+    Alert.alert('Remove Logo', 'This will remove your restaurant logo. Continue?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await (supabase
+              .from('organizations' as any)
+              .update({ logo_url: null, updated_at: new Date().toISOString() })
+              .eq('id', organizationId) as any);
+            setLogoPreview(null);
+            await refreshOrganization();
+          } catch (err: any) {
+            Alert.alert('Error', err.message || 'Failed to remove logo.');
+          }
+        },
+      },
+    ]);
+  };
 
   if (user?.role !== 'owner') {
     return (
@@ -189,6 +287,52 @@ export default function OrganizationSettingsScreen() {
         {/* Branding Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Branding</Text>
+
+          {/* Logo Upload */}
+          <View style={[styles.fieldContainer, { alignItems: 'center' }]}>
+            <TouchableOpacity
+              style={styles.logoUploadArea}
+              onPress={handlePickLogo}
+              disabled={uploadingLogo}
+              activeOpacity={0.7}
+            >
+              {uploadingLogo ? (
+                <ActivityIndicator size="large" color={colors.primary} />
+              ) : logoPreview ? (
+                <Image
+                  source={{ uri: logoPreview }}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <View style={styles.logoPlaceholder}>
+                  <IconSymbol
+                    ios_icon_name="camera.fill"
+                    android_material_icon_name="photo-camera"
+                    size={32}
+                    color={colors.textSecondary}
+                  />
+                  <Text style={[styles.logoPlaceholderText, { color: colors.textSecondary }]}>
+                    Add Logo
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+            <View style={styles.logoActions}>
+              <TouchableOpacity onPress={handlePickLogo} disabled={uploadingLogo}>
+                <Text style={[styles.logoActionText, { color: colors.primary }]}>
+                  {logoPreview ? 'Change Logo' : 'Upload Logo'}
+                </Text>
+              </TouchableOpacity>
+              {logoPreview && (
+                <TouchableOpacity onPress={handleRemoveLogo}>
+                  <Text style={[styles.logoActionText, { color: '#E53935' }]}>Remove</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <Text style={styles.fieldHint}>Displayed on the login screen and app header</Text>
+          </View>
+
           <View style={styles.fieldContainer}>
             <Text style={styles.fieldLabel}>Restaurant Name</Text>
             <TextInput
@@ -555,6 +699,42 @@ function createStyles(colors: any) {
       flexDirection: 'row',
       alignItems: 'center',
       marginBottom: 16,
+    },
+    logoUploadArea: {
+      width: 120,
+      height: 120,
+      borderRadius: 20,
+      backgroundColor: colors.background,
+      borderWidth: 2,
+      borderColor: colors.border,
+      borderStyle: 'dashed',
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+      marginBottom: 8,
+    },
+    logoImage: {
+      width: 120,
+      height: 120,
+      borderRadius: 18,
+    },
+    logoPlaceholder: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    logoPlaceholderText: {
+      fontSize: 12,
+      fontWeight: '600',
+      marginTop: 6,
+    },
+    logoActions: {
+      flexDirection: 'row',
+      gap: 16,
+      marginBottom: 4,
+    },
+    logoActionText: {
+      fontSize: 14,
+      fontWeight: '600',
     },
     saveButton: {
       backgroundColor: colors.primary,
