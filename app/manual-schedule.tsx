@@ -19,6 +19,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import ShiftEditForm from '@/components/ShiftEditForm';
 import * as Haptics from 'expo-haptics';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
@@ -107,6 +108,7 @@ export default function ManualScheduleScreen() {
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
+  const { hasPremium } = useSubscription();
 
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [shifts, setShifts] = useState<ShiftRecord[]>([]);
@@ -192,11 +194,22 @@ export default function ManualScheduleScreen() {
   }, []);
 
   const handlePremiumFeature = () => {
-    Alert.alert(
-      'Premium Feature',
-      'AI Schedule Upload is a premium feature. Upload a photo or PDF of your schedule and our AI will automatically parse and assign shifts.\n\nComing soon!',
-      [{ text: 'OK' }]
-    );
+    if (hasPremium) {
+      Alert.alert(
+        'Coming Soon',
+        'AI Schedule Upload is in development. This feature will let you upload a photo or PDF of your schedule and our AI will automatically parse and assign shifts.',
+        [{ text: 'OK' }]
+      );
+    } else {
+      Alert.alert(
+        'Premium Feature',
+        'AI Schedule Upload requires the Premium plan ($15/mo). Upgrade to unlock this and other premium features.',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          { text: 'Upgrade', onPress: () => router.push('/subscription-management' as any) },
+        ]
+      );
+    }
   };
 
   const employeeRows = useMemo(() => {
@@ -326,7 +339,7 @@ export default function ManualScheduleScreen() {
           >
             <IconSymbol ios_icon_name="doc.fill" android_material_icon_name="description" size={16} color={colors.primary} />
             <Text style={[styles.premiumButtonText, { color: colors.primary }]}>Upload File</Text>
-            <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={11} color={colors.primary + '60'} />
+            {!hasPremium && <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={11} color={colors.primary + '60'} />}
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.premiumButton, { backgroundColor: colors.primary + '12' }]}
@@ -335,7 +348,7 @@ export default function ManualScheduleScreen() {
           >
             <IconSymbol ios_icon_name="photo.fill" android_material_icon_name="photo-library" size={16} color={colors.primary} />
             <Text style={[styles.premiumButtonText, { color: colors.primary }]}>Upload Images</Text>
-            <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={11} color={colors.primary + '60'} />
+            {!hasPremium && <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={11} color={colors.primary + '60'} />}
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.premiumButton, { backgroundColor: colors.primary + '12' }]}
@@ -344,7 +357,7 @@ export default function ManualScheduleScreen() {
           >
             <IconSymbol ios_icon_name="clock.arrow.circlepath" android_material_icon_name="history" size={16} color={colors.primary} />
             <Text style={[styles.premiumButtonText, { color: colors.primary }]}>History</Text>
-            <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={11} color={colors.primary + '60'} />
+            {!hasPremium && <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={11} color={colors.primary + '60'} />}
           </TouchableOpacity>
         </View>
       </View>

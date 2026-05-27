@@ -75,13 +75,22 @@ export default function ManagerManageScreen() {
     { id: 'schedules', label: 'Schedules', iosIcon: 'calendar.badge.clock', androidIcon: 'event', route: '/manual-schedule' },
     { id: 'menu-editor', label: t('manager_manage.grid_menu'), iosIcon: 'fork.knife', androidIcon: 'restaurant', route: '/menu-editor' },
     { id: 'notifications', label: t('manager_manage.grid_notifications'), iosIcon: 'bell.fill', androidIcon: 'notifications', route: '/notification-center' },
-    ...(user?.role === 'owner' ? [{
-      id: 'org-settings',
-      label: 'Org Settings',
-      iosIcon: 'gearshape.fill',
-      androidIcon: 'settings',
-      route: '/organization-settings',
-    }] : []),
+    ...(user?.role === 'owner' ? [
+      {
+        id: 'org-settings',
+        label: 'Org Settings',
+        iosIcon: 'gearshape.fill',
+        androidIcon: 'settings',
+        route: '/organization-settings',
+      },
+      {
+        id: 'subscription',
+        label: 'Subscription',
+        iosIcon: 'creditcard.fill',
+        androidIcon: 'credit-card',
+        route: '/subscription-management',
+      },
+    ] : []),
   ];
 
   const renderGridItem = (item: GridItem) => (

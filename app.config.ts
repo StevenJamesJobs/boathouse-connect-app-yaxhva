@@ -12,13 +12,17 @@ const config: ExpoConfig = {
   owner: "stevenjamesjobs",
   version: "2.2.0",
   orientation: "portrait",
-  icon: "./assets/images/MayMothersDayAppClip.png",
+  icon: isMcloones
+    ? "./assets/images/MayMothersDayAppClip.png"
+    : "./assets/images/MyRestoAppClip.png",
   scheme: isMcloones ? "boathouseconnect" : "myrestoconnect",
   userInterfaceStyle: "automatic",
   splash: {
-    image: "./assets/images/MayMotherDaySplashScreen.png",
-    resizeMode: "cover",
-    backgroundColor: "#87CEEB",
+    image: isMcloones
+      ? "./assets/images/MayMotherDaySplashScreen.png"
+      : "./assets/images/splash-placeholder.png",
+    resizeMode: isMcloones ? "cover" : "contain",
+    backgroundColor: isMcloones ? "#87CEEB" : "#FFFFFF",
   },
   ios: {
     supportsTablet: true,
@@ -38,7 +42,9 @@ const config: ExpoConfig = {
   },
   android: {
     adaptiveIcon: {
-      foregroundImage: "./assets/images/MayMothersDayAppClip.png",
+      foregroundImage: isMcloones
+        ? "./assets/images/MayMothersDayAppClip.png"
+        : "./assets/images/MyRestoAppClip.png",
       backgroundColor: "#ffffff",
     },
     package: isMcloones
@@ -72,21 +78,34 @@ const config: ExpoConfig = {
     ],
     [
       "expo-splash-screen",
-      {
-        backgroundColor: "#87CEEB",
-        image: "./assets/images/MayMotherDaySplashScreen.png",
-        imageResizeMode: "cover",
-        dark: {
-          backgroundColor: "#87CEEB",
-          image: "./assets/images/MayMotherDaySplashScreen.png",
-          imageResizeMode: "cover",
-        },
-      },
+      isMcloones
+        ? {
+            backgroundColor: "#87CEEB",
+            image: "./assets/images/MayMotherDaySplashScreen.png",
+            imageResizeMode: "cover",
+            dark: {
+              backgroundColor: "#87CEEB",
+              image: "./assets/images/MayMotherDaySplashScreen.png",
+              imageResizeMode: "cover",
+            },
+          }
+        : {
+            backgroundColor: "#FFFFFF",
+            image: "./assets/images/splash-placeholder.png",
+            imageResizeMode: "contain",
+            dark: {
+              backgroundColor: "#FFFFFF",
+              image: "./assets/images/splash-placeholder.png",
+              imageResizeMode: "contain",
+            },
+          },
     ],
     [
       "expo-notifications",
       {
-        icon: "./assets/images/MayMothersDayAppClip.png",
+        icon: isMcloones
+          ? "./assets/images/MayMothersDayAppClip.png"
+          : "./assets/images/MyRestoAppClip.png",
         color: "#ffffff",
         sounds: [],
         mode: "production",

@@ -19,10 +19,12 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { WidgetProvider } from "@/contexts/WidgetContext";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { OrganizationProvider } from "@/contexts/OrganizationContext";
+import { OrganizationProvider, useOrganization } from "@/contexts/OrganizationContext";
 import { NotificationProvider } from "@/contexts/NotificationContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ThemeProvider as AppThemeProvider, useAppTheme } from "@/contexts/ThemeContext";
+import { SubscriptionProvider, useSubscription } from "@/contexts/SubscriptionContext";
+import { REVENUECAT_ENABLED, REVENUECAT_API_KEY } from "@/config/revenueCat";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -104,6 +106,8 @@ function RootLayoutNav() {
   const segments = useSegments();
   const router = useRouter();
   const { isAuthenticated, isLoading, user } = useAuth();
+  const { organizationId } = useOrganization();
+  const { tier: subscriptionTier, isLoading: subLoading } = useSubscription();
 
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
@@ -135,10 +139,30 @@ function RootLayoutNav() {
     }
   }, [networkState.isConnected, networkState.isInternetReachable]);
 
+  // Initialize RevenueCat SDK
+  useEffect(() => {
+    if (!REVENUECAT_ENABLED || Platform.OS === 'web') return;
+
+    async function initRC() {
+      try {
+        const Purchases = (await import('react-native-purchases')).default;
+        Purchases.configure({ apiKey: REVENUECAT_API_KEY });
+
+        if (organizationId) {
+          await Purchases.logIn(organizationId);
+        }
+      } catch (err) {
+        console.warn('[RootLayout] RevenueCat init skipped:', err);
+      }
+    }
+
+    initRC();
+  }, [organizationId]);
+
   // Handle navigation based on auth state
   useEffect(() => {
-    if (isLoading || !loaded) {
-      console.log('[RootLayout] Waiting for auth/fonts to load...');
+    if (isLoading || !loaded || subLoading) {
+      console.log('[RootLayout] Waiting for auth/fonts/subscription to load...');
       return;
     }
 
@@ -168,6 +192,17 @@ function RootLayoutNav() {
           }
         }
 
+        // Paywall redirect — owner with expired/no subscription
+        if (isAuthenticated && user?.role === 'owner' &&
+            (subscriptionTier === 'expired' || subscriptionTier === 'none')) {
+          const onPaywall = segments[0] === 'paywall';
+          if (!onPaywall && !onLogin && !onIndex) {
+            console.log('[RootLayout] Redirecting to paywall — subscription expired');
+            router.replace('/paywall' as any);
+            return;
+          }
+        }
+
         if (!isAuthenticated && inPortal) {
           // Redirect to login if not authenticated and trying to access portal
           console.log('[RootLayout] Redirecting to login - not authenticated');
@@ -189,7 +224,7 @@ function RootLayoutNav() {
     }, 100);
 
     return () => clearTimeout(navigationTimeout);
-  }, [isAuthenticated, isLoading, segments, loaded, user?.role, user?.forcePasswordChange, router]);
+  }, [isAuthenticated, isLoading, segments, loaded, user?.role, user?.forcePasswordChange, router, subscriptionTier, subLoading]);
 
   if (!loaded || isLoading) {
     console.log('[RootLayout] Still loading, returning null');
@@ -229,6 +264,8 @@ function RootLayoutNav() {
                 <Stack.Screen name="picture-this-play" options={{ gestureEnabled: false }} />
                 <Stack.Screen name="word-search-play" options={{ gestureEnabled: false }} />
                 <Stack.Screen name="memory-game-play" options={{ gestureEnabled: false }} />
+                <Stack.Screen name="subscription-management" />
+                <Stack.Screen name="paywall" options={{ gestureEnabled: false }} />
               </Stack>
               <SystemBars style="auto" />
             </GestureHandlerRootView>
@@ -251,7 +288,9 @@ export default function RootLayout() {
         <AppThemeProvider>
           <AuthProvider>
             <OrganizationProvider>
-              <RootLayoutNav />
+              <SubscriptionProvider>
+                <RootLayoutNav />
+              </SubscriptionProvider>
             </OrganizationProvider>
           </AuthProvider>
         </AppThemeProvider>
