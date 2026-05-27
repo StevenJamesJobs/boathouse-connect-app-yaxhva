@@ -30,6 +30,7 @@ import { useNotification } from '@/contexts/NotificationContext';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { MessageBadge } from '@/components/MessageBadge';
@@ -687,6 +688,7 @@ export default function RewardsAndReviewsEditorScreen() {
 
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
+  const { hasPremium } = useSubscription();
   const currencyName = organization.reward_currency_name;
   const { sendNotification } = useNotification();
   const { pendingCount } = usePendingApprovals();
@@ -1533,6 +1535,18 @@ export default function RewardsAndReviewsEditorScreen() {
   };
 
   const handleRefreshGoogleReviews = async () => {
+    if (!hasPremium) {
+      Alert.alert(
+        'Premium Feature',
+        'Automatic Google Reviews import requires the Premium plan ($15/mo).',
+        [
+          { text: 'Not Now', style: 'cancel' },
+          { text: 'Upgrade', onPress: () => router.push('/subscription-management' as any) },
+        ]
+      );
+      return;
+    }
+
     try {
       setRefreshingGoogle(true);
       const { data, error } = await supabase.functions.invoke('import-google-reviews', {

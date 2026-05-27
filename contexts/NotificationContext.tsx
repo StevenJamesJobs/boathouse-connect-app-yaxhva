@@ -281,6 +281,9 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
               case 'redeem':
                 router.push('/redeem' as any);
                 break;
+              case 'subscription-management':
+                router.push('/subscription-management' as any);
+                break;
               default:
                 // Default: just open the app (no specific navigation)
                 break;

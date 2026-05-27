@@ -16,6 +16,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import WeeklyQuizCard, { WeeklyQuizCardResult } from '@/components/WeeklyQuizCard';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 
 type ExamType = 'server' | 'bartender' | 'host';
 
@@ -59,6 +60,7 @@ export default function WeeklyQuizzesScreen() {
   const colors = useThemeColors();
   const { user } = useAuth();
   const { organizationId } = useOrganization();
+  const { hasPremium } = useSubscription();
 
   const [loading, setLoading] = useState(true);
   const [quizzes, setQuizzes] = useState<QuizEntry[]>([]);
@@ -157,6 +159,42 @@ export default function WeeklyQuizzesScreen() {
   // Multi-quiz reward split: N quizzes → $1/N per correct standard question
   const eligibleQuizCount = Math.max(1, getEligibleQuizTypes(user?.jobTitles || []).length);
   const rewardPerCorrect = 1 / eligibleQuizCount;
+
+  if (!hasPremium) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <IconSymbol
+              ios_icon_name="chevron.left"
+              android_material_icon_name="arrow-back"
+              size={24}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {t('weekly_quizzes.title')}
+          </Text>
+          <View style={styles.placeholder} />
+        </View>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
+          <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={48} color={colors.textSecondary} />
+          <Text style={{ fontSize: 20, fontWeight: '700', color: colors.text, marginTop: 16, textAlign: 'center' }}>
+            Premium Feature
+          </Text>
+          <Text style={{ fontSize: 15, color: colors.textSecondary, marginTop: 8, textAlign: 'center', lineHeight: 22 }}>
+            Weekly Quizzes require the Premium plan. Test your team's knowledge with quizzes tailored to each role.
+          </Text>
+          <TouchableOpacity
+            style={{ backgroundColor: colors.primary, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12, marginTop: 24 }}
+            onPress={() => router.push('/subscription-management' as any)}
+          >
+            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>Upgrade to Premium</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

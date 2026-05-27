@@ -14,6 +14,7 @@ import {
   Image,
   ActivityIndicator,
   Platform,
+  Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -28,6 +29,7 @@ import { useOrganization } from '../contexts/OrganizationContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
 import { useTranslation } from 'react-i18next';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 
 interface GameCard {
   titleKey: string;
@@ -36,6 +38,7 @@ interface GameCard {
   androidIcon: string;
   route: string;
   color: string;
+  isPremium?: boolean;
 }
 
 interface LeaderboardEntry {
@@ -54,6 +57,7 @@ const GAME_CARDS: GameCard[] = [
     androidIcon: 'sports-esports',
     route: '/menu-memory-game',
     color: '#6366F1',
+    isPremium: true,
   },
   {
     titleKey: 'game_hub_cards:word_search_title',
@@ -70,6 +74,7 @@ const GAME_CARDS: GameCard[] = [
     androidIcon: 'photo-camera',
     route: '/picture-this-game',
     color: '#EC4899',
+    isPremium: true,
   },
 ];
 
@@ -190,6 +195,7 @@ export default function GameHubScreen() {
   const { t } = useTranslation();
   const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
   const { organizationId } = useOrganization();
+  const { hasPremium } = useSubscription();
   const [topLeaders, setTopLeaders] = useState<LeaderboardEntry[]>([]);
   const [loadingLeaders, setLoadingLeaders] = useState(true);
 
@@ -235,33 +241,58 @@ export default function GameHubScreen() {
           {t('game_hub_ui:subtitle')}
         </Text>
 
-        {GAME_CARDS.map((card) => (
-          <TouchableOpacity
-            key={card.route}
-            style={[styles.card, { backgroundColor: colors.card }]}
-            onPress={() => router.push(card.route as any)}
-            activeOpacity={0.75}
-          >
-            <View style={[styles.iconContainer, { backgroundColor: card.color + '18' }]}>
-              <IconSymbol
-                ios_icon_name={card.iosIcon as any}
-                android_material_icon_name={card.androidIcon as any}
-                size={30}
-                color={card.color}
-              />
-            </View>
-            <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{t(card.titleKey)}</Text>
-              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{t(card.descKey)}</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={18}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-        ))}
+        {GAME_CARDS.map((card) => {
+          const isLocked = card.isPremium && !hasPremium;
+          return (
+            <TouchableOpacity
+              key={card.route}
+              style={[styles.card, { backgroundColor: colors.card }, isLocked && { opacity: 0.7 }]}
+              onPress={() => {
+                if (isLocked) {
+                  Alert.alert(
+                    'Premium Feature',
+                    `${t(card.titleKey)} requires the Premium plan ($15/mo).`,
+                    [
+                      { text: 'Not Now', style: 'cancel' },
+                      { text: 'Upgrade', onPress: () => router.push('/subscription-management' as any) },
+                    ]
+                  );
+                  return;
+                }
+                router.push(card.route as any);
+              }}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.iconContainer, { backgroundColor: card.color + '18' }]}>
+                <IconSymbol
+                  ios_icon_name={card.iosIcon as any}
+                  android_material_icon_name={card.androidIcon as any}
+                  size={30}
+                  color={card.color}
+                />
+              </View>
+              <View style={styles.cardText}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{t(card.titleKey)}</Text>
+                <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{t(card.descKey)}</Text>
+              </View>
+              {isLocked ? (
+                <IconSymbol
+                  ios_icon_name="lock.fill"
+                  android_material_icon_name="lock"
+                  size={16}
+                  color={colors.textSecondary}
+                />
+              ) : (
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={18}
+                  color={colors.textSecondary}
+                />
+              )}
+            </TouchableOpacity>
+          );
+        })}
 
         {/* Leaderboard Card with Top 3 Preview */}
         <View style={[styles.leaderboardCard, { backgroundColor: colors.card }]}>
