@@ -3,8 +3,8 @@ import { IS_MCLOONES } from '@/constants/buildVariant';
 
 // RevenueCat public API keys — fill in after dashboard setup
 // These are safe to include in client code (they identify your app, not secret)
-export const REVENUECAT_API_KEY_IOS = 'appl_PLACEHOLDER';
-export const REVENUECAT_API_KEY_ANDROID = 'goog_PLACEHOLDER';
+export const REVENUECAT_API_KEY_IOS = 'appl_dXlzgOPoRuhIBEDOCuAuGrECTbU';
+export const REVENUECAT_API_KEY_ANDROID = 'goog_DTlsXYVXrUiVYBsleOpoxyLSpAA';
 
 export const REVENUECAT_API_KEY =
   Platform.OS === 'ios' ? REVENUECAT_API_KEY_IOS : REVENUECAT_API_KEY_ANDROID;
