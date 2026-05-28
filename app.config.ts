@@ -10,7 +10,7 @@ const config: ExpoConfig = {
   name: appName,
   slug: isMcloones ? "BoathouseConnect" : "MyRestoConnect",
   owner: "stevenjamesjobs",
-  version: "2.2.0",
+  version: isMcloones ? "2.2.0" : "1.0.0",
   orientation: "portrait",
   icon: isMcloones
     ? "./assets/images/MayMothersDayAppClip.png"
@@ -118,7 +118,9 @@ const config: ExpoConfig = {
   extra: {
     APP_VARIANT: variant,
     eas: {
-      projectId: "1ab6bb51-f4ea-445b-8c25-cd0c5d0d4fea",
+      projectId: isMcloones
+        ? "1ab6bb51-f4ea-445b-8c25-cd0c5d0d4fea" // BoathouseConnect
+        : "a202f52f-a6b0-4eba-a5c1-081c2b134d9e", // MyRestoConnect
     },
   },
 };
