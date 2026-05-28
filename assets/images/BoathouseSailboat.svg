@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg viewBox="-85 -160 170 235" xmlns="http://www.w3.org/2000/svg">
+  <!-- Mainsail (left/behind mast) -->
+  <path d="M 0 -145 C -15 -100, -45 -40, -68 10 C -72 20, -72 28, -70 32 L 0 32 Z" fill="#A9CEF4"/>
+  <!-- Mainsail highlight -->
+  <path d="M -4 -130 C -14 -90, -38 -35, -55 10 C -58 18, -58 24, -56 28" fill="none" stroke="#ffffff" stroke-width="1.5" opacity="0.3" stroke-linecap="round"/>
+  <!-- Jib / headsail (right/front of mast) -->
+  <path d="M 0 -145 C 18 -95, 50 -30, 65 10 C 68 20, 66 28, 62 32 L 0 32 Z" fill="#A9CEF4" opacity="0.8"/>
+  <!-- Jib highlight -->
+  <path d="M 4 -130 C 16 -85, 40 -25, 52 12 C 54 18, 52 24, 50 28" fill="none" stroke="#ffffff" stroke-width="1.2" opacity="0.25" stroke-linecap="round"/>
+  <!-- Mast -->
+  <line x1="0" y1="-148" x2="0" y2="34" stroke="#153664" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- Mast top cap -->
+  <circle cx="0" cy="-148" r="2" fill="#153664"/>
+  <!-- Boom -->
+  <line x1="0" y1="32" x2="-68" y2="32" stroke="#153664" stroke-width="1.5" stroke-linecap="round" opacity="0.7"/>
+  <!-- Forestay -->
+  <line x1="0" y1="-148" x2="62" y2="32" stroke="#153664" stroke-width="0.8" opacity="0.3"/>
+  <!-- Hull -->
+  <path d="M -55 34 Q -52 42, -48 48 Q -30 56, 0 58 Q 30 56, 50 48 L 65 34 Z" fill="#153664"/>
+  <!-- Hull waterline accent -->
+  <path d="M -48 40 Q -25 50, 5 52 Q 35 50, 55 42" fill="none" stroke="#A9CEF4" stroke-width="1.3" opacity="0.35"/>
+  <!-- Bow point -->
+  <path d="M 50 48 L 65 34" stroke="#0e1f3a" stroke-width="1.5" fill="none" opacity="0.6"/>
+  <!-- Stern detail -->
+  <line x1="-55" y1="34" x2="-52" y2="42" stroke="#0e1f3a" stroke-width="1" opacity="0.4"/>
+  <!-- Keel hint -->
+  <line x1="0" y1="55" x2="0" y2="64" stroke="#153664" stroke-width="1.5" opacity="0.4"/>
+</svg>
