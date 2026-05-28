@@ -14,7 +14,7 @@ const config: ExpoConfig = {
   orientation: "portrait",
   icon: isMcloones
     ? "./assets/images/MayMothersDayAppClip.png"
-    : "./assets/images/MyRestoAppClip.png",
+    : "./assets/images/MyRestoAppClipCharcoalAppClip.png",
   scheme: isMcloones ? "boathouseconnect" : "myrestoconnect",
   userInterfaceStyle: "automatic",
   splash: {
@@ -44,7 +44,7 @@ const config: ExpoConfig = {
     adaptiveIcon: {
       foregroundImage: isMcloones
         ? "./assets/images/MayMothersDayAppClip.png"
-        : "./assets/images/MyRestoAppClip.png",
+        : "./assets/images/MyRestoAppClipCharcoalAppClip.png",
       backgroundColor: "#ffffff",
     },
     package: isMcloones
@@ -105,7 +105,7 @@ const config: ExpoConfig = {
       {
         icon: isMcloones
           ? "./assets/images/MayMothersDayAppClip.png"
-          : "./assets/images/MyRestoAppClip.png",
+          : "./assets/images/MyRestoAppClipCharcoalAppClip.png",
         color: "#ffffff",
         sounds: [],
         mode: "production",
