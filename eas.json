@@ -17,6 +17,7 @@
     },
     "production": {
       "autoIncrement": true,
+      "node": "22.15.0",
       "cache": {
         "disabled": false
       },
