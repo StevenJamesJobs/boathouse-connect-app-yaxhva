@@ -177,26 +177,19 @@ export default function LoginScreen() {
             },
           ]}
         >
-          {cachedOrg?.logoUrl ? (
-            <Image
-              source={{ uri: cachedOrg.logoUrl }}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          ) : cachedOrg ? (
-            <Text style={styles.orgNameText}>{cachedOrg.orgName}</Text>
-          ) : (
-            <Image
-              source={DEFAULT_LOGO}
-              style={styles.logo}
-              resizeMode="contain"
-            />
-          )}
+          {/* Returning user: greet by org name above the logo. */}
           {cachedOrg && (
             <Text style={styles.welcomeBackText}>
               {t('login.welcome_back', { orgName: cachedOrg.orgName })}
             </Text>
           )}
+          {/* Their uploaded logo if they have one, otherwise the MyResto
+              plate placeholder (or McLoone's mark on that variant). */}
+          <Image
+            source={cachedOrg?.logoUrl ? { uri: cachedOrg.logoUrl } : DEFAULT_LOGO}
+            style={styles.logo}
+            resizeMode="contain"
+          />
         </Animated.View>
 
         {/* Form Section */}
@@ -413,17 +406,11 @@ const styles = StyleSheet.create({
     color: splashColors.textSecondary,
     fontStyle: 'italic',
   },
-  orgNameText: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: splashColors.text,
-    textAlign: 'center',
-  },
   welcomeBackText: {
     fontSize: 16,
     color: splashColors.text,
     textAlign: 'center',
-    marginTop: 12,
+    marginBottom: 16,
   },
   linksContainer: {
     alignItems: 'center',
