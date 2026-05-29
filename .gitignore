@@ -23,6 +23,10 @@ yarn-error.*
 .DS_Store
 *.pem
 
+# Google Play service account key (used by `eas submit` + RevenueCat) — secret, never commit
+google-play-service-account.json
+*service-account*.json
+
 .env*.local
 
 *.tsbuildinfo
