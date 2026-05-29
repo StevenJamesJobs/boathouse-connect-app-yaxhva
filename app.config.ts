@@ -17,12 +17,13 @@ const config: ExpoConfig = {
     : "./assets/images/MyRestoAppClipCharcoalAppClip.png",
   scheme: isMcloones ? "boathouseconnect" : "myrestoconnect",
   userInterfaceStyle: "automatic",
+  // Native splash shown before JS loads. Kept intentionally blank (pure white)
+  // for both variants so it blends into the white background of the animated
+  // splash (components/AnimatedSplash.tsx) — no stale branded image flashes.
   splash: {
-    image: isMcloones
-      ? "./assets/images/MayMotherDaySplashScreen.png"
-      : "./assets/images/splash-placeholder.png",
-    resizeMode: isMcloones ? "cover" : "contain",
-    backgroundColor: isMcloones ? "#87CEEB" : "#FFFFFF",
+    image: "./assets/images/splash-white.png",
+    resizeMode: "contain",
+    backgroundColor: "#FFFFFF",
   },
   ios: {
     supportsTablet: true,
@@ -78,27 +79,16 @@ const config: ExpoConfig = {
     ],
     [
       "expo-splash-screen",
-      isMcloones
-        ? {
-            backgroundColor: "#87CEEB",
-            image: "./assets/images/MayMotherDaySplashScreen.png",
-            imageResizeMode: "cover",
-            dark: {
-              backgroundColor: "#87CEEB",
-              image: "./assets/images/MayMotherDaySplashScreen.png",
-              imageResizeMode: "cover",
-            },
-          }
-        : {
-            backgroundColor: "#FFFFFF",
-            image: "./assets/images/splash-placeholder.png",
-            imageResizeMode: "contain",
-            dark: {
-              backgroundColor: "#FFFFFF",
-              image: "./assets/images/splash-placeholder.png",
-              imageResizeMode: "contain",
-            },
-          },
+      {
+        backgroundColor: "#FFFFFF",
+        image: "./assets/images/splash-white.png",
+        imageResizeMode: "contain",
+        dark: {
+          backgroundColor: "#FFFFFF",
+          image: "./assets/images/splash-white.png",
+          imageResizeMode: "contain",
+        },
+      },
     ],
     [
       "expo-notifications",
