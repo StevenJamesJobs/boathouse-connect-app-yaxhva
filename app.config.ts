@@ -10,7 +10,7 @@ const config: ExpoConfig = {
   name: appName,
   slug: isMcloones ? "BoathouseConnect" : "MyRestoConnect",
   owner: "stevenjamesjobs",
-  version: isMcloones ? "2.2.0" : "1.0.0",
+  version: isMcloones ? "2.2.1" : "1.0.0",
   orientation: "portrait",
   icon: isMcloones
     ? "./assets/images/MayMothersDayAppClip.png"
