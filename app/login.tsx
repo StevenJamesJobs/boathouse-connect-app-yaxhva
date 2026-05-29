@@ -19,8 +19,16 @@ import { useRouter, Link } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
-import FallingPetals from '@/components/FallingPetals';
+import { IS_MCLOONES } from '@/constants/buildVariant';
 import { useTranslation } from 'react-i18next';
+
+// Default logo shown on the login screen when the user has no cached
+// restaurant logo yet. McLoone's keeps its branded mark; the public
+// (MyResto Connect) variant shows the MyResto plate logo until an owner
+// uploads their own branding.
+const DEFAULT_LOGO = IS_MCLOONES
+  ? require('@/assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg')
+  : require('@/assets/images/MyRestoPlateOnTopLogo.png');
 
 export default function LoginScreen() {
   console.log('[iOS Login] Screen mounted, Platform:', Platform.OS);
@@ -154,7 +162,6 @@ export default function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <FallingPetals />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
@@ -180,7 +187,7 @@ export default function LoginScreen() {
             <Text style={styles.orgNameText}>{cachedOrg.orgName}</Text>
           ) : (
             <Image
-              source={require('@/assets/images/43c91958-d4c9-4b12-8d2a-51e85de57f94.jpeg')}
+              source={DEFAULT_LOGO}
               style={styles.logo}
               resizeMode="contain"
             />

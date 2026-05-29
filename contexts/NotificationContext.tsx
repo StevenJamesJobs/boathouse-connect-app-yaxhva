@@ -1,7 +1,14 @@
 import React, { createContext, useContext, useEffect, useState, useRef } from 'react';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import { Platform, AppState } from 'react-native';
+
+// Use the EAS project ID for the active build variant (Boathouse vs MyResto),
+// not a hardcoded one — expo push tokens are scoped per project.
+const EAS_PROJECT_ID =
+  Constants.expoConfig?.extra?.eas?.projectId ??
+  '1ab6bb51-f4ea-445b-8c25-cd0c5d0d4fea';
 import { useAuth } from './AuthContext';
 import { useOrganization } from './OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -16,7 +23,10 @@ import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
-      shouldShowAlert: true,
+      // expo-notifications 0.32 (SDK 54) replaced shouldShowAlert with
+      // shouldShowBanner + shouldShowList.
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: true,
     }),
@@ -90,12 +100,11 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
       return () => {
         appStateSubscription.remove();
-        if (notificationListener.current) {
-          Notifications.removeNotificationSubscription(notificationListener.current);
-        }
-        if (responseListener.current) {
-          Notifications.removeNotificationSubscription(responseListener.current);
-        }
+        // expo-notifications 0.32 (SDK 54) removed
+        // Notifications.removeNotificationSubscription — call .remove() on the
+        // subscription instead.
+        notificationListener.current?.remove();
+        responseListener.current?.remove();
       };
     }
   }, [user]);
@@ -135,7 +144,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       console.log('[NotificationContext] ✅ Permission granted, getting push token...');
       
       try {
-        const projectId = '1ab6bb51-f4ea-445b-8c25-cd0c5d0d4fea'; // Your Expo project ID from app.json
+        const projectId = EAS_PROJECT_ID; // variant-aware (see top of file)
         token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
         console.log('Expo Push Token:', token);
       } catch (error) {
