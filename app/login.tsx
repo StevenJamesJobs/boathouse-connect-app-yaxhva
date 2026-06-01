@@ -15,7 +15,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter, Link } from 'expo-router';
+import { useRouter, usePathname, Link } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -41,6 +41,7 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [cachedOrg, setCachedOrg] = useState<{ orgId: string; orgName: string; logoUrl: string | null } | null>(null);
   const router = useRouter();
+  const pathname = usePathname();
   const { login, isAuthenticated, user } = useAuth();
 
   useEffect(() => {
@@ -97,9 +98,13 @@ export default function LoginScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Check if already authenticated and redirect
+  // Check if already authenticated and redirect.
+  // Guard on pathname: this screen stays mounted underneath the onboarding
+  // stack (login -> signup -> create-restaurant), so without this check it
+  // would hijack the auth flip mid-signup and yank a brand-new owner to the
+  // portal/paywall before the success screen + trial load.
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (pathname === '/login' && isAuthenticated && user) {
       console.log('[iOS Login] Already authenticated, redirecting to portal');
       const timeout = setTimeout(() => {
         try {
@@ -114,7 +119,7 @@ export default function LoginScreen() {
       }, 100);
       return () => clearTimeout(timeout);
     }
-  }, [isAuthenticated, user, router]);
+  }, [pathname, isAuthenticated, user, router]);
 
   const handleLogin = async () => {
     console.log('[iOS Login] Login button pressed');
