@@ -192,11 +192,14 @@ function RootLayoutNav() {
           }
         }
 
-        // Paywall redirect — owner with expired/no subscription
+        // Paywall redirect — owner with expired/no subscription.
+        // Onboarding/join routes are exempt so a brand-new owner finishing
+        // signup is never bounced before their org + trial exist.
         if (isAuthenticated && user?.role === 'owner' &&
             (subscriptionTier === 'expired' || subscriptionTier === 'none')) {
           const onPaywall = segments[0] === 'paywall';
-          if (!onPaywall && !onLogin && !onIndex) {
+          const inOnboarding = segments[0] === 'onboarding' || segments[0] === 'join';
+          if (!onPaywall && !onLogin && !onIndex && !inOnboarding) {
             console.log('[RootLayout] Redirecting to paywall — subscription expired');
             router.replace('/paywall' as any);
             return;

@@ -32,7 +32,8 @@
     "forgot_password": "Forgot your password? Contact your manager to have it reset.",
     "join_restaurant": "Join a Restaurant",
     "owner_signup": "I'm a Restaurant Owner",
-    "welcome_back": "Welcome back to {{orgName}}"
+    "welcome_back": "Welcome back to {{orgName}}",
+    "username_hint": "Tip: your username is your first initial + last name (e.g. seccles)."
   },
   "tabs": {
     "welcome": "Welcome",

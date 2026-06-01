@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { deriveUsername, findAvailableUsername } from '@/utils/username';
 
 type Phase = 'enter_code' | 'create_account';
 
@@ -32,7 +33,8 @@ export default function JoinScreen() {
   const [phase, setPhase] = useState<Phase>('enter_code');
   const [joinCode, setJoinCode] = useState('');
   const [org, setOrg] = useState<FoundOrg | null>(null);
-  const [fullName, setFullName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -114,15 +116,15 @@ export default function JoinScreen() {
     }
   };
 
-  const generateUsername = (name: string): string => {
-    return name.toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9.]/g, '');
-  };
-
   const handleCreateAccount = async () => {
     if (!org) return;
 
-    if (!fullName.trim()) {
-      setError('Full name is required.');
+    if (!firstName.trim()) {
+      setError('First name is required.');
+      return;
+    }
+    if (!lastName.trim()) {
+      setError('Last name is required.');
       return;
     }
 
@@ -130,26 +132,24 @@ export default function JoinScreen() {
     setError('');
 
     try {
-      // Generate username from name
-      let username = generateUsername(fullName.trim());
+      const fullName = `${firstName.trim()} ${lastName.trim()}`;
 
-      // Check username uniqueness
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('username', username)
-        .single();
-
-      if (existingUser) {
-        // Append random 2-digit number if taken
-        const suffix = Math.floor(10 + Math.random() * 90);
-        username = `${username}${suffix}`;
-      }
+      // Username = first initial + last name (e.g. "seccles"), with a numeric
+      // suffix if that's already taken.
+      const base = deriveUsername(firstName, lastName);
+      const username = await findAvailableUsername(base, async (candidate) => {
+        const { data } = await supabase
+          .from('users')
+          .select('id')
+          .eq('username', candidate)
+          .maybeSingle();
+        return !!data;
+      });
 
       // Create user via RPC
       const { data: newUserId, error: createError } = await supabase.rpc('create_user', {
         p_username: username,
-        p_name: fullName.trim(),
+        p_name: fullName,
         p_email: email.trim() || '',
         p_job_title: '',
         p_phone_number: '',
@@ -179,9 +179,16 @@ export default function JoinScreen() {
       const loginSuccess = await login(username, org.default_password, false);
 
       if (loginSuccess) {
-        router.replace('/change-password');
+        Alert.alert(
+          'Account Created',
+          `Your username is "${username}". Use it to sign in next time.\n\nNow set your own password.`,
+          [{ text: 'Continue', onPress: () => router.replace('/change-password') }],
+        );
       } else {
-        setError('Account created but login failed. Please go to the login page and sign in.');
+        setError(
+          `Account created with username "${username}", but login failed. ` +
+            'Please go to the login page and sign in.',
+        );
       }
     } catch (e: any) {
       console.error('[Join] Error creating account:', e);
@@ -290,28 +297,54 @@ export default function JoinScreen() {
           <Text style={styles.orgBadgeText}>Joining {org.name}</Text>
         </View>
 
-        <View style={styles.inputContainer}>
-          <IconSymbol
-            ios_icon_name="person.fill"
-            android_material_icon_name="person"
-            size={20}
-            color={splashColors.textSecondary}
-            style={styles.inputIcon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="Full Name *"
-            placeholderTextColor={splashColors.textSecondary}
-            value={fullName}
-            onChangeText={(text) => {
-              setFullName(text);
-              setError('');
-            }}
-            autoCapitalize="words"
-            returnKeyType="next"
-            editable={!isLoading}
-          />
+        <View style={styles.nameRow}>
+          <View style={[styles.inputContainer, styles.nameField]}>
+            <IconSymbol
+              ios_icon_name="person.fill"
+              android_material_icon_name="person"
+              size={20}
+              color={splashColors.textSecondary}
+              style={styles.inputIcon}
+            />
+            <TextInput
+              style={styles.input}
+              placeholder="First Name *"
+              placeholderTextColor={splashColors.textSecondary}
+              value={firstName}
+              onChangeText={(text) => {
+                setFirstName(text);
+                setError('');
+              }}
+              autoCapitalize="words"
+              returnKeyType="next"
+              editable={!isLoading}
+            />
+          </View>
+          <View style={[styles.inputContainer, styles.nameField]}>
+            <TextInput
+              style={styles.input}
+              placeholder="Last Name *"
+              placeholderTextColor={splashColors.textSecondary}
+              value={lastName}
+              onChangeText={(text) => {
+                setLastName(text);
+                setError('');
+              }}
+              autoCapitalize="words"
+              returnKeyType="next"
+              editable={!isLoading}
+            />
+          </View>
         </View>
+
+        {firstName.trim() && lastName.trim() ? (
+          <Text style={styles.usernameHintText}>
+            Your username will be{' '}
+            <Text style={styles.usernameHintBold}>
+              {deriveUsername(firstName, lastName)}
+            </Text>
+          </Text>
+        ) : null}
 
         <View style={styles.inputContainer}>
           <IconSymbol
@@ -366,7 +399,8 @@ export default function JoinScreen() {
           onPress={() => {
             setPhase('enter_code');
             setOrg(null);
-            setFullName('');
+            setFirstName('');
+            setLastName('');
             setEmail('');
             setError('');
           }}
@@ -457,6 +491,24 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     width: '100%',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  nameField: {
+    flex: 1,
+  },
+  usernameHintText: {
+    fontSize: 13,
+    color: splashColors.textSecondary,
+    marginTop: -4,
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  usernameHintBold: {
+    color: splashColors.primary,
+    fontWeight: '700',
   },
   inputContainer: {
     flexDirection: 'row',
