@@ -296,20 +296,23 @@ export default function LoginScreen() {
             {t('login.forgot_password')}
           </Text>
 
-          {/* Join / Owner Links */}
-          <View style={styles.linksContainer}>
-            <Link href="/join" asChild>
-              <Pressable>
-                <Text style={styles.linkText}>{t('login.join_restaurant')}</Text>
-              </Pressable>
-            </Link>
-            <Text style={styles.linkSeparator}>or</Text>
-            <Link href="/onboarding/signup" asChild>
-              <Pressable>
-                <Text style={styles.linkText}>{t('login.owner_signup')}</Text>
-              </Pressable>
-            </Link>
-          </View>
+          {/* Join / Owner Links — multi-tenant entry points only; hidden for the
+              single-tenant McLoone's/Boathouse build. */}
+          {!IS_MCLOONES && (
+            <View style={styles.linksContainer}>
+              <Link href="/join" asChild>
+                <Pressable>
+                  <Text style={styles.linkText}>{t('login.join_restaurant')}</Text>
+                </Pressable>
+              </Link>
+              <Text style={styles.linkSeparator}>or</Text>
+              <Link href="/onboarding/signup" asChild>
+                <Pressable>
+                  <Text style={styles.linkText}>{t('login.owner_signup')}</Text>
+                </Pressable>
+              </Link>
+            </View>
+          )}
         </Animated.View>
       </ScrollView>
     </KeyboardAvoidingView>
