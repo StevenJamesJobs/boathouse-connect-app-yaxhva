@@ -242,6 +242,12 @@ export default function EmployeePortalScreen() {
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
   const loadAllContent = async () => {
+    // Org context resolves asynchronously on fresh login; bail until we have an
+    // org id so we never fire queries filtered on organization_id = null (which
+    // return empty and leave the home screen blank). The [organizationId] effect
+    // below re-runs this once the id lands.
+    if (!organizationId) return;
+
     setLoadingSpecials(true);
     setLoadingAnnouncements(true);
     setLoadingEvents(true);
@@ -343,11 +349,11 @@ export default function EmployeePortalScreen() {
     }
   };
 
-  useEffect(() => { loadAllContent(); }, []);
+  useEffect(() => { loadAllContent(); }, [organizationId]);
 
-  useEffect(() => { loadAllContent(); }, [language]);
+  useEffect(() => { loadAllContent(); }, [language, organizationId]);
 
-  useFocusEffect(React.useCallback(() => { loadAllContent(); }, []));
+  useFocusEffect(React.useCallback(() => { loadAllContent(); }, [organizationId]));
 
   // Handle deep link params from notification taps
   useEffect(() => {
