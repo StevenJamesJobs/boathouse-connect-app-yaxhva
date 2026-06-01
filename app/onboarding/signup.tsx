@@ -9,28 +9,26 @@ import {
   Platform,
   ScrollView,
   Alert,
-  ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
-import { supabase } from '@/app/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { deriveUsername } from '@/utils/username';
 
 export default function SignupScreen() {
   const router = useRouter();
-  const { login } = useAuth();
 
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
 
   const validate = (): string | null => {
-    if (!name.trim()) return 'Full name is required.';
+    if (!firstName.trim()) return 'First name is required.';
+    if (!lastName.trim()) return 'Last name is required.';
     if (!email.trim()) return 'Email is required.';
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       return 'Please enter a valid email address.';
@@ -39,57 +37,29 @@ export default function SignupScreen() {
     return null;
   };
 
-  const handleSignup = async () => {
+  // Live preview of the username the owner will get (collisions may append a
+  // number at creation time, but this shows the rule).
+  const usernamePreview = deriveUsername(firstName, lastName);
+
+  const handleContinue = () => {
     const error = validate();
     if (error) {
       Alert.alert('Validation Error', error);
       return;
     }
 
-    setIsLoading(true);
-
-    try {
-      const username = email.trim().split('@')[0].toLowerCase();
-
-      const { data, error: rpcError } = await supabase.rpc('create_user', {
-        p_username: username,
-        p_name: name.trim(),
-        p_email: email.trim().toLowerCase(),
-        p_job_title: 'Owner',
-        p_phone_number: '',
-        p_role: 'owner',
-        p_password: password,
-      });
-
-      if (rpcError) {
-        console.error('[Signup] create_user RPC error:', rpcError);
-        Alert.alert('Error', rpcError.message || 'Failed to create account.');
-        setIsLoading(false);
-        return;
-      }
-
-      // Auto-login with the freshly created credentials
-      const loginSuccess = await login(username, password, true);
-
-      if (!loginSuccess) {
-        console.warn('[Signup] Auto-login failed, redirecting to login');
-        Alert.alert(
-          'Account Created',
-          'Your account was created. Please sign in with your new credentials.',
-        );
-        router.replace('/login');
-        setIsLoading(false);
-        return;
-      }
-
-      // Navigate to restaurant creation
-      router.push('/onboarding/create-restaurant');
-    } catch (err: any) {
-      console.error('[Signup] Unexpected error:', err);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
-    } finally {
-      setIsLoading(false);
-    }
+    // Defer account creation: carry the owner's details to the restaurant step,
+    // where the org + owner account are created atomically in one transaction.
+    // This avoids ever attaching the new owner to another tenant.
+    router.push({
+      pathname: '/onboarding/create-restaurant',
+      params: {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+      },
+    });
   };
 
   return (
@@ -112,24 +82,35 @@ export default function SignupScreen() {
 
         {/* Form */}
         <View style={styles.formContainer}>
-          {/* Full Name */}
-          <View style={styles.inputContainer}>
-            <IconSymbol
-              ios_icon_name="person.fill"
-              android_material_icon_name="person"
-              size={20}
-              color={splashColors.textSecondary}
-              style={styles.inputIcon}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="Full Name"
-              placeholderTextColor={splashColors.textSecondary}
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-              editable={!isLoading}
-            />
+          {/* First / Last name row */}
+          <View style={styles.nameRow}>
+            <View style={[styles.inputContainer, styles.nameField]}>
+              <IconSymbol
+                ios_icon_name="person.fill"
+                android_material_icon_name="person"
+                size={20}
+                color={splashColors.textSecondary}
+                style={styles.inputIcon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="First Name"
+                placeholderTextColor={splashColors.textSecondary}
+                value={firstName}
+                onChangeText={setFirstName}
+                autoCapitalize="words"
+              />
+            </View>
+            <View style={[styles.inputContainer, styles.nameField]}>
+              <TextInput
+                style={styles.input}
+                placeholder="Last Name"
+                placeholderTextColor={splashColors.textSecondary}
+                value={lastName}
+                onChangeText={setLastName}
+                autoCapitalize="words"
+              />
+            </View>
           </View>
 
           {/* Email */}
@@ -149,9 +130,25 @@ export default function SignupScreen() {
               onChangeText={setEmail}
               autoCapitalize="none"
               keyboardType="email-address"
-              editable={!isLoading}
             />
           </View>
+
+          {/* Username hint — your login name is first initial + last name. */}
+          {usernamePreview ? (
+            <View style={styles.usernameHint}>
+              <IconSymbol
+                ios_icon_name="info.circle.fill"
+                android_material_icon_name="info"
+                size={16}
+                color={splashColors.primary}
+              />
+              <Text style={styles.usernameHintText}>
+                Your username will be{' '}
+                <Text style={styles.usernameHintBold}>{usernamePreview}</Text>
+                {'  '}— use it to sign in.
+              </Text>
+            </View>
+          ) : null}
 
           {/* Password */}
           <View style={styles.inputContainer}>
@@ -170,12 +167,10 @@ export default function SignupScreen() {
               onChangeText={setPassword}
               secureTextEntry={!showPassword}
               autoCapitalize="none"
-              editable={!isLoading}
             />
             <TouchableOpacity
               onPress={() => setShowPassword(!showPassword)}
               style={styles.eyeIcon}
-              disabled={isLoading}
             >
               <IconSymbol
                 ios_icon_name={showPassword ? 'eye.slash.fill' : 'eye.fill'}
@@ -203,12 +198,10 @@ export default function SignupScreen() {
               onChangeText={setConfirmPassword}
               secureTextEntry={!showConfirmPassword}
               autoCapitalize="none"
-              editable={!isLoading}
             />
             <TouchableOpacity
               onPress={() => setShowConfirmPassword(!showConfirmPassword)}
               style={styles.eyeIcon}
-              disabled={isLoading}
             >
               <IconSymbol
                 ios_icon_name={showConfirmPassword ? 'eye.slash.fill' : 'eye.fill'}
@@ -219,17 +212,9 @@ export default function SignupScreen() {
             </TouchableOpacity>
           </View>
 
-          {/* Sign Up Button */}
-          <TouchableOpacity
-            style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
-            onPress={handleSignup}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Create Account</Text>
-            )}
+          {/* Continue Button */}
+          <TouchableOpacity style={styles.primaryButton} onPress={handleContinue}>
+            <Text style={styles.primaryButtonText}>Continue</Text>
           </TouchableOpacity>
         </View>
 
@@ -237,7 +222,6 @@ export default function SignupScreen() {
         <TouchableOpacity
           style={styles.signInLink}
           onPress={() => router.replace('/login')}
-          disabled={isLoading}
         >
           <Text style={styles.signInText}>
             Already have an account?{' '}
@@ -277,6 +261,13 @@ const styles = StyleSheet.create({
   formContainer: {
     width: '100%',
   },
+  nameRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  nameField: {
+    flex: 1,
+  },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -299,6 +290,23 @@ const styles = StyleSheet.create({
   eyeIcon: {
     padding: 8,
   },
+  usernameHint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: -4,
+    marginBottom: 16,
+    paddingHorizontal: 4,
+  },
+  usernameHintText: {
+    flex: 1,
+    fontSize: 13,
+    color: splashColors.textSecondary,
+  },
+  usernameHintBold: {
+    color: splashColors.primary,
+    fontWeight: '700',
+  },
   primaryButton: {
     backgroundColor: splashColors.primary,
     borderRadius: 12,
@@ -308,9 +316,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     boxShadow: '0px 4px 8px rgba(44, 95, 141, 0.2)',
     elevation: 4,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
   },
   primaryButtonText: {
     color: '#FFFFFF',

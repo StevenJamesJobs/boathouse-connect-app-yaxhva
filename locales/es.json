@@ -32,7 +32,8 @@
     "forgot_password": "¿Olvidaste tu contraseña? Contacta a tu gerente para restablecerla.",
     "join_restaurant": "Unirse a un Restaurante",
     "owner_signup": "Soy Dueño de un Restaurante",
-    "welcome_back": "Bienvenido de nuevo a {{orgName}}"
+    "welcome_back": "Bienvenido de nuevo a {{orgName}}",
+    "username_hint": "Consejo: tu usuario es la inicial de tu nombre + tu apellido (ej. seccles)."
   },
   "tabs": {
     "welcome": "Bienvenido",

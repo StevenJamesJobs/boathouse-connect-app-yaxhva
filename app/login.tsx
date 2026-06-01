@@ -224,6 +224,15 @@ export default function LoginScreen() {
             />
           </View>
 
+          {/* Username hint — MyResto usernames follow first-initial + last name.
+              Hidden on the McLoone's build, whose existing accounts predate
+              this convention. */}
+          {!IS_MCLOONES && (
+            <Text style={styles.usernameHint}>
+              {t('login.username_hint')}
+            </Text>
+          )}
+
           {/* Password Input */}
           <View style={styles.inputContainer}>
             <IconSymbol
@@ -408,6 +417,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: splashColors.textSecondary,
     fontStyle: 'italic',
+  },
+  usernameHint: {
+    fontSize: 12,
+    color: splashColors.textSecondary,
+    marginTop: -6,
+    marginBottom: 16,
+    paddingHorizontal: 4,
   },
   welcomeBackText: {
     fontSize: 16,
