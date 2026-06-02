@@ -22,7 +22,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import { useLanguage } from '@/contexts/LanguageContext';
