@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '@/app/integrations/supabase/client';
 
 const BUCKET = 'message-attachments';

@@ -29,7 +29,7 @@ import { formatTime, formatCountdown, getCountdownUrgency } from '@/utils/exam/e
 import { sendCustomNotification } from '@/utils/notificationHelpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 
 interface Exam {
   id: string;
