@@ -31,7 +31,8 @@ export function useUnreadLeaderboardPasses() {
       return;
     }
     try {
-      const { data, error } = await supabase.rpc('get_unread_leaderboard_pass_count', { p_organization_id: organizationId });
+      // Per-user count derived from auth.uid() server-side — takes no args.
+      const { data, error } = await supabase.rpc('get_unread_leaderboard_pass_count');
       if (error) {
         console.error('Error loading leaderboard pass count:', error);
         return;
