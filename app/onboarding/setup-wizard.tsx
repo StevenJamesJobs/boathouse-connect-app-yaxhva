@@ -39,7 +39,7 @@ export default function SetupWizardScreen() {
   const [isLoading, setIsLoading] = useState(false);
 
   // Step 1 state — job titles
-  const [selectedTitles, setSelectedTitles] = useState<string[]>([...DEFAULT_JOB_TITLES]);
+  const [selectedTitles, setSelectedTitles] = useState<string[]>([]);
   const [customTitle, setCustomTitle] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
 
@@ -94,6 +94,20 @@ export default function SetupWizardScreen() {
     setIsLoading(true);
 
     try {
+      // Idempotent: clear any titles left over from a previous (failed) attempt
+      // so tapping Complete Setup again replaces them instead of duplicating.
+      const { error: clearError } = await supabase
+        .from('organization_job_titles')
+        .delete()
+        .eq('organization_id', organizationId);
+
+      if (clearError) {
+        console.error('[SetupWizard] Clear job titles error:', clearError);
+        Alert.alert('Error', 'Failed to save job titles.');
+        setIsLoading(false);
+        return;
+      }
+
       // Insert job titles with display_order
       const titleRows = selectedTitles.map((title, idx) => ({
         organization_id: organizationId,
@@ -119,7 +133,9 @@ export default function SetupWizardScreen() {
         .update({
           menu_count: menuCount,
           menu_1_name: menu1Name.trim() || 'Menu 1',
-          menu_2_name: hasSeasonalMenus ? (menu2Name.trim() || 'Menu 2') : null,
+          // menu_2_name is NOT NULL in the DB; menu_count governs display, so
+          // keep a valid placeholder even when there's only one menu.
+          menu_2_name: menu2Name.trim() || 'Menu 2',
         })
         .eq('id', organizationId);
 
