@@ -13,6 +13,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import MenuIconPicker from '@/components/MenuIconPicker';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 
@@ -47,6 +48,9 @@ export default function SetupWizardScreen() {
   const [hasSeasonalMenus, setHasSeasonalMenus] = useState(true);
   const [menu1Name, setMenu1Name] = useState('Menu 1');
   const [menu2Name, setMenu2Name] = useState('Menu 2');
+  const [menu1Icon, setMenu1Icon] = useState('snowflake');
+  const [menu2Icon, setMenu2Icon] = useState('sun.max.fill');
+  const [headerIcon, setHeaderIcon] = useState('fork.knife');
 
   // ─── Step 1: Job Titles ───────────────────────────────────────────
 
@@ -147,6 +151,9 @@ export default function SetupWizardScreen() {
           // menu_2_name is NOT NULL in the DB; menu_count governs display, so
           // keep a valid placeholder even when there's only one menu.
           menu_2_name: menu2Name.trim() || 'Menu 2',
+          menu_1_icon: menu1Icon,
+          menu_2_icon: menu2Icon,
+          header_icon: headerIcon,
         })
         .eq('id', organizationId);
 
@@ -340,6 +347,8 @@ export default function SetupWizardScreen() {
         />
       </View>
 
+      <MenuIconPicker label={`${menu1Name.trim() || 'Menu 1'} Icon`} value={menu1Icon} onChange={setMenu1Icon} />
+
       {hasSeasonalMenus && (
         <>
           <Text style={styles.label}>Menu 2 Name</Text>
@@ -360,8 +369,12 @@ export default function SetupWizardScreen() {
               autoCapitalize="words"
             />
           </View>
+
+          <MenuIconPicker label={`${menu2Name.trim() || 'Menu 2'} Icon`} value={menu2Icon} onChange={setMenu2Icon} />
         </>
       )}
+
+      <MenuIconPicker label="Header Icon (shown next to your restaurant name)" value={headerIcon} onChange={setHeaderIcon} />
     </View>
   );
 

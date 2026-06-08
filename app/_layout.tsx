@@ -161,8 +161,14 @@ function RootLayoutNav() {
 
   // Handle navigation based on auth state
   useEffect(() => {
-    if (isLoading || !loaded || subLoading) {
-      console.log('[RootLayout] Waiting for auth/fonts/subscription to load...');
+    // Wait for auth, fonts, and subscription. Also wait for an authenticated
+    // owner's organizationId to resolve before evaluating any redirect —
+    // otherwise the subscription gate can run while tier is still 'none'
+    // (org not yet loaded on cold start) and wrongly bounce the owner to the
+    // paywall even though their trial is active.
+    if (isLoading || !loaded || subLoading ||
+        (isAuthenticated && user?.role === 'owner' && !organizationId)) {
+      console.log('[RootLayout] Waiting for auth/fonts/subscription/org to load...');
       return;
     }
 
@@ -192,11 +198,16 @@ function RootLayoutNav() {
           }
         }
 
-        // Paywall redirect — owner with expired/no subscription.
+        // Paywall redirect — owner whose trial has actually ended.
+        // Gate ONLY on 'expired'. 'none' means "subscription not yet known"
+        // (org/RevenueCat still resolving on cold start), never "trial over":
+        // a real org always settles on trial/base/premium/expired because
+        // loadSubscription initializes a trial when none exists. Treating
+        // 'none' as expired caused the cold-start paywall flap.
         // Onboarding/join routes are exempt so a brand-new owner finishing
         // signup is never bounced before their org + trial exist.
         if (isAuthenticated && user?.role === 'owner' &&
-            (subscriptionTier === 'expired' || subscriptionTier === 'none')) {
+            subscriptionTier === 'expired') {
           const onPaywall = segments[0] === 'paywall';
           const inOnboarding = segments[0] === 'onboarding' || segments[0] === 'join';
           if (!onPaywall && !onLogin && !onIndex && !inOnboarding) {
@@ -227,7 +238,7 @@ function RootLayoutNav() {
     }, 100);
 
     return () => clearTimeout(navigationTimeout);
-  }, [isAuthenticated, isLoading, segments, loaded, user?.role, user?.forcePasswordChange, router, subscriptionTier, subLoading]);
+  }, [isAuthenticated, isLoading, segments, loaded, user?.role, user?.forcePasswordChange, router, subscriptionTier, subLoading, organizationId]);
 
   if (!loaded || isLoading) {
     console.log('[RootLayout] Still loading, returning null');

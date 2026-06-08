@@ -289,7 +289,9 @@ async function processScheduleInBackground(
         'anthropic-beta': 'pdfs-2024-09-25,output-128k-2025-02-19',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        // Sonnet 4.6 — current Sonnet; claude-sonnet-4-5 remains active but
+        // this future-proofs the parser. 64K output cap matches Sonnet 4.6's max.
+        model: 'claude-sonnet-4-6',
         max_tokens: 64000,
         messages: [
           {

@@ -147,7 +147,7 @@ export default function MenuEditorScreen() {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
   const { language } = useLanguage();
   const [season, setSeason] = useState<Season>('summer');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -910,7 +910,14 @@ export default function MenuEditorScreen() {
 
       {/* Season Selector */}
       <View style={styles.seasonSelectorContainer}>
-        <SeasonSelector selectedSeason={season} onSeasonChange={setSeason} />
+        <SeasonSelector
+          selectedSeason={season}
+          onSeasonChange={setSeason}
+          menu1Label={organization?.menu_1_name}
+          menu2Label={organization?.menu_2_name}
+          menu1Icon={organization?.menu_1_icon}
+          menu2Icon={organization?.menu_2_icon}
+        />
       </View>
 
       {/* Search Bar + Add Button */}
@@ -1726,23 +1733,33 @@ export default function MenuEditorScreen() {
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{t('menu_editor:season_label')}</Text>
                 <View style={styles.seasonTagRow}>
-                  {(['winter', 'both', 'summer'] as const).map((s) => (
-                    <TouchableOpacity
-                      key={s}
-                      style={[
-                        styles.seasonTagOption,
-                        formData.item_season === s && { backgroundColor: colors.primary },
-                      ]}
-                      onPress={() => setFormData({ ...formData, item_season: s })}
-                    >
-                      <Text style={[
-                        styles.seasonTagText,
-                        { color: formData.item_season === s ? '#FFFFFF' : colors.text },
-                      ]}>
-                        {t(`menu_editor:season_${s}`)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                  {(['winter', 'both', 'summer'] as const).map((s) => {
+                    // Reflect the org's custom Menu 1 / Menu 2 names; "Both"
+                    // stays translated since it spans both menus.
+                    const seasonLabel =
+                      s === 'winter'
+                        ? organization?.menu_1_name || t('menu_editor:season_winter')
+                        : s === 'summer'
+                        ? organization?.menu_2_name || t('menu_editor:season_summer')
+                        : t('menu_editor:season_both');
+                    return (
+                      <TouchableOpacity
+                        key={s}
+                        style={[
+                          styles.seasonTagOption,
+                          formData.item_season === s && { backgroundColor: colors.primary },
+                        ]}
+                        onPress={() => setFormData({ ...formData, item_season: s })}
+                      >
+                        <Text style={[
+                          styles.seasonTagText,
+                          { color: formData.item_season === s ? '#FFFFFF' : colors.text },
+                        ]}>
+                          {seasonLabel}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
 

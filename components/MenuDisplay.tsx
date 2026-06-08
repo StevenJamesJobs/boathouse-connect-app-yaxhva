@@ -117,6 +117,12 @@ const SUMMER_LIB_CATEGORY_MAP: Record<string, string> = {
   'No ABV': 'Zero ABV',
 };
 
+// Winter (Menu 1) libations are stored in `libation_recipes` and use the same
+// category names, so the mapping mirrors the summer one. Entering a recipe in
+// the Winter Libations Recipes editor now also surfaces it as a Libations menu
+// card (matching how summer_libation_recipes works).
+const WINTER_LIB_CATEGORY_MAP: Record<string, string> = SUMMER_LIB_CATEGORY_MAP;
+
 // Filter options
 const FILTER_OPTIONS = [
   { key: 'dinner', label: 'Dinner' },
@@ -388,6 +394,49 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             price: r.price,
             category: 'Libations',
             subcategory: SUMMER_LIB_CATEGORY_MAP[r.category] || r.category,
+            available_for_lunch: false,
+            available_for_dinner: false,
+            is_gluten_free: false,
+            is_gluten_free_available: false,
+            is_vegetarian: false,
+            is_vegetarian_available: false,
+            thumbnail_url: r.thumbnail_url,
+            thumbnail_shape: 'square',
+            display_order: r.category === 'Featured' ? -1000 + r.display_order : r.display_order,
+            is_active: true,
+          }));
+          items = [...items, ...mapped];
+          items.sort((a, b) => a.display_order - b.display_order);
+        }
+      }
+
+      if (season === 'winter') {
+        // Winter cocktails are sourced from the Winter Libations Recipes editor
+        // (libation_recipes), mirroring summer. Hide any manually-entered
+        // Libations cocktail menu items first so they don't double up — the
+        // beer/wine Libations subcategories (Draft Beer, Bottle & Cans, etc.)
+        // are untouched. No data is deleted; manual rows just aren't re-rendered.
+        items = items.filter(
+          (i) => !(i.category === 'Libations' && i.subcategory != null && COCKTAIL_SUBCATEGORIES.has(i.subcategory))
+        );
+
+        const { data: lrData } = await (supabase
+          .from('libation_recipes' as any) as any)
+          .select('*')
+          .eq('organization_id', organizationId)
+          .eq('is_active', true)
+          .order('display_order', { ascending: true });
+
+        if (lrData) {
+          const mapped: MenuItem[] = lrData.map((r: any) => ({
+            id: `lr-${r.id}`,
+            name: r.name,
+            name_es: null,
+            description: r.ingredients?.map((i: any) => i.ingredient).join(', ') || null,
+            description_es: null,
+            price: r.price,
+            category: 'Libations',
+            subcategory: WINTER_LIB_CATEGORY_MAP[r.category] || r.category,
             available_for_lunch: false,
             available_for_dinner: false,
             is_gluten_free: false,
@@ -700,6 +749,8 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
               onSeasonChange={setSeason}
               menu1Label={organization.menu_1_name}
               menu2Label={organization.menu_2_name}
+              menu1Icon={organization.menu_1_icon}
+              menu2Icon={organization.menu_2_icon}
             />
           </View>
         )}
