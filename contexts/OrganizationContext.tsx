@@ -22,6 +22,7 @@ export interface Organization {
   menu_2_name: string;
   default_password: string;
   owner_id: string | null;
+  games_use_sample_data: boolean;
 }
 
 interface OrganizationContextType {
@@ -51,6 +52,7 @@ const DEFAULT_ORG: Organization = {
   menu_2_name: 'Summer',
   default_password: 'boathouseconnect',
   owner_id: null,
+  games_use_sample_data: true,
 };
 
 const OrganizationContext = createContext<OrganizationContextType>({
@@ -97,6 +99,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         menu_2_name: orgData.menu_2_name || DEFAULT_ORG.menu_2_name,
         default_password: orgData.default_password || DEFAULT_ORG.default_password,
         owner_id: orgData.owner_id || null,
+        games_use_sample_data: orgData.games_use_sample_data ?? true,
       });
     }
   }, []);

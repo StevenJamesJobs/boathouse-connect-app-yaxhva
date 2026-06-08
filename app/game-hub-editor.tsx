@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
   TextInput,
   Image,
+  Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -77,8 +78,35 @@ export default function GameHubEditorScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { t } = useTranslation();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization, refreshOrganization } = useOrganization();
   const [resettingAll, setResettingAll] = useState(false);
+
+  // "Use sample game data" toggle — see utils/game/gameSource.ts. ON = games
+  // draw from the Boathouse sample org; OFF = the org's own menu only.
+  const [useSampleData, setUseSampleData] = useState(organization.games_use_sample_data);
+  const [savingSample, setSavingSample] = useState(false);
+  useEffect(() => {
+    setUseSampleData(organization.games_use_sample_data);
+  }, [organization.games_use_sample_data]);
+
+  const handleToggleSampleData = async (value: boolean) => {
+    setUseSampleData(value); // optimistic
+    setSavingSample(true);
+    try {
+      const { error } = await (supabase
+        .from('organizations') as any)
+        .update({ games_use_sample_data: value })
+        .eq('id', organizationId);
+      if (error) throw error;
+      await refreshOrganization();
+    } catch (err) {
+      console.error('[GameHubEditor] toggle sample data error:', err);
+      setUseSampleData(!value); // revert
+      Alert.alert(t('game_hub_editor:error'), t('game_hub_editor:sample_data_error'));
+    } finally {
+      setSavingSample(false);
+    }
+  };
 
   // Employee Lookup state
   const [searchQuery, setSearchQuery] = useState('');
@@ -340,6 +368,30 @@ export default function GameHubEditorScreen() {
           {t('game_hub_editor:subtitle')}
         </Text>
 
+        {/* Sample game data toggle */}
+        <View style={[styles.sampleCard, { backgroundColor: colors.card }]}>
+          <View style={styles.sampleTextCol}>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              {t('game_hub_editor:sample_data_title')}
+            </Text>
+            <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
+              {t('game_hub_editor:sample_data_desc')}
+            </Text>
+            <Text style={[styles.sampleLabel, { color: colors.text }]}>
+              {t('game_hub_editor:sample_data_label')}
+            </Text>
+          </View>
+          {savingSample ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Switch
+              value={useSampleData}
+              onValueChange={handleToggleSampleData}
+              trackColor={{ false: colors.border, true: colors.primary }}
+            />
+          )}
+        </View>
+
         {/* Employee Score Lookup — placed FIRST so keyboard can't bury results */}
         <View style={styles.lookupSectionTop}>
           <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('game_hub_editor:lookup_title')}</Text>
@@ -552,6 +604,19 @@ const styles = StyleSheet.create({
   cardText: { flex: 1 },
   cardTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
   cardDesc: { fontSize: 12, lineHeight: 17 },
+
+  // Sample game data toggle
+  sampleCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 14,
+    padding: 14,
+    gap: 12,
+    boxShadow: '0px 2px 8px rgba(0,0,0,0.1)',
+    elevation: 3,
+  },
+  sampleTextCol: { flex: 1, gap: 4 },
+  sampleLabel: { fontSize: 13, fontWeight: '600', marginTop: 2 },
 
   // Employee Score Lookup (now placed at top of screen — no top divider)
   lookupSectionTop: {

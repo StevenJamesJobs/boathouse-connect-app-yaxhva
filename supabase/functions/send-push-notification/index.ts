@@ -94,7 +94,8 @@ serve(async (req) => {
       // Send to all users in the organization (for announcements, events, etc.)
       let query = supabaseClient
         .from('users')
-        .select('id');
+        .select('id')
+        .eq('is_active', true);
 
       if (organizationId) {
         query = query.eq('organization_id', organizationId);

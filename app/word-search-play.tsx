@@ -51,7 +51,7 @@ export default function WordSearchPlayScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
   const { t } = useTranslation();
   const params = useLocalSearchParams<{
     category: WordSearchCategory;
@@ -77,7 +77,7 @@ export default function WordSearchPlayScreen() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const rawWords = await getWordsForCategory(category, difficulty);
+      const rawWords = await getWordsForCategory(category, difficulty, organizationId ?? '', organization.games_use_sample_data);
       if (cancelled) return;
       const generated = generateWordSearchPuzzle(rawWords, difficulty);
       setPuzzle(generated);
@@ -158,7 +158,7 @@ export default function WordSearchPlayScreen() {
     setScore(0);
     setElapsedSeconds(0);
     setSelectedCells([]);
-    const rawWords = await getWordsForCategory(category, difficulty);
+    const rawWords = await getWordsForCategory(category, difficulty, organizationId ?? '', organization.games_use_sample_data);
     const generated = generateWordSearchPuzzle(rawWords, difficulty);
     setPuzzle(generated);
     setPhase('playing');

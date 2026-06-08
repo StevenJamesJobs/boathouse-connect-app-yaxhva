@@ -67,7 +67,7 @@ export default function PictureThisPlayScreen() {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
   const params = useLocalSearchParams<{ category: string; difficulty: string; playMode: string }>();
 
   const category = (params.category || 'food') as PictureThisCategory;
@@ -135,7 +135,7 @@ export default function PictureThisPlayScreen() {
       setLoading(true);
       setPoolError(null);
       try {
-        const data = await loadPool(category);
+        const data = await loadPool(category, organizationId ?? '', organization.games_use_sample_data);
         if (cancelled) return;
         if (data.length < 4) {
           setPoolError('Not enough menu items in this category to play. Try a different category.');
