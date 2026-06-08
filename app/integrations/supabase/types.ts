@@ -1652,6 +1652,7 @@ export type Database = {
           city: string | null
           created_at: string
           default_password: string
+          games_use_sample_data: boolean
           google_maps_query: string | null
           id: string
           join_code: string
@@ -1676,6 +1677,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           default_password?: string
+          games_use_sample_data?: boolean
           google_maps_query?: string | null
           id?: string
           join_code: string
@@ -1700,6 +1702,7 @@ export type Database = {
           city?: string | null
           created_at?: string
           default_password?: string
+          games_use_sample_data?: boolean
           google_maps_query?: string | null
           id?: string
           join_code?: string
@@ -3396,6 +3399,11 @@ export type Database = {
         Args: { p_category?: string; p_organization_id?: string }
         Returns: undefined
       }
+      seed_default_job_title_assistants: {
+        Args: { p_org_id: string }
+        Returns: undefined
+      }
+      seed_org_assistants: { Args: { p_org_id: string }; Returns: undefined }
       set_user_test_flag: {
         Args: {
           p_is_test: boolean

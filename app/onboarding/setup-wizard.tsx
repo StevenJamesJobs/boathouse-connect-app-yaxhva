@@ -126,6 +126,17 @@ export default function SetupWizardScreen() {
         return;
       }
 
+      // Seed default job-title → assistant mappings now that titles exist, so
+      // employees can see the right assistants out of the box (idempotent;
+      // owner can adjust in Org Settings → Jobs & Tools). Non-fatal on error.
+      const { error: seedError } = await supabase.rpc(
+        'seed_default_job_title_assistants',
+        { p_org_id: organizationId }
+      );
+      if (seedError) {
+        console.error('[SetupWizard] Seed assistant mappings error:', seedError);
+      }
+
       // Update org menu settings
       const menuCount = hasSeasonalMenus ? 2 : 1;
       const { error: orgError } = await supabase

@@ -35,7 +35,7 @@ export default function MemoryGamePlayScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
   const params = useLocalSearchParams<{ mode: string; difficulty: string; play_mode: string }>();
 
   const mode = (params.mode || 'wine_pairings') as GameMode;
@@ -153,7 +153,7 @@ export default function MemoryGamePlayScreen() {
     setScoreSaved(false);
     setTimeRemaining(difficultyConfig.timeLimitSeconds);
     try {
-      const generatedCards = await generateCards(mode, difficultyConfig.totalPairs);
+      const generatedCards = await generateCards(mode, difficultyConfig.totalPairs, organizationId ?? '', organization.games_use_sample_data);
       setCards(generatedCards);
     } catch (e) {
       console.error('Error generating cards:', e);

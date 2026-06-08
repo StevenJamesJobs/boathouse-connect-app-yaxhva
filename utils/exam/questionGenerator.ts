@@ -204,13 +204,13 @@ interface WineItem {
   member_bottle_price: string | null;
 }
 
-async function fetchMenuItems(organizationId?: string): Promise<MenuItem[]> {
+async function fetchMenuItems(organizationId: string): Promise<MenuItem[]> {
   let query = supabase
     .from('menu_items')
     .select('id, name, name_es, description, price, category, subcategory, is_gluten_free, is_vegetarian, available_for_lunch, available_for_dinner')
     .eq('is_active', true)
     .in('category', ['Lunch', 'Dinner']);
-  if (organizationId) query = query.eq('organization_id', organizationId);
+  query = query.eq('organization_id', organizationId);
 
   const { data, error } = await query;
   if (error || !data) return [];
@@ -221,14 +221,14 @@ async function fetchMenuItems(organizationId?: string): Promise<MenuItem[]> {
 // fetchMenuItems: includes Libations and Wine so bartender/server/host
 // quizzes can all pull imagery. Only returns rows with a non-null
 // thumbnail_url.
-async function fetchMenuItemsWithImages(organizationId?: string): Promise<MenuItem[]> {
+async function fetchMenuItemsWithImages(organizationId: string): Promise<MenuItem[]> {
   let query = (supabase
     .from('menu_items') as any)
     .select('id, name, name_es, description, description_es, price, category, subcategory, is_gluten_free, is_vegetarian, available_for_lunch, available_for_dinner, thumbnail_url')
     .eq('is_active', true)
     .in('category', ['Lunch', 'Dinner', 'Libations', 'Wine'])
     .not('thumbnail_url', 'is', null);
-  if (organizationId) query = query.eq('organization_id', organizationId);
+  query = query.eq('organization_id', organizationId);
 
   const { data, error } = await query;
   if (error || !data) return [];
@@ -237,48 +237,48 @@ async function fetchMenuItemsWithImages(organizationId?: string): Promise<MenuIt
   );
 }
 
-async function fetchCocktails(organizationId?: string): Promise<Cocktail[]> {
+async function fetchCocktails(organizationId: string): Promise<Cocktail[]> {
   let query = supabase
     .from('cocktails')
     .select('id, name, alcohol_type, ingredients')
     .eq('is_active', true);
-  if (organizationId) query = query.eq('organization_id', organizationId);
+  query = query.eq('organization_id', organizationId);
 
   const { data, error } = await query;
   if (error || !data) return [];
   return data as Cocktail[];
 }
 
-async function fetchLibationRecipes(organizationId?: string): Promise<LibationRecipe[]> {
+async function fetchLibationRecipes(organizationId: string): Promise<LibationRecipe[]> {
   let query = supabase
     .from('libation_recipes')
     .select('id, name, category, glassware, garnish, ingredients')
     .eq('is_active', true);
-  if (organizationId) query = query.eq('organization_id', organizationId);
+  query = query.eq('organization_id', organizationId);
 
   const { data, error } = await query;
   if (error || !data) return [];
   return data as LibationRecipe[];
 }
 
-async function fetchWinePairings(organizationId?: string): Promise<WinePairing[]> {
+async function fetchWinePairings(organizationId: string): Promise<WinePairing[]> {
   let query = (supabase
     .from('wine_pairings' as any) as any)
     .select('wine, entree')
     .eq('is_active', true);
-  if (organizationId) query = query.eq('organization_id', organizationId);
+  query = query.eq('organization_id', organizationId);
 
   const { data, error } = await query;
   if (error || !data) return [];
   return data as WinePairing[];
 }
 
-async function fetchHostChecklistItems(organizationId?: string): Promise<ChecklistItem[]> {
+async function fetchHostChecklistItems(organizationId: string): Promise<ChecklistItem[]> {
   let catQuery = supabase
     .from('checklist_categories')
     .select('id, name, checklist_type')
     .eq('is_active', true);
-  if (organizationId) catQuery = catQuery.eq('organization_id', organizationId);
+  catQuery = catQuery.eq('organization_id', organizationId);
   const { data: categories } = await catQuery;
 
   if (!categories || categories.length === 0) return [];
@@ -287,7 +287,7 @@ async function fetchHostChecklistItems(organizationId?: string): Promise<Checkli
     .from('checklist_items')
     .select('id, text, category_id')
     .eq('is_active', true);
-  if (organizationId) itemQuery = itemQuery.eq('organization_id', organizationId);
+  itemQuery = itemQuery.eq('organization_id', organizationId);
   const { data: items } = await itemQuery;
 
   if (!items) return [];
@@ -304,23 +304,23 @@ async function fetchHostChecklistItems(organizationId?: string): Promise<Checkli
   }).filter((item: ChecklistItem) => item.category_name !== 'Unknown');
 }
 
-async function fetchWineItems(organizationId?: string): Promise<WineItem[]> {
+async function fetchWineItems(organizationId: string): Promise<WineItem[]> {
   let query = (supabase.from('menu_items') as any)
     .select('id, name, location, glass_price, bottle_price, member_bottle_price')
     .eq('is_active', true)
     .eq('category', 'Wine');
-  if (organizationId) query = query.eq('organization_id', organizationId);
+  query = query.eq('organization_id', organizationId);
   const { data, error } = await query;
   if (error || !data) return [];
   return data as WineItem[];
 }
 
-async function fetchBartenderChecklistItems(organizationId?: string): Promise<ChecklistItem[]> {
+async function fetchBartenderChecklistItems(organizationId: string): Promise<ChecklistItem[]> {
   let catQuery = supabase
     .from('bartender_checklist_categories')
     .select('id, name, checklist_type')
     .eq('is_active', true);
-  if (organizationId) catQuery = catQuery.eq('organization_id', organizationId);
+  catQuery = catQuery.eq('organization_id', organizationId);
   const { data: categories } = await catQuery;
 
   if (!categories || categories.length === 0) return [];
@@ -329,7 +329,7 @@ async function fetchBartenderChecklistItems(organizationId?: string): Promise<Ch
     .from('bartender_checklist_items')
     .select('id, text, category_id')
     .eq('is_active', true);
-  if (organizationId) itemQuery = itemQuery.eq('organization_id', organizationId);
+  itemQuery = itemQuery.eq('organization_id', organizationId);
   const { data: items } = await itemQuery;
 
   if (!items) return [];
@@ -1086,10 +1086,13 @@ function menuPhotoQuestion(
 // Exported so exam-editor's per-question refresh can regenerate a picture
 // question against a filtered pool (excluding the item currently shown).
 export async function generatePhotoQuestion(
+  organizationId: string,
   excludeMenuItemIds: string[] = [],
   seed?: string,
-  organizationId?: string,
 ): Promise<GeneratedQuestion | null> {
+  if (!organizationId) {
+    throw new Error('generatePhotoQuestion requires an organizationId');
+  }
   const pool = await fetchMenuItemsWithImages(organizationId);
   const rng = seededRandom(hashString(seed || `photo-${Date.now()}-${Math.random()}`));
   const q = menuPhotoQuestion(pool, rng, new Set(excludeMenuItemIds));
@@ -1106,8 +1109,12 @@ export async function generateQuizQuestions(
   examType: ExamType,
   cycleKey: string,
   questionCount: number = 5,
-  organizationId?: string,
+  organizationId: string,
 ): Promise<GeneratedQuestion[]> {
+  // Org scoping is mandatory: never generate a quiz from another tenant's data.
+  if (!organizationId) {
+    throw new Error('generateQuizQuestions requires an organizationId');
+  }
   const seedStr = `${cycleKey}-${examType}`;
   const rng = seededRandom(hashString(seedStr));
 

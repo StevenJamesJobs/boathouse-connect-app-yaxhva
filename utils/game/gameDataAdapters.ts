@@ -2,21 +2,23 @@ import { CardData, GameMode } from '@/types/game';
 import { createCardPair, selectRandom } from './gameEngine';
 import { WINE_PAIRINGS } from './winePairings';
 import { supabase } from '@/app/integrations/supabase/client';
+import { resolveGameSourceOrgId } from './gameSource';
 
 // Generate card pairs for a specific game mode and pair count
-export async function generateCards(mode: GameMode, pairCount: number, organizationId?: string): Promise<CardData[]> {
+export async function generateCards(mode: GameMode, pairCount: number, organizationId: string, useSampleData: boolean): Promise<CardData[]> {
   switch (mode) {
     case 'wine_pairings':
-      return await generateWinePairingCards(pairCount, organizationId);
+      return await generateWinePairingCards(pairCount, organizationId, useSampleData);
     case 'ingredients_dishes':
-      return await generateIngredientDishCards(pairCount, organizationId);
+      return await generateIngredientDishCards(pairCount, organizationId, useSampleData);
     case 'cocktail_ingredients':
-      return await generateCocktailCards(pairCount, organizationId);
+      return await generateCocktailCards(pairCount, organizationId, useSampleData);
   }
 }
 
 // Mode 1: Wine & Entree Pairings (from DB with static fallback)
-async function generateWinePairingCards(pairCount: number, organizationId?: string): Promise<CardData[]> {
+async function generateWinePairingCards(pairCount: number, organizationId: string, useSampleData: boolean): Promise<CardData[]> {
+  const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
   // Try fetching from DB first
   try {
     let query = (supabase
@@ -24,7 +26,7 @@ async function generateWinePairingCards(pairCount: number, organizationId?: stri
       .select('wine, entree, hint')
       .eq('is_active', true)
       .order('display_order');
-    if (organizationId) query = query.eq('organization_id', organizationId);
+    query = query.eq('organization_id', sourceOrgId);
     const { data: dbPairings, error } = await query;
 
     if (!error && dbPairings && dbPairings.length > 0) {
@@ -63,19 +65,20 @@ async function generateWinePairingCards(pairCount: number, organizationId?: stri
 }
 
 // Mode 2: Ingredients to Dishes (from menu_items table)
-async function generateIngredientDishCards(pairCount: number, organizationId?: string): Promise<CardData[]> {
+async function generateIngredientDishCards(pairCount: number, organizationId: string, useSampleData: boolean): Promise<CardData[]> {
+  const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
   let menuQuery = supabase
     .from('menu_items')
     .select('id, name, description')
     .eq('is_active', true)
     .in('category', ['Dinner', 'Lunch'])
     .not('description', 'is', null);
-  if (organizationId) menuQuery = menuQuery.eq('organization_id', organizationId);
+  menuQuery = menuQuery.eq('organization_id', sourceOrgId);
   const { data: menuItems, error } = await menuQuery as { data: { id: string; name: string; description: string | null }[] | null; error: any };
 
   if (error || !menuItems || menuItems.length === 0) {
     // Fallback to wine pairings if menu data unavailable
-    return generateWinePairingCards(pairCount, organizationId);
+    return generateWinePairingCards(pairCount, organizationId, useSampleData);
   }
 
   // Parse descriptions to extract key ingredients
@@ -106,7 +109,8 @@ async function generateIngredientDishCards(pairCount: number, organizationId?: s
 }
 
 // Mode 3: Cocktail Ingredients to Cocktails (from cocktails + libation_recipes)
-async function generateCocktailCards(pairCount: number, organizationId?: string): Promise<CardData[]> {
+async function generateCocktailCards(pairCount: number, organizationId: string, useSampleData: boolean): Promise<CardData[]> {
+  const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
   // Fetch from both tables
   type CocktailRow = { id: string; name: string; ingredients: string | null; alcohol_type: string };
   type LibationRow = { id: string; name: string; ingredients: any; category: string };
@@ -115,13 +119,13 @@ async function generateCocktailCards(pairCount: number, organizationId?: string)
     .from('cocktails')
     .select('id, name, ingredients, alcohol_type')
     .eq('is_active', true);
-  if (organizationId) cocktailQuery = cocktailQuery.eq('organization_id', organizationId);
+  cocktailQuery = cocktailQuery.eq('organization_id', sourceOrgId);
 
   let libationQuery = supabase
     .from('libation_recipes')
     .select('id, name, ingredients, category')
     .eq('is_active', true);
-  if (organizationId) libationQuery = libationQuery.eq('organization_id', organizationId);
+  libationQuery = libationQuery.eq('organization_id', sourceOrgId);
 
   const [cocktailsResult, libationsResult] = await Promise.all([
     cocktailQuery as unknown as { data: CocktailRow[] | null; error: any },
@@ -153,7 +157,7 @@ async function generateCocktailCards(pairCount: number, organizationId?: string)
   }
 
   if (allPairs.length === 0) {
-    return generateWinePairingCards(pairCount, organizationId);
+    return generateWinePairingCards(pairCount, organizationId, useSampleData);
   }
 
   const selected = selectRandom(allPairs, pairCount);
