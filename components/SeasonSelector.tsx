@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
+import { menuIconAndroid } from '@/constants/menuIcons';
 
 export type Season = 'winter' | 'summer';
 
@@ -11,9 +12,18 @@ interface SeasonSelectorProps {
   onSeasonChange: (season: Season) => void;
   menu1Label?: string;
   menu2Label?: string;
+  menu1Icon?: string;
+  menu2Icon?: string;
 }
 
-export default function SeasonSelector({ selectedSeason, onSeasonChange, menu1Label, menu2Label }: SeasonSelectorProps) {
+export default function SeasonSelector({
+  selectedSeason,
+  onSeasonChange,
+  menu1Label,
+  menu2Label,
+  menu1Icon,
+  menu2Icon,
+}: SeasonSelectorProps) {
   const colors = useThemeColors();
   const { t } = useTranslation();
 
@@ -25,7 +35,8 @@ export default function SeasonSelector({ selectedSeason, onSeasonChange, menu1La
         activeOpacity={0.7}
       >
         <IconSymbol
-          ios_icon_name="snowflake" android_material_icon_name="ac-unit"
+          ios_icon_name={menu1Icon || 'snowflake'}
+          android_material_icon_name={menuIconAndroid(menu1Icon || 'snowflake')}
           size={16} color={selectedSeason === 'winter' ? colors.primary : colors.textSecondary}
         />
         <Text style={[styles.label, { color: selectedSeason === 'winter' ? colors.text : colors.textSecondary }]}>
@@ -38,7 +49,8 @@ export default function SeasonSelector({ selectedSeason, onSeasonChange, menu1La
         activeOpacity={0.7}
       >
         <IconSymbol
-          ios_icon_name="sun.max.fill" android_material_icon_name="wb-sunny"
+          ios_icon_name={menu2Icon || 'sun.max.fill'}
+          android_material_icon_name={menuIconAndroid(menu2Icon || 'sun.max.fill')}
           size={16} color={selectedSeason === 'summer' ? colors.primary : colors.textSecondary}
         />
         <Text style={[styles.label, { color: selectedSeason === 'summer' ? colors.text : colors.textSecondary }]}>

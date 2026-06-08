@@ -59,7 +59,7 @@ export default function LibationRecipesEditorScreen() {
   const { user } = useAuth();
   const colors = useThemeColors();
   const { language } = useLanguage();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
   const procedureInputRef = useRef<TextInput>(null);
   const [procedureSelection, setProcedureSelection] = useState({ start: 0, end: 0 });
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
@@ -451,7 +451,9 @@ export default function LibationRecipesEditorScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('libation_editor.title')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          {organization?.menu_1_name ? `${organization.menu_1_name} ${t('libation_editor.title')}` : t('libation_editor.title')}
+        </Text>
         <View style={styles.backButton} />
       </View>
 

@@ -186,6 +186,29 @@ const ICON_MAP: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   'person.3.fill': 'groups',
   'book.pages': 'menu-book',
   'list.clipboard.fill': 'list-alt',
+
+  // Customizable menu / header icons (keep in sync with constants/menuIcons.ts)
+  'leaf.fill': 'eco',
+  'sparkles': 'auto-awesome',
+  'moon.stars.fill': 'nights-stay',
+  'fork.knife': 'restaurant',
+  'wineglass.fill': 'wine-bar',
+  'cup.and.saucer.fill': 'local-cafe',
+  'cup.and.straw.fill': 'local-bar',
+  'fish.fill': 'set-meal',
+  'takeoutbag.and.cup.and.straw.fill': 'takeout-dining',
+  'popcorn.fill': 'fastfood',
+  'birthday.cake.fill': 'cake',
+  'carrot.fill': 'local-florist',
+  'heart.fill': 'favorite',
+  'gift.fill': 'card-giftcard',
+  'drop.fill': 'water-drop',
+  'bolt.fill': 'bolt',
+  'trophy.fill': 'emoji-events',
+  'sailboat.fill': 'sailing',
+  'globe.americas.fill': 'public',
+  'building.2.fill': 'storefront',
+  'snowflake': 'ac-unit',
 };
 
 /**

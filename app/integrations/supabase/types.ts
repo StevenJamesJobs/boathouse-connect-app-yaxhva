@@ -1659,7 +1659,10 @@ export type Database = {
           latitude: number | null
           logo_url: string | null
           longitude: number | null
+          header_icon: string
+          menu_1_icon: string
           menu_1_name: string
+          menu_2_icon: string
           menu_2_name: string
           menu_count: number
           name: string
@@ -1684,7 +1687,10 @@ export type Database = {
           latitude?: number | null
           logo_url?: string | null
           longitude?: number | null
+          header_icon?: string
+          menu_1_icon?: string
           menu_1_name?: string
+          menu_2_icon?: string
           menu_2_name?: string
           menu_count?: number
           name: string
@@ -1709,7 +1715,10 @@ export type Database = {
           latitude?: number | null
           logo_url?: string | null
           longitude?: number | null
+          header_icon?: string
+          menu_1_icon?: string
           menu_1_name?: string
+          menu_2_icon?: string
           menu_2_name?: string
           menu_count?: number
           name?: string
@@ -3629,7 +3638,10 @@ export type Database = {
           p_city?: string
           p_default_password?: string
           p_google_maps_query?: string
+          p_header_icon?: string
+          p_menu_1_icon?: string
           p_menu_1_name?: string
+          p_menu_2_icon?: string
           p_menu_2_name?: string
           p_menu_count?: number
           p_name?: string

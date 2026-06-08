@@ -21,6 +21,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import MenuIconPicker from '@/components/MenuIconPicker';
 import JobTitlesManager from '@/components/JobTitlesManager';
 import AssistantsManager from '@/components/AssistantsManager';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -59,6 +60,9 @@ export default function OrganizationSettingsScreen() {
   const [menuCount, setMenuCount] = useState<1 | 2>(2);
   const [menu1Name, setMenu1Name] = useState('');
   const [menu2Name, setMenu2Name] = useState('');
+  const [menu1Icon, setMenu1Icon] = useState('snowflake');
+  const [menu2Icon, setMenu2Icon] = useState('sun.max.fill');
+  const [headerIcon, setHeaderIcon] = useState('fork.knife');
   const [defaultPassword, setDefaultPassword] = useState('');
 
   useEffect(() => {
@@ -74,6 +78,9 @@ export default function OrganizationSettingsScreen() {
     setMenuCount(organization.menu_count);
     setMenu1Name(organization.menu_1_name);
     setMenu2Name(organization.menu_2_name);
+    setMenu1Icon(organization.menu_1_icon);
+    setMenu2Icon(organization.menu_2_icon);
+    setHeaderIcon(organization.header_icon);
     setDefaultPassword(organization.default_password);
     setLogoPreview(organization.logo_url);
   }, [organization]);
@@ -207,6 +214,9 @@ export default function OrganizationSettingsScreen() {
         p_menu_1_name: menu1Name.trim() || 'Menu 1',
         p_menu_2_name: menu2Name.trim() || 'Menu 2',
         p_default_password: defaultPassword.trim() || 'welcome123',
+        p_menu_1_icon: menu1Icon,
+        p_menu_2_icon: menu2Icon,
+        p_header_icon: headerIcon,
       });
 
       if (error) throw error;
@@ -494,18 +504,29 @@ export default function OrganizationSettingsScreen() {
                   placeholderTextColor={colors.textSecondary}
                 />
               </View>
+              <View style={styles.fieldContainer}>
+                <MenuIconPicker label={`${menu1Name || 'Menu 1'} Icon`} value={menu1Icon} onChange={setMenu1Icon} />
+              </View>
               {menuCount === 2 && (
-                <View style={styles.fieldContainer}>
-                  <Text style={styles.fieldLabel}>Menu 2 Name</Text>
-                  <TextInput
-                    style={styles.input}
-                    value={menu2Name}
-                    onChangeText={setMenu2Name}
-                    placeholder="e.g. Summer, Dinner, Seasonal"
-                    placeholderTextColor={colors.textSecondary}
-                  />
-                </View>
+                <>
+                  <View style={styles.fieldContainer}>
+                    <Text style={styles.fieldLabel}>Menu 2 Name</Text>
+                    <TextInput
+                      style={styles.input}
+                      value={menu2Name}
+                      onChangeText={setMenu2Name}
+                      placeholder="e.g. Summer, Dinner, Seasonal"
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                  </View>
+                  <View style={styles.fieldContainer}>
+                    <MenuIconPicker label={`${menu2Name || 'Menu 2'} Icon`} value={menu2Icon} onChange={setMenu2Icon} />
+                  </View>
+                </>
               )}
+              <View style={styles.fieldContainer}>
+                <MenuIconPicker label="Header Icon (top bar, next to your name)" value={headerIcon} onChange={setHeaderIcon} />
+              </View>
             </View>
           </>
         )}

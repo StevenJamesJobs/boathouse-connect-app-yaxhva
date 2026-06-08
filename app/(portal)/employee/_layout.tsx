@@ -30,8 +30,8 @@ function EmployeeHeader() {
     <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
       <View style={styles.cornerBrand}>
         <IconSymbol
-          ios_icon_name="sailboat.fill"
-          android_material_icon_name="sailing"
+          ios_icon_name={organization?.header_icon || 'sailboat.fill'}
+          android_material_icon_name={organization?.header_icon || 'sailboat.fill'}
           size={22}
           color={colors.primary}
         />
