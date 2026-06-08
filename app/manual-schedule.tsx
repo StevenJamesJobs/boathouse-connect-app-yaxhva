@@ -195,11 +195,8 @@ export default function ManualScheduleScreen() {
 
   const handlePremiumFeature = () => {
     if (hasPremium) {
-      Alert.alert(
-        'Coming Soon',
-        'AI Schedule Upload is in development. This feature will let you upload a photo or PDF of your schedule and our AI will automatically parse and assign shifts.',
-        [{ text: 'OK' }]
-      );
+      // AI Schedule Upload is live — open the uploader (PDF/image → AI parse).
+      router.push('/schedule-upload' as any);
     } else {
       Alert.alert(
         'Premium Feature',
