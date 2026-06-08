@@ -372,6 +372,11 @@ export default function OrganizationSettingsScreen() {
                     </TouchableOpacity>
                   )}
                 </View>
+              </View>
+
+              {/* Header Icon — paired with the logo since both appear in the app header */}
+              <View style={styles.fieldContainer}>
+                <MenuIconPicker label="Header Icon (shown next to your restaurant name)" value={headerIcon} onChange={setHeaderIcon} />
                 <Text style={styles.fieldHint}>Displayed on the login screen and app header</Text>
               </View>
 
@@ -524,9 +529,6 @@ export default function OrganizationSettingsScreen() {
                   </View>
                 </>
               )}
-              <View style={styles.fieldContainer}>
-                <MenuIconPicker label="Header Icon (top bar, next to your name)" value={headerIcon} onChange={setHeaderIcon} />
-              </View>
             </View>
           </>
         )}

@@ -12,11 +12,14 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { menuIconAndroid } from '@/constants/menuIcons';
 
 export default function BartenderAssistantEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { organization } = useOrganization();
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Header */}
@@ -104,15 +107,15 @@ export default function BartenderAssistantEditorScreen() {
         >
           <View style={styles.cardContent}>
             <IconSymbol
-              ios_icon_name="sun.max.fill"
-              android_material_icon_name="wb-sunny"
+              ios_icon_name={organization?.menu_2_icon || 'sun.max.fill'}
+              android_material_icon_name={menuIconAndroid(organization?.menu_2_icon || 'sun.max.fill')}
               size={28}
               color={colors.primary}
             />
             <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.summer_libation_recipes_editor')}</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{`${organization?.menu_2_name || 'Summer'} ${t('bartender_assistant_editor.libation_recipes_editor_suffix')}`}</Text>
               <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                {t('bartender_assistant_editor.summer_libation_recipes_editor_desc')}
+                {t('bartender_assistant_editor.summer_libation_recipes_editor_desc', { menu: organization?.menu_2_name || 'Summer' })}
               </Text>
             </View>
             <IconSymbol
@@ -132,15 +135,15 @@ export default function BartenderAssistantEditorScreen() {
         >
           <View style={styles.cardContent}>
             <IconSymbol
-              ios_icon_name="snowflake"
-              android_material_icon_name="ac-unit"
+              ios_icon_name={organization?.menu_1_icon || 'snowflake'}
+              android_material_icon_name={menuIconAndroid(organization?.menu_1_icon || 'snowflake')}
               size={28}
               color={colors.primary}
             />
             <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('bartender_assistant_editor.winter_libation_recipes_editor')}</Text>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{`${organization?.menu_1_name || 'Winter'} ${t('bartender_assistant_editor.libation_recipes_editor_suffix')}`}</Text>
               <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                {t('bartender_assistant_editor.winter_libation_recipes_editor_desc')}
+                {t('bartender_assistant_editor.winter_libation_recipes_editor_desc', { menu: organization?.menu_1_name || 'Winter' })}
               </Text>
             </View>
             <IconSymbol
