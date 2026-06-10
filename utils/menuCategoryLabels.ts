@@ -1,0 +1,166 @@
+import type { MenuCategory, MenuSubcategory } from '@/hooks/useMenuCategories';
+
+// Label + behavior helpers for the owner-editable menu category tree (D4).
+//
+// LABELS are resolved by display_name against the canonical built-in names: an
+// unrenamed built-in (e.g. "Wine", "Starters") maps to its i18n key so EN/ES
+// localization still works; a renamed built-in or a custom category no longer
+// matches a canonical name and falls back to its raw display_name. This mirrors
+// the original `KEY ? t(KEY) : raw` behavior and gives "renamed → raw" for free.
+//
+// BEHAVIOR (filtering, Wine form, cocktail injection) keys off system_key /
+// filter_behavior / is_cocktail_fed — never the display name — so it survives
+// renames.
+
+type TFunc = (key: string) => string;
+
+// Canonical English name → i18n key (same key strings the constants used).
+export const CATEGORY_TRANSLATION_KEYS: { [name: string]: string } = {
+  'Weekly Specials': 'menu_display.weekly_specials',
+  Lunch: 'menu_display.lunch',
+  Dinner: 'menu_display.dinner',
+  Libations: 'menu_display.libations',
+  Wine: 'menu_display.wine',
+  'Happy Hour': 'menu_display.happy_hour',
+};
+
+export const SUBCATEGORY_TRANSLATION_KEYS: { [name: string]: string } = {
+  Starters: 'menu_display.starters',
+  'Raw Bar': 'menu_display.raw_bar',
+  Soups: 'menu_display.soups',
+  Tacos: 'menu_display.tacos',
+  Salads: 'menu_display.salads',
+  Burgers: 'menu_display.burgers',
+  Sandwiches: 'menu_display.sandwiches',
+  Sides: 'menu_display.sides',
+  Entrees: 'menu_display.entrees',
+  Pasta: 'menu_display.pasta',
+  'Signature Cocktails': 'menu_display.signature_cocktails',
+  Martinis: 'menu_display.martinis',
+  Sangria: 'menu_display.sangria',
+  'Low ABV': 'menu_display.low_abv',
+  'Zero ABV': 'menu_display.zero_abv',
+  'Draft Beer': 'menu_display.draft_beer',
+  'Bottle & Cans': 'menu_display.bottle_and_cans',
+  Sparkling: 'menu_display.sparkling',
+  Rose: 'menu_display.rose',
+  Chardonnay: 'menu_display.chardonnay',
+  'Pinot Grigio': 'menu_display.pinot_grigio',
+  'Sauvignon Blanc': 'menu_display.sauvignon_blanc',
+  'Interesting Whites': 'menu_display.interesting_whites',
+  'Cabernet Sauvignon': 'menu_display.cabernet_sauvignon',
+  'Pinot Noir': 'menu_display.pinot_noir',
+  Merlot: 'menu_display.merlot',
+  'Italian Reds': 'menu_display.italian_reds',
+  'Interesting Reds': 'menu_display.interesting_reds',
+  Appetizers: 'menu_display.appetizers',
+  Drinks: 'menu_display.drinks',
+  Spirits: 'menu_display.spirits',
+  All: 'menu_display.all',
+};
+
+/** Virtual "All" subcategory system_key used by MenuDisplay (never persisted). */
+export const ALL_SUBCATEGORY_KEY = 'sub.__all__';
+
+export function categoryLabel(cat: Pick<MenuCategory, 'display_name'>, t: TFunc): string {
+  const key = CATEGORY_TRANSLATION_KEYS[cat.display_name];
+  return key ? t(key) : cat.display_name;
+}
+
+export function subcategoryLabel(sub: Pick<MenuSubcategory, 'display_name' | 'system_key'>, t: TFunc): string {
+  if (sub.system_key === ALL_SUBCATEGORY_KEY) return t('menu_display.all');
+  const key = SUBCATEGORY_TRANSLATION_KEYS[sub.display_name];
+  return key ? t(key) : sub.display_name;
+}
+
+/** Plain string variant (for resolving names that aren't a category object). */
+export function labelForCategoryName(name: string, t: TFunc): string {
+  const key = CATEGORY_TRANSLATION_KEYS[name];
+  return key ? t(key) : name;
+}
+export function labelForSubcategoryName(name: string, t: TFunc): string {
+  const key = SUBCATEGORY_TRANSLATION_KEYS[name];
+  return key ? t(key) : name;
+}
+
+// --- Behavior helpers (key off system_key, not display name) ----------------
+
+export function findCategoryByName(
+  categories: MenuCategory[],
+  name: string | null | undefined,
+): MenuCategory | undefined {
+  if (!name) return undefined;
+  return categories.find((c) => c.display_name === name);
+}
+
+/** True when the given category display_name resolves to the Wine built-in. */
+export function isWineCategoryName(categories: MenuCategory[], name: string | null | undefined): boolean {
+  return findCategoryByName(categories, name)?.system_key === 'cat.wine';
+}
+
+// Recipe-table category vocabulary → cocktail-fed subcategory system_key.
+// The libation_recipes / summer_libation_recipes tables use a FIXED vocabulary
+// (this is recipe-table data, not menu vocabulary, so it legitimately stays
+// static). MenuDisplay resolves the system_key to the org's CURRENT subcategory
+// display_name so injected cocktails follow renames.
+export const RECIPE_CATEGORY_TO_SUBCATEGORY_KEY: Record<string, string> = {
+  Featured: 'sub.signature_cocktails',
+  'Signature Cocktails': 'sub.signature_cocktails',
+  Martinis: 'sub.martinis',
+  Sangrias: 'sub.sangria',
+  'Low ABV': 'sub.low_abv',
+  'No ABV': 'sub.zero_abv',
+};
+
+// The fixed recipe-table category vocabulary (the values stored in
+// libation_recipes.category / summer_libation_recipes.category). Stable — never
+// renamed — so injection and existing rows keep working; only the LABEL shown to
+// owners changes (see below).
+export const LIBATION_RECIPE_CATEGORY_VALUES = [
+  'Featured',
+  'Signature Cocktails',
+  'Martinis',
+  'Sangrias',
+  'Low ABV',
+  'No ABV',
+] as const;
+
+/**
+ * Resolve a recipe-table category value to the label the recipe editors/viewers
+ * should show: the org's CURRENT Libations cocktail-subcategory name (by
+ * system_key), so renamed cocktail subs (e.g. "Signature Cocktails" → "Bubbly")
+ * appear in the recipe editors too. Unrenamed built-ins fall through
+ * subcategoryLabel to their i18n translation. 'Featured' is a pin-to-top
+ * placement, not a subcategory, so it keeps its own `fallback` label.
+ */
+export function libationRecipeCategoryLabel(
+  categories: MenuCategory[],
+  recipeCategory: string,
+  t: TFunc,
+  fallback: string,
+): string {
+  if (recipeCategory === 'Featured') return fallback;
+  const subKey = RECIPE_CATEGORY_TO_SUBCATEGORY_KEY[recipeCategory];
+  if (!subKey) return fallback;
+  const libCat = categories.find((c) => c.system_key === 'cat.libations');
+  const sub = libCat?.subcategories.find((s) => s.system_key === subKey);
+  return sub ? subcategoryLabel(sub, t) : fallback;
+}
+
+export interface RecipeCategoryOption {
+  value: string;
+  label: string;
+}
+
+/** Build the recipe-editor category picker options: stable `value` stored on the
+ *  recipe row, `label` showing the org's current cocktail-subcategory names. */
+export function libationRecipeCategoryOptions(
+  categories: MenuCategory[],
+  t: TFunc,
+  fallbackLabel: (recipeCategory: string) => string,
+): RecipeCategoryOption[] {
+  return LIBATION_RECIPE_CATEGORY_VALUES.map((value) => ({
+    value,
+    label: libationRecipeCategoryLabel(categories, value, t, fallbackLabel(value)),
+  }));
+}

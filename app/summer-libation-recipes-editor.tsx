@@ -26,6 +26,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useMenuCategories } from '@/hooks/useMenuCategories';
+import { libationRecipeCategoryOptions } from '@/utils/menuCategoryLabels';
 
 interface LibationRecipe {
   id: string;
@@ -60,6 +62,8 @@ export default function SummerLibationRecipesEditorScreen() {
   const colors = useThemeColors();
   const { language } = useLanguage();
   const { organizationId, organization } = useOrganization();
+  const { categories: menuCats } = useMenuCategories({ includeHidden: true });
+  const categoryOptions = libationRecipeCategoryOptions(menuCats, t, (v) => v);
   const procedureInputRef = useRef<TextInput>(null);
   const [procedureSelection, setProcedureSelection] = useState({ start: 0, end: 0 });
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
@@ -543,22 +547,22 @@ export default function SummerLibationRecipesEditorScreen() {
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>{t('summer_libation_editor.category_label')}</Text>
                 <View style={styles.picker}>
-                  {CATEGORIES.map((cat, index) => (
+                  {categoryOptions.map((opt) => (
                     <TouchableOpacity
-                      key={index}
+                      key={opt.value}
                       style={[
                         styles.pickerOption,
-                        category === cat && { backgroundColor: colors.highlight }
+                        category === opt.value && { backgroundColor: colors.highlight }
                       ]}
-                      onPress={() => setCategory(cat)}
+                      onPress={() => setCategory(opt.value)}
                     >
                       <Text
                         style={[
                           styles.pickerOptionText,
-                          category === cat && { color: colors.text, fontWeight: '600' }
+                          category === opt.value && { color: colors.text, fontWeight: '600' }
                         ]}
                       >
-                        {cat}
+                        {opt.label}
                       </Text>
                     </TouchableOpacity>
                   ))}

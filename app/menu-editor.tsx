@@ -17,7 +17,7 @@ import {
   FlatList,
   Dimensions,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -34,6 +34,8 @@ import FormattedText from '@/components/FormattedText';
 import CategoryPill from '@/components/CategoryPill';
 import SeasonSelector, { type Season } from '@/components/SeasonSelector';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useMenuCategories } from '@/hooks/useMenuCategories';
+import { categoryLabel, subcategoryLabel, findCategoryByName } from '@/utils/menuCategoryLabels';
 
 interface MenuItem {
   id: string;
@@ -67,78 +69,13 @@ interface MenuItem {
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-const CATEGORIES = ['Weekly Specials', 'Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
-
-const CATEGORY_TRANSLATION_KEYS: { [key: string]: string } = {
-  'Weekly Specials': 'menu_display.weekly_specials',
-  'Lunch': 'menu_display.lunch',
-  'Dinner': 'menu_display.dinner',
-  'Libations': 'menu_display.libations',
-  'Wine': 'menu_display.wine',
-  'Happy Hour': 'menu_display.happy_hour',
-};
-
-const SUBCATEGORY_TRANSLATION_KEYS: { [key: string]: string } = {
-  'Starters': 'menu_display.starters',
-  'Raw Bar': 'menu_display.raw_bar',
-  'Soups': 'menu_display.soups',
-  'Tacos': 'menu_display.tacos',
-  'Salads': 'menu_display.salads',
-  'Burgers': 'menu_display.burgers',
-  'Sandwiches': 'menu_display.sandwiches',
-  'Sides': 'menu_display.sides',
-  'Entrees': 'menu_display.entrees',
-  'Pasta': 'menu_display.pasta',
-  'Signature Cocktails': 'menu_display.signature_cocktails',
-  'Martinis': 'menu_display.martinis',
-  'Sangria': 'menu_display.sangria',
-  'Low ABV': 'menu_display.low_abv',
-  'Zero ABV': 'menu_display.zero_abv',
-  'Draft Beer': 'menu_display.draft_beer',
-  'Bottle & Cans': 'menu_display.bottle_and_cans',
-  'Sparkling': 'menu_display.sparkling',
-  'Rose': 'menu_display.rose',
-  'Chardonnay': 'menu_display.chardonnay',
-  'Pinot Grigio': 'menu_display.pinot_grigio',
-  'Sauvignon Blanc': 'menu_display.sauvignon_blanc',
-  'Interesting Whites': 'menu_display.interesting_whites',
-  'Cabernet Sauvignon': 'menu_display.cabernet_sauvignon',
-  'Pinot Noir': 'menu_display.pinot_noir',
-  'Merlot': 'menu_display.merlot',
-  'Italian Reds': 'menu_display.italian_reds',
-  'Interesting Reds': 'menu_display.interesting_reds',
-  'Appetizers': 'menu_display.appetizers',
-  'Drinks': 'menu_display.drinks',
-  'Spirits': 'menu_display.spirits',
-};
-
-const SUBCATEGORIES: { [key: string]: string[] } = {
-  'Weekly Specials': [],
-  Lunch: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Burgers', 'Sandwiches', 'Sides'],
-  Dinner: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Entrees', 'Pasta', 'Sides'],
-  Libations: ['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV', 'Draft Beer', 'Bottle & Cans'],
-  Wine: ['Sparkling', 'Rose', 'Chardonnay', 'Pinot Grigio', 'Sauvignon Blanc', 'Interesting Whites', 'Cabernet Sauvignon', 'Pinot Noir', 'Merlot', 'Italian Reds', 'Interesting Reds'],
-  'Happy Hour': ['Appetizers', 'Drinks', 'Spirits'],
-};
-
-// Libation subcategories managed via Summer Libation Recipes Editor when season='summer'
-const COCKTAIL_SUBCATEGORIES = new Set(['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV']);
-
-// Build flat page sequence for horizontal swipe navigation (mirrors MenuDisplay)
+// The category/subcategory tree is loaded per-org from the DB (useMenuCategories).
+// Labels/behavior resolve through utils/menuCategoryLabels: built-ins keep their
+// i18n labels; renamed or custom names show raw. The swipe-pager page sequence is
+// derived per-render from the loaded categories (see `pages` in the component).
 interface PageConfig {
   category: string;
   subcategory: string | null;
-}
-const PAGES: PageConfig[] = [];
-for (const category of CATEGORIES) {
-  const subs = SUBCATEGORIES[category];
-  if (!subs || subs.length === 0) {
-    PAGES.push({ category, subcategory: null });
-  } else {
-    for (const sub of subs) {
-      PAGES.push({ category, subcategory: sub });
-    }
-  }
 }
 
 export default function MenuEditorScreen() {
@@ -148,6 +85,7 @@ export default function MenuEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
+  const { categories: menuCats, loading: categoriesLoading, refresh: refreshCategories } = useMenuCategories({ includeHidden: true });
   const { language } = useLanguage();
   const [season, setSeason] = useState<Season>('summer');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -160,10 +98,46 @@ export default function MenuEditorScreen() {
   const subcategoryScrollRef = useRef<ScrollView>(null);
   const categoryLayoutsRef = useRef<{ [key: string]: { x: number; width: number } }>({});
   const subcategoryLayoutsRef = useRef<{ [key: string]: { x: number; width: number } }>({});
+  // Page sequence derived from the loaded category tree: one page per
+  // subcategory, or a single page for a category with no subcategories.
+  const pages = useMemo<PageConfig[]>(() => {
+    const out: PageConfig[] = [];
+    for (const cat of menuCats) {
+      if (!cat.subcategories || cat.subcategories.length === 0) {
+        out.push({ category: cat.display_name, subcategory: null });
+      } else {
+        for (const sub of cat.subcategories) {
+          out.push({ category: cat.display_name, subcategory: sub.display_name });
+        }
+      }
+    }
+    return out;
+  }, [menuCats]);
+
   // Derive selected category/subcategory from current page index
-  const currentPage = PAGES[currentPageIndex] || PAGES[0];
+  const currentPage = pages[currentPageIndex] || pages[0] || { category: '', subcategory: null };
   const selectedCategory = currentPage.category;
   const selectedSubcategory = currentPage.subcategory;
+
+  // Behavior resolves by (possibly renamed) display name → system_key/filter_behavior.
+  const categoryMatches = useCallback(
+    (item: MenuItem, categoryName: string): boolean => {
+      const fb = findCategoryByName(menuCats, categoryName)?.filter_behavior;
+      if (fb === 'lunch') return item.available_for_lunch;
+      if (fb === 'dinner') return item.available_for_dinner;
+      return item.category === categoryName;
+    },
+    [menuCats],
+  );
+  const isWineName = useCallback(
+    (name: string | null | undefined) => findCategoryByName(menuCats, name)?.system_key === 'cat.wine',
+    [menuCats],
+  );
+  const selectedCategoryObj = findCategoryByName(menuCats, selectedCategory);
+  const selectedSubObj = selectedCategoryObj?.subcategories.find((s) => s.display_name === selectedSubcategory);
+  // Availability checkbox/tag labels follow the lunch/dinner category renames.
+  const lunchName = menuCats.find((c) => c.filter_behavior === 'lunch')?.display_name || t('menu_editor:available_lunch');
+  const dinnerName = menuCats.find((c) => c.filter_behavior === 'dinner')?.display_name || t('menu_editor:available_dinner');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
@@ -208,6 +182,13 @@ export default function MenuEditorScreen() {
     pagerRef.current?.scrollToIndex({ index: 0, animated: false });
   }, [season]);
 
+  // Refresh the category tree when returning from the Manage Categories screen.
+  useFocusEffect(
+    useCallback(() => {
+      refreshCategories();
+    }, [refreshCategories]),
+  );
+
   const loadMenuItems = async () => {
     try {
       setLoading(true);
@@ -246,18 +227,10 @@ export default function MenuEditorScreen() {
           (item.is_vegetarian_available && ('va'.includes(query) || 'vegetarian available'.includes(query)))
       );
     } else {
-      // Only filter by category/subcategory if there's NO search query
-      // Filter by category
-      if (selectedCategory === 'Weekly Specials') {
-        filtered = filtered.filter(item => item.category === 'Weekly Specials');
-      } else if (selectedCategory === 'Lunch') {
-        filtered = filtered.filter(item => item.available_for_lunch);
-      } else if (selectedCategory === 'Dinner') {
-        filtered = filtered.filter(item => item.available_for_dinner);
-      } else {
-        // For other categories (Libations, Wine, Happy Hour), use the category field
-        filtered = filtered.filter(item => item.category === selectedCategory);
-      }
+      // Only filter by category/subcategory if there's NO search query.
+      // Lunch/Dinner resolve to availability booleans; everything else matches
+      // the category field (see categoryMatches).
+      filtered = filtered.filter(item => categoryMatches(item, selectedCategory));
 
       // Filter by subcategory if selected
       if (selectedSubcategory) {
@@ -266,7 +239,7 @@ export default function MenuEditorScreen() {
     }
 
     setFilteredItems(filtered);
-  }, [menuItems, searchQuery, selectedCategory, selectedSubcategory]);
+  }, [menuItems, searchQuery, selectedCategory, selectedSubcategory, categoryMatches]);
 
   useEffect(() => {
     filterItems();
@@ -276,9 +249,9 @@ export default function MenuEditorScreen() {
   const navigateToPage = (category: string, subcategory?: string | null) => {
     let targetIndex: number;
     if (subcategory) {
-      targetIndex = PAGES.findIndex(p => p.category === category && p.subcategory === subcategory);
+      targetIndex = pages.findIndex(p => p.category === category && p.subcategory === subcategory);
     } else {
-      targetIndex = PAGES.findIndex(p => p.category === category);
+      targetIndex = pages.findIndex(p => p.category === category);
     }
     if (targetIndex >= 0) {
       setCurrentPageIndex(targetIndex);
@@ -290,7 +263,7 @@ export default function MenuEditorScreen() {
   const onMomentumScrollEnd = (event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const newIndex = Math.round(offsetX / SCREEN_WIDTH);
-    if (newIndex >= 0 && newIndex < PAGES.length && newIndex !== currentPageIndex) {
+    if (newIndex >= 0 && newIndex < pages.length && newIndex !== currentPageIndex) {
       setCurrentPageIndex(newIndex);
     }
   };
@@ -333,21 +306,12 @@ export default function MenuEditorScreen() {
 
   // Get items for a specific page (used by the horizontal pager)
   const getItemsForPage = useCallback((page: PageConfig): MenuItem[] => {
-    let filtered = menuItems;
-    if (page.category === 'Weekly Specials') {
-      filtered = filtered.filter(item => item.category === 'Weekly Specials');
-    } else if (page.category === 'Lunch') {
-      filtered = filtered.filter(item => item.available_for_lunch);
-    } else if (page.category === 'Dinner') {
-      filtered = filtered.filter(item => item.available_for_dinner);
-    } else {
-      filtered = filtered.filter(item => item.category === page.category);
-    }
+    let filtered = menuItems.filter(item => categoryMatches(item, page.category));
     if (page.subcategory) {
       filtered = filtered.filter(item => item.subcategory === page.subcategory);
     }
     return filtered;
-  }, [menuItems]);
+  }, [menuItems, categoryMatches]);
 
   const pickImage = async () => {
     try {
@@ -430,7 +394,7 @@ export default function MenuEditorScreen() {
   };
 
   const handleAutoTranslate = async () => {
-    const isWine = formData.category === 'Wine';
+    const isWine = isWineName(formData.category);
     const hasAny = formData.name || formData.description ||
       (isWine && (formData.flavor_profile || formData.unique_selling_points));
     if (!hasAny) {
@@ -465,7 +429,7 @@ export default function MenuEditorScreen() {
   };
 
   const handleSave = async () => {
-    const isWine = formData.category === 'Wine';
+    const isWine = isWineName(formData.category);
     // Wines validate on glass OR bottle price (members may not order all tiers);
     // non-wines still require the legacy single price.
     const winePriceMissing = isWine && !formData.glass_price && !formData.bottle_price;
@@ -793,8 +757,8 @@ export default function MenuEditorScreen() {
       price: '',
       category: selectedCategory,
       subcategory: selectedSubcategory || '',
-      available_for_lunch: selectedCategory === 'Lunch',
-      available_for_dinner: selectedCategory === 'Dinner',
+      available_for_lunch: findCategoryByName(menuCats, selectedCategory)?.filter_behavior === 'lunch',
+      available_for_dinner: findCategoryByName(menuCats, selectedCategory)?.filter_behavior === 'dinner',
       is_gluten_free: false,
       is_gluten_free_available: false,
       is_vegetarian: false,
@@ -883,7 +847,7 @@ export default function MenuEditorScreen() {
   // Compact price label for the editor preview card. Wines collapse to
   // "Glass / Bottle" tiers; non-wines fall back to the legacy single price.
   const formatItemPriceLabel = (item: MenuItem) => {
-    if (item.category === 'Wine') {
+    if (isWineName(item.category)) {
       const parts: string[] = [];
       if (item.glass_price) parts.push(`Gl ${formatPrice(item.glass_price)}`);
       if (item.bottle_price) parts.push(`Btl ${formatPrice(item.bottle_price)}`);
@@ -905,7 +869,18 @@ export default function MenuEditorScreen() {
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('menu_editor:title')}</Text>
-        <View style={styles.backButton} />
+        {user?.role === 'owner' ? (
+          <TouchableOpacity onPress={() => router.push('/manage-menu-categories' as any)} style={styles.backButton}>
+            <IconSymbol
+              ios_icon_name="slider.horizontal.3"
+              android_material_icon_name="tune"
+              size={22}
+              color={colors.text}
+            />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backButton} />
+        )}
       </View>
 
       {/* Season Selector */}
@@ -987,15 +962,15 @@ export default function MenuEditorScreen() {
           style={styles.categoryScroll}
           contentContainerStyle={styles.categoryScrollContent}
         >
-          {CATEGORIES.map((category, index) => (
+          {menuCats.map((cat) => (
             <CategoryPill
-              key={index}
+              key={cat.id}
               size="lg"
-              label={CATEGORY_TRANSLATION_KEYS[category] ? t(CATEGORY_TRANSLATION_KEYS[category]) : category}
-              selected={selectedCategory === category}
-              onPress={() => navigateToPage(category)}
+              label={categoryLabel(cat, t)}
+              selected={selectedCategory === cat.display_name}
+              onPress={() => navigateToPage(cat.display_name)}
               onLayout={(e) => {
-                categoryLayoutsRef.current[category] = {
+                categoryLayoutsRef.current[cat.display_name] = {
                   x: e.nativeEvent.layout.x,
                   width: e.nativeEvent.layout.width,
                 };
@@ -1006,7 +981,7 @@ export default function MenuEditorScreen() {
       )}
 
       {/* Subcategory Tabs - Only show when NOT searching */}
-      {!searchQuery && SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
+      {!searchQuery && selectedCategoryObj && selectedCategoryObj.subcategories.length > 0 && (
         <ScrollView
           ref={subcategoryScrollRef}
           horizontal
@@ -1014,15 +989,15 @@ export default function MenuEditorScreen() {
           style={styles.subcategoryScroll}
           contentContainerStyle={styles.subcategoryScrollContent}
         >
-          {SUBCATEGORIES[selectedCategory].map((subcategory, index) => (
+          {selectedCategoryObj.subcategories.map((sub) => (
             <CategoryPill
-              key={index}
+              key={sub.id}
               size="sm"
-              label={SUBCATEGORY_TRANSLATION_KEYS[subcategory] ? t(SUBCATEGORY_TRANSLATION_KEYS[subcategory]) : subcategory}
-              selected={selectedSubcategory === subcategory}
-              onPress={() => navigateToPage(selectedCategory, subcategory)}
+              label={subcategoryLabel(sub, t)}
+              selected={selectedSubcategory === sub.display_name}
+              onPress={() => navigateToPage(selectedCategory, sub.display_name)}
               onLayout={(e) => {
-                subcategoryLayoutsRef.current[`${selectedCategory}_${subcategory}`] = {
+                subcategoryLayoutsRef.current[`${selectedCategory}_${sub.display_name}`] = {
                   x: e.nativeEvent.layout.x,
                   width: e.nativeEvent.layout.width,
                 };
@@ -1033,7 +1008,7 @@ export default function MenuEditorScreen() {
       )}
 
       {/* Summer Libation cocktails redirect banner */}
-      {season === 'summer' && selectedCategory === 'Libations' && selectedSubcategory && COCKTAIL_SUBCATEGORIES.has(selectedSubcategory) && !searchQuery && (
+      {season === 'summer' && selectedSubObj?.is_cocktail_fed && !searchQuery && (
         <TouchableOpacity
           style={styles.libationBanner}
           onPress={() => router.push('/summer-libation-recipes-editor' as any)}
@@ -1048,7 +1023,7 @@ export default function MenuEditorScreen() {
       )}
 
       {/* Menu Items List */}
-      {loading ? (
+      {(loading || categoriesLoading) ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -1100,8 +1075,8 @@ export default function MenuEditorScreen() {
                       )}
                       <View style={styles.menuItemTags}>
                         {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                        {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_lunch')}</Text></View>}
-                        {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_dinner')}</Text></View>}
+                        {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
+                        {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
                         {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
                         {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
                         {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
@@ -1123,8 +1098,8 @@ export default function MenuEditorScreen() {
                       {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
                       <View style={styles.menuItemTags}>
                         {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                        {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_lunch')}</Text></View>}
-                        {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_dinner')}</Text></View>}
+                        {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
+                        {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
                         {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
                         {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
                         {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
@@ -1144,7 +1119,7 @@ export default function MenuEditorScreen() {
           <FlatList
             ref={pagerRef}
             style={{ flex: 1 }}
-            data={PAGES}
+            data={pages}
             keyExtractor={(_, index) => `page-${index}`}
             horizontal
             pagingEnabled
@@ -1233,8 +1208,8 @@ export default function MenuEditorScreen() {
                             )}
                             <View style={styles.menuItemTags}>
                               {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                              {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_lunch')}</Text></View>}
-                              {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_dinner')}</Text></View>}
+                              {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
+                              {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
                               {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
                               {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
                               {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
@@ -1256,8 +1231,8 @@ export default function MenuEditorScreen() {
                             {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
                             <View style={styles.menuItemTags}>
                               {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                              {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_lunch')}</Text></View>}
-                              {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{t('menu_editor:available_dinner')}</Text></View>}
+                              {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
+                              {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
                               {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
                               {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
                               {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
@@ -1475,7 +1450,7 @@ export default function MenuEditorScreen() {
               {/* Price + Display Order — side by side. Wines hide the legacy
                   single Price field (replaced by Glass/Bottle/Member below). */}
               <View style={styles.priceOrderRow}>
-                {formData.category !== 'Wine' && (
+                {!isWineName(formData.category) && (
                   <View style={styles.priceOrderCol}>
                     <Text style={styles.formLabel}>{t('menu_editor:price_label')}</Text>
                     <View style={styles.inputWithAdornment}>
@@ -1512,7 +1487,7 @@ export default function MenuEditorScreen() {
 
               {/* Wine-specific fields: location + 3 prices.
                   Source-of-truth for auto-generated quiz/game questions. */}
-              {formData.category === 'Wine' && (
+              {isWineName(formData.category) && (
                 <>
                   <View style={styles.formGroup}>
                     <Text style={styles.formLabel}>Location</Text>
@@ -1634,20 +1609,23 @@ export default function MenuEditorScreen() {
                   showsHorizontalScrollIndicator={false}
                   style={styles.optionsScroll}
                 >
-                  {CATEGORIES.map((category, index) => (
+                  {menuCats.map((cat) => (
                     <CategoryPill
-                      key={index}
+                      key={cat.id}
                       size="sm"
-                      label={CATEGORY_TRANSLATION_KEYS[category] ? t(CATEGORY_TRANSLATION_KEYS[category]) : category}
-                      selected={formData.category === category}
-                      onPress={() => setFormData({ ...formData, category, subcategory: '' })}
+                      label={categoryLabel(cat, t)}
+                      selected={formData.category === cat.display_name}
+                      onPress={() => setFormData({ ...formData, category: cat.display_name, subcategory: '' })}
                     />
                   ))}
                 </ScrollView>
               </View>
 
               {/* Subcategory */}
-              {SUBCATEGORIES[formData.category] && SUBCATEGORIES[formData.category].length > 0 && (
+              {(() => {
+                const formCat = findCategoryByName(menuCats, formData.category);
+                if (!formCat || formCat.subcategories.length === 0) return null;
+                return (
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel}>{t('menu_editor:subcategory_label')}</Text>
                   <ScrollView
@@ -1655,21 +1633,25 @@ export default function MenuEditorScreen() {
                     showsHorizontalScrollIndicator={false}
                     style={styles.optionsScroll}
                   >
-                    {SUBCATEGORIES[formData.category].map((subcategory, index) => (
+                    {formCat.subcategories.map((sub) => (
                       <CategoryPill
-                        key={index}
+                        key={sub.id}
                         size="sm"
-                        label={SUBCATEGORY_TRANSLATION_KEYS[subcategory] ? t(SUBCATEGORY_TRANSLATION_KEYS[subcategory]) : subcategory}
-                        selected={formData.subcategory === subcategory}
-                        onPress={() => setFormData({ ...formData, subcategory })}
+                        label={subcategoryLabel(sub, t)}
+                        selected={formData.subcategory === sub.display_name}
+                        onPress={() => setFormData({ ...formData, subcategory: sub.display_name })}
                       />
                     ))}
                   </ScrollView>
                 </View>
-              )}
+                );
+              })()}
 
               {/* Availability - Only show for Lunch, Dinner, and Weekly Specials */}
-              {(formData.category === 'Lunch' || formData.category === 'Dinner' || formData.category === 'Weekly Specials') && (
+              {(() => {
+                const fb = findCategoryByName(menuCats, formData.category)?.filter_behavior;
+                return fb === 'lunch' || fb === 'dinner' || fb === 'weekly_specials';
+              })() && (
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel}>{t('menu_editor:available_for_label')}</Text>
                   <View style={styles.checkboxGroup}>
@@ -1697,7 +1679,7 @@ export default function MenuEditorScreen() {
                           />
                         )}
                       </View>
-                      <Text style={styles.checkboxLabel}>{t('menu_editor:available_lunch')}</Text>
+                      <Text style={styles.checkboxLabel}>{lunchName}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.checkbox}
@@ -1723,7 +1705,7 @@ export default function MenuEditorScreen() {
                           />
                         )}
                       </View>
-                      <Text style={styles.checkboxLabel}>{t('menu_editor:available_dinner')}</Text>
+                      <Text style={styles.checkboxLabel}>{dinnerName}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
