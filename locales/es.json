@@ -1938,5 +1938,30 @@
     "error_match": "Las contraseñas no coinciden",
     "error_short": "La contraseña debe tener al menos 6 caracteres",
     "success": "¡Contraseña cambiada exitosamente!"
+  },
+  "manage_categories": {
+    "title": "Administrar Categorías",
+    "access_denied": "Solo el propietario del restaurante puede administrar las categorías del menú.",
+    "go_back": "Volver",
+    "category_hint": "Arrastra para reordenar. Toca una categoría para abrir sus subcategorías. Las categorías integradas se pueden renombrar, cambiar de color y ocultar, pero no eliminar. Eliminar una categoría personalizada mueve sus elementos a una categoría \"Sin categoría\" que puedes reasignar aquí o en el Editor de Menú.",
+    "subcategory_hint": "Arrastra para reordenar. Renombra con el lápiz, oculta con el ojo. Eliminar una subcategoría mantiene sus elementos en esta categoría pero quita la etiqueta de subcategoría. Las subcategorías vinculadas a recetas no se pueden eliminar — ocúltalas en su lugar.",
+    "behavior_weekly_specials": "También aparece en la pestaña de Especiales de Bienvenida",
+    "behavior_lunch_dinner": "Los elementos se etiquetan aquí con el interruptor \"Disponible para\"",
+    "behavior_wine": "Usa los campos de precio de copa/botella de vino",
+    "behavior_libations": "Los cócteles provienen de los editores de recetas",
+    "add_category": "Agregar Categoría",
+    "add_subcategory": "Agregar Subcategoría",
+    "rename_category": "Renombrar Categoría",
+    "rename_subcategory": "Renombrar Subcategoría",
+    "built_in": "Integrada",
+    "linked_to_recipes": "Vinculada a recetas",
+    "delete": "Eliminar",
+    "cancel": "Cancelar",
+    "save": "Guardar",
+    "name_placeholder": "Nombre",
+    "delete_category_title": "Eliminar Categoría",
+    "delete_category_confirm": "¿Eliminar \"{{name}}\"? Los elementos pasarán a Sin categoría.",
+    "delete_subcategory_title": "Eliminar Subcategoría",
+    "delete_subcategory_confirm": "¿Eliminar \"{{name}}\"? Los elementos conservarán la categoría pero perderán esta subcategoría."
   }
 }

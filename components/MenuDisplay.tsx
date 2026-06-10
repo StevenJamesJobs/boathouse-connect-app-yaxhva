@@ -27,6 +27,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRouter } from 'expo-router';
 import SeasonSelector, { type Season } from '@/components/SeasonSelector';
+import { useMenuCategories } from '@/hooks/useMenuCategories';
+import {
+  labelForCategoryName,
+  labelForSubcategoryName,
+  findCategoryByName,
+  RECIPE_CATEGORY_TO_SUBCATEGORY_KEY,
+} from '@/utils/menuCategoryLabels';
 
 interface MenuItem {
   id: string;
@@ -61,67 +68,24 @@ interface MenuItem {
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-const CATEGORIES = ['Weekly Specials', 'Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
+// The category tree (and each category's accent color) is loaded per-org from
+// the DB via useMenuCategories. The swipe-pager page sequence — one page per
+// subcategory plus a virtual 'All' page per category — is derived per-render in
+// the component. 'All' is never persisted; it stays a display-only affordance.
+const ALL_PAGE_KEY = 'All';
 
-const SUBCATEGORIES: { [key: string]: string[] } = {
-  'Weekly Specials': [],
-  Lunch: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Burgers', 'Sandwiches', 'Sides', 'All'],
-  Dinner: ['Starters', 'Raw Bar', 'Soups', 'Tacos', 'Salads', 'Entrees', 'Pasta', 'Sides', 'All'],
-  Libations: ['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV', 'Draft Beer', 'Bottle & Cans', 'All'],
-  Wine: ['Sparkling', 'Rose', 'Chardonnay', 'Pinot Grigio', 'Sauvignon Blanc', 'Interesting Whites', 'Cabernet Sauvignon', 'Pinot Noir', 'Merlot', 'Italian Reds', 'Interesting Reds', 'All'],
-  'Happy Hour': ['Appetizers', 'Drinks', 'Spirits', 'All'],
-};
-
-// Border-left accent colors by category
-const CATEGORY_COLORS: { [key: string]: string } = {
-  'Weekly Specials': '#F44336',
-  'Lunch': '#4CAF50',
-  'Dinner': '#1976D2',
-  'Libations': '#9C27B0',
-  'Wine': '#E91E63',
-  'Happy Hour': '#FF9800',
-};
-
-// Build flat page sequence for swipe navigation
 interface PageConfig {
   category: string;
   subcategory: string | null;
 }
 
-const MENU_PAGES: PageConfig[] = [];
-for (const category of CATEGORIES) {
-  const subs = SUBCATEGORIES[category];
-  if (subs.length === 0) {
-    MENU_PAGES.push({ category, subcategory: null });
-  } else {
-    for (const sub of subs) {
-      MENU_PAGES.push({ category, subcategory: sub });
-    }
-  }
-}
-
 // Phantom bridge page used when swipe-to-welcome is enabled
 const WELCOME_BRIDGE_PAGE: PageConfig = { category: '__welcome-bridge__', subcategory: null };
 
-// Libation subcategories that pull from summer_libation_recipes when season='summer'
-const COCKTAIL_SUBCATEGORIES = new Set(['Signature Cocktails', 'Martinis', 'Sangria', 'Low ABV', 'Zero ABV']);
-
-// Map summer_libation_recipes.category → menu SUBCATEGORIES names
-// Featured → Signature Cocktails so they appear at the top of that page
-const SUMMER_LIB_CATEGORY_MAP: Record<string, string> = {
-  'Featured': 'Signature Cocktails',
-  'Signature Cocktails': 'Signature Cocktails',
-  'Martinis': 'Martinis',
-  'Sangrias': 'Sangria',
-  'Low ABV': 'Low ABV',
-  'No ABV': 'Zero ABV',
-};
-
-// Winter (Menu 1) libations are stored in `libation_recipes` and use the same
-// category names, so the mapping mirrors the summer one. Entering a recipe in
-// the Winter Libations Recipes editor now also surfaces it as a Libations menu
-// card (matching how summer_libation_recipes works).
-const WINTER_LIB_CATEGORY_MAP: Record<string, string> = SUMMER_LIB_CATEGORY_MAP;
+// Cocktail recipe injection (summer_libation_recipes / libation_recipes) is now
+// resolved against the org's live Libations subcategories by stable system_key
+// (RECIPE_CATEGORY_TO_SUBCATEGORY_KEY in utils/menuCategoryLabels), so injected
+// cocktails follow subcategory renames. See `libInjection` in the component.
 
 // Filter options
 const FILTER_OPTIONS = [
@@ -137,50 +101,8 @@ const FILTER_OPTIONS = [
   { key: 'weeklySpecials', label: 'Weekly Specials' },
 ];
 
-// Mapping from English category/subcategory names to i18n translation keys
-const CATEGORY_TRANSLATION_KEYS: { [key: string]: string } = {
-  'Weekly Specials': 'menu_display.weekly_specials',
-  'Lunch': 'menu_display.lunch',
-  'Dinner': 'menu_display.dinner',
-  'Libations': 'menu_display.libations',
-  'Wine': 'menu_display.wine',
-  'Happy Hour': 'menu_display.happy_hour',
-};
-
-const SUBCATEGORY_TRANSLATION_KEYS: { [key: string]: string } = {
-  'Starters': 'menu_display.starters',
-  'Raw Bar': 'menu_display.raw_bar',
-  'Soups': 'menu_display.soups',
-  'Tacos': 'menu_display.tacos',
-  'Salads': 'menu_display.salads',
-  'Burgers': 'menu_display.burgers',
-  'Sandwiches': 'menu_display.sandwiches',
-  'Sides': 'menu_display.sides',
-  'Entrees': 'menu_display.entrees',
-  'Pasta': 'menu_display.pasta',
-  'Signature Cocktails': 'menu_display.signature_cocktails',
-  'Martinis': 'menu_display.martinis',
-  'Sangria': 'menu_display.sangria',
-  'Low ABV': 'menu_display.low_abv',
-  'Zero ABV': 'menu_display.zero_abv',
-  'Draft Beer': 'menu_display.draft_beer',
-  'Bottle & Cans': 'menu_display.bottle_and_cans',
-  'Sparkling': 'menu_display.sparkling',
-  'Rose': 'menu_display.rose',
-  'Chardonnay': 'menu_display.chardonnay',
-  'Pinot Grigio': 'menu_display.pinot_grigio',
-  'Sauvignon Blanc': 'menu_display.sauvignon_blanc',
-  'Interesting Whites': 'menu_display.interesting_whites',
-  'Cabernet Sauvignon': 'menu_display.cabernet_sauvignon',
-  'Pinot Noir': 'menu_display.pinot_noir',
-  'Merlot': 'menu_display.merlot',
-  'Italian Reds': 'menu_display.italian_reds',
-  'Interesting Reds': 'menu_display.interesting_reds',
-  'Appetizers': 'menu_display.appetizers',
-  'Drinks': 'menu_display.drinks',
-  'Spirits': 'menu_display.spirits',
-  'All': 'menu_display.all',
-};
+// Category/subcategory labels resolve through utils/menuCategoryLabels:
+// built-ins keep their i18n labels; renamed/custom names show raw.
 
 interface MenuDisplayProps {
   colors: {
@@ -200,13 +122,66 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const { t } = useTranslation();
   const { language } = useLanguage();
   const { organizationId, organization } = useOrganization();
+  const { categories: menuCats, loading: categoriesLoading } = useMenuCategories();
 
-  // Build pages array — prepend phantom bridge page when swipe-to-welcome is enabled
+  // Build pages from the loaded category tree: one page per subcategory plus a
+  // virtual 'All' page per category, then prepend the phantom bridge page when
+  // swipe-to-welcome is enabled.
   const hasBridge = !!onSwipeToWelcome;
+  const menuPages = useMemo<PageConfig[]>(() => {
+    const out: PageConfig[] = [];
+    for (const cat of menuCats) {
+      const subs = cat.subcategories;
+      if (subs.length === 0) {
+        out.push({ category: cat.display_name, subcategory: null });
+      } else {
+        for (const sub of subs) out.push({ category: cat.display_name, subcategory: sub.display_name });
+        out.push({ category: cat.display_name, subcategory: ALL_PAGE_KEY });
+      }
+    }
+    return out;
+  }, [menuCats]);
   const PAGES = useMemo(() => {
-    return hasBridge ? [WELCOME_BRIDGE_PAGE, ...MENU_PAGES] : MENU_PAGES;
-  }, [hasBridge]);
+    return hasBridge ? [WELCOME_BRIDGE_PAGE, ...menuPages] : menuPages;
+  }, [hasBridge, menuPages]);
   const bridgeOffset = hasBridge ? 1 : 0;
+
+  // Behavior resolvers — key off system_key / filter_behavior, not display name,
+  // so Wine/Lunch/Dinner/Libations behavior survives renames.
+  const catOf = useCallback(
+    (name: string | null | undefined) => findCategoryByName(menuCats, name),
+    [menuCats],
+  );
+  const isWineName = useCallback(
+    (name: string | null | undefined) => catOf(name)?.system_key === 'cat.wine',
+    [catOf],
+  );
+  const categoryMatches = useCallback(
+    (item: MenuItem, categoryName: string): boolean => {
+      const fb = catOf(categoryName)?.filter_behavior;
+      if (fb === 'lunch') return item.available_for_lunch;
+      if (fb === 'dinner') return item.available_for_dinner;
+      return item.category === categoryName;
+    },
+    [catOf],
+  );
+
+  // Cocktail-recipe injection: map the fixed recipe vocabulary to the org's
+  // CURRENT Libations subcategory names (by system_key) so injected cocktails
+  // follow renames; plus the set of cocktail-fed names for the winter dedup.
+  const libInjection = useMemo(() => {
+    const libCat = menuCats.find((c) => c.system_key === 'cat.libations');
+    const libationsCategoryName = libCat?.display_name ?? 'Libations';
+    const subNameByKey: Record<string, string> = {};
+    const cocktailSubNames = new Set<string>();
+    if (libCat) {
+      for (const s of libCat.subcategories) {
+        if (s.system_key) subNameByKey[s.system_key] = s.display_name;
+        if (s.is_cocktail_fed) cocktailSubNames.add(s.display_name);
+      }
+    }
+    return { libationsCategoryName, subNameByKey, cocktailSubNames };
+  }, [menuCats]);
 
   const [season, setSeason] = useState<Season>(organization.menu_count === 1 ? 'winter' : 'summer');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -230,8 +205,23 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
 
   // Derive selected category/subcategory from page index
   const currentPage = PAGES[currentPageIndex];
-  const selectedCategory = currentPage?.category || 'Weekly Specials';
+  const selectedCategory = currentPage?.category || '';
   const selectedSubcategory = currentPage?.subcategory || null;
+  const selectedCategoryObj = findCategoryByName(menuCats, selectedCategory);
+  // Availability tags + filter chips follow the lunch/dinner (and other built-in) renames.
+  const lunchName = labelForCategoryName(menuCats.find((c) => c.filter_behavior === 'lunch')?.display_name || 'Lunch', t);
+  const dinnerName = labelForCategoryName(menuCats.find((c) => c.filter_behavior === 'dinner')?.display_name || 'Dinner', t);
+  const filterChipLabel = (key: string, fallback: string): string => {
+    switch (key) {
+      case 'lunch': return lunchName;
+      case 'dinner': return dinnerName;
+      case 'wine': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.wine')?.display_name || 'Wine', t);
+      case 'libations': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.libations')?.display_name || 'Libations', t);
+      case 'happyHour': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.happy_hour')?.display_name || 'Happy Hour', t);
+      case 'weeklySpecials': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.weekly_specials')?.display_name || 'Weekly Specials', t);
+      default: return fallback;
+    }
+  };
 
   // Auto-scroll category pills to center the active one
   useEffect(() => {
@@ -275,44 +265,27 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     }
   }, [selectedCategory, selectedSubcategory]);
 
-  const getCategoryLabel = (category: string) => {
-    const key = CATEGORY_TRANSLATION_KEYS[category];
-    return key ? t(key) : category;
-  };
-
-  const getSubcategoryLabel = (subcategory: string) => {
-    const key = SUBCATEGORY_TRANSLATION_KEYS[subcategory];
-    return key ? t(key) : subcategory;
-  };
+  const getCategoryLabel = (category: string) => labelForCategoryName(category, t);
+  const getSubcategoryLabel = (subcategory: string) => labelForSubcategoryName(subcategory, t);
 
   useEffect(() => {
+    if (categoriesLoading) return; // wait for the category tree so injection resolves names
     loadMenuItems();
     setCurrentPageIndex(bridgeOffset);
     pagerRef.current?.scrollToIndex({ index: bridgeOffset, animated: false });
-  }, [season]);
+  }, [season, menuCats, categoriesLoading]);
 
   // Filter items for a given page
   const getItemsForPage = useCallback((page: PageConfig): MenuItem[] => {
-    let filtered = menuItems;
+    let filtered = menuItems.filter(item => categoryMatches(item, page.category));
 
-    // Filter by category
-    if (page.category === 'Weekly Specials') {
-      filtered = filtered.filter(item => item.category === 'Weekly Specials');
-    } else if (page.category === 'Lunch') {
-      filtered = filtered.filter(item => item.available_for_lunch);
-    } else if (page.category === 'Dinner') {
-      filtered = filtered.filter(item => item.available_for_dinner);
-    } else {
-      filtered = filtered.filter(item => item.category === page.category);
-    }
-
-    // Filter by subcategory if not null and not "All"
-    if (page.subcategory && page.subcategory !== 'All') {
+    // Filter by subcategory if not null and not the virtual "All" page
+    if (page.subcategory && page.subcategory !== ALL_PAGE_KEY) {
       filtered = filtered.filter(item => item.subcategory === page.subcategory);
     }
 
     return filtered;
-  }, [menuItems]);
+  }, [menuItems, categoryMatches]);
 
   // Get filtered items for search/filter mode
   const getSearchFilteredItems = useCallback(() => {
@@ -347,10 +320,10 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             case 'gfa': return item.is_gluten_free_available;
             case 'v': return item.is_vegetarian;
             case 'va': return item.is_vegetarian_available;
-            case 'wine': return item.category === 'Wine';
-            case 'libations': return item.category === 'Libations';
-            case 'happyHour': return item.category === 'Happy Hour';
-            case 'weeklySpecials': return item.category === 'Weekly Specials';
+            case 'wine': return isWineName(item.category);
+            case 'libations': return catOf(item.category)?.system_key === 'cat.libations';
+            case 'happyHour': return catOf(item.category)?.system_key === 'cat.happy_hour';
+            case 'weeklySpecials': return catOf(item.category)?.filter_behavior === 'weekly_specials';
             default: return true;
           }
         });
@@ -358,7 +331,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     }
 
     return filtered;
-  }, [menuItems, searchQuery, activeFilters]);
+  }, [menuItems, searchQuery, activeFilters, isWineName, catOf]);
 
   const isSearchOrFilterMode = searchQuery.trim().length > 0 || activeFilters.length > 0;
 
@@ -392,8 +365,8 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             description: r.ingredients?.map((i: any) => i.ingredient).join(', ') || null,
             description_es: null,
             price: r.price,
-            category: 'Libations',
-            subcategory: SUMMER_LIB_CATEGORY_MAP[r.category] || r.category,
+            category: libInjection.libationsCategoryName,
+            subcategory: libInjection.subNameByKey[RECIPE_CATEGORY_TO_SUBCATEGORY_KEY[r.category]] || r.category,
             available_for_lunch: false,
             available_for_dinner: false,
             is_gluten_free: false,
@@ -417,7 +390,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         // beer/wine Libations subcategories (Draft Beer, Bottle & Cans, etc.)
         // are untouched. No data is deleted; manual rows just aren't re-rendered.
         items = items.filter(
-          (i) => !(i.category === 'Libations' && i.subcategory != null && COCKTAIL_SUBCATEGORIES.has(i.subcategory))
+          (i) => !(i.category === libInjection.libationsCategoryName && i.subcategory != null && libInjection.cocktailSubNames.has(i.subcategory))
         );
 
         const { data: lrData } = await (supabase
@@ -435,8 +408,8 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             description: r.ingredients?.map((i: any) => i.ingredient).join(', ') || null,
             description_es: null,
             price: r.price,
-            category: 'Libations',
-            subcategory: WINTER_LIB_CATEGORY_MAP[r.category] || r.category,
+            category: libInjection.libationsCategoryName,
+            subcategory: libInjection.subNameByKey[RECIPE_CATEGORY_TO_SUBCATEGORY_KEY[r.category]] || r.category,
             available_for_lunch: false,
             available_for_dinner: false,
             is_gluten_free: false,
@@ -509,7 +482,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const buildDetailedDescription = (item: MenuItem) => {
     let description = getLocalizedField(item, 'description', language) || item.description || '';
 
-    if (item.category === 'Wine') {
+    if (isWineName(item.category)) {
       const loc = getLocalizedField(item, 'location', language) || item.location;
       if (loc) description = `📍 ${loc}\n\n${description}`.trim();
 
@@ -544,8 +517,8 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     }
 
     const availability = [];
-    if (item.available_for_lunch) availability.push('Lunch');
-    if (item.available_for_dinner) availability.push('Dinner');
+    if (item.available_for_lunch) availability.push(lunchName);
+    if (item.available_for_dinner) availability.push(dinnerName);
 
     if (availability.length > 0) {
       description += `\n\nAvailable for: ${availability.join(', ')}`;
@@ -594,7 +567,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
 
   // Render a single menu item card (compact style matching Welcome page)
   const renderMenuCard = (item: MenuItem, categoryColor: string) => {
-    const isWine = item.category === 'Wine';
+    const isWine = isWineName(item.category);
     const localizedLocation = isWine ? getLocalizedField(item, 'location', language) : '';
     return (
     <TouchableOpacity
@@ -651,17 +624,17 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
               📍 {localizedLocation}
             </Text>
           ) : null}
-          {(item.category === 'Weekly Specials' && (item.available_for_lunch || item.available_for_dinner)) || item.is_gluten_free || item.is_gluten_free_available ||
+          {(catOf(item.category)?.filter_behavior === 'weekly_specials' && (item.available_for_lunch || item.available_for_dinner)) || item.is_gluten_free || item.is_gluten_free_available ||
             item.is_vegetarian || item.is_vegetarian_available ? (
             <View style={styles.tagsRow}>
-              {item.category === 'Weekly Specials' && item.available_for_lunch && (
+              {catOf(item.category)?.filter_behavior === 'weekly_specials' && item.available_for_lunch && (
                 <View style={[styles.tag, { backgroundColor: '#FF980018' }]}>
-                  <Text style={[styles.tagText, { color: '#FF9800' }]}>Lunch</Text>
+                  <Text style={[styles.tagText, { color: '#FF9800' }]}>{lunchName}</Text>
                 </View>
               )}
-              {item.category === 'Weekly Specials' && item.available_for_dinner && (
+              {catOf(item.category)?.filter_behavior === 'weekly_specials' && item.available_for_dinner && (
                 <View style={[styles.tag, { backgroundColor: '#9C27B018' }]}>
-                  <Text style={[styles.tagText, { color: '#9C27B0' }]}>Dinner</Text>
+                  <Text style={[styles.tagText, { color: '#9C27B0' }]}>{dinnerName}</Text>
                 </View>
               )}
               {item.is_gluten_free && (
@@ -705,7 +678,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     }
 
     const pageItems = getItemsForPage(page);
-    const categoryColor = CATEGORY_COLORS[page.category] || colors.primary;
+    const categoryColor = catOf(page.category)?.color || colors.primary;
 
     return (
       <View style={{ width: SCREEN_WIDTH }}>
@@ -838,15 +811,15 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             style={styles.categoryScroll}
             contentContainerStyle={styles.categoryScrollContent}
           >
-            {CATEGORIES.map((category, index) => (
+            {menuCats.map((cat) => (
               <CategoryPill
-                key={index}
+                key={cat.id}
                 size="lg"
-                label={getCategoryLabel(category)}
-                selected={selectedCategory === category}
-                onPress={() => navigateToPage(category)}
+                label={getCategoryLabel(cat.display_name)}
+                selected={selectedCategory === cat.display_name}
+                onPress={() => navigateToPage(cat.display_name)}
                 onLayout={(e) => {
-                  categoryLayoutsRef.current[category] = {
+                  categoryLayoutsRef.current[cat.display_name] = {
                     x: e.nativeEvent.layout.x,
                     width: e.nativeEvent.layout.width,
                   };
@@ -856,8 +829,9 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
           </ScrollView>
         )}
 
-        {/* Subcategory Tabs — only in normal mode and when category has subcategories */}
-        {!isSearchOrFilterMode && SUBCATEGORIES[selectedCategory] && SUBCATEGORIES[selectedCategory].length > 0 && (
+        {/* Subcategory Tabs — only in normal mode and when category has subcategories.
+            A virtual 'All' pill is appended (never persisted). */}
+        {!isSearchOrFilterMode && selectedCategoryObj && selectedCategoryObj.subcategories.length > 0 && (
           <ScrollView
             ref={subcategoryScrollRef}
             horizontal
@@ -865,7 +839,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             style={styles.subcategoryScroll}
             contentContainerStyle={styles.subcategoryScrollContent}
           >
-            {SUBCATEGORIES[selectedCategory].map((subcategory, index) => (
+            {[...selectedCategoryObj.subcategories.map((s) => s.display_name), ALL_PAGE_KEY].map((subcategory, index) => (
               <CategoryPill
                 key={index}
                 size="sm"
@@ -885,7 +859,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       </View>
 
       {/* Main Content Area */}
-      {loading ? (
+      {(loading || categoriesLoading) ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -907,7 +881,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             </View>
           ) : (
             getSearchFilteredItems().map(item =>
-              renderMenuCard(item, CATEGORY_COLORS[item.category] || colors.primary)
+              renderMenuCard(item, catOf(item.category)?.color || colors.primary)
             )
           )}
         </ScrollView>
@@ -992,7 +966,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
                       activeFilters.includes(option.key) && styles.filterOptionTextActive,
                     ]}
                   >
-                    {option.label}
+                    {filterChipLabel(option.key, option.label)}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -1032,7 +1006,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             visible={detailModalVisible}
             onClose={closeDetailModal}
             title={
-              item.category === 'Wine'
+              isWineName(item.category)
                 ? getLocalizedField(item, 'name', language)
                 : `${getLocalizedField(item, 'name', language)} - ${formatPrice(item.price)}`
             }

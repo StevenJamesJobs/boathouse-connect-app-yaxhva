@@ -26,6 +26,8 @@ import FormattedText from '@/components/FormattedText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useMenuCategories } from '@/hooks/useMenuCategories';
+import { libationRecipeCategoryLabel } from '@/utils/menuCategoryLabels';
 
 interface LibationRecipe {
   id: string;
@@ -60,6 +62,7 @@ export default function LibationRecipesScreen() {
   const { language } = useLanguage();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
+  const { categories: menuCats } = useMenuCategories({ includeHidden: true });
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecipe, setSelectedRecipe] = useState<LibationRecipe | null>(null);
@@ -212,7 +215,7 @@ export default function LibationRecipesScreen() {
             Object.entries(recipesByCategory).map(([category, categoryRecipes], categoryIndex) => (
               <React.Fragment key={categoryIndex}>
                 {/* Category Header */}
-                <Text style={[styles.categoryTitle, { color: colors.text }]}>{getCategoryLabel(category)}</Text>
+                <Text style={[styles.categoryTitle, { color: colors.text }]}>{libationRecipeCategoryLabel(menuCats, category, t, getCategoryLabel(category))}</Text>
 
                 {/* Recipe Tiles in 2 columns */}
                 <View style={styles.tilesContainer}>

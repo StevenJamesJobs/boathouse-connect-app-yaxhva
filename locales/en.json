@@ -1938,5 +1938,30 @@
     "error_match": "Passwords do not match",
     "error_short": "Password must be at least 6 characters",
     "success": "Password changed successfully!"
+  },
+  "manage_categories": {
+    "title": "Manage Categories",
+    "access_denied": "Only the restaurant owner can manage menu categories.",
+    "go_back": "Go Back",
+    "category_hint": "Drag to reorder. Tap a category to open its subcategories. Built-in categories can be renamed, recolored, and hidden, but not deleted. Deleting a custom category moves its items to an \"Uncategorized\" category you can reassign here or in the Menu Editor.",
+    "subcategory_hint": "Drag to reorder. Rename with the pencil, hide with the eye. Deleting a subcategory keeps its items in this category but removes the subcategory tag. Subcategories linked to recipes can't be deleted — hide them instead.",
+    "behavior_weekly_specials": "Also appears on the Welcome Specials tab",
+    "behavior_lunch_dinner": "Items are tagged here with the \"Available for\" toggle",
+    "behavior_wine": "Uses the wine glass/bottle price fields",
+    "behavior_libations": "Cocktails are pulled from the recipe editors",
+    "add_category": "Add Category",
+    "add_subcategory": "Add Subcategory",
+    "rename_category": "Rename Category",
+    "rename_subcategory": "Rename Subcategory",
+    "built_in": "Built-in",
+    "linked_to_recipes": "Linked to recipes",
+    "delete": "Delete",
+    "cancel": "Cancel",
+    "save": "Save",
+    "name_placeholder": "Name",
+    "delete_category_title": "Delete Category",
+    "delete_category_confirm": "Delete \"{{name}}\"? Items in it will move to Uncategorized.",
+    "delete_subcategory_title": "Delete Subcategory",
+    "delete_subcategory_confirm": "Delete \"{{name}}\"? Items in it will keep the category but lose this subcategory."
   }
 }

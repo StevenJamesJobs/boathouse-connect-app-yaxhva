@@ -1139,6 +1139,107 @@ export type Database = {
           },
         ]
       }
+      menu_categories: {
+        Row: {
+          color: string
+          created_at: string
+          display_name: string
+          display_order: number
+          filter_behavior: string
+          id: string
+          is_hidden: boolean
+          organization_id: string
+          system_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          display_name: string
+          display_order?: number
+          filter_behavior?: string
+          id?: string
+          is_hidden?: boolean
+          organization_id: string
+          system_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          display_name?: string
+          display_order?: number
+          filter_behavior?: string
+          id?: string
+          is_hidden?: boolean
+          organization_id?: string
+          system_key?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_categories_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      menu_subcategories: {
+        Row: {
+          category_id: string
+          created_at: string
+          display_name: string
+          display_order: number
+          id: string
+          is_cocktail_fed: boolean
+          is_hidden: boolean
+          organization_id: string
+          system_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          category_id: string
+          created_at?: string
+          display_name: string
+          display_order?: number
+          id?: string
+          is_cocktail_fed?: boolean
+          is_hidden?: boolean
+          organization_id: string
+          system_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category_id?: string
+          created_at?: string
+          display_name?: string
+          display_order?: number
+          id?: string
+          is_cocktail_fed?: boolean
+          is_hidden?: boolean
+          organization_id?: string
+          system_key?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_subcategories_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "menu_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "menu_subcategories_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       menu_items: {
         Row: {
           available_for_dinner: boolean | null

@@ -22,6 +22,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { weeklySpecialsName } from '@/utils/categoryNames';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -254,12 +255,13 @@ export default function EmployeePortalScreen() {
     setLoadingFeatures(true);
 
     try {
+      const wsName = await weeklySpecialsName(organizationId);
       const [specialsResult, announcementsResult, eventsResult, featuresResult] = await Promise.all([
         supabase
           .from('menu_items')
           .select('*')
           .eq('organization_id', organizationId)
-          .eq('category', 'Weekly Specials')
+          .eq('category', wsName)
           .eq('is_active', true)
           .order('display_order', { ascending: true }),
         supabase

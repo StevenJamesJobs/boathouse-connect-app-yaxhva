@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/app/integrations/supabase/client';
+import { weeklySpecialsName } from '@/utils/categoryNames';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { ConnectBarTab } from '@/components/ConnectBar';
 
@@ -196,11 +197,13 @@ export function useUnreadContent(): UnreadContentResult {
       setEventsEventHasNew(eventEventUnviewed > 0);
       setEventsEntertainmentHasNew(eventEntertainmentUnviewed > 0);
 
-      // Check "Specials" tab: menu_items with category "Weekly Specials"
+      // Check "Specials" tab: menu_items in the org's Weekly Specials category
+      // (resolved by system_key so it follows owner renames).
+      const wsName = await weeklySpecialsName(organizationId || '');
       const specialsCutoff = specialsTs || new Date(0).toISOString();
       let specialsQuery = (supabase.from('menu_items') as any)
         .select('id', { count: 'exact', head: true })
-        .eq('category', 'Weekly Specials')
+        .eq('category', wsName)
         .gt('created_at', specialsCutoff);
       if (organizationId) specialsQuery = specialsQuery.eq('organization_id', organizationId);
       const specialsRes = await specialsQuery;
