@@ -3,6 +3,7 @@ import { createCardPair, selectRandom } from './gameEngine';
 import { WINE_PAIRINGS } from './winePairings';
 import { supabase } from '@/app/integrations/supabase/client';
 import { resolveGameSourceOrgId } from './gameSource';
+import { fetchMenuCategoryResolver } from '@/utils/categoryNames';
 
 // Generate card pairs for a specific game mode and pair count
 export async function generateCards(mode: GameMode, pairCount: number, organizationId: string, useSampleData: boolean): Promise<CardData[]> {
@@ -67,11 +68,15 @@ async function generateWinePairingCards(pairCount: number, organizationId: strin
 // Mode 2: Ingredients to Dishes (from menu_items table)
 async function generateIngredientDishCards(pairCount: number, organizationId: string, useSampleData: boolean): Promise<CardData[]> {
   const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
+  // Resolve the source org's current Dinner/Lunch names by system_key (renames-safe).
+  const resolver = await fetchMenuCategoryResolver(sourceOrgId);
+  const foodCats = resolver.namesForKeys(['cat.dinner', 'cat.lunch']);
+  const categories = foodCats.length ? foodCats : ['Dinner', 'Lunch'];
   let menuQuery = supabase
     .from('menu_items')
     .select('id, name, description')
     .eq('is_active', true)
-    .in('category', ['Dinner', 'Lunch'])
+    .in('category', categories)
     .not('description', 'is', null);
   menuQuery = menuQuery.eq('organization_id', sourceOrgId);
   const { data: menuItems, error } = await menuQuery as { data: { id: string; name: string; description: string | null }[] | null; error: any };

@@ -9,6 +9,7 @@
 import { supabase } from '@/app/integrations/supabase/client';
 import { parseIngredients, hasParseableIngredients } from './ingredientParser';
 import { resolveGameSourceOrgId } from './gameSource';
+import { fetchMenuCategoryResolver } from '@/utils/categoryNames';
 
 export type PictureThisCategory = 'food' | 'libations' | 'wine' | 'menu_prices';
 export type PictureThisDifficulty = 'easy' | 'medium' | 'hard' | 'only';
@@ -70,6 +71,20 @@ const PRICE_RANGES = {
 // ─── Pool loaders ──────────────────────────────────────────────────────────
 export async function loadPool(category: PictureThisCategory, organizationId: string, useSampleData: boolean): Promise<MenuItem[]> {
   const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
+
+  // Resolve the source org's CURRENT built-in category names by system_key so
+  // renamed categories still pool correctly; fall back to the canonical literal.
+  const resolver = await fetchMenuCategoryResolver(sourceOrgId);
+  const namesOr = (key: string, fallback: string): string[] => {
+    const n = resolver.namesForKeys([key]);
+    return n.length ? n : [fallback];
+  };
+  const lunchN = namesOr('cat.lunch', 'Lunch');
+  const dinnerN = namesOr('cat.dinner', 'Dinner');
+  const wsN = namesOr('cat.weekly_specials', 'Weekly Specials');
+  const libN = namesOr('cat.libations', 'Libations');
+  const wineN = namesOr('cat.wine', 'Wine');
+
   let query = (supabase.from('menu_items') as any)
     .select(
       'id, name, description, category, subcategory, thumbnail_url, price, glass_price, bottle_price, member_bottle_price, location, display_order'
@@ -79,13 +94,13 @@ export async function loadPool(category: PictureThisCategory, organizationId: st
   query = query.eq('organization_id', sourceOrgId);
 
   if (category === 'food') {
-    query = query.in('category', ['Lunch', 'Dinner', 'Weekly Specials']);
+    query = query.in('category', [...lunchN, ...dinnerN, ...wsN]);
   } else if (category === 'libations') {
-    query = query.eq('category', 'Libations');
+    query = query.in('category', libN);
   } else if (category === 'wine') {
-    query = query.eq('category', 'Wine');
+    query = query.in('category', wineN);
   } else if (category === 'menu_prices') {
-    query = query.in('category', ['Lunch', 'Dinner', 'Weekly Specials', 'Libations', 'Wine']);
+    query = query.in('category', [...lunchN, ...dinnerN, ...wsN, ...libN, ...wineN]);
   }
 
   const { data, error } = await query;
@@ -95,12 +110,17 @@ export async function loadPool(category: PictureThisCategory, organizationId: st
   }
   let items = data as MenuItem[];
 
-  // Exclude Weekly Specials summary card (display_order = 0)
-  items = items.filter(i => !(i.category === 'Weekly Specials' && i.display_order === 0));
+  // Exclude the Weekly Specials summary card (display_order = 0)
+  const wsSet = new Set(wsN);
+  items = items.filter(i => !(wsSet.has(i.category) && i.display_order === 0));
 
-  // Exclude Draft Beer + Bottle & Cans
+  // Within Libations, keep only recipe-backed (cocktail-fed) subcategories —
+  // this excludes Draft Beer / Bottle & Cans (and any other non-cocktail sub)
+  // from ingredient/price games, resolved by the is_cocktail_fed flag (renames-safe).
+  const libSet = new Set(libN);
+  const cocktailFed = new Set(resolver.cocktailFedSubNames);
   items = items.filter(
-    i => !(i.category === 'Libations' && (i.subcategory === 'Draft Beer' || i.subcategory === 'Bottle & Cans'))
+    i => !(libSet.has(i.category) && !(i.subcategory != null && cocktailFed.has(i.subcategory)))
   );
 
   // For ingredient-based categories, require parseable ingredients
@@ -109,6 +129,22 @@ export async function loadPool(category: PictureThisCategory, organizationId: st
   }
 
   return items;
+}
+
+/** Resolve the source org's current Wine/Libations names for the price game's
+ *  per-item classification (used by generateMenuPrice via generateQuestion). */
+export async function resolvePriceCategoryNames(
+  organizationId: string,
+  useSampleData: boolean,
+): Promise<{ wineNames: string[]; libationNames: string[] }> {
+  const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
+  const resolver = await fetchMenuCategoryResolver(sourceOrgId);
+  const wineNames = resolver.namesForKeys(['cat.wine']);
+  const libationNames = resolver.namesForKeys(['cat.libations']);
+  return {
+    wineNames: wineNames.length ? wineNames : ['Wine'],
+    libationNames: libationNames.length ? libationNames : ['Libations'],
+  };
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -448,12 +484,17 @@ export function generateWineHard(item: MenuItem, pool: MenuItem[]): PictureThisQ
 }
 
 // ─── MENU PRICES — single difficulty across food / libations / wine ───────
-export function generateMenuPrice(item: MenuItem, pool: MenuItem[]): PictureThisQuestion | null {
+export function generateMenuPrice(item: MenuItem, pool: MenuItem[], libationNames: string[] = ['Libations']): PictureThisQuestion | null {
   if (!item.thumbnail_url) return null;
 
-  // Determine type bucket
-  const isWine = item.category === 'Wine';
-  const isLibation = item.category === 'Libations';
+  // Determine type bucket. Wine is detected STRUCTURALLY (only wine rows carry
+  // glass/bottle/member prices), so it survives a renamed Wine category;
+  // libations resolve by the org's current Libations name(s).
+  const itemIsWine = (it: MenuItem) =>
+    parsePrice(it.glass_price) !== null || parsePrice(it.bottle_price) !== null || parsePrice(it.member_bottle_price) !== null;
+  const libSet = new Set(libationNames);
+  const isWine = itemIsWine(item);
+  const isLibation = !isWine && libSet.has(item.category);
 
   let correct: number | null = null;
   let priceType: PriceType | 'price' = 'price';
@@ -495,7 +536,7 @@ export function generateMenuPrice(item: MenuItem, pool: MenuItem[]): PictureThis
   if (isWine && priceType !== 'price') {
     range = PRICE_RANGES[priceType];
     for (const w of pool) {
-      if (w.id === item.id || w.category !== 'Wine') continue;
+      if (w.id === item.id || !itemIsWine(w)) continue;
       const v =
         priceType === 'glass' ? parsePrice(w.glass_price) :
         priceType === 'bottle' ? parsePrice(w.bottle_price) :
@@ -506,7 +547,7 @@ export function generateMenuPrice(item: MenuItem, pool: MenuItem[]): PictureThis
     range = PRICE_RANGES.libation;
     for (const o of pool) {
       if (o.id === item.id) continue;
-      if (o.category !== 'Libations') continue;
+      if (!libSet.has(o.category)) continue;
       const v = parsePrice(o.price);
       if (v !== null) forbidden.add(v);
     }
@@ -514,7 +555,7 @@ export function generateMenuPrice(item: MenuItem, pool: MenuItem[]): PictureThis
     range = PRICE_RANGES.food;
     for (const o of pool) {
       if (o.id === item.id) continue;
-      if (o.category === 'Wine' || o.category === 'Libations') continue;
+      if (itemIsWine(o) || libSet.has(o.category)) continue;
       const v = parsePrice(o.price);
       if (v !== null) forbidden.add(v);
     }
@@ -552,6 +593,7 @@ export function generateQuestion(
   pool: MenuItem[],
   category: PictureThisCategory,
   difficulty: PictureThisDifficulty,
+  libationNames: string[] = ['Libations'],
 ): PictureThisQuestion | null {
   if (category === 'food' || category === 'libations') {
     if (difficulty === 'easy') return generateIngredientEasy(item, pool, category);
@@ -565,7 +607,7 @@ export function generateQuestion(
     return null;
   }
   if (category === 'menu_prices') {
-    return generateMenuPrice(item, pool);
+    return generateMenuPrice(item, pool, libationNames);
   }
   return null;
 }

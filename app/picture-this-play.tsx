@@ -34,6 +34,7 @@ import {
   MenuItem,
   loadPool,
   generateQuestion,
+  resolvePriceCategoryNames,
   QuestionItemPicker,
   pointsPerCorrect,
   STARTING_LIVES,
@@ -82,6 +83,8 @@ export default function PictureThisPlayScreen() {
   const [poolError, setPoolError] = useState<string | null>(null);
 
   const pickerRef = useRef<QuestionItemPicker | null>(null);
+  // Source org's current Libations name(s) for the price game's classification.
+  const libationNamesRef = useRef<string[]>(['Libations']);
   const [currentQuestion, setCurrentQuestion] = useState<PictureThisQuestion | null>(null);
   const [imgLoaded, setImgLoaded] = useState(false);
 
@@ -135,6 +138,10 @@ export default function PictureThisPlayScreen() {
       setLoading(true);
       setPoolError(null);
       try {
+        if (category === 'menu_prices') {
+          const { libationNames } = await resolvePriceCategoryNames(organizationId ?? '', organization.games_use_sample_data);
+          if (!cancelled) libationNamesRef.current = libationNames;
+        }
         const data = await loadPool(category, organizationId ?? '', organization.games_use_sample_data);
         if (cancelled) return;
         if (data.length < 4) {
@@ -194,7 +201,7 @@ export default function PictureThisPlayScreen() {
     for (let i = 0; i < 30 && !q; i++) {
       const item = pickerRef.current.next();
       if (!item) break;
-      q = generateQuestion(item, pickPool, category, difficulty);
+      q = generateQuestion(item, pickPool, category, difficulty, libationNamesRef.current);
     }
 
     if (!q) {

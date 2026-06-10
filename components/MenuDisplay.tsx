@@ -32,7 +32,7 @@ import {
   labelForCategoryName,
   labelForSubcategoryName,
   findCategoryByName,
-  RECIPE_CATEGORY_TO_SUBCATEGORY_KEY,
+  resolveRecipeSubName,
 } from '@/utils/menuCategoryLabels';
 
 interface MenuItem {
@@ -122,7 +122,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const { t } = useTranslation();
   const { language } = useLanguage();
   const { organizationId, organization } = useOrganization();
-  const { categories: menuCats, loading: categoriesLoading } = useMenuCategories();
+  const [season, setSeason] = useState<Season>(organization.menu_count === 1 ? 'winter' : 'summer');
+  // In per-menu scope the active season selects which menu's category tree to render.
+  const { categories: menuCats, loading: categoriesLoading } = useMenuCategories({
+    menuSlot: season === 'winter' ? 1 : 2,
+  });
 
   // Build pages from the loaded category tree: one page per subcategory plus a
   // virtual 'All' page per category, then prepend the phantom bridge page when
@@ -146,6 +150,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   }, [hasBridge, menuPages]);
   const bridgeOffset = hasBridge ? 1 : 0;
 
+  const perMenu = organization?.menu_category_scope === 'per_menu';
   // Behavior resolvers — key off system_key / filter_behavior, not display name,
   // so Wine/Lunch/Dinner/Libations behavior survives renames.
   const catOf = useCallback(
@@ -159,11 +164,13 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const categoryMatches = useCallback(
     (item: MenuItem, categoryName: string): boolean => {
       const fb = catOf(categoryName)?.filter_behavior;
-      if (fb === 'lunch') return item.available_for_lunch;
-      if (fb === 'dinner') return item.available_for_dinner;
+      // Per-menu treats Lunch/Dinner as normal categories (placement by assignment);
+      // shared mode keeps the meal-availability overlay.
+      if (!perMenu && fb === 'lunch') return item.available_for_lunch;
+      if (!perMenu && fb === 'dinner') return item.available_for_dinner;
       return item.category === categoryName;
     },
-    [catOf],
+    [catOf, perMenu],
   );
 
   // Cocktail-recipe injection: map the fixed recipe vocabulary to the org's
@@ -183,7 +190,6 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     return { libationsCategoryName, subNameByKey, cocktailSubNames };
   }, [menuCats]);
 
-  const [season, setSeason] = useState<Season>(organization.menu_count === 1 ? 'winter' : 'summer');
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -366,7 +372,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             description_es: null,
             price: r.price,
             category: libInjection.libationsCategoryName,
-            subcategory: libInjection.subNameByKey[RECIPE_CATEGORY_TO_SUBCATEGORY_KEY[r.category]] || r.category,
+            subcategory: resolveRecipeSubName(menuCats, r),
             available_for_lunch: false,
             available_for_dinner: false,
             is_gluten_free: false,
@@ -375,7 +381,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             is_vegetarian_available: false,
             thumbnail_url: r.thumbnail_url,
             thumbnail_shape: 'square',
-            display_order: r.category === 'Featured' ? -1000 + r.display_order : r.display_order,
+            display_order: r.is_featured ? -1000 + r.display_order : r.display_order,
             is_active: true,
           }));
           items = [...items, ...mapped];
@@ -409,7 +415,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             description_es: null,
             price: r.price,
             category: libInjection.libationsCategoryName,
-            subcategory: libInjection.subNameByKey[RECIPE_CATEGORY_TO_SUBCATEGORY_KEY[r.category]] || r.category,
+            subcategory: resolveRecipeSubName(menuCats, r),
             available_for_lunch: false,
             available_for_dinner: false,
             is_gluten_free: false,
@@ -418,7 +424,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             is_vegetarian_available: false,
             thumbnail_url: r.thumbnail_url,
             thumbnail_shape: 'square',
-            display_order: r.category === 'Featured' ? -1000 + r.display_order : r.display_order,
+            display_order: r.is_featured ? -1000 + r.display_order : r.display_order,
             is_active: true,
           }));
           items = [...items, ...mapped];

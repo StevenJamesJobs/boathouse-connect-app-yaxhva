@@ -8,6 +8,9 @@ interface MenuIconPickerProps {
   label: string;
   value: string;
   onChange: (sf: string) => void;
+  // compact: render just a square icon button (no label / "Tap to change" row),
+  // for placing inline next to a text field.
+  compact?: boolean;
 }
 
 const COLUMNS = 4;
@@ -15,7 +18,7 @@ const COLUMNS = 4;
 // Owner-facing icon chooser: shows the current icon and opens a grid of the
 // curated MENU_ICON_OPTIONS. Renders rows explicitly (no flexWrap) to avoid
 // the bordered-cell ghost-gap issue noted in feedback_ui_patterns.
-export default function MenuIconPicker({ label, value, onChange }: MenuIconPickerProps) {
+export default function MenuIconPicker({ label, value, onChange, compact }: MenuIconPickerProps) {
   const colors = useThemeColors();
   const [open, setOpen] = useState(false);
 
@@ -24,19 +27,7 @@ export default function MenuIconPicker({ label, value, onChange }: MenuIconPicke
     rows.push(MENU_ICON_OPTIONS.slice(i, i + COLUMNS));
   }
 
-  return (
-    <View style={styles.wrapper}>
-      <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
-      <TouchableOpacity
-        style={[styles.trigger, { backgroundColor: colors.card, borderColor: colors.border }]}
-        onPress={() => setOpen(true)}
-        activeOpacity={0.7}
-      >
-        <IconSymbol ios_icon_name={value} android_material_icon_name={value} size={22} color={colors.primary} />
-        <Text style={[styles.triggerText, { color: colors.textSecondary }]}>Tap to change</Text>
-        <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color={colors.textSecondary} />
-      </TouchableOpacity>
-
+  const pickerModal = (
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
         <View style={styles.overlay}>
           <View style={[styles.sheet, { backgroundColor: colors.background }]}>
@@ -80,6 +71,37 @@ export default function MenuIconPicker({ label, value, onChange }: MenuIconPicke
           </View>
         </View>
       </Modal>
+  );
+
+  if (compact) {
+    return (
+      <View>
+        <TouchableOpacity
+          style={[styles.compactTrigger, { backgroundColor: colors.card, borderColor: colors.border }]}
+          onPress={() => setOpen(true)}
+          activeOpacity={0.7}
+          accessibilityLabel={label}
+        >
+          <IconSymbol ios_icon_name={value} android_material_icon_name={value} size={24} color={colors.primary} />
+        </TouchableOpacity>
+        {pickerModal}
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.wrapper}>
+      <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
+      <TouchableOpacity
+        style={[styles.trigger, { backgroundColor: colors.card, borderColor: colors.border }]}
+        onPress={() => setOpen(true)}
+        activeOpacity={0.7}
+      >
+        <IconSymbol ios_icon_name={value} android_material_icon_name={value} size={22} color={colors.primary} />
+        <Text style={[styles.triggerText, { color: colors.textSecondary }]}>Tap to change</Text>
+        <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color={colors.textSecondary} />
+      </TouchableOpacity>
+      {pickerModal}
     </View>
   );
 }
@@ -97,6 +119,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   triggerText: { flex: 1, fontSize: 14 },
+  compactTrigger: {
+    width: 52,
+    height: 52,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, maxHeight: '70%' },
   sheetHeader: {

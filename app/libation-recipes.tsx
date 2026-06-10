@@ -27,13 +27,15 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
-import { libationRecipeCategoryLabel } from '@/utils/menuCategoryLabels';
+import { cocktailFedSubOptions, resolveRecipeSubId } from '@/utils/menuCategoryLabels';
 
 interface LibationRecipe {
   id: string;
   name: string;
   price: string;
   category: string;
+  subcategory_id: string | null;
+  is_featured: boolean;
   glassware: string | null;
   garnish: string | null;
   ingredients: { amount: string; ingredient: string }[];
@@ -44,15 +46,6 @@ interface LibationRecipe {
   is_active: boolean;
 }
 
-const CATEGORIES = [
-  'Featured',
-  'Signature Cocktails',
-  'Martinis',
-  'Sangrias',
-  'Low ABV',
-  'No ABV',
-];
-
 // Placeholder image for recipes without thumbnails
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=400&h=400&fit=crop';
 
@@ -62,7 +55,8 @@ export default function LibationRecipesScreen() {
   const { language } = useLanguage();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
-  const { categories: menuCats } = useMenuCategories({ includeHidden: true });
+  // Menu 1 → slot 1 in per-menu scope (shared scope ignores the slot).
+  const { categories: menuCats } = useMenuCategories({ includeHidden: true, menuSlot: 1 });
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecipe, setSelectedRecipe] = useState<LibationRecipe | null>(null);
@@ -153,15 +147,25 @@ export default function LibationRecipesScreen() {
     return map[category] ?? category;
   };
 
-  // Group recipes by category
-  const recipesByCategory = CATEGORIES.reduce((acc, category) => {
-    const categoryRecipes = recipes.filter(r => r.category === category);
-    // Only include category if it has recipes (except for Featured which should only show if it has recipes)
-    if (categoryRecipes.length > 0) {
-      acc[category] = categoryRecipes;
+  // Group recipes under their bound cocktail-fed subcategory (current names, in
+  // the menu's subcategory order); featured recipes pin to the top of each group.
+  const cocktailSubOptions = cocktailFedSubOptions(menuCats, t);
+  const recipesByCategory: Record<string, LibationRecipe[]> = {};
+  const groupedIds = new Set<string>();
+  for (const opt of cocktailSubOptions) {
+    const subRecipes = recipes
+      .filter((r) => resolveRecipeSubId(menuCats, r) === opt.id)
+      .sort((a, b) => (Number(b.is_featured) - Number(a.is_featured)) || (a.display_order - b.display_order));
+    if (subRecipes.length > 0) {
+      recipesByCategory[opt.label] = subRecipes;
+      subRecipes.forEach((r) => groupedIds.add(r.id));
     }
-    return acc;
-  }, {} as Record<string, LibationRecipe[]>);
+  }
+  for (const r of recipes) {
+    if (groupedIds.has(r.id)) continue;
+    const key = r.category || 'Other';
+    (recipesByCategory[key] ||= []).push(r);
+  }
 
   // Animated header opacity for parallax effect
   const imageOpacity = scrollY.interpolate({
@@ -215,7 +219,7 @@ export default function LibationRecipesScreen() {
             Object.entries(recipesByCategory).map(([category, categoryRecipes], categoryIndex) => (
               <React.Fragment key={categoryIndex}>
                 {/* Category Header */}
-                <Text style={[styles.categoryTitle, { color: colors.text }]}>{libationRecipeCategoryLabel(menuCats, category, t, getCategoryLabel(category))}</Text>
+                <Text style={[styles.categoryTitle, { color: colors.text }]}>{category}</Text>
 
                 {/* Recipe Tiles in 2 columns */}
                 <View style={styles.tilesContainer}>

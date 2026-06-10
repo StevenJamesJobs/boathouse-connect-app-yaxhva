@@ -40,10 +40,18 @@ interface UseMenuCategoriesResult {
  * Loads the current org's menu categories + subcategories, nested and ordered.
  * @param opts.includeHidden — owner editor passes true to manage hidden rows;
  *   MenuDisplay omits it so hidden categories/subcategories are filtered out.
+ * @param opts.menuSlot — the active menu (1 = Menu 1, 2 = Menu 2). Only consulted
+ *   when the org's menu_category_scope is 'per_menu'; in 'shared' mode the single
+ *   slot-0 tree is always returned (today's behavior). When per_menu and no slot
+ *   is supplied, defaults to Menu 1 (slot 1).
  */
-export function useMenuCategories(opts?: { includeHidden?: boolean }): UseMenuCategoriesResult {
+export function useMenuCategories(opts?: { includeHidden?: boolean; menuSlot?: 1 | 2 }): UseMenuCategoriesResult {
   const includeHidden = opts?.includeHidden ?? false;
-  const { organizationId } = useOrganization();
+  const requestedSlot = opts?.menuSlot;
+  const { organizationId, organization } = useOrganization();
+  const perMenu = organization?.menu_category_scope === 'per_menu';
+  // Shared mode always reads the slot-0 tree; per-menu reads the active slot.
+  const effectiveSlot = perMenu ? (requestedSlot ?? 1) : 0;
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -62,11 +70,13 @@ export function useMenuCategories(opts?: { includeHidden?: boolean }): UseMenuCa
           .from('menu_categories' as any)
           .select('id, display_name, system_key, filter_behavior, color, display_order, is_hidden')
           .eq('organization_id', organizationId)
+          .eq('menu_slot', effectiveSlot)
           .order('display_order', { ascending: true }) as any),
         (supabase
           .from('menu_subcategories' as any)
           .select('id, category_id, display_name, system_key, is_cocktail_fed, display_order, is_hidden')
           .eq('organization_id', organizationId)
+          .eq('menu_slot', effectiveSlot)
           .order('display_order', { ascending: true }) as any),
       ]);
 
@@ -109,7 +119,7 @@ export function useMenuCategories(opts?: { includeHidden?: boolean }): UseMenuCa
     } finally {
       setLoading(false);
     }
-  }, [organizationId, includeHidden]);
+  }, [organizationId, includeHidden, effectiveSlot]);
 
   useEffect(() => {
     load();

@@ -1078,11 +1078,13 @@ export type Database = {
           id: string
           ingredients: Json | null
           is_active: boolean | null
+          is_featured: boolean
           name: string
           organization_id: string
           price: string
           procedure: string | null
           procedure_es: string | null
+          subcategory_id: string | null
           thumbnail_url: string | null
           updated_at: string | null
         }
@@ -1096,11 +1098,13 @@ export type Database = {
           id?: string
           ingredients?: Json | null
           is_active?: boolean | null
+          is_featured?: boolean
           name: string
           organization_id: string
           price: string
           procedure?: string | null
           procedure_es?: string | null
+          subcategory_id?: string | null
           thumbnail_url?: string | null
           updated_at?: string | null
         }
@@ -1114,11 +1118,13 @@ export type Database = {
           id?: string
           ingredients?: Json | null
           is_active?: boolean | null
+          is_featured?: boolean
           name?: string
           organization_id?: string
           price?: string
           procedure?: string | null
           procedure_es?: string | null
+          subcategory_id?: string | null
           thumbnail_url?: string | null
           updated_at?: string | null
         }
@@ -1148,6 +1154,7 @@ export type Database = {
           filter_behavior: string
           id: string
           is_hidden: boolean
+          menu_slot: number
           organization_id: string
           system_key: string | null
           updated_at: string
@@ -1160,6 +1167,7 @@ export type Database = {
           filter_behavior?: string
           id?: string
           is_hidden?: boolean
+          menu_slot?: number
           organization_id: string
           system_key?: string | null
           updated_at?: string
@@ -1172,6 +1180,7 @@ export type Database = {
           filter_behavior?: string
           id?: string
           is_hidden?: boolean
+          menu_slot?: number
           organization_id?: string
           system_key?: string | null
           updated_at?: string
@@ -1195,6 +1204,7 @@ export type Database = {
           id: string
           is_cocktail_fed: boolean
           is_hidden: boolean
+          menu_slot: number
           organization_id: string
           system_key: string | null
           updated_at: string
@@ -1207,6 +1217,7 @@ export type Database = {
           id?: string
           is_cocktail_fed?: boolean
           is_hidden?: boolean
+          menu_slot?: number
           organization_id: string
           system_key?: string | null
           updated_at?: string
@@ -1219,6 +1230,7 @@ export type Database = {
           id?: string
           is_cocktail_fed?: boolean
           is_hidden?: boolean
+          menu_slot?: number
           organization_id?: string
           system_key?: string | null
           updated_at?: string
@@ -1765,6 +1777,7 @@ export type Database = {
           menu_1_name: string
           menu_2_icon: string
           menu_2_name: string
+          menu_category_scope: string
           menu_count: number
           name: string
           owner_id: string | null
@@ -1793,6 +1806,7 @@ export type Database = {
           menu_1_name?: string
           menu_2_icon?: string
           menu_2_name?: string
+          menu_category_scope?: string
           menu_count?: number
           name: string
           owner_id?: string | null
@@ -1821,6 +1835,7 @@ export type Database = {
           menu_1_name?: string
           menu_2_icon?: string
           menu_2_name?: string
+          menu_category_scope?: string
           menu_count?: number
           name?: string
           owner_id?: string | null
@@ -2545,11 +2560,13 @@ export type Database = {
           id: string
           ingredients: Json
           is_active: boolean
+          is_featured: boolean
           name: string
           organization_id: string
           price: string
           procedure: string | null
           procedure_es: string | null
+          subcategory_id: string | null
           thumbnail_url: string | null
           updated_at: string | null
         }
@@ -2563,11 +2580,13 @@ export type Database = {
           id?: string
           ingredients?: Json
           is_active?: boolean
+          is_featured?: boolean
           name: string
           organization_id: string
           price?: string
           procedure?: string | null
           procedure_es?: string | null
+          subcategory_id?: string | null
           thumbnail_url?: string | null
           updated_at?: string | null
         }
@@ -2581,11 +2600,13 @@ export type Database = {
           id?: string
           ingredients?: Json
           is_active?: boolean
+          is_featured?: boolean
           name?: string
           organization_id?: string
           price?: string
           procedure?: string | null
           procedure_es?: string | null
+          subcategory_id?: string | null
           thumbnail_url?: string | null
           updated_at?: string | null
         }
@@ -3446,10 +3467,12 @@ export type Database = {
           p_garnish: string
           p_glassware: string
           p_ingredients: Json
+          p_is_featured?: boolean
           p_name: string
           p_organization_id?: string
           p_price: string
           p_procedure: string
+          p_subcategory_id?: string
           p_thumbnail_url: string
           p_user_id: string
         }
@@ -3475,10 +3498,12 @@ export type Database = {
           p_garnish?: string
           p_glassware?: string
           p_ingredients?: Json
+          p_is_featured?: boolean
           p_name: string
           p_organization_id?: string
           p_price: string
           p_procedure?: string
+          p_subcategory_id?: string
           p_thumbnail_url?: string
           p_user_id: string
         }
@@ -3673,11 +3698,13 @@ export type Database = {
           p_garnish: string
           p_glassware: string
           p_ingredients: Json
+          p_is_featured?: boolean
           p_name: string
           p_organization_id?: string
           p_price: string
           p_procedure: string
           p_recipe_id: string
+          p_subcategory_id?: string
           p_thumbnail_url: string
           p_user_id: string
         }
@@ -3855,11 +3882,13 @@ export type Database = {
           p_garnish?: string
           p_glassware?: string
           p_ingredients?: Json
+          p_is_featured?: boolean
           p_name: string
           p_organization_id?: string
           p_price: string
           p_procedure?: string
           p_recipe_id: string
+          p_subcategory_id?: string
           p_thumbnail_url?: string
           p_user_id: string
         }

@@ -85,9 +85,14 @@ export default function MenuEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
-  const { categories: menuCats, loading: categoriesLoading, refresh: refreshCategories } = useMenuCategories({ includeHidden: true });
-  const { language } = useLanguage();
   const [season, setSeason] = useState<Season>('summer');
+  const perMenu = organization?.menu_category_scope === 'per_menu';
+  // In per-menu scope the active season selects which menu's category tree to edit.
+  const { categories: menuCats, loading: categoriesLoading, refresh: refreshCategories } = useMenuCategories({
+    includeHidden: true,
+    menuSlot: season === 'winter' ? 1 : 2,
+  });
+  const { language } = useLanguage();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -123,11 +128,14 @@ export default function MenuEditorScreen() {
   const categoryMatches = useCallback(
     (item: MenuItem, categoryName: string): boolean => {
       const fb = findCategoryByName(menuCats, categoryName)?.filter_behavior;
-      if (fb === 'lunch') return item.available_for_lunch;
-      if (fb === 'dinner') return item.available_for_dinner;
+      // Per-menu treats Lunch/Dinner as normal categories — placement is by the
+      // item's category assignment, not the "Available for" flags (which are a
+      // shared-mode meal-service overlay).
+      if (!perMenu && fb === 'lunch') return item.available_for_lunch;
+      if (!perMenu && fb === 'dinner') return item.available_for_dinner;
       return item.category === categoryName;
     },
-    [menuCats],
+    [menuCats, perMenu],
   );
   const isWineName = useCallback(
     (name: string | null | undefined) => findCategoryByName(menuCats, name)?.system_key === 'cat.wine',
@@ -138,6 +146,10 @@ export default function MenuEditorScreen() {
   // Availability checkbox/tag labels follow the lunch/dinner category renames.
   const lunchName = menuCats.find((c) => c.filter_behavior === 'lunch')?.display_name || t('menu_editor:available_lunch');
   const dinnerName = menuCats.find((c) => c.filter_behavior === 'dinner')?.display_name || t('menu_editor:available_dinner');
+  // "Available for" is a shared-mode meal overlay; only surface a checkbox when
+  // its Lunch/Dinner category actually exists and is visible.
+  const hasLunchCat = menuCats.some((c) => c.filter_behavior === 'lunch' && !c.is_hidden);
+  const hasDinnerCat = menuCats.some((c) => c.filter_behavior === 'dinner' && !c.is_hidden);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
@@ -1075,8 +1087,8 @@ export default function MenuEditorScreen() {
                       )}
                       <View style={styles.menuItemTags}>
                         {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                        {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
-                        {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
+                        {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
+                        {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
                         {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
                         {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
                         {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
@@ -1098,8 +1110,8 @@ export default function MenuEditorScreen() {
                       {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
                       <View style={styles.menuItemTags}>
                         {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                        {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
-                        {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
+                        {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
+                        {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
                         {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
                         {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
                         {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
@@ -1208,8 +1220,8 @@ export default function MenuEditorScreen() {
                             )}
                             <View style={styles.menuItemTags}>
                               {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                              {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
-                              {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
+                              {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
+                              {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
                               {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
                               {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
                               {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
@@ -1231,8 +1243,8 @@ export default function MenuEditorScreen() {
                             {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
                             <View style={styles.menuItemTags}>
                               {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                              {item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
-                              {item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
+                              {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
+                              {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
                               {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
                               {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
                               {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
@@ -1647,14 +1659,19 @@ export default function MenuEditorScreen() {
                 );
               })()}
 
-              {/* Availability - Only show for Lunch, Dinner, and Weekly Specials */}
-              {(() => {
+              {/* Availability — shared-mode meal overlay; lets one item appear on
+                  both the Lunch and Dinner sections. Hidden in per-menu (an item
+                  belongs to one menu + category there) and when neither Lunch nor
+                  Dinner category is present/visible. */}
+              {!perMenu && (hasLunchCat || hasDinnerCat) && (() => {
                 const fb = findCategoryByName(menuCats, formData.category)?.filter_behavior;
                 return fb === 'lunch' || fb === 'dinner' || fb === 'weekly_specials';
               })() && (
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel}>{t('menu_editor:available_for_label')}</Text>
+                  <Text style={styles.seasonLegacyHint}>{t('menu_editor:available_for_hint')}</Text>
                   <View style={styles.checkboxGroup}>
+                    {hasLunchCat && (
                     <TouchableOpacity
                       style={styles.checkbox}
                       onPress={() =>
@@ -1681,6 +1698,8 @@ export default function MenuEditorScreen() {
                       </View>
                       <Text style={styles.checkboxLabel}>{lunchName}</Text>
                     </TouchableOpacity>
+                    )}
+                    {hasDinnerCat && (
                     <TouchableOpacity
                       style={styles.checkbox}
                       onPress={() =>
@@ -1707,6 +1726,7 @@ export default function MenuEditorScreen() {
                       </View>
                       <Text style={styles.checkboxLabel}>{dinnerName}</Text>
                     </TouchableOpacity>
+                    )}
                   </View>
                 </View>
               )}
@@ -1715,7 +1735,15 @@ export default function MenuEditorScreen() {
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{t('menu_editor:season_label')}</Text>
                 <View style={styles.seasonTagRow}>
-                  {(['winter', 'both', 'summer'] as const).map((s) => {
+                  {(((): readonly ('winter' | 'both' | 'summer')[] => {
+                    // Per-menu scope: an item belongs to ONE menu, so the "Both"
+                    // option is dropped for new/edited items. Legacy items already
+                    // tagged 'both' keep the option so they're never stranded.
+                    if (organization?.menu_category_scope !== 'per_menu') return ['winter', 'both', 'summer'] as const;
+                    return formData.item_season === 'both'
+                      ? (['winter', 'both', 'summer'] as const)
+                      : (['winter', 'summer'] as const);
+                  })()).map((s) => {
                     // Reflect the org's custom Menu 1 / Menu 2 names; "Both"
                     // stays translated since it spans both menus.
                     const seasonLabel =
@@ -1743,6 +1771,9 @@ export default function MenuEditorScreen() {
                     );
                   })}
                 </View>
+                {organization?.menu_category_scope === 'per_menu' && formData.item_season === 'both' && (
+                  <Text style={styles.seasonLegacyHint}>{t('menu_editor:season_both_legacy_hint')}</Text>
+                )}
               </View>
 
               {/* Dietary Options */}
@@ -1948,6 +1979,12 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   seasonTagText: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  seasonLegacyHint: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 6,
+    fontStyle: 'italic',
   },
   searchRow: {
     flexDirection: 'row',
