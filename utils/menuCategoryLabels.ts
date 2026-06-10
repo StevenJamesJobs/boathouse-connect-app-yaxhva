@@ -164,3 +164,91 @@ export function libationRecipeCategoryOptions(
     label: libationRecipeCategoryLabel(categories, value, t, fallbackLabel(value)),
   }));
 }
+
+// --- Generalized recipe-backing (Part B) ------------------------------------
+// Recipes now bind to a Libations subcategory by id (subcategory_id) instead of
+// the fixed vocab, so owners can mark ANY Libations sub (built-in or custom)
+// recipe-backed. The legacy `category` string is still written as a stable
+// fallback and resolves built-ins by system_key / customs by name.
+
+// Reverse of RECIPE_CATEGORY_TO_SUBCATEGORY_KEY (system_key → stable vocab),
+// used to keep writing a resolvable legacy `category` for built-in subs.
+const SUBCATEGORY_KEY_TO_RECIPE_CATEGORY: Record<string, string> = {
+  'sub.signature_cocktails': 'Signature Cocktails',
+  'sub.martinis': 'Martinis',
+  'sub.sangria': 'Sangrias',
+  'sub.low_abv': 'Low ABV',
+  'sub.zero_abv': 'No ABV',
+};
+
+export interface CocktailSubOption {
+  id: string;
+  label: string;
+  system_key: string | null;
+}
+
+/** Cocktail-fed (recipe-backed) Libations subcategories for the recipe-editor
+ *  picker: value = subcategory id, label = current (possibly renamed) name. */
+export function cocktailFedSubOptions(categories: MenuCategory[], t: TFunc): CocktailSubOption[] {
+  const libCat = categories.find((c) => c.system_key === 'cat.libations');
+  if (!libCat) return [];
+  return libCat.subcategories
+    .filter((s) => s.is_cocktail_fed && !s.is_hidden)
+    .map((s) => ({ id: s.id, label: subcategoryLabel(s, t), system_key: s.system_key }));
+}
+
+/** Resolve a subcategory id to its current display_name in the loaded tree. */
+export function subNameById(categories: MenuCategory[], subId: string | null | undefined): string | null {
+  if (!subId) return null;
+  for (const c of categories) {
+    const s = c.subcategories.find((x) => x.id === subId);
+    if (s) return s.display_name;
+  }
+  return null;
+}
+
+/** The legacy `category` string to store for a recipe bound to `sub`: the stable
+ *  recipe vocab for built-ins (keeps fallback resolution working across slots /
+ *  renames), else the custom sub's display_name. */
+export function recipeCategoryValueForSub(
+  sub: Pick<MenuSubcategory, 'system_key' | 'display_name'>,
+): string {
+  return (sub.system_key && SUBCATEGORY_KEY_TO_RECIPE_CATEGORY[sub.system_key]) || sub.display_name;
+}
+
+/**
+ * The Libations subcategory id a recipe should bind to, within the loaded
+ * (slot-scoped) tree. Resolution order:
+ *   1. subcategory_id, if that sub exists in this tree (same-slot binding);
+ *   2. legacy `category` vocab → system_key → built-in sub in this tree
+ *      (handles per-menu, where the stored id points at another slot's sub);
+ *   3. a cocktail-fed sub whose display_name === `category` (custom subs by name).
+ */
+export function resolveRecipeSubId(
+  categories: MenuCategory[],
+  recipe: { subcategory_id?: string | null; category?: string | null },
+): string | null {
+  if (recipe.subcategory_id && subNameById(categories, recipe.subcategory_id)) return recipe.subcategory_id;
+  const libCat = categories.find((c) => c.system_key === 'cat.libations');
+  if (!libCat) return null;
+  const key = recipe.category ? RECIPE_CATEGORY_TO_SUBCATEGORY_KEY[recipe.category] : undefined;
+  if (key) {
+    const s = libCat.subcategories.find((x) => x.system_key === key);
+    if (s) return s.id;
+  }
+  if (recipe.category) {
+    const s = libCat.subcategories.find((x) => x.display_name === recipe.category && x.is_cocktail_fed);
+    if (s) return s.id;
+  }
+  return null;
+}
+
+/** Current display_name of the Libations subcategory a recipe should appear under,
+ *  in the loaded tree (falls back to the raw `category` string if unresolved). */
+export function resolveRecipeSubName(
+  categories: MenuCategory[],
+  recipe: { subcategory_id?: string | null; category?: string | null },
+): string {
+  const id = resolveRecipeSubId(categories, recipe);
+  return (id && subNameById(categories, id)) || recipe.category || '';
+}

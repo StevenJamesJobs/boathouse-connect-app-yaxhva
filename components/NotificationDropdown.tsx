@@ -13,7 +13,7 @@ import {
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { supabase } from '@/app/integrations/supabase/client';
-import { weeklySpecialsName } from '@/utils/categoryNames';
+import { weeklySpecialsNames } from '@/utils/categoryNames';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRouter } from 'expo-router';
 import { getLocalizedField } from '@/utils/translateContent';
@@ -211,12 +211,12 @@ export default function NotificationDropdown({
       }
 
       // Fetch weekly specials (category resolved by system_key → follows renames)
-      const wsName = await weeklySpecialsName(organizationId);
+      const wsNames = await weeklySpecialsNames(organizationId);
       const { data: specials } = await supabase
         .from('menu_items')
         .select('*')
         .eq('organization_id', organizationId)
-        .eq('category', wsName)
+        .in('category', wsNames)
         .eq('is_active', true)
         .order('created_at', { ascending: false })
         .limit(SOURCE_FETCH_LIMIT);

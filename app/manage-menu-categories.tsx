@@ -43,8 +43,11 @@ export default function ManageMenuCategoriesScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
-  const { categories: hookCats, loading, refresh } = useMenuCategories({ includeHidden: true });
+  const { organizationId, organization } = useOrganization();
+  const perMenu = organization?.menu_category_scope === 'per_menu';
+  // In per-menu scope the owner edits one menu's tree at a time (slot 1 / 2).
+  const [editSlot, setEditSlot] = useState<1 | 2>(1);
+  const { categories: hookCats, loading, refresh } = useMenuCategories({ includeHidden: true, menuSlot: editSlot });
 
   // Local mirror so drag-reorder is snappy; re-synced whenever the hook reloads.
   const [cats, setCats] = useState<MenuCategory[]>([]);
@@ -110,6 +113,7 @@ export default function ManageMenuCategoriesScreen() {
         p_organization_id: organizationId,
         p_user_id: user!.id,
         p_display_name: value,
+        p_menu_slot: perMenu ? editSlot : 0,
       });
     } else if (m.mode === 'rename-cat') {
       await callRpc('manage_menu_category_rename', {
@@ -195,6 +199,21 @@ export default function ManageMenuCategoriesScreen() {
       p_subcategory_id: sub.id,
       p_is_hidden: !sub.is_hidden,
     });
+
+  // Mark/unmark a Libations subcategory as recipe-backed (fed by the cocktail
+  // recipe editors). Only valid under the Libations category (enforced by RPC).
+  const toggleSubCocktailFed = (sub: MenuSubcategory) =>
+    callRpc('manage_menu_subcategory_set_cocktail_fed', {
+      p_organization_id: organizationId,
+      p_user_id: user!.id,
+      p_subcategory_id: sub.id,
+      p_is_cocktail_fed: !sub.is_cocktail_fed,
+    });
+
+  const switchEditSlot = (slot: 1 | 2) => {
+    setSelectedCategoryId(null);
+    setEditSlot(slot);
+  };
 
   const deleteSub = (sub: MenuSubcategory) => {
     Alert.alert(
@@ -298,6 +317,21 @@ export default function ManageMenuCategoriesScreen() {
           <TouchableOpacity onPress={() => openNameModal('rename-sub', item.id, item.display_name, t('manage_categories:rename_subcategory'))} style={styles.iconBtn} disabled={busy}>
             <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.primary} />
           </TouchableOpacity>
+          {selectedCategory?.system_key === 'cat.libations' && (
+            <TouchableOpacity
+              onPress={() => toggleSubCocktailFed(item)}
+              style={styles.iconBtn}
+              disabled={busy}
+              accessibilityLabel={t('manage_categories:recipe_backed_toggle')}
+            >
+              <IconSymbol
+                ios_icon_name={item.is_cocktail_fed ? 'book.closed.fill' : 'book.closed'}
+                android_material_icon_name="menu-book"
+                size={20}
+                color={item.is_cocktail_fed ? colors.primary : colors.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
           <TouchableOpacity onPress={() => toggleSubHidden(item)} style={styles.iconBtn} disabled={busy}>
             <IconSymbol ios_icon_name={item.is_hidden ? 'eye.slash' : 'eye'} android_material_icon_name={item.is_hidden ? 'visibility-off' : 'visibility'} size={20} color={colors.textSecondary} />
           </TouchableOpacity>
@@ -312,6 +346,38 @@ export default function ManageMenuCategoriesScreen() {
       </ScaleDecorator>
     );
   };
+
+  // --- Bulleted hints (inline icons) ---------------------------------------
+  const hintIcon = (ios: string, android: string, color?: string) => (
+    <IconSymbol ios_icon_name={ios} android_material_icon_name={android} size={15} color={color || colors.textSecondary} />
+  );
+  const hintRow = (key: string, icons: React.ReactNode, text: string) => (
+    <View key={key} style={styles.hintRow}>
+      <View style={styles.hintIconCol}>{icons}</View>
+      <Text style={styles.hintRowText}>{text}</Text>
+    </View>
+  );
+
+  const categoryHint = (
+    <View style={styles.hintBlock}>
+      {hintRow('drag', hintIcon('line.3.horizontal', 'drag-indicator'), t('manage_categories:hint_drag'))}
+      {hintRow('tap', hintIcon('chevron.right', 'chevron-right'), t('manage_categories:hint_tap_open'))}
+      {hintRow('edit', <>{hintIcon('pencil', 'edit', colors.primary)}{hintIcon('eye', 'visibility')}</>, t('manage_categories:hint_builtin_edit'))}
+      {hintRow('del', hintIcon('trash', 'delete', '#E53935'), t('manage_categories:hint_delete_custom'))}
+    </View>
+  );
+
+  const isLibSub = selectedCategory?.system_key === 'cat.libations';
+  const subcategoryHint = (
+    <View style={styles.hintBlock}>
+      {hintRow('drag', hintIcon('line.3.horizontal', 'drag-indicator'), t('manage_categories:hint_drag'))}
+      {hintRow('edit', <>{hintIcon('pencil', 'edit', colors.primary)}{hintIcon('eye', 'visibility')}</>, t('manage_categories:hint_sub_edit'))}
+      {isLibSub && hintRow('recipe', hintIcon('book.closed', 'menu-book', colors.primary), t('manage_categories:hint_recipe_backed'))}
+      {isLibSub && hintRow('reflected', hintIcon('arrow.triangle.2.circlepath', 'sync'), t('manage_categories:hint_recipe_reflected', { menu1: organization?.menu_1_name || 'Menu 1', menu2: organization?.menu_2_name || 'Menu 2' }))}
+      {hintRow('del', hintIcon('trash', 'delete', '#E53935'), t('manage_categories:hint_sub_delete'))}
+      {isLibSub && hintRow('locked', hintIcon('lock.fill', 'lock'), t('manage_categories:hint_recipe_locked'))}
+    </View>
+  );
 
   // --- Screen --------------------------------------------------------------
   const inSubview = selectedCategory !== null;
@@ -340,9 +406,7 @@ export default function ManageMenuCategoriesScreen() {
           renderItem={renderSub}
           onDragEnd={({ data }) => persistSubOrder(selectedCategory!.id, data)}
           contentContainerStyle={styles.listContent}
-          ListHeaderComponent={
-            <Text style={styles.hint}>{t('manage_categories:subcategory_hint')}</Text>
-          }
+          ListHeaderComponent={subcategoryHint}
           ListFooterComponent={
             <TouchableOpacity
               style={styles.addBtn}
@@ -361,7 +425,33 @@ export default function ManageMenuCategoriesScreen() {
           renderItem={renderCategory}
           onDragEnd={({ data }) => persistCategoryOrder(data)}
           contentContainerStyle={styles.listContent}
-          ListHeaderComponent={<Text style={styles.hint}>{t('manage_categories:category_hint')}</Text>}
+          ListHeaderComponent={
+            <>
+              {perMenu && (
+                <View style={styles.slotToggle}>
+                  <TouchableOpacity
+                    style={[styles.slotSeg, editSlot === 1 && styles.slotSegActive]}
+                    onPress={() => switchEditSlot(1)}
+                    disabled={busy}
+                  >
+                    <Text style={[styles.slotSegText, editSlot === 1 && styles.slotSegTextActive]} numberOfLines={1}>
+                      {organization?.menu_1_name || 'Menu 1'}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.slotSeg, editSlot === 2 && styles.slotSegActive]}
+                    onPress={() => switchEditSlot(2)}
+                    disabled={busy}
+                  >
+                    <Text style={[styles.slotSegText, editSlot === 2 && styles.slotSegTextActive]} numberOfLines={1}>
+                      {organization?.menu_2_name || 'Menu 2'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+              {categoryHint}
+            </>
+          }
           ListFooterComponent={
             <TouchableOpacity
               style={styles.addBtn}
@@ -433,6 +523,30 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     headerTitle: { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: 'bold', color: colors.text },
     listContent: { padding: 12, paddingBottom: 40 },
     hint: { fontSize: 13, color: colors.textSecondary, marginBottom: 12, paddingHorizontal: 4 },
+    hintBlock: { marginBottom: 12, gap: 8, paddingHorizontal: 4 },
+    hintRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+    hintIconCol: { width: 40, flexDirection: 'row', gap: 4, alignItems: 'center', paddingTop: 1 },
+    hintRowText: { flex: 1, fontSize: 13, color: colors.textSecondary, lineHeight: 18 },
+    slotToggle: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 12,
+    },
+    slotSeg: {
+      flex: 1,
+      paddingVertical: 10,
+      borderRadius: 8,
+      alignItems: 'center',
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    slotSegActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    slotSegText: { fontSize: 14, fontWeight: '600', color: colors.text },
+    slotSegTextActive: { color: '#FFFFFF' },
     row: {
       flexDirection: 'row',
       alignItems: 'center',

@@ -13,6 +13,7 @@ import {
 } from '@/utils/game/wordSearchEngine';
 import { stripFormattingTags } from '@/components/FormattedText';
 import { resolveGameSourceOrgId } from './gameSource';
+import { fetchMenuCategoryResolver } from '@/utils/categoryNames';
 
 export interface RawWordItem {
   searchWord: string;
@@ -37,17 +38,26 @@ export async function getWordsForCategory(
   // owner's toggle is on) and pass the concrete id down to the fetchers.
   const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
 
+  // Resolve the source org's CURRENT built-in category names by system_key, so
+  // renamed categories still match. Fall back to the canonical literal when the
+  // org hasn't seeded that built-in.
+  const resolver = await fetchMenuCategoryResolver(sourceOrgId);
+  const namesOr = (key: string, fallback: string): string[] => {
+    const n = resolver.namesForKeys([key]);
+    return n.length ? n : [fallback];
+  };
+
   switch (category) {
     case 'weekly_specials':
-      return fetchMenuItemWords('Weekly Specials', config.itemCount, sourceOrgId);
+      return fetchMenuItemWords(namesOr('cat.weekly_specials', 'Weekly Specials'), config.itemCount, sourceOrgId);
     case 'lunch':
-      return fetchMenuItemWords('Lunch', config.itemCount, sourceOrgId);
+      return fetchMenuItemWords(namesOr('cat.lunch', 'Lunch'), config.itemCount, sourceOrgId);
     case 'dinner':
-      return fetchMenuItemWords('Dinner', config.itemCount, sourceOrgId);
+      return fetchMenuItemWords(namesOr('cat.dinner', 'Dinner'), config.itemCount, sourceOrgId);
     case 'happy_hour':
-      return fetchMenuItemWords('Happy Hour', config.itemCount, sourceOrgId);
+      return fetchMenuItemWords(namesOr('cat.happy_hour', 'Happy Hour'), config.itemCount, sourceOrgId);
     case 'libations':
-      return fetchLibationWords(config.itemCount, sourceOrgId);
+      return fetchLibationWords(config.itemCount, sourceOrgId, namesOr('cat.libations', 'Libations'));
     default:
       return [];
   }
@@ -56,7 +66,7 @@ export async function getWordsForCategory(
 // ─── Food Category Fetcher ────────────────────────────────────────────────────
 
 async function fetchMenuItemWords(
-  category: string,
+  categories: string[],
   itemCount: number,
   organizationId: string
 ): Promise<RawWordItem[]> {
@@ -65,7 +75,7 @@ async function fetchMenuItemWords(
       .from('menu_items')
       .select('name, description')
       .eq('is_active', true)
-      .eq('category', category)
+      .in('category', categories)
       .not('description', 'is', null);
     query = query.eq('organization_id', organizationId);
     const { data, error } = await query;
@@ -97,7 +107,11 @@ async function fetchMenuItemWords(
 
 // ─── Libations Fetcher ────────────────────────────────────────────────────────
 
-async function fetchLibationWords(itemCount: number, organizationId: string): Promise<RawWordItem[]> {
+async function fetchLibationWords(
+  itemCount: number,
+  organizationId: string,
+  libationCategoryNames: string[]
+): Promise<RawWordItem[]> {
   try {
     // Primary: libation_recipes (JSONB ingredients — cleanest data)
     let recipeQuery = supabase
@@ -108,12 +122,12 @@ async function fetchLibationWords(itemCount: number, organizationId: string): Pr
     recipeQuery = recipeQuery.eq('organization_id', organizationId);
     const { data: recipes, error: recipeError } = await recipeQuery;
 
-    // Secondary: menu_items with Libations category
+    // Secondary: menu_items in the org's Libations category (resolved by key)
     let menuQuery = supabase
       .from('menu_items')
       .select('name, description')
       .eq('is_active', true)
-      .eq('category', 'Libations')
+      .in('category', libationCategoryNames)
       .not('description', 'is', null);
     menuQuery = menuQuery.eq('organization_id', organizationId);
     const { data: menuLibations, error: menuError } = await menuQuery;

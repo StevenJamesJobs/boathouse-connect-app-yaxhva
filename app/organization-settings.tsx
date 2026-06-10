@@ -26,10 +26,11 @@ import JobTitlesManager from '@/components/JobTitlesManager';
 import AssistantsManager from '@/components/AssistantsManager';
 import { supabase } from '@/app/integrations/supabase/client';
 
-type SettingsTab = 'branding' | 'jobs-tools' | 'access';
+type SettingsTab = 'branding' | 'menu' | 'jobs-tools' | 'access';
 
 const TABS: { key: SettingsTab; label: string }[] = [
   { key: 'branding', label: 'Branding' },
+  { key: 'menu', label: 'Menu' },
   { key: 'jobs-tools', label: 'Jobs & Tools' },
   { key: 'access', label: 'Access' },
 ];
@@ -64,6 +65,8 @@ export default function OrganizationSettingsScreen() {
   const [menu2Icon, setMenu2Icon] = useState('sun.max.fill');
   const [headerIcon, setHeaderIcon] = useState('fork.knife');
   const [defaultPassword, setDefaultPassword] = useState('');
+  const [menuScope, setMenuScope] = useState<'shared' | 'per_menu'>('shared');
+  const [scopeSaving, setScopeSaving] = useState(false);
 
   useEffect(() => {
     setName(organization.name);
@@ -76,6 +79,7 @@ export default function OrganizationSettingsScreen() {
     setRewardCurrencyName(organization.reward_currency_name);
     setAllowSelfSignup(organization.allow_self_signup);
     setMenuCount(organization.menu_count);
+    setMenuScope(organization.menu_category_scope);
     setMenu1Name(organization.menu_1_name);
     setMenu2Name(organization.menu_2_name);
     setMenu1Icon(organization.menu_1_icon);
@@ -84,6 +88,53 @@ export default function OrganizationSettingsScreen() {
     setDefaultPassword(organization.default_password);
     setLogoPreview(organization.logo_url);
   }, [organization]);
+
+  // Menu category scope toggle. Applies immediately via its own RPC (it
+  // materializes the per-menu trees as a side-effect), separate from the Save
+  // button. Switching is lossless: the shared tree is always preserved.
+  const handleScopeChange = (next: 'shared' | 'per_menu') => {
+    if (next === menuScope || scopeSaving) return;
+    const apply = async () => {
+      if (!organizationId || !user?.id) return;
+      setScopeSaving(true);
+      try {
+        const { data, error } = await (supabase.rpc as any)('set_org_menu_category_scope', {
+          p_organization_id: organizationId,
+          p_user_id: user.id,
+          p_scope: next,
+        });
+        if (error || (data && data.success === false)) {
+          Alert.alert('Error', (data && data.error) || error?.message || 'Failed to change menu mode');
+          return;
+        }
+        setMenuScope(next);
+        await refreshOrganization();
+      } catch (e: any) {
+        Alert.alert('Error', e?.message || 'Failed to change menu mode');
+      } finally {
+        setScopeSaving(false);
+      }
+    };
+    if (next === 'per_menu') {
+      Alert.alert(
+        'Switch to Per-Menu categories?',
+        'Each menu gets its own independent category list you can edit separately. New items will belong to a single menu (the "Both" option goes away). Items currently set to both menus stay visible on both until you re-tag them. You can switch back anytime.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Switch', onPress: apply },
+        ],
+      );
+    } else {
+      Alert.alert(
+        'Switch to Shared categories?',
+        'Both menus will share one category list again. Items can appear on Menu 1, Menu 2, or both. Your per-menu edits are kept and reappear if you switch back.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Switch', onPress: apply },
+        ],
+      );
+    }
+  };
 
   const handlePickLogo = async () => {
     try {
@@ -279,7 +330,7 @@ export default function OrganizationSettingsScreen() {
     }
   };
 
-  const showSaveButton = activeTab === 'branding' || activeTab === 'access';
+  const showSaveButton = activeTab === 'branding' || activeTab === 'menu' || activeTab === 'access';
 
   return (
     <KeyboardAvoidingView
@@ -475,62 +526,105 @@ export default function OrganizationSettingsScreen() {
               </View>
             </View>
 
-            {/* Menu Configuration */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Menu Configuration</Text>
+          </>
+        )}
+
+        {/* ─── Menu Tab ───────────────────────────────────────────────── */}
+        {activeTab === 'menu' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Menu Configuration</Text>
+
+            {/* Number of menus */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Number of Menus</Text>
+              <View style={styles.segmentedControl}>
+                <TouchableOpacity
+                  style={[styles.segment, menuCount === 1 && styles.segmentActive]}
+                  onPress={() => setMenuCount(1)}
+                >
+                  <Text style={[styles.segmentText, menuCount === 1 && styles.segmentTextActive]}>1 Menu</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.segment, menuCount === 2 && styles.segmentActive]}
+                  onPress={() => setMenuCount(2)}
+                >
+                  <Text style={[styles.segmentText, menuCount === 2 && styles.segmentTextActive]}>2 Menus</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Category mode (2 menus only) — both options described up front */}
+            {menuCount === 2 && (
               <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>Number of Menus</Text>
+                <Text style={styles.fieldLabel}>Category Mode</Text>
                 <View style={styles.segmentedControl}>
                   <TouchableOpacity
-                    style={[styles.segment, menuCount === 1 && styles.segmentActive]}
-                    onPress={() => setMenuCount(1)}
+                    style={[styles.segment, menuScope === 'shared' && styles.segmentActive]}
+                    onPress={() => handleScopeChange('shared')}
+                    disabled={scopeSaving}
                   >
-                    <Text style={[styles.segmentText, menuCount === 1 && styles.segmentTextActive]}>
-                      1 Menu
-                    </Text>
+                    <Text style={[styles.segmentText, menuScope === 'shared' && styles.segmentTextActive]}>Shared</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.segment, menuCount === 2 && styles.segmentActive]}
-                    onPress={() => setMenuCount(2)}
+                    style={[styles.segment, menuScope === 'per_menu' && styles.segmentActive]}
+                    onPress={() => handleScopeChange('per_menu')}
+                    disabled={scopeSaving}
                   >
-                    <Text style={[styles.segmentText, menuCount === 2 && styles.segmentTextActive]}>
-                      2 Menus
-                    </Text>
+                    <Text style={[styles.segmentText, menuScope === 'per_menu' && styles.segmentTextActive]}>Per-Menu</Text>
                   </TouchableOpacity>
                 </View>
+                <View style={styles.scopeBullets}>
+                  <View style={styles.scopeBulletRow}>
+                    <Text style={styles.scopeBulletDot}>•</Text>
+                    <Text style={styles.scopeBulletText}>
+                      <Text style={styles.scopeBulletLead}>Shared — </Text>
+                      both menus use one set of categories; an item can appear on {menu1Name || 'Menu 1'},{' '}
+                      {menu2Name || 'Menu 2'}, or both.
+                    </Text>
+                  </View>
+                  <View style={styles.scopeBulletRow}>
+                    <Text style={styles.scopeBulletDot}>•</Text>
+                    <Text style={styles.scopeBulletText}>
+                      <Text style={styles.scopeBulletLead}>Per-Menu — </Text>
+                      each menu has its own independent categories; every item belongs to a single menu.
+                    </Text>
+                  </View>
+                </View>
               </View>
-              <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>Menu 1 Name</Text>
+            )}
+
+            {/* Menu 1 name + icon */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.fieldLabel}>Menu 1 Name</Text>
+              <View style={styles.nameIconRow}>
+                <MenuIconPicker compact label={`${menu1Name || 'Menu 1'} Icon`} value={menu1Icon} onChange={setMenu1Icon} />
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, styles.nameIconInput]}
                   value={menu1Name}
                   onChangeText={setMenu1Name}
                   placeholder="e.g. Winter, Lunch, Main"
                   placeholderTextColor={colors.textSecondary}
                 />
               </View>
-              <View style={styles.fieldContainer}>
-                <MenuIconPicker label={`${menu1Name || 'Menu 1'} Icon`} value={menu1Icon} onChange={setMenu1Icon} />
-              </View>
-              {menuCount === 2 && (
-                <>
-                  <View style={styles.fieldContainer}>
-                    <Text style={styles.fieldLabel}>Menu 2 Name</Text>
-                    <TextInput
-                      style={styles.input}
-                      value={menu2Name}
-                      onChangeText={setMenu2Name}
-                      placeholder="e.g. Summer, Dinner, Seasonal"
-                      placeholderTextColor={colors.textSecondary}
-                    />
-                  </View>
-                  <View style={styles.fieldContainer}>
-                    <MenuIconPicker label={`${menu2Name || 'Menu 2'} Icon`} value={menu2Icon} onChange={setMenu2Icon} />
-                  </View>
-                </>
-              )}
             </View>
-          </>
+
+            {/* Menu 2 name + icon (2 menus only) */}
+            {menuCount === 2 && (
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Menu 2 Name</Text>
+                <View style={styles.nameIconRow}>
+                  <MenuIconPicker compact label={`${menu2Name || 'Menu 2'} Icon`} value={menu2Icon} onChange={setMenu2Icon} />
+                  <TextInput
+                    style={[styles.input, styles.nameIconInput]}
+                    value={menu2Name}
+                    onChangeText={setMenu2Name}
+                    placeholder="e.g. Summer, Dinner, Seasonal"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+              </View>
+            )}
+          </View>
         )}
 
         {/* ─── Jobs & Tools Tab ───────────────────────────────────────── */}
@@ -728,6 +822,37 @@ function createStyles(colors: any) {
       color: colors.text,
       borderWidth: 1,
       borderColor: colors.border,
+    },
+    nameIconRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    nameIconInput: {
+      flex: 1,
+    },
+    scopeBullets: {
+      marginTop: 10,
+      gap: 6,
+    },
+    scopeBulletRow: {
+      flexDirection: 'row',
+      gap: 6,
+    },
+    scopeBulletDot: {
+      fontSize: 13,
+      lineHeight: 19,
+      color: colors.textSecondary,
+    },
+    scopeBulletText: {
+      flex: 1,
+      fontSize: 13,
+      lineHeight: 19,
+      color: colors.textSecondary,
+    },
+    scopeBulletLead: {
+      fontWeight: '700',
+      color: colors.text,
     },
     row: {
       flexDirection: 'row',

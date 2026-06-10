@@ -18,6 +18,7 @@ export interface Organization {
   join_code: string;
   allow_self_signup: boolean;
   menu_count: 1 | 2;
+  menu_category_scope: 'shared' | 'per_menu';
   menu_1_name: string;
   menu_2_name: string;
   menu_1_icon: string;
@@ -51,6 +52,7 @@ const DEFAULT_ORG: Organization = {
   join_code: '',
   allow_self_signup: true,
   menu_count: 2,
+  menu_category_scope: 'shared',
   menu_1_name: 'Winter',
   menu_2_name: 'Summer',
   menu_1_icon: 'snowflake',
@@ -101,6 +103,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         join_code: orgData.join_code || '',
         allow_self_signup: orgData.allow_self_signup ?? true,
         menu_count: (orgData.menu_count as 1 | 2) || DEFAULT_ORG.menu_count,
+        menu_category_scope: orgData.menu_category_scope === 'per_menu' ? 'per_menu' : 'shared',
         menu_1_name: orgData.menu_1_name || DEFAULT_ORG.menu_1_name,
         menu_2_name: orgData.menu_2_name || DEFAULT_ORG.menu_2_name,
         menu_1_icon: orgData.menu_1_icon || DEFAULT_ORG.menu_1_icon,

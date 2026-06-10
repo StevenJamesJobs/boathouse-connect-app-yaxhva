@@ -51,6 +51,7 @@ export default function SetupWizardScreen() {
   const [menu1Icon, setMenu1Icon] = useState('snowflake');
   const [menu2Icon, setMenu2Icon] = useState('sun.max.fill');
   const [headerIcon, setHeaderIcon] = useState('fork.knife');
+  const [categoryScope, setCategoryScope] = useState<'shared' | 'per_menu'>('shared');
 
   // ─── Step 1: Job Titles ───────────────────────────────────────────
 
@@ -141,12 +142,14 @@ export default function SetupWizardScreen() {
         console.error('[SetupWizard] Seed assistant mappings error:', seedError);
       }
 
-      // Update org menu settings
+      // Update org menu settings. Per-menu scope only applies with 2 menus.
       const menuCount = hasSeasonalMenus ? 2 : 1;
+      const scope: 'shared' | 'per_menu' = hasSeasonalMenus ? categoryScope : 'shared';
       const { error: orgError } = await supabase
         .from('organizations')
         .update({
           menu_count: menuCount,
+          menu_category_scope: scope,
           menu_1_name: menu1Name.trim() || 'Menu 1',
           // menu_2_name is NOT NULL in the DB; menu_count governs display, so
           // keep a valid placeholder even when there's only one menu.
@@ -162,6 +165,15 @@ export default function SetupWizardScreen() {
         Alert.alert('Error', 'Failed to save menu configuration.');
         setIsLoading(false);
         return;
+      }
+
+      // Per-menu mode needs the slot-1/slot-2 category trees materialized from
+      // the seeded slot-0 tree. Non-fatal: the owner can re-toggle in Settings.
+      if (scope === 'per_menu') {
+        const { error: matError } = await (supabase.rpc as any)('materialize_org_per_menu_categories', {
+          p_org_id: organizationId,
+        });
+        if (matError) console.error('[SetupWizard] Materialize per-menu categories error:', matError);
       }
 
       router.push({
@@ -371,6 +383,32 @@ export default function SetupWizardScreen() {
           </View>
 
           <MenuIconPicker label={`${menu2Name.trim() || 'Menu 2'} Icon`} value={menu2Icon} onChange={setMenu2Icon} />
+
+          <Text style={styles.label}>How should categories work?</Text>
+          <TouchableOpacity
+            style={[styles.scopeOption, categoryScope === 'shared' && styles.scopeOptionActive]}
+            onPress={() => setCategoryScope('shared')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.scopeOptionTitle}>Shared categories {categoryScope === 'shared' ? '✓' : ''}</Text>
+            <Text style={styles.scopeOptionDesc}>
+              Both menus use the same category list (e.g. one seasonal rotation). An item can appear on
+              {` ${menu1Name.trim() || 'Menu 1'}, ${menu2Name.trim() || 'Menu 2'}, or both`}. Best if your two menus
+              are variations of the same lineup.
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.scopeOption, categoryScope === 'per_menu' && styles.scopeOptionActive]}
+            onPress={() => setCategoryScope('per_menu')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.scopeOptionTitle}>Per-menu categories {categoryScope === 'per_menu' ? '✓' : ''}</Text>
+            <Text style={styles.scopeOptionDesc}>
+              Each menu gets its own independent categories you edit separately, and every item belongs to a single
+              menu. Best when your two menus are truly different (e.g. a Breakfast menu and a Dinner menu). You can
+              switch modes anytime in Settings.
+            </Text>
+          </TouchableOpacity>
         </>
       )}
 
@@ -660,6 +698,31 @@ const styles = StyleSheet.create({
     color: splashColors.text,
   },
   switchHint: {
+    fontSize: 13,
+    color: splashColors.textSecondary,
+    lineHeight: 18,
+  },
+
+  // Category-scope option cards
+  scopeOption: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1.5,
+    borderColor: '#E8E8E8',
+  },
+  scopeOptionActive: {
+    borderColor: splashColors.primary,
+    backgroundColor: '#FFF8F0',
+  },
+  scopeOptionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: splashColors.text,
+    marginBottom: 4,
+  },
+  scopeOptionDesc: {
     fontSize: 13,
     color: splashColors.textSecondary,
     lineHeight: 18,

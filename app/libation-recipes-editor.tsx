@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
+  Switch,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -27,13 +28,19 @@ import { translateTexts, saveTranslations } from '@/utils/translateContent';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
-import { libationRecipeCategoryOptions } from '@/utils/menuCategoryLabels';
+import {
+  cocktailFedSubOptions,
+  resolveRecipeSubId,
+  recipeCategoryValueForSub,
+} from '@/utils/menuCategoryLabels';
 
 interface LibationRecipe {
   id: string;
   name: string;
   price: string;
   category: string;
+  subcategory_id: string | null;
+  is_featured: boolean;
   glassware: string | null;
   garnish: string | null;
   ingredients: { amount: string; ingredient: string }[];
@@ -44,15 +51,6 @@ interface LibationRecipe {
   is_active: boolean;
 }
 
-const CATEGORIES = [
-  'Featured',
-  'Signature Cocktails',
-  'Martinis',
-  'Sangrias',
-  'Low ABV',
-  'No ABV',
-];
-
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=400&h=400&fit=crop';
 
 export default function LibationRecipesEditorScreen() {
@@ -62,8 +60,9 @@ export default function LibationRecipesEditorScreen() {
   const colors = useThemeColors();
   const { language } = useLanguage();
   const { organizationId, organization } = useOrganization();
-  const { categories: menuCats } = useMenuCategories({ includeHidden: true });
-  const categoryOptions = libationRecipeCategoryOptions(menuCats, t, (v) => v);
+  // Menu 1 → slot 1 in per-menu scope (shared scope ignores the slot).
+  const { categories: menuCats } = useMenuCategories({ includeHidden: true, menuSlot: 1 });
+  const cocktailSubOptions = cocktailFedSubOptions(menuCats, t);
   const procedureInputRef = useRef<TextInput>(null);
   const [procedureSelection, setProcedureSelection] = useState({ start: 0, end: 0 });
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
@@ -74,7 +73,8 @@ export default function LibationRecipesEditorScreen() {
   // Form state
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
-  const [category, setCategory] = useState('');
+  const [subcategoryId, setSubcategoryId] = useState('');
+  const [isFeatured, setIsFeatured] = useState(false);
   const [glassware, setGlassware] = useState('');
   const [garnish, setGarnish] = useState('');
   const [ingredients, setIngredients] = useState<{ amount: string; ingredient: string }[]>([
@@ -232,7 +232,7 @@ export default function LibationRecipesEditorScreen() {
         return;
       }
 
-      if (!category) {
+      if (!subcategoryId) {
         Alert.alert(t('common.error'), t('libation_editor.error_no_category'));
         return;
       }
@@ -254,6 +254,11 @@ export default function LibationRecipesEditorScreen() {
 
       setLoading(true);
 
+      // Resolve the chosen cocktail-fed subcategory; keep writing a stable legacy
+      // `category` string (built-in vocab or custom name) for fallback resolution.
+      const selectedSub = menuCats.flatMap((c) => c.subcategories).find((s) => s.id === subcategoryId);
+      const legacyCategory = selectedSub ? recipeCategoryValueForSub(selectedSub) : '';
+
       if (editingRecipe) {
         // Update existing recipe using RPC function (same pattern as cocktails editor)
         console.log('Updating libation recipe:', editingRecipe.id);
@@ -263,7 +268,9 @@ export default function LibationRecipesEditorScreen() {
           p_recipe_id: editingRecipe.id,
           p_name: name.trim(),
           p_price: price.trim(),
-          p_category: category,
+          p_category: legacyCategory,
+          p_subcategory_id: subcategoryId,
+          p_is_featured: isFeatured,
           p_glassware: glassware.trim() || null,
           p_garnish: garnish.trim() || null,
           p_ingredients: validIngredients,
@@ -289,7 +296,9 @@ export default function LibationRecipesEditorScreen() {
           p_organization_id: organizationId,
           p_name: name.trim(),
           p_price: price.trim(),
-          p_category: category,
+          p_category: legacyCategory,
+          p_subcategory_id: subcategoryId,
+          p_is_featured: isFeatured,
           p_glassware: glassware.trim() || null,
           p_garnish: garnish.trim() || null,
           p_ingredients: validIngredients,
@@ -373,7 +382,8 @@ export default function LibationRecipesEditorScreen() {
     setEditingRecipe(recipe);
     setName(recipe.name);
     setPrice(recipe.price);
-    setCategory(recipe.category);
+    setSubcategoryId(resolveRecipeSubId(menuCats, recipe) || '');
+    setIsFeatured(!!recipe.is_featured);
     setGlassware(recipe.glassware || '');
     setGarnish(recipe.garnish || '');
     setIngredients(
@@ -397,7 +407,8 @@ export default function LibationRecipesEditorScreen() {
     setEditingRecipe(null);
     setName('');
     setPrice('');
-    setCategory('');
+    setSubcategoryId('');
+    setIsFeatured(false);
     setGlassware('');
     setGarnish('');
     setIngredients([{ amount: '', ingredient: '' }]);
@@ -434,14 +445,26 @@ export default function LibationRecipesEditorScreen() {
     return data.publicUrl;
   };
 
-  // Group recipes by category
-  const recipesByCategory = CATEGORIES.reduce((acc, cat) => {
-    const categoryRecipes = recipes.filter((r) => r.category === cat);
-    if (categoryRecipes.length > 0) {
-      acc[cat] = categoryRecipes;
+  // Group recipes under their bound cocktail-fed subcategory (current names, in
+  // the menu's subcategory order); featured recipes pin to the top of each group.
+  const recipesByCategory: Record<string, LibationRecipe[]> = {};
+  const groupedIds = new Set<string>();
+  for (const opt of cocktailSubOptions) {
+    const subRecipes = recipes
+      .filter((r) => resolveRecipeSubId(menuCats, r) === opt.id)
+      .sort((a, b) => (Number(b.is_featured) - Number(a.is_featured)) || (a.display_order - b.display_order));
+    if (subRecipes.length > 0) {
+      recipesByCategory[opt.label] = subRecipes;
+      subRecipes.forEach((r) => groupedIds.add(r.id));
     }
-    return acc;
-  }, {} as Record<string, LibationRecipe[]>);
+  }
+  // Recipes whose subcategory no longer resolves (e.g. a sub was un-marked
+  // recipe-backed) still show, grouped by their stored category string.
+  for (const r of recipes) {
+    if (groupedIds.has(r.id)) continue;
+    const key = r.category || 'Other';
+    (recipesByCategory[key] ||= []).push(r);
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -578,29 +601,48 @@ export default function LibationRecipesEditorScreen() {
                 )}
               </View>
 
-              {/* Category */}
+              {/* Subcategory (recipe-backed Libations subcategory) */}
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>{t('libation_editor.category_label')}</Text>
-                <View style={styles.picker}>
-                  {categoryOptions.map((opt) => (
-                    <TouchableOpacity
-                      key={opt.value}
-                      style={[
-                        styles.pickerOption,
-                        category === opt.value && { backgroundColor: colors.highlight }
-                      ]}
-                      onPress={() => setCategory(opt.value)}
-                    >
-                      <Text
+                {cocktailSubOptions.length === 0 ? (
+                  <Text style={[styles.pickerEmptyHint, { color: colors.textSecondary }]}>
+                    {t('libation_editor.no_cocktail_subs')}
+                  </Text>
+                ) : (
+                  <View style={styles.picker}>
+                    {cocktailSubOptions.map((opt) => (
+                      <TouchableOpacity
+                        key={opt.id}
                         style={[
-                          styles.pickerOptionText,
-                          category === opt.value && { color: colors.text, fontWeight: '600' }
+                          styles.pickerOption,
+                          subcategoryId === opt.id && { backgroundColor: colors.highlight }
                         ]}
+                        onPress={() => setSubcategoryId(opt.id)}
                       >
-                        {opt.label}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text
+                          style={[
+                            styles.pickerOptionText,
+                            subcategoryId === opt.id && { color: colors.text, fontWeight: '600' }
+                          ]}
+                        >
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {/* Featured (pin to top of its subcategory) */}
+              <View style={styles.formField}>
+                <View style={styles.featuredRow}>
+                  <View style={styles.featuredTextWrap}>
+                    <Text style={styles.formLabel}>{t('libation_editor.featured_label')}</Text>
+                    <Text style={[styles.featuredHint, { color: colors.textSecondary }]}>
+                      {t('libation_editor.featured_hint')}
+                    </Text>
+                  </View>
+                  <Switch value={isFeatured} onValueChange={setIsFeatured} />
                 </View>
               </View>
 
@@ -998,6 +1040,24 @@ const styles = StyleSheet.create({
   pickerOptionText: {
     color: '#1A1A1A',
     fontWeight: '400',
+  },
+  pickerEmptyHint: {
+    fontSize: 13,
+    fontStyle: 'italic',
+    lineHeight: 18,
+  },
+  featuredRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  featuredTextWrap: {
+    flex: 1,
+  },
+  featuredHint: {
+    fontSize: 12,
+    marginTop: 2,
+    lineHeight: 16,
   },
   ingredientRow: {
     flexDirection: 'row',
