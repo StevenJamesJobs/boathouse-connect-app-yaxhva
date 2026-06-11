@@ -1272,6 +1272,7 @@ export type Database = {
           is_gluten_free_available: boolean | null
           is_vegetarian: boolean | null
           is_vegetarian_available: boolean | null
+          is_weekly_special: boolean | null
           location: string | null
           location_es: string | null
           member_bottle_price: string | null
@@ -1306,6 +1307,7 @@ export type Database = {
           is_gluten_free_available?: boolean | null
           is_vegetarian?: boolean | null
           is_vegetarian_available?: boolean | null
+          is_weekly_special?: boolean | null
           location?: string | null
           location_es?: string | null
           member_bottle_price?: string | null
@@ -1340,6 +1342,7 @@ export type Database = {
           is_gluten_free_available?: boolean | null
           is_vegetarian?: boolean | null
           is_vegetarian_available?: boolean | null
+          is_weekly_special?: boolean | null
           location?: string | null
           location_es?: string | null
           member_bottle_price?: string | null
@@ -3124,6 +3127,7 @@ export type Database = {
           p_is_gluten_free_available: boolean
           p_is_vegetarian: boolean
           p_is_vegetarian_available: boolean
+          p_is_weekly_special?: boolean
           p_location?: string
           p_member_bottle_price?: string
           p_name: string
@@ -3733,6 +3737,7 @@ export type Database = {
           p_is_gluten_free_available: boolean
           p_is_vegetarian: boolean
           p_is_vegetarian_available: boolean
+          p_is_weekly_special?: boolean
           p_location?: string
           p_member_bottle_price?: string
           p_menu_item_id: string

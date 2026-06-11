@@ -269,7 +269,8 @@ export default function ManageMenuCategoriesScreen() {
                 <Text style={styles.badgeText}>{t('manage_categories:built_in')}</Text>
               </View>
             )}
-            {item.system_key && BEHAVIOR_CAPTION_KEY[item.system_key] && (
+            {item.system_key && BEHAVIOR_CAPTION_KEY[item.system_key] &&
+              !(perMenu && (item.system_key === 'cat.lunch' || item.system_key === 'cat.dinner')) && (
               <Text style={styles.caption}>{t(BEHAVIOR_CAPTION_KEY[item.system_key])}</Text>
             )}
           </TouchableOpacity>
@@ -285,7 +286,10 @@ export default function ManageMenuCategoriesScreen() {
               <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color="#E53935" />
             </TouchableOpacity>
           ) : (
-            <View style={styles.iconBtn} />
+            // Built-in category — a grey lock marks it as undeletable (hide instead).
+            <View style={styles.iconBtn}>
+              <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={18} color={colors.textSecondary} />
+            </View>
           )}
           <TouchableOpacity onPress={() => setSelectedCategoryId(item.id)} style={styles.iconBtn}>
             <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={20} color={colors.textSecondary} />
@@ -296,7 +300,11 @@ export default function ManageMenuCategoriesScreen() {
   };
 
   const renderSub = ({ item, drag, isActive }: RenderItemParams<MenuSubcategory>) => {
-    const locked = item.is_cocktail_fed;
+    const locked = item.is_cocktail_fed; // drives the "Linked to recipes" badge
+    // Deletion is blocked server-side for built-in (system_key) subs AND for any
+    // recipe-linked sub. Mirror that here so we don't show a trash button that
+    // would just error — e.g. on a built-in cocktail sub that's been unlinked.
+    const canDelete = item.system_key === null && !item.is_cocktail_fed;
     return (
       <ScaleDecorator>
         <View style={[styles.row, { opacity: item.is_hidden ? 0.5 : 1 }, isActive && styles.rowActive]}>
@@ -320,14 +328,18 @@ export default function ManageMenuCategoriesScreen() {
           {selectedCategory?.system_key === 'cat.libations' && (
             <TouchableOpacity
               onPress={() => toggleSubCocktailFed(item)}
-              style={styles.iconBtn}
-              disabled={busy}
+              style={[styles.iconBtn, item.is_cocktail_fed && styles.iconBtnLinked]}
+              disabled={busy || item.system_key !== null}
               accessibilityLabel={t('manage_categories:recipe_backed_toggle')}
             >
+              {/* Filled link-circle = recipe-linked (on); hollow link-circle =
+                  not linked (off). Distinct glyph per state (iOS has no broken-
+                  chain symbol; filled-vs-hollow reads clearly + always renders).
+                  Android uses link / link-off (chain / broken chain). */}
               <IconSymbol
-                ios_icon_name={item.is_cocktail_fed ? 'book.closed.fill' : 'book.closed'}
-                android_material_icon_name="menu-book"
-                size={20}
+                ios_icon_name={item.is_cocktail_fed ? 'link.circle.fill' : 'link.circle'}
+                android_material_icon_name={item.is_cocktail_fed ? 'link' : 'link-off'}
+                size={22}
                 color={item.is_cocktail_fed ? colors.primary : colors.textSecondary}
               />
             </TouchableOpacity>
@@ -335,10 +347,15 @@ export default function ManageMenuCategoriesScreen() {
           <TouchableOpacity onPress={() => toggleSubHidden(item)} style={styles.iconBtn} disabled={busy}>
             <IconSymbol ios_icon_name={item.is_hidden ? 'eye.slash' : 'eye'} android_material_icon_name={item.is_hidden ? 'visibility-off' : 'visibility'} size={20} color={colors.textSecondary} />
           </TouchableOpacity>
-          {!locked ? (
+          {canDelete ? (
             <TouchableOpacity onPress={() => deleteSub(item)} style={styles.iconBtn} disabled={busy}>
               <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color="#E53935" />
             </TouchableOpacity>
+          ) : item.system_key !== null ? (
+            // Locked (built-in) sub — a grey lock marks it as undeletable.
+            <View style={styles.iconBtn}>
+              <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={18} color={colors.textSecondary} />
+            </View>
           ) : (
             <View style={styles.iconBtn} />
           )}
@@ -372,8 +389,7 @@ export default function ManageMenuCategoriesScreen() {
     <View style={styles.hintBlock}>
       {hintRow('drag', hintIcon('line.3.horizontal', 'drag-indicator'), t('manage_categories:hint_drag'))}
       {hintRow('edit', <>{hintIcon('pencil', 'edit', colors.primary)}{hintIcon('eye', 'visibility')}</>, t('manage_categories:hint_sub_edit'))}
-      {isLibSub && hintRow('recipe', hintIcon('book.closed', 'menu-book', colors.primary), t('manage_categories:hint_recipe_backed'))}
-      {isLibSub && hintRow('reflected', hintIcon('arrow.triangle.2.circlepath', 'sync'), t('manage_categories:hint_recipe_reflected', { menu1: organization?.menu_1_name || 'Menu 1', menu2: organization?.menu_2_name || 'Menu 2' }))}
+      {isLibSub && hintRow('recipe', hintIcon('link.circle.fill', 'link', colors.primary), t('manage_categories:hint_recipe_backed', { menu1: organization?.menu_1_name || 'Menu 1', menu2: organization?.menu_2_name || 'Menu 2' }))}
       {hintRow('del', hintIcon('trash', 'delete', '#E53935'), t('manage_categories:hint_sub_delete'))}
       {isLibSub && hintRow('locked', hintIcon('lock.fill', 'lock'), t('manage_categories:hint_recipe_locked'))}
     </View>
@@ -392,7 +408,20 @@ export default function ManageMenuCategoriesScreen() {
         <Text style={styles.headerTitle} numberOfLines={1}>
           {inSubview ? categoryLabel(selectedCategory!, t) : t('manage_categories:title')}
         </Text>
-        <View style={styles.backButton} />
+        {/* Context-aware add: a subcategory when inside a category, otherwise a
+            category. Always reachable even when the hint text is long. */}
+        <TouchableOpacity
+          onPress={() =>
+            inSubview
+              ? openNameModal('add-sub', selectedCategory!.id, '', t('manage_categories:add_subcategory'))
+              : openNameModal('add-cat', null, '', t('manage_categories:add_category'))
+          }
+          style={styles.backButton}
+          disabled={busy}
+          accessibilityLabel={inSubview ? t('manage_categories:add_subcategory') : t('manage_categories:add_category')}
+        >
+          <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={24} color={colors.primary} />
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -521,7 +550,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     },
     backButton: { padding: 8, width: 40 },
     headerTitle: { flex: 1, textAlign: 'center', fontSize: 20, fontWeight: 'bold', color: colors.text },
-    listContent: { padding: 12, paddingBottom: 40 },
+    listContent: { padding: 12, paddingBottom: 120 },
     hint: { fontSize: 13, color: colors.textSecondary, marginBottom: 12, paddingHorizontal: 4 },
     hintBlock: { marginBottom: 12, gap: 8, paddingHorizontal: 4 },
     hintRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
@@ -567,6 +596,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     badgeText: { fontSize: 11, color: colors.textSecondary },
     caption: { fontSize: 11, color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 },
     iconBtn: { padding: 6, width: 32, alignItems: 'center' },
+    iconBtnLinked: { backgroundColor: colors.primary + '1F', borderRadius: 8 },
     addBtn: {
       flexDirection: 'row',
       alignItems: 'center',

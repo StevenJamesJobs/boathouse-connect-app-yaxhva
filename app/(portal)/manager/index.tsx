@@ -257,13 +257,19 @@ export default function ManagerPortalScreen() {
     try {
       const wsNames = await weeklySpecialsNames(organizationId);
       const [specialsResult, announcementsResult, eventsResult, featuresResult] = await Promise.all([
-        supabase
-          .from('menu_items')
-          .select('*')
-          .eq('organization_id', organizationId)
-          .in('category', wsNames)
-          .eq('is_active', true)
-          .order('display_order', { ascending: true }),
+        // Weekly Specials = items categorized as Weekly Specials PLUS any item
+        // flagged is_weekly_special (overlay — the item stays in its home
+        // category but is featured here too). Merge + dedupe by id.
+        (async () => {
+          const [byCategory, flagged] = await Promise.all([
+            supabase.from('menu_items').select('*').eq('organization_id', organizationId).in('category', wsNames).eq('is_active', true),
+            supabase.from('menu_items').select('*').eq('organization_id', organizationId).eq('is_weekly_special', true).eq('is_active', true),
+          ]);
+          const byId = new Map<string, any>();
+          for (const row of [...(byCategory.data || []), ...(flagged.data || [])]) byId.set(row.id, row);
+          const merged = Array.from(byId.values()).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+          return { data: merged };
+        })(),
         supabase
           .from('announcements')
           .select(`
