@@ -27,6 +27,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRouter } from 'expo-router';
 import SeasonSelector, { type Season } from '@/components/SeasonSelector';
+import { menuIconAndroid } from '@/constants/menuIcons';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
 import {
   labelForCategoryName,
@@ -54,6 +55,8 @@ interface MenuItem {
   thumbnail_shape: string;
   display_order: number;
   is_active: boolean;
+  is_weekly_special?: boolean;
+  season?: string;
   location?: string | null;
   location_es?: string | null;
   glass_price?: string | null;
@@ -122,7 +125,8 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const { t } = useTranslation();
   const { language } = useLanguage();
   const { organizationId, organization } = useOrganization();
-  const [season, setSeason] = useState<Season>(organization.menu_count === 1 ? 'winter' : 'summer');
+  // Default to Menu 1 (winter slot) for everyone — the more natural landing menu.
+  const [season, setSeason] = useState<Season>('winter');
   // In per-menu scope the active season selects which menu's category tree to render.
   const { categories: menuCats, loading: categoriesLoading } = useMenuCategories({
     menuSlot: season === 'winter' ? 1 : 2,
@@ -168,6 +172,9 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       // shared mode keeps the meal-availability overlay.
       if (!perMenu && fb === 'lunch') return item.available_for_lunch;
       if (!perMenu && fb === 'dinner') return item.available_for_dinner;
+      // Weekly Specials is an overlay: items flagged is_weekly_special surface
+      // here too, on top of items actually categorized as Weekly Specials.
+      if (fb === 'weekly_specials') return item.category === categoryName || !!item.is_weekly_special;
       return item.category === categoryName;
     },
     [catOf, perMenu],
@@ -191,6 +198,10 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   }, [menuCats]);
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  // Cross-menu search corpus (both menus + their injected cocktails), deduped.
+  // Used only when there's a search query so the customer can find an item on
+  // either menu; the badge on each result shows which menu it lives on.
+  const [allItems, setAllItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPageIndex, setCurrentPageIndex] = useState(bridgeOffset);
@@ -200,6 +211,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
+  // Per-menu hides the Lunch/Dinner chips — drop any stale ones so they can't
+  // linger as active filters with no way to untoggle them.
+  useEffect(() => {
+    if (perMenu) setActiveFilters((prev) => prev.filter((f) => f !== 'lunch' && f !== 'dinner'));
+  }, [perMenu]);
   const { user } = useAuth();
   const router = useRouter();
 
@@ -295,11 +311,13 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
 
   // Get filtered items for search/filter mode
   const getSearchFilteredItems = useCallback(() => {
-    let filtered = menuItems;
+    // A text search spans the WHOLE menu (allItems); filter-only stays on the
+    // active menu (menuItems).
+    let filtered = searchQuery.trim() ? allItems : menuItems;
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = menuItems.filter(
+      filtered = filtered.filter(
         item =>
           item.name.toLowerCase().includes(query) ||
           (item.description && item.description.toLowerCase().includes(query)) ||
@@ -337,102 +355,123 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     }
 
     return filtered;
-  }, [menuItems, searchQuery, activeFilters, isWineName, catOf]);
+  }, [menuItems, allItems, searchQuery, activeFilters, isWineName, catOf]);
 
   const isSearchOrFilterMode = searchQuery.trim().length > 0 || activeFilters.length > 0;
+
+  // Build the full item list for ONE menu (regular items + that menu's injected
+  // cocktail recipes). Used both for the active display and the cross-menu
+  // search corpus. (For the non-active menu the cocktail subcategory names
+  // resolve best-effort against the active tree — fine for search.)
+  const buildItemsForSeason = async (seasonKey: Season): Promise<MenuItem[]> => {
+    const { data, error } = await (supabase
+      .from('menu_items') as any)
+      .select('*')
+      .eq('organization_id', organizationId)
+      .eq('is_active', true)
+      .in('season', [seasonKey, 'both'])
+      .order('display_order', { ascending: true });
+
+    if (error) throw error;
+    let items: MenuItem[] = data || [];
+
+    if (seasonKey === 'summer') {
+      const { data: slrData } = await (supabase
+        .from('summer_libation_recipes' as any) as any)
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (slrData) {
+        const mapped: MenuItem[] = slrData.map((r: any) => ({
+          id: `slr-${r.id}`,
+          name: r.name,
+          name_es: null,
+          description: r.ingredients?.map((i: any) => i.ingredient).join(', ') || null,
+          description_es: null,
+          price: r.price,
+          category: libInjection.libationsCategoryName,
+          subcategory: resolveRecipeSubName(menuCats, r),
+          available_for_lunch: false,
+          available_for_dinner: false,
+          is_gluten_free: false,
+          is_gluten_free_available: false,
+          is_vegetarian: false,
+          is_vegetarian_available: false,
+          thumbnail_url: r.thumbnail_url,
+          thumbnail_shape: 'square',
+          display_order: r.is_featured ? -1000 + r.display_order : r.display_order,
+          is_active: true,
+          season: 'summer',
+        }));
+        items = [...items, ...mapped];
+        items.sort((a, b) => a.display_order - b.display_order);
+      }
+    }
+
+    if (seasonKey === 'winter') {
+      // Winter cocktails are sourced from the Winter Libations Recipes editor
+      // (libation_recipes), mirroring summer. Hide any manually-entered
+      // Libations cocktail menu items first so they don't double up — the
+      // beer/wine Libations subcategories (Draft Beer, Bottle & Cans, etc.)
+      // are untouched. No data is deleted; manual rows just aren't re-rendered.
+      items = items.filter(
+        (i) => !(i.category === libInjection.libationsCategoryName && i.subcategory != null && libInjection.cocktailSubNames.has(i.subcategory))
+      );
+
+      const { data: lrData } = await (supabase
+        .from('libation_recipes' as any) as any)
+        .select('*')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true });
+
+      if (lrData) {
+        const mapped: MenuItem[] = lrData.map((r: any) => ({
+          id: `lr-${r.id}`,
+          name: r.name,
+          name_es: null,
+          description: r.ingredients?.map((i: any) => i.ingredient).join(', ') || null,
+          description_es: null,
+          price: r.price,
+          category: libInjection.libationsCategoryName,
+          subcategory: resolveRecipeSubName(menuCats, r),
+          available_for_lunch: false,
+          available_for_dinner: false,
+          is_gluten_free: false,
+          is_gluten_free_available: false,
+          is_vegetarian: false,
+          is_vegetarian_available: false,
+          thumbnail_url: r.thumbnail_url,
+          thumbnail_shape: 'square',
+          display_order: r.is_featured ? -1000 + r.display_order : r.display_order,
+          is_active: true,
+          season: 'winter',
+        }));
+        items = [...items, ...mapped];
+        items.sort((a, b) => a.display_order - b.display_order);
+      }
+    }
+
+    return items;
+  };
 
   const loadMenuItems = async () => {
     try {
       setLoading(true);
-      const { data, error } = await (supabase
-        .from('menu_items') as any)
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .in('season', [season, 'both'])
-        .order('display_order', { ascending: true });
-
-      if (error) throw error;
-      let items: MenuItem[] = data || [];
-
-      if (season === 'summer') {
-        const { data: slrData } = await (supabase
-          .from('summer_libation_recipes' as any) as any)
-          .select('*')
-          .eq('organization_id', organizationId)
-          .eq('is_active', true)
-          .order('display_order', { ascending: true });
-
-        if (slrData) {
-          const mapped: MenuItem[] = slrData.map((r: any) => ({
-            id: `slr-${r.id}`,
-            name: r.name,
-            name_es: null,
-            description: r.ingredients?.map((i: any) => i.ingredient).join(', ') || null,
-            description_es: null,
-            price: r.price,
-            category: libInjection.libationsCategoryName,
-            subcategory: resolveRecipeSubName(menuCats, r),
-            available_for_lunch: false,
-            available_for_dinner: false,
-            is_gluten_free: false,
-            is_gluten_free_available: false,
-            is_vegetarian: false,
-            is_vegetarian_available: false,
-            thumbnail_url: r.thumbnail_url,
-            thumbnail_shape: 'square',
-            display_order: r.is_featured ? -1000 + r.display_order : r.display_order,
-            is_active: true,
-          }));
-          items = [...items, ...mapped];
-          items.sort((a, b) => a.display_order - b.display_order);
-        }
+      const active = await buildItemsForSeason(season);
+      setMenuItems(active);
+      // Cross-menu search corpus: also pull the OTHER menu (deduped by id) so the
+      // search box spans the whole menu. Single-menu orgs reuse the active set.
+      if (organization.menu_count === 2) {
+        const other = await buildItemsForSeason(season === 'winter' ? 'summer' : 'winter');
+        const byId = new Map<string, MenuItem>();
+        for (const it of [...active, ...other]) byId.set(it.id, it);
+        setAllItems(Array.from(byId.values()));
+      } else {
+        setAllItems(active);
       }
-
-      if (season === 'winter') {
-        // Winter cocktails are sourced from the Winter Libations Recipes editor
-        // (libation_recipes), mirroring summer. Hide any manually-entered
-        // Libations cocktail menu items first so they don't double up — the
-        // beer/wine Libations subcategories (Draft Beer, Bottle & Cans, etc.)
-        // are untouched. No data is deleted; manual rows just aren't re-rendered.
-        items = items.filter(
-          (i) => !(i.category === libInjection.libationsCategoryName && i.subcategory != null && libInjection.cocktailSubNames.has(i.subcategory))
-        );
-
-        const { data: lrData } = await (supabase
-          .from('libation_recipes' as any) as any)
-          .select('*')
-          .eq('organization_id', organizationId)
-          .eq('is_active', true)
-          .order('display_order', { ascending: true });
-
-        if (lrData) {
-          const mapped: MenuItem[] = lrData.map((r: any) => ({
-            id: `lr-${r.id}`,
-            name: r.name,
-            name_es: null,
-            description: r.ingredients?.map((i: any) => i.ingredient).join(', ') || null,
-            description_es: null,
-            price: r.price,
-            category: libInjection.libationsCategoryName,
-            subcategory: resolveRecipeSubName(menuCats, r),
-            available_for_lunch: false,
-            available_for_dinner: false,
-            is_gluten_free: false,
-            is_gluten_free_available: false,
-            is_vegetarian: false,
-            is_vegetarian_available: false,
-            thumbnail_url: r.thumbnail_url,
-            thumbnail_shape: 'square',
-            display_order: r.is_featured ? -1000 + r.display_order : r.display_order,
-            is_active: true,
-          }));
-          items = [...items, ...mapped];
-          items.sort((a, b) => a.display_order - b.display_order);
-        }
-      }
-
-      setMenuItems(items);
     } catch (error) {
       console.error('Error loading menu items:', error);
     } finally {
@@ -572,9 +611,20 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   };
 
   // Render a single menu item card (compact style matching Welcome page)
-  const renderMenuCard = (item: MenuItem, categoryColor: string) => {
+  // Which menu an item belongs to (winter → Menu 1, summer → Menu 2, both →
+  // shared) — shown as a badge on whole-menu search results.
+  const menuBadgeForSeason = (s: string | null | undefined): { icon: string; label: string } => {
+    if (s === 'winter') return { icon: organization?.menu_1_icon || 'snowflake', label: organization?.menu_1_name || 'Menu 1' };
+    if (s === 'summer') return { icon: organization?.menu_2_icon || 'sun.max.fill', label: organization?.menu_2_name || 'Menu 2' };
+    return { icon: 'circle.grid.2x2', label: t('menu_display.both_menus') };
+  };
+
+  const renderMenuCard = (item: MenuItem, categoryColor: string, menuBadge?: { icon: string; label: string }) => {
     const isWine = isWineName(item.category);
     const localizedLocation = isWine ? getLocalizedField(item, 'location', language) : '';
+    // Banner items render the image full-width across the top of the card;
+    // square items keep the inline 80×80 thumbnail (matches the Menu Editor).
+    const isBanner = item.thumbnail_shape === 'banner';
     return (
     <TouchableOpacity
       key={item.id}
@@ -588,8 +638,15 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       onPress={() => openDetailModal(item)}
       activeOpacity={0.7}
     >
+      {isBanner && item.thumbnail_url && (
+        <Image
+          source={getImageUrl(item.thumbnail_url, item.updated_at)!}
+          style={styles.cardImageBanner}
+          contentFit="cover"
+        />
+      )}
       <View style={styles.cardRow}>
-        {item.thumbnail_url && (
+        {!isBanner && item.thumbnail_url && (
           <Image
             source={getImageUrl(item.thumbnail_url, item.updated_at)!}
             style={styles.cardImage}
@@ -597,6 +654,12 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
           />
         )}
         <View style={styles.cardContent}>
+          {menuBadge && (
+            <View style={styles.menuBadge}>
+              <IconSymbol ios_icon_name={menuBadge.icon} android_material_icon_name={menuIconAndroid(menuBadge.icon)} size={11} color={colors.primary} />
+              <Text style={[styles.menuBadgeText, { color: colors.primary }]} numberOfLines={1}>{menuBadge.label}</Text>
+            </View>
+          )}
           <View style={styles.cardTitleRow}>
             <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
               {getLocalizedField(item, 'name', language)}
@@ -887,7 +950,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             </View>
           ) : (
             getSearchFilteredItems().map(item =>
-              renderMenuCard(item, catOf(item.category)?.color || colors.primary)
+              renderMenuCard(
+                item,
+                catOf(item.category)?.color || colors.primary,
+                searchQuery.trim() ? menuBadgeForSeason(item.season) : undefined,
+              )
             )
           )}
         </ScrollView>
@@ -939,9 +1006,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             </View>
 
             <ScrollView style={styles.filterModalScroll} contentContainerStyle={styles.filterModalScrollContent}>
-              {FILTER_OPTIONS.map((option, index) => (
+              {/* Per-menu treats Lunch/Dinner as ordinary categories, so their
+                  meal-overlay filter chips don't apply there. */}
+              {FILTER_OPTIONS.filter((o) => !(perMenu && (o.key === 'lunch' || o.key === 'dinner'))).map((option) => (
                 <TouchableOpacity
-                  key={index}
+                  key={option.key}
                   style={[
                     styles.filterOption,
                     { backgroundColor: colors.background },
@@ -1186,9 +1255,31 @@ const createStyles = (colors: any) =>
       height: 80,
       borderRadius: 10,
     },
+    cardImageBanner: {
+      width: '100%',
+      aspectRatio: 16 / 9,
+      borderRadius: 10,
+      marginBottom: 10,
+    },
     cardContent: {
       flex: 1,
       justifyContent: 'center',
+    },
+    menuBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      alignSelf: 'flex-start',
+      gap: 3,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 8,
+      backgroundColor: colors.primary + '18',
+      marginBottom: 4,
+      maxWidth: 150,
+    },
+    menuBadgeText: {
+      fontSize: 10,
+      fontWeight: '600',
     },
     cardTitleRow: {
       flexDirection: 'row',

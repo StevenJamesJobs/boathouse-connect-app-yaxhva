@@ -36,6 +36,7 @@ import SeasonSelector, { type Season } from '@/components/SeasonSelector';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
 import { categoryLabel, subcategoryLabel, findCategoryByName } from '@/utils/menuCategoryLabels';
+import { menuIconAndroid } from '@/constants/menuIcons';
 
 interface MenuItem {
   id: string;
@@ -54,6 +55,7 @@ interface MenuItem {
   thumbnail_shape: string;
   display_order: number;
   is_active: boolean;
+  is_weekly_special: boolean;
   name_es?: string | null;
   description_es?: string | null;
   location?: string | null;
@@ -85,7 +87,8 @@ export default function MenuEditorScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
-  const [season, setSeason] = useState<Season>('summer');
+  // Default to Menu 1 (winter slot) — the more natural landing menu.
+  const [season, setSeason] = useState<Season>('winter');
   const perMenu = organization?.menu_category_scope === 'per_menu';
   // In per-menu scope the active season selects which menu's category tree to edit.
   const { categories: menuCats, loading: categoriesLoading, refresh: refreshCategories } = useMenuCategories({
@@ -94,7 +97,13 @@ export default function MenuEditorScreen() {
   });
   const { language } = useLanguage();
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  // All org items across BOTH menus (no season filter) — used so the search box
+  // spans the whole menu database, not just the active menu.
+  const [allItems, setAllItems] = useState<MenuItem[]>([]);
   const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
+  // Order Position picker (opened from a card's ··· menu): which item, its
+  // category+subcategory siblings, and its current 0-based slot.
+  const [positionPicker, setPositionPicker] = useState<{ item: MenuItem; siblings: MenuItem[]; currentIndex: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
@@ -143,13 +152,10 @@ export default function MenuEditorScreen() {
   );
   const selectedCategoryObj = findCategoryByName(menuCats, selectedCategory);
   const selectedSubObj = selectedCategoryObj?.subcategories.find((s) => s.display_name === selectedSubcategory);
-  // Availability checkbox/tag labels follow the lunch/dinner category renames.
+  // Availability tag labels on the editor item cards follow lunch/dinner renames.
+  // (The add/edit form uses its own menu-aware form* variants — see below.)
   const lunchName = menuCats.find((c) => c.filter_behavior === 'lunch')?.display_name || t('menu_editor:available_lunch');
   const dinnerName = menuCats.find((c) => c.filter_behavior === 'dinner')?.display_name || t('menu_editor:available_dinner');
-  // "Available for" is a shared-mode meal overlay; only surface a checkbox when
-  // its Lunch/Dinner category actually exists and is visible.
-  const hasLunchCat = menuCats.some((c) => c.filter_behavior === 'lunch' && !c.is_hidden);
-  const hasDinnerCat = menuCats.some((c) => c.filter_behavior === 'dinner' && !c.is_hidden);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
@@ -168,6 +174,7 @@ export default function MenuEditorScreen() {
     is_vegetarian_available: false,
     thumbnail_shape: 'square',
     display_order: 0,
+    is_weekly_special: false,
     name_es: '',
     description_es: '',
     location: '',
@@ -188,6 +195,20 @@ export default function MenuEditorScreen() {
   const descriptionInputRef = useRef<TextInput>(null);
   const [descriptionSelection, setDescriptionSelection] = useState({ start: 0, end: 0 });
 
+  // The add/edit form's category/subcategory pills must reflect the menu the
+  // item is being assigned to (formData.item_season) — NOT whichever menu the
+  // editor is currently viewing. In per-menu each menu has its own tree; in
+  // shared mode this resolves to the single shared tree.
+  const formMenuSlot: 1 | 2 = formData.item_season === 'summer' ? 2 : 1;
+  const { categories: formMenuCats } = useMenuCategories({ includeHidden: true, menuSlot: formMenuSlot });
+  const formWeeklySpecialsCat = formMenuCats.find((c) => c.system_key === 'cat.weekly_specials' && !c.is_hidden);
+  const formHasWeeklySpecialsCat = !!formWeeklySpecialsCat;
+  const formWeeklySpecialsLabel = formWeeklySpecialsCat ? categoryLabel(formWeeklySpecialsCat, t) : '';
+  const formHasLunchCat = formMenuCats.some((c) => c.filter_behavior === 'lunch' && !c.is_hidden);
+  const formHasDinnerCat = formMenuCats.some((c) => c.filter_behavior === 'dinner' && !c.is_hidden);
+  const formLunchName = formMenuCats.find((c) => c.filter_behavior === 'lunch')?.display_name || t('menu_editor:available_lunch');
+  const formDinnerName = formMenuCats.find((c) => c.filter_behavior === 'dinner')?.display_name || t('menu_editor:available_dinner');
+
   useEffect(() => {
     loadMenuItems();
     setCurrentPageIndex(0);
@@ -204,15 +225,23 @@ export default function MenuEditorScreen() {
   const loadMenuItems = async () => {
     try {
       setLoading(true);
-      const { data, error } = await (supabase
-        .from('menu_items') as any)
-        .select('*')
-        .eq('organization_id', organizationId)
-        .in('season', [season, 'both'])
-        .order('display_order', { ascending: true });
+      // Active-menu items (season-scoped) feed the swipe pager; the full set
+      // (all menus) backs the whole-database search.
+      const [scoped, all] = await Promise.all([
+        (supabase.from('menu_items') as any)
+          .select('*')
+          .eq('organization_id', organizationId)
+          .in('season', [season, 'both'])
+          .order('display_order', { ascending: true }),
+        (supabase.from('menu_items') as any)
+          .select('*')
+          .eq('organization_id', organizationId)
+          .order('display_order', { ascending: true }),
+      ]);
 
-      if (error) throw error;
-      setMenuItems((data || []) as MenuItem[]);
+      if (scoped.error) throw scoped.error;
+      setMenuItems((scoped.data || []) as MenuItem[]);
+      setAllItems((all.data || []) as MenuItem[]);
     } catch (error) {
       console.error('Error loading menu items:', error);
       Alert.alert(t('common:error'), t('menu_editor:load_error'));
@@ -222,36 +251,35 @@ export default function MenuEditorScreen() {
   };
 
   const filterItems = useCallback(() => {
-    let filtered = menuItems;
-
-    // FIXED: If there's a search query, search through ALL menu items first
+    // Search spans the WHOLE org (both menus) via allItems; browsing without a
+    // query stays scoped to the active menu's pager (menuItems).
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        item =>
-          item.name.toLowerCase().includes(query) ||
-          (item.description && item.description.toLowerCase().includes(query)) ||
-          item.category.toLowerCase().includes(query) ||
-          (item.subcategory && item.subcategory.toLowerCase().includes(query)) ||
-          (item.is_gluten_free && 'gf'.includes(query)) ||
-          (item.is_gluten_free_available && 'gfa'.includes(query)) ||
-          (item.is_vegetarian && ('v'.includes(query) || 'vegetarian'.includes(query))) ||
-          (item.is_vegetarian_available && ('va'.includes(query) || 'vegetarian available'.includes(query)))
+      setFilteredItems(
+        allItems.filter(
+          item =>
+            item.name.toLowerCase().includes(query) ||
+            (item.description && item.description.toLowerCase().includes(query)) ||
+            item.category.toLowerCase().includes(query) ||
+            (item.subcategory && item.subcategory.toLowerCase().includes(query)) ||
+            (item.is_gluten_free && 'gf'.includes(query)) ||
+            (item.is_gluten_free_available && 'gfa'.includes(query)) ||
+            (item.is_vegetarian && ('v'.includes(query) || 'vegetarian'.includes(query))) ||
+            (item.is_vegetarian_available && ('va'.includes(query) || 'vegetarian available'.includes(query)))
+        )
       );
-    } else {
-      // Only filter by category/subcategory if there's NO search query.
-      // Lunch/Dinner resolve to availability booleans; everything else matches
-      // the category field (see categoryMatches).
-      filtered = filtered.filter(item => categoryMatches(item, selectedCategory));
-
-      // Filter by subcategory if selected
-      if (selectedSubcategory) {
-        filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
-      }
+      return;
     }
 
+    // No query: filter by the active page's category/subcategory.
+    // Lunch/Dinner resolve to availability booleans; everything else matches
+    // the category field (see categoryMatches).
+    let filtered = menuItems.filter(item => categoryMatches(item, selectedCategory));
+    if (selectedSubcategory) {
+      filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
+    }
     setFilteredItems(filtered);
-  }, [menuItems, searchQuery, selectedCategory, selectedSubcategory, categoryMatches]);
+  }, [menuItems, allItems, searchQuery, selectedCategory, selectedSubcategory, categoryMatches]);
 
   useEffect(() => {
     filterItems();
@@ -496,6 +524,7 @@ export default function MenuEditorScreen() {
           p_unique_selling_points: isWine ? (formData.unique_selling_points || null) : null,
           p_unique_selling_points_es: isWine ? (formData.unique_selling_points_es || null) : null,
           p_season: formData.item_season,
+          p_is_weekly_special: formData.is_weekly_special,
         });
 
         if (error) {
@@ -514,6 +543,15 @@ export default function MenuEditorScreen() {
           }, organizationId);
         }
       } else {
+        // New items append to the END of their category/subcategory list;
+        // ordering is then adjusted via drag or the Order Position picker.
+        const siblings = menuItems.filter(
+          (m) => m.category === formData.category &&
+            (formData.subcategory ? m.subcategory === formData.subcategory : !m.subcategory),
+        );
+        const nextOrder = siblings.length
+          ? Math.max(...siblings.map((s) => s.display_order ?? 0)) + 1
+          : 0;
         // Create new item using database function
         const { data, error } = await supabase.rpc('create_menu_item', {
           p_user_id: user.id,
@@ -531,7 +569,7 @@ export default function MenuEditorScreen() {
           p_is_vegetarian_available: formData.is_vegetarian_available,
           p_thumbnail_url: thumbnailUrl,
           p_thumbnail_shape: formData.thumbnail_shape,
-          p_display_order: formData.display_order,
+          p_display_order: nextOrder,
           p_location: isWine ? (formData.location || null) : null,
           p_glass_price: isWine ? (formData.glass_price || null) : null,
           p_bottle_price: isWine ? (formData.bottle_price || null) : null,
@@ -541,6 +579,7 @@ export default function MenuEditorScreen() {
           p_unique_selling_points: isWine ? (formData.unique_selling_points || null) : null,
           p_unique_selling_points_es: isWine ? (formData.unique_selling_points_es || null) : null,
           p_season: formData.item_season,
+          p_is_weekly_special: formData.is_weekly_special,
         });
 
         if (error) {
@@ -683,30 +722,69 @@ export default function MenuEditorScreen() {
     }
   };
 
-  // Overflow (⋮) action sheet for a menu item row. Combines Edit / Move Up /
-  // Move Down / Delete into one compact menu so individual cards can ditch
-  // their four-button footer. Drag-to-reorder remains the primary reorder
-  // path; Up/Down here are a secondary nicety.
+  // Open the Order Position picker for an item — a quick way to jump it to an
+  // exact slot within its category/subcategory without dragging.
+  const openPositionPicker = (item: MenuItem) => {
+    const siblings = getItemsForPage({ category: item.category, subcategory: item.subcategory });
+    const currentIndex = siblings.findIndex((s) => s.id === item.id);
+    if (siblings.length < 2 || currentIndex < 0) return;
+    setPositionPicker({ item, siblings, currentIndex });
+  };
+
+  // Commit a chosen 1-based position: splice the item into the new slot, then
+  // rewrite display_order across the sibling group and reload.
+  const applyPositionChange = async (newPos: number) => {
+    if (!positionPicker) return;
+    const { item, siblings, currentIndex } = positionPicker;
+    const newIndex = newPos - 1;
+    setPositionPicker(null);
+    if (newIndex === currentIndex) return;
+    const reordered = [...siblings];
+    reordered.splice(currentIndex, 1);
+    reordered.splice(newIndex, 0, item);
+    try {
+      await Promise.all(
+        reordered.map((it, idx) =>
+          supabase.from('menu_items').update({ display_order: idx }).eq('id', it.id).eq('organization_id', organizationId)
+        )
+      );
+    } catch (error) {
+      console.error('Error applying position change:', error);
+    }
+    loadMenuItems();
+  };
+
+  // Overflow (⋮) action sheet for a menu item row. Edit / Move Up / Move Down /
+  // Order Position / Delete in one compact menu. Drag-to-reorder is the primary
+  // reorder path; Move Up/Down (non-search only) and Order Position are quick
+  // alternatives so cards stay clean.
   const openItemActions = (item: MenuItem, index: number) => {
+    const inSearch = searchQuery.trim().length > 0;
     const isFirst = index === 0;
     const isLast = index === filteredItems.length - 1;
+    const siblingCount = getItemsForPage({ category: item.category, subcategory: item.subcategory }).length;
 
     const editLabel = t('common:edit');
     const moveUpLabel = t('upcoming_events_editor:move_up');
     const moveDownLabel = t('upcoming_events_editor:move_down');
+    const orderLabel = t('menu_editor:order_position');
     const deleteLabel = t('common:delete');
     const cancelLabel = t('common:cancel');
 
     if (Platform.OS === 'ios') {
       const options: string[] = [editLabel];
       const actions: Array<() => void> = [() => openEditModal(item)];
-      if (!isFirst) {
+      if (!inSearch && !isFirst) {
         options.push(moveUpLabel);
         actions.push(() => handleMoveUp(index));
       }
-      if (!isLast) {
+      if (!inSearch && !isLast) {
         options.push(moveDownLabel);
         actions.push(() => handleMoveDown(index));
+      }
+      if (siblingCount > 1) {
+        options.push(orderLabel);
+        actions.push(() => openPositionPicker(item));
       }
       options.push(deleteLabel);
       actions.push(() => handleDelete(item));
@@ -728,8 +806,9 @@ export default function MenuEditorScreen() {
       const buttons: Array<{ text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }> = [
         { text: editLabel, onPress: () => openEditModal(item) },
       ];
-      if (!isFirst) buttons.push({ text: moveUpLabel, onPress: () => handleMoveUp(index) });
-      if (!isLast) buttons.push({ text: moveDownLabel, onPress: () => handleMoveDown(index) });
+      if (!inSearch && !isFirst) buttons.push({ text: moveUpLabel, onPress: () => handleMoveUp(index) });
+      if (!inSearch && !isLast) buttons.push({ text: moveDownLabel, onPress: () => handleMoveDown(index) });
+      if (siblingCount > 1) buttons.push({ text: orderLabel, onPress: () => openPositionPicker(item) });
       buttons.push({ text: deleteLabel, style: 'destructive', onPress: () => handleDelete(item) });
       buttons.push({ text: cancelLabel, style: 'cancel' });
       Alert.alert(item.name, undefined, buttons);
@@ -777,6 +856,7 @@ export default function MenuEditorScreen() {
       is_vegetarian_available: false,
       thumbnail_shape: 'square',
       display_order: 0,
+      is_weekly_special: false,
       name_es: '',
       description_es: '',
       location: '',
@@ -811,6 +891,7 @@ export default function MenuEditorScreen() {
       is_vegetarian_available: item.is_vegetarian_available,
       thumbnail_shape: item.thumbnail_shape,
       display_order: item.display_order,
+      is_weekly_special: item.is_weekly_special,
       name_es: item.name_es || '',
       description_es: item.description_es || '',
       location: item.location || '',
@@ -868,6 +949,14 @@ export default function MenuEditorScreen() {
     return formatPrice(item.price);
   };
 
+  // Which menu an item belongs to (winter → Menu 1, summer → Menu 2, both →
+  // shared/legacy) — drives the badge on whole-database search results.
+  const menuBadgeForSeason = (s: string | null | undefined): { icon: string; label: string } => {
+    if (s === 'winter') return { icon: organization?.menu_1_icon || 'snowflake', label: organization?.menu_1_name || t('menu_editor:season_winter') };
+    if (s === 'summer') return { icon: organization?.menu_2_icon || 'sun.max.fill', label: organization?.menu_2_name || t('menu_editor:season_summer') };
+    return { icon: 'circle.grid.2x2', label: t('menu_editor:season_both') };
+  };
+
   return (
     <View style={styles.container}>
       {/* Header with Back Button */}
@@ -882,13 +971,18 @@ export default function MenuEditorScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('menu_editor:title')}</Text>
         {user?.role === 'owner' ? (
-          <TouchableOpacity onPress={() => router.push('/manage-menu-categories' as any)} style={styles.backButton}>
+          <TouchableOpacity
+            onPress={() => router.push('/manage-menu-categories' as any)}
+            style={styles.manageCatsButton}
+            accessibilityLabel={t('menu_editor:manage_categories_button')}
+          >
             <IconSymbol
-              ios_icon_name="slider.horizontal.3"
-              android_material_icon_name="tune"
-              size={22}
-              color={colors.text}
+              ios_icon_name="square.grid.2x2"
+              android_material_icon_name="grid-view"
+              size={16}
+              color={colors.primary}
             />
+            <Text style={styles.manageCatsButtonText}>{t('menu_editor:manage_categories_button')}</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.backButton} />
@@ -1095,9 +1189,15 @@ export default function MenuEditorScreen() {
                         {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
                       </View>
                     </View>
-                    <View style={styles.displayOrderCorner}>
-                      <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
-                    </View>
+                    {(() => {
+                      const badge = menuBadgeForSeason((item as any).season);
+                      return (
+                        <View style={styles.menuBadge}>
+                          <IconSymbol ios_icon_name={badge.icon} android_material_icon_name={menuIconAndroid(badge.icon)} size={12} color={colors.primary} />
+                          <Text style={styles.menuBadgeText} numberOfLines={1}>{badge.label}</Text>
+                        </View>
+                      );
+                    })()}
                   </View>
                 ) : (
                   <>
@@ -1117,9 +1217,15 @@ export default function MenuEditorScreen() {
                         {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
                         {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
                       </View>
-                      <View style={styles.displayOrderCorner}>
-                        <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
-                      </View>
+                      {(() => {
+                        const badge = menuBadgeForSeason((item as any).season);
+                        return (
+                          <View style={styles.menuBadge}>
+                            <IconSymbol ios_icon_name={badge.icon} android_material_icon_name={menuIconAndroid(badge.icon)} size={12} color={colors.primary} />
+                            <Text style={styles.menuBadgeText} numberOfLines={1}>{badge.label}</Text>
+                          </View>
+                        );
+                      })()}
                     </View>
                   </>
                 )}
@@ -1228,9 +1334,6 @@ export default function MenuEditorScreen() {
                               {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
                             </View>
                           </View>
-                          <View style={styles.displayOrderCorner}>
-                            <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
-                          </View>
                         </View>
                       ) : (
                         <>
@@ -1249,9 +1352,6 @@ export default function MenuEditorScreen() {
                               {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
                               {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
                               {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
-                            </View>
-                            <View style={styles.displayOrderCorner}>
-                              <Text style={styles.displayOrderTextCompact}>#{item.display_order}</Text>
                             </View>
                           </View>
                         </>
@@ -1308,6 +1408,8 @@ export default function MenuEditorScreen() {
               bounces={false}
               keyboardShouldPersistTaps="handled"
             >
+              {/* ── SECTION: Item basics ───────────────────────────── */}
+              <View style={styles.formSection}>
               {/* Thumbnail (80×80, top-left) + Name (right) */}
               <View style={styles.thumbAndNameRow}>
                 <View style={styles.thumbColumn}>
@@ -1343,40 +1445,48 @@ export default function MenuEditorScreen() {
                 </View>
               </View>
 
-              {/* Square / Banner segmented control — full width row */}
-              <View style={styles.shapeSegmented}>
-                <TouchableOpacity
-                  style={[
-                    styles.shapeSegment,
-                    formData.thumbnail_shape === 'square' && styles.shapeSegmentActive,
-                  ]}
-                  onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
-                >
-                  <Text
-                    style={[
-                      styles.shapeSegmentText,
-                      formData.thumbnail_shape === 'square' && styles.shapeSegmentTextActive,
-                    ]}
-                  >
-                    {t('menu_editor:shape_square')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.shapeSegment,
-                    formData.thumbnail_shape === 'banner' && styles.shapeSegmentActive,
-                  ]}
-                  onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
-                >
-                  <Text
-                    style={[
-                      styles.shapeSegmentText,
-                      formData.thumbnail_shape === 'banner' && styles.shapeSegmentTextActive,
-                    ]}
-                  >
-                    {t('menu_editor:shape_banner')}
-                  </Text>
-                </TouchableOpacity>
+              {/* Image shape (left, under the thumbnail) + Price (right, under the
+                  Name). Wines hide the legacy single Price (Glass/Bottle/Member
+                  live in the wine section); the shape selector then takes the full
+                  width. */}
+              <View style={styles.priceShapeRow}>
+                <View style={styles.shapeCol}>
+                  <Text style={styles.formLabel}>{t('menu_editor:shape_label')}</Text>
+                  <View style={styles.shapeSegmented}>
+                    <TouchableOpacity
+                      style={[styles.shapeSegment, formData.thumbnail_shape === 'square' && styles.shapeSegmentActive]}
+                      onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
+                    >
+                      <Text style={[styles.shapeSegmentText, formData.thumbnail_shape === 'square' && styles.shapeSegmentTextActive]}>
+                        {t('menu_editor:shape_square')}
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.shapeSegment, formData.thumbnail_shape === 'banner' && styles.shapeSegmentActive]}
+                      onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
+                    >
+                      <Text style={[styles.shapeSegmentText, formData.thumbnail_shape === 'banner' && styles.shapeSegmentTextActive]}>
+                        {t('menu_editor:shape_banner')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                {!isWineName(formData.category) && (
+                  <View style={styles.priceCol}>
+                    <Text style={styles.formLabel}>{t('menu_editor:price_label')}</Text>
+                    <View style={styles.inputWithAdornment}>
+                      <Text style={styles.inputAdornment}>$</Text>
+                      <TextInput
+                        style={styles.inputAdornmentField}
+                        placeholder={t('menu_editor:price_placeholder')}
+                        placeholderTextColor="#999999"
+                        value={formData.price}
+                        onChangeText={(text) => setFormData({ ...formData, price: text })}
+                        keyboardType="decimal-pad"
+                      />
+                    </View>
+                  </View>
+                )}
               </View>
 
               {/* Description */}
@@ -1457,44 +1567,6 @@ export default function MenuEditorScreen() {
                     <Text style={styles.formHint}>{t('translation_section:hint')}</Text>
                   </View>
                 )}
-              </View>
-
-              {/* Price + Display Order — side by side. Wines hide the legacy
-                  single Price field (replaced by Glass/Bottle/Member below). */}
-              <View style={styles.priceOrderRow}>
-                {!isWineName(formData.category) && (
-                  <View style={styles.priceOrderCol}>
-                    <Text style={styles.formLabel}>{t('menu_editor:price_label')}</Text>
-                    <View style={styles.inputWithAdornment}>
-                      <Text style={styles.inputAdornment}>$</Text>
-                      <TextInput
-                        style={styles.inputAdornmentField}
-                        placeholder={t('menu_editor:price_placeholder')}
-                        placeholderTextColor="#999999"
-                        value={formData.price}
-                        onChangeText={(text) => setFormData({ ...formData, price: text })}
-                        keyboardType="decimal-pad"
-                      />
-                    </View>
-                  </View>
-                )}
-                <View style={styles.priceOrderCol}>
-                  <Text style={styles.formLabel}>{t('menu_editor:display_order_label')}</Text>
-                  <View style={styles.inputWithAdornment}>
-                    <Text style={styles.inputAdornment}>#</Text>
-                    <TextInput
-                      style={styles.inputAdornmentField}
-                      placeholder={t('menu_editor:display_order_placeholder')}
-                      placeholderTextColor="#999999"
-                      value={formData.display_order.toString()}
-                      onChangeText={(text) => {
-                        const num = parseInt(text) || 0;
-                        setFormData({ ...formData, display_order: num });
-                      }}
-                      keyboardType="numeric"
-                    />
-                  </View>
-                </View>
               </View>
 
               {/* Wine-specific fields: location + 3 prices.
@@ -1613,125 +1685,14 @@ export default function MenuEditorScreen() {
                 </>
               )}
 
-              {/* Category */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('menu_editor:category_label')}</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.optionsScroll}
-                >
-                  {menuCats.map((cat) => (
-                    <CategoryPill
-                      key={cat.id}
-                      size="sm"
-                      label={categoryLabel(cat, t)}
-                      selected={formData.category === cat.display_name}
-                      onPress={() => setFormData({ ...formData, category: cat.display_name, subcategory: '' })}
-                    />
-                  ))}
-                </ScrollView>
+              {/* close SECTION: Item basics */}
               </View>
 
-              {/* Subcategory */}
-              {(() => {
-                const formCat = findCategoryByName(menuCats, formData.category);
-                if (!formCat || formCat.subcategories.length === 0) return null;
-                return (
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>{t('menu_editor:subcategory_label')}</Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.optionsScroll}
-                  >
-                    {formCat.subcategories.map((sub) => (
-                      <CategoryPill
-                        key={sub.id}
-                        size="sm"
-                        label={subcategoryLabel(sub, t)}
-                        selected={formData.subcategory === sub.display_name}
-                        onPress={() => setFormData({ ...formData, subcategory: sub.display_name })}
-                      />
-                    ))}
-                  </ScrollView>
-                </View>
-                );
-              })()}
+              {/* ── SECTION: Menu placement & options ──────────────── */}
+              <View style={styles.formSection}>
 
-              {/* Availability — shared-mode meal overlay; lets one item appear on
-                  both the Lunch and Dinner sections. Hidden in per-menu (an item
-                  belongs to one menu + category there) and when neither Lunch nor
-                  Dinner category is present/visible. */}
-              {!perMenu && (hasLunchCat || hasDinnerCat) && (() => {
-                const fb = findCategoryByName(menuCats, formData.category)?.filter_behavior;
-                return fb === 'lunch' || fb === 'dinner' || fb === 'weekly_specials';
-              })() && (
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>{t('menu_editor:available_for_label')}</Text>
-                  <Text style={styles.seasonLegacyHint}>{t('menu_editor:available_for_hint')}</Text>
-                  <View style={styles.checkboxGroup}>
-                    {hasLunchCat && (
-                    <TouchableOpacity
-                      style={styles.checkbox}
-                      onPress={() =>
-                        setFormData({
-                          ...formData,
-                          available_for_lunch: !formData.available_for_lunch,
-                        })
-                      }
-                    >
-                      <View
-                        style={[
-                          styles.checkboxBox,
-                          formData.available_for_lunch && styles.checkboxBoxChecked,
-                        ]}
-                      >
-                        {formData.available_for_lunch && (
-                          <IconSymbol
-                            ios_icon_name="checkmark"
-                            android_material_icon_name="check"
-                            size={16}
-                            color="#1A1A1A"
-                          />
-                        )}
-                      </View>
-                      <Text style={styles.checkboxLabel}>{lunchName}</Text>
-                    </TouchableOpacity>
-                    )}
-                    {hasDinnerCat && (
-                    <TouchableOpacity
-                      style={styles.checkbox}
-                      onPress={() =>
-                        setFormData({
-                          ...formData,
-                          available_for_dinner: !formData.available_for_dinner,
-                        })
-                      }
-                    >
-                      <View
-                        style={[
-                          styles.checkboxBox,
-                          formData.available_for_dinner && styles.checkboxBoxChecked,
-                        ]}
-                      >
-                        {formData.available_for_dinner && (
-                          <IconSymbol
-                            ios_icon_name="checkmark"
-                            android_material_icon_name="check"
-                            size={16}
-                            color="#1A1A1A"
-                          />
-                        )}
-                      </View>
-                      <Text style={styles.checkboxLabel}>{dinnerName}</Text>
-                    </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              )}
-
-              {/* Season Tag */}
+              {/* Menu Choice — pick the menu FIRST so the category pills below
+                  reflect that menu's tree (per-menu) or the shared tree. */}
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{t('menu_editor:season_label')}</Text>
                 <View style={styles.seasonTagRow}>
@@ -1759,7 +1720,17 @@ export default function MenuEditorScreen() {
                           styles.seasonTagOption,
                           formData.item_season === s && { backgroundColor: colors.primary },
                         ]}
-                        onPress={() => setFormData({ ...formData, item_season: s })}
+                        onPress={() => {
+                          // Switching to a DIFFERENT menu (per-menu) clears the
+                          // category/subcategory — each menu has its own tree.
+                          const newSlot = s === 'summer' ? 2 : 1;
+                          const oldSlot = formData.item_season === 'summer' ? 2 : 1;
+                          if (perMenu && newSlot !== oldSlot) {
+                            setFormData({ ...formData, item_season: s, category: '', subcategory: '' });
+                          } else {
+                            setFormData({ ...formData, item_season: s });
+                          }
+                        }}
                       >
                         <Text style={[
                           styles.seasonTagText,
@@ -1775,6 +1746,122 @@ export default function MenuEditorScreen() {
                   <Text style={styles.seasonLegacyHint}>{t('menu_editor:season_both_legacy_hint')}</Text>
                 )}
               </View>
+
+              {/* Category — pills come from the SELECTED menu's tree (formMenuCats). */}
+              <View style={styles.formGroup}>
+                <Text style={styles.formLabel}>{t('menu_editor:category_label')}</Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.optionsScroll}
+                >
+                  {formMenuCats.map((cat) => (
+                    <CategoryPill
+                      key={cat.id}
+                      size="sm"
+                      label={categoryLabel(cat, t)}
+                      selected={formData.category === cat.display_name}
+                      onPress={() => setFormData({ ...formData, category: cat.display_name, subcategory: '' })}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+
+              {/* Subcategory — also from the selected menu's tree. */}
+              {(() => {
+                const formCat = findCategoryByName(formMenuCats, formData.category);
+                if (!formCat || formCat.subcategories.length === 0) return null;
+                return (
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>{t('menu_editor:subcategory_label')}</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.optionsScroll}
+                  >
+                    {formCat.subcategories.map((sub) => (
+                      <CategoryPill
+                        key={sub.id}
+                        size="sm"
+                        label={subcategoryLabel(sub, t)}
+                        selected={formData.subcategory === sub.display_name}
+                        onPress={() => setFormData({ ...formData, subcategory: sub.display_name })}
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+                );
+              })()}
+
+              {/* Availability — shared-mode meal overlay (Lunch/Dinner). Hidden in
+                  per-menu and when neither category is present/visible. */}
+              {!perMenu && (formHasLunchCat || formHasDinnerCat) && (() => {
+                const fb = findCategoryByName(formMenuCats, formData.category)?.filter_behavior;
+                return fb === 'lunch' || fb === 'dinner' || fb === 'weekly_specials';
+              })() && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>{t('menu_editor:available_for_label')}</Text>
+                  <Text style={styles.seasonLegacyHint}>{t('menu_editor:available_for_hint')}</Text>
+                  <View style={styles.checkboxGroup}>
+                    {formHasLunchCat && (
+                    <TouchableOpacity
+                      style={styles.checkbox}
+                      onPress={() =>
+                        setFormData({
+                          ...formData,
+                          available_for_lunch: !formData.available_for_lunch,
+                        })
+                      }
+                    >
+                      <View
+                        style={[
+                          styles.checkboxBox,
+                          formData.available_for_lunch && styles.checkboxBoxChecked,
+                        ]}
+                      >
+                        {formData.available_for_lunch && (
+                          <IconSymbol
+                            ios_icon_name="checkmark"
+                            android_material_icon_name="check"
+                            size={16}
+                            color="#1A1A1A"
+                          />
+                        )}
+                      </View>
+                      <Text style={styles.checkboxLabel}>{formLunchName}</Text>
+                    </TouchableOpacity>
+                    )}
+                    {formHasDinnerCat && (
+                    <TouchableOpacity
+                      style={styles.checkbox}
+                      onPress={() =>
+                        setFormData({
+                          ...formData,
+                          available_for_dinner: !formData.available_for_dinner,
+                        })
+                      }
+                    >
+                      <View
+                        style={[
+                          styles.checkboxBox,
+                          formData.available_for_dinner && styles.checkboxBoxChecked,
+                        ]}
+                      >
+                        {formData.available_for_dinner && (
+                          <IconSymbol
+                            ios_icon_name="checkmark"
+                            android_material_icon_name="check"
+                            size={16}
+                            color="#1A1A1A"
+                          />
+                        )}
+                      </View>
+                      <Text style={styles.checkboxLabel}>{formDinnerName}</Text>
+                    </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              )}
 
               {/* Dietary Options */}
               <View style={styles.formGroup}>
@@ -1887,6 +1974,32 @@ export default function MenuEditorScreen() {
                 </View>
               </View>
 
+              {/* Feature on Weekly Specials — overlay, kept LAST before save:
+                  also shows the item on the Weekly Specials page/tab while it
+                  stays in its home category. Hidden when it already lives there. */}
+              {formHasWeeklySpecialsCat && findCategoryByName(formMenuCats, formData.category)?.system_key !== 'cat.weekly_specials' && (
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>{t('menu_editor:weekly_special_label', { name: formWeeklySpecialsLabel })}</Text>
+                  <Text style={styles.seasonLegacyHint}>{t('menu_editor:weekly_special_hint', { name: formWeeklySpecialsLabel })}</Text>
+                  <TouchableOpacity
+                    style={styles.checkbox}
+                    onPress={() => setFormData({ ...formData, is_weekly_special: !formData.is_weekly_special })}
+                  >
+                    <View style={[styles.checkboxBox, formData.is_weekly_special && styles.checkboxBoxChecked]}>
+                      {formData.is_weekly_special && (
+                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={16} color="#1A1A1A" />
+                      )}
+                    </View>
+                    <Text style={styles.checkboxLabel}>{t('menu_editor:weekly_special_checkbox', { name: formWeeklySpecialsLabel })}</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* close SECTION: Menu placement & options */}
+              </View>
+
+              {/* ── SECTION: actions ───────────────────────────────── */}
+              <View style={styles.formSectionActions}>
               {/* Cancel + Save — side by side */}
               <View style={styles.formFooter}>
                 <TouchableOpacity
@@ -1909,9 +2022,56 @@ export default function MenuEditorScreen() {
                   )}
                 </TouchableOpacity>
               </View>
+              {/* close SECTION: actions */}
+              </View>
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Order Position picker — jump an item to an exact slot within its
+          category/subcategory without dragging. */}
+      <Modal
+        visible={!!positionPicker}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setPositionPicker(null)}
+      >
+        <View style={styles.modalContainer}>
+          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setPositionPicker(null)} />
+          <View style={styles.positionSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{t('menu_editor:order_position')}</Text>
+              <TouchableOpacity onPress={() => setPositionPicker(null)}>
+                <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={28} color="#666666" />
+              </TouchableOpacity>
+            </View>
+            {positionPicker && (
+              <>
+                <Text style={styles.positionSubtitle}>
+                  {t('menu_editor:order_position_subtitle', { name: positionPicker.item.name })}
+                </Text>
+                <ScrollView style={styles.positionScroll} contentContainerStyle={{ paddingBottom: 24 }}>
+                  {Array.from({ length: positionPicker.siblings.length }, (_, i) => i + 1).map((pos) => {
+                    const isCurrent = pos - 1 === positionPicker.currentIndex;
+                    return (
+                      <TouchableOpacity
+                        key={pos}
+                        style={[styles.positionRow, isCurrent && styles.positionRowActive]}
+                        onPress={() => applyPositionChange(pos)}
+                      >
+                        <Text style={[styles.positionRowText, isCurrent && styles.positionRowTextActive]}>{pos}</Text>
+                        {isCurrent && (
+                          <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={18} color={colors.primary} />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </>
+            )}
+          </View>
+        </View>
       </Modal>
     </View>
   );
@@ -1941,6 +2101,20 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontSize: 20,
     fontWeight: 'bold',
     color: colors.text,
+  },
+  manageCatsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: colors.primary + '18',
+  },
+  manageCatsButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.primary,
   },
   seasonSelectorContainer: {
     paddingHorizontal: 16,
@@ -2163,6 +2337,67 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: colors.textSecondary,
     opacity: 0.7,
   },
+  menuBadge: {
+    position: 'absolute',
+    bottom: 6,
+    right: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: colors.primary + '18',
+    maxWidth: 130,
+  },
+  menuBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  positionSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    maxHeight: '70%',
+    marginTop: 'auto',
+    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
+    elevation: 10,
+  },
+  positionSubtitle: {
+    fontSize: 14,
+    color: '#666666',
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  positionScroll: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  positionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    backgroundColor: '#F5F5F5',
+    marginBottom: 8,
+  },
+  positionRowActive: {
+    backgroundColor: colors.primary + '22',
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  positionRowText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  positionRowTextActive: {
+    color: colors.primary,
+  },
   menuItemDescription: {
     fontSize: 14,
     color: colors.textSecondary,
@@ -2272,10 +2507,38 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   modalScroll: {
     flex: 1,
+    backgroundColor: '#EEEFF1',
   },
   modalScrollContent: {
-    padding: 20,
+    padding: 16,
     paddingBottom: 40,
+  },
+  // White cards that group the form into scannable sections on the gray scroll.
+  formSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.06)',
+  },
+  formSectionActions: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 4,
+    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.06)',
+  },
+  priceShapeRow: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+    marginBottom: 16,
+  },
+  priceCol: {
+    width: 120,
+  },
+  shapeCol: {
+    flex: 1,
   },
   formGroup: {
     marginBottom: 20,
@@ -2377,7 +2640,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   // Square / Banner segmented control — full-width row below thumb+name
   shapeSegmented: {
     flexDirection: 'row',
-    marginBottom: 16,
     borderRadius: 10,
     backgroundColor: '#F5F5F5',
     borderWidth: 1,

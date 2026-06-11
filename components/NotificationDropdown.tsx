@@ -210,28 +210,29 @@ export default function NotificationDropdown({
         }
       }
 
-      // Fetch weekly specials (category resolved by system_key → follows renames)
+      // Weekly specials = items in the Weekly Specials category (resolved by
+      // system_key → follows renames) PLUS any item FEATURED via is_weekly_special
+      // (overlay). Featured-but-not-categorized items surface by their feature
+      // time (updated_at). Merge + dedupe by id.
       const wsNames = await weeklySpecialsNames(organizationId);
-      const { data: specials } = await supabase
-        .from('menu_items')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .in('category', wsNames)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(SOURCE_FETCH_LIMIT);
-
-      if (specials) {
-        for (const s of specials) {
-          items.push({
-            id: s.id,
-            type: 'weekly_special',
-            title: getLocalizedField(s, 'name', language),
-            subtitle: stripFormattingTags(getLocalizedField(s, 'description', language) || s.description || ''),
-            createdAt: s.created_at,
-            rawData: s,
-          });
-        }
+      const [byCatSpecials, byFlagSpecials] = await Promise.all([
+        supabase.from('menu_items').select('*').eq('organization_id', organizationId).in('category', wsNames).eq('is_active', true).order('created_at', { ascending: false }).limit(SOURCE_FETCH_LIMIT),
+        supabase.from('menu_items').select('*').eq('organization_id', organizationId).eq('is_weekly_special', true).eq('is_active', true).order('updated_at', { ascending: false }).limit(SOURCE_FETCH_LIMIT),
+      ]);
+      const specialsById = new Map<string, any>();
+      for (const s of (byCatSpecials.data || [])) specialsById.set(s.id, { ...s, __ts: s.created_at });
+      for (const s of (byFlagSpecials.data || [])) {
+        if (!specialsById.has(s.id)) specialsById.set(s.id, { ...s, __ts: s.updated_at || s.created_at });
+      }
+      for (const s of specialsById.values()) {
+        items.push({
+          id: s.id,
+          type: 'weekly_special',
+          title: getLocalizedField(s, 'name', language),
+          subtitle: stripFormattingTags(getLocalizedField(s, 'description', language) || s.description || ''),
+          createdAt: s.__ts,
+          rawData: s,
+        });
       }
 
       // Fetch custom notifications

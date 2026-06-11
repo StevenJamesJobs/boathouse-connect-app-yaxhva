@@ -201,13 +201,27 @@ export function useUnreadContent(): UnreadContentResult {
       // (resolved by system_key so it follows owner renames).
       const wsNames = await weeklySpecialsNames(organizationId || '');
       const specialsCutoff = specialsTs || new Date(0).toISOString();
-      let specialsQuery = (supabase.from('menu_items') as any)
-        .select('id', { count: 'exact', head: true })
+      // Two sources of "new specials": items newly CREATED in the Weekly
+      // Specials category, and existing items just FEATURED via is_weekly_special
+      // (the feature toggle bumps updated_at). Dedupe by id.
+      let byCatQuery = (supabase.from('menu_items') as any)
+        .select('id')
         .in('category', wsNames)
         .gt('created_at', specialsCutoff);
-      if (organizationId) specialsQuery = specialsQuery.eq('organization_id', organizationId);
-      const specialsRes = await specialsQuery;
-      const specialsCount = specialsRes.count || 0;
+      let byFlagQuery = (supabase.from('menu_items') as any)
+        .select('id')
+        .eq('is_weekly_special', true)
+        .gt('updated_at', specialsCutoff);
+      if (organizationId) {
+        byCatQuery = byCatQuery.eq('organization_id', organizationId);
+        byFlagQuery = byFlagQuery.eq('organization_id', organizationId);
+      }
+      const [byCatRes, byFlagRes] = await Promise.all([byCatQuery, byFlagQuery]);
+      const specialIds = new Set<string>([
+        ...((byCatRes.data || []) as any[]).map((r) => r.id),
+        ...((byFlagRes.data || []) as any[]).map((r) => r.id),
+      ]);
+      const specialsCount = specialIds.size;
       setSpecialsHasNew(specialsCount > 0);
 
       // Total count for notification bell badge
