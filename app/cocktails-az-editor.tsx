@@ -23,6 +23,8 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
 import RichTextToolbar from '@/components/RichTextToolbar';
+import CollapsibleSection from '@/components/CollapsibleSection';
+import SimpleSelectPicker, { SelectField } from '@/components/SimpleSelectPicker';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
@@ -31,6 +33,8 @@ interface Cocktail {
   id: string;
   name: string;
   alcohol_type: string;
+  // Stored as TEXT in the DB. New/edited cocktails store a JSON-stringified
+  // array of { amount, ingredient } rows; legacy rows are a single plain string.
   ingredients: string;
   procedure: string | null;
   procedure_es?: string | null;
@@ -38,6 +42,26 @@ interface Cocktail {
   display_order: number;
   is_active: boolean;
 }
+
+type IngredientRow = { amount: string; ingredient: string };
+
+// Parse a stored cocktails.ingredients value into structured rows. A JSON array
+// (new format) parses directly; a legacy plain string becomes a single row so it
+// still shows (and can be re-entered) in the structured editor.
+const parseIngredients = (raw: string | null): IngredientRow[] => {
+  const s = (raw || '').trim();
+  if (s.startsWith('[')) {
+    try {
+      const arr = JSON.parse(s);
+      if (Array.isArray(arr) && arr.length > 0) {
+        return arr.map((r: any) => ({ amount: String(r?.amount ?? ''), ingredient: String(r?.ingredient ?? '') }));
+      }
+    } catch {
+      // fall through to legacy handling
+    }
+  }
+  return [{ amount: '', ingredient: raw || '' }];
+};
 
 const ALCOHOL_TYPES = [
   'Bourbon',
@@ -71,7 +95,7 @@ export default function CocktailsAZEditorScreen() {
   // Form state
   const [name, setName] = useState('');
   const [alcoholType, setAlcoholType] = useState('');
-  const [ingredients, setIngredients] = useState('');
+  const [ingredients, setIngredients] = useState<IngredientRow[]>([{ amount: '', ingredient: '' }]);
   const [procedure, setProcedure] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -80,6 +104,17 @@ export default function CocktailsAZEditorScreen() {
   const [procedureEs, setProcedureEs] = useState('');
   const [showSpanish, setShowSpanish] = useState(false);
   const [translating, setTranslating] = useState(false);
+  const [alcoholPickerOpen, setAlcoholPickerOpen] = useState(false);
+  const [procH, setProcH] = useState(120);
+
+  const addIngredient = () => setIngredients((prev) => [...prev, { amount: '', ingredient: '' }]);
+  const removeIngredient = (index: number) =>
+    setIngredients((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.length > 0 ? next : [{ amount: '', ingredient: '' }];
+    });
+  const updateIngredient = (index: number, field: 'amount' | 'ingredient', value: string) =>
+    setIngredients((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
 
   const filterCocktails = useCallback(() => {
     let filtered = cocktails;
@@ -252,10 +287,12 @@ export default function CocktailsAZEditorScreen() {
         return;
       }
 
-      if (!ingredients.trim()) {
+      const validIngredients = ingredients.filter((ing) => ing.ingredient.trim());
+      if (validIngredients.length === 0) {
         Alert.alert(t('common.error'), t('cocktails_editor.error_no_ingredients'));
         return;
       }
+      const ingredientsJson = JSON.stringify(validIngredients);
 
       if (!user?.id) {
         Alert.alert(t('common.error'), t('cocktails_editor.error_not_authenticated'));
@@ -273,7 +310,7 @@ export default function CocktailsAZEditorScreen() {
           p_cocktail_id: editingCocktail.id,
           p_name: name.trim(),
           p_alcohol_type: alcoholType,
-          p_ingredients: ingredients.trim(),
+          p_ingredients: ingredientsJson,
           p_procedure: procedure.trim() || null,
           p_thumbnail_url: thumbnailUrl,
           p_display_order: editingCocktail.display_order,
@@ -296,7 +333,7 @@ export default function CocktailsAZEditorScreen() {
           p_organization_id: organizationId,
           p_name: name.trim(),
           p_alcohol_type: alcoholType,
-          p_ingredients: ingredients.trim(),
+          p_ingredients: ingredientsJson,
           p_procedure: procedure.trim() || null,
           p_thumbnail_url: thumbnailUrl,
           p_display_order: cocktails.length,
@@ -376,7 +413,7 @@ export default function CocktailsAZEditorScreen() {
     setEditingCocktail(cocktail);
     setName(cocktail.name);
     setAlcoholType(cocktail.alcohol_type);
-    setIngredients(cocktail.ingredients);
+    setIngredients(parseIngredients(cocktail.ingredients));
     setProcedure(cocktail.procedure || '');
     setProcedureEs(cocktail.procedure_es || '');
     setThumbnailUrl(cocktail.thumbnail_url);
@@ -392,7 +429,7 @@ export default function CocktailsAZEditorScreen() {
     setEditingCocktail(null);
     setName('');
     setAlcoholType('');
-    setIngredients('');
+    setIngredients([{ amount: '', ingredient: '' }]);
     setProcedure('');
     setProcedureEs('');
     setShowSpanish(false);
@@ -576,156 +613,195 @@ export default function CocktailsAZEditorScreen() {
             </View>
 
             <ScrollView style={styles.modalForm}>
-              {/* Name */}
-              <View style={styles.formField}>
-                <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.cocktail_name_label')}</Text>
-                <TextInput
-                  style={[styles.formInput, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder={t('cocktails_editor.cocktail_name_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-
-              {/* Alcohol Type */}
-              <View style={styles.formField}>
-                <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.alcohol_type_label')}</Text>
-                <View style={[styles.picker, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  {ALCOHOL_TYPES.map((type, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={{
-                        paddingVertical: 12,
-                        paddingHorizontal: 16,
-                        backgroundColor:
-                          alcoholType === type ? colors.highlight : 'transparent',
-                      }}
-                      onPress={() => setAlcoholType(type)}
-                    >
-                      <Text
-                        style={{
-                          color: colors.text,
-                          fontWeight: alcoholType === type ? '600' : '400',
-                        }}
-                      >
-                        {type}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Ingredients */}
-              <View style={styles.formField}>
-                <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.ingredients_label')}</Text>
-                <TextInput
-                  style={[styles.formInput, styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                  value={ingredients}
-                  onChangeText={setIngredients}
-                  placeholder={t('cocktails_editor.ingredients_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                  multiline
-                  numberOfLines={4}
-                />
-              </View>
-
-              {/* Procedure */}
-              <View style={styles.formField}>
-                <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.procedure_label')}</Text>
-                <RichTextToolbar
-                  text={procedure}
-                  onChangeText={setProcedure}
-                  selection={procedureSelection}
-                  onSelectionChange={setProcedureSelection}
-                  textInputRef={procedureInputRef}
-                  accentColor={colors.highlight}
-                />
-                <TextInput
-                  ref={procedureInputRef}
-                  style={[styles.formInput, styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                  value={procedure}
-                  onChangeText={setProcedure}
-                  placeholder={t('cocktails_editor.procedure_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                  multiline
-                  numberOfLines={4}
-                  onSelectionChange={(e) => setProcedureSelection(e.nativeEvent.selection)}
-                />
-              </View>
-
-              {/* Spanish Procedure Translation */}
-              <View style={styles.formField}>
-                <TouchableOpacity
-                  style={[styles.spanishSectionHeader, { backgroundColor: '#FFF3E0' }]}
-                  onPress={() => setShowSpanish(!showSpanish)}
-                >
-                  <Text style={styles.spanishHeaderText}>
-                    {showSpanish ? '▼' : '▶'} Spanish Translation (Procedure)
-                  </Text>
+              {/* ── Section 1: Cocktail Basics (open) ── */}
+              <CollapsibleSection
+                title={t('cocktails_editor.section_basics')}
+                iconIos="wineglass.fill"
+                iconAndroid="local-bar"
+                iconColor={colors.primary}
+                headerBackgroundColor={colors.card}
+                headerTextColor={colors.text}
+                contentBackgroundColor={colors.card}
+                defaultExpanded
+              >
+                {/* Thumbnail (tap to attach) + Name */}
+                <View style={styles.thumbAndNameRow}>
                   <TouchableOpacity
-                    style={[styles.autoTranslateButton, { backgroundColor: colors.highlight }]}
-                    onPress={handleAutoTranslate}
-                    disabled={translating}
+                    style={[styles.thumbSquare, { backgroundColor: colors.background, borderColor: colors.border }]}
+                    onPress={pickImage}
+                    disabled={uploadingImage}
                   >
-                    <Text style={[styles.autoTranslateButtonText, { color: colors.text }]}>
-                      {translating ? 'Translating...' : 'Auto-Translate'}
-                    </Text>
+                    {thumbnailUrl ? (
+                      <Image source={{ uri: getImageUrl(thumbnailUrl) || undefined }} style={styles.thumbImage} resizeMode="cover" />
+                    ) : (
+                      <View style={styles.thumbPlaceholder}>
+                        <IconSymbol ios_icon_name="photo" android_material_icon_name="add-photo-alternate" size={26} color={colors.textSecondary} />
+                      </View>
+                    )}
+                    {uploadingImage && (<View style={styles.thumbUploading}><ActivityIndicator color="#FFFFFF" /></View>)}
                   </TouchableOpacity>
-                </TouchableOpacity>
-                {showSpanish && (
-                  <View style={styles.spanishFields}>
-                    <Text style={[styles.formLabel, { color: colors.text }]}>Procedure (Spanish)</Text>
+                  <View style={styles.nameColumn}>
+                    <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.cocktail_name_label')}</Text>
                     <TextInput
-                      style={[styles.formInput, styles.textArea, { backgroundColor: colors.card, color: colors.text, borderColor: colors.border }]}
-                      value={procedureEs}
-                      onChangeText={setProcedureEs}
-                      placeholder="Procedimiento en español"
+                      style={[styles.formInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                      value={name}
+                      onChangeText={setName}
+                      placeholder={t('cocktails_editor.cocktail_name_placeholder')}
                       placeholderTextColor={colors.textSecondary}
-                      multiline
-                      numberOfLines={4}
                     />
                   </View>
-                )}
-              </View>
+                </View>
 
-              {/* Image Upload */}
-              <View style={styles.formField}>
-                <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.image_label')}</Text>
-                <TouchableOpacity
-                  style={[styles.imagePickerButton, { backgroundColor: colors.highlight }]}
-                  onPress={pickImage}
-                  disabled={uploadingImage}
-                >
-                  <Text style={[styles.imagePickerButtonText, { color: colors.text }]}>
-                    {uploadingImage ? t('cocktails_editor.uploading') : t('cocktails_editor.choose_image')}
-                  </Text>
-                </TouchableOpacity>
-                {thumbnailUrl && (
-                  <Image
-                    source={{ uri: getImageUrl(thumbnailUrl) || undefined }}
-                    style={styles.thumbnailPreview}
-                    resizeMode="cover"
+                {/* Alcohol Type (dropdown) */}
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.alcohol_type_label')}</Text>
+                  <SelectField
+                    value={alcoholType}
+                    placeholder={t('cocktails_editor.select_alcohol_type')}
+                    onPress={() => setAlcoholPickerOpen(true)}
                   />
-                )}
-              </View>
+                </View>
+              </CollapsibleSection>
 
-              {/* Submit Button */}
-              <TouchableOpacity
-                style={[styles.submitButton, { backgroundColor: colors.highlight }]}
-                onPress={handleSave}
-                disabled={loading || uploadingImage}
+              {/* ── Section 2: Ingredients (collapsed) ── */}
+              <CollapsibleSection
+                title={t('cocktails_editor.section_ingredients')}
+                iconIos="list.bullet"
+                iconAndroid="format-list-bulleted"
+                iconColor={colors.primary}
+                headerBackgroundColor={colors.card}
+                headerTextColor={colors.text}
+                contentBackgroundColor={colors.card}
+                defaultExpanded={false}
               >
-                {loading ? (
-                  <ActivityIndicator color={colors.text} />
-                ) : (
-                  <Text style={[styles.submitButtonText, { color: colors.text }]}>
-                    {editingCocktail ? t('cocktails_editor.update_button') : t('cocktails_editor.add_button')}
-                  </Text>
-                )}
-              </TouchableOpacity>
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.ingredients_label')}</Text>
+                  {ingredients.map((ingredient, index) => (
+                    <View key={index} style={styles.ingredientRow}>
+                      <TextInput
+                        style={[styles.formInput, styles.ingredientAmount, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                        value={ingredient.amount}
+                        onChangeText={(value) => updateIngredient(index, 'amount', value)}
+                        placeholder="Amount"
+                        placeholderTextColor={colors.textSecondary}
+                      />
+                      <TextInput
+                        style={[styles.formInput, styles.ingredientName, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                        value={ingredient.ingredient}
+                        onChangeText={(value) => updateIngredient(index, 'ingredient', value)}
+                        placeholder="Ingredient"
+                        placeholderTextColor={colors.textSecondary}
+                      />
+                      {ingredients.length > 1 && (
+                        <TouchableOpacity style={styles.removeIngredientButton} onPress={() => removeIngredient(index)}>
+                          <IconSymbol ios_icon_name="minus.circle.fill" android_material_icon_name="remove-circle" size={24} color="#F44336" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                  <TouchableOpacity style={styles.addIngredientButton} onPress={addIngredient}>
+                    <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={20} color={colors.primary} />
+                    <Text style={[styles.addIngredientText, { color: colors.highlight }]}>Add Ingredient</Text>
+                  </TouchableOpacity>
+                </View>
+              </CollapsibleSection>
+
+              {/* ── Section 3: Procedure (collapsed) ── */}
+              <CollapsibleSection
+                title={t('cocktails_editor.section_procedure')}
+                iconIos="list.number"
+                iconAndroid="format-list-numbered"
+                iconColor={colors.primary}
+                headerBackgroundColor={colors.card}
+                headerTextColor={colors.text}
+                contentBackgroundColor={colors.card}
+                defaultExpanded={false}
+              >
+                {/* Procedure (auto-grow) */}
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.procedure_label')}</Text>
+                  <RichTextToolbar
+                    text={procedure}
+                    onChangeText={setProcedure}
+                    selection={procedureSelection}
+                    onSelectionChange={setProcedureSelection}
+                    textInputRef={procedureInputRef}
+                    accentColor={colors.highlight}
+                  />
+                  <TextInput
+                    ref={procedureInputRef}
+                    style={[styles.formInput, styles.textArea, { height: Math.max(120, procH), backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                    value={procedure}
+                    onChangeText={setProcedure}
+                    placeholder={t('cocktails_editor.procedure_placeholder')}
+                    placeholderTextColor={colors.textSecondary}
+                    multiline
+                    onContentSizeChange={(e) => setProcH(e.nativeEvent.contentSize.height)}
+                    onSelectionChange={(e) => setProcedureSelection(e.nativeEvent.selection)}
+                  />
+                </View>
+
+                {/* Spanish Procedure Translation (menu-editor blue style) */}
+                <View style={styles.formField}>
+                  <TouchableOpacity style={styles.spanishSectionHeader} onPress={() => setShowSpanish(!showSpanish)}>
+                    <Text style={[styles.formLabel, { color: colors.text }]}>{t('translation_section:spanish_section_title')}</Text>
+                    <IconSymbol
+                      ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
+                      android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
+                      size={20}
+                      color="#666666"
+                    />
+                  </TouchableOpacity>
+                  {showSpanish && (
+                    <View style={styles.spanishFields}>
+                      <TouchableOpacity style={styles.autoTranslateButton} onPress={handleAutoTranslate} disabled={translating}>
+                        {translating ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text style={styles.autoTranslateButtonText}>{t('translation_section:auto_translate')}</Text>
+                        )}
+                      </TouchableOpacity>
+                      <Text style={styles.spanishFieldLabel}>{t('cocktails_editor.procedure_es_label')}</Text>
+                      <TextInput
+                        style={[styles.formInput, styles.textArea, { backgroundColor: '#FFFFFF', color: '#1A1A1A', borderColor: '#D0E8FF' }]}
+                        value={procedureEs}
+                        onChangeText={setProcedureEs}
+                        placeholder="Procedimiento en español"
+                        placeholderTextColor="#999999"
+                        multiline
+                        numberOfLines={4}
+                      />
+                    </View>
+                  )}
+                </View>
+              </CollapsibleSection>
+
+              {/* ── Actions ── */}
+              <View style={[styles.formSectionActions, { backgroundColor: colors.card }]}>
+                <TouchableOpacity
+                  style={[styles.submitButton, { backgroundColor: colors.highlight }]}
+                  onPress={handleSave}
+                  disabled={loading || uploadingImage}
+                >
+                  {loading ? (
+                    <ActivityIndicator color={colors.text} />
+                  ) : (
+                    <Text style={[styles.submitButtonText, { color: colors.text }]}>
+                      {editingCocktail ? t('cocktails_editor.update_button') : t('cocktails_editor.add_button')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
           </View>
+          <SimpleSelectPicker
+            visible={alcoholPickerOpen}
+            title={t('cocktails_editor.select_alcohol_type')}
+            options={ALCOHOL_TYPES}
+            value={alcoholType}
+            onSelect={setAlcoholType}
+            onClose={() => setAlcoholPickerOpen(false)}
+          />
         </View>
       </Modal>
     </KeyboardAvoidingView>
@@ -908,19 +984,35 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   modalForm: {
-    paddingHorizontal: 24,
+    paddingHorizontal: 16,
     paddingTop: 16,
+    paddingBottom: 24,
+  },
+  // White cards grouping the form into scannable sections on the scroll (D5).
+  // Theme-aware (this editor adapts to dark mode): backgroundColor: colors.card
+  // is applied inline at each usage; inputs use colors.background for contrast.
+  formSection: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.06)',
+  },
+  formSectionActions: {
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 4,
+    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.06)',
   },
   formField: {
     marginBottom: 20,
   },
   formLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     marginBottom: 8,
   },
   formInput: {
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
@@ -961,28 +1053,69 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
+  // Spanish block — menu-editor blue style (replaces the old orange).
   spanishSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-  },
-  spanishHeaderText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#E65100',
-  },
-  autoTranslateButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  autoTranslateButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
+    paddingVertical: 4,
   },
   spanishFields: {
     marginTop: 8,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#D0E8FF',
   },
+  autoTranslateButton: {
+    backgroundColor: '#3498DB',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  autoTranslateButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  spanishFieldLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#666666',
+    marginBottom: 4,
+  },
+  // Tap-to-attach thumbnail + name row (theme-aware bg applied inline).
+  thumbAndNameRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+    alignItems: 'flex-start',
+  },
+  thumbSquare: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+  },
+  thumbImage: { width: '100%', height: '100%' },
+  thumbPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  thumbUploading: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  nameColumn: { flex: 1 },
+  // Structured ingredient rows (new for cocktails; mirrors the libation editor).
+  ingredientRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, gap: 8 },
+  ingredientAmount: { flex: 1 },
+  ingredientName: { flex: 2 },
+  removeIngredientButton: { padding: 4 },
+  addIngredientButton: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 8 },
+  addIngredientText: { fontSize: 14, fontWeight: '600' },
 });

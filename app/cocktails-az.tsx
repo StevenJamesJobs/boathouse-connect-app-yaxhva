@@ -40,6 +40,24 @@ interface Cocktail {
   is_active: boolean;
 }
 
+// Cocktails store ingredients as TEXT: new rows are a JSON-stringified array of
+// { amount, ingredient }; legacy rows are a single plain string. Parse to rows
+// for display, falling back to a single line for legacy values.
+const parseCocktailIngredients = (raw: string | null): { amount: string; ingredient: string }[] => {
+  const s = (raw || '').trim();
+  if (s.startsWith('[')) {
+    try {
+      const arr = JSON.parse(s);
+      if (Array.isArray(arr) && arr.length > 0) {
+        return arr.map((r: any) => ({ amount: String(r?.amount ?? ''), ingredient: String(r?.ingredient ?? '') }));
+      }
+    } catch {
+      // fall through
+    }
+  }
+  return [];
+};
+
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function CocktailsAZScreen() {
@@ -340,7 +358,17 @@ export default function CocktailsAZScreen() {
 
               <View style={styles.detailSection}>
                 <Text style={styles.detailLabel}>{t('cocktails.ingredients')}</Text>
-                <Text style={styles.detailText}>{selectedCocktail?.ingredients}</Text>
+                {(() => {
+                  const rows = parseCocktailIngredients(selectedCocktail?.ingredients || null);
+                  if (rows.length === 0) {
+                    return <Text style={styles.detailText}>{selectedCocktail?.ingredients}</Text>;
+                  }
+                  return rows.map((row, i) => (
+                    <Text key={i} style={styles.detailText}>
+                      {'•'} {row.amount ? `${row.amount} ` : ''}{row.ingredient}
+                    </Text>
+                  ));
+                })()}
               </View>
 
               <View style={styles.detailSection}>

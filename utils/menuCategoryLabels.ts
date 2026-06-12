@@ -62,23 +62,60 @@ export const SUBCATEGORY_TRANSLATION_KEYS: { [name: string]: string } = {
 /** Virtual "All" subcategory system_key used by MenuDisplay (never persisted). */
 export const ALL_SUBCATEGORY_KEY = 'sub.__all__';
 
-export function categoryLabel(cat: Pick<MenuCategory, 'display_name'>, t: TFunc): string {
+// Display-label resolution order (when `language === 'es'`):
+//   1. the owner's Spanish override `display_name_es`, if set;
+//   2. the i18n key for an unrenamed built-in (so EN/ES still localize);
+//   3. the raw `display_name` (renamed built-in or custom category).
+// Omitting `language` (or any non-'es' value) preserves the original behavior.
+export function categoryLabel(
+  cat: Pick<MenuCategory, 'display_name' | 'display_name_es'>,
+  t: TFunc,
+  language?: string,
+): string {
+  if (language === 'es' && cat.display_name_es) return cat.display_name_es;
   const key = CATEGORY_TRANSLATION_KEYS[cat.display_name];
   return key ? t(key) : cat.display_name;
 }
 
-export function subcategoryLabel(sub: Pick<MenuSubcategory, 'display_name' | 'system_key'>, t: TFunc): string {
+export function subcategoryLabel(
+  sub: Pick<MenuSubcategory, 'display_name' | 'display_name_es' | 'system_key'>,
+  t: TFunc,
+  language?: string,
+): string {
   if (sub.system_key === ALL_SUBCATEGORY_KEY) return t('menu_display.all');
+  if (language === 'es' && sub.display_name_es) return sub.display_name_es;
   const key = SUBCATEGORY_TRANSLATION_KEYS[sub.display_name];
   return key ? t(key) : sub.display_name;
 }
 
-/** Plain string variant (for resolving names that aren't a category object). */
-export function labelForCategoryName(name: string, t: TFunc): string {
+/** Plain string variant (for resolving names that aren't a category object).
+ *  Pass the loaded `categories` tree + `language` to honor `display_name_es`
+ *  overrides; without them it falls back to the i18n-key/raw-name behavior. */
+export function labelForCategoryName(
+  name: string,
+  t: TFunc,
+  categories?: MenuCategory[],
+  language?: string,
+): string {
+  if (language === 'es' && categories) {
+    const cat = categories.find((c) => c.display_name === name);
+    if (cat?.display_name_es) return cat.display_name_es;
+  }
   const key = CATEGORY_TRANSLATION_KEYS[name];
   return key ? t(key) : name;
 }
-export function labelForSubcategoryName(name: string, t: TFunc): string {
+export function labelForSubcategoryName(
+  name: string,
+  t: TFunc,
+  categories?: MenuCategory[],
+  language?: string,
+): string {
+  if (language === 'es' && categories) {
+    for (const c of categories) {
+      const sub = c.subcategories.find((s) => s.display_name === name);
+      if (sub?.display_name_es) return sub.display_name_es;
+    }
+  }
   const key = SUBCATEGORY_TRANSLATION_KEYS[name];
   return key ? t(key) : name;
 }

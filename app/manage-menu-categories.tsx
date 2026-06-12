@@ -22,6 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMenuCategories, MenuCategory, MenuSubcategory } from '@/hooks/useMenuCategories';
 import { categoryLabel, subcategoryLabel } from '@/utils/menuCategoryLabels';
+import { translateTexts, saveTranslations } from '@/utils/translateContent';
 import CategoryColorPicker from '@/components/CategoryColorPicker';
 
 type NameMode = 'add-cat' | 'rename-cat' | 'add-sub' | 'rename-sub';
@@ -57,6 +58,8 @@ export default function ManageMenuCategoriesScreen() {
   const [colorPickerCatId, setColorPickerCatId] = useState<string | null>(null);
   const [nameModal, setNameModal] = useState<{ mode: NameMode; id: string | null; title: string } | null>(null);
   const [nameInput, setNameInput] = useState('');
+  const [nameInputEs, setNameInputEs] = useState('');
+  const [translating, setTranslating] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const selectedCategory = cats.find((c) => c.id === selectedCategoryId) || null;
@@ -73,70 +76,108 @@ export default function ManageMenuCategoriesScreen() {
   }
 
   // --- RPC helper ----------------------------------------------------------
-  const callRpc = async (fn: string, args: Record<string, any>, doRefresh = true): Promise<boolean> => {
-    if (busy) return false;
+  // Returns the RPC's JSON payload on success (so callers can read e.g. the new
+  // row's `id`), or null on failure. Success with no JSON body resolves to {}.
+  const callRpc = async (fn: string, args: Record<string, any>, doRefresh = true): Promise<any | null> => {
+    if (busy) return null;
     setBusy(true);
     try {
       const { data, error } = await (supabase.rpc as any)(fn, args);
       if (error) {
         Alert.alert(t('common:error'), error.message);
-        return false;
+        return null;
       }
       if (data && data.success === false) {
         Alert.alert(t('common:error'), data.error || 'Action failed');
-        return false;
+        return null;
       }
       if (doRefresh) await refresh();
-      return true;
+      return data ?? {};
     } catch (e: any) {
       Alert.alert(t('common:error'), e?.message || 'Action failed');
-      return false;
+      return null;
     } finally {
       setBusy(false);
     }
   };
 
   // --- Name modal ----------------------------------------------------------
-  const openNameModal = (mode: NameMode, id: string | null, initial: string, title: string) => {
+  const openNameModal = (mode: NameMode, id: string | null, initial: string, title: string, initialEs = '') => {
     setNameModal({ mode, id, title });
     setNameInput(initial);
+    setNameInputEs(initialEs);
+  };
+
+  // Auto-translate the English name into the Spanish field (reuses the menu-item
+  // name_es pattern: translate-text Edge Function via translateTexts).
+  const handleTranslateName = async () => {
+    const src = nameInput.trim();
+    if (!src) return;
+    setTranslating(true);
+    try {
+      const [es] = await translateTexts([src]);
+      setNameInputEs(es || '');
+    } finally {
+      setTranslating(false);
+    }
   };
 
   const submitName = async () => {
     if (!nameModal) return;
     const value = nameInput.trim();
     if (!value) return;
+    const es = nameInputEs.trim();
     const m = nameModal;
     setNameModal(null);
+
+    let res: any = null;
+    let targetId: string | null = null;
+    let table: 'menu_categories' | 'menu_subcategories' = 'menu_categories';
+
     if (m.mode === 'add-cat') {
-      await callRpc('manage_menu_category_create', {
+      res = await callRpc('manage_menu_category_create', {
         p_organization_id: organizationId,
         p_user_id: user!.id,
         p_display_name: value,
         p_menu_slot: perMenu ? editSlot : 0,
-      });
+      }, false);
+      table = 'menu_categories';
+      targetId = res?.id ?? null;
     } else if (m.mode === 'rename-cat') {
-      await callRpc('manage_menu_category_rename', {
+      res = await callRpc('manage_menu_category_rename', {
         p_organization_id: organizationId,
         p_user_id: user!.id,
         p_category_id: m.id,
         p_new_name: value,
-      });
+      }, false);
+      table = 'menu_categories';
+      targetId = res ? m.id : null;
     } else if (m.mode === 'add-sub') {
-      await callRpc('manage_menu_subcategory_create', {
+      res = await callRpc('manage_menu_subcategory_create', {
         p_organization_id: organizationId,
         p_user_id: user!.id,
         p_category_id: m.id,
         p_display_name: value,
-      });
+      }, false);
+      table = 'menu_subcategories';
+      targetId = res?.id ?? null;
     } else if (m.mode === 'rename-sub') {
-      await callRpc('manage_menu_subcategory_rename', {
+      res = await callRpc('manage_menu_subcategory_rename', {
         p_organization_id: organizationId,
         p_user_id: user!.id,
         p_subcategory_id: m.id,
         p_new_name: value,
-      });
+      }, false);
+      table = 'menu_subcategories';
+      targetId = res ? m.id : null;
     }
+
+    // Write the Spanish override only when the English create/rename succeeded
+    // (empty `es` clears it via saveTranslations → null).
+    if (targetId) {
+      await saveTranslations(table, targetId, { display_name_es: es }, organizationId);
+    }
+    await refresh();
   };
 
   // --- Category actions ----------------------------------------------------
@@ -263,6 +304,9 @@ export default function ManageMenuCategoriesScreen() {
 
           <TouchableOpacity style={styles.rowLabelArea} onPress={() => setSelectedCategoryId(item.id)} activeOpacity={0.7}>
             <Text style={styles.rowLabel} numberOfLines={1}>{categoryLabel(item, t)}</Text>
+            {item.display_name_es ? (
+              <Text style={styles.esCaption} numberOfLines={1}>{t('manage_categories:es_caption', { name: item.display_name_es })}</Text>
+            ) : null}
             {builtIn && (
               <View style={styles.badge}>
                 <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={11} color={colors.textSecondary} />
@@ -275,7 +319,7 @@ export default function ManageMenuCategoriesScreen() {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => openNameModal('rename-cat', item.id, item.display_name, t('manage_categories:rename_category'))} style={styles.iconBtn} disabled={busy}>
+          <TouchableOpacity onPress={() => openNameModal('rename-cat', item.id, item.display_name, t('manage_categories:rename_category'), item.display_name_es || '')} style={styles.iconBtn} disabled={busy}>
             <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.primary} />
           </TouchableOpacity>
           <TouchableOpacity onPress={() => toggleCategoryHidden(item)} style={styles.iconBtn} disabled={busy}>
@@ -314,6 +358,9 @@ export default function ManageMenuCategoriesScreen() {
 
           <View style={styles.rowLabelArea}>
             <Text style={styles.rowLabel} numberOfLines={1}>{subcategoryLabel(item, t)}</Text>
+            {item.display_name_es ? (
+              <Text style={styles.esCaption} numberOfLines={1}>{t('manage_categories:es_caption', { name: item.display_name_es })}</Text>
+            ) : null}
             {locked && (
               <View style={styles.badge}>
                 <IconSymbol ios_icon_name="link" android_material_icon_name="link" size={11} color={colors.textSecondary} />
@@ -322,7 +369,7 @@ export default function ManageMenuCategoriesScreen() {
             )}
           </View>
 
-          <TouchableOpacity onPress={() => openNameModal('rename-sub', item.id, item.display_name, t('manage_categories:rename_subcategory'))} style={styles.iconBtn} disabled={busy}>
+          <TouchableOpacity onPress={() => openNameModal('rename-sub', item.id, item.display_name, t('manage_categories:rename_subcategory'), item.display_name_es || '')} style={styles.iconBtn} disabled={busy}>
             <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.primary} />
           </TouchableOpacity>
           {selectedCategory?.system_key === 'cat.libations' && (
@@ -514,6 +561,28 @@ export default function ManageMenuCategoriesScreen() {
               placeholder={t('manage_categories:name_placeholder')}
               placeholderTextColor={colors.textSecondary}
               autoFocus
+              returnKeyType="next"
+            />
+            <View style={styles.esHeaderRow}>
+              <Text style={styles.esFieldLabel}>{t('manage_categories:spanish_name_label')}</Text>
+              <TouchableOpacity
+                style={[styles.translateBtn, (!nameInput.trim() || translating) && styles.translateBtnDisabled]}
+                onPress={handleTranslateName}
+                disabled={!nameInput.trim() || translating}
+              >
+                {translating ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Text style={styles.translateBtnText}>{t('manage_categories:translate_button')}</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={[styles.modalInput, styles.esInput]}
+              value={nameInputEs}
+              onChangeText={setNameInputEs}
+              placeholder={t('manage_categories:spanish_name_placeholder')}
+              placeholderTextColor={colors.textSecondary}
               returnKeyType="done"
               onSubmitEditing={submitName}
             />
@@ -595,6 +664,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     badge: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 3 },
     badgeText: { fontSize: 11, color: colors.textSecondary },
     caption: { fontSize: 11, color: colors.textSecondary, fontStyle: 'italic', marginTop: 2 },
+    esCaption: { fontSize: 11, color: colors.primary, marginTop: 2 },
     iconBtn: { padding: 6, width: 32, alignItems: 'center' },
     iconBtnLinked: { backgroundColor: colors.primary + '1F', borderRadius: 8 },
     addBtn: {
@@ -625,6 +695,23 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       color: colors.text,
       backgroundColor: colors.background,
     },
+    esHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginBottom: 6 },
+    esFieldLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
+    translateBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      minWidth: 96,
+      minHeight: 30,
+    },
+    translateBtnDisabled: { opacity: 0.5 },
+    translateBtnText: { fontSize: 13, fontWeight: '600', color: colors.primary },
+    esInput: { marginTop: 0 },
     modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 18 },
     modalCancel: { paddingHorizontal: 18, paddingVertical: 10 },
     modalCancelText: { fontSize: 15, color: colors.textSecondary, fontWeight: '600' },
