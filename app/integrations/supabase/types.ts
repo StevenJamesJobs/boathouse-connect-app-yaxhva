@@ -3524,6 +3524,30 @@ export type Database = {
         Args: { p_organization_id: string; p_user_id: string }
         Returns: Json
       }
+      reorder_libation_recipes: {
+        Args: {
+          p_ordered_ids: string[]
+          p_organization_id?: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      reorder_puree_syrup_recipes: {
+        Args: {
+          p_ordered_ids: string[]
+          p_organization_id?: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      reorder_summer_libation_recipes: {
+        Args: {
+          p_ordered_ids: string[]
+          p_organization_id?: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
       reset_game_scores: {
         Args: {
           p_game_mode?: string
