@@ -23,6 +23,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
 import RichTextToolbar from '@/components/RichTextToolbar';
+import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import SimpleSelectPicker, { SelectField } from '@/components/SimpleSelectPicker';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -106,6 +107,7 @@ export default function CocktailsAZEditorScreen() {
   const [translating, setTranslating] = useState(false);
   const [alcoholPickerOpen, setAlcoholPickerOpen] = useState(false);
   const [procH, setProcH] = useState(120);
+  const [procDragH, setProcDragH] = useState(0);
 
   const addIngredient = () => setIngredients((prev) => [...prev, { amount: '', ingredient: '' }]);
   const removeIngredient = (index: number) =>
@@ -433,6 +435,7 @@ export default function CocktailsAZEditorScreen() {
     setProcedure('');
     setProcedureEs('');
     setShowSpanish(false);
+    setProcDragH(0);
     setThumbnailUrl(null);
   };
 
@@ -596,7 +599,11 @@ export default function CocktailsAZEditorScreen() {
 
       {/* Add/Edit Modal */}
       <Modal visible={showModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={0}
+        >
           <View style={[styles.modalContent, { backgroundColor: colors.background }]}>
             <View style={[styles.modalHeader, { borderBottomColor: colors.highlight }]}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>
@@ -612,7 +619,11 @@ export default function CocktailsAZEditorScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView style={styles.modalForm}>
+            <ScrollView
+              style={styles.modalForm}
+              contentContainerStyle={{ paddingBottom: 40 }}
+              keyboardShouldPersistTaps="handled"
+            >
               {/* ── Section 1: Cocktail Basics (open) ── */}
               <CollapsibleSection
                 title={t('cocktails_editor.section_basics')}
@@ -728,17 +739,21 @@ export default function CocktailsAZEditorScreen() {
                     textInputRef={procedureInputRef}
                     accentColor={colors.highlight}
                   />
-                  <TextInput
-                    ref={procedureInputRef}
-                    style={[styles.formInput, styles.textArea, { height: Math.max(120, procH), backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-                    value={procedure}
-                    onChangeText={setProcedure}
-                    placeholder={t('cocktails_editor.procedure_placeholder')}
-                    placeholderTextColor={colors.textSecondary}
-                    multiline
-                    onContentSizeChange={(e) => setProcH(e.nativeEvent.contentSize.height)}
-                    onSelectionChange={(e) => setProcedureSelection(e.nativeEvent.selection)}
-                  />
+                  <View>
+                    <TextInput
+                      ref={procedureInputRef}
+                      style={[styles.formInput, styles.textArea, { minHeight: Math.max(120, procDragH), paddingBottom: 22, backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                      value={procedure}
+                      onChangeText={setProcedure}
+                      placeholder={t('cocktails_editor.procedure_placeholder')}
+                      placeholderTextColor={colors.textSecondary}
+                      multiline
+                      scrollEnabled={false}
+                      onContentSizeChange={(e) => setProcH(e.nativeEvent.contentSize.height)}
+                      onSelectionChange={(e) => setProcedureSelection(e.nativeEvent.selection)}
+                    />
+                    <ProcedureResizeHandle height={Math.max(120, procH, procDragH)} onResize={setProcDragH} />
+                  </View>
                 </View>
 
                 {/* Spanish Procedure Translation (menu-editor blue style) */}
@@ -802,7 +817,7 @@ export default function CocktailsAZEditorScreen() {
             onSelect={setAlcoholType}
             onClose={() => setAlcoholPickerOpen(false)}
           />
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </KeyboardAvoidingView>
   );

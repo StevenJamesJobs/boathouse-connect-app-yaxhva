@@ -895,6 +895,10 @@
   },
   "summer_libation_editor": {
     "title": "Summer Libation Recipes Editor",
+    "move_up": "Move Up",
+    "move_down": "Move Down",
+    "order_position": "Order Position",
+    "order_position_subtitle": "Move \"{{name}}\" to position:",
     "recipe_name_label": "Recipe Name *",
     "recipe_name_placeholder": "Enter recipe name",
     "price_label": "Price *",
@@ -948,6 +952,10 @@
   },
   "libation_editor": {
     "title": "Libation Recipes Editor",
+    "move_up": "Move Up",
+    "move_down": "Move Down",
+    "order_position": "Order Position",
+    "order_position_subtitle": "Move \"{{name}}\" to position:",
     "cancel_button": "Cancel",
     "section_basics": "Recipe Basics",
     "section_recipe": "Recipe",
@@ -1002,6 +1010,10 @@
   },
   "puree_editor": {
     "title": "Purees & Syrups Editor",
+    "move_up": "Move Up",
+    "move_down": "Move Down",
+    "order_position": "Order Position",
+    "order_position_subtitle": "Move \"{{name}}\" to position:",
     "section_basics": "Recipe Basics",
     "section_ingredients": "Ingredients",
     "section_procedure": "Procedure",

@@ -895,6 +895,10 @@
   },
   "summer_libation_editor": {
     "title": "Editor de Recetas de Verano",
+    "move_up": "Subir",
+    "move_down": "Bajar",
+    "order_position": "Posición en el Orden",
+    "order_position_subtitle": "Mover \"{{name}}\" a la posición:",
     "recipe_name_label": "Nombre de la Receta *",
     "recipe_name_placeholder": "Ingresa el nombre de la receta",
     "price_label": "Precio *",
@@ -948,6 +952,10 @@
   },
   "libation_editor": {
     "title": "Editor de Recetas de Bebidas",
+    "move_up": "Subir",
+    "move_down": "Bajar",
+    "order_position": "Posición en el Orden",
+    "order_position_subtitle": "Mover \"{{name}}\" a la posición:",
     "cancel_button": "Cancelar",
     "section_basics": "Datos de la Receta",
     "section_recipe": "Receta",
@@ -1002,6 +1010,10 @@
   },
   "puree_editor": {
     "title": "Editor de Purés y Almíbares",
+    "move_up": "Subir",
+    "move_down": "Bajar",
+    "order_position": "Posición en el Orden",
+    "order_position_subtitle": "Mover \"{{name}}\" a la posición:",
     "section_basics": "Datos de la Receta",
     "section_ingredients": "Ingredientes",
     "section_procedure": "Preparación",

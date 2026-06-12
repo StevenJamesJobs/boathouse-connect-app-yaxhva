@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
+  ActionSheetIOS,
   Alert,
   Modal,
   Image,
@@ -26,6 +27,7 @@ import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
 import RichTextToolbar from '@/components/RichTextToolbar';
+import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import SimpleSelectPicker, { SelectField } from '@/components/SimpleSelectPicker';
 import { GLASSWARE_OPTIONS } from '@/constants/glassware';
@@ -36,6 +38,9 @@ import {
   resolveRecipeSubId,
   recipeCategoryValueForSub,
 } from '@/utils/menuCategoryLabels';
+import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
+import RecipeGridCard from '@/components/RecipeGridCard';
+import OrderPositionModal from '@/components/OrderPositionModal';
 
 interface LibationRecipe {
   id: string;
@@ -72,6 +77,8 @@ export default function LibationRecipesEditorScreen() {
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingRecipe, setEditingRecipe] = useState<LibationRecipe | null>(null);
+  // ··· meatball → "Order Position" picker (siblings = the tapped recipe's category list)
+  const [positionPicker, setPositionPicker] = useState<{ recipe: LibationRecipe; siblings: LibationRecipe[]; currentIndex: number } | null>(null);
 
   // Form state
   const [name, setName] = useState('');
@@ -84,7 +91,6 @@ export default function LibationRecipesEditorScreen() {
     { amount: '', ingredient: '' },
   ]);
   const [procedure, setProcedure] = useState('');
-  const [displayOrder, setDisplayOrder] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [procedureEs, setProcedureEs] = useState('');
@@ -94,6 +100,7 @@ export default function LibationRecipesEditorScreen() {
   const [subPickerOpen, setSubPickerOpen] = useState(false);
   const [glasswarePickerOpen, setGlasswarePickerOpen] = useState(false);
   const [procH, setProcH] = useState(120);
+  const [procDragH, setProcDragH] = useState(0);
 
   const loadRecipes = useCallback(async () => {
     try {
@@ -283,7 +290,7 @@ export default function LibationRecipesEditorScreen() {
           p_ingredients: validIngredients,
           p_procedure: procedure.trim() || null,
           p_thumbnail_url: thumbnailUrl,
-          p_display_order: displayOrder.trim() ? parseInt(displayOrder.trim()) : editingRecipe.display_order,
+          p_display_order: editingRecipe.display_order,
         });
 
         if (error) {
@@ -311,7 +318,7 @@ export default function LibationRecipesEditorScreen() {
           p_ingredients: validIngredients,
           p_procedure: procedure.trim() || null,
           p_thumbnail_url: thumbnailUrl,
-          p_display_order: displayOrder.trim() ? parseInt(displayOrder.trim()) : recipes.length,
+          p_display_order: recipes.length,
         });
 
         if (error) {
@@ -380,6 +387,90 @@ export default function LibationRecipesEditorScreen() {
     ]);
   };
 
+  // Persist a category's new card order. `ordered` is that category's recipes in
+  // their new sequence; display_order is written 0..n via the reorder RPC (the
+  // SECURITY DEFINER RPC is required — libation_recipes' direct-UPDATE policy is
+  // gated on auth.uid(), which is null under the app's anon-key custom auth).
+  const persistOrder = async (ordered: LibationRecipe[]) => {
+    if (!user?.id) return;
+    const orderMap = new Map(ordered.map((r, idx) => [r.id, idx]));
+    setRecipes((prev) =>
+      prev.map((r) => (orderMap.has(r.id) ? { ...r, display_order: orderMap.get(r.id)! } : r))
+    );
+    try {
+      const { error } = await supabase.rpc('reorder_libation_recipes', {
+        p_user_id: user.id,
+        p_organization_id: organizationId,
+        p_ordered_ids: ordered.map((r) => r.id),
+      });
+      if (error) {
+        console.error('Error reordering libation recipes:', error);
+        loadRecipes();
+      }
+    } catch (error) {
+      console.error('Error reordering libation recipes:', error);
+      loadRecipes();
+    }
+  };
+
+  const handleMove = (siblings: LibationRecipe[], index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= siblings.length) return;
+    const reordered = [...siblings];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(target, 0, moved);
+    persistOrder(reordered);
+  };
+
+  const applyPositionChange = (newPos: number) => {
+    if (!positionPicker) return;
+    const { siblings, currentIndex } = positionPicker;
+    const newIndex = newPos - 1;
+    setPositionPicker(null);
+    if (newIndex === currentIndex) return;
+    const reordered = [...siblings];
+    const [moved] = reordered.splice(currentIndex, 1);
+    reordered.splice(newIndex, 0, moved);
+    persistOrder(reordered);
+  };
+
+  // ··· meatball: Edit · Move up · Move down · Order Position · Delete (mirrors
+  // menu-editor's openItemActions). In the horizontal list "up" = toward index 0.
+  const openRecipeActions = (recipe: LibationRecipe, siblings: LibationRecipe[], index: number) => {
+    const isFirst = index === 0;
+    const isLast = index === siblings.length - 1;
+    const editLabel = t('common.edit');
+    const moveUpLabel = t('libation_editor.move_up');
+    const moveDownLabel = t('libation_editor.move_down');
+    const orderLabel = t('libation_editor.order_position');
+    const deleteLabel = t('common.delete');
+    const cancelLabel = t('common.cancel');
+
+    if (Platform.OS === 'ios') {
+      const options: string[] = [editLabel];
+      const actions: Array<() => void> = [() => openEditModal(recipe)];
+      if (!isFirst) { options.push(moveUpLabel); actions.push(() => handleMove(siblings, index, -1)); }
+      if (!isLast) { options.push(moveDownLabel); actions.push(() => handleMove(siblings, index, 1)); }
+      if (siblings.length > 1) { options.push(orderLabel); actions.push(() => setPositionPicker({ recipe, siblings, currentIndex: index })); }
+      options.push(deleteLabel); actions.push(() => handleDelete(recipe));
+      options.push(cancelLabel);
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, destructiveButtonIndex: options.length - 2, cancelButtonIndex: options.length - 1, title: recipe.name },
+        (buttonIndex) => { if (buttonIndex === options.length - 1) return; actions[buttonIndex]?.(); }
+      );
+    } else {
+      const buttons: Array<{ text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }> = [
+        { text: editLabel, onPress: () => openEditModal(recipe) },
+      ];
+      if (!isFirst) buttons.push({ text: moveUpLabel, onPress: () => handleMove(siblings, index, -1) });
+      if (!isLast) buttons.push({ text: moveDownLabel, onPress: () => handleMove(siblings, index, 1) });
+      if (siblings.length > 1) buttons.push({ text: orderLabel, onPress: () => setPositionPicker({ recipe, siblings, currentIndex: index }) });
+      buttons.push({ text: deleteLabel, style: 'destructive', onPress: () => handleDelete(recipe) });
+      buttons.push({ text: cancelLabel, style: 'cancel' });
+      Alert.alert(recipe.name, undefined, buttons);
+    }
+  };
+
   const openAddModal = () => {
     resetForm();
     setShowModal(true);
@@ -400,7 +491,6 @@ export default function LibationRecipesEditorScreen() {
     );
     setProcedure(recipe.procedure || '');
     setProcedureEs(recipe.procedure_es || '');
-    setDisplayOrder(recipe.display_order.toString());
     setThumbnailUrl(recipe.thumbnail_url);
     setShowModal(true);
   };
@@ -422,7 +512,7 @@ export default function LibationRecipesEditorScreen() {
     setProcedure('');
     setProcedureEs('');
     setShowSpanish(false);
-    setDisplayOrder('');
+    setProcDragH(0);
     setThumbnailUrl(null);
   };
 
@@ -512,45 +602,43 @@ export default function LibationRecipesEditorScreen() {
               {/* Category Header */}
               <Text style={[styles.categoryTitle, { color: colors.text }]}>{cat}</Text>
 
-              {/* Horizontal Scrollable Recipe Cards */}
-              <ScrollView
+              {/* Horizontal, drag-reorderable recipe cards (full-image tiles) */}
+              <DraggableFlatList
+                data={categoryRecipes}
                 horizontal
+                keyExtractor={(item) => item.id}
                 showsHorizontalScrollIndicator={false}
+                activationDistance={12}
                 style={styles.horizontalScroll}
                 contentContainerStyle={styles.horizontalScrollContent}
-              >
-                {categoryRecipes.map((recipe, index) => (
-                  <View key={index} style={[styles.recipeCard, { backgroundColor: colors.card }]}>
-                    <Image
-                      source={{ uri: getImageUrl(recipe.thumbnail_url) }}
-                      style={styles.recipeThumbnail}
-                      resizeMode="cover"
-                    />
-                    <View style={styles.recipeInfo}>
-                      <Text style={[styles.recipeName, { color: colors.text }]} numberOfLines={2}>{recipe.name}</Text>
-                      <Text style={[styles.recipePrice, { color: colors.textSecondary }]}>{recipe.price}</Text>
-                    </View>
-                    <View style={styles.recipeActions}>
-                      <TouchableOpacity
-                        style={[styles.editButton, { backgroundColor: colors.highlight }]}
-                        onPress={() => openEditModal(recipe)}
-                      >
-                        <Text style={[styles.buttonText, { color: colors.text }]}>{t('common.edit')}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.deleteButton}
-                        onPress={() => handleDelete(recipe)}
-                      >
-                        <Text style={[styles.buttonText, { color: colors.text }]}>{t('common.delete')}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-              </ScrollView>
+                onDragEnd={({ data }) => persistOrder(data)}
+                renderItem={({ item, getIndex, drag, isActive }: RenderItemParams<LibationRecipe>) => (
+                  <RecipeGridCard
+                    imageUrl={getImageUrl(item.thumbnail_url)}
+                    name={item.name}
+                    price={item.price}
+                    onPress={() => openEditModal(item)}
+                    onMeatball={() => openRecipeActions(item, categoryRecipes, getIndex() ?? 0)}
+                    drag={drag}
+                    isActive={isActive}
+                  />
+                )}
+              />
             </React.Fragment>
           ))
         )}
       </ScrollView>
+
+      {/* Order Position picker (··· → Order Position) */}
+      <OrderPositionModal
+        visible={!!positionPicker}
+        title={t('libation_editor.order_position')}
+        subtitle={positionPicker ? t('libation_editor.order_position_subtitle', { name: positionPicker.recipe.name }) : undefined}
+        count={positionPicker?.siblings.length ?? 0}
+        currentIndex={positionPicker?.currentIndex ?? 0}
+        onClose={() => setPositionPicker(null)}
+        onApply={applyPositionChange}
+      />
 
       {/* Loading Overlay */}
       {loading && (
@@ -750,17 +838,21 @@ export default function LibationRecipesEditorScreen() {
                     textInputRef={procedureInputRef}
                     accentColor={colors.highlight}
                   />
-                  <TextInput
-                    ref={procedureInputRef}
-                    style={[styles.formInput, styles.textArea, { height: Math.max(120, procH) }]}
-                    value={procedure}
-                    onChangeText={setProcedure}
-                    placeholder={t('libation_editor.procedure_placeholder')}
-                    placeholderTextColor={colors.textSecondary}
-                    multiline
-                    onContentSizeChange={(e) => setProcH(e.nativeEvent.contentSize.height)}
-                    onSelectionChange={(e) => setProcedureSelection(e.nativeEvent.selection)}
-                  />
+                  <View>
+                    <TextInput
+                      ref={procedureInputRef}
+                      style={[styles.formInput, styles.textArea, { minHeight: Math.max(120, procDragH), paddingBottom: 22 }]}
+                      value={procedure}
+                      onChangeText={setProcedure}
+                      placeholder={t('libation_editor.procedure_placeholder')}
+                      placeholderTextColor={colors.textSecondary}
+                      multiline
+                      scrollEnabled={false}
+                      onContentSizeChange={(e) => setProcH(e.nativeEvent.contentSize.height)}
+                      onSelectionChange={(e) => setProcedureSelection(e.nativeEvent.selection)}
+                    />
+                    <ProcedureResizeHandle height={Math.max(120, procH, procDragH)} onResize={setProcDragH} />
+                  </View>
                 </View>
 
                 {/* Spanish Procedure Translation (menu-editor blue style) */}
@@ -797,18 +889,6 @@ export default function LibationRecipesEditorScreen() {
                   )}
                 </View>
 
-                {/* Display Order (kept this phase; moves to the ··· menu in Phase 2) */}
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>{t('libation_editor.display_order_label')}</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={displayOrder}
-                    onChangeText={setDisplayOrder}
-                    placeholder={t('libation_editor.display_order_placeholder')}
-                    placeholderTextColor={colors.textSecondary}
-                    keyboardType="numeric"
-                  />
-                </View>
               </CollapsibleSection>
 
               {/* ── Actions ── */}
@@ -924,50 +1004,6 @@ const styles = StyleSheet.create({
   horizontalScrollContent: {
     paddingHorizontal: 16,
     paddingBottom: 8,
-  },
-  recipeCard: {
-    borderRadius: 12,
-    padding: 12,
-    marginRight: 12,
-    width: 180,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  recipeThumbnail: {
-    width: '100%',
-    height: 120,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  recipeInfo: {
-    marginBottom: 12,
-  },
-  recipeName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  recipePrice: {
-    fontSize: 14,
-  },
-  recipeActions: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  editButton: {
-    flex: 1,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  deleteButton: {
-    flex: 1,
-    backgroundColor: '#F44336',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    alignItems: 'center',
   },
   buttonText: {
     fontSize: 13,
