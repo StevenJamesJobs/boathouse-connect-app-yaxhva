@@ -1150,6 +1150,7 @@ export type Database = {
           color: string
           created_at: string
           display_name: string
+          display_name_es: string | null
           display_order: number
           filter_behavior: string
           id: string
@@ -1163,6 +1164,7 @@ export type Database = {
           color?: string
           created_at?: string
           display_name: string
+          display_name_es?: string | null
           display_order?: number
           filter_behavior?: string
           id?: string
@@ -1176,6 +1178,7 @@ export type Database = {
           color?: string
           created_at?: string
           display_name?: string
+          display_name_es?: string | null
           display_order?: number
           filter_behavior?: string
           id?: string
@@ -1200,6 +1203,7 @@ export type Database = {
           category_id: string
           created_at: string
           display_name: string
+          display_name_es: string | null
           display_order: number
           id: string
           is_cocktail_fed: boolean
@@ -1213,6 +1217,7 @@ export type Database = {
           category_id: string
           created_at?: string
           display_name: string
+          display_name_es?: string | null
           display_order?: number
           id?: string
           is_cocktail_fed?: boolean
@@ -1226,6 +1231,7 @@ export type Database = {
           category_id?: string
           created_at?: string
           display_name?: string
+          display_name_es?: string | null
           display_order?: number
           id?: string
           is_cocktail_fed?: boolean
@@ -3754,12 +3760,28 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_menu_category_translations: {
+        Args: {
+          p_display_name_es?: string
+          p_id: string
+          p_organization_id?: string
+        }
+        Returns: undefined
+      }
       update_menu_item_translations: {
         Args: {
           p_description_es?: string
           p_id: string
           p_location_es?: string
           p_name_es?: string
+          p_organization_id?: string
+        }
+        Returns: undefined
+      }
+      update_menu_subcategory_translations: {
+        Args: {
+          p_display_name_es?: string
+          p_id: string
           p_organization_id?: string
         }
         Returns: undefined

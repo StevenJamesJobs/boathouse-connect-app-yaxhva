@@ -203,7 +203,7 @@ export default function MenuEditorScreen() {
   const { categories: formMenuCats } = useMenuCategories({ includeHidden: true, menuSlot: formMenuSlot });
   const formWeeklySpecialsCat = formMenuCats.find((c) => c.system_key === 'cat.weekly_specials' && !c.is_hidden);
   const formHasWeeklySpecialsCat = !!formWeeklySpecialsCat;
-  const formWeeklySpecialsLabel = formWeeklySpecialsCat ? categoryLabel(formWeeklySpecialsCat, t) : '';
+  const formWeeklySpecialsLabel = formWeeklySpecialsCat ? categoryLabel(formWeeklySpecialsCat, t, language) : '';
   const formHasLunchCat = formMenuCats.some((c) => c.filter_behavior === 'lunch' && !c.is_hidden);
   const formHasDinnerCat = formMenuCats.some((c) => c.filter_behavior === 'dinner' && !c.is_hidden);
   const formLunchName = formMenuCats.find((c) => c.filter_behavior === 'lunch')?.display_name || t('menu_editor:available_lunch');
@@ -1072,7 +1072,7 @@ export default function MenuEditorScreen() {
             <CategoryPill
               key={cat.id}
               size="lg"
-              label={categoryLabel(cat, t)}
+              label={categoryLabel(cat, t, language)}
               selected={selectedCategory === cat.display_name}
               onPress={() => navigateToPage(cat.display_name)}
               onLayout={(e) => {
@@ -1099,7 +1099,7 @@ export default function MenuEditorScreen() {
             <CategoryPill
               key={sub.id}
               size="sm"
-              label={subcategoryLabel(sub, t)}
+              label={subcategoryLabel(sub, t, language)}
               selected={selectedSubcategory === sub.display_name}
               onPress={() => navigateToPage(selectedCategory, sub.display_name)}
               onLayout={(e) => {
@@ -1759,7 +1759,7 @@ export default function MenuEditorScreen() {
                     <CategoryPill
                       key={cat.id}
                       size="sm"
-                      label={categoryLabel(cat, t)}
+                      label={categoryLabel(cat, t, language)}
                       selected={formData.category === cat.display_name}
                       onPress={() => setFormData({ ...formData, category: cat.display_name, subcategory: '' })}
                     />
@@ -1783,7 +1783,7 @@ export default function MenuEditorScreen() {
                       <CategoryPill
                         key={sub.id}
                         size="sm"
-                        label={subcategoryLabel(sub, t)}
+                        label={subcategoryLabel(sub, t, language)}
                         selected={formData.subcategory === sub.display_name}
                         onPress={() => setFormData({ ...formData, subcategory: sub.display_name })}
                       />

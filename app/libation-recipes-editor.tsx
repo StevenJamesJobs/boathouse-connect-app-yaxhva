@@ -26,6 +26,9 @@ import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
 import RichTextToolbar from '@/components/RichTextToolbar';
+import CollapsibleSection from '@/components/CollapsibleSection';
+import SimpleSelectPicker, { SelectField } from '@/components/SimpleSelectPicker';
+import { GLASSWARE_OPTIONS } from '@/constants/glassware';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
 import {
@@ -87,6 +90,10 @@ export default function LibationRecipesEditorScreen() {
   const [procedureEs, setProcedureEs] = useState('');
   const [showSpanish, setShowSpanish] = useState(false);
   const [translating, setTranslating] = useState(false);
+  // Dropdown pickers + auto-grow procedure height
+  const [subPickerOpen, setSubPickerOpen] = useState(false);
+  const [glasswarePickerOpen, setGlasswarePickerOpen] = useState(false);
+  const [procH, setProcH] = useState(120);
 
   const loadRecipes = useCallback(async () => {
     try {
@@ -580,61 +587,72 @@ export default function LibationRecipesEditorScreen() {
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={true}
             >
-              {/* Image Upload */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('libation_editor.image_label')}</Text>
-                <TouchableOpacity
-                  style={[styles.imagePickerButton, { backgroundColor: colors.highlight }]}
-                  onPress={pickImage}
-                  disabled={uploadingImage}
-                >
-                  <Text style={[styles.imagePickerButtonText, { color: colors.text }]}>
-                    {uploadingImage ? t('libation_editor.uploading') : t('libation_editor.choose_image')}
-                  </Text>
-                </TouchableOpacity>
-                {thumbnailUrl && (
-                  <Image
-                    source={{ uri: getImageUrl(thumbnailUrl) }}
-                    style={styles.thumbnailPreview}
-                    resizeMode="cover"
-                  />
-                )}
-              </View>
-
-              {/* Subcategory (recipe-backed Libations subcategory) */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('libation_editor.category_label')}</Text>
-                {cocktailSubOptions.length === 0 ? (
-                  <Text style={[styles.pickerEmptyHint, { color: colors.textSecondary }]}>
-                    {t('libation_editor.no_cocktail_subs')}
-                  </Text>
-                ) : (
-                  <View style={styles.picker}>
-                    {cocktailSubOptions.map((opt) => (
-                      <TouchableOpacity
-                        key={opt.id}
-                        style={[
-                          styles.pickerOption,
-                          subcategoryId === opt.id && { backgroundColor: colors.highlight }
-                        ]}
-                        onPress={() => setSubcategoryId(opt.id)}
-                      >
-                        <Text
-                          style={[
-                            styles.pickerOptionText,
-                            subcategoryId === opt.id && { color: colors.text, fontWeight: '600' }
-                          ]}
-                        >
-                          {opt.label}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
+              {/* ── Section 1: Recipe Basics (open) ── */}
+              <CollapsibleSection
+                title={t('libation_editor.section_basics')}
+                iconIos="wineglass.fill"
+                iconAndroid="local-bar"
+                iconColor={colors.primary}
+                headerBackgroundColor="#FFFFFF"
+                headerTextColor="#1A1A1A"
+                contentBackgroundColor="#FFFFFF"
+                defaultExpanded
+              >
+                {/* Thumbnail (tap to attach) + Name */}
+                <View style={styles.thumbAndNameRow}>
+                  <TouchableOpacity style={styles.thumbSquare} onPress={pickImage} disabled={uploadingImage}>
+                    {thumbnailUrl ? (
+                      <Image source={{ uri: getImageUrl(thumbnailUrl) }} style={styles.thumbImage} resizeMode="cover" />
+                    ) : (
+                      <View style={styles.thumbPlaceholder}>
+                        <IconSymbol ios_icon_name="photo" android_material_icon_name="add-photo-alternate" size={26} color="#999999" />
+                      </View>
+                    )}
+                    {uploadingImage && (
+                      <View style={styles.thumbUploading}><ActivityIndicator color="#FFFFFF" /></View>
+                    )}
+                  </TouchableOpacity>
+                  <View style={styles.nameColumn}>
+                    <Text style={styles.formLabel}>{t('libation_editor.recipe_name_label')}</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      value={name}
+                      onChangeText={setName}
+                      placeholder={t('libation_editor.recipe_name_placeholder')}
+                      placeholderTextColor={colors.textSecondary}
+                    />
                   </View>
-                )}
-              </View>
+                </View>
 
-              {/* Featured (pin to top of its subcategory) */}
-              <View style={styles.formField}>
+                {/* Subcategory (dropdown) + Price */}
+                <View style={styles.twoColRow}>
+                  <View style={styles.twoColLeft}>
+                    <Text style={styles.formLabel}>{t('libation_editor.category_label')}</Text>
+                    {cocktailSubOptions.length === 0 ? (
+                      <Text style={[styles.pickerEmptyHint, { color: colors.textSecondary }]}>
+                        {t('libation_editor.no_cocktail_subs')}
+                      </Text>
+                    ) : (
+                      <SelectField
+                        value={cocktailSubOptions.find((o) => o.id === subcategoryId)?.label || ''}
+                        placeholder={t('libation_editor.select_category')}
+                        onPress={() => setSubPickerOpen(true)}
+                      />
+                    )}
+                  </View>
+                  <View style={styles.twoColRight}>
+                    <Text style={styles.formLabel}>{t('libation_editor.price_label')}</Text>
+                    <TextInput
+                      style={styles.formInput}
+                      value={price}
+                      onChangeText={setPrice}
+                      placeholder={t('libation_editor.price_placeholder')}
+                      placeholderTextColor={colors.textSecondary}
+                    />
+                  </View>
+                </View>
+
+                {/* Featured */}
                 <View style={styles.featuredRow}>
                   <View style={styles.featuredTextWrap}>
                     <Text style={styles.formLabel}>{t('libation_editor.featured_label')}</Text>
@@ -644,201 +662,204 @@ export default function LibationRecipesEditorScreen() {
                   </View>
                   <Switch value={isFeatured} onValueChange={setIsFeatured} />
                 </View>
-              </View>
+              </CollapsibleSection>
 
-              {/* Name */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Recipe Name *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Enter recipe name"
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-
-              {/* Price */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Price *</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={price}
-                  onChangeText={setPrice}
-                  placeholder="e.g., $12.00"
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-
-              {/* Glassware */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Glassware</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={glassware}
-                  onChangeText={setGlassware}
-                  placeholder="e.g., Martini Glass"
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-
-              {/* Garnish */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Garnish</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={garnish}
-                  onChangeText={setGarnish}
-                  placeholder="e.g., Lemon Twist"
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-
-              {/* Ingredients */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Ingredients *</Text>
-                {ingredients.map((ingredient, index) => (
-                  <View key={index} style={styles.ingredientRow}>
-                    <TextInput
-                      style={[styles.formInput, styles.ingredientAmount]}
-                      value={ingredient.amount}
-                      onChangeText={(value) => updateIngredient(index, 'amount', value)}
-                      placeholder="Amount"
-                      placeholderTextColor={colors.textSecondary}
-                    />
-                    <TextInput
-                      style={[styles.formInput, styles.ingredientName]}
-                      value={ingredient.ingredient}
-                      onChangeText={(value) => updateIngredient(index, 'ingredient', value)}
-                      placeholder="Ingredient"
-                      placeholderTextColor={colors.textSecondary}
-                    />
-                    {ingredients.length > 1 && (
-                      <TouchableOpacity
-                        style={styles.removeIngredientButton}
-                        onPress={() => removeIngredient(index)}
-                      >
-                        <IconSymbol
-                          ios_icon_name="minus.circle.fill"
-                          android_material_icon_name="remove-circle"
-                          size={24}
-                          color="#F44336"
-                        />
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                ))}
-                <TouchableOpacity style={styles.addIngredientButton} onPress={addIngredient}>
-                  <IconSymbol
-                    ios_icon_name="plus.circle.fill"
-                    android_material_icon_name="add-circle"
-                    size={20}
-                    color={colors.primary}
+              {/* ── Section 2: Recipe (collapsed) ── */}
+              <CollapsibleSection
+                title={t('libation_editor.section_recipe')}
+                iconIos="list.bullet"
+                iconAndroid="format-list-bulleted"
+                iconColor={colors.primary}
+                headerBackgroundColor="#FFFFFF"
+                headerTextColor="#1A1A1A"
+                contentBackgroundColor="#FFFFFF"
+                defaultExpanded={false}
+              >
+                {/* Glassware (dropdown + custom) */}
+                <View style={styles.formField}>
+                  <Text style={styles.formLabel}>{t('libation_editor.glassware_label')}</Text>
+                  <SelectField
+                    value={glassware}
+                    placeholder={t('libation_editor.select_glassware')}
+                    onPress={() => setGlasswarePickerOpen(true)}
                   />
-                  <Text style={[styles.addIngredientText, { color: colors.highlight }]}>Add Ingredient</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Procedure */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Procedure</Text>
-                <RichTextToolbar
-                  text={procedure}
-                  onChangeText={setProcedure}
-                  selection={procedureSelection}
-                  onSelectionChange={setProcedureSelection}
-                  textInputRef={procedureInputRef}
-                  accentColor={colors.highlight}
-                />
-                <TextInput
-                  ref={procedureInputRef}
-                  style={[styles.formInput, styles.textArea]}
-                  value={procedure}
-                  onChangeText={setProcedure}
-                  placeholder="Enter preparation instructions"
-                  placeholderTextColor={colors.textSecondary}
-                  multiline
-                  numberOfLines={4}
-                  onSelectionChange={(e) => setProcedureSelection(e.nativeEvent.selection)}
-                />
-              </View>
-
-              {/* Spanish Procedure Translation */}
-              <View style={styles.formField}>
-                <TouchableOpacity
-                  style={[styles.spanishSectionHeader, { backgroundColor: '#FFF3E0' }]}
-                  onPress={() => setShowSpanish(!showSpanish)}
-                >
-                  <Text style={styles.spanishHeaderText}>
-                    {showSpanish ? '▼' : '▶'} Spanish Translation (Procedure)
-                  </Text>
-                  <TouchableOpacity
-                    style={[styles.autoTranslateButton, { backgroundColor: colors.highlight }]}
-                    onPress={handleAutoTranslate}
-                    disabled={translating}
-                  >
-                    <Text style={[styles.autoTranslateButtonText, { color: colors.text }]}>
-                      {translating ? 'Translating...' : 'Auto-Translate'}
-                    </Text>
+                </View>
+                {/* Garnish */}
+                <View style={styles.formField}>
+                  <Text style={styles.formLabel}>{t('libation_editor.garnish_label')}</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={garnish}
+                    onChangeText={setGarnish}
+                    placeholder={t('libation_editor.garnish_placeholder')}
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                {/* Ingredients */}
+                <View style={styles.formField}>
+                  <Text style={styles.formLabel}>{t('libation_editor.ingredients_label')}</Text>
+                  {ingredients.map((ingredient, index) => (
+                    <View key={index} style={styles.ingredientRow}>
+                      <TextInput
+                        style={[styles.formInput, styles.ingredientAmount]}
+                        value={ingredient.amount}
+                        onChangeText={(value) => updateIngredient(index, 'amount', value)}
+                        placeholder={t('libation_editor.amount_placeholder')}
+                        placeholderTextColor={colors.textSecondary}
+                      />
+                      <TextInput
+                        style={[styles.formInput, styles.ingredientName]}
+                        value={ingredient.ingredient}
+                        onChangeText={(value) => updateIngredient(index, 'ingredient', value)}
+                        placeholder={t('libation_editor.ingredient_placeholder')}
+                        placeholderTextColor={colors.textSecondary}
+                      />
+                      {ingredients.length > 1 && (
+                        <TouchableOpacity style={styles.removeIngredientButton} onPress={() => removeIngredient(index)}>
+                          <IconSymbol ios_icon_name="minus.circle.fill" android_material_icon_name="remove-circle" size={24} color="#F44336" />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                  <TouchableOpacity style={styles.addIngredientButton} onPress={addIngredient}>
+                    <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={20} color={colors.primary} />
+                    <Text style={[styles.addIngredientText, { color: colors.highlight }]}>{t('libation_editor.add_ingredient')}</Text>
                   </TouchableOpacity>
-                </TouchableOpacity>
-                {showSpanish && (
-                  <View style={styles.spanishFields}>
-                    <Text style={styles.formLabel}>Procedure (Spanish)</Text>
-                    <TextInput
-                      style={[styles.formInput, styles.textArea]}
-                      value={procedureEs}
-                      onChangeText={setProcedureEs}
-                      placeholder="Procedimiento en español"
-                      placeholderTextColor={colors.textSecondary}
-                      multiline
-                      numberOfLines={4}
+                </View>
+              </CollapsibleSection>
+
+              {/* ── Section 3: Procedure (collapsed) ── */}
+              <CollapsibleSection
+                title={t('libation_editor.section_procedure')}
+                iconIos="list.number"
+                iconAndroid="format-list-numbered"
+                iconColor={colors.primary}
+                headerBackgroundColor="#FFFFFF"
+                headerTextColor="#1A1A1A"
+                contentBackgroundColor="#FFFFFF"
+                defaultExpanded={false}
+              >
+                {/* Procedure (auto-grow) */}
+                <View style={styles.formField}>
+                  <Text style={styles.formLabel}>{t('libation_editor.procedure_label')}</Text>
+                  <RichTextToolbar
+                    text={procedure}
+                    onChangeText={setProcedure}
+                    selection={procedureSelection}
+                    onSelectionChange={setProcedureSelection}
+                    textInputRef={procedureInputRef}
+                    accentColor={colors.highlight}
+                  />
+                  <TextInput
+                    ref={procedureInputRef}
+                    style={[styles.formInput, styles.textArea, { height: Math.max(120, procH) }]}
+                    value={procedure}
+                    onChangeText={setProcedure}
+                    placeholder={t('libation_editor.procedure_placeholder')}
+                    placeholderTextColor={colors.textSecondary}
+                    multiline
+                    onContentSizeChange={(e) => setProcH(e.nativeEvent.contentSize.height)}
+                    onSelectionChange={(e) => setProcedureSelection(e.nativeEvent.selection)}
+                  />
+                </View>
+
+                {/* Spanish Procedure Translation (menu-editor blue style) */}
+                <View style={styles.formField}>
+                  <TouchableOpacity style={styles.spanishSectionHeader} onPress={() => setShowSpanish(!showSpanish)}>
+                    <Text style={styles.formLabel}>{t('translation_section:spanish_section_title')}</Text>
+                    <IconSymbol
+                      ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
+                      android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
+                      size={20}
+                      color="#666666"
                     />
-                  </View>
-                )}
-              </View>
-
-              {/* Display Order */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>Display Order</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={displayOrder}
-                  onChangeText={setDisplayOrder}
-                  placeholder="Enter display order (optional)"
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                />
-              </View>
-
-              {/* Action Buttons */}
-              <View style={styles.modalActions}>
-                <TouchableOpacity
-                  style={styles.cancelButton}
-                  onPress={closeModal}
-                  disabled={loading}
-                >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.submitButton, { backgroundColor: colors.highlight }]}
-                  onPress={handleSave}
-                  disabled={loading || uploadingImage}
-                >
-                  {loading ? (
-                    <ActivityIndicator color={colors.text} />
-                  ) : (
-                    <Text style={[styles.submitButtonText, { color: colors.text }]}>
-                      {editingRecipe ? 'Update' : 'Save'}
-                    </Text>
+                  </TouchableOpacity>
+                  {showSpanish && (
+                    <View style={styles.spanishFields}>
+                      <TouchableOpacity style={styles.autoTranslateButton} onPress={handleAutoTranslate} disabled={translating}>
+                        {translating ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text style={styles.autoTranslateButtonText}>{t('translation_section:auto_translate')}</Text>
+                        )}
+                      </TouchableOpacity>
+                      <Text style={styles.spanishFieldLabel}>{t('libation_editor.procedure_es_label')}</Text>
+                      <TextInput
+                        style={[styles.formInput, styles.textArea]}
+                        value={procedureEs}
+                        onChangeText={setProcedureEs}
+                        placeholder="Procedimiento en español"
+                        placeholderTextColor={colors.textSecondary}
+                        multiline
+                        numberOfLines={4}
+                      />
+                    </View>
                   )}
-                </TouchableOpacity>
+                </View>
+
+                {/* Display Order (kept this phase; moves to the ··· menu in Phase 2) */}
+                <View style={styles.formField}>
+                  <Text style={styles.formLabel}>{t('libation_editor.display_order_label')}</Text>
+                  <TextInput
+                    style={styles.formInput}
+                    value={displayOrder}
+                    onChangeText={setDisplayOrder}
+                    placeholder={t('libation_editor.display_order_placeholder')}
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </CollapsibleSection>
+
+              {/* ── Actions ── */}
+              <View style={styles.formSectionActions}>
+                <View style={styles.modalActions}>
+                  <TouchableOpacity style={styles.cancelButton} onPress={closeModal} disabled={loading}>
+                    <Text style={styles.cancelButtonText}>{t('libation_editor.cancel_button')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.submitButton, { backgroundColor: colors.highlight }]}
+                    onPress={handleSave}
+                    disabled={loading || uploadingImage}
+                  >
+                    {loading ? (
+                      <ActivityIndicator color={colors.text} />
+                    ) : (
+                      <Text style={[styles.submitButtonText, { color: colors.text }]}>
+                        {editingRecipe ? t('libation_editor.update_button') : t('libation_editor.save_button')}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
 
               {/* Extra padding at bottom to ensure buttons are visible above keyboard */}
               <View style={styles.extraBottomPadding} />
             </ScrollView>
           </View>
+
+          <SimpleSelectPicker
+            visible={subPickerOpen}
+            title={t('libation_editor.select_category')}
+            options={cocktailSubOptions.map((o) => o.label)}
+            value={cocktailSubOptions.find((o) => o.id === subcategoryId)?.label || ''}
+            onSelect={(label) => {
+              const opt = cocktailSubOptions.find((o) => o.label === label);
+              if (opt) setSubcategoryId(opt.id);
+            }}
+            onClose={() => setSubPickerOpen(false)}
+          />
+          <SimpleSelectPicker
+            visible={glasswarePickerOpen}
+            title={t('libation_editor.select_glassware')}
+            options={[...GLASSWARE_OPTIONS]}
+            value={glassware}
+            onSelect={setGlassware}
+            onClose={() => setGlasswarePickerOpen(false)}
+            allowCustom
+            customLabel={t('common.custom_option')}
+            customPlaceholder={t('libation_editor.custom_glassware_placeholder')}
+          />
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -997,24 +1018,39 @@ const styles = StyleSheet.create({
   },
   modalForm: {
     flex: 1,
+    backgroundColor: '#EEEFF1',
   },
   modalFormContent: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
+    padding: 16,
     paddingBottom: 40,
+  },
+  // White cards that group the form into scannable sections on the gray scroll (D5).
+  formSection: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 14,
+    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.06)',
+  },
+  formSectionActions: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 4,
+    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.06)',
   },
   formField: {
     marginBottom: 20,
   },
   formLabel: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '600',
     color: '#1A1A1A',
     marginBottom: 8,
   },
   formInput: {
     backgroundColor: '#F5F5F5',
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 16,
@@ -1103,8 +1139,6 @@ const styles = StyleSheet.create({
   modalActions: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 8,
-    marginBottom: 24,
   },
   cancelButton: {
     flex: 1,
@@ -1133,28 +1167,67 @@ const styles = StyleSheet.create({
   extraBottomPadding: {
     height: 30,
   },
+  // Spanish block — menu-editor blue style (replaces the old orange).
   spanishSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-  },
-  spanishHeaderText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#E65100',
-  },
-  autoTranslateButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  autoTranslateButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
+    paddingVertical: 4,
   },
   spanishFields: {
     marginTop: 8,
+    backgroundColor: '#F0F8FF',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#D0E8FF',
   },
+  autoTranslateButton: {
+    backgroundColor: '#3498DB',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  autoTranslateButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  spanishFieldLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#666666',
+    marginBottom: 4,
+  },
+  // Tap-to-attach 80×80 thumbnail + name row, and the subcategory/price two-col row.
+  thumbAndNameRow: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+    alignItems: 'flex-start',
+  },
+  thumbSquare: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+    backgroundColor: '#F5F5F5',
+    borderWidth: 2,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+  },
+  thumbImage: { width: '100%', height: '100%' },
+  thumbPlaceholder: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  thumbUploading: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  nameColumn: { flex: 1 },
+  twoColRow: { flexDirection: 'row', gap: 12, marginBottom: 16, alignItems: 'flex-start' },
+  twoColLeft: { flex: 1 },
+  twoColRight: { width: 120 },
 });

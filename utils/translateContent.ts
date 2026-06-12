@@ -82,6 +82,14 @@ const TRANSLATION_RPC_MAP: Record<string, { rpc: string; paramMap: Record<string
     rpc: 'update_menu_item_translations',
     paramMap: { name_es: 'p_name_es', description_es: 'p_description_es', location_es: 'p_location_es' },
   },
+  menu_categories: {
+    rpc: 'update_menu_category_translations',
+    paramMap: { display_name_es: 'p_display_name_es' },
+  },
+  menu_subcategories: {
+    rpc: 'update_menu_subcategory_translations',
+    paramMap: { display_name_es: 'p_display_name_es' },
+  },
   guides_and_training: {
     rpc: 'update_guide_translations',
     paramMap: { title_es: 'p_title_es', description_es: 'p_description_es' },

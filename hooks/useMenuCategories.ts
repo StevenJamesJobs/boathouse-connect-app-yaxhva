@@ -12,6 +12,7 @@ export type FilterBehavior = 'category_match' | 'lunch' | 'dinner' | 'weekly_spe
 export interface MenuSubcategory {
   id: string;
   display_name: string;
+  display_name_es: string | null;
   system_key: string | null;
   is_cocktail_fed: boolean;
   display_order: number;
@@ -21,6 +22,7 @@ export interface MenuSubcategory {
 export interface MenuCategory {
   id: string;
   display_name: string;
+  display_name_es: string | null;
   system_key: string | null;
   filter_behavior: FilterBehavior;
   color: string;
@@ -68,13 +70,13 @@ export function useMenuCategories(opts?: { includeHidden?: boolean; menuSlot?: 1
       const [catRes, subRes] = await Promise.all([
         (supabase
           .from('menu_categories' as any)
-          .select('id, display_name, system_key, filter_behavior, color, display_order, is_hidden')
+          .select('id, display_name, display_name_es, system_key, filter_behavior, color, display_order, is_hidden')
           .eq('organization_id', organizationId)
           .eq('menu_slot', effectiveSlot)
           .order('display_order', { ascending: true }) as any),
         (supabase
           .from('menu_subcategories' as any)
-          .select('id, category_id, display_name, system_key, is_cocktail_fed, display_order, is_hidden')
+          .select('id, category_id, display_name, display_name_es, system_key, is_cocktail_fed, display_order, is_hidden')
           .eq('organization_id', organizationId)
           .eq('menu_slot', effectiveSlot)
           .order('display_order', { ascending: true }) as any),
@@ -90,6 +92,7 @@ export function useMenuCategories(opts?: { includeHidden?: boolean; menuSlot?: 1
         arr.push({
           id: s.id,
           display_name: s.display_name,
+          display_name_es: s.display_name_es ?? null,
           system_key: s.system_key ?? null,
           is_cocktail_fed: !!s.is_cocktail_fed,
           display_order: s.display_order ?? 0,
@@ -103,6 +106,7 @@ export function useMenuCategories(opts?: { includeHidden?: boolean; menuSlot?: 1
         .map((c) => ({
           id: c.id,
           display_name: c.display_name,
+          display_name_es: c.display_name_es ?? null,
           system_key: c.system_key ?? null,
           filter_behavior: (c.filter_behavior || 'category_match') as FilterBehavior,
           color: c.color || '#607D8B',

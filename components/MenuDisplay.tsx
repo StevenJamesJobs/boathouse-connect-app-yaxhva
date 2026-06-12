@@ -231,16 +231,16 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const selectedSubcategory = currentPage?.subcategory || null;
   const selectedCategoryObj = findCategoryByName(menuCats, selectedCategory);
   // Availability tags + filter chips follow the lunch/dinner (and other built-in) renames.
-  const lunchName = labelForCategoryName(menuCats.find((c) => c.filter_behavior === 'lunch')?.display_name || 'Lunch', t);
-  const dinnerName = labelForCategoryName(menuCats.find((c) => c.filter_behavior === 'dinner')?.display_name || 'Dinner', t);
+  const lunchName = labelForCategoryName(menuCats.find((c) => c.filter_behavior === 'lunch')?.display_name || 'Lunch', t, menuCats, language);
+  const dinnerName = labelForCategoryName(menuCats.find((c) => c.filter_behavior === 'dinner')?.display_name || 'Dinner', t, menuCats, language);
   const filterChipLabel = (key: string, fallback: string): string => {
     switch (key) {
       case 'lunch': return lunchName;
       case 'dinner': return dinnerName;
-      case 'wine': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.wine')?.display_name || 'Wine', t);
-      case 'libations': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.libations')?.display_name || 'Libations', t);
-      case 'happyHour': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.happy_hour')?.display_name || 'Happy Hour', t);
-      case 'weeklySpecials': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.weekly_specials')?.display_name || 'Weekly Specials', t);
+      case 'wine': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.wine')?.display_name || 'Wine', t, menuCats, language);
+      case 'libations': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.libations')?.display_name || 'Libations', t, menuCats, language);
+      case 'happyHour': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.happy_hour')?.display_name || 'Happy Hour', t, menuCats, language);
+      case 'weeklySpecials': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.weekly_specials')?.display_name || 'Weekly Specials', t, menuCats, language);
       default: return fallback;
     }
   };
@@ -287,8 +287,8 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     }
   }, [selectedCategory, selectedSubcategory]);
 
-  const getCategoryLabel = (category: string) => labelForCategoryName(category, t);
-  const getSubcategoryLabel = (subcategory: string) => labelForSubcategoryName(subcategory, t);
+  const getCategoryLabel = (category: string) => labelForCategoryName(category, t, menuCats, language);
+  const getSubcategoryLabel = (subcategory: string) => labelForSubcategoryName(subcategory, t, menuCats, language);
 
   useEffect(() => {
     if (categoriesLoading) return; // wait for the category tree so injection resolves names
@@ -569,8 +569,8 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       description += `\n\nAvailable for: ${availability.join(', ')}`;
     }
 
-    if (item.category) description += `\n\nCategory: ${item.category}`;
-    if (item.subcategory) description += `\nSubcategory: ${item.subcategory}`;
+    if (item.category) description += `\n\nCategory: ${getCategoryLabel(item.category)}`;
+    if (item.subcategory) description += `\nSubcategory: ${getSubcategoryLabel(item.subcategory)}`;
 
     return description;
   };
