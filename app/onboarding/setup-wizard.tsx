@@ -423,6 +423,17 @@ export default function SetupWizardScreen() {
       )}
 
       <MenuIconPicker label="Header Icon (shown next to your restaurant name)" value={headerIcon} onChange={setHeaderIcon} />
+
+      <View style={styles.aiMenuNote}>
+        <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={20} color={splashColors.primary} />
+        <View style={{ flex: 1 }}>
+          <Text style={styles.aiMenuNoteTitle}>Have your menu handy?</Text>
+          <Text style={styles.aiMenuNoteText}>
+            You can upload your first menu now or later in the Menu Editor — for FREE. Our AI reads your PDF or
+            photos and builds your categories and items; you review everything before it goes live.
+          </Text>
+        </View>
+      </View>
     </View>
   );
 
@@ -708,6 +719,27 @@ const styles = StyleSheet.create({
     color: splashColors.text,
   },
   switchHint: {
+    fontSize: 13,
+    color: splashColors.textSecondary,
+    lineHeight: 18,
+  },
+  aiMenuNote: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+    backgroundColor: splashColors.primary + '12',
+    borderRadius: 14,
+    padding: 14,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  aiMenuNoteTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: splashColors.primary,
+    marginBottom: 3,
+  },
+  aiMenuNoteText: {
     fontSize: 13,
     color: splashColors.textSecondary,
     lineHeight: 18,

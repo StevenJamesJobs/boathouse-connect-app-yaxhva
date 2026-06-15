@@ -117,10 +117,12 @@ export default function MenuEditorScreen() {
   const pages = useMemo<PageConfig[]>(() => {
     const out: PageConfig[] = [];
     for (const cat of menuCats) {
-      if (!cat.subcategories || cat.subcategories.length === 0) {
+      if (cat.is_hidden) continue; // hidden categories don't appear as editor tabs
+      const visibleSubs = (cat.subcategories || []).filter((s) => !s.is_hidden);
+      if (visibleSubs.length === 0) {
         out.push({ category: cat.display_name, subcategory: null });
       } else {
-        for (const sub of cat.subcategories) {
+        for (const sub of visibleSubs) {
           out.push({ category: cat.display_name, subcategory: sub.display_name });
         }
       }
@@ -142,6 +144,9 @@ export default function MenuEditorScreen() {
       // shared-mode meal-service overlay).
       if (!perMenu && fb === 'lunch') return item.available_for_lunch;
       if (!perMenu && fb === 'dinner') return item.available_for_dinner;
+      // Featured/Weekly Specials page surfaces both items tagged to it AND any item
+      // flagged "Show on Featured Specials" (mirrors the customer MenuDisplay overlay).
+      if (fb === 'weekly_specials') return item.category === categoryName || item.is_weekly_special;
       return item.category === categoryName;
     },
     [menuCats, perMenu],
@@ -971,19 +976,34 @@ export default function MenuEditorScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('menu_editor:title')}</Text>
         {user?.role === 'owner' ? (
-          <TouchableOpacity
-            onPress={() => router.push('/manage-menu-categories' as any)}
-            style={styles.manageCatsButton}
-            accessibilityLabel={t('menu_editor:manage_categories_button')}
-          >
-            <IconSymbol
-              ios_icon_name="square.grid.2x2"
-              android_material_icon_name="grid-view"
-              size={16}
-              color={colors.primary}
-            />
-            <Text style={styles.manageCatsButtonText}>{t('menu_editor:manage_categories_button')}</Text>
-          </TouchableOpacity>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={() => router.push('/menu-upload' as any)}
+              style={styles.aiButton}
+              accessibilityLabel={t('menu_editor:ai_upload_button', 'AI Menu Upload')}
+            >
+              <IconSymbol
+                ios_icon_name="sparkles"
+                android_material_icon_name="auto-awesome"
+                size={15}
+                color={colors.primary}
+              />
+              <Text style={styles.aiButtonText}>{t('menu_editor:ai_button', 'AI')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => router.push('/manage-menu-categories' as any)}
+              style={styles.manageCatsButton}
+              accessibilityLabel={t('menu_editor:manage_categories_button')}
+            >
+              <IconSymbol
+                ios_icon_name="square.grid.2x2"
+                android_material_icon_name="grid-view"
+                size={16}
+                color={colors.primary}
+              />
+              <Text style={styles.manageCatsButtonText}>{t('menu_editor:manage_categories_button')}</Text>
+            </TouchableOpacity>
+          </View>
         ) : (
           <View style={styles.backButton} />
         )}
@@ -1068,7 +1088,7 @@ export default function MenuEditorScreen() {
           style={styles.categoryScroll}
           contentContainerStyle={styles.categoryScrollContent}
         >
-          {menuCats.map((cat) => (
+          {menuCats.filter((c) => !c.is_hidden).map((cat) => (
             <CategoryPill
               key={cat.id}
               size="lg"
@@ -1087,7 +1107,7 @@ export default function MenuEditorScreen() {
       )}
 
       {/* Subcategory Tabs - Only show when NOT searching */}
-      {!searchQuery && selectedCategoryObj && selectedCategoryObj.subcategories.length > 0 && (
+      {!searchQuery && selectedCategoryObj && selectedCategoryObj.subcategories.some((s) => !s.is_hidden) && (
         <ScrollView
           ref={subcategoryScrollRef}
           horizontal
@@ -1095,7 +1115,7 @@ export default function MenuEditorScreen() {
           style={styles.subcategoryScroll}
           contentContainerStyle={styles.subcategoryScrollContent}
         >
-          {selectedCategoryObj.subcategories.map((sub) => (
+          {selectedCategoryObj.subcategories.filter((s) => !s.is_hidden).map((sub) => (
             <CategoryPill
               key={sub.id}
               size="sm"
@@ -1113,16 +1133,17 @@ export default function MenuEditorScreen() {
         </ScrollView>
       )}
 
-      {/* Summer Libation cocktails redirect banner */}
-      {season === 'summer' && selectedSubObj?.is_cocktail_fed && !searchQuery && (
+      {/* Libation cocktails redirect banner — Menu 1 (winter) feeds from the Libation
+          Recipes Editor; Menu 2 (summer) from the Summer Libation Recipes Editor. */}
+      {selectedSubObj?.is_cocktail_fed && !searchQuery && (
         <TouchableOpacity
           style={styles.libationBanner}
-          onPress={() => router.push('/summer-libation-recipes-editor' as any)}
+          onPress={() => router.push((season === 'summer' ? '/summer-libation-recipes-editor' : '/libation-recipes-editor') as any)}
           activeOpacity={0.7}
         >
           <IconSymbol ios_icon_name="info.circle.fill" android_material_icon_name="info" size={20} color={colors.primary} />
           <Text style={styles.libationBannerText}>
-            {t('menu_editor:summer_libation_banner')}
+            {t(season === 'summer' ? 'menu_editor:summer_libation_banner' : 'menu_editor:winter_libation_banner')}
           </Text>
           <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={18} color={colors.primary} />
         </TouchableOpacity>
@@ -1264,6 +1285,16 @@ export default function MenuEditorScreen() {
                       />
                       <Text style={styles.emptyText}>{t('menu_editor:empty_title')}</Text>
                       <Text style={styles.emptySubtext}>{t('menu_editor:empty_subtext')}</Text>
+                      {user?.role === 'owner' && (
+                        <TouchableOpacity
+                          style={styles.uploadMenuButton}
+                          onPress={() => router.push('/menu-upload' as any)}
+                          activeOpacity={0.85}
+                        >
+                          <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={18} color="#FFFFFF" />
+                          <Text style={styles.uploadMenuButtonText}>{t('menu_editor:upload_menu_button', 'Upload Menu')}</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                   </View>
                 );
@@ -2116,6 +2147,25 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontWeight: '600',
     color: colors.primary,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  aiButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: 16,
+    backgroundColor: colors.primary + '18',
+  },
+  aiButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
   seasonSelectorContainer: {
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -2256,6 +2306,21 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: colors.textSecondary,
     marginTop: 8,
     textAlign: 'center',
+  },
+  uploadMenuButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 24,
+  },
+  uploadMenuButtonText: {
+    color: '#FFFFFF',
+    fontSize: 15,
+    fontWeight: '700',
   },
   menuItemCard: {
     backgroundColor: colors.card,
