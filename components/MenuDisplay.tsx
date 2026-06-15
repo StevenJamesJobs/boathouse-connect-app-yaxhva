@@ -765,9 +765,25 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
                 color={colors.textSecondary}
               />
               <Text style={[styles.emptyText, { color: colors.text }]}>{t('menu_display.no_items')}</Text>
-              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                {t('menu_display.check_back')}
-              </Text>
+              {user?.role === 'owner' ? (
+                <>
+                  <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                    {t('menu_display.owner_setup_hint', 'Upload your first menu, or create and edit it by hand.')}
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.setupMenuButton, { backgroundColor: colors.primary }]}
+                    onPress={() => router.push('/menu-editor' as any)}
+                    activeOpacity={0.85}
+                  >
+                    <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={18} color="#FFFFFF" />
+                    <Text style={styles.setupMenuButtonText}>{t('menu_display.setup_menu_now', 'Set up Menu Now')}</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                  {t('menu_display.check_back')}
+                </Text>
+              )}
             </View>
           ) : (
             pageItems.map(item => renderMenuCard(item, categoryColor))
@@ -1354,6 +1370,20 @@ const createStyles = (colors: any) =>
       fontSize: 14,
       marginTop: 8,
       textAlign: 'center',
+    },
+    setupMenuButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: 24,
+      marginTop: 24,
+    },
+    setupMenuButtonText: {
+      color: '#FFFFFF',
+      fontSize: 15,
+      fontWeight: '700',
     },
     // Filter Modal
     filterModalContainer: {
