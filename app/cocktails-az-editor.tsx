@@ -29,6 +29,7 @@ import SimpleSelectPicker, { SelectField } from '@/components/SimpleSelectPicker
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
+import { IS_MCLOONES } from '@/constants/buildVariant';
 
 interface Cocktail {
   id: string;
@@ -92,6 +93,11 @@ export default function CocktailsAZEditorScreen() {
   const [editingCocktail, setEditingCocktail] = useState<Cocktail | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
+  const [isPushing, setIsPushing] = useState(false);
+
+  // Boathouse-only: the source-org owner can push the curated Cocktails A-Z
+  // library out to every other organization. Gated again server-side by the RPC.
+  const canPushToAllOrgs = IS_MCLOONES && user?.role === 'owner';
 
   // Form state
   const [name, setName] = useState('');
@@ -443,6 +449,49 @@ export default function CocktailsAZEditorScreen() {
     router.back();
   };
 
+  // Boathouse-only owner action: push the curated Cocktails A-Z library out to
+  // every other organization. Additive + idempotent server-side — only adds
+  // cocktails an org doesn't already have by name, never overwriting their edits.
+  const handlePushToAllOrgs = () => {
+    if (!user?.id || isPushing) return;
+    Alert.alert(
+      t('cocktails_editor.push_confirm_title'),
+      t('cocktails_editor.push_confirm_message'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('cocktails_editor.push_confirm_button'),
+          onPress: async () => {
+            setIsPushing(true);
+            try {
+              const { data, error } = await supabase.rpc('push_source_cocktails_to_all_orgs', {
+                p_user_id: user.id,
+              });
+              if (error) {
+                console.error('[CocktailsEditor] Push to all orgs error:', error);
+                Alert.alert(t('common.error'), t('cocktails_editor.push_error'));
+                return;
+              }
+              const seeded = Number((data as any)?.total_seeded ?? 0);
+              const orgs = Number((data as any)?.orgs_processed ?? 0);
+              Alert.alert(
+                t('cocktails_editor.push_success_title'),
+                seeded > 0
+                  ? t('cocktails_editor.push_success_message', { count: seeded, orgs })
+                  : t('cocktails_editor.push_uptodate_message', { orgs }),
+              );
+            } catch (err) {
+              console.error('[CocktailsEditor] Push to all orgs exception:', err);
+              Alert.alert(t('common.error'), t('cocktails_editor.push_error'));
+            } finally {
+              setIsPushing(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
@@ -467,7 +516,27 @@ export default function CocktailsAZEditorScreen() {
           />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>{t('cocktails_editor.title')}</Text>
-        <View style={styles.backButton} />
+        {canPushToAllOrgs ? (
+          <TouchableOpacity
+            onPress={handlePushToAllOrgs}
+            disabled={isPushing}
+            style={styles.pushButton}
+            accessibilityLabel={t('cocktails_editor.push_to_all')}
+          >
+            {isPushing ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <IconSymbol
+                ios_icon_name="arrow.clockwise.circle.fill"
+                android_material_icon_name="refresh"
+                size={26}
+                color={colors.primary}
+              />
+            )}
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.backButton} />
+        )}
       </View>
 
       {/* Content Container with Vertical A-Z Nav */}
@@ -840,6 +909,11 @@ const styles = StyleSheet.create({
   backButton: {
     padding: 8,
     width: 40,
+  },
+  pushButton: {
+    padding: 8,
+    width: 40,
+    alignItems: 'flex-end',
   },
   headerTitle: {
     fontSize: 20,

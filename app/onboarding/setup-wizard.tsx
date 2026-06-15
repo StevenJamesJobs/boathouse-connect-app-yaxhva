@@ -142,6 +142,16 @@ export default function SetupWizardScreen() {
         console.error('[SetupWizard] Seed assistant mappings error:', seedError);
       }
 
+      // Seed the Cocktails A-Z starter library (clone from the canonical source
+      // org). Idempotent by name; non-fatal — a failure here must not block
+      // onboarding. p_source_org defaults to McLoone's in the RPC.
+      const { error: cocktailSeedError } = await supabase.rpc('seed_org_cocktails', {
+        p_target_org: organizationId,
+      });
+      if (cocktailSeedError) {
+        console.error('[SetupWizard] Seed cocktails error:', cocktailSeedError);
+      }
+
       // Update org menu settings. Per-menu scope only applies with 2 menus.
       const menuCount = hasSeasonalMenus ? 2 : 1;
       const scope: 'shared' | 'per_menu' = hasSeasonalMenus ? categoryScope : 'shared';
