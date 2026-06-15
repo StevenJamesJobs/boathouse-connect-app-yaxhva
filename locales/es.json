@@ -891,7 +891,15 @@
     "delete_title": "Eliminar Cóctel",
     "delete_confirm": "¿Estás seguro de que quieres eliminar este cóctel?",
     "cocktail_deleted": "Cóctel eliminado exitosamente",
-    "all_letters": "Todos"
+    "all_letters": "Todos",
+    "push_to_all": "Enviar a todas las organizaciones",
+    "push_confirm_title": "¿Enviar cócteles a todas las organizaciones?",
+    "push_confirm_message": "Esto agrega cualquier receta nueva de Cócteles A-Z de Boathouse Connect a cada organización. Las recetas que ya tienen — incluidas las que han renombrado o editado — no se modifican.",
+    "push_confirm_button": "Enviar",
+    "push_success_title": "Cócteles enviados",
+    "push_success_message": "Se agregaron {{count}} cóctel(es) nuevo(s) en {{orgs}} organización(es).",
+    "push_uptodate_message": "Las {{orgs}} organización(es) ya están actualizadas — no hay nada nuevo que agregar.",
+    "push_error": "No se pudieron enviar los cócteles. Inténtalo de nuevo."
   },
   "summer_libation_editor": {
     "title": "Editor de Recetas de Verano",

@@ -891,7 +891,15 @@
     "delete_title": "Delete Cocktail",
     "delete_confirm": "Are you sure you want to delete this cocktail?",
     "cocktail_deleted": "Cocktail deleted successfully",
-    "all_letters": "All"
+    "all_letters": "All",
+    "push_to_all": "Push to all organizations",
+    "push_confirm_title": "Push Cocktails to All Organizations?",
+    "push_confirm_message": "This adds any new Cocktails A-Z recipes from Boathouse Connect to every organization. Recipes they already have — including ones they've renamed or edited — are left unchanged.",
+    "push_confirm_button": "Push",
+    "push_success_title": "Cocktails Pushed",
+    "push_success_message": "Added {{count}} new cocktail(s) across {{orgs}} organization(s).",
+    "push_uptodate_message": "All {{orgs}} organization(s) are already up to date — nothing new to add.",
+    "push_error": "Could not push cocktails. Please try again."
   },
   "summer_libation_editor": {
     "title": "Summer Libation Recipes Editor",

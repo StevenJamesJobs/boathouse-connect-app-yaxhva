@@ -3568,11 +3568,19 @@ export type Database = {
         Args: { p_category?: string; p_organization_id?: string }
         Returns: undefined
       }
+      push_source_cocktails_to_all_orgs: {
+        Args: { p_user_id: string; p_source_org?: string }
+        Returns: Json
+      }
       seed_default_job_title_assistants: {
         Args: { p_org_id: string }
         Returns: undefined
       }
       seed_org_assistants: { Args: { p_org_id: string }; Returns: undefined }
+      seed_org_cocktails: {
+        Args: { p_target_org: string; p_source_org?: string }
+        Returns: number
+      }
       set_user_test_flag: {
         Args: {
           p_is_test: boolean
