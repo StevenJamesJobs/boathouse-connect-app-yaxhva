@@ -583,7 +583,9 @@
     "no_results_hint": "Try adjusting your search or filter",
     "alcohol_type": "Alcohol Type",
     "ingredients": "Ingredients",
-    "procedure": "Procedure"
+    "procedure": "Procedure",
+    "glassware": "Glassware",
+    "garnish": "Garnish"
   },
   "summer_libation_recipes": {
     "title": "Summer Libation Recipes",
@@ -894,12 +896,17 @@
     "all_letters": "All",
     "push_to_all": "Push to all organizations",
     "push_confirm_title": "Push Cocktails to All Organizations?",
-    "push_confirm_message": "This adds any new Cocktails A-Z recipes from Boathouse Connect to every organization. Recipes they already have — including ones they've renamed or edited — are left unchanged.",
+    "push_confirm_message": "This adds any new Cocktails A-Z recipes from Boathouse Connect to every organization, and fills in any blank details (glassware, garnish, etc.) on recipes they already have. Anything an organization has renamed or edited is left untouched.",
     "push_confirm_button": "Push",
     "push_success_title": "Cocktails Pushed",
-    "push_success_message": "Added {{count}} new cocktail(s) across {{orgs}} organization(s).",
-    "push_uptodate_message": "All {{orgs}} organization(s) are already up to date — nothing new to add.",
-    "push_error": "Could not push cocktails. Please try again."
+    "push_success_message": "Pushed updates to {{count}} cocktail(s) across {{orgs}} organization(s).",
+    "push_uptodate_message": "All {{orgs}} organization(s) are already up to date — nothing to push.",
+    "push_error": "Could not push cocktails. Please try again.",
+    "glassware_label": "Glassware",
+    "select_glassware": "Select glassware",
+    "custom_glassware_placeholder": "Enter custom glassware",
+    "garnish_label": "Garnish",
+    "garnish_placeholder": "e.g., Lemon Twist"
   },
   "summer_libation_editor": {
     "title": "Summer Libation Recipes Editor",

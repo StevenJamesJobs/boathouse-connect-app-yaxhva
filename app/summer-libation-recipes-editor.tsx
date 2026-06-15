@@ -30,7 +30,7 @@ import RichTextToolbar from '@/components/RichTextToolbar';
 import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import SimpleSelectPicker, { SelectField } from '@/components/SimpleSelectPicker';
-import { GLASSWARE_OPTIONS } from '@/constants/glassware';
+import GlasswareIconPicker from '@/components/GlasswareIconPicker';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
 import {
@@ -97,7 +97,6 @@ export default function SummerLibationRecipesEditorScreen() {
   const [translating, setTranslating] = useState(false);
   // Dropdown pickers + auto-grow procedure height
   const [subPickerOpen, setSubPickerOpen] = useState(false);
-  const [glasswarePickerOpen, setGlasswarePickerOpen] = useState(false);
   const [procH, setProcH] = useState(120);
   const [procDragH, setProcDragH] = useState(0);
 
@@ -725,13 +724,16 @@ export default function SummerLibationRecipesEditorScreen() {
                 contentBackgroundColor="#FFFFFF"
                 defaultExpanded={false}
               >
-                {/* Glassware (dropdown + custom) */}
+                {/* Glassware (visual picker) */}
                 <View style={styles.formField}>
                   <Text style={styles.formLabel}>{t('summer_libation_editor.glassware_label')}</Text>
-                  <SelectField
+                  <GlasswareIconPicker
                     value={glassware}
+                    onChange={setGlassware}
+                    title={t('summer_libation_editor.select_glassware')}
                     placeholder={t('summer_libation_editor.select_glassware')}
-                    onPress={() => setGlasswarePickerOpen(true)}
+                    customLabel={t('common.custom_option')}
+                    customPlaceholder={t('summer_libation_editor.custom_glassware_placeholder')}
                   />
                 </View>
                 {/* Garnish */}
@@ -889,17 +891,6 @@ export default function SummerLibationRecipesEditorScreen() {
               if (opt) setSubcategoryId(opt.id);
             }}
             onClose={() => setSubPickerOpen(false)}
-          />
-          <SimpleSelectPicker
-            visible={glasswarePickerOpen}
-            title={t('summer_libation_editor.select_glassware')}
-            options={[...GLASSWARE_OPTIONS]}
-            value={glassware}
-            onSelect={setGlassware}
-            onClose={() => setGlasswarePickerOpen(false)}
-            allowCustom
-            customLabel={t('common.custom_option')}
-            customPlaceholder={t('summer_libation_editor.custom_glassware_placeholder')}
           />
         </KeyboardAvoidingView>
       </Modal>
