@@ -26,6 +26,7 @@ import RichTextToolbar from '@/components/RichTextToolbar';
 import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import SimpleSelectPicker, { SelectField } from '@/components/SimpleSelectPicker';
+import GlasswareIconPicker, { GlasswareGlyph } from '@/components/GlasswareIconPicker';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
@@ -40,6 +41,8 @@ interface Cocktail {
   ingredients: string;
   procedure: string | null;
   procedure_es?: string | null;
+  glassware?: string | null;
+  garnish?: string | null;
   thumbnail_url: string | null;
   display_order: number;
   is_active: boolean;
@@ -102,6 +105,8 @@ export default function CocktailsAZEditorScreen() {
   // Form state
   const [name, setName] = useState('');
   const [alcoholType, setAlcoholType] = useState('');
+  const [glassware, setGlassware] = useState('');
+  const [garnish, setGarnish] = useState('');
   const [ingredients, setIngredients] = useState<IngredientRow[]>([{ amount: '', ingredient: '' }]);
   const [procedure, setProcedure] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
@@ -322,6 +327,8 @@ export default function CocktailsAZEditorScreen() {
           p_procedure: procedure.trim() || null,
           p_thumbnail_url: thumbnailUrl,
           p_display_order: editingCocktail.display_order,
+          p_glassware: glassware.trim() || null,
+          p_garnish: garnish.trim() || null,
         });
 
         if (error) {
@@ -345,6 +352,8 @@ export default function CocktailsAZEditorScreen() {
           p_procedure: procedure.trim() || null,
           p_thumbnail_url: thumbnailUrl,
           p_display_order: cocktails.length,
+          p_glassware: glassware.trim() || null,
+          p_garnish: garnish.trim() || null,
         });
 
         if (error) {
@@ -421,6 +430,8 @@ export default function CocktailsAZEditorScreen() {
     setEditingCocktail(cocktail);
     setName(cocktail.name);
     setAlcoholType(cocktail.alcohol_type);
+    setGlassware(cocktail.glassware || '');
+    setGarnish(cocktail.garnish || '');
     setIngredients(parseIngredients(cocktail.ingredients));
     setProcedure(cocktail.procedure || '');
     setProcedureEs(cocktail.procedure_es || '');
@@ -437,6 +448,8 @@ export default function CocktailsAZEditorScreen() {
     setEditingCocktail(null);
     setName('');
     setAlcoholType('');
+    setGlassware('');
+    setGarnish('');
     setIngredients([{ amount: '', ingredient: '' }]);
     setProcedure('');
     setProcedureEs('');
@@ -450,8 +463,8 @@ export default function CocktailsAZEditorScreen() {
   };
 
   // Boathouse-only owner action: push the curated Cocktails A-Z library out to
-  // every other organization. Additive + idempotent server-side — only adds
-  // cocktails an org doesn't already have by name, never overwriting their edits.
+  // every other organization. Idempotent server-side — adds cocktails an org
+  // lacks by name AND fills blank fields on ones it has, never overwriting edits.
   const handlePushToAllOrgs = () => {
     if (!user?.id || isPushing) return;
     Alert.alert(
@@ -754,6 +767,29 @@ export default function CocktailsAZEditorScreen() {
                 contentBackgroundColor={colors.card}
                 defaultExpanded={false}
               >
+                {/* Glassware (visual picker) */}
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.glassware_label')}</Text>
+                  <GlasswareIconPicker
+                    value={glassware}
+                    onChange={setGlassware}
+                    title={t('cocktails_editor.select_glassware')}
+                    placeholder={t('cocktails_editor.select_glassware')}
+                    customLabel={t('common.custom_option')}
+                    customPlaceholder={t('cocktails_editor.custom_glassware_placeholder')}
+                  />
+                </View>
+                {/* Garnish (free-text) */}
+                <View style={styles.formField}>
+                  <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.garnish_label')}</Text>
+                  <TextInput
+                    style={[styles.formInput, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
+                    value={garnish}
+                    onChangeText={setGarnish}
+                    placeholder={t('cocktails_editor.garnish_placeholder')}
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
                 <View style={styles.formField}>
                   <Text style={[styles.formLabel, { color: colors.text }]}>{t('cocktails_editor.ingredients_label')}</Text>
                   {ingredients.map((ingredient, index) => (

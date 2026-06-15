@@ -583,7 +583,9 @@
     "no_results_hint": "Intenta ajustar tu búsqueda o filtro",
     "alcohol_type": "Tipo de Alcohol",
     "ingredients": "Ingredientes",
-    "procedure": "Procedimiento"
+    "procedure": "Procedimiento",
+    "glassware": "Cristalería",
+    "garnish": "Decoración"
   },
   "summer_libation_recipes": {
     "title": "Recetas de Bebidas de Verano",
@@ -894,12 +896,17 @@
     "all_letters": "Todos",
     "push_to_all": "Enviar a todas las organizaciones",
     "push_confirm_title": "¿Enviar cócteles a todas las organizaciones?",
-    "push_confirm_message": "Esto agrega cualquier receta nueva de Cócteles A-Z de Boathouse Connect a cada organización. Las recetas que ya tienen — incluidas las que han renombrado o editado — no se modifican.",
+    "push_confirm_message": "Esto agrega cualquier receta nueva de Cócteles A-Z de Boathouse Connect a cada organización, y completa los detalles en blanco (cristalería, decoración, etc.) en las recetas que ya tienen. Todo lo que una organización haya renombrado o editado no se modifica.",
     "push_confirm_button": "Enviar",
     "push_success_title": "Cócteles enviados",
-    "push_success_message": "Se agregaron {{count}} cóctel(es) nuevo(s) en {{orgs}} organización(es).",
-    "push_uptodate_message": "Las {{orgs}} organización(es) ya están actualizadas — no hay nada nuevo que agregar.",
-    "push_error": "No se pudieron enviar los cócteles. Inténtalo de nuevo."
+    "push_success_message": "Se enviaron actualizaciones a {{count}} cóctel(es) en {{orgs}} organización(es).",
+    "push_uptodate_message": "Las {{orgs}} organización(es) ya están actualizadas — no hay nada que enviar.",
+    "push_error": "No se pudieron enviar los cócteles. Inténtalo de nuevo.",
+    "glassware_label": "Cristalería",
+    "select_glassware": "Seleccionar cristalería",
+    "custom_glassware_placeholder": "Escribe tu cristalería",
+    "garnish_label": "Decoración",
+    "garnish_placeholder": "ej. Twist de Limón"
   },
   "summer_libation_editor": {
     "title": "Editor de Recetas de Verano",

@@ -24,6 +24,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import FormattedText from '@/components/FormattedText';
+import { GlasswareGlyph } from '@/components/GlasswareIconPicker';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -35,6 +36,8 @@ interface Cocktail {
   ingredients: string;
   procedure: string;
   procedure_es?: string | null;
+  glassware?: string | null;
+  garnish?: string | null;
   thumbnail_url: string | null;
   display_order: number;
   is_active: boolean;
@@ -355,6 +358,26 @@ export default function CocktailsAZScreen() {
                   <Text style={[styles.alcoholTypeText, { color: colors.text }]}>{selectedCocktail?.alcohol_type}</Text>
                 </View>
               </View>
+
+              {(selectedCocktail?.glassware || selectedCocktail?.garnish) && (
+                <View style={styles.detailSection}>
+                  {selectedCocktail?.glassware ? (
+                    <>
+                      <Text style={styles.detailLabel}>{t('cocktails.glassware')}</Text>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <GlasswareGlyph name={selectedCocktail.glassware} size={22} color={colors.primary} />
+                        <Text style={[styles.detailText, { marginLeft: 8 }]}>{selectedCocktail.glassware}</Text>
+                      </View>
+                    </>
+                  ) : null}
+                  {selectedCocktail?.garnish ? (
+                    <>
+                      <Text style={[styles.detailLabel, selectedCocktail?.glassware ? { marginTop: 10 } : null]}>{t('cocktails.garnish')}</Text>
+                      <Text style={styles.detailText}>{selectedCocktail.garnish}</Text>
+                    </>
+                  ) : null}
+                </View>
+              )}
 
               <View style={styles.detailSection}>
                 <Text style={styles.detailLabel}>{t('cocktails.ingredients')}</Text>

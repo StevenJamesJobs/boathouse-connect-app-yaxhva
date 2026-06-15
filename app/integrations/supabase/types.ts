@@ -282,6 +282,8 @@ export type Database = {
           alcohol_type: string
           created_at: string | null
           created_by: string | null
+          garnish: string | null
+          glassware: string | null
           display_order: number | null
           id: string
           ingredients: string
@@ -297,6 +299,8 @@ export type Database = {
           alcohol_type: string
           created_at?: string | null
           created_by?: string | null
+          garnish?: string | null
+          glassware?: string | null
           display_order?: number | null
           id?: string
           ingredients: string
@@ -318,6 +322,8 @@ export type Database = {
           is_active?: boolean | null
           name?: string
           organization_id?: string
+          garnish?: string | null
+          glassware?: string | null
           procedure?: string | null
           procedure_es?: string | null
           thumbnail_url?: string | null
@@ -3461,6 +3467,8 @@ export type Database = {
         Args: {
           p_alcohol_type: string
           p_display_order: number
+          p_garnish?: string | null
+          p_glassware?: string | null
           p_ingredients: string
           p_name: string
           p_organization_id?: string
@@ -3678,6 +3686,8 @@ export type Database = {
           p_alcohol_type: string
           p_cocktail_id: string
           p_display_order: number
+          p_garnish?: string | null
+          p_glassware?: string | null
           p_ingredients: string
           p_name: string
           p_organization_id?: string
