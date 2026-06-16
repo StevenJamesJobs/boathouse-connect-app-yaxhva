@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  ActionSheetIOS,
   Modal,
   Image,
   ActivityIndicator,
@@ -34,6 +35,8 @@ import { fetchContentImages, saveContentImages, uploadImageToStorage, deleteCont
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import CollapsibleSection from '@/components/CollapsibleSection';
+import OrderPositionModal from '@/components/OrderPositionModal';
 
 interface SpecialFeature {
   id: string;
@@ -85,7 +88,6 @@ export default function SpecialFeaturesEditorScreen() {
     title: '',
     message: '',
     thumbnail_shape: 'square',
-    display_order: 0,
     link: '',
     title_es: '',
     message_es: '',
@@ -106,6 +108,10 @@ export default function SpecialFeaturesEditorScreen() {
   const [shouldSendNotification, setShouldSendNotification] = useState(true);
   const contentInputRef = useRef<TextInput>(null);
   const [contentSelection, setContentSelection] = useState({ start: 0, end: 0 });
+  const [positionPicker, setPositionPicker] = useState<{
+    item: SpecialFeature;
+    currentIndex: number;
+  } | null>(null);
 
   useEffect(() => {
     loadFeatures();
@@ -348,7 +354,7 @@ export default function SpecialFeaturesEditorScreen() {
           p_thumbnail_shape: formData.thumbnail_shape,
           p_start_date_time: startDateTime?.toISOString() || null,
           p_end_date_time: endDateTime?.toISOString() || null,
-          p_display_order: formData.display_order,
+          p_display_order: editingFeature.display_order,
           p_link: linkValue,
           p_guide_file_id: guideFileId,
         });
@@ -391,7 +397,7 @@ export default function SpecialFeaturesEditorScreen() {
           p_thumbnail_shape: formData.thumbnail_shape,
           p_start_date_time: startDateTime?.toISOString() || null,
           p_end_date_time: endDateTime?.toISOString() || null,
-          p_display_order: formData.display_order,
+          p_display_order: features.length,
           p_link: linkValue,
           p_guide_file_id: guideFileId,
         });
@@ -618,13 +624,65 @@ export default function SpecialFeaturesEditorScreen() {
     }
   };
 
+  const applyPositionChange = async (newPos: number) => {
+    if (!positionPicker) return;
+    const idx = features.findIndex(f => f.id === positionPicker.item.id);
+    if (idx === -1) { setPositionPicker(null); return; }
+    const reordered = [...features];
+    const [moved] = reordered.splice(idx, 1);
+    reordered.splice(newPos - 1, 0, moved);
+    const updated = reordered.map((item, i) => ({ ...item, display_order: i }));
+    setFeatures(updated);
+    setPositionPicker(null);
+    try {
+      await Promise.all(updated.map((item, i) =>
+        supabase.from('special_features').update({ display_order: i }).eq('id', item.id).eq('organization_id', organizationId)
+      ));
+    } catch (error) {
+      console.error('Error applying position change:', error);
+      await loadFeatures();
+    }
+  };
+
+  const openItemActions = (feature: SpecialFeature, index: number) => {
+    const isFirst = index === 0;
+    const isLast = index === features.length - 1;
+    const editLabel = t('common:edit');
+    const moveUpLabel = t('upcoming_events_editor:move_up');
+    const moveDownLabel = t('upcoming_events_editor:move_down');
+    const orderLabel = t('menu_editor:order_position');
+    const deleteLabel = t('common:delete');
+    const cancelLabel = t('common:cancel');
+
+    if (Platform.OS === 'ios') {
+      const options: string[] = [editLabel];
+      const actions: Array<() => void> = [() => openEditModal(feature)];
+      if (!isFirst) { options.push(moveUpLabel); actions.push(() => handleMoveUp(index)); }
+      if (!isLast) { options.push(moveDownLabel); actions.push(() => handleMoveDown(index)); }
+      if (features.length > 1) { options.push(orderLabel); actions.push(() => setPositionPicker({ item: feature, currentIndex: index })); }
+      options.push(deleteLabel); actions.push(() => handleDelete(feature));
+      options.push(cancelLabel);
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, destructiveButtonIndex: options.length - 2, cancelButtonIndex: options.length - 1, title: feature.title },
+        (buttonIndex) => { if (buttonIndex !== options.length - 1) actions[buttonIndex]?.(); }
+      );
+    } else {
+      const buttons: any[] = [{ text: editLabel, onPress: () => openEditModal(feature) }];
+      if (!isFirst) buttons.push({ text: moveUpLabel, onPress: () => handleMoveUp(index) });
+      if (!isLast) buttons.push({ text: moveDownLabel, onPress: () => handleMoveDown(index) });
+      if (features.length > 1) buttons.push({ text: orderLabel, onPress: () => setPositionPicker({ item: feature, currentIndex: index }) });
+      buttons.push({ text: deleteLabel, style: 'destructive', onPress: () => handleDelete(feature) });
+      buttons.push({ text: cancelLabel, style: 'cancel' });
+      Alert.alert(feature.title, undefined, buttons);
+    }
+  };
+
   const openAddModal = () => {
     setEditingFeature(null);
     setFormData({
       title: '',
       message: '',
       thumbnail_shape: 'square',
-      display_order: features.length,
       link: '',
       title_es: '',
       message_es: '',
@@ -648,12 +706,11 @@ export default function SpecialFeaturesEditorScreen() {
       title: feature.title,
       message: feature.content || feature.message || '',
       thumbnail_shape: feature.thumbnail_shape,
-      display_order: feature.display_order,
       link: feature.link || '',
       title_es: feature.title_es || '',
       message_es: feature.content_es || '',
     });
-    setShowSpanish(!!(feature.title_es || feature.content_es));
+    setShowSpanish(false);
     setStartDateTime(feature.start_date_time ? new Date(feature.start_date_time) : null);
     setEndDateTime(feature.end_date_time ? new Date(feature.end_date_time) : null);
     setSelectedImageUri(null);
@@ -812,9 +869,23 @@ export default function SpecialFeaturesEditorScreen() {
                       style={styles.dragHandle}
                     >
                       <IconSymbol
-                        ios_icon_name="line.3.horizontal.decrease"
+                        ios_icon_name="line.3.horizontal"
                         android_material_icon_name="drag-indicator"
-                        size={20}
+                        size={18}
+                        color="#FFFFFF"
+                      />
+                    </TouchableOpacity>
+
+                    {/* Meatball Menu */}
+                    <TouchableOpacity
+                      onPress={() => openItemActions(feature, index)}
+                      style={styles.meatballButton}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <IconSymbol
+                        ios_icon_name="ellipsis"
+                        android_material_icon_name="more-vert"
+                        size={18}
                         color="#FFFFFF"
                       />
                     </TouchableOpacity>
@@ -882,30 +953,6 @@ export default function SpecialFeaturesEditorScreen() {
                         </View>
                       </>
                     )}
-                    <View style={styles.featureActions}>
-                      <TouchableOpacity
-                        style={[styles.arrowButton, index === 0 && styles.arrowButtonDisabled]}
-                        onPress={() => handleMoveUp(index)}
-                        disabled={index === 0}
-                      >
-                        <IconSymbol ios_icon_name="arrow.up" android_material_icon_name="arrow-upward" size={18} color={index === 0 ? colors.textSecondary : colors.highlight} />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.arrowButton, index === features.length - 1 && styles.arrowButtonDisabled]}
-                        onPress={() => handleMoveDown(index)}
-                        disabled={index === features.length - 1}
-                      >
-                        <IconSymbol ios_icon_name="arrow.down" android_material_icon_name="arrow-downward" size={18} color={index === features.length - 1 ? colors.textSecondary : colors.highlight} />
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.actionButton} onPress={() => openEditModal(feature)}>
-                        <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.primary} />
-                        <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity style={[styles.actionButton, styles.deleteButton]} onPress={() => handleDelete(feature)}>
-                        <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color="#E74C3C" />
-                        <Text style={[styles.actionButtonText, styles.deleteButtonText]}>{t('common:delete')}</Text>
-                      </TouchableOpacity>
-                    </View>
                   </View>
                 </ScaleDecorator>
               );
@@ -946,437 +993,423 @@ export default function SpecialFeaturesEditorScreen() {
               </TouchableOpacity>
             </View>
 
-            <ScrollView 
-              style={styles.modalScroll} 
+            <ScrollView
+              style={styles.modalScroll}
               contentContainerStyle={styles.modalScrollContent}
               showsVerticalScrollIndicator={true}
               bounces={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* Thumbnail (80x80, top-left) + Title (right) */}
-              <View style={styles.thumbAndNameRow}>
-                <View style={styles.thumbColumn}>
-                  <TouchableOpacity style={styles.thumbSquare} onPress={pickImage}>
-                    {selectedImageUri || editingFeature?.thumbnail_url ? (
-                      <Image
-                        source={{ uri: selectedImageUri || getImageUrl(editingFeature?.thumbnail_url || '') || '' }}
-                        style={styles.thumbImage}
-                        key={selectedImageUri || getImageUrl(editingFeature?.thumbnail_url || '')}
-                      />
-                    ) : (
-                      <View style={styles.thumbPlaceholder}>
-                        <IconSymbol
-                          ios_icon_name="photo"
-                          android_material_icon_name="add-photo-alternate"
-                          size={28}
-                          color="#999999"
+              {/* Section 1: Details (open by default) */}
+              <CollapsibleSection
+                title={t('special_features_editor:section_details')}
+                iconIos="doc.text.fill"
+                iconAndroid="article"
+                iconColor={colors.primary}
+                headerBackgroundColor="#FFFFFF"
+                headerTextColor="#1A1A1A"
+                contentBackgroundColor="#FFFFFF"
+                defaultExpanded
+              >
+                {/* Thumbnail + Title */}
+                <View style={styles.thumbAndNameRow}>
+                  <View style={styles.thumbColumn}>
+                    <TouchableOpacity style={styles.thumbSquare} onPress={pickImage}>
+                      {selectedImageUri || editingFeature?.thumbnail_url ? (
+                        <Image
+                          source={{ uri: selectedImageUri || getImageUrl(editingFeature?.thumbnail_url || '') || '' }}
+                          style={styles.thumbImage}
+                          key={selectedImageUri || getImageUrl(editingFeature?.thumbnail_url || '')}
                         />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.nameColumn}>
-                  <Text style={styles.formLabel}>{t('special_features_editor:feature_title_label')}</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder={t('special_features_editor:feature_title_placeholder')}
-                    placeholderTextColor="#999999"
-                    value={formData.title}
-                    onChangeText={(text) => setFormData({ ...formData, title: text })}
-                  />
-                </View>
-              </View>
-
-              {/* Square / Banner segmented control */}
-              <View style={styles.shapeSegmented}>
-                <TouchableOpacity
-                  style={[
-                    styles.shapeSegment,
-                    formData.thumbnail_shape === 'square' && styles.shapeSegmentActive,
-                  ]}
-                  onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
-                >
-                  <Text
-                    style={[
-                      styles.shapeSegmentText,
-                      formData.thumbnail_shape === 'square' && styles.shapeSegmentTextActive,
-                    ]}
-                  >
-                    {t('special_features_editor:shape_square')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.shapeSegment,
-                    formData.thumbnail_shape === 'banner' && styles.shapeSegmentActive,
-                  ]}
-                  onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
-                >
-                  <Text
-                    style={[
-                      styles.shapeSegmentText,
-                      formData.thumbnail_shape === 'banner' && styles.shapeSegmentTextActive,
-                    ]}
-                  >
-                    {t('special_features_editor:shape_banner')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Additional Images Section */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Additional Images</Text>
-                <Text style={styles.formHint}>Add more images for a swipeable carousel in the detail view</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.additionalImagesScroll}>
-                  {additionalImageUrls.map((url, index) => (
-                    <View key={`existing-${index}`} style={styles.additionalImageContainer}>
-                      <Image source={{ uri: getImageUrl(url) || url }} style={styles.additionalImageThumb} />
-                      <TouchableOpacity style={styles.removeImageButton} onPress={() => removeAdditionalImage(index, false)}>
-                        <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
-                      </TouchableOpacity>
-                    </View>
-                  ))}
-                  {newAdditionalImageUris.map((uri, index) => (
-                    <View key={`new-${index}`} style={styles.additionalImageContainer}>
-                      <Image source={{ uri }} style={styles.additionalImageThumb} />
-                      <TouchableOpacity style={styles.removeImageButton} onPress={() => removeAdditionalImage(index, true)}>
-                        <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
-                      </TouchableOpacity>
-                      <View style={styles.newImageBadge}>
-                        <Text style={styles.newImageBadgeText}>NEW</Text>
-                      </View>
-                    </View>
-                  ))}
-                  <TouchableOpacity style={styles.addImageButton} onPress={pickAdditionalImage}>
-                    <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={32} color="#D4A843" />
-                    <Text style={styles.addImageText}>Add</Text>
-                  </TouchableOpacity>
-                </ScrollView>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('special_features_editor:description_label')}</Text>
-                <RichTextToolbar
-                  text={formData.message}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, message: text }))}
-                  selection={contentSelection}
-                  onSelectionChange={setContentSelection}
-                  textInputRef={contentInputRef}
-                  accentColor={colors.highlight}
-                />
-                <TextInput
-                  ref={contentInputRef}
-                  style={[styles.input, styles.textArea]}
-                  placeholder={t('special_features_editor:description_placeholder')}
-                  placeholderTextColor="#999999"
-                  value={formData.message}
-                  onChangeText={(text) => setFormData({ ...formData, message: text })}
-                  multiline
-                  numberOfLines={4}
-                  onSelectionChange={(e) => setContentSelection(e.nativeEvent.selection)}
-                />
-              </View>
-
-              {/* Spanish Translation Section */}
-              <View style={styles.formGroup}>
-                <TouchableOpacity
-                  style={styles.spanishSectionHeader}
-                  onPress={() => setShowSpanish(!showSpanish)}
-                >
-                  <Text style={styles.formLabel}>{t('translation_section:spanish_section_title')}</Text>
-                  <IconSymbol
-                    ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
-                    android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
-                    size={20}
-                    color="#666666"
-                  />
-                </TouchableOpacity>
-
-                {showSpanish && (
-                  <View style={styles.spanishFields}>
-                    <TouchableOpacity
-                      style={styles.autoTranslateButton}
-                      onPress={handleAutoTranslate}
-                      disabled={translating}
-                    >
-                      {translating ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
                       ) : (
-                        <Text style={styles.autoTranslateButtonText}>
-                          {t('translation_section:auto_translate')}
-                        </Text>
+                        <View style={styles.thumbPlaceholder}>
+                          <IconSymbol
+                            ios_icon_name="photo"
+                            android_material_icon_name="add-photo-alternate"
+                            size={28}
+                            color="#999999"
+                          />
+                        </View>
                       )}
                     </TouchableOpacity>
-
-                    <Text style={styles.spanishFieldLabel}>{t('translation_section:title_es_label')}</Text>
+                  </View>
+                  <View style={styles.nameColumn}>
+                    <Text style={styles.formLabel}>{t('special_features_editor:feature_title_label')}</Text>
                     <TextInput
                       style={styles.input}
-                      placeholder={t('translation_section:title_es_placeholder')}
+                      placeholder={t('special_features_editor:feature_title_placeholder')}
                       placeholderTextColor="#999999"
-                      value={formData.title_es}
-                      onChangeText={(text) => setFormData({ ...formData, title_es: text })}
+                      value={formData.title}
+                      onChangeText={(text) => setFormData({ ...formData, title: text })}
                     />
-
-                    <Text style={[styles.spanishFieldLabel, { marginTop: 12 }]}>{t('translation_section:message_es_label')}</Text>
-                    <TextInput
-                      style={[styles.input, styles.textArea]}
-                      placeholder={t('translation_section:message_es_placeholder')}
-                      placeholderTextColor="#999999"
-                      value={formData.message_es}
-                      onChangeText={(text) => setFormData({ ...formData, message_es: text })}
-                      multiline
-                      numberOfLines={4}
-                    />
-
-                    <Text style={styles.formHint}>{t('translation_section:hint')}</Text>
                   </View>
-                )}
-              </View>
+                </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('special_features_editor:link_label')}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t('special_features_editor:link_placeholder')}
-                  placeholderTextColor="#999999"
-                  value={formData.link}
-                  onChangeText={(text) => setFormData({ ...formData, link: text })}
-                  autoCapitalize="none"
-                  keyboardType="url"
-                />
-                <Text style={styles.formHint}>
-                  {t('special_features_editor:link_hint')}
-                </Text>
-              </View>
+                {/* Square / Banner segmented control */}
+                <View style={styles.shapeSegmented}>
+                  <TouchableOpacity
+                    style={[styles.shapeSegment, formData.thumbnail_shape === 'square' && styles.shapeSegmentActive]}
+                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
+                  >
+                    <Text style={[styles.shapeSegmentText, formData.thumbnail_shape === 'square' && styles.shapeSegmentTextActive]}>
+                      {t('special_features_editor:shape_square')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.shapeSegment, formData.thumbnail_shape === 'banner' && styles.shapeSegmentActive]}
+                    onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
+                  >
+                    <Text style={[styles.shapeSegmentText, formData.thumbnail_shape === 'banner' && styles.shapeSegmentTextActive]}>
+                      {t('special_features_editor:shape_banner')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('special_features_editor:attach_file_label')}</Text>
-                
-                {selectedGuideFile ? (
-                  <View style={styles.selectedFileContainer}>
-                    <View style={styles.selectedFileInfo}>
+                {/* Additional Images */}
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>Additional Images</Text>
+                  <Text style={styles.formHint}>Add more images for a swipeable carousel in the detail view</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.additionalImagesScroll}>
+                    {additionalImageUrls.map((url, idx) => (
+                      <View key={`existing-${idx}`} style={styles.additionalImageContainer}>
+                        <Image source={{ uri: getImageUrl(url) || url }} style={styles.additionalImageThumb} />
+                        <TouchableOpacity style={styles.removeImageButton} onPress={() => removeAdditionalImage(idx, false)}>
+                          <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                    {newAdditionalImageUris.map((uri, idx) => (
+                      <View key={`new-${idx}`} style={styles.additionalImageContainer}>
+                        <Image source={{ uri }} style={styles.additionalImageThumb} />
+                        <TouchableOpacity style={styles.removeImageButton} onPress={() => removeAdditionalImage(idx, true)}>
+                          <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
+                        </TouchableOpacity>
+                        <View style={styles.newImageBadge}>
+                          <Text style={styles.newImageBadgeText}>NEW</Text>
+                        </View>
+                      </View>
+                    ))}
+                    <TouchableOpacity style={styles.addImageButton} onPress={pickAdditionalImage}>
+                      <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={32} color="#D4A843" />
+                      <Text style={styles.addImageText}>Add</Text>
+                    </TouchableOpacity>
+                  </ScrollView>
+                </View>
+
+              </CollapsibleSection>
+
+              {/* Section: Date & Time (collapsed by default) */}
+              <CollapsibleSection
+                title={t('special_features_editor:section_date_time')}
+                iconIos="calendar.badge.clock"
+                iconAndroid="event"
+                iconColor={colors.primary}
+                headerBackgroundColor="#FFFFFF"
+                headerTextColor="#1A1A1A"
+                contentBackgroundColor="#FFFFFF"
+                defaultExpanded={false}
+              >
+                {/* Start Date/Time */}
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>{t('special_features_editor:start_datetime_label')}</Text>
+                  <View style={[styles.dateTimeRow, startDateTime && styles.dateTimeRowSelected]}>
+                    {Platform.OS === 'ios' ? (
+                      <>
+                        <DateTimePicker
+                          value={startDateTime || new Date()}
+                          mode="date"
+                          display="compact"
+                          onChange={(event, selectedDate) => {
+                            if (selectedDate) {
+                              const newDate = startDateTime ? new Date(startDateTime) : new Date();
+                              newDate.setFullYear(selectedDate.getFullYear());
+                              newDate.setMonth(selectedDate.getMonth());
+                              newDate.setDate(selectedDate.getDate());
+                              setStartDateTime(newDate);
+                            }
+                          }}
+                        />
+                        <DateTimePicker
+                          value={startDateTime || new Date()}
+                          mode="time"
+                          display="compact"
+                          onChange={(event, selectedTime) => {
+                            if (selectedTime) {
+                              const newDate = startDateTime ? new Date(startDateTime) : new Date();
+                              newDate.setHours(selectedTime.getHours());
+                              newDate.setMinutes(selectedTime.getMinutes());
+                              setStartDateTime(newDate);
+                            }
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <TouchableOpacity style={[styles.dateTimeButton, startDateTime && styles.dateTimeButtonSelected]} onPress={() => setShowStartDatePicker(true)}>
+                          <IconSymbol ios_icon_name="calendar" android_material_icon_name="event" size={20} color={startDateTime ? colors.primary : '#666666'} />
+                          <Text style={[styles.dateTimeButtonText, startDateTime && styles.dateTimeButtonTextSelected]}>
+                            {startDateTime ? startDateTime.toLocaleDateString() : t('special_features_editor:select_date')}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.dateTimeButton, startDateTime && styles.dateTimeButtonSelected]} onPress={() => setShowStartTimePicker(true)}>
+                          <IconSymbol ios_icon_name="clock" android_material_icon_name="schedule" size={20} color={startDateTime ? colors.primary : '#666666'} />
+                          <Text style={[styles.dateTimeButtonText, startDateTime && styles.dateTimeButtonTextSelected]}>
+                            {startDateTime ? startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('special_features_editor:select_time')}
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                    {startDateTime && (
+                      <TouchableOpacity style={styles.clearButtonInline} onPress={() => setStartDateTime(null)}>
+                        <Text style={styles.clearButtonText}>{t('common:clear')}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+
+                {/* End Date/Time */}
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>{t('special_features_editor:end_datetime_label')}</Text>
+                  <View style={[styles.dateTimeRow, endDateTime && styles.dateTimeRowSelected]}>
+                    {Platform.OS === 'ios' ? (
+                      <>
+                        <DateTimePicker
+                          value={endDateTime || new Date()}
+                          mode="date"
+                          display="compact"
+                          onChange={(event, selectedDate) => {
+                            if (selectedDate) {
+                              const newDate = endDateTime ? new Date(endDateTime) : new Date();
+                              newDate.setFullYear(selectedDate.getFullYear());
+                              newDate.setMonth(selectedDate.getMonth());
+                              newDate.setDate(selectedDate.getDate());
+                              setEndDateTime(newDate);
+                            }
+                          }}
+                        />
+                        <DateTimePicker
+                          value={endDateTime || new Date()}
+                          mode="time"
+                          display="compact"
+                          onChange={(event, selectedTime) => {
+                            if (selectedTime) {
+                              const newDate = endDateTime ? new Date(endDateTime) : new Date();
+                              newDate.setHours(selectedTime.getHours());
+                              newDate.setMinutes(selectedTime.getMinutes());
+                              setEndDateTime(newDate);
+                            }
+                          }}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <TouchableOpacity style={[styles.dateTimeButton, endDateTime && styles.dateTimeButtonSelected]} onPress={() => setShowEndDatePicker(true)}>
+                          <IconSymbol ios_icon_name="calendar" android_material_icon_name="event" size={20} color={endDateTime ? colors.primary : '#666666'} />
+                          <Text style={[styles.dateTimeButtonText, endDateTime && styles.dateTimeButtonTextSelected]}>
+                            {endDateTime ? endDateTime.toLocaleDateString() : t('special_features_editor:select_date')}
+                          </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity style={[styles.dateTimeButton, endDateTime && styles.dateTimeButtonSelected]} onPress={() => setShowEndTimePicker(true)}>
+                          <IconSymbol ios_icon_name="clock" android_material_icon_name="schedule" size={20} color={endDateTime ? colors.primary : '#666666'} />
+                          <Text style={[styles.dateTimeButtonText, endDateTime && styles.dateTimeButtonTextSelected]}>
+                            {endDateTime ? endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('special_features_editor:select_time')}
+                          </Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                    {endDateTime && (
+                      <TouchableOpacity style={styles.clearButtonInline} onPress={() => setEndDateTime(null)}>
+                        <Text style={styles.clearButtonText}>{t('common:clear')}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              </CollapsibleSection>
+
+              {/* Section 2: Description (collapsed by default) */}
+              <CollapsibleSection
+                title={t('special_features_editor:section_description')}
+                iconIos="text.alignleft"
+                iconAndroid="description"
+                iconColor={colors.primary}
+                headerBackgroundColor="#FFFFFF"
+                headerTextColor="#1A1A1A"
+                contentBackgroundColor="#FFFFFF"
+                defaultExpanded={false}
+              >
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>{t('special_features_editor:description_label')}</Text>
+                  <RichTextToolbar
+                    text={formData.message}
+                    onChangeText={(text) => setFormData(prev => ({ ...prev, message: text }))}
+                    selection={contentSelection}
+                    onSelectionChange={setContentSelection}
+                    textInputRef={contentInputRef}
+                    accentColor={colors.highlight}
+                  />
+                  <TextInput
+                    ref={contentInputRef}
+                    style={[styles.input, styles.textArea]}
+                    placeholder={t('special_features_editor:description_placeholder')}
+                    placeholderTextColor="#999999"
+                    value={formData.message}
+                    onChangeText={(text) => setFormData({ ...formData, message: text })}
+                    multiline
+                    numberOfLines={4}
+                    onSelectionChange={(e) => setContentSelection(e.nativeEvent.selection)}
+                  />
+                </View>
+
+                {/* Spanish Translation */}
+                <View style={styles.formGroup}>
+                  <TouchableOpacity
+                    style={styles.spanishSectionHeader}
+                    onPress={() => setShowSpanish(!showSpanish)}
+                  >
+                    <Text style={styles.formLabel}>{t('translation_section:spanish_section_title')}</Text>
+                    <IconSymbol
+                      ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
+                      android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
+                      size={20}
+                      color="#666666"
+                    />
+                  </TouchableOpacity>
+                  {showSpanish && (
+                    <View style={styles.spanishFields}>
+                      <TouchableOpacity style={styles.autoTranslateButton} onPress={handleAutoTranslate} disabled={translating}>
+                        {translating ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text style={styles.autoTranslateButtonText}>{t('translation_section:auto_translate')}</Text>
+                        )}
+                      </TouchableOpacity>
+                      <Text style={styles.spanishFieldLabel}>{t('translation_section:title_es_label')}</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder={t('translation_section:title_es_placeholder')}
+                        placeholderTextColor="#999999"
+                        value={formData.title_es}
+                        onChangeText={(text) => setFormData({ ...formData, title_es: text })}
+                      />
+                      <Text style={[styles.spanishFieldLabel, { marginTop: 12 }]}>{t('translation_section:message_es_label')}</Text>
+                      <TextInput
+                        style={[styles.input, styles.textArea]}
+                        placeholder={t('translation_section:message_es_placeholder')}
+                        placeholderTextColor="#999999"
+                        value={formData.message_es}
+                        onChangeText={(text) => setFormData({ ...formData, message_es: text })}
+                        multiline
+                        numberOfLines={4}
+                      />
+                      <Text style={styles.formHint}>{t('translation_section:hint')}</Text>
+                    </View>
+                  )}
+                </View>
+              </CollapsibleSection>
+
+              {/* Section 3: Additional Info (collapsed by default) */}
+              <CollapsibleSection
+                title={t('special_features_editor:section_additional_info')}
+                iconIos="info.circle.fill"
+                iconAndroid="info"
+                iconColor={colors.primary}
+                headerBackgroundColor="#FFFFFF"
+                headerTextColor="#1A1A1A"
+                contentBackgroundColor="#FFFFFF"
+                defaultExpanded={false}
+              >
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>{t('special_features_editor:link_label')}</Text>
+                  <TextInput
+                    style={styles.input}
+                    placeholder={t('special_features_editor:link_placeholder')}
+                    placeholderTextColor="#999999"
+                    value={formData.link}
+                    onChangeText={(text) => setFormData({ ...formData, link: text })}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                  />
+                  <Text style={styles.formHint}>{t('special_features_editor:link_hint')}</Text>
+                </View>
+
+                <View style={styles.formGroup}>
+                  <Text style={styles.formLabel}>{t('special_features_editor:attach_file_label')}</Text>
+                  {selectedGuideFile ? (
+                    <View style={styles.selectedFileContainer}>
+                      <View style={styles.selectedFileInfo}>
+                        <IconSymbol ios_icon_name="doc.fill" android_material_icon_name="description" size={24} color={colors.primary} />
+                        <View style={styles.selectedFileText}>
+                          <Text style={styles.selectedFileTitle}>{selectedGuideFile.title}</Text>
+                          <Text style={styles.selectedFileCategory}>{selectedGuideFile.category}</Text>
+                        </View>
+                      </View>
+                      <TouchableOpacity onPress={clearGuideFile} style={styles.clearFileButton}>
+                        <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={24} color="#E74C3C" />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity style={styles.filePickerButton} onPress={() => setShowFileSection(!showFileSection)}>
                       <IconSymbol
-                        ios_icon_name="doc.fill"
-                        android_material_icon_name="description"
+                        ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
+                        android_material_icon_name={showFileSection ? "expand-less" : "expand-more"}
                         size={24}
                         color={colors.primary}
                       />
-                      <View style={styles.selectedFileText}>
-                        <Text style={styles.selectedFileTitle}>{selectedGuideFile.title}</Text>
-                        <Text style={styles.selectedFileCategory}>{selectedGuideFile.category}</Text>
-                      </View>
-                    </View>
-                    <TouchableOpacity onPress={clearGuideFile} style={styles.clearFileButton}>
-                      <IconSymbol
-                        ios_icon_name="xmark.circle.fill"
-                        android_material_icon_name="cancel"
-                        size={24}
-                        color="#E74C3C"
-                      />
+                      <Text style={styles.filePickerButtonText}>
+                        {showFileSection ? t('special_features_editor:hide_file_selection') : t('special_features_editor:show_file_selection')}
+                      </Text>
                     </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity 
-                    style={styles.filePickerButton} 
-                    onPress={() => setShowFileSection(!showFileSection)}
-                  >
-                    <IconSymbol
-                      ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
-                      android_material_icon_name={showFileSection ? "expand-less" : "expand-more"}
-                      size={24}
-                      color={colors.primary}
-                    />
-                    <Text style={styles.filePickerButtonText}>
-                      {showFileSection ? t('special_features_editor:hide_file_selection') : t('special_features_editor:show_file_selection')}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {showFileSection && !selectedGuideFile && (
-                  <View style={styles.fileSelectionSection}>
-                    <View style={styles.searchContainer}>
-                      <IconSymbol
-                        ios_icon_name="magnifyingglass"
-                        android_material_icon_name="search"
-                        size={20}
-                        color="#666666"
-                      />
-                      <TextInput
-                        style={styles.searchInput}
-                        placeholder={t('special_features_editor:search_files_placeholder')}
-                        placeholderTextColor="#999999"
-                        value={fileSearchQuery}
-                        onChangeText={setFileSearchQuery}
-                      />
-                      {fileSearchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setFileSearchQuery('')}>
-                          <IconSymbol
-                            ios_icon_name="xmark.circle.fill"
-                            android_material_icon_name="cancel"
-                            size={20}
-                            color="#999999"
-                          />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-
-                    <ScrollView style={styles.fileList} nestedScrollEnabled={true}>
-                      {GUIDE_CATEGORIES.map((category, catIndex) => {
-                        const categoryFiles = groupedGuideFiles[category];
-                        if (categoryFiles.length === 0) return null;
-
-                        return (
-                          <View key={catIndex} style={styles.fileCategorySection}>
-                            <Text style={styles.fileCategoryTitle}>{category}</Text>
-                            {categoryFiles.map((file, fileIndex) => (
-                              <TouchableOpacity
-                                key={fileIndex}
-                                style={styles.fileItem}
-                                onPress={() => selectGuideFile(file)}
-                              >
-                                <IconSymbol
-                                  ios_icon_name="doc.fill"
-                                  android_material_icon_name="description"
-                                  size={24}
-                                  color={colors.primary}
-                                />
-                                <View style={styles.fileItemText}>
-                                  <Text style={styles.fileItemTitle}>{file.title}</Text>
-                                  <Text style={styles.fileItemName}>{file.file_name}</Text>
-                                </View>
-                                <IconSymbol
-                                  ios_icon_name="chevron.right"
-                                  android_material_icon_name="chevron-right"
-                                  size={20}
-                                  color="#666666"
-                                />
-                              </TouchableOpacity>
-                            ))}
+                  )}
+                  {showFileSection && !selectedGuideFile && (
+                    <View style={styles.fileSelectionSection}>
+                      <View style={styles.searchContainer}>
+                        <IconSymbol ios_icon_name="magnifyingglass" android_material_icon_name="search" size={20} color="#666666" />
+                        <TextInput
+                          style={styles.searchInput}
+                          placeholder={t('special_features_editor:search_files_placeholder')}
+                          placeholderTextColor="#999999"
+                          value={fileSearchQuery}
+                          onChangeText={setFileSearchQuery}
+                        />
+                        {fileSearchQuery.length > 0 && (
+                          <TouchableOpacity onPress={() => setFileSearchQuery('')}>
+                            <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={20} color="#999999" />
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                      <ScrollView style={styles.fileList} nestedScrollEnabled={true}>
+                        {GUIDE_CATEGORIES.map((category, catIndex) => {
+                          const categoryFiles = groupedGuideFiles[category];
+                          if (categoryFiles.length === 0) return null;
+                          return (
+                            <View key={catIndex} style={styles.fileCategorySection}>
+                              <Text style={styles.fileCategoryTitle}>{category}</Text>
+                              {categoryFiles.map((file, fileIndex) => (
+                                <TouchableOpacity key={fileIndex} style={styles.fileItem} onPress={() => selectGuideFile(file)}>
+                                  <IconSymbol ios_icon_name="doc.fill" android_material_icon_name="description" size={24} color={colors.primary} />
+                                  <View style={styles.fileItemText}>
+                                    <Text style={styles.fileItemTitle}>{file.title}</Text>
+                                    <Text style={styles.fileItemName}>{file.file_name}</Text>
+                                  </View>
+                                  <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={20} color="#666666" />
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          );
+                        })}
+                        {filteredGuideFiles.length === 0 && (
+                          <View style={styles.emptyFileList}>
+                            <IconSymbol ios_icon_name="doc" android_material_icon_name="description" size={48} color="#999999" />
+                            <Text style={styles.emptyFileListText}>{t('special_features_editor:no_files_found')}</Text>
+                            <Text style={styles.emptyFileListSubtext}>{t('special_features_editor:no_files_subtext')}</Text>
                           </View>
-                        );
-                      })}
-
-                      {filteredGuideFiles.length === 0 && (
-                        <View style={styles.emptyFileList}>
-                          <IconSymbol
-                            ios_icon_name="doc"
-                            android_material_icon_name="description"
-                            size={48}
-                            color="#999999"
-                          />
-                          <Text style={styles.emptyFileListText}>{t('special_features_editor:no_files_found')}</Text>
-                          <Text style={styles.emptyFileListSubtext}>
-                            {t('special_features_editor:no_files_subtext')}
-                          </Text>
-                        </View>
-                      )}
-                    </ScrollView>
-                  </View>
-                )}
-
-                <Text style={styles.formHint}>
-                  {t('special_features_editor:attach_file_hint')}
-                </Text>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('special_features_editor:start_datetime_label')}</Text>
-                <TouchableOpacity
-                  style={styles.dateTimeButton}
-                  onPress={() => setShowStartDatePicker(true)}
-                >
-                  <IconSymbol
-                    ios_icon_name="calendar"
-                    android_material_icon_name="event"
-                    size={20}
-                    color="#666666"
-                  />
-                  <Text style={styles.dateTimeButtonText}>
-                    {startDateTime ? startDateTime.toLocaleDateString() : t('special_features_editor:select_date')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.dateTimeButton}
-                  onPress={() => setShowStartTimePicker(true)}
-                >
-                  <IconSymbol
-                    ios_icon_name="clock"
-                    android_material_icon_name="schedule"
-                    size={20}
-                    color="#666666"
-                  />
-                  <Text style={styles.dateTimeButtonText}>
-                    {startDateTime ? startDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('special_features_editor:select_time')}
-                  </Text>
-                </TouchableOpacity>
-                {startDateTime && (
-                  <TouchableOpacity
-                    style={styles.clearButton}
-                    onPress={() => setStartDateTime(null)}
-                  >
-                    <Text style={styles.clearButtonText}>{t('special_features_editor:clear_start_datetime')}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('special_features_editor:end_datetime_label')}</Text>
-                <TouchableOpacity
-                  style={styles.dateTimeButton}
-                  onPress={() => setShowEndDatePicker(true)}
-                >
-                  <IconSymbol
-                    ios_icon_name="calendar"
-                    android_material_icon_name="event"
-                    size={20}
-                    color="#666666"
-                  />
-                  <Text style={styles.dateTimeButtonText}>
-                    {endDateTime ? endDateTime.toLocaleDateString() : t('special_features_editor:select_date')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.dateTimeButton}
-                  onPress={() => setShowEndTimePicker(true)}
-                >
-                  <IconSymbol
-                    ios_icon_name="clock"
-                    android_material_icon_name="schedule"
-                    size={20}
-                    color="#666666"
-                  />
-                  <Text style={styles.dateTimeButtonText}>
-                    {endDateTime ? endDateTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : t('special_features_editor:select_time')}
-                  </Text>
-                </TouchableOpacity>
-                {endDateTime && (
-                  <TouchableOpacity
-                    style={styles.clearButton}
-                    onPress={() => setEndDateTime(null)}
-                  >
-                    <Text style={styles.clearButtonText}>{t('special_features_editor:clear_end_datetime')}</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('special_features_editor:display_order_label')}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t('special_features_editor:display_order_placeholder')}
-                  placeholderTextColor="#999999"
-                  value={formData.display_order.toString()}
-                  onChangeText={(text) => {
-                    const num = parseInt(text) || 0;
-                    setFormData({ ...formData, display_order: num });
-                  }}
-                  keyboardType="numeric"
-                />
-                <Text style={styles.formHint}>
-                  {t('special_features_editor:display_order_hint')}
-                </Text>
-              </View>
+                        )}
+                      </ScrollView>
+                    </View>
+                  )}
+                  <Text style={styles.formHint}>{t('special_features_editor:attach_file_hint')}</Text>
+                </View>
+              </CollapsibleSection>
 
               {!editingFeature && (
                 <View style={styles.notificationToggleContainer}>
@@ -1397,141 +1430,41 @@ export default function SpecialFeaturesEditorScreen() {
                 </View>
               )}
 
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={handleSave}
-                disabled={uploadingImage}
-              >
-                {uploadingImage ? (
-                  <ActivityIndicator color="#1A1A1A" />
-                ) : (
-                  <Text style={styles.saveButtonText}>
-                    {editingFeature ? t('special_features_editor:save_button') : t('special_features_editor:add_save_button')}
-                  </Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={closeModal}
-              >
-                <Text style={styles.cancelButtonText}>{t('special_features_editor:cancel_button')}</Text>
-              </TouchableOpacity>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={closeModal}
+                >
+                  <Text style={styles.cancelButtonText}>{t('special_features_editor:cancel_button')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleSave}
+                  disabled={uploadingImage}
+                >
+                  {uploadingImage ? (
+                    <ActivityIndicator color="#1A1A1A" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>
+                      {editingFeature ? t('special_features_editor:save_button') : t('special_features_editor:add_save_button')}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
-
-            {/* iOS Date/Time Pickers - Rendered inside modal */}
-            {Platform.OS === 'ios' && showStartDatePicker && (
-              <View style={styles.datePickerOverlay}>
-                <View style={styles.datePickerContainer}>
-                  <View style={styles.datePickerHeader}>
-                    <TouchableOpacity onPress={() => setShowStartDatePicker(false)}>
-                      <Text style={styles.datePickerDone}>{t('special_features_editor:done')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <DateTimePicker
-                    value={startDateTime || new Date()}
-                    mode="date"
-                    display="spinner"
-                    textColor="#000000"
-                    onChange={(event, selectedDate) => {
-                      if (selectedDate) {
-                        const newDate = startDateTime ? new Date(startDateTime) : new Date();
-                        newDate.setFullYear(selectedDate.getFullYear());
-                        newDate.setMonth(selectedDate.getMonth());
-                        newDate.setDate(selectedDate.getDate());
-                        setStartDateTime(newDate);
-                      }
-                    }}
-                    style={styles.datePicker}
-                  />
-                </View>
-              </View>
-            )}
-
-            {Platform.OS === 'ios' && showStartTimePicker && (
-              <View style={styles.datePickerOverlay}>
-                <View style={styles.datePickerContainer}>
-                  <View style={styles.datePickerHeader}>
-                    <TouchableOpacity onPress={() => setShowStartTimePicker(false)}>
-                      <Text style={styles.datePickerDone}>{t('special_features_editor:done')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <DateTimePicker
-                    value={startDateTime || new Date()}
-                    mode="time"
-                    display="spinner"
-                    textColor="#000000"
-                    onChange={(event, selectedTime) => {
-                      if (selectedTime) {
-                        const newDate = startDateTime ? new Date(startDateTime) : new Date();
-                        newDate.setHours(selectedTime.getHours());
-                        newDate.setMinutes(selectedTime.getMinutes());
-                        setStartDateTime(newDate);
-                      }
-                    }}
-                    style={styles.datePicker}
-                  />
-                </View>
-              </View>
-            )}
-
-            {Platform.OS === 'ios' && showEndDatePicker && (
-              <View style={styles.datePickerOverlay}>
-                <View style={styles.datePickerContainer}>
-                  <View style={styles.datePickerHeader}>
-                    <TouchableOpacity onPress={() => setShowEndDatePicker(false)}>
-                      <Text style={styles.datePickerDone}>{t('special_features_editor:done')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <DateTimePicker
-                    value={endDateTime || new Date()}
-                    mode="date"
-                    display="spinner"
-                    textColor="#000000"
-                    onChange={(event, selectedDate) => {
-                      if (selectedDate) {
-                        const newDate = endDateTime ? new Date(endDateTime) : new Date();
-                        newDate.setFullYear(selectedDate.getFullYear());
-                        newDate.setMonth(selectedDate.getMonth());
-                        newDate.setDate(selectedDate.getDate());
-                        setEndDateTime(newDate);
-                      }
-                    }}
-                    style={styles.datePicker}
-                  />
-                </View>
-              </View>
-            )}
-
-            {Platform.OS === 'ios' && showEndTimePicker && (
-              <View style={styles.datePickerOverlay}>
-                <View style={styles.datePickerContainer}>
-                  <View style={styles.datePickerHeader}>
-                    <TouchableOpacity onPress={() => setShowEndTimePicker(false)}>
-                      <Text style={styles.datePickerDone}>{t('special_features_editor:done')}</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <DateTimePicker
-                    value={endDateTime || new Date()}
-                    mode="time"
-                    display="spinner"
-                    textColor="#000000"
-                    onChange={(event, selectedTime) => {
-                      if (selectedTime) {
-                        const newDate = endDateTime ? new Date(endDateTime) : new Date();
-                        newDate.setHours(selectedTime.getHours());
-                        newDate.setMinutes(selectedTime.getMinutes());
-                        setEndDateTime(newDate);
-                      }
-                    }}
-                    style={styles.datePicker}
-                  />
-                </View>
-              </View>
-            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <OrderPositionModal
+        visible={!!positionPicker}
+        title={t('menu_editor:order_position')}
+        subtitle={positionPicker?.item.title || ''}
+        count={features.length}
+        currentIndex={positionPicker?.currentIndex ?? 0}
+        onClose={() => setPositionPicker(null)}
+        onApply={applyPositionChange}
+      />
 
       {/* Android Date/Time Pickers - Rendered as native dialogs */}
       {Platform.OS === 'android' && showStartDatePicker && (
@@ -1771,38 +1704,19 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontSize: 12,
     color: colors.textSecondary,
   },
-  featureActions: {
-    flexDirection: 'row',
-    gap: 12,
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 6,
-  },
-  deleteButton: {
-    backgroundColor: '#2C1F1F',
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.highlight,
-  },
-  deleteButtonText: {
-    color: '#E74C3C',
-  },
   dragHandle: {
     position: 'absolute',
     top: 8,
     left: 8,
+    padding: 6,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 14,
+  },
+  meatballButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
     padding: 6,
     zIndex: 10,
     backgroundColor: 'rgba(0,0,0,0.3)',
@@ -1816,17 +1730,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     paddingHorizontal: 16,
     marginBottom: 8,
     marginTop: 12,
-  },
-  arrowButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowButtonDisabled: {
-    opacity: 0.3,
   },
   modalContainer: {
     flex: 1,
@@ -1867,6 +1770,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   modalScroll: {
     flex: 1,
+    backgroundColor: '#EEEFF1',
   },
   modalScrollContent: {
     padding: 20,
@@ -2138,13 +2042,13 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontSize: 16,
     color: '#1A1A1A',
   },
-  clearButton: {
+  clearButtonInline: {
     backgroundColor: '#FFE5E5',
     borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     alignItems: 'center',
-    marginTop: 4,
+    justifyContent: 'center',
   },
   clearButtonText: {
     fontSize: 14,
@@ -2176,62 +2080,57 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: colors.textSecondary,
     marginTop: 4,
   },
-  saveButton: {
-    backgroundColor: colors.highlight,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
     marginTop: 24,
   },
+  saveButton: {
+    flex: 1,
+    backgroundColor: colors.highlight,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
   saveButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#1A1A1A',
   },
   cancelButton: {
+    flex: 1,
     backgroundColor: '#F5F5F5',
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 12,
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#666666',
   },
-  datePickerOverlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  datePickerContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.3)',
-    elevation: 10,
-  },
-  datePickerHeader: {
+  dateTimeRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
+    alignItems: 'center',
+    gap: 8,
+    borderRadius: 10,
+    padding: 8,
+    backgroundColor: '#F9F9F9',
+    borderWidth: 1,
+    borderColor: '#E8E8E8',
   },
-  datePickerDone: {
-    fontSize: 16,
-    fontWeight: '600',
+  dateTimeRowSelected: {
+    backgroundColor: `${colors.primary}08`,
+    borderColor: `${colors.primary}40`,
+  },
+  dateTimeButtonSelected: {
+    borderColor: `${colors.primary}40`,
+    backgroundColor: `${colors.primary}08`,
+  },
+  dateTimeButtonTextSelected: {
     color: colors.primary,
-  },
-  datePicker: {
-    height: 200,
   },
   additionalImagesScroll: {
     marginTop: 10,

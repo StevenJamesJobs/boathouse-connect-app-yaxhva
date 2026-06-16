@@ -21,7 +21,8 @@
     "reply": "Reply",
     "messages": "Messages",
     "not_now": "Not Now",
-    "upgrade": "Upgrade"
+    "upgrade": "Upgrade",
+    "clear": "Clear"
   },
   "login": {
     "username": "Username",
@@ -1203,9 +1204,13 @@
     "save_error": "Failed to save announcement",
     "delete_error": "Failed to delete announcement",
     "pick_image_error": "Failed to pick image",
-    "upload_image_error": "Failed to upload image"
+    "upload_image_error": "Failed to upload image",
+    "section_details": "Details",
+    "section_description": "Description",
+    "section_additional_info": "Additional Info"
   },
   "special_features_editor": {
+
     "title": "Special Features Editor",
     "count": "{{count}} / 15 features",
     "add_button": "Add New Feature",
@@ -1260,7 +1265,11 @@
     "save_error": "Failed to save special feature",
     "delete_error": "Failed to delete special feature",
     "pick_image_error": "Failed to pick image",
-    "upload_image_error": "Failed to upload image"
+    "upload_image_error": "Failed to upload image",
+    "section_details": "Details",
+    "section_date_time": "Date & Time",
+    "section_description": "Description",
+    "section_additional_info": "Additional Info"
   },
   "upcoming_events_editor": {
     "title": "Upcoming Events Editor",
@@ -1326,7 +1335,11 @@
     "move_down": "Move Down",
     "reorder_hint": "Hold and drag to reorder, or use arrows",
     "send_notification_label": "Send Push Notification",
-    "send_notification_hint": "Turn off when adding multiple events to avoid sending repeated notifications. You can send one notification from the Notification Center when done."
+    "send_notification_hint": "Turn off when adding multiple events to avoid sending repeated notifications. You can send one notification from the Notification Center when done.",
+    "section_details": "Details",
+    "section_date_time": "Date & Time",
+    "section_description": "Description",
+    "section_additional_info": "Additional Info"
   },
   "menu_editor": {
     "title": "Menu Editor",
