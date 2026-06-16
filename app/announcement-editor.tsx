@@ -14,6 +14,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   Switch,
+  ActionSheetIOS,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -33,6 +34,9 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { fetchContentImages, saveContentImages, uploadImageToStorage, deleteContentImages } from '@/utils/contentImages';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
+import CollapsibleSection from '@/components/CollapsibleSection';
+import OrderPositionModal from '@/components/OrderPositionModal';
+import SimpleSelectPicker, { SelectField } from '@/components/SimpleSelectPicker';
 
 interface Announcement {
   id: string;
@@ -88,7 +92,6 @@ export default function AnnouncementEditorScreen() {
     priority: 'none',
     visibility: 'everyone',
     thumbnail_shape: 'square',
-    display_order: 0,
     link: '',
     title_es: '',
     message_es: '',
@@ -102,6 +105,13 @@ export default function AnnouncementEditorScreen() {
   // Rich text toolbar state
   const contentInputRef = useRef<TextInput>(null);
   const [contentSelection, setContentSelection] = useState({ start: 0, end: 0 });
+
+  // Position picker state
+  const [positionPicker, setPositionPicker] = useState<{ item: Announcement; currentIndex: number } | null>(null);
+
+  // Dropdown picker visibility
+  const [showBadgePicker, setShowBadgePicker] = useState(false);
+  const [showVisibilityPicker, setShowVisibilityPicker] = useState(false);
 
   // Additional images state
   const [additionalImageUrls, setAdditionalImageUrls] = useState<string[]>([]);
@@ -336,7 +346,7 @@ export default function AnnouncementEditorScreen() {
           p_thumbnail_shape: formData.thumbnail_shape,
           p_priority: formData.priority,
           p_visibility: formData.visibility,
-          p_display_order: formData.display_order,
+          p_display_order: editingAnnouncement.display_order,
           p_link: linkValue,
           p_guide_file_id: guideFileId,
         });
@@ -379,7 +389,7 @@ export default function AnnouncementEditorScreen() {
           p_thumbnail_shape: formData.thumbnail_shape,
           p_priority: formData.priority,
           p_visibility: formData.visibility,
-          p_display_order: formData.display_order,
+          p_display_order: announcements.length,
           p_link: linkValue,
           p_guide_file_id: guideFileId,
         });
@@ -605,7 +615,6 @@ export default function AnnouncementEditorScreen() {
       priority: 'none',
       visibility: 'everyone',
       thumbnail_shape: 'square',
-      display_order: announcements.length,
       link: '',
       title_es: '',
       message_es: '',
@@ -629,12 +638,11 @@ export default function AnnouncementEditorScreen() {
       priority: announcement.priority,
       visibility: announcement.visibility,
       thumbnail_shape: announcement.thumbnail_shape,
-      display_order: announcement.display_order,
       link: announcement.link || '',
       title_es: announcement.title_es || '',
       message_es: announcement.content_es || '',
     });
-    setShowSpanish(!!(announcement.title_es || announcement.content_es));
+    setShowSpanish(false);
     setSelectedImageUri(null);
     setNewAdditionalImageUris([]);
 
@@ -677,6 +685,66 @@ export default function AnnouncementEditorScreen() {
 
   const handleBackPress = () => {
     router.replace('/(portal)/manager/manage');
+  };
+
+  const applyPositionChange = async (newPosition: number) => {
+    if (!positionPicker) return;
+    const oldIndex = positionPicker.currentIndex;
+    const newIndex = newPosition - 1;
+    if (newIndex === oldIndex) { setPositionPicker(null); return; }
+    const reordered = [...announcements];
+    const [moved] = reordered.splice(oldIndex, 1);
+    reordered.splice(newIndex, 0, moved);
+    const updated = reordered.map((item, i) => ({ ...item, display_order: i }));
+    setAnnouncements(updated);
+    setPositionPicker(null);
+    try {
+      await Promise.all(
+        updated.map((item) =>
+          supabase.from('announcements').update({ display_order: item.display_order }).eq('id', item.id).eq('organization_id', organizationId)
+        )
+      );
+    } catch (error) {
+      console.error('Error applying position change:', error);
+      await loadAnnouncements();
+    }
+  };
+
+  const openItemActions = (announcement: Announcement, index: number) => {
+    const isFirst = index === 0;
+    const isLast = index === announcements.length - 1;
+
+    if (Platform.OS === 'ios') {
+      const options: string[] = [t('common:edit')];
+      if (!isFirst) options.push(t('upcoming_events_editor:move_up'));
+      if (!isLast) options.push(t('upcoming_events_editor:move_down'));
+      if (announcements.length > 1) options.push(t('menu_editor:order_position'));
+      options.push(t('common:delete'));
+      options.push(t('common:cancel'));
+      const destructiveIndex = options.indexOf(t('common:delete'));
+      const cancelIndex = options.length - 1;
+      ActionSheetIOS.showActionSheetWithOptions(
+        { options, destructiveButtonIndex: destructiveIndex, cancelButtonIndex: cancelIndex },
+        (buttonIndex) => {
+          const label = options[buttonIndex];
+          if (label === t('common:edit')) openEditModal(announcement);
+          else if (label === t('upcoming_events_editor:move_up')) handleMoveUp(index);
+          else if (label === t('upcoming_events_editor:move_down')) handleMoveDown(index);
+          else if (label === t('menu_editor:order_position')) setPositionPicker({ item: announcement, currentIndex: index });
+          else if (label === t('common:delete')) handleDelete(announcement);
+        }
+      );
+    } else {
+      const buttons: any[] = [
+        { text: t('common:edit'), onPress: () => openEditModal(announcement) },
+      ];
+      if (!isFirst) buttons.push({ text: t('upcoming_events_editor:move_up'), onPress: () => handleMoveUp(index) });
+      if (!isLast) buttons.push({ text: t('upcoming_events_editor:move_down'), onPress: () => handleMoveDown(index) });
+      if (announcements.length > 1) buttons.push({ text: t('menu_editor:order_position'), onPress: () => setPositionPicker({ item: announcement, currentIndex: index }) });
+      buttons.push({ text: t('common:delete'), style: 'destructive', onPress: () => handleDelete(announcement) });
+      buttons.push({ text: t('common:cancel'), style: 'cancel' });
+      Alert.alert(announcement.title, undefined, buttons);
+    }
   };
 
   const getImageUrl = (url: string | null) => {
@@ -817,9 +885,22 @@ export default function AnnouncementEditorScreen() {
                       style={styles.dragHandle}
                     >
                       <IconSymbol
-                        ios_icon_name="line.3.horizontal.decrease"
+                        ios_icon_name="line.3.horizontal"
                         android_material_icon_name="drag-indicator"
-                        size={20}
+                        size={18}
+                        color="#FFFFFF"
+                      />
+                    </TouchableOpacity>
+
+                    {/* Meatball Menu */}
+                    <TouchableOpacity
+                      style={styles.meatballButton}
+                      onPress={() => openItemActions(announcement, index)}
+                    >
+                      <IconSymbol
+                        ios_icon_name="ellipsis"
+                        android_material_icon_name="more-vert"
+                        size={18}
                         color="#FFFFFF"
                       />
                     </TouchableOpacity>
@@ -862,9 +943,6 @@ export default function AnnouncementEditorScreen() {
                                 color={colors.textSecondary}
                               />
                               <Text style={styles.metaText}>{announcement.visibility}</Text>
-                            </View>
-                            <View style={styles.metaItem}>
-                              <Text style={styles.metaText}>{t('announcement_editor:order_label', { order: announcement.display_order })}</Text>
                             </View>
                           </View>
                         </View>
@@ -910,65 +988,10 @@ export default function AnnouncementEditorScreen() {
                               />
                               <Text style={styles.metaText}>{announcement.visibility}</Text>
                             </View>
-                            <View style={styles.metaItem}>
-                              <Text style={styles.metaText}>{t('announcement_editor:order_label', { order: announcement.display_order })}</Text>
-                            </View>
                           </View>
                         </View>
                       </>
                     )}
-                    <View style={styles.announcementActions}>
-                      <TouchableOpacity
-                        style={[styles.arrowButton, index === 0 && styles.arrowButtonDisabled]}
-                        onPress={() => handleMoveUp(index)}
-                        disabled={index === 0}
-                      >
-                        <IconSymbol
-                          ios_icon_name="arrow.up"
-                          android_material_icon_name="arrow-upward"
-                          size={18}
-                          color={index === 0 ? colors.textSecondary : colors.highlight}
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.arrowButton, index === announcements.length - 1 && styles.arrowButtonDisabled]}
-                        onPress={() => handleMoveDown(index)}
-                        disabled={index === announcements.length - 1}
-                      >
-                        <IconSymbol
-                          ios_icon_name="arrow.down"
-                          android_material_icon_name="arrow-downward"
-                          size={18}
-                          color={index === announcements.length - 1 ? colors.textSecondary : colors.highlight}
-                        />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.actionButton}
-                        onPress={() => openEditModal(announcement)}
-                      >
-                        <IconSymbol
-                          ios_icon_name="pencil"
-                          android_material_icon_name="edit"
-                          size={20}
-                          color={colors.primary}
-                        />
-                        <Text style={styles.actionButtonText}>{t('common:edit')}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.deleteButton]}
-                        onPress={() => handleDelete(announcement)}
-                      >
-                        <IconSymbol
-                          ios_icon_name="trash"
-                          android_material_icon_name="delete"
-                          size={20}
-                          color="#E74C3C"
-                        />
-                        <Text style={[styles.actionButtonText, styles.deleteButtonText]}>
-                          {t('common:delete')}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
                   </View>
                 </ScaleDecorator>
               );
@@ -1016,417 +1039,397 @@ export default function AnnouncementEditorScreen() {
               bounces={false}
               keyboardShouldPersistTaps="handled"
             >
-              {/* Thumbnail (80x80, top-left) + Title (right) */}
-              <View style={styles.thumbAndNameRow}>
-                <View style={styles.thumbColumn}>
-                  <TouchableOpacity style={styles.thumbSquare} onPress={pickImage}>
-                    {selectedImageUri || editingAnnouncement?.thumbnail_url ? (
-                      <Image
-                        source={{ uri: selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '') || '' }}
-                        style={styles.thumbImage}
-                        key={selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '')}
+              {/* === Section 1: Details === */}
+              <CollapsibleSection
+                title={t('announcement_editor:section_details')}
+                iconIos="info.circle"
+                iconAndroid="info"
+                iconColor={colors.primary}
+                headerBackgroundColor="#FFFFFF"
+                headerTextColor="#1A1A1A"
+                contentBackgroundColor="#FFFFFF"
+                defaultExpanded={true}
+              >
+                  {/* Thumbnail + Title */}
+                  <View style={styles.thumbAndNameRow}>
+                    <View style={styles.thumbColumn}>
+                      <TouchableOpacity style={styles.thumbSquare} onPress={pickImage}>
+                        {selectedImageUri || editingAnnouncement?.thumbnail_url ? (
+                          <Image
+                            source={{ uri: selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '') || '' }}
+                            style={styles.thumbImage}
+                            key={selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '')}
+                          />
+                        ) : (
+                          <View style={styles.thumbPlaceholder}>
+                            <IconSymbol
+                              ios_icon_name="photo"
+                              android_material_icon_name="add-photo-alternate"
+                              size={28}
+                              color="#999999"
+                            />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+
+                    <View style={styles.nameColumn}>
+                      <Text style={styles.formLabel}>{t('announcement_editor:announcement_title_label')}</Text>
+                      <TextInput
+                        style={styles.input}
+                        placeholder={t('announcement_editor:announcement_title_placeholder')}
+                        placeholderTextColor="#999999"
+                        value={formData.title}
+                        onChangeText={(text) => setFormData({ ...formData, title: text })}
                       />
-                    ) : (
-                      <View style={styles.thumbPlaceholder}>
-                        <IconSymbol
-                          ios_icon_name="photo"
-                          android_material_icon_name="add-photo-alternate"
-                          size={28}
-                          color="#999999"
-                        />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.nameColumn}>
-                  <Text style={styles.formLabel}>{t('announcement_editor:announcement_title_label')}</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder={t('announcement_editor:announcement_title_placeholder')}
-                    placeholderTextColor="#999999"
-                    value={formData.title}
-                    onChangeText={(text) => setFormData({ ...formData, title: text })}
-                  />
-                </View>
-              </View>
-
-              {/* Square / Banner segmented control */}
-              <View style={styles.shapeSegmented}>
-                <TouchableOpacity
-                  style={[
-                    styles.shapeSegment,
-                    formData.thumbnail_shape === 'square' && styles.shapeSegmentActive,
-                  ]}
-                  onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
-                >
-                  <Text
-                    style={[
-                      styles.shapeSegmentText,
-                      formData.thumbnail_shape === 'square' && styles.shapeSegmentTextActive,
-                    ]}
-                  >
-                    {t('announcement_editor:shape_square')}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.shapeSegment,
-                    formData.thumbnail_shape === 'banner' && styles.shapeSegmentActive,
-                  ]}
-                  onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
-                >
-                  <Text
-                    style={[
-                      styles.shapeSegmentText,
-                      formData.thumbnail_shape === 'banner' && styles.shapeSegmentTextActive,
-                    ]}
-                  >
-                    {t('announcement_editor:shape_banner')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Additional Images Section */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Additional Images</Text>
-                <Text style={styles.formHint}>Add more images for a swipeable carousel in the detail view</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.additionalImagesScroll}>
-                  {/* Existing additional images */}
-                  {additionalImageUrls.map((url, index) => (
-                    <View key={`existing-${index}`} style={styles.additionalImageContainer}>
-                      <Image source={{ uri: getImageUrl(url) || url }} style={styles.additionalImageThumb} />
-                      <TouchableOpacity
-                        style={styles.removeImageButton}
-                        onPress={() => removeAdditionalImage(index, false)}
-                      >
-                        <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
-                      </TouchableOpacity>
                     </View>
-                  ))}
-                  {/* Newly selected images (pending upload) */}
-                  {newAdditionalImageUris.map((uri, index) => (
-                    <View key={`new-${index}`} style={styles.additionalImageContainer}>
-                      <Image source={{ uri }} style={styles.additionalImageThumb} />
-                      <TouchableOpacity
-                        style={styles.removeImageButton}
-                        onPress={() => removeAdditionalImage(index, true)}
-                      >
-                        <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
-                      </TouchableOpacity>
-                      <View style={styles.newImageBadge}>
-                        <Text style={styles.newImageBadgeText}>NEW</Text>
-                      </View>
-                    </View>
-                  ))}
-                  {/* Add image button */}
-                  <TouchableOpacity style={styles.addImageButton} onPress={pickAdditionalImage}>
-                    <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={32} color="#D4A843" />
-                    <Text style={styles.addImageText}>Add</Text>
-                  </TouchableOpacity>
-                </ScrollView>
-              </View>
+                  </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('announcement_editor:message_label')}</Text>
-                <RichTextToolbar
-                  text={formData.message}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, message: text }))}
-                  selection={contentSelection}
-                  onSelectionChange={setContentSelection}
-                  textInputRef={contentInputRef}
-                  accentColor={colors.highlight}
-                />
-                <TextInput
-                  ref={contentInputRef}
-                  style={[styles.input, styles.textArea]}
-                  placeholder={t('announcement_editor:message_placeholder')}
-                  placeholderTextColor="#999999"
-                  value={formData.message}
-                  onChangeText={(text) => setFormData({ ...formData, message: text })}
-                  multiline
-                  numberOfLines={4}
-                  onSelectionChange={(e) => setContentSelection(e.nativeEvent.selection)}
-                />
-              </View>
-
-              {/* Spanish Translation Section */}
-              <View style={styles.formGroup}>
-                <TouchableOpacity
-                  style={styles.spanishSectionHeader}
-                  onPress={() => setShowSpanish(!showSpanish)}
-                >
-                  <Text style={styles.formLabel}>{t('translation_section:spanish_section_title')}</Text>
-                  <IconSymbol
-                    ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
-                    android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
-                    size={20}
-                    color="#666666"
-                  />
-                </TouchableOpacity>
-
-                {showSpanish && (
-                  <View style={styles.spanishFields}>
+                  {/* Square / Banner segmented control */}
+                  <View style={styles.shapeSegmented}>
                     <TouchableOpacity
-                      style={styles.autoTranslateButton}
-                      onPress={handleAutoTranslate}
-                      disabled={translating}
+                      style={[
+                        styles.shapeSegment,
+                        formData.thumbnail_shape === 'square' && styles.shapeSegmentActive,
+                      ]}
+                      onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
                     >
-                      {translating ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <Text style={styles.autoTranslateButtonText}>
-                          {t('translation_section:auto_translate')}
-                        </Text>
-                      )}
+                      <Text
+                        style={[
+                          styles.shapeSegmentText,
+                          formData.thumbnail_shape === 'square' && styles.shapeSegmentTextActive,
+                        ]}
+                      >
+                        {t('announcement_editor:shape_square')}
+                      </Text>
                     </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.shapeSegment,
+                        formData.thumbnail_shape === 'banner' && styles.shapeSegmentActive,
+                      ]}
+                      onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
+                    >
+                      <Text
+                        style={[
+                          styles.shapeSegmentText,
+                          formData.thumbnail_shape === 'banner' && styles.shapeSegmentTextActive,
+                        ]}
+                      >
+                        {t('announcement_editor:shape_banner')}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
-                    <Text style={styles.spanishFieldLabel}>{t('translation_section:title_es_label')}</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder={t('translation_section:title_es_placeholder')}
-                      placeholderTextColor="#999999"
-                      value={formData.title_es}
-                      onChangeText={(text) => setFormData({ ...formData, title_es: text })}
+                  {/* Additional Images */}
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Additional Images</Text>
+                    <Text style={styles.formHint}>Add more images for a swipeable carousel in the detail view</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.additionalImagesScroll}>
+                      {additionalImageUrls.map((url, idx) => (
+                        <View key={`existing-${idx}`} style={styles.additionalImageContainer}>
+                          <Image source={{ uri: getImageUrl(url) || url }} style={styles.additionalImageThumb} />
+                          <TouchableOpacity
+                            style={styles.removeImageButton}
+                            onPress={() => removeAdditionalImage(idx, false)}
+                          >
+                            <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                      {newAdditionalImageUris.map((uri, idx) => (
+                        <View key={`new-${idx}`} style={styles.additionalImageContainer}>
+                          <Image source={{ uri }} style={styles.additionalImageThumb} />
+                          <TouchableOpacity
+                            style={styles.removeImageButton}
+                            onPress={() => removeAdditionalImage(idx, true)}
+                          >
+                            <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
+                          </TouchableOpacity>
+                          <View style={styles.newImageBadge}>
+                            <Text style={styles.newImageBadgeText}>NEW</Text>
+                          </View>
+                        </View>
+                      ))}
+                      <TouchableOpacity style={styles.addImageButton} onPress={pickAdditionalImage}>
+                        <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={32} color="#D4A843" />
+                        <Text style={styles.addImageText}>Add</Text>
+                      </TouchableOpacity>
+                    </ScrollView>
+                  </View>
+              </CollapsibleSection>
+
+              {/* === Section 2: Description === */}
+              <CollapsibleSection
+                title={t('announcement_editor:section_description')}
+                iconIos="doc.text"
+                iconAndroid="description"
+                iconColor={colors.primary}
+                headerBackgroundColor="#FFFFFF"
+                headerTextColor="#1A1A1A"
+                contentBackgroundColor="#FFFFFF"
+                defaultExpanded={false}
+              >
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>{t('announcement_editor:message_label')}</Text>
+                    <RichTextToolbar
+                      text={formData.message}
+                      onChangeText={(text) => setFormData(prev => ({ ...prev, message: text }))}
+                      selection={contentSelection}
+                      onSelectionChange={setContentSelection}
+                      textInputRef={contentInputRef}
+                      accentColor={colors.highlight}
                     />
-
-                    <Text style={[styles.spanishFieldLabel, { marginTop: 12 }]}>{t('translation_section:message_es_label')}</Text>
                     <TextInput
+                      ref={contentInputRef}
                       style={[styles.input, styles.textArea]}
-                      placeholder={t('translation_section:message_es_placeholder')}
+                      placeholder={t('announcement_editor:message_placeholder')}
                       placeholderTextColor="#999999"
-                      value={formData.message_es}
-                      onChangeText={(text) => setFormData({ ...formData, message_es: text })}
+                      value={formData.message}
+                      onChangeText={(text) => setFormData({ ...formData, message: text })}
                       multiline
                       numberOfLines={4}
+                      onSelectionChange={(e) => setContentSelection(e.nativeEvent.selection)}
                     />
-
-                    <Text style={styles.formHint}>{t('translation_section:hint')}</Text>
                   </View>
-                )}
-              </View>
 
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('announcement_editor:link_label')}</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={t('announcement_editor:link_placeholder')}
-                  placeholderTextColor="#999999"
-                  value={formData.link}
-                  onChangeText={(text) => setFormData({ ...formData, link: text })}
-                  autoCapitalize="none"
-                  keyboardType="url"
-                />
-                <Text style={styles.formHint}>
-                  {t('announcement_editor:link_hint')}
-                </Text>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Attach File from Guides & Training (Optional)</Text>
-                
-                {selectedGuideFile ? (
-                  <View style={styles.selectedFileContainer}>
-                    <View style={styles.selectedFileInfo}>
+                  {/* Spanish Translation */}
+                  <View style={styles.formGroup}>
+                    <TouchableOpacity
+                      style={styles.spanishSectionHeader}
+                      onPress={() => setShowSpanish(!showSpanish)}
+                    >
+                      <Text style={styles.formLabel}>{t('translation_section:spanish_section_title')}</Text>
                       <IconSymbol
-                        ios_icon_name="doc.fill"
-                        android_material_icon_name="description"
-                        size={24}
-                        color={colors.primary}
-                      />
-                      <View style={styles.selectedFileText}>
-                        <Text style={styles.selectedFileTitle}>{selectedGuideFile.title}</Text>
-                        <Text style={styles.selectedFileCategory}>{selectedGuideFile.category}</Text>
-                      </View>
-                    </View>
-                    <TouchableOpacity onPress={clearGuideFile} style={styles.clearFileButton}>
-                      <IconSymbol
-                        ios_icon_name="xmark.circle.fill"
-                        android_material_icon_name="cancel"
-                        size={24}
-                        color="#E74C3C"
-                      />
-                    </TouchableOpacity>
-                  </View>
-                ) : (
-                  <TouchableOpacity 
-                    style={styles.filePickerButton} 
-                    onPress={() => setShowFileSection(!showFileSection)}
-                  >
-                    <IconSymbol
-                      ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
-                      android_material_icon_name={showFileSection ? "expand-less" : "expand-more"}
-                      size={24}
-                      color={colors.primary}
-                    />
-                    <Text style={styles.filePickerButtonText}>
-                      {showFileSection ? 'Hide File Selection' : 'Show File Selection'}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                {showFileSection && !selectedGuideFile && (
-                  <View style={styles.fileSelectionSection}>
-                    <View style={styles.searchContainer}>
-                      <IconSymbol
-                        ios_icon_name="magnifyingglass"
-                        android_material_icon_name="search"
+                        ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
+                        android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
                         size={20}
                         color="#666666"
                       />
-                      <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search files by name, category..."
-                        placeholderTextColor="#999999"
-                        value={fileSearchQuery}
-                        onChangeText={setFileSearchQuery}
-                      />
-                      {fileSearchQuery.length > 0 && (
-                        <TouchableOpacity onPress={() => setFileSearchQuery('')}>
+                    </TouchableOpacity>
+
+                    {showSpanish && (
+                      <View style={styles.spanishFields}>
+                        <TouchableOpacity
+                          style={styles.autoTranslateButton}
+                          onPress={handleAutoTranslate}
+                          disabled={translating}
+                        >
+                          {translating ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <Text style={styles.autoTranslateButtonText}>
+                              {t('translation_section:auto_translate')}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+
+                        <Text style={styles.spanishFieldLabel}>{t('translation_section:title_es_label')}</Text>
+                        <TextInput
+                          style={styles.input}
+                          placeholder={t('translation_section:title_es_placeholder')}
+                          placeholderTextColor="#999999"
+                          value={formData.title_es}
+                          onChangeText={(text) => setFormData({ ...formData, title_es: text })}
+                        />
+
+                        <Text style={[styles.spanishFieldLabel, { marginTop: 12 }]}>{t('translation_section:message_es_label')}</Text>
+                        <TextInput
+                          style={[styles.input, styles.textArea]}
+                          placeholder={t('translation_section:message_es_placeholder')}
+                          placeholderTextColor="#999999"
+                          value={formData.message_es}
+                          onChangeText={(text) => setFormData({ ...formData, message_es: text })}
+                          multiline
+                          numberOfLines={4}
+                        />
+
+                        <Text style={styles.formHint}>{t('translation_section:hint')}</Text>
+                      </View>
+                    )}
+                  </View>
+              </CollapsibleSection>
+
+              {/* === Section 3: Additional Info === */}
+              <CollapsibleSection
+                title={t('announcement_editor:section_additional_info')}
+                iconIos="ellipsis.circle"
+                iconAndroid="more-horiz"
+                iconColor={colors.primary}
+                headerBackgroundColor="#FFFFFF"
+                headerTextColor="#1A1A1A"
+                contentBackgroundColor="#FFFFFF"
+                defaultExpanded={false}
+                >
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>{t('announcement_editor:link_label')}</Text>
+                    <TextInput
+                      style={styles.input}
+                      placeholder={t('announcement_editor:link_placeholder')}
+                      placeholderTextColor="#999999"
+                      value={formData.link}
+                      onChangeText={(text) => setFormData({ ...formData, link: text })}
+                      autoCapitalize="none"
+                      keyboardType="url"
+                    />
+                    <Text style={styles.formHint}>
+                      {t('announcement_editor:link_hint')}
+                    </Text>
+                  </View>
+
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Attach File from Guides & Training (Optional)</Text>
+
+                    {selectedGuideFile ? (
+                      <View style={styles.selectedFileContainer}>
+                        <View style={styles.selectedFileInfo}>
+                          <IconSymbol
+                            ios_icon_name="doc.fill"
+                            android_material_icon_name="description"
+                            size={24}
+                            color={colors.primary}
+                          />
+                          <View style={styles.selectedFileText}>
+                            <Text style={styles.selectedFileTitle}>{selectedGuideFile.title}</Text>
+                            <Text style={styles.selectedFileCategory}>{selectedGuideFile.category}</Text>
+                          </View>
+                        </View>
+                        <TouchableOpacity onPress={clearGuideFile} style={styles.clearFileButton}>
                           <IconSymbol
                             ios_icon_name="xmark.circle.fill"
                             android_material_icon_name="cancel"
-                            size={20}
-                            color="#999999"
+                            size={24}
+                            color="#E74C3C"
                           />
                         </TouchableOpacity>
-                      )}
-                    </View>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.filePickerButton}
+                        onPress={() => setShowFileSection(!showFileSection)}
+                      >
+                        <IconSymbol
+                          ios_icon_name={showFileSection ? "chevron.up" : "chevron.down"}
+                          android_material_icon_name={showFileSection ? "expand-less" : "expand-more"}
+                          size={24}
+                          color={colors.primary}
+                        />
+                        <Text style={styles.filePickerButtonText}>
+                          {showFileSection ? 'Hide File Selection' : 'Show File Selection'}
+                        </Text>
+                      </TouchableOpacity>
+                    )}
 
-                    <ScrollView style={styles.fileList} nestedScrollEnabled={true}>
-                      {GUIDE_CATEGORIES.map((category, catIndex) => {
-                        const categoryFiles = groupedGuideFiles[category];
-                        if (categoryFiles.length === 0) return null;
-
-                        return (
-                          <View key={catIndex} style={styles.fileCategorySection}>
-                            <Text style={styles.fileCategoryTitle}>{category}</Text>
-                            {categoryFiles.map((file, fileIndex) => (
-                              <TouchableOpacity
-                                key={fileIndex}
-                                style={styles.fileItem}
-                                onPress={() => selectGuideFile(file)}
-                              >
-                                <IconSymbol
-                                  ios_icon_name="doc.fill"
-                                  android_material_icon_name="description"
-                                  size={24}
-                                  color={colors.primary}
-                                />
-                                <View style={styles.fileItemText}>
-                                  <Text style={styles.fileItemTitle}>{file.title}</Text>
-                                  <Text style={styles.fileItemName}>{file.file_name}</Text>
-                                </View>
-                                <IconSymbol
-                                  ios_icon_name="chevron.right"
-                                  android_material_icon_name="chevron-right"
-                                  size={20}
-                                  color="#666666"
-                                />
-                              </TouchableOpacity>
-                            ))}
-                          </View>
-                        );
-                      })}
-
-                      {filteredGuideFiles.length === 0 && (
-                        <View style={styles.emptyFileList}>
+                    {showFileSection && !selectedGuideFile && (
+                      <View style={styles.fileSelectionSection}>
+                        <View style={styles.searchContainer}>
                           <IconSymbol
-                            ios_icon_name="doc"
-                            android_material_icon_name="description"
-                            size={48}
-                            color="#999999"
+                            ios_icon_name="magnifyingglass"
+                            android_material_icon_name="search"
+                            size={20}
+                            color="#666666"
                           />
-                          <Text style={styles.emptyFileListText}>No files found</Text>
-                          <Text style={styles.emptyFileListSubtext}>
-                            Try adjusting your search or check if files are uploaded in Guides & Training
-                          </Text>
+                          <TextInput
+                            style={styles.searchInput}
+                            placeholder="Search files by name, category..."
+                            placeholderTextColor="#999999"
+                            value={fileSearchQuery}
+                            onChangeText={setFileSearchQuery}
+                          />
+                          {fileSearchQuery.length > 0 && (
+                            <TouchableOpacity onPress={() => setFileSearchQuery('')}>
+                              <IconSymbol
+                                ios_icon_name="xmark.circle.fill"
+                                android_material_icon_name="cancel"
+                                size={20}
+                                color="#999999"
+                              />
+                            </TouchableOpacity>
+                          )}
                         </View>
-                      )}
-                    </ScrollView>
+
+                        <ScrollView style={styles.fileList} nestedScrollEnabled={true}>
+                          {GUIDE_CATEGORIES.map((category, catIndex) => {
+                            const categoryFiles = groupedGuideFiles[category];
+                            if (categoryFiles.length === 0) return null;
+
+                            return (
+                              <View key={catIndex} style={styles.fileCategorySection}>
+                                <Text style={styles.fileCategoryTitle}>{category}</Text>
+                                {categoryFiles.map((file, fileIndex) => (
+                                  <TouchableOpacity
+                                    key={fileIndex}
+                                    style={styles.fileItem}
+                                    onPress={() => selectGuideFile(file)}
+                                  >
+                                    <IconSymbol
+                                      ios_icon_name="doc.fill"
+                                      android_material_icon_name="description"
+                                      size={24}
+                                      color={colors.primary}
+                                    />
+                                    <View style={styles.fileItemText}>
+                                      <Text style={styles.fileItemTitle}>{file.title}</Text>
+                                      <Text style={styles.fileItemName}>{file.file_name}</Text>
+                                    </View>
+                                    <IconSymbol
+                                      ios_icon_name="chevron.right"
+                                      android_material_icon_name="chevron-right"
+                                      size={20}
+                                      color="#666666"
+                                    />
+                                  </TouchableOpacity>
+                                ))}
+                              </View>
+                            );
+                          })}
+
+                          {filteredGuideFiles.length === 0 && (
+                            <View style={styles.emptyFileList}>
+                              <IconSymbol
+                                ios_icon_name="doc"
+                                android_material_icon_name="description"
+                                size={48}
+                                color="#999999"
+                              />
+                              <Text style={styles.emptyFileListText}>No files found</Text>
+                              <Text style={styles.emptyFileListSubtext}>
+                                Try adjusting your search or check if files are uploaded in Guides & Training
+                              </Text>
+                            </View>
+                          )}
+                        </ScrollView>
+                      </View>
+                    )}
+
+                    <Text style={styles.formHint}>
+                      Attach a file from Guides & Training to display View and Download buttons
+                    </Text>
                   </View>
-                )}
 
-                <Text style={styles.formHint}>
-                  Attach a file from Guides & Training to display View and Download buttons
-                </Text>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Badge Type</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.optionsScroll}
-                >
-                  {PRIORITY_LEVELS.map((priority, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={[
-                        styles.optionButton,
-                        formData.priority === priority && styles.optionButtonActive,
-                      ]}
-                      onPress={() => setFormData({ ...formData, priority })}
-                    >
-                      <Text
-                        style={[
-                          styles.optionButtonText,
-                          formData.priority === priority && styles.optionButtonTextActive,
-                        ]}
-                      >
-                        {getPriorityLabel(priority)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Visible To</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.optionsScroll}
-                >
-                  {VISIBILITY_OPTIONS.map((visibility, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={[
-                        styles.optionButton,
-                        formData.visibility === visibility && styles.optionButtonActive,
-                      ]}
-                      onPress={() => setFormData({ ...formData, visibility })}
-                    >
-                      <Text
-                        style={[
-                          styles.optionButtonText,
-                          formData.visibility === visibility && styles.optionButtonTextActive,
-                        ]}
-                      >
-                        {visibility.charAt(0).toUpperCase() + visibility.slice(1)}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </View>
-
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>Display Order</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter display order (e.g., 1, 2, 3...)"
-                  placeholderTextColor="#999999"
-                  value={formData.display_order.toString()}
-                  onChangeText={(text) => {
-                    const num = parseInt(text) || 0;
-                    setFormData({ ...formData, display_order: num });
-                  }}
-                  keyboardType="numeric"
-                />
-                <Text style={styles.formHint}>
-                  Lower numbers appear first. Announcements with the same order are sorted by creation date.
-                </Text>
-              </View>
+                  {/* Badge Type + Visible To — side-by-side dropdowns */}
+                  <View style={styles.formGroup}>
+                    <Text style={styles.formLabel}>Badge Type & Visibility</Text>
+                    <View style={styles.dropdownRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.formHint}>Badge</Text>
+                        <SelectField
+                          value={getPriorityLabel(formData.priority)}
+                          placeholder="Badge Type"
+                          onPress={() => setShowBadgePicker(true)}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.formHint}>Visible To</Text>
+                        <SelectField
+                          value={formData.visibility.charAt(0).toUpperCase() + formData.visibility.slice(1)}
+                          placeholder="Visibility"
+                          onPress={() => setShowVisibilityPicker(true)}
+                        />
+                      </View>
+                    </View>
+                  </View>
+              </CollapsibleSection>
 
               {!editingAnnouncement && (
                 <View style={styles.notificationToggleContainer}>
@@ -1447,30 +1450,65 @@ export default function AnnouncementEditorScreen() {
                 </View>
               )}
 
-              <TouchableOpacity
-                style={styles.saveButton}
-                onPress={handleSave}
-                disabled={uploadingImage}
-              >
-                {uploadingImage ? (
-                  <ActivityIndicator color="#1A1A1A" />
-                ) : (
-                  <Text style={styles.saveButtonText}>
-                    {editingAnnouncement ? 'Update Announcement' : 'Add Announcement'}
-                  </Text>
-                )}
-              </TouchableOpacity>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={styles.cancelButton}
+                  onPress={closeModal}
+                >
+                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={closeModal}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.saveButton}
+                  onPress={handleSave}
+                  disabled={uploadingImage}
+                >
+                  {uploadingImage ? (
+                    <ActivityIndicator color="#1A1A1A" />
+                  ) : (
+                    <Text style={styles.saveButtonText}>
+                      {editingAnnouncement ? 'Update Announcement' : 'Add Announcement'}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </ScrollView>
+
+            <SimpleSelectPicker
+              visible={showBadgePicker}
+              title="Badge Type"
+              options={PRIORITY_LEVELS.map(p => getPriorityLabel(p))}
+              value={getPriorityLabel(formData.priority)}
+              onSelect={(label) => {
+                const match = PRIORITY_LEVELS.find(p => getPriorityLabel(p) === label);
+                if (match) setFormData(prev => ({ ...prev, priority: match }));
+              }}
+              onClose={() => setShowBadgePicker(false)}
+            />
+
+            <SimpleSelectPicker
+              visible={showVisibilityPicker}
+              title="Visible To"
+              options={VISIBILITY_OPTIONS.map(v => v.charAt(0).toUpperCase() + v.slice(1))}
+              value={formData.visibility.charAt(0).toUpperCase() + formData.visibility.slice(1)}
+              onSelect={(label) => {
+                setFormData(prev => ({ ...prev, visibility: label.toLowerCase() }));
+              }}
+              onClose={() => setShowVisibilityPicker(false)}
+            />
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      <OrderPositionModal
+        visible={!!positionPicker}
+        title={t('menu_editor:order_position')}
+        subtitle={positionPicker?.item.title || ''}
+        count={announcements.length}
+        currentIndex={positionPicker?.currentIndex ?? 0}
+        onClose={() => setPositionPicker(null)}
+        onApply={applyPositionChange}
+      />
     </View>
   );
 }
@@ -1634,6 +1672,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    marginTop: 28,
   },
   priorityText: {
     fontSize: 10,
@@ -1660,33 +1699,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontSize: 12,
     color: colors.textSecondary,
   },
-  announcementActions: {
-    flexDirection: 'row',
-    gap: 12,
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 6,
-  },
-  deleteButton: {
-    backgroundColor: '#2C1F1F',
-  },
-  actionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.highlight,
-  },
-  deleteButtonText: {
-    color: '#E74C3C',
+  meatballButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 6,
+    zIndex: 10,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 14,
   },
   dragHandle: {
     position: 'absolute',
@@ -1705,17 +1725,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     paddingHorizontal: 16,
     marginBottom: 8,
     marginTop: 12,
-  },
-  arrowButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    borderRadius: 8,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  arrowButtonDisabled: {
-    opacity: 0.3,
   },
   modalContainer: {
     flex: 1,
@@ -1756,10 +1765,16 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   modalScroll: {
     flex: 1,
+    backgroundColor: '#EEEFF1',
   },
   modalScrollContent: {
     padding: 20,
     paddingBottom: 40,
+  },
+  dropdownRow: {
+    flexDirection: 'row' as const,
+    gap: 12,
+    marginTop: 8,
   },
   formGroup: {
     marginBottom: 20,
@@ -2011,30 +2026,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     textAlign: 'center',
     paddingHorizontal: 20,
   },
-  optionsScroll: {
-    maxHeight: 50,
-  },
-  optionButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: '#F5F5F5',
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  optionButtonActive: {
-    backgroundColor: colors.highlight,
-    borderColor: colors.highlight,
-  },
-  optionButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
-  },
-  optionButtonTextActive: {
-    color: '#1A1A1A',
-  },
   notificationToggleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2060,29 +2051,34 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: colors.textSecondary,
     marginTop: 4,
   },
-  saveButton: {
-    backgroundColor: colors.highlight,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
+  buttonRow: {
+    flexDirection: 'row',
+    gap: 12,
     marginTop: 24,
   },
+  saveButton: {
+    flex: 1,
+    backgroundColor: colors.highlight,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
   saveButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#1A1A1A',
   },
   cancelButton: {
+    flex: 1,
     backgroundColor: '#F5F5F5',
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 12,
     borderWidth: 1,
     borderColor: '#E0E0E0',
   },
   cancelButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
     color: '#666666',
   },

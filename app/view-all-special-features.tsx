@@ -208,8 +208,15 @@ export default function ViewAllSpecialFeaturesScreen() {
                 onPress={() => openDetailModal(feature)}
                 activeOpacity={0.7}
               >
+                {feature.thumbnail_shape === 'banner' && feature.thumbnail_url && (
+                  <Image
+                    source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
+                    style={styles.bannerImage}
+                    contentFit="cover"
+                  />
+                )}
                 <View style={styles.squareLayout}>
-                {feature.thumbnail_url && (
+                {feature.thumbnail_shape !== 'banner' && feature.thumbnail_url && (
                   <Image
                     source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
                     style={styles.squareImage}
@@ -364,6 +371,12 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 8,
+  },
+  bannerImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   squareContent: {
     flex: 1,

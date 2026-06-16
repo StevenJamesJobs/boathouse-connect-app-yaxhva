@@ -225,8 +225,11 @@ export default function ViewAllUpcomingEventsScreen() {
       onPress={() => openDetailModal(event)}
       activeOpacity={0.7}
     >
+      {event.thumbnail_shape === 'banner' && event.thumbnail_url && (
+        <Image source={getImageUrl(event.thumbnail_url, event.updated_at)!} style={styles.bannerCardImage} contentFit="cover" />
+      )}
       <View style={styles.cardRow}>
-        {event.thumbnail_url && (
+        {event.thumbnail_shape !== 'banner' && event.thumbnail_url && (
           <Image source={getImageUrl(event.thumbnail_url, event.updated_at)!} style={styles.cardImage} contentFit="cover" />
         )}
         <View style={styles.cardContent}>
@@ -583,6 +586,12 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 10,
+  },
+  bannerCardImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   cardContent: {
     flex: 1,

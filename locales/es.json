@@ -21,7 +21,8 @@
     "reply": "Responder",
     "messages": "Mensajes",
     "not_now": "Ahora no",
-    "upgrade": "Mejorar plan"
+    "upgrade": "Mejorar plan",
+    "clear": "Borrar"
   },
   "login": {
     "username": "Usuario",
@@ -1203,7 +1204,10 @@
     "save_error": "Error al guardar el anuncio",
     "delete_error": "Error al eliminar el anuncio",
     "pick_image_error": "Error al seleccionar imagen",
-    "upload_image_error": "Error al subir imagen"
+    "upload_image_error": "Error al subir imagen",
+    "section_details": "Detalles",
+    "section_description": "Descripción",
+    "section_additional_info": "Info Adicional"
   },
   "special_features_editor": {
     "title": "Editor de Características Especiales",
@@ -1260,7 +1264,11 @@
     "save_error": "Error al guardar la característica especial",
     "delete_error": "Error al eliminar la característica especial",
     "pick_image_error": "Error al seleccionar imagen",
-    "upload_image_error": "Error al subir imagen"
+    "upload_image_error": "Error al subir imagen",
+    "section_details": "Detalles",
+    "section_date_time": "Fecha y Hora",
+    "section_description": "Descripción",
+    "section_additional_info": "Info Adicional"
   },
   "upcoming_events_editor": {
     "title": "Editor de Próximos Eventos",
@@ -1326,7 +1334,11 @@
     "move_down": "Bajar",
     "reorder_hint": "Mantén presionado y arrastra para reordenar, o usa las flechas",
     "send_notification_label": "Enviar Notificación Push",
-    "send_notification_hint": "Desactiva al agregar varios eventos para evitar enviar notificaciones repetidas. Puedes enviar una notificación desde el Centro de Notificaciones cuando termines."
+    "send_notification_hint": "Desactiva al agregar varios eventos para evitar enviar notificaciones repetidas. Puedes enviar una notificación desde el Centro de Notificaciones cuando termines.",
+    "section_details": "Detalles",
+    "section_date_time": "Fecha y Hora",
+    "section_description": "Descripción",
+    "section_additional_info": "Info Adicional"
   },
   "menu_editor": {
     "title": "Editor de Menú",

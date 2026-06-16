@@ -576,8 +576,15 @@ export default function ManagerPortalScreen() {
         }}
         activeOpacity={0.7}
       >
+        {event.thumbnail_shape === 'banner' && event.thumbnail_url && (
+          <Image
+            source={getImageUrl(event.thumbnail_url, event.updated_at)!}
+            style={styles.bannerCardImage}
+            contentFit="cover"
+          />
+        )}
         <View style={styles.cardRow}>
-          {event.thumbnail_url && (
+          {event.thumbnail_shape !== 'banner' && event.thumbnail_url && (
             <Image
               source={getImageUrl(event.thumbnail_url, event.updated_at)!}
               style={styles.cardImage}
@@ -715,8 +722,15 @@ export default function ManagerPortalScreen() {
       }}
       activeOpacity={0.7}
     >
+      {announcement.thumbnail_shape === 'banner' && announcement.thumbnail_url && (
+        <Image
+          source={getImageUrl(announcement.thumbnail_url, announcement.updated_at)!}
+          style={styles.bannerCardImage}
+          contentFit="cover"
+        />
+      )}
       <View style={styles.cardRow}>
-        {announcement.thumbnail_url && (
+        {announcement.thumbnail_shape !== 'banner' && announcement.thumbnail_url && (
           <Image
             source={getImageUrl(announcement.thumbnail_url, announcement.updated_at)!}
             style={styles.cardImage}
@@ -768,8 +782,15 @@ export default function ManagerPortalScreen() {
       }}
       activeOpacity={0.7}
     >
+      {feature.thumbnail_shape === 'banner' && feature.thumbnail_url && (
+        <Image
+          source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
+          style={styles.bannerCardImage}
+          contentFit="cover"
+        />
+      )}
       <View style={styles.cardRow}>
-        {feature.thumbnail_url && (
+        {feature.thumbnail_shape !== 'banner' && feature.thumbnail_url && (
           <Image
             source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
             style={styles.cardImage}
@@ -813,8 +834,15 @@ export default function ManagerPortalScreen() {
       })}
       activeOpacity={0.7}
     >
+      {item.thumbnail_shape === 'banner' && item.thumbnail_url && (
+        <Image
+          source={getImageUrl(item.thumbnail_url, item.updated_at)!}
+          style={styles.bannerCardImage}
+          contentFit="cover"
+        />
+      )}
       <View style={styles.cardRow}>
-        {item.thumbnail_url && (
+        {item.thumbnail_shape !== 'banner' && item.thumbnail_url && (
           <Image
             source={getImageUrl(item.thumbnail_url, item.updated_at)!}
             style={styles.cardImage}
@@ -830,8 +858,6 @@ export default function ManagerPortalScreen() {
               {formatPrice(item.price)}
             </Text>
           </View>
-          {/* Menu + Category — Specials combine both menus, so show where each item lives
-              (replaces the built-in Lunch/Dinner tags). */}
           <View style={styles.specialTagsRow}>
             <View style={[styles.specialMealTag, { backgroundColor: '#1E88E518' }]}>
               <Text style={[styles.specialTagText, { color: '#1E88E5' }]}>
@@ -1331,6 +1357,12 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 10,
+  },
+  bannerCardImage: {
+    width: '100%',
+    aspectRatio: 16 / 9,
+    borderRadius: 10,
+    marginBottom: 10,
   },
   cardContent: {
     flex: 1,
