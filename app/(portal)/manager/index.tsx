@@ -23,6 +23,8 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { weeklySpecialsNames } from '@/utils/categoryNames';
+import { menuBadgeForSeason, compareBySectionThenOrder } from '@/utils/menuBadges';
+import { labelForCategoryName } from '@/utils/menuCategoryLabels';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { GestureHandlerRootView, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
@@ -139,7 +141,7 @@ interface SpecialFeature {
 export default function ManagerPortalScreen() {
   const colors = useThemeColors();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
   const { t } = useTranslation();
   const router = useRouter();
   const params = useLocalSearchParams<{ openAnnouncementId?: string; openEventId?: string; openFeatureId?: string }>();
@@ -267,7 +269,7 @@ export default function ManagerPortalScreen() {
           ]);
           const byId = new Map<string, any>();
           for (const row of [...(byCategory.data || []), ...(flagged.data || [])]) byId.set(row.id, row);
-          const merged = Array.from(byId.values()).sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+          const merged = Array.from(byId.values()).sort(compareBySectionThenOrder);
           return { data: merged };
         })(),
         supabase
@@ -828,18 +830,19 @@ export default function ManagerPortalScreen() {
               {formatPrice(item.price)}
             </Text>
           </View>
-          {/* Meal Period + Dietary Tags */}
+          {/* Menu + Category — Specials combine both menus, so show where each item lives
+              (replaces the built-in Lunch/Dinner tags). */}
           <View style={styles.specialTagsRow}>
-            {item.available_for_lunch && (
-              <View style={[styles.specialMealTag, { backgroundColor: '#FF980018' }]}>
-                <Text style={[styles.specialTagText, { color: '#FF9800' }]}>Lunch</Text>
-              </View>
-            )}
-            {item.available_for_dinner && (
-              <View style={[styles.specialMealTag, { backgroundColor: '#9C27B018' }]}>
-                <Text style={[styles.specialTagText, { color: '#9C27B0' }]}>Dinner</Text>
-              </View>
-            )}
+            <View style={[styles.specialMealTag, { backgroundColor: '#1E88E518' }]}>
+              <Text style={[styles.specialTagText, { color: '#1E88E5' }]}>
+                {menuBadgeForSeason((item as any).season, organization, t).label}
+              </Text>
+            </View>
+            <View style={[styles.specialMealTag, { backgroundColor: '#00897B18' }]}>
+              <Text style={[styles.specialTagText, { color: '#00897B' }]}>
+                {labelForCategoryName(item.category, t)}
+              </Text>
+            </View>
             {item.is_gluten_free && (
               <View style={[styles.specialDietTag, { backgroundColor: colors.highlight }]}>
                 <Text style={[styles.specialTagText, { color: colors.text }]}>GF</Text>

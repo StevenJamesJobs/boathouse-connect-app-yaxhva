@@ -35,6 +35,7 @@ import {
   findCategoryByName,
   resolveRecipeSubName,
 } from '@/utils/menuCategoryLabels';
+import { menuBadgeForSeason as menuBadgeForSeasonUtil, compareBySectionThenOrder } from '@/utils/menuBadges';
 
 interface MenuItem {
   id: string;
@@ -299,15 +300,23 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
 
   // Filter items for a given page
   const getItemsForPage = useCallback((page: PageConfig): MenuItem[] => {
-    let filtered = menuItems.filter(item => categoryMatches(item, page.category));
+    // Featured Specials combines flagged items from BOTH menus (allItems) so the
+    // pill shows the same set on Menu 1 and Menu 2; every other page stays scoped
+    // to the active menu (menuItems).
+    const isSpecials = catOf(page.category)?.filter_behavior === 'weekly_specials';
+    let filtered = (isSpecials ? allItems : menuItems).filter(item => categoryMatches(item, page.category));
 
     // Filter by subcategory if not null and not the virtual "All" page
     if (page.subcategory && page.subcategory !== ALL_PAGE_KEY) {
       filtered = filtered.filter(item => item.subcategory === page.subcategory);
     }
 
+    // Group the combined Specials list by category → subcategory → order so
+    // flagged items from the same section stay together.
+    if (isSpecials) filtered = [...filtered].sort(compareBySectionThenOrder);
+
     return filtered;
-  }, [menuItems, categoryMatches]);
+  }, [menuItems, allItems, categoryMatches, catOf]);
 
   // Get filtered items for search/filter mode
   const getSearchFilteredItems = useCallback(() => {
@@ -613,13 +622,10 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   // Render a single menu item card (compact style matching Welcome page)
   // Which menu an item belongs to (winter → Menu 1, summer → Menu 2, both →
   // shared) — shown as a badge on whole-menu search results.
-  const menuBadgeForSeason = (s: string | null | undefined): { icon: string; label: string } => {
-    if (s === 'winter') return { icon: organization?.menu_1_icon || 'snowflake', label: organization?.menu_1_name || 'Menu 1' };
-    if (s === 'summer') return { icon: organization?.menu_2_icon || 'sun.max.fill', label: organization?.menu_2_name || 'Menu 2' };
-    return { icon: 'circle.grid.2x2', label: t('menu_display.both_menus') };
-  };
+  const menuBadgeForSeason = (s: string | null | undefined): { icon: string; label: string } =>
+    menuBadgeForSeasonUtil(s, organization, t);
 
-  const renderMenuCard = (item: MenuItem, categoryColor: string, menuBadge?: { icon: string; label: string }) => {
+  const renderMenuCard = (item: MenuItem, categoryColor: string, menuBadge?: { icon: string; label: string }, specialsContext: boolean = false) => {
     const isWine = isWineName(item.category);
     const localizedLocation = isWine ? getLocalizedField(item, 'location', language) : '';
     // Banner items render the image full-width across the top of the card;
@@ -654,7 +660,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
           />
         )}
         <View style={styles.cardContent}>
-          {menuBadge && (
+          {menuBadge && !specialsContext && (
             <View style={styles.menuBadge}>
               <IconSymbol ios_icon_name={menuBadge.icon} android_material_icon_name={menuIconAndroid(menuBadge.icon)} size={11} color={colors.primary} />
               <Text style={[styles.menuBadgeText, { color: colors.primary }]} numberOfLines={1}>{menuBadge.label}</Text>
@@ -693,18 +699,18 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
               📍 {localizedLocation}
             </Text>
           ) : null}
-          {(catOf(item.category)?.filter_behavior === 'weekly_specials' && (item.available_for_lunch || item.available_for_dinner)) || item.is_gluten_free || item.is_gluten_free_available ||
-            item.is_vegetarian || item.is_vegetarian_available ? (
+          {(specialsContext || item.is_gluten_free || item.is_gluten_free_available ||
+            item.is_vegetarian || item.is_vegetarian_available) ? (
             <View style={styles.tagsRow}>
-              {catOf(item.category)?.filter_behavior === 'weekly_specials' && item.available_for_lunch && (
-                <View style={[styles.tag, { backgroundColor: '#FF980018' }]}>
-                  <Text style={[styles.tagText, { color: '#FF9800' }]}>{lunchName}</Text>
-                </View>
-              )}
-              {catOf(item.category)?.filter_behavior === 'weekly_specials' && item.available_for_dinner && (
-                <View style={[styles.tag, { backgroundColor: '#9C27B018' }]}>
-                  <Text style={[styles.tagText, { color: '#9C27B0' }]}>{dinnerName}</Text>
-                </View>
+              {specialsContext && (
+                <>
+                  <View style={[styles.tag, { backgroundColor: '#1E88E518' }]}>
+                    <Text style={[styles.tagText, { color: '#1E88E5' }]}>{menuBadgeForSeason(item.season).label}</Text>
+                  </View>
+                  <View style={[styles.tag, { backgroundColor: '#00897B18' }]}>
+                    <Text style={[styles.tagText, { color: '#00897B' }]}>{getCategoryLabel(item.category)}</Text>
+                  </View>
+                </>
               )}
               {item.is_gluten_free && (
                 <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
@@ -748,6 +754,9 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
 
     const pageItems = getItemsForPage(page);
     const categoryColor = catOf(page.category)?.color || colors.primary;
+    // Featured Specials shows items from both menus — badge each card with its
+    // menu and show its home-category chip (replaces the Lunch/Dinner tags).
+    const isSpecialsPage = catOf(page.category)?.filter_behavior === 'weekly_specials';
 
     return (
       <View style={{ width: SCREEN_WIDTH }}>
@@ -786,7 +795,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
               )}
             </View>
           ) : (
-            pageItems.map(item => renderMenuCard(item, categoryColor))
+            pageItems.map(item =>
+              isSpecialsPage
+                ? renderMenuCard(item, categoryColor, menuBadgeForSeason(item.season), true)
+                : renderMenuCard(item, categoryColor),
+            )
           )}
         </ScrollView>
       </View>
