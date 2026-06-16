@@ -35,7 +35,8 @@ import CategoryPill from '@/components/CategoryPill';
 import SeasonSelector, { type Season } from '@/components/SeasonSelector';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
-import { categoryLabel, subcategoryLabel, findCategoryByName } from '@/utils/menuCategoryLabels';
+import { categoryLabel, subcategoryLabel, findCategoryByName, labelForCategoryName } from '@/utils/menuCategoryLabels';
+import { compareBySectionThenOrder } from '@/utils/menuBadges';
 import { menuIconAndroid } from '@/constants/menuIcons';
 
 interface MenuItem {
@@ -351,12 +352,19 @@ export default function MenuEditorScreen() {
 
   // Get items for a specific page (used by the horizontal pager)
   const getItemsForPage = useCallback((page: PageConfig): MenuItem[] => {
-    let filtered = menuItems.filter(item => categoryMatches(item, page.category));
+    // Featured Specials combines flagged items from BOTH menus (allItems) so the
+    // pill shows the same set on Menu 1 and Menu 2; other pages stay scoped to
+    // the active menu (menuItems).
+    const isSpecials = findCategoryByName(menuCats, page.category)?.filter_behavior === 'weekly_specials';
+    let filtered = (isSpecials ? allItems : menuItems).filter(item => categoryMatches(item, page.category));
     if (page.subcategory) {
       filtered = filtered.filter(item => item.subcategory === page.subcategory);
     }
+    // Group the combined Specials list by category → subcategory → order so
+    // flagged items from the same section stay together.
+    if (isSpecials) filtered = [...filtered].sort(compareBySectionThenOrder);
     return filtered;
-  }, [menuItems, categoryMatches]);
+  }, [menuItems, allItems, categoryMatches, menuCats]);
 
   const pickImage = async () => {
     try {
@@ -763,7 +771,10 @@ export default function MenuEditorScreen() {
   // Order Position / Delete in one compact menu. Drag-to-reorder is the primary
   // reorder path; Move Up/Down (non-search only) and Order Position are quick
   // alternatives so cards stay clean.
-  const openItemActions = (item: MenuItem, index: number) => {
+  const openItemActions = (item: MenuItem, index: number, opts?: { allowReorder?: boolean }) => {
+    // Featured Specials is a read-only combined overview — its overflow menu
+    // omits the reorder actions (Move Up/Down/Order Position).
+    const allowReorder = opts?.allowReorder !== false;
     const inSearch = searchQuery.trim().length > 0;
     const isFirst = index === 0;
     const isLast = index === filteredItems.length - 1;
@@ -779,15 +790,15 @@ export default function MenuEditorScreen() {
     if (Platform.OS === 'ios') {
       const options: string[] = [editLabel];
       const actions: Array<() => void> = [() => openEditModal(item)];
-      if (!inSearch && !isFirst) {
+      if (allowReorder && !inSearch && !isFirst) {
         options.push(moveUpLabel);
         actions.push(() => handleMoveUp(index));
       }
-      if (!inSearch && !isLast) {
+      if (allowReorder && !inSearch && !isLast) {
         options.push(moveDownLabel);
         actions.push(() => handleMoveDown(index));
       }
-      if (siblingCount > 1) {
+      if (allowReorder && siblingCount > 1) {
         options.push(orderLabel);
         actions.push(() => openPositionPicker(item));
       }
@@ -811,9 +822,9 @@ export default function MenuEditorScreen() {
       const buttons: Array<{ text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }> = [
         { text: editLabel, onPress: () => openEditModal(item) },
       ];
-      if (!inSearch && !isFirst) buttons.push({ text: moveUpLabel, onPress: () => handleMoveUp(index) });
-      if (!inSearch && !isLast) buttons.push({ text: moveDownLabel, onPress: () => handleMoveDown(index) });
-      if (siblingCount > 1) buttons.push({ text: orderLabel, onPress: () => openPositionPicker(item) });
+      if (allowReorder && !inSearch && !isFirst) buttons.push({ text: moveUpLabel, onPress: () => handleMoveUp(index) });
+      if (allowReorder && !inSearch && !isLast) buttons.push({ text: moveDownLabel, onPress: () => handleMoveDown(index) });
+      if (allowReorder && siblingCount > 1) buttons.push({ text: orderLabel, onPress: () => openPositionPicker(item) });
       buttons.push({ text: deleteLabel, style: 'destructive', onPress: () => handleDelete(item) });
       buttons.push({ text: cancelLabel, style: 'cancel' });
       Alert.alert(item.name, undefined, buttons);
@@ -1273,6 +1284,9 @@ export default function MenuEditorScreen() {
             initialScrollIndex={0}
             renderItem={({ item: page }) => {
               const pageItems = getItemsForPage(page);
+              // Featured Specials is a combined cross-menu overview — read-only
+              // ordering here (drag + Move/Order disabled), with menu + category chips.
+              const isWS = findCategoryByName(menuCats, page.category)?.filter_behavior === 'weekly_specials';
               if (pageItems.length === 0) {
                 return (
                   <View style={{ width: SCREEN_WIDTH }}>
@@ -1301,7 +1315,7 @@ export default function MenuEditorScreen() {
               }
               return (
                 <View style={[styles.itemsList, { width: SCREEN_WIDTH }]}>
-                  {pageItems.length > 1 && (
+                  {pageItems.length > 1 && !isWS && (
                     <Text style={styles.reorderHint}>{t('upcoming_events_editor:reorder_hint')}</Text>
                   )}
                   <DraggableFlatList
@@ -1316,24 +1330,26 @@ export default function MenuEditorScreen() {
                 return (
                   <ScaleDecorator>
                     <View style={[styles.menuItemCard, isActive && styles.menuItemCardDragging]}>
-                      {/* Drag Handle */}
-                      <TouchableOpacity
-                        onLongPress={drag}
-                        disabled={isActive}
-                        style={styles.dragHandle}
-                      >
-                        <IconSymbol
-                          ios_icon_name="line.3.horizontal.decrease"
-                          android_material_icon_name="drag-indicator"
-                          size={20}
-                          color="#FFFFFF"
-                        />
-                      </TouchableOpacity>
+                      {/* Drag Handle — hidden on the read-only Featured Specials overview */}
+                      {!isWS && (
+                        <TouchableOpacity
+                          onLongPress={drag}
+                          disabled={isActive}
+                          style={styles.dragHandle}
+                        >
+                          <IconSymbol
+                            ios_icon_name="line.3.horizontal.decrease"
+                            android_material_icon_name="drag-indicator"
+                            size={20}
+                            color="#FFFFFF"
+                          />
+                        </TouchableOpacity>
+                      )}
 
                       {/* Overflow menu (Edit / Move Up / Move Down / Delete) */}
                       <TouchableOpacity
                         style={styles.overflowButton}
-                        onPress={() => openItemActions(item, index)}
+                        onPress={() => openItemActions(item, index, { allowReorder: !isWS })}
                         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       >
                         <IconSymbol
@@ -1356,6 +1372,10 @@ export default function MenuEditorScreen() {
                               <FormattedText style={styles.squareDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>
                             )}
                             <View style={styles.menuItemTags}>
+                              {isWS && (<>
+                                <View style={[styles.tag, { backgroundColor: '#1E88E518' }]}><Text style={[styles.tagText, { color: '#1E88E5' }]}>{menuBadgeForSeason((item as any).season).label}</Text></View>
+                                <View style={[styles.tag, { backgroundColor: '#00897B18' }]}><Text style={[styles.tagText, { color: '#00897B' }]}>{labelForCategoryName(item.category, t, menuCats, language)}</Text></View>
+                              </>)}
                               {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
                               {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
                               {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
@@ -1370,12 +1390,16 @@ export default function MenuEditorScreen() {
                         <>
                           {item.thumbnail_url && <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.menuItemImageBanner} />}
                           <View style={styles.menuItemContent}>
-                            <View style={styles.menuItemHeader}>
-                              <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>
+                            <View style={[styles.menuItemHeader, !item.thumbnail_url && !isWS && styles.menuItemHeaderClear]}>
+                              {item.thumbnail_url && <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>}
                               <Text style={styles.menuItemName} numberOfLines={1}>{getLocalizedField(item, 'name', language)}</Text>
                             </View>
                             {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
-                            <View style={styles.menuItemTags}>
+                            <View style={[styles.menuItemTags, !item.thumbnail_url && styles.menuItemTagsPriceRoom]}>
+                              {isWS && (<>
+                                <View style={[styles.tag, { backgroundColor: '#1E88E518' }]}><Text style={[styles.tagText, { color: '#1E88E5' }]}>{menuBadgeForSeason((item as any).season).label}</Text></View>
+                                <View style={[styles.tag, { backgroundColor: '#00897B18' }]}><Text style={[styles.tagText, { color: '#00897B' }]}>{labelForCategoryName(item.category, t, menuCats, language)}</Text></View>
+                              </>)}
                               {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
                               {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
                               {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
@@ -1384,6 +1408,7 @@ export default function MenuEditorScreen() {
                               {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
                               {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
                             </View>
+                            {!item.thumbnail_url && <Text style={styles.menuItemPriceCorner}>{formatItemPriceLabel(item)}</Text>}
                           </View>
                         </>
                       )}
@@ -2419,6 +2444,20 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontSize: 10,
     fontWeight: '600',
     color: colors.primary,
+  },
+  menuItemHeaderClear: {
+    paddingLeft: 40, // clear the drag handle on no-thumbnail cards
+  },
+  menuItemTagsPriceRoom: {
+    paddingRight: 64, // leave room for the bottom-right price on no-thumbnail cards
+  },
+  menuItemPriceCorner: {
+    position: 'absolute',
+    bottom: 10,
+    right: 14,
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.highlight,
   },
   positionSheet: {
     backgroundColor: '#FFFFFF',
