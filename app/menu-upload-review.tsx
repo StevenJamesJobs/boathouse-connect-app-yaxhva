@@ -64,8 +64,11 @@ export default function MenuUploadReviewScreen() {
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
   const { t } = useTranslation();
-  const params = useLocalSearchParams<{ upload_id?: string }>();
+  const params = useLocalSearchParams<{ upload_id?: string; onboarding?: string }>();
   const uploadId = params.upload_id;
+  // Onboarding = the owner's very first menu, so there's nothing to replace —
+  // hide the Add/Replace choice and just add it (mode stays 'add').
+  const isOnboarding = params.onboarding === '1';
 
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
@@ -243,20 +246,24 @@ export default function MenuUploadReviewScreen() {
           </>
         )}
 
-        <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('menu_upload.mode', 'How should this be added?')}</Text>
-        <View style={styles.segmentRow}>
-          <TouchableOpacity style={[styles.segment, mode === 'add' && { backgroundColor: colors.primary }]} onPress={() => setMode('add')}>
-            <Text style={[styles.segmentText, { color: mode === 'add' ? '#FFF' : colors.text }]}>{t('menu_upload.mode_add', 'Add to menu')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.segment, mode === 'replace' && { backgroundColor: colors.primary }]} onPress={() => setMode('replace')}>
-            <Text style={[styles.segmentText, { color: mode === 'replace' ? '#FFF' : colors.text }]}>{t('menu_upload.mode_replace', 'Replace menu')}</Text>
-          </TouchableOpacity>
-        </View>
-        {mode === 'replace' && (
-          <View style={[styles.warnBanner, { backgroundColor: '#FFF3E0' }]}>
-            <IconSymbol ios_icon_name="exclamationmark.triangle.fill" android_material_icon_name="warning" size={15} color="#E65100" />
-            <Text style={styles.warnText}>{t('menu_upload.replace_warn', 'Replace deletes this menu’s current items first. Items shared with the other menu are kept.')}</Text>
-          </View>
+        {!isOnboarding && (
+          <>
+            <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('menu_upload.mode', 'How should this be added?')}</Text>
+            <View style={styles.segmentRow}>
+              <TouchableOpacity style={[styles.segment, mode === 'add' && { backgroundColor: colors.primary }]} onPress={() => setMode('add')}>
+                <Text style={[styles.segmentText, { color: mode === 'add' ? '#FFF' : colors.text }]}>{t('menu_upload.mode_add', 'Add to menu')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.segment, mode === 'replace' && { backgroundColor: colors.primary }]} onPress={() => setMode('replace')}>
+                <Text style={[styles.segmentText, { color: mode === 'replace' ? '#FFF' : colors.text }]}>{t('menu_upload.mode_replace', 'Replace menu')}</Text>
+              </TouchableOpacity>
+            </View>
+            {mode === 'replace' && (
+              <View style={[styles.warnBanner, { backgroundColor: '#FFF3E0' }]}>
+                <IconSymbol ios_icon_name="exclamationmark.triangle.fill" android_material_icon_name="warning" size={15} color="#E65100" />
+                <Text style={styles.warnText}>{t('menu_upload.replace_warn', 'Replace deletes this menu’s current items first. Items shared with the other menu are kept.')}</Text>
+              </View>
+            )}
+          </>
         )}
 
         {/* Flagged cocktails */}

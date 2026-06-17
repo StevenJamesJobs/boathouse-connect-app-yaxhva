@@ -76,7 +76,7 @@ export default function SignupScreen() {
         <View style={styles.headerContainer}>
           <Text style={styles.title}>Create Your Account</Text>
           <Text style={styles.subtitle}>
-            Set up your owner account to get started with MyResto Connect.
+            Set up your owner account to get started with MyResto Connect and your free 14-day trial!
           </Text>
         </View>
 
