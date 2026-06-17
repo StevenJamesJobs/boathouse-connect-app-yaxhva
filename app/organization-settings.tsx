@@ -89,6 +89,16 @@ export default function OrganizationSettingsScreen() {
     setLogoPreview(organization.logo_url);
   }, [organization]);
 
+  // Pull the latest org from the server when this screen opens, so the form
+  // initializes from real DB values rather than a possibly-stale context
+  // snapshot (e.g. right after onboarding). This makes the saved Google Maps
+  // query and menu config show up correctly, and — critically — prevents a
+  // Save from writing stale defaults back over good data.
+  useEffect(() => {
+    refreshOrganization();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Menu category scope toggle. Applies immediately via its own RPC (it
   // materializes the per-menu trees as a side-effect), separate from the Save
   // button. Switching is lossless: the shared tree is always preserved.
@@ -247,6 +257,12 @@ export default function OrganizationSettingsScreen() {
       return;
     }
 
+    // Detect a newly added / changed Google Maps query so we can auto-import
+    // reviews after saving (only when it actually changed — avoids a needless
+    // Outscraper call on unrelated saves).
+    const newQuery = googleMapsQuery.trim();
+    const queryChanged = !!newQuery && newQuery !== (organization.google_maps_query || '').trim();
+
     setSaving(true);
     try {
       const { data, error } = await (supabase.rpc as any)('update_organization_settings', {
@@ -279,7 +295,28 @@ export default function OrganizationSettingsScreen() {
       }
 
       await refreshOrganization();
-      Alert.alert('Saved', 'Organization settings updated successfully.');
+
+      // If the Google Maps query was just added or changed, import reviews now
+      // so the owner sees them right away (mirrors the onboarding auto-import).
+      let reviewMsg = '';
+      if (queryChanged) {
+        try {
+          const { data: imp, error: impErr } = await supabase.functions.invoke('import-google-reviews', {
+            body: { source: 'manual', user_id: user?.id, organization_id: organizationId, backfill: true },
+          });
+          if (impErr) throw impErr;
+          if (!imp?.success) throw new Error(imp?.error || 'Import failed');
+          const n = imp.reviews_upserted ?? 0;
+          reviewMsg = n > 0
+            ? `\n\nImported ${n} Google review${n === 1 ? '' : 's'} for this location.`
+            : '\n\nNo Google reviews found for that location yet — they\'ll appear automatically once customers post them.';
+        } catch (e: any) {
+          console.error('[OrgSettings] Review import on save failed:', e);
+          reviewMsg = '\n\nWe couldn\'t import reviews from that location right now, but it\'s saved and we\'ll keep trying automatically.';
+        }
+      }
+
+      Alert.alert('Saved', 'Organization settings updated successfully.' + reviewMsg);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to save settings.');
     } finally {
@@ -519,10 +556,13 @@ export default function OrganizationSettingsScreen() {
                   style={styles.input}
                   value={googleMapsQuery}
                   onChangeText={setGoogleMapsQuery}
-                  placeholder="e.g. McLoone's Boathouse West Orange NJ"
+                  placeholder="e.g. McLoone's Boathouse, 9 Cherry Lane, West Orange NJ"
                   placeholderTextColor={colors.textSecondary}
                 />
-                <Text style={styles.fieldHint}>Used to find your restaurant for Google Reviews</Text>
+                <Text style={styles.fieldHint}>
+                  Enter your restaurant's name and address exactly as it appears on Google Maps. We'll import
+                  your Google Reviews from this location — saving a new or changed entry imports them right away.
+                </Text>
               </View>
             </View>
 

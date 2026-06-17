@@ -2096,7 +2096,7 @@
     "upgrade_cta": "Mejora a Premium para subir más menús",
     "upload_pdf": "Subir PDF",
     "upload_photos": "Subir fotos",
-    "processing_message": "La IA está leyendo tu menú… esto puede tardar de 40 segundos a 3 minutos según el tamaño del archivo.",
+    "processing_message": "La IA está leyendo tu menú… esto puede tardar de 40 segundos a 3 minutos según el tamaño del archivo. Por favor, no cierres la aplicación mientras escanea tu archivo.",
     "history": "Subidas recientes",
     "no_uploads": "Aún no hay subidas.",
     "items": "artículos",
@@ -2152,6 +2152,6 @@
     "delete_failed": "No se pudo eliminar",
     "insufficient_title": "Créditos insuficientes",
     "insufficient_msg": "Esto necesita {{cost}} créditos pero te quedan {{have}} este mes. Los créditos se reinician el próximo mes.",
-    "upload_hint": "Leer un menú tarda entre 40 segundos y 3 minutos según el tamaño del archivo."
+    "upload_hint": "Leer un menú tarda entre 40 segundos y 3 minutos según el tamaño del archivo. Por favor, no cierres la aplicación mientras escanea tu archivo o imagen del menú."
   }
 }

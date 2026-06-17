@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Share,
   Platform,
+  ScrollView,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -89,7 +90,7 @@ export default function JoinCodeScreen() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.content}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Success icon */}
         <View style={styles.iconCircle}>
           <IconSymbol
@@ -149,7 +150,43 @@ export default function JoinCodeScreen() {
             restaurant on MyResto Connect.
           </Text>
         </View>
-      </View>
+
+        {/* Premium trial features */}
+        <View style={styles.trialCard}>
+          <View style={styles.trialHeader}>
+            <IconSymbol
+              ios_icon_name="crown.fill"
+              android_material_icon_name="workspace-premium"
+              size={20}
+              color={splashColors.primary}
+            />
+            <Text style={styles.trialTitle}>Your Free 14-Day Premium Trial</Text>
+          </View>
+          <Text style={styles.trialBody}>
+            Everything's unlocked — explore every Premium feature free for 14 days:
+          </Text>
+          {[
+            'AI Menu & Schedule Upload',
+            'Automatic Google Reviews import',
+            'Weekly Quizzes with rewards',
+            'Menu Memory & Picture This! games',
+            'Plus the essentials: menus, messaging, schedules, rewards & guides',
+          ].map((f) => (
+            <View key={f} style={styles.trialRow}>
+              <IconSymbol
+                ios_icon_name="checkmark.circle.fill"
+                android_material_icon_name="check-circle"
+                size={16}
+                color={splashColors.primary}
+              />
+              <Text style={styles.trialItem}>{f}</Text>
+            </View>
+          ))}
+          <Text style={styles.trialFooter}>
+            Manage or activate your subscription anytime in Manage → Subscription.
+          </Text>
+        </View>
+      </ScrollView>
 
       {/* Go to Dashboard */}
       <View style={styles.bottomBar}>
@@ -173,10 +210,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  content: {
+  scroll: {
     flex: 1,
-    paddingTop: 100,
+  },
+  content: {
+    flexGrow: 1,
+    paddingTop: 80,
     paddingHorizontal: 24,
+    paddingBottom: 24,
     alignItems: 'center',
   },
 
@@ -272,6 +313,53 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: splashColors.text,
     lineHeight: 20,
+  },
+
+  // Premium trial card
+  trialCard: {
+    width: '100%',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderColor: splashColors.secondary,
+  },
+  trialHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  trialTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: splashColors.text,
+  },
+  trialBody: {
+    fontSize: 14,
+    color: splashColors.textSecondary,
+    lineHeight: 20,
+    marginBottom: 10,
+  },
+  trialRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    marginBottom: 6,
+  },
+  trialItem: {
+    flex: 1,
+    fontSize: 14,
+    color: splashColors.text,
+    lineHeight: 19,
+  },
+  trialFooter: {
+    fontSize: 13,
+    color: splashColors.textSecondary,
+    lineHeight: 18,
+    marginTop: 8,
+    fontStyle: 'italic',
   },
 
   // Bottom bar

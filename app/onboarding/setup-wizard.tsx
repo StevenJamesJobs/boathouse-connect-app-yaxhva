@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,13 @@ import {
   Switch,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import MenuIconPicker from '@/components/MenuIconPicker';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 const DEFAULT_JOB_TITLES = [
   'Manager',
@@ -33,7 +35,8 @@ const DEFAULT_JOB_TITLES = [
 export default function SetupWizardScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ organizationId: string }>();
-  const { organizationId: contextOrgId } = useOrganization();
+  const { organizationId: contextOrgId, refreshOrganization } = useOrganization();
+  const { user } = useAuth();
   const organizationId = params.organizationId || contextOrgId;
 
   const [step, setStep] = useState(1);
@@ -52,6 +55,34 @@ export default function SetupWizardScreen() {
   const [menu2Icon, setMenu2Icon] = useState('sun.max.fill');
   const [headerIcon, setHeaderIcon] = useState('fork.knife');
   const [categoryScope, setCategoryScope] = useState<'shared' | 'per_menu'>('shared');
+
+  // Step 3 state — Google Reviews
+  const [googleMapsQuery, setGoogleMapsQuery] = useState('');
+  const [importingReviews, setImportingReviews] = useState(false);
+  const [importResult, setImportResult] = useState<
+    { success: boolean; count: number; error?: string } | null
+  >(null);
+  // True once the org has menu items (i.e. they uploaded their first menu).
+  const [menuUploaded, setMenuUploaded] = useState(false);
+
+  // Re-check on focus (e.g. returning from the AI menu uploader) so step 2 can
+  // swap the "upload your menu" prompt for a confirmation once a menu exists.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      (async () => {
+        if (!organizationId) return;
+        const { count } = await (supabase
+          .from('menu_items' as any)
+          .select('id', { count: 'exact', head: true })
+          .eq('organization_id', organizationId) as any);
+        if (!cancelled) setMenuUploaded((count ?? 0) > 0);
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [organizationId]),
+  );
 
   // ─── Step 1: Job Titles ───────────────────────────────────────────
 
@@ -78,15 +109,136 @@ export default function SetupWizardScreen() {
 
   // ─── Navigation ───────────────────────────────────────────────────
 
-  const nextStep = () => {
+  // Persist the menu configuration as soon as the user finishes step 2, so the
+  // choice is saved the moment it's made (not only at the very end) and the rest
+  // of the app reflects it immediately via refreshOrganization. Returns false on
+  // failure so the caller can keep the user on the step.
+  const persistMenuConfig = async (): Promise<boolean> => {
+    if (!organizationId) return false;
+    const menuCount = hasSeasonalMenus ? 2 : 1;
+    const scope: 'shared' | 'per_menu' = hasSeasonalMenus ? categoryScope : 'shared';
+    console.log('[SetupWizard] Saving menu config:', {
+      organizationId, menuCount, scope, menu1Icon, menu2Icon, headerIcon,
+    });
+    const { error } = await supabase
+      .from('organizations')
+      .update({
+        menu_count: menuCount,
+        menu_category_scope: scope,
+        menu_1_name: menu1Name.trim() || 'Menu 1',
+        // menu_2_name is NOT NULL; menu_count governs display, so keep a valid
+        // placeholder even with one menu.
+        menu_2_name: menu2Name.trim() || 'Menu 2',
+        menu_1_icon: menu1Icon,
+        menu_2_icon: menu2Icon,
+        header_icon: headerIcon,
+      })
+      .eq('id', organizationId);
+    if (error) {
+      console.error('[SetupWizard] Save menu config error:', error);
+      return false;
+    }
+    // Per-menu mode needs the slot-1/slot-2 category trees materialized from the
+    // seeded slot-0 tree. Idempotent, so re-running on a revisit is safe.
+    if (scope === 'per_menu') {
+      const { error: matError } = await (supabase.rpc as any)('materialize_org_per_menu_categories', {
+        p_org_id: organizationId,
+      });
+      if (matError) console.error('[SetupWizard] Materialize per-menu categories error:', matError);
+    }
+    await refreshOrganization();
+    return true;
+  };
+
+  const nextStep = async () => {
     if (step === 1 && selectedTitles.length === 0) {
       Alert.alert('Select Titles', 'Please select at least one job title.');
+      return;
+    }
+    // Leaving the Menu step: persist the menu configuration right now.
+    if (step === 2) {
+      setIsLoading(true);
+      const ok = await persistMenuConfig();
+      setIsLoading(false);
+      if (!ok) {
+        Alert.alert('Error', 'Could not save your menu setup. Please try again.');
+        return;
+      }
+    }
+    // Step 3 (Google Reviews): if they typed a business but haven't imported
+    // yet, nudge them — but let them skip (the query is saved either way and
+    // the Mon/Thu cron will pick it up).
+    if (step === 3 && googleMapsQuery.trim() && !(importResult && importResult.success)) {
+      Alert.alert(
+        'Import your reviews?',
+        'Tap "Import My Reviews" to see them now, or skip for now — we\'ll import them automatically.',
+        [
+          { text: 'Import Now', style: 'cancel' },
+          { text: 'Skip for Now', onPress: () => setStep((s) => s + 1) },
+        ],
+      );
       return;
     }
     setStep((s) => s + 1);
   };
 
   const prevStep = () => setStep((s) => s - 1);
+
+  // Save the menu choice, then open the AI menu uploader. Persisting first means
+  // the uploader sees the correct menu_count / category scope.
+  const launchMenuUpload = async () => {
+    setIsLoading(true);
+    const ok = await persistMenuConfig();
+    setIsLoading(false);
+    if (!ok) {
+      Alert.alert('Error', 'Could not save your menu setup. Please try again.');
+      return;
+    }
+    // Flag the uploader as onboarding so it hides the add/replace choice (first
+    // menu) and offers a "Return to Onboarding" button when done.
+    router.push({ pathname: '/menu-upload', params: { onboarding: '1' } } as any);
+  };
+
+  // ─── Step 3: Google Reviews import ────────────────────────────────
+
+  const handleImportReviews = async () => {
+    const query = googleMapsQuery.trim();
+    if (!query || !organizationId) return;
+
+    setImportingReviews(true);
+    setImportResult(null);
+
+    try {
+      // Save the query first so it persists even if the import errors out — the
+      // Mon/Thu cron will then pick it up for this org.
+      const { error: saveError } = await supabase
+        .from('organizations')
+        .update({ google_maps_query: query })
+        .eq('id', organizationId);
+      if (saveError) throw saveError;
+
+      const { data, error } = await supabase.functions.invoke('import-google-reviews', {
+        body: {
+          source: 'manual',
+          user_id: user?.id,
+          organization_id: organizationId,
+          backfill: true,
+        },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Import failed');
+
+      // The query is now saved on the org — refresh context so Org Settings and
+      // the rest of the app pick it up (and don't prompt for it again).
+      await refreshOrganization();
+      setImportResult({ success: true, count: data.reviews_upserted ?? 0 });
+    } catch (err: any) {
+      console.error('[SetupWizard] Import reviews error:', err);
+      setImportResult({ success: false, count: 0, error: err?.message });
+    } finally {
+      setImportingReviews(false);
+    }
+  };
 
   // ─── Step 3: Save ─────────────────────────────────────────────────
 
@@ -152,39 +304,25 @@ export default function SetupWizardScreen() {
         console.error('[SetupWizard] Seed cocktails error:', cocktailSeedError);
       }
 
-      // Update org menu settings. Per-menu scope only applies with 2 menus.
-      const menuCount = hasSeasonalMenus ? 2 : 1;
-      const scope: 'shared' | 'per_menu' = hasSeasonalMenus ? categoryScope : 'shared';
-      const { error: orgError } = await supabase
-        .from('organizations')
-        .update({
-          menu_count: menuCount,
-          menu_category_scope: scope,
-          menu_1_name: menu1Name.trim() || 'Menu 1',
-          // menu_2_name is NOT NULL in the DB; menu_count governs display, so
-          // keep a valid placeholder even when there's only one menu.
-          menu_2_name: menu2Name.trim() || 'Menu 2',
-          menu_1_icon: menu1Icon,
-          menu_2_icon: menu2Icon,
-          header_icon: headerIcon,
-        })
-        .eq('id', organizationId);
-
-      if (orgError) {
-        console.error('[SetupWizard] Update org menus error:', orgError);
-        Alert.alert('Error', 'Failed to save menu configuration.');
-        setIsLoading(false);
-        return;
+      // Menu config (count/scope/names/icons) was already saved when the user
+      // left step 2 via persistMenuConfig — we deliberately don't re-write it
+      // here so a stale render can never clobber their choice. We only
+      // idempotently persist the Google Maps query, in case it was typed on
+      // step 3 but never imported (the cron will then pick it up). No-op if
+      // empty; non-fatal so onboarding is never blocked by it.
+      if (googleMapsQuery.trim()) {
+        const { error: queryError } = await supabase
+          .from('organizations')
+          .update({ google_maps_query: googleMapsQuery.trim() })
+          .eq('id', organizationId);
+        if (queryError) {
+          console.error('[SetupWizard] Save google_maps_query error:', queryError);
+        }
       }
 
-      // Per-menu mode needs the slot-1/slot-2 category trees materialized from
-      // the seeded slot-0 tree. Non-fatal: the owner can re-toggle in Settings.
-      if (scope === 'per_menu') {
-        const { error: matError } = await (supabase.rpc as any)('materialize_org_per_menu_categories', {
-          p_org_id: organizationId,
-        });
-        if (matError) console.error('[SetupWizard] Materialize per-menu categories error:', matError);
-      }
+      // Reflect everything we saved (menu config, query, seeds) in the rest of
+      // the app so Org Settings & the menu show the owner's choices immediately.
+      await refreshOrganization();
 
       router.push({
         pathname: '/onboarding/join-code',
@@ -202,7 +340,7 @@ export default function SetupWizardScreen() {
 
   const renderStepIndicator = () => (
     <View style={styles.stepIndicator}>
-      {[1, 2, 3].map((s) => (
+      {[1, 2, 3, 4].map((s) => (
         <View key={s} style={styles.stepRow}>
           <View
             style={[
@@ -229,7 +367,7 @@ export default function SetupWizardScreen() {
               </Text>
             )}
           </View>
-          {s < 3 && (
+          {s < 4 && (
             <View
               style={[styles.stepLine, s < step && styles.stepLineCompleted]}
             />
@@ -424,22 +562,163 @@ export default function SetupWizardScreen() {
 
       <MenuIconPicker label="Header Icon (shown next to your restaurant name)" value={headerIcon} onChange={setHeaderIcon} />
 
-      <View style={styles.aiMenuNote}>
-        <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={20} color={splashColors.primary} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.aiMenuNoteTitle}>Have your menu handy?</Text>
-          <Text style={styles.aiMenuNoteText}>
-            You can upload your first menu now or later in the Menu Editor — for FREE. Our AI reads your PDF or
-            photos and builds your categories and items; you review everything before it goes live.
-          </Text>
+      {menuUploaded ? (
+        <View style={styles.menuDoneNote}>
+          <IconSymbol ios_icon_name="checkmark.seal.fill" android_material_icon_name="verified" size={20} color="#34A853" />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.menuDoneTitle}>Your first menu is uploaded!</Text>
+            <Text style={styles.menuDoneText}>
+              Your first menu has been uploaded and created successfully. You can view, edit, and upload
+              another in the Menu and Menu Editor after you complete onboarding!
+            </Text>
+          </View>
         </View>
-      </View>
+      ) : (
+        <View style={styles.aiMenuNote}>
+          <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={20} color={splashColors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.aiMenuNoteTitle}>Have your menu handy?</Text>
+            <Text style={styles.aiMenuNoteText}>
+              You can upload your first menu now or later in the Menu Editor — for FREE. Our AI reads your PDF or
+              photos and builds your categories and items; you review everything before it goes live.
+            </Text>
+            <TouchableOpacity
+              style={styles.uploadMenuButton}
+              onPress={launchMenuUpload}
+              activeOpacity={0.85}
+              disabled={isLoading}
+            >
+              <IconSymbol ios_icon_name="arrow.up.doc.fill" android_material_icon_name="upload-file" size={18} color={splashColors.primary} />
+              <Text style={styles.uploadMenuButtonText}>Upload Menu Now</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </View>
   );
 
-  // ─── Step 3 UI ────────────────────────────────────────────────────
+  // ─── Step 3 UI: Google Reviews ────────────────────────────────────
 
   const renderStep3 = () => (
+    <View>
+      <Text style={styles.stepTitle}>Google Reviews</Text>
+      <Text style={styles.stepSubtitle}>
+        Your 14-day trial includes automatic Google review importing. See your real reviews in the app
+        right away!
+      </Text>
+
+      <Text style={styles.label}>Find your restaurant on Google Maps</Text>
+      <View style={styles.inputContainer}>
+        <IconSymbol
+          ios_icon_name="mappin.and.ellipse"
+          android_material_icon_name="place"
+          size={20}
+          color={splashColors.textSecondary}
+          style={styles.inputIcon}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. Snow King Resort, 400 E Snow King Ave, Jackson WY"
+          placeholderTextColor={splashColors.textSecondary}
+          value={googleMapsQuery}
+          onChangeText={(text) => {
+            setGoogleMapsQuery(text);
+            setImportResult(null);
+          }}
+          autoCapitalize="words"
+        />
+      </View>
+      <Text style={styles.googleHint}>
+        Enter your restaurant's name and address exactly as it appears on Google Maps.
+      </Text>
+
+      <TouchableOpacity
+        style={[
+          styles.importButton,
+          (importingReviews || !googleMapsQuery.trim()) && styles.buttonDisabled,
+        ]}
+        onPress={handleImportReviews}
+        disabled={importingReviews || !googleMapsQuery.trim()}
+        activeOpacity={0.85}
+      >
+        {importingReviews ? (
+          <>
+            <ActivityIndicator color="#FFFFFF" />
+            <Text style={styles.importButtonText}>Importing reviews…</Text>
+          </>
+        ) : (
+          <>
+            <IconSymbol
+              ios_icon_name="arrow.down.circle.fill"
+              android_material_icon_name="file-download"
+              size={20}
+              color="#FFFFFF"
+            />
+            <Text style={styles.importButtonText}>Import My Reviews</Text>
+          </>
+        )}
+      </TouchableOpacity>
+
+      {importResult && importResult.success && importResult.count > 0 && (
+        <View style={[styles.resultCard, styles.resultCardSuccess]}>
+          <IconSymbol
+            ios_icon_name="checkmark.circle.fill"
+            android_material_icon_name="check-circle"
+            size={20}
+            color="#34A853"
+          />
+          <Text style={styles.resultCardText}>
+            Found {importResult.count} review{importResult.count === 1 ? '' : 's'}! They're waiting for
+            you to see in the Tools page of the app after you review and complete onboarding on the next
+            page.
+          </Text>
+        </View>
+      )}
+      {importResult && importResult.success && importResult.count === 0 && (
+        <View style={[styles.resultCard, styles.resultCardInfo]}>
+          <IconSymbol
+            ios_icon_name="info.circle.fill"
+            android_material_icon_name="info"
+            size={20}
+            color={splashColors.primary}
+          />
+          <Text style={styles.resultCardText}>
+            No reviews found yet — they'll appear here once customers leave them on Google.
+          </Text>
+        </View>
+      )}
+      {importResult && !importResult.success && (
+        <View style={[styles.resultCard, styles.resultCardError]}>
+          <IconSymbol
+            ios_icon_name="exclamationmark.triangle.fill"
+            android_material_icon_name="error-outline"
+            size={20}
+            color="#EA4335"
+          />
+          <Text style={styles.resultCardText}>
+            We couldn't import right now, but your info is saved — we'll keep trying automatically.
+          </Text>
+        </View>
+      )}
+
+      {/* Always offer a clear skip until reviews are actually imported — e.g. if
+          they still need to look up exactly how their business appears on Google
+          Maps. The query (if any) is saved and the cron will pick it up. */}
+      {!(importResult && importResult.success) && (
+        <TouchableOpacity
+          style={styles.skipLink}
+          onPress={() => setStep((s) => s + 1)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.skipLinkText}>Skip for now — you can set this up later in Settings</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+
+  // ─── Step 4 UI: Review & Save ─────────────────────────────────────
+
+  const renderStep4 = () => (
     <View>
       <Text style={styles.stepTitle}>Review & Save</Text>
       <Text style={styles.stepSubtitle}>
@@ -469,6 +748,25 @@ export default function SetupWizardScreen() {
           {hasSeasonalMenus ? ` / ${menu2Name.trim() || 'Menu 2'}` : ''}
         </Text>
       </View>
+
+      {/* Google Reviews Summary */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Google Reviews</Text>
+        {googleMapsQuery.trim() ? (
+          <>
+            <Text style={styles.cardValue} numberOfLines={2}>
+              {googleMapsQuery.trim()}
+            </Text>
+            <Text style={styles.cardDetail}>
+              {importResult && importResult.success
+                ? `${importResult.count} review${importResult.count === 1 ? '' : 's'} imported`
+                : 'Will import automatically'}
+            </Text>
+          </>
+        ) : (
+          <Text style={styles.cardValue}>Skipped — you can set this up later in Settings.</Text>
+        )}
+      </View>
     </View>
   );
 
@@ -486,6 +784,7 @@ export default function SetupWizardScreen() {
         {step === 1 && renderStep1()}
         {step === 2 && renderStep2()}
         {step === 3 && renderStep3()}
+        {step === 4 && renderStep4()}
       </ScrollView>
 
       {/* Bottom nav */}
@@ -498,9 +797,17 @@ export default function SetupWizardScreen() {
           <View style={{ flex: 1 }} />
         )}
 
-        {step < 3 ? (
-          <TouchableOpacity style={styles.nextButton} onPress={nextStep}>
-            <Text style={styles.nextButtonText}>Next</Text>
+        {step < 4 ? (
+          <TouchableOpacity
+            style={[styles.nextButton, isLoading && styles.buttonDisabled]}
+            onPress={nextStep}
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.nextButtonText}>Next</Text>
+            )}
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
@@ -743,6 +1050,108 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: splashColors.textSecondary,
     lineHeight: 18,
+  },
+  menuDoneNote: {
+    flexDirection: 'row',
+    gap: 12,
+    alignItems: 'flex-start',
+    backgroundColor: '#34A85312',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#34A853',
+    padding: 14,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  menuDoneTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1E7E34',
+    marginBottom: 3,
+  },
+  menuDoneText: {
+    fontSize: 13,
+    color: splashColors.textSecondary,
+    lineHeight: 18,
+  },
+  uploadMenuButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    marginTop: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: splashColors.primary,
+  },
+  uploadMenuButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: splashColors.primary,
+  },
+
+  // Step 3 — Google Reviews
+  googleHint: {
+    fontSize: 13,
+    color: splashColors.textSecondary,
+    lineHeight: 18,
+    marginTop: -8,
+    marginBottom: 18,
+  },
+  importButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: '#4285F4',
+    marginBottom: 16,
+  },
+  importButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  resultCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 16,
+    borderWidth: 1,
+  },
+  resultCardSuccess: {
+    backgroundColor: '#34A85312',
+    borderColor: '#34A85340',
+  },
+  resultCardInfo: {
+    backgroundColor: splashColors.primary + '12',
+    borderColor: splashColors.primary + '40',
+  },
+  resultCardError: {
+    backgroundColor: '#EA433512',
+    borderColor: '#EA433540',
+  },
+  resultCardText: {
+    flex: 1,
+    fontSize: 14,
+    color: splashColors.text,
+    lineHeight: 19,
+  },
+  skipLink: {
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  skipLinkText: {
+    fontSize: 14,
+    color: splashColors.textSecondary,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 
   // Category-scope option cards

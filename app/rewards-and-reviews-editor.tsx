@@ -1946,6 +1946,14 @@ export default function RewardsAndReviewsEditorScreen() {
                 <Text style={[styles.actionButtonText, { color: '#FFF' }]}>
                   {refreshingGoogle ? t('rewards_reviews_editor:refreshing_reviews') : t('rewards_reviews_editor:refresh_google_reviews')}
                 </Text>
+                {!hasPremium && (
+                  <IconSymbol
+                    ios_icon_name="lock.fill"
+                    android_material_icon_name="lock"
+                    size={11}
+                    color="rgba(255,255,255,0.6)"
+                  />
+                )}
               </TouchableOpacity>
             </View>
 

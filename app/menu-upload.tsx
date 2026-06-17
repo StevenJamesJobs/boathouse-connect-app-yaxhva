@@ -11,7 +11,7 @@ import {
   Modal,
   TextInput,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -52,6 +52,8 @@ function targetMenuOptions(menuCount: number, scope: string, m1: string, m2: str
 
 export default function MenuUploadScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ onboarding?: string }>();
+  const isOnboarding = params.onboarding === '1';
   const colors = useThemeColors();
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
@@ -133,7 +135,7 @@ export default function MenuUploadScreen() {
         loadUploads();
         loadQuota();
         if (data.status === 'ready_for_review') {
-          router.push({ pathname: '/menu-upload-review', params: { upload_id: id } });
+          router.push({ pathname: '/menu-upload-review', params: { upload_id: id, ...(isOnboarding ? { onboarding: '1' } : {}) } });
         } else if (data.status === 'failed') {
           Alert.alert(
             t('menu_upload.failed_title', 'Could Not Read Menu'),
@@ -143,7 +145,7 @@ export default function MenuUploadScreen() {
       }
     }, 3000);
     return () => clearInterval(interval);
-  }, [processingId, router, t, loadUploads, loadQuota]);
+  }, [processingId, router, t, loadUploads, loadQuota, isOnboarding]);
 
   const uploadFileToStorage = async (base64: string, fileName: string, contentType: string): Promise<string> => {
     const binaryString = atob(base64);
@@ -408,12 +410,12 @@ export default function MenuUploadScreen() {
         {processingId ? (
           <View style={[styles.processingBanner, { backgroundColor: '#FFF3E0' }]}>
             <ActivityIndicator size="small" color="#FF9800" />
-            <Text style={styles.processingText}>{t('menu_upload.processing_message', 'AI is reading your menu… this can take 40 seconds to 3 minutes depending on the file size.')}</Text>
+            <Text style={styles.processingText}>{t('menu_upload.processing_message', 'AI is reading your menu… this can take 40 seconds to 3 minutes depending on the file size. Please don\'t close the app while it scans your file.')}</Text>
           </View>
         ) : (
           <View style={[styles.hintBanner, { backgroundColor: colors.primary + '0D' }]}>
             <IconSymbol ios_icon_name="clock" android_material_icon_name="schedule" size={16} color={colors.textSecondary} />
-            <Text style={[styles.hintText, { color: colors.textSecondary }]}>{t('menu_upload.upload_hint', 'Reading a menu takes about 40 seconds to 3 minutes depending on the file size.')}</Text>
+            <Text style={[styles.hintText, { color: colors.textSecondary }]}>{t('menu_upload.upload_hint', 'Reading a menu takes about 40 seconds to 3 minutes depending on the file size. Please don\'t close the app while it scans your menu file or image.')}</Text>
           </View>
         )}
 
@@ -429,7 +431,7 @@ export default function MenuUploadScreen() {
               key={u.id}
               style={[styles.historyCard, { backgroundColor: colors.card }]}
               activeOpacity={u.status === 'ready_for_review' ? 0.7 : 1}
-              onPress={() => u.status === 'ready_for_review' && router.push({ pathname: '/menu-upload-review', params: { upload_id: u.id } })}
+              onPress={() => u.status === 'ready_for_review' && router.push({ pathname: '/menu-upload-review', params: { upload_id: u.id, ...(isOnboarding ? { onboarding: '1' } : {}) } })}
             >
               <IconSymbol
                 ios_icon_name={u.source_type === 'image' ? 'photo' : 'doc'}
@@ -458,6 +460,23 @@ export default function MenuUploadScreen() {
             <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={16} color="#F44336" />
             <Text style={styles.dangerText}>{t('menu_upload.delete_menu_cta', 'Delete a menu (start fresh)')}</Text>
           </TouchableOpacity>
+        )}
+
+        {/* Onboarding: confirmation + a clear way back to the setup wizard
+            (so they don't have to rely on the top-left back arrow). */}
+        {isOnboarding && uploads.some((u) => u.status === 'applied') && (
+          <View style={styles.onboardDoneCard}>
+            <View style={styles.onboardDoneRow}>
+              <IconSymbol ios_icon_name="checkmark.seal.fill" android_material_icon_name="verified" size={22} color="#34A853" />
+              <Text style={[styles.onboardDoneText, { color: colors.text }]}>
+                {t('menu_upload.onboarding_done', 'Your first menu has been uploaded and created!')}
+              </Text>
+            </View>
+            <TouchableOpacity style={styles.onboardReturnBtn} onPress={() => router.back()} activeOpacity={0.85}>
+              <IconSymbol ios_icon_name="arrow.left" android_material_icon_name="arrow-back" size={18} color="#FFFFFF" />
+              <Text style={styles.onboardReturnText}>{t('menu_upload.return_to_onboarding', 'Return to Onboarding')}</Text>
+            </TouchableOpacity>
+          </View>
         )}
       </ScrollView>
 
@@ -545,6 +564,11 @@ const createStyles = (colors: any) => StyleSheet.create({
   historyMeta: { fontSize: 12, fontWeight: '600', marginTop: 2 },
   dangerRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 12, borderRadius: 10, borderWidth: StyleSheet.hairlineWidth, marginTop: 20 },
   dangerText: { fontSize: 13, fontWeight: '600', color: '#F44336' },
+  onboardDoneCard: { backgroundColor: '#34A85312', borderColor: '#34A853', borderWidth: 1.5, borderRadius: 14, padding: 16, marginTop: 20 },
+  onboardDoneRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  onboardDoneText: { flex: 1, fontSize: 14, fontWeight: '700', lineHeight: 19 },
+  onboardReturnBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, height: 48, borderRadius: 12, backgroundColor: '#34A853' },
+  onboardReturnText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 },
   modalCard: { borderRadius: 16, padding: 20 },
   modalTitle: { fontSize: 18, fontWeight: '700' },

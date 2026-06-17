@@ -2097,7 +2097,7 @@
     "upgrade_cta": "Upgrade to Premium to upload more menus",
     "upload_pdf": "Upload PDF",
     "upload_photos": "Upload Photos",
-    "processing_message": "AI is reading your menu… this can take 40 seconds to 3 minutes depending on the file size.",
+    "processing_message": "AI is reading your menu… this can take 40 seconds to 3 minutes depending on the file size. Please don't close the app while it scans your file.",
     "history": "Recent Uploads",
     "no_uploads": "No uploads yet.",
     "items": "items",
@@ -2153,6 +2153,6 @@
     "delete_failed": "Could Not Delete",
     "insufficient_title": "Not Enough Credits",
     "insufficient_msg": "This needs {{cost}} credits but you have {{have}} left this month. Credits reset next month.",
-    "upload_hint": "Reading a menu takes about 40 seconds to 3 minutes depending on the file size."
+    "upload_hint": "Reading a menu takes about 40 seconds to 3 minutes depending on the file size. Please don't close the app while it scans your menu file or image."
   }
 }

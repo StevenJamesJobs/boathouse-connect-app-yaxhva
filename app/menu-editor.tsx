@@ -1020,17 +1020,21 @@ export default function MenuEditorScreen() {
         )}
       </View>
 
-      {/* Season Selector */}
-      <View style={styles.seasonSelectorContainer}>
-        <SeasonSelector
-          selectedSeason={season}
-          onSeasonChange={setSeason}
-          menu1Label={organization?.menu_1_name}
-          menu2Label={organization?.menu_2_name}
-          menu1Icon={organization?.menu_1_icon}
-          menu2Icon={organization?.menu_2_icon}
-        />
-      </View>
+      {/* Season Selector — only for two-menu orgs. A single-menu org has no
+          Menu 1 / Menu 2 choice, so we hide the tabs (matches the customer
+          MenuDisplay, which also gates this on menu_count === 2). */}
+      {organization?.menu_count === 2 && (
+        <View style={styles.seasonSelectorContainer}>
+          <SeasonSelector
+            selectedSeason={season}
+            onSeasonChange={setSeason}
+            menu1Label={organization?.menu_1_name}
+            menu2Label={organization?.menu_2_name}
+            menu1Icon={organization?.menu_1_icon}
+            menu2Icon={organization?.menu_2_icon}
+          />
+        </View>
+      )}
 
       {/* Search Bar + Add Button */}
       <View style={styles.searchRow}>
@@ -1748,7 +1752,10 @@ export default function MenuEditorScreen() {
               <View style={styles.formSection}>
 
               {/* Menu Choice — pick the menu FIRST so the category pills below
-                  reflect that menu's tree (per-menu) or the shared tree. */}
+                  reflect that menu's tree (per-menu) or the shared tree. Hidden
+                  for single-menu orgs — there's only one menu, so items just
+                  default to showing on it (item_season stays 'both'). */}
+              {organization?.menu_count === 2 && (
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{t('menu_editor:season_label')}</Text>
                 <View style={styles.seasonTagRow}>
@@ -1802,6 +1809,7 @@ export default function MenuEditorScreen() {
                   <Text style={styles.seasonLegacyHint}>{t('menu_editor:season_both_legacy_hint')}</Text>
                 )}
               </View>
+              )}
 
               {/* Category — pills come from the SELECTED menu's tree (formMenuCats). */}
               <View style={styles.formGroup}>
