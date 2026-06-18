@@ -46,7 +46,9 @@ const DEFAULT_ORG: Organization = {
   zip: null,
   latitude: null,
   longitude: null,
-  weather_location: 'Long Branch, NJ',
+  // No hardcoded location — each org's weather_location comes from the DB
+  // (auto-derived from their address at onboarding). Null until real org loads.
+  weather_location: null,
   google_maps_query: null,
   reward_currency_name: "McLoone's Bucks",
   join_code: '',

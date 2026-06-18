@@ -26,7 +26,7 @@ const WEATHER_API_KEY = '6e3db8832cf34a5bbc5182329251711';
 export default function WeatherWidget({ textColor, secondaryTextColor, language = 'en', onPress }: WeatherWidgetProps) {
   const { t } = useTranslation();
   const { organization } = useOrganization();
-  const location = organization?.weather_location || 'Unknown';
+  const location = organization?.weather_location || null;
   const [weather, setWeather] = useState<WeatherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -75,6 +75,11 @@ export default function WeatherWidget({ textColor, secondaryTextColor, language 
   };
 
   const fetchWeather = useCallback(async () => {
+    if (!location) {
+      setWeather(null);
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setError(null);
@@ -114,6 +119,16 @@ export default function WeatherWidget({ textColor, secondaryTextColor, language 
   useEffect(() => {
     fetchWeather();
   }, [fetchWeather]);
+
+  if (!location) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={[styles.errorText, { color: secondaryTextColor }]}>
+          {t('weather.no_location')}
+        </Text>
+      </View>
+    );
+  }
 
   if (loading) {
     return (

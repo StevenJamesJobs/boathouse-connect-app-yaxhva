@@ -504,7 +504,7 @@ export default function EmployeeRewardsScreen() {
               <View style={styles.placeholderContainer}>
                 <IconSymbol
                   ios_icon_name="star.fill"
-                  android_material_icon_name="rate_review"
+                  android_material_icon_name="rate-review"
                   size={64}
                   color={colors.primary}
                 />

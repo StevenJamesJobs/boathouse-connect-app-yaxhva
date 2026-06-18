@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useTranslation } from 'react-i18next';
 
@@ -37,16 +38,27 @@ export default function WelcomeHeader({
 }: WelcomeHeaderProps) {
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { organization } = useOrganization();
   const { unreadCount } = useUnreadMessages();
   const router = useRouter();
   const { t } = useTranslation();
 
+  // Follow the org's own weather location (auto-derived from their address at
+  // onboarding). No hardcoded fallback — a null location simply hides the chip.
+  const weatherLocation = organization?.weather_location || null;
+
   const [weather, setWeather] = useState<WeatherInfo | null>(externalWeather || null);
 
   const fetchWeather = useCallback(async () => {
+    if (!weatherLocation) {
+      setWeather(null);
+      return;
+    }
     try {
       const res = await fetch(
-        `https://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=07003&aqi=no`
+        `https://api.weatherapi.com/v1/current.json?key=${WEATHER_API_KEY}&q=${encodeURIComponent(
+          weatherLocation
+        )}&aqi=no`
       );
       const data = await res.json();
       if (data?.current) {
@@ -58,7 +70,7 @@ export default function WelcomeHeader({
     } catch (e) {
       console.error('Weather fetch error:', e);
     }
-  }, []);
+  }, [weatherLocation]);
 
   useEffect(() => {
     if (!externalWeather) {

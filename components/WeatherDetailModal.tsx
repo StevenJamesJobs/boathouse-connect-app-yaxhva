@@ -12,10 +12,14 @@ import {
   Image,
   Animated,
   PanResponder,
+  Platform,
+  Linking,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
 import { useOrganization } from '../contexts/OrganizationContext';
+import HourlyForecastChart, { HourlyPoint } from '@/components/HourlyForecastChart';
 
 interface DayForecast {
   date: string;
@@ -41,7 +45,9 @@ interface WeatherDetailData {
   sunrise: string;
   sunset: string;
   next4Days: DayForecast[];
-  radarImageUrl: string;
+  hourly: HourlyPoint[];
+  lat: number | null;
+  lon: number | null;
 }
 
 interface WeatherDetailModalProps {
@@ -60,6 +66,20 @@ interface WeatherDetailModalProps {
 const WEATHER_API_KEY = '6e3db8832cf34a5bbc5182329251711';
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const DISMISS_THRESHOLD = 120;
+
+/**
+ * Interactive Windy radar map centered on the given coordinates. The embed keeps
+ * Windy's layer switcher (radar, temp, wind, clouds…) and time animation.
+ * `metricTemp=°F` is URL-encoded as %C2%B0F.
+ */
+function buildWindyUrl(lat: number, lon: number): string {
+  return (
+    'https://embed.windy.com/embed2.html' +
+    `?lat=${lat}&lon=${lon}&detailLat=${lat}&detailLon=${lon}` +
+    '&zoom=8&level=surface&overlay=radar&product=radar&marker=true&calendar=now' +
+    '&type=map&location=coordinates&metricWind=mph&metricTemp=%C2%B0F&radarRange=-1'
+  );
+}
 
 export default function WeatherDetailModal({
   visible,
@@ -228,9 +248,30 @@ export default function WeatherDetailModal({
         console.log(`  Day ${i + 1}: ${day.dayOfWeek} ${day.date} - High: ${day.highTemp}°F, Low: ${day.lowTemp}°F`);
       });
 
-      // Use North Jersey focused radar from NOAA with timestamp to force refresh
-      const timestamp = Date.now();
-      const radarImageUrl = `https://radar.weather.gov/ridge/standard/KDIX_loop.gif?t=${timestamp}`;
+      // ─── Hourly forecast: next 24 hours from "now" in the location's tz ──────
+      // Compare absolute epochs (tz-safe); derive the label from the API's local
+      // wall-clock string (h.time, already in the location's timezone).
+      const nowEpoch = data.location?.localtime_epoch ?? Math.floor(Date.now() / 1000);
+      const allHours: any[] = data.forecast.forecastday.flatMap((fd: any) => fd.hour || []);
+      const hourly: HourlyPoint[] = allHours
+        .filter((h: any) => h.time_epoch >= nowEpoch - 3600)
+        .slice(0, 24)
+        .map((h: any) => {
+          const hh = parseInt((h.time.split(' ')[1] || '0:00').split(':')[0], 10);
+          const label =
+            language === 'es'
+              ? `${hh}:00`
+              : `${hh % 12 === 0 ? 12 : hh % 12} ${hh < 12 ? 'AM' : 'PM'}`;
+          return {
+            label,
+            temp: Math.round(h.temp_f),
+            precip: Math.round(h.chance_of_rain ?? 0),
+            icon: `https:${h.condition.icon}`,
+          };
+        });
+
+      const lat = typeof data.location?.lat === 'number' ? data.location.lat : null;
+      const lon = typeof data.location?.lon === 'number' ? data.location.lon : null;
 
       const weatherDetail: WeatherDetailData = {
         currentTemp: Math.round(data.current.temp_f),
@@ -247,7 +288,9 @@ export default function WeatherDetailModal({
         sunrise: todayAstro.sunrise,
         sunset: todayAstro.sunset,
         next4Days,
-        radarImageUrl,
+        hourly,
+        lat,
+        lon,
       };
 
       setWeatherData(weatherDetail);
@@ -350,6 +393,9 @@ export default function WeatherDetailModal({
                       </Text>
                     </View>
 
+                    {/* Hourly Forecast - next 24 hours */}
+                    <HourlyForecastChart hours={weatherData.hourly} colors={colors} />
+
                     {/* Extended Forecast - 4 Days */}
                     <View style={styles.forecastSection}>
                       <Text style={[styles.forecastTitle, { color: colors.text }]}>{t('weather.extended_forecast')}</Text>
@@ -379,7 +425,7 @@ export default function WeatherDetailModal({
                               <View style={styles.horizontalTempRow}>
                                 <IconSymbol
                                   ios_icon_name="arrow.up"
-                                  android_material_icon_name="arrow_upward"
+                                  android_material_icon_name="arrow-upward"
                                   size={12}
                                   color="#E74C3C"
                                 />
@@ -390,7 +436,7 @@ export default function WeatherDetailModal({
                               <View style={styles.horizontalTempRow}>
                                 <IconSymbol
                                   ios_icon_name="arrow.down"
-                                  android_material_icon_name="arrow_downward"
+                                  android_material_icon_name="arrow-downward"
                                   size={12}
                                   color="#3498DB"
                                 />
@@ -404,22 +450,50 @@ export default function WeatherDetailModal({
                       )}
                     </View>
 
-                    {/* Radar Image - North Jersey Area */}
-                    <View style={styles.radarContainer}>
-                      <Text style={[styles.radarTitle, { color: colors.text }]}>
-                        {t('weather.local_radar')}
-                      </Text>
-                      <Text style={[styles.radarSubtitle, { color: colors.textSecondary }]}>
-                        {t('weather.radar_area')}
-                      </Text>
-                      <View style={[styles.radarImageWrapper, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}>
-                        <Image
-                          source={{ uri: weatherData.radarImageUrl }}
-                          style={styles.radarImage}
-                          resizeMode="cover"
-                        />
+                    {/* Radar - interactive Windy map centered on the location */}
+                    {weatherData.lat != null && weatherData.lon != null && (
+                      <View style={styles.radarContainer}>
+                        <Text style={[styles.radarTitle, { color: colors.text }]}>
+                          {t('weather.local_radar')}
+                        </Text>
+                        <Text style={[styles.radarSubtitle, { color: colors.textSecondary }]}>
+                          {t('weather.radar_hint')}
+                        </Text>
+                        <View style={[styles.radarImageWrapper, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '20' }]}>
+                          {Platform.OS === 'web' ? (
+                            <TouchableOpacity
+                              style={styles.radarWebFallback}
+                              activeOpacity={0.8}
+                              onPress={() => Linking.openURL(buildWindyUrl(weatherData.lat!, weatherData.lon!))}
+                            >
+                              <IconSymbol
+                                ios_icon_name="map.fill"
+                                android_material_icon_name="map"
+                                size={28}
+                                color={colors.primary}
+                              />
+                              <Text style={[styles.radarWebFallbackText, { color: colors.primary }]}>
+                                {t('weather.open_radar')}
+                              </Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <WebView
+                              source={{ uri: buildWindyUrl(weatherData.lat, weatherData.lon) }}
+                              style={styles.radarImage}
+                              originWhitelist={['*']}
+                              javaScriptEnabled
+                              domStorageEnabled
+                              startInLoadingState
+                              renderLoading={() => (
+                                <View style={styles.radarLoading}>
+                                  <ActivityIndicator color={colors.primary} />
+                                </View>
+                              )}
+                            />
+                          )}
+                        </View>
                       </View>
-                    </View>
+                    )}
 
                     {/* Weather Details Grid - 2 rows of 3 items */}
                     <View style={styles.detailsGrid}>
@@ -428,7 +502,7 @@ export default function WeatherDetailModal({
                         <View style={styles.detailItem}>
                           <IconSymbol
                             ios_icon_name="drop.fill"
-                            android_material_icon_name="water_drop"
+                            android_material_icon_name="water-drop"
                             size={18}
                             color={colors.primary}
                           />
@@ -466,7 +540,7 @@ export default function WeatherDetailModal({
                         <View style={styles.detailItem}>
                           <IconSymbol
                             ios_icon_name="sun.max.fill"
-                            android_material_icon_name="wb_sunny"
+                            android_material_icon_name="wb-sunny"
                             size={18}
                             color={colors.primary}
                           />
@@ -477,7 +551,7 @@ export default function WeatherDetailModal({
                         <View style={styles.detailItem}>
                           <IconSymbol
                             ios_icon_name="sunrise.fill"
-                            android_material_icon_name="wb_twilight"
+                            android_material_icon_name="wb-twilight"
                             size={18}
                             color={colors.primary}
                           />
@@ -488,7 +562,7 @@ export default function WeatherDetailModal({
                         <View style={styles.detailItem}>
                           <IconSymbol
                             ios_icon_name="sunset.fill"
-                            android_material_icon_name="wb_twilight"
+                            android_material_icon_name="wb-twilight"
                             size={18}
                             color={colors.primary}
                           />
@@ -635,11 +709,31 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: 'hidden',
     borderWidth: 1,
-    height: 200,
+    height: 240,
   },
   radarImage: {
     width: '100%',
     height: '100%',
+    backgroundColor: 'transparent',
+  },
+  radarLoading: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radarWebFallback: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  radarWebFallbackText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   detailsGrid: {
     gap: 12,
