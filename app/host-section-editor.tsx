@@ -383,8 +383,11 @@ export default function HostSectionEditorScreen() {
       </ScrollView>
 
       {/* Tile add/edit modal */}
-      <Modal visible={tileModalVisible} transparent animationType="slide" onRequestClose={() => setTileModalVisible(false)}>
-        <View style={styles.modalOverlay}>
+      <Modal visible={tileModalVisible} transparent animationType="slide" onRequestClose={() => setTileModalVisible(false)} statusBarTranslucent>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
           <View style={[styles.modalSheet, { backgroundColor: colors.background }]}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>{editingTile ? 'Edit Tile' : 'Add Tile'}</Text>
@@ -425,7 +428,7 @@ export default function HostSectionEditorScreen() {
               </TouchableOpacity>
             </ScrollView>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </KeyboardAvoidingView>
   );
