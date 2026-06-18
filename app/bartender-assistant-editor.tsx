@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { menuIconAndroid } from '@/constants/menuIcons';
+import HeaderNavButton from '@/components/HeaderNavButton';
 
 export default function BartenderAssistantEditorScreen() {
   const router = useRouter();
@@ -33,7 +34,7 @@ export default function BartenderAssistantEditorScreen() {
           />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>{t('bartender_assistant_editor.title')}</Text>
-        <View style={styles.placeholder} />
+        <HeaderNavButton label={t('common:user')} iconIos="person.fill" iconAndroid="person" onPress={() => router.push('/bartender-assistant')} />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>

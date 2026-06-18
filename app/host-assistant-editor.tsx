@@ -18,6 +18,7 @@ import BottomNavBar from '@/components/BottomNavBar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
+import HeaderNavButton from '@/components/HeaderNavButton';
 
 interface SectionRow {
   id: string;
@@ -133,7 +134,12 @@ export default function HostAssistantEditorScreen() {
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>{t('host_assistant_editor.title')}</Text>
-        <View style={styles.placeholder} />
+        <HeaderNavButton
+          label={t('common:user')}
+          iconIos="person.fill"
+          iconAndroid="person"
+          onPress={() => router.push('/host-assistant')}
+        />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>

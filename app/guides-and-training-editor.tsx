@@ -17,6 +17,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import HeaderNavButton from '@/components/HeaderNavButton';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -612,7 +613,7 @@ export default function GuidesAndTrainingEditorScreen() {
           />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>{t('guides_training_editor.title')}</Text>
-        <View style={styles.backButton} />
+        <HeaderNavButton label={t('common:user')} iconIos="person.fill" iconAndroid="person" onPress={() => router.push('/guides-and-training')} />
       </View>
 
       {/* Category Tabs */}

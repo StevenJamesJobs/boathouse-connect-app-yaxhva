@@ -28,6 +28,9 @@ import ContentDetailModal from '@/components/ContentDetailModal';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { isManagerOrOwner } from '@/utils/roles';
+import HeaderNavButton from '@/components/HeaderNavButton';
 
 interface GuideItem {
   id: string;
@@ -55,6 +58,7 @@ export default function GuidesAndTrainingScreen() {
   const { language } = useLanguage();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const [guides, setGuides] = useState<GuideItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -413,7 +417,11 @@ export default function GuidesAndTrainingScreen() {
           />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>{t('guides_training.title')}</Text>
-        <View style={styles.headerSpacer} />
+        {isManagerOrOwner(user) ? (
+          <HeaderNavButton label={t('common:editor')} iconIos="pencil" iconAndroid="edit" onPress={() => router.push('/guides-and-training-editor')} />
+        ) : (
+          <View style={styles.headerSpacer} />
+        )}
       </View>
 
       {/* Search Box */}

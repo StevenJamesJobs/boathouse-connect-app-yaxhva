@@ -12,11 +12,15 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
+import { useAuth } from '@/contexts/AuthContext';
+import { isManagerOrOwner } from '@/utils/roles';
+import HeaderNavButton from '@/components/HeaderNavButton';
 
 export default function KitchenAssistantScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { user } = useAuth();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -31,7 +35,11 @@ export default function KitchenAssistantScreen() {
           />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>{t('kitchen_assistant.title')}</Text>
-        <View style={styles.placeholder} />
+        {isManagerOrOwner(user) ? (
+          <HeaderNavButton label={t('common:editor')} iconIos="pencil" iconAndroid="edit" onPress={() => router.push('/kitchen-assistant-editor')} />
+        ) : (
+          <View style={styles.placeholder} />
+        )}
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>

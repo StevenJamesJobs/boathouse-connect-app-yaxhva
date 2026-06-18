@@ -21,6 +21,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import HeaderNavButton from '@/components/HeaderNavButton';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 
@@ -356,7 +357,7 @@ export default function GameHubEditorScreen() {
           />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>{t('game_hub_editor:title')}</Text>
-        <View style={{ width: 40 }} />
+        <HeaderNavButton label={t('common:user')} iconIos="person.fill" iconAndroid="person" onPress={() => router.push('/game-hub')} />
       </View>
 
       <ScrollView

@@ -14,6 +14,9 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { isManagerOrOwner } from '@/utils/roles';
+import HeaderNavButton from '@/components/HeaderNavButton';
 import { supabase } from '@/app/integrations/supabase/client';
 
 interface HostSectionCard {
@@ -38,6 +41,7 @@ export default function HostAssistantScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const [sections, setSections] = useState<HostSectionCard[]>([]);
 
   const loadSections = useCallback(async () => {
@@ -70,7 +74,16 @@ export default function HostAssistantScreen() {
           />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>{t('host_assistant.title')}</Text>
-        <View style={styles.placeholder} />
+        {isManagerOrOwner(user) ? (
+          <HeaderNavButton
+            label={t('common:editor')}
+            iconIos="pencil"
+            iconAndroid="edit"
+            onPress={() => router.push('/host-assistant-editor')}
+          />
+        ) : (
+          <View style={styles.placeholder} />
+        )}
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>

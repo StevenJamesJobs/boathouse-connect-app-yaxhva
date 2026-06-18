@@ -12,6 +12,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
+import HeaderNavButton from '@/components/HeaderNavButton';
 
 export default function KitchenAssistantEditorScreen() {
   const router = useRouter();
@@ -31,7 +32,7 @@ export default function KitchenAssistantEditorScreen() {
           />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text }]}>{t('kitchen_assistant_editor.title')}</Text>
-        <View style={styles.placeholder} />
+        <HeaderNavButton label={t('common:user')} iconIos="person.fill" iconAndroid="person" onPress={() => router.push('/kitchen-assistant')} />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
