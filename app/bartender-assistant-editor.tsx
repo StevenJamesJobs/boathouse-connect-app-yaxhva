@@ -33,8 +33,8 @@ export default function BartenderAssistantEditorScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('bartender_assistant_editor.title')}</Text>
-        <HeaderNavButton label={t('common:user')} iconIos="person.fill" iconAndroid="person" onPress={() => router.push('/bartender-assistant')} />
+        <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>{t('bartender_assistant_editor.title')}</Text>
+        <HeaderNavButton label={t('common:to_user')} iconIos="person.fill" iconAndroid="person" onPress={() => router.replace('/bartender-assistant')} />
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>

@@ -37,9 +37,9 @@ export default function BartenderAssistantScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('bartender_assistant.title')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>{t('bartender_assistant.title')}</Text>
         {isManagerOrOwner(user) ? (
-          <HeaderNavButton label={t('common:editor')} iconIos="pencil" iconAndroid="edit" onPress={() => router.push('/bartender-assistant-editor')} />
+          <HeaderNavButton label={t('common:to_editor')} iconIos="pencil" iconAndroid="edit" onPress={() => router.replace('/bartender-assistant-editor')} />
         ) : (
           <View style={styles.placeholder} />
         )}

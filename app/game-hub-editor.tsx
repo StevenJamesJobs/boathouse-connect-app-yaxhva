@@ -356,8 +356,8 @@ export default function GameHubEditorScreen() {
             color={colors.primary}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('game_hub_editor:title')}</Text>
-        <HeaderNavButton label={t('common:user')} iconIos="person.fill" iconAndroid="person" onPress={() => router.push('/game-hub')} />
+        <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>{t('game_hub_editor:title')}</Text>
+        <HeaderNavButton label={t('common:to_user')} iconIos="person.fill" iconAndroid="person" onPress={() => router.replace('/game-hub')} />
       </View>
 
       <ScrollView

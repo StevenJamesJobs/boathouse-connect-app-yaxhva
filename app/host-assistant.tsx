@@ -73,13 +73,13 @@ export default function HostAssistantScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('host_assistant.title')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>{t('host_assistant.title')}</Text>
         {isManagerOrOwner(user) ? (
           <HeaderNavButton
-            label={t('common:editor')}
+            label={t('common:to_editor')}
             iconIos="pencil"
             iconAndroid="edit"
-            onPress={() => router.push('/host-assistant-editor')}
+            onPress={() => router.replace('/host-assistant-editor')}
           />
         ) : (
           <View style={styles.placeholder} />

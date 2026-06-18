@@ -133,12 +133,12 @@ export default function HostAssistantEditorScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('host_assistant_editor.title')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>{t('host_assistant_editor.title')}</Text>
         <HeaderNavButton
-          label={t('common:user')}
+          label={t('common:to_user')}
           iconIos="person.fill"
           iconAndroid="person"
-          onPress={() => router.push('/host-assistant')}
+          onPress={() => router.replace('/host-assistant')}
         />
       </View>
 

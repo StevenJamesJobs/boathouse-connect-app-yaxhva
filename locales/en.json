@@ -1,7 +1,7 @@
 {
   "common": {
-    "editor": "Editor",
-    "user": "User",
+    "to_editor": "To Editor",
+    "to_user": "To User",
     "custom_option": "Custom…",
     "cancel": "Cancel",
     "save": "Save",

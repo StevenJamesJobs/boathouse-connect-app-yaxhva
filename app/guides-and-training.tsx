@@ -416,9 +416,9 @@ export default function GuidesAndTrainingScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('guides_training.title')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>{t('guides_training.title')}</Text>
         {isManagerOrOwner(user) ? (
-          <HeaderNavButton label={t('common:editor')} iconIos="pencil" iconAndroid="edit" onPress={() => router.push('/guides-and-training-editor')} />
+          <HeaderNavButton label={t('common:to_editor')} iconIos="pencil" iconAndroid="edit" onPress={() => router.replace('/guides-and-training-editor')} />
         ) : (
           <View style={styles.headerSpacer} />
         )}
