@@ -102,6 +102,7 @@ export default function SettingsScreen() {
       const { error: updateError } = await supabase.rpc('update_password', {
         user_id: user.id,
         new_password: newPassword,
+        p_actor_id: user.id,
         p_organization_id: organizationId,
       });
       if (updateError) throw updateError;
