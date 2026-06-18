@@ -25,6 +25,8 @@ import MenuIconPicker from '@/components/MenuIconPicker';
 import JobTitlesManager from '@/components/JobTitlesManager';
 import AssistantsManager from '@/components/AssistantsManager';
 import { supabase } from '@/app/integrations/supabase/client';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 
 type SettingsTab = 'branding' | 'menu' | 'jobs-tools' | 'access';
 
@@ -369,6 +371,24 @@ export default function OrganizationSettingsScreen() {
 
   const showSaveButton = activeTab === 'branding' || activeTab === 'menu' || activeTab === 'access';
 
+  // Swipe left/right to move between tabs (mirrors the home-screen gesture).
+  const goToTabByDelta = (dir: 1 | -1) => {
+    const idx = TABS.findIndex(t => t.key === activeTab);
+    const next = idx + dir;
+    if (next >= 0 && next < TABS.length) setActiveTab(TABS[next].key);
+  };
+
+  const tabSwipe = Gesture.Pan()
+    .activeOffsetX([-20, 20])
+    .failOffsetY([-20, 20])
+    .onEnd((e) => {
+      if (e.translationX < -50 || e.velocityX < -500) {
+        runOnJS(goToTabByDelta)(1);
+      } else if (e.translationX > 50 || e.velocityX > 500) {
+        runOnJS(goToTabByDelta)(-1);
+      }
+    });
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -410,6 +430,7 @@ export default function OrganizationSettingsScreen() {
         ))}
       </View>
 
+      <GestureDetector gesture={tabSwipe}>
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         {/* ─── Branding Tab ──────────────────────────────────────────── */}
         {activeTab === 'branding' && (
@@ -761,6 +782,7 @@ export default function OrganizationSettingsScreen() {
 
         <View style={{ height: 60 }} />
       </ScrollView>
+      </GestureDetector>
     </KeyboardAvoidingView>
   );
 }
