@@ -305,7 +305,7 @@
   },
   "employee_tools": {
     "title": "Herramientas",
-    "bartender_assistant": "Asistente de Barman",
+    "bartender_assistant": "Asistente de Bar",
     "bartender_assistant_desc": "Recetas, listas de verificación y exámenes de bar",
     "host_assistant": "Asistente de Anfitrión",
     "host_assistant_desc": "Listas de verificación, OpenTable Academy y exámenes de anfitrión",
@@ -400,7 +400,7 @@
     "upcoming_events_editor_desc": "Crear y gestionar próximos eventos",
     "guides_training_editor": "Editor de Guías y Entrenamiento",
     "guides_training_editor_desc": "Cargar y gestionar materiales de entrenamiento",
-    "bartender_assistant_editor": "Editor del Asistente de Barman",
+    "bartender_assistant_editor": "Editor del Asistente de Bar",
     "bartender_assistant_editor_desc": "Gestionar recetas de cócteles, base de conocimiento y exámenes de bar",
     "server_assistant_editor": "Editor del Asistente de Mesero",
     "server_assistant_editor_desc": "Gestionar herramientas de mesero, juegos y exámenes de mesero",
@@ -429,7 +429,7 @@
     "grid_guides": "Guías y Entren.",
     "grid_game_hub": "Hub de Juegos",
     "grid_server": "Mesero",
-    "grid_bartender": "Barman",
+    "grid_bartender": "Bar",
     "grid_host": "Host",
     "grid_kitchen": "Cocina",
     "grid_employee_hub": "Hub Empleados",
@@ -439,7 +439,7 @@
     "assistant_editors_title": "Editores de Asistentes"
   },
   "bartender_assistant": {
-    "title": "Asistente de Barman",
+    "title": "Asistente de Bar",
     "encyclopedia": "Enciclopedia",
     "bar_exams": "Exámenes de Bar",
     "checklists": "Listas de Verificación",
@@ -759,7 +759,7 @@
     "delete_item_confirm": "¿Estás seguro de que quieres eliminar este elemento?"
   },
   "bartender_assistant_editor": {
-    "title": "Editor del Asistente de Barman",
+    "title": "Editor del Asistente de Bar",
     "tab_encyclopedia": "Enciclopedia",
     "tab_bar_exams": "Exámenes de Bar",
     "checklists_editor": "Editor de Listas de Verificación",
@@ -1700,7 +1700,7 @@
     "menus": "Menús",
     "rewards": "Premios",
     "server_assistant": "Asistente de Mesero",
-    "bartender_assistant": "Asistente de Bartender",
+    "bartender_assistant": "Asistente de Bar",
     "host_assistant": "Asistente de Host",
     "kitchen_assistant": "Asistente de Cocina",
     "announcement_editor": "Editor de Anuncios",
@@ -2087,7 +2087,7 @@
     "hint_delete_custom": "Eliminar una categoría personalizada mueve sus elementos a una categoría \"Sin categoría\" que puedes reasignar aquí o en el Editor de Menú.",
     "hint_sub_edit": "Renombra u oculta una subcategoría.",
     "hint_sub_delete": "Eliminar una subcategoría no elimina sus elementos — permanecen en esta Categoría y siguen apareciendo en el menú, solo sin la agrupación de subcategoría. Vuelve a asignarlos a otra subcategoría en cualquier momento editando el elemento.",
-    "hint_recipe_backed": "Marcar esto mantiene los cócteles sincronizados automáticamente con los editores de Recetas de Bebidas de {{menu1}} y {{menu2}} en el Asistente de Bartender.",
+    "hint_recipe_backed": "Marcar esto mantiene los cócteles sincronizados automáticamente con los editores de Recetas de Bebidas de {{menu1}} y {{menu2}} en el Asistente de Bar.",
     "hint_recipe_locked": "Las subcategorías bloqueadas no se pueden eliminar — renómbralas u ocúltalas en su lugar.",
     "add_category": "Agregar Categoría",
     "add_subcategory": "Agregar Subcategoría",

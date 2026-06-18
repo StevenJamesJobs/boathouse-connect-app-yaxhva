@@ -305,7 +305,7 @@
   },
   "employee_tools": {
     "title": "Tools",
-    "bartender_assistant": "Bartender Assistant",
+    "bartender_assistant": "Bar Assistant",
     "bartender_assistant_desc": "Recipes, checklists, and bar exams",
     "host_assistant": "Host Assistant",
     "host_assistant_desc": "Checklists, OpenTable Academy, and host exams",
@@ -400,7 +400,7 @@
     "upcoming_events_editor_desc": "Create and manage upcoming events",
     "guides_training_editor": "Guides and Training Editor",
     "guides_training_editor_desc": "Upload and manage training materials",
-    "bartender_assistant_editor": "Bartender Assistant Editor",
+    "bartender_assistant_editor": "Bar Assistant Editor",
     "bartender_assistant_editor_desc": "Manage cocktail recipes, knowledge base, and bar exams",
     "server_assistant_editor": "Server Assistant Editor",
     "server_assistant_editor_desc": "Manage server tools, games, and server exams",
@@ -429,7 +429,7 @@
     "grid_guides": "Guides & Training",
     "grid_game_hub": "Game Hub",
     "grid_server": "Server",
-    "grid_bartender": "Bartender",
+    "grid_bartender": "Bar",
     "grid_host": "Host",
     "grid_kitchen": "Kitchen",
     "grid_employee_hub": "Employee Hub",
@@ -439,7 +439,7 @@
     "assistant_editors_title": "Assistant Editors"
   },
   "bartender_assistant": {
-    "title": "Bartender Assistant",
+    "title": "Bar Assistant",
     "encyclopedia": "Encyclopedia",
     "bar_exams": "Bar Exams",
     "checklists": "Checklists",
@@ -759,7 +759,7 @@
     "delete_item_confirm": "Are you sure you want to delete this item?"
   },
   "bartender_assistant_editor": {
-    "title": "Bartender Assistant Editor",
+    "title": "Bar Assistant Editor",
     "tab_encyclopedia": "Encyclopedia",
     "tab_bar_exams": "Bar Exams",
     "checklists_editor": "Checklists Editor",
@@ -1701,7 +1701,7 @@
     "menus": "Menus",
     "rewards": "Rewards",
     "server_assistant": "Server Assistant",
-    "bartender_assistant": "Bartender Assistant",
+    "bartender_assistant": "Bar Assistant",
     "host_assistant": "Host Assistant",
     "kitchen_assistant": "Kitchen Assistant",
     "announcement_editor": "Announcements Editor",
@@ -2088,7 +2088,7 @@
     "hint_delete_custom": "Deleting a custom category moves its items to an \"Uncategorized\" category you can reassign here or in the Menu Editor.",
     "hint_sub_edit": "Rename or hide a subcategory.",
     "hint_sub_delete": "Deleting a subcategory doesn't delete its items — they stay in this Category and still appear on the menu, just without the subcategory grouping. Re-tag them to another subcategory anytime by editing the item.",
-    "hint_recipe_backed": "Marking this keeps the cocktails automatically synced to the {{menu1}} and {{menu2}} Libation Recipes editors in the Bartender Assistant.",
+    "hint_recipe_backed": "Marking this keeps the cocktails automatically synced to the {{menu1}} and {{menu2}} Libation Recipes editors in the Bar Assistant.",
     "hint_recipe_locked": "Locked subcategories can't be deleted — rename or hide them instead.",
     "add_category": "Add Category",
     "add_subcategory": "Add Subcategory",
