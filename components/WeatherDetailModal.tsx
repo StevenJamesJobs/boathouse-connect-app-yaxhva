@@ -67,6 +67,22 @@ const WEATHER_API_KEY = '6e3db8832cf34a5bbc5182329251711';
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const DISMISS_THRESHOLD = 120;
 
+// Neutralize the Windy embed's geolocation request so it never prompts for the
+// device's location (the map already centers on the coordinates we pass in). Runs
+// before the page's own scripts. The trailing `true;` silences an iOS warning.
+const DISABLE_GEOLOCATION_JS = `
+  (function() {
+    try {
+      var deny = function(_s, e) { if (e) e({ code: 1, message: 'Geolocation disabled', PERMISSION_DENIED: 1 }); };
+      Object.defineProperty(navigator, 'geolocation', {
+        value: { getCurrentPosition: deny, watchPosition: function(){ return 0; }, clearWatch: function(){} },
+        configurable: false,
+      });
+    } catch (e) {}
+  })();
+  true;
+`;
+
 /**
  * Interactive Windy radar map centered on the given coordinates. The embed keeps
  * Windy's layer switcher (radar, temp, wind, clouds…) and time animation.
@@ -483,6 +499,8 @@ export default function WeatherDetailModal({
                               originWhitelist={['*']}
                               javaScriptEnabled
                               domStorageEnabled
+                              geolocationEnabled={false}
+                              injectedJavaScriptBeforeContentLoaded={DISABLE_GEOLOCATION_JS}
                               startInLoadingState
                               renderLoading={() => (
                                 <View style={styles.radarLoading}>
