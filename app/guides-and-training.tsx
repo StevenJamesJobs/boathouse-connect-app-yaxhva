@@ -384,7 +384,7 @@ export default function GuidesAndTrainingScreen() {
             <View style={styles.emptyContainer}>
               <IconSymbol
                 ios_icon_name="book.fill"
-                android_material_icon_name="menu_book"
+                android_material_icon_name="menu-book"
                 size={64}
                 color={colors.textSecondary}
               />
