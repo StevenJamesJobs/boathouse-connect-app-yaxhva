@@ -13,6 +13,9 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { isManagerOrOwner } from '@/utils/roles';
+import HeaderNavButton from '@/components/HeaderNavButton';
 import { menuIconAndroid } from '@/constants/menuIcons';
 
 export default function BartenderAssistantScreen() {
@@ -20,6 +23,7 @@ export default function BartenderAssistantScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { organization } = useOrganization();
+  const { user } = useAuth();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -33,8 +37,12 @@ export default function BartenderAssistantScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('bartender_assistant.title')}</Text>
-        <View style={styles.placeholder} />
+        <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>{t('bartender_assistant.title')}</Text>
+        {isManagerOrOwner(user) ? (
+          <HeaderNavButton label={t('common:to_editor')} iconIos="pencil" iconAndroid="edit" onPress={() => router.replace('/bartender-assistant-editor')} />
+        ) : (
+          <View style={styles.placeholder} />
+        )}
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>

@@ -20,6 +20,8 @@ import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { isManagerOrOwner } from '@/utils/roles';
+import HeaderNavButton from '@/components/HeaderNavButton';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import { MessageBadge } from '@/components/MessageBadge';
 import { hexToRgba } from '@/styles/commonStyles';
@@ -193,6 +195,7 @@ export default function GameHubScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { t } = useTranslation();
+  const { user } = useAuth();
   const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
   const { organizationId } = useOrganization();
   const { hasPremium } = useSubscription();
@@ -232,8 +235,12 @@ export default function GameHubScreen() {
             color={colors.primary}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('game_hub_ui:title')}</Text>
-        <View style={{ width: 40 }} />
+        <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>{t('game_hub_ui:title')}</Text>
+        {isManagerOrOwner(user) ? (
+          <HeaderNavButton label={t('common:to_editor')} iconIos="pencil" iconAndroid="edit" onPress={() => router.replace('/game-hub-editor')} />
+        ) : (
+          <View style={{ width: 40 }} />
+        )}
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 120 }]}>

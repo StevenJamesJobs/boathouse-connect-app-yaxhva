@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Platform,
   Switch,
   Image,
+  Dimensions,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
@@ -34,6 +35,8 @@ const TABS: { key: SettingsTab; label: string }[] = [
   { key: 'jobs-tools', label: 'Jobs & Tools' },
   { key: 'access', label: 'Access' },
 ];
+
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export default function OrganizationSettingsScreen() {
   const router = useRouter();
@@ -367,7 +370,34 @@ export default function OrganizationSettingsScreen() {
     }
   };
 
-  const showSaveButton = activeTab === 'branding' || activeTab === 'menu' || activeTab === 'access';
+  // Paged horizontal tabs (content follows the finger, like the home screen).
+  const pagerRef = useRef<ScrollView>(null);
+
+  const goToTab = (key: SettingsTab) => {
+    const idx = TABS.findIndex(t => t.key === key);
+    setActiveTab(key);
+    pagerRef.current?.scrollTo({ x: idx * SCREEN_WIDTH, animated: true });
+  };
+
+  const handlePagerScroll = (e: any) => {
+    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+    const next = TABS[idx];
+    if (next && next.key !== activeTab) setActiveTab(next.key);
+  };
+
+  const saveButtonNode = (
+    <TouchableOpacity
+      style={[styles.saveButton, saving && { opacity: 0.6 }]}
+      onPress={handleSave}
+      disabled={saving}
+    >
+      {saving ? (
+        <ActivityIndicator color="#fff" />
+      ) : (
+        <Text style={styles.saveButtonText}>Save Changes</Text>
+      )}
+    </TouchableOpacity>
+  );
 
   return (
     <KeyboardAvoidingView
@@ -400,7 +430,7 @@ export default function OrganizationSettingsScreen() {
           <TouchableOpacity
             key={tab.key}
             style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-            onPress={() => setActiveTab(tab.key)}
+            onPress={() => goToTab(tab.key)}
             activeOpacity={0.7}
           >
             <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
@@ -410,9 +440,18 @@ export default function OrganizationSettingsScreen() {
         ))}
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        ref={pagerRef}
+        horizontal
+        pagingEnabled
+        bounces={false}
+        showsHorizontalScrollIndicator={false}
+        onMomentumScrollEnd={handlePagerScroll}
+        scrollEventThrottle={16}
+      >
         {/* ─── Branding Tab ──────────────────────────────────────────── */}
-        {activeTab === 'branding' && (
+        <View style={{ width: SCREEN_WIDTH }}>
+          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator={false}>
           <>
             {/* Branding Section */}
             <View style={styles.section}>
@@ -567,10 +606,14 @@ export default function OrganizationSettingsScreen() {
             </View>
 
           </>
-        )}
+          {saveButtonNode}
+          <View style={{ height: 60 }} />
+          </ScrollView>
+        </View>
 
         {/* ─── Menu Tab ───────────────────────────────────────────────── */}
-        {activeTab === 'menu' && (
+        <View style={{ width: SCREEN_WIDTH }}>
+          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Menu Configuration</Text>
 
@@ -665,18 +708,25 @@ export default function OrganizationSettingsScreen() {
               </View>
             )}
           </View>
-        )}
+          {saveButtonNode}
+          <View style={{ height: 60 }} />
+          </ScrollView>
+        </View>
 
         {/* ─── Jobs & Tools Tab ───────────────────────────────────────── */}
-        {activeTab === 'jobs-tools' && (
+        <View style={{ width: SCREEN_WIDTH }}>
+          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator={false}>
           <>
             <JobTitlesManager colors={colors} />
             <AssistantsManager colors={colors} />
           </>
-        )}
+          <View style={{ height: 60 }} />
+          </ScrollView>
+        </View>
 
         {/* ─── Access Tab ─────────────────────────────────────────────── */}
-        {activeTab === 'access' && (
+        <View style={{ width: SCREEN_WIDTH }}>
+          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Employee Access</Text>
 
@@ -742,24 +792,10 @@ export default function OrganizationSettingsScreen() {
               <Text style={styles.fieldHint}>Used when managers create accounts for employees</Text>
             </View>
           </View>
-        )}
-
-        {/* Save Button — only on tabs with form fields */}
-        {showSaveButton && (
-          <TouchableOpacity
-            style={[styles.saveButton, saving && { opacity: 0.6 }]}
-            onPress={handleSave}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.saveButtonText}>Save Changes</Text>
-            )}
-          </TouchableOpacity>
-        )}
-
-        <View style={{ height: 60 }} />
+          {saveButtonNode}
+          <View style={{ height: 60 }} />
+          </ScrollView>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );

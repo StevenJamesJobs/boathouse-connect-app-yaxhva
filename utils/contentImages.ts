@@ -158,16 +158,15 @@ export async function saveContentImages(
 }
 
 /**
- * Uploads an image to the appropriate storage bucket and returns the public URL.
- * Shared across all editor types to avoid code duplication.
+ * Uploads an image to a specific storage bucket and returns the public URL.
+ * The lowest-level shared upload helper.
  */
-export async function uploadImageToStorage(
+export async function uploadImageToBucket(
   uri: string,
-  contentType: ContentType,
+  bucket: string,
   readAsBase64: (uri: string) => Promise<string>
 ): Promise<string | null> {
   try {
-    const bucket = CONTENT_TYPE_TO_BUCKET[contentType];
     const base64 = await readAsBase64(uri);
 
     const byteCharacters = atob(base64);
@@ -206,6 +205,18 @@ export async function uploadImageToStorage(
     console.error('Image upload error:', err);
     return null;
   }
+}
+
+/**
+ * Uploads an image to the bucket mapped from a content type (announcements,
+ * special-features, upcoming-events). Thin wrapper over uploadImageToBucket.
+ */
+export async function uploadImageToStorage(
+  uri: string,
+  contentType: ContentType,
+  readAsBase64: (uri: string) => Promise<string>
+): Promise<string | null> {
+  return uploadImageToBucket(uri, CONTENT_TYPE_TO_BUCKET[contentType], readAsBase64);
 }
 
 /**

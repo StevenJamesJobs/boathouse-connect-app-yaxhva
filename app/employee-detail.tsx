@@ -181,6 +181,7 @@ export default function EmployeeDetailScreen() {
               const { error } = await supabase.rpc('update_password', {
                 user_id: employee.id,
                 new_password: defaultPassword,
+                p_actor_id: user?.id,
                 p_organization_id: organizationId,
               });
               if (error) throw error;
@@ -282,23 +283,19 @@ export default function EmployeeDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const { error, count } = await supabase
-                .from('users')
-                .delete({ count: 'exact' })
-                .eq('id', employee.id);
+              const { error } = await supabase.rpc('delete_employee' as any, {
+                p_actor_id: user?.id,
+                p_employee_id: employee.id,
+                p_organization_id: organizationId,
+              });
 
               if (error) throw error;
 
-              if (count === 0) {
-                Alert.alert(t('common:error'), 'Unable to delete employee. Please try again.');
-                return;
-              }
-
               Alert.alert(t('common:success'), t('employee_deleted'));
               router.back();
-            } catch (error) {
+            } catch (error: any) {
               console.error('Error deleting employee:', error);
-              Alert.alert(t('common:error'), t('error_delete'));
+              Alert.alert(t('common:error'), error.message || t('error_delete'));
             }
           },
         },
@@ -318,6 +315,16 @@ export default function EmployeeDetailScreen() {
     return null;
   }
 
+  // Owner-account protection (mirrors the DB-enforced guards in the UI).
+  const currentUserIsOwner = user?.role === 'owner';
+  const targetIsOwner = employee.role === 'owner';
+  const targetIsPrimaryOwner = employee.id === organization.owner_id;
+  const roleLocked = targetIsPrimaryOwner || (targetIsOwner && !currentUserIsOwner);
+  const roleOptions: string[] =
+    currentUserIsOwner || targetIsOwner ? ['employee', 'manager', 'owner'] : ['employee', 'manager'];
+  const canResetPassword = currentUserIsOwner || !targetIsOwner;
+  const canDelete = !targetIsPrimaryOwner && (currentUserIsOwner || !targetIsOwner);
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
@@ -334,14 +341,18 @@ export default function EmployeeDetailScreen() {
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('title')}</Text>
-        <TouchableOpacity onPress={handleDeleteEmployee} style={styles.deleteButton}>
-          <IconSymbol
-            ios_icon_name="trash.fill"
-            android_material_icon_name="delete"
-            size={24}
-            color="#F44336"
-          />
-        </TouchableOpacity>
+        {canDelete ? (
+          <TouchableOpacity onPress={handleDeleteEmployee} style={styles.deleteButton}>
+            <IconSymbol
+              ios_icon_name="trash.fill"
+              android_material_icon_name="delete"
+              size={24}
+              color="#F44336"
+            />
+          </TouchableOpacity>
+        ) : (
+          <View style={styles.deleteButton} />
+        )}
       </View>
 
       <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer} keyboardShouldPersistTaps="handled">
@@ -445,33 +456,33 @@ export default function EmployeeDetailScreen() {
           <View style={styles.formField}>
             <Text style={styles.formLabel}>{t('role')}</Text>
             <View style={styles.roleSelector}>
-              <TouchableOpacity
-                style={[styles.roleButton, employee.role === 'employee' && styles.roleButtonActive]}
-                onPress={() => setEmployee({ ...employee, role: 'employee' })}
-              >
-                <Text
+              {roleOptions.map((r) => (
+                <TouchableOpacity
+                  key={r}
                   style={[
-                    styles.roleButtonText,
-                    employee.role === 'employee' && styles.roleButtonTextActive,
+                    styles.roleButton,
+                    employee.role === r && styles.roleButtonActive,
+                    roleLocked && { opacity: 0.5 },
                   ]}
+                  onPress={() => { if (!roleLocked) setEmployee({ ...employee, role: r }); }}
+                  disabled={roleLocked}
                 >
-                  {t('employee')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.roleButton, employee.role === 'manager' && styles.roleButtonActive]}
-                onPress={() => setEmployee({ ...employee, role: 'manager' })}
-              >
-                <Text
-                  style={[
-                    styles.roleButtonText,
-                    employee.role === 'manager' && styles.roleButtonTextActive,
-                  ]}
-                >
-                  {t('manager')}
-                </Text>
-              </TouchableOpacity>
+                  <Text
+                    style={[
+                      styles.roleButtonText,
+                      employee.role === r && styles.roleButtonTextActive,
+                    ]}
+                  >
+                    {t(r)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
             </View>
+            {roleLocked && (
+              <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 8, fontStyle: 'italic' }}>
+                {targetIsPrimaryOwner ? t('role_locked_primary') : t('role_locked_owner')}
+              </Text>
+            )}
           </View>
 
           <TouchableOpacity
@@ -493,15 +504,21 @@ export default function EmployeeDetailScreen() {
           <Text style={styles.sectionDescription}>
             {t('reset_password_desc', { defaultPassword })}
           </Text>
-          <TouchableOpacity style={styles.resetButton} onPress={handleResetPassword}>
-            <IconSymbol
-              ios_icon_name="key.fill"
-              android_material_icon_name="vpn-key"
-              size={20}
-              color={colors.text}
-            />
-            <Text style={styles.resetButtonText}>{t('reset_password')}</Text>
-          </TouchableOpacity>
+          {canResetPassword ? (
+            <TouchableOpacity style={styles.resetButton} onPress={handleResetPassword}>
+              <IconSymbol
+                ios_icon_name="key.fill"
+                android_material_icon_name="vpn-key"
+                size={20}
+                color={colors.text}
+              />
+              <Text style={styles.resetButtonText}>{t('reset_password')}</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={{ fontSize: 12, color: colors.textSecondary, fontStyle: 'italic' }}>
+              {t('owner_password_locked')}
+            </Text>
+          )}
         </View>
 
         {/* Account Status */}

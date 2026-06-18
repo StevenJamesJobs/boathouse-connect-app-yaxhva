@@ -1,22 +1,65 @@
 
-import React from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Image,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { isManagerOrOwner } from '@/utils/roles';
+import HeaderNavButton from '@/components/HeaderNavButton';
+import { supabase } from '@/app/integrations/supabase/client';
+
+interface HostSectionCard {
+  id: string;
+  title: string;
+  card_subtitle: string | null;
+  card_image_url: string | null;
+  icon: string | null;
+}
+
+// iOS SF Symbol → Android MaterialIcons glyph for section card icons.
+const ANDROID_ICON: Record<string, string> = {
+  'graduationcap.fill': 'school',
+  'book.fill': 'menu-book',
+  'calendar': 'event',
+  'star.fill': 'star',
+  'link': 'link',
+};
 
 export default function HostAssistantScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { organizationId } = useOrganization();
+  const { user } = useAuth();
+  const [sections, setSections] = useState<HostSectionCard[]>([]);
+
+  const loadSections = useCallback(async () => {
+    if (!organizationId) return;
+    try {
+      const { data } = await (supabase
+        .from('host_sections' as any)
+        .select('id, title, card_subtitle, card_image_url, icon')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .order('display_order', { ascending: true }) as any);
+      setSections((data as HostSectionCard[]) || []);
+    } catch (e) {
+      console.error('Error loading host sections:', e);
+    }
+  }, [organizationId]);
+
+  useFocusEffect(useCallback(() => { loadSections(); }, [loadSections]));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -30,37 +73,55 @@ export default function HostAssistantScreen() {
             color={colors.text}
           />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('host_assistant.title')}</Text>
-        <View style={styles.placeholder} />
+        <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>{t('host_assistant.title')}</Text>
+        {isManagerOrOwner(user) ? (
+          <HeaderNavButton
+            label={t('common:to_editor')}
+            iconIos="pencil"
+            iconAndroid="edit"
+            onPress={() => router.replace('/host-assistant-editor')}
+          />
+        ) : (
+          <View style={styles.placeholder} />
+        )}
       </View>
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* OpenTable Academy Section */}
-        <TouchableOpacity
-          style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-          onPress={() => router.push('/opentable-academy')}
-        >
-          <View style={styles.sectionCardContent}>
-            <IconSymbol
-              ios_icon_name="graduationcap.fill"
-              android_material_icon_name="school"
-              size={32}
-              color={colors.primary}
-            />
-            <View style={styles.sectionCardText}>
-              <Text style={[styles.sectionCardTitle, { color: colors.text }]}>{t('host_assistant.opentable')}</Text>
-              <Text style={[styles.sectionCardDescription, { color: colors.textSecondary }]}>
-                {t('host_assistant.opentable_desc')}
-              </Text>
+        {/* Custom Sections (owner/manager managed; e.g. OpenTable Academy) */}
+        {sections.map((section) => (
+          <TouchableOpacity
+            key={section.id}
+            style={[styles.sectionCard, { backgroundColor: colors.card, borderColor: colors.border }]}
+            onPress={() => router.push(`/host-section?id=${section.id}` as any)}
+          >
+            <View style={styles.sectionCardContent}>
+              {section.card_image_url ? (
+                <Image source={{ uri: section.card_image_url }} style={styles.sectionThumb} resizeMode="cover" />
+              ) : (
+                <IconSymbol
+                  ios_icon_name={section.icon || 'square.grid.2x2.fill'}
+                  android_material_icon_name={(section.icon && ANDROID_ICON[section.icon]) || 'apps'}
+                  size={32}
+                  color={colors.primary}
+                />
+              )}
+              <View style={styles.sectionCardText}>
+                <Text style={[styles.sectionCardTitle, { color: colors.text }]}>{section.title}</Text>
+                {!!section.card_subtitle && (
+                  <Text style={[styles.sectionCardDescription, { color: colors.textSecondary }]}>
+                    {section.card_subtitle}
+                  </Text>
+                )}
+              </View>
             </View>
-          </View>
-          <IconSymbol
-            ios_icon_name="chevron.right"
-            android_material_icon_name="chevron-right"
-            size={24}
-            color={colors.textSecondary}
-          />
-        </TouchableOpacity>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={24}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+        ))}
 
         {/* Checklists Section */}
         <View style={[styles.card, { backgroundColor: colors.card }]}>
@@ -198,6 +259,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     gap: 16,
+  },
+  sectionThumb: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
   },
   sectionCardText: {
     flex: 1,
