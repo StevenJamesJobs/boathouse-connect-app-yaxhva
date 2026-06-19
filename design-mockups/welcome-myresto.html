@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MyResto Connect — Welcome redesign</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.11.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:26px 12px;background:#0E0F13;font-family:'Inter',system-ui,sans-serif;transition:background .3s}
+body.lt{background:#D2CCC3}
+.toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center}
+.grp{display:flex;align-items:center;gap:6px}
+.grp .gl2{font-family:'JetBrains Mono';font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#7E776D;margin-right:2px}
+body.lt .grp .gl2{color:#5A544B}
+.tb{background:rgba(255,255,255,0.08);color:#E8E5DF;border:1px solid rgba(255,255,255,0.16);border-radius:24px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.2s}
+body.lt .tb{background:rgba(0,0,0,0.06);color:#2A2A28;border-color:rgba(0,0,0,0.14)}
+.tb.on{background:#FF7A2F;color:#14171E;border-color:#FF7A2F}
+.hint{color:#7E776D;font-size:11.5px;font-family:'JetBrains Mono';text-align:center}
+
+.phone{
+  --bg:#14171E; --text:#F4F2EE; --muted:#9C958C; --fire:#FF7A2F; --ember:#FFB07A; --blue:#36B0C9; --bluetext:#7FD3E4; --fireText:#14171E;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.05); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --nav:rgba(22,25,32,0.40); --sheen:rgba(255,255,255,0.13); --thumbbg:#22262E; --glowA:rgba(255,122,47,0.30); --glowB:rgba(54,176,201,0.15);
+  position:relative;width:380px;height:760px;background:var(--bg);border-radius:48px;border:1px solid #2A2620;
+  box-shadow:0 22px 60px rgba(0,0,0,0.5);overflow:hidden;color:var(--text);transition:background .3s}
+.phone.t-carbon-l{--bg:#ECE8E1;--text:#1F2329;--muted:#80776B;--fire:#EC6A1E;--ember:#B8530F;--blue:#1390A8;--bluetext:#0E6E80;--fireText:#FFFFFF;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.85);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--nav:rgba(255,255,255,0.5);--sheen:rgba(255,255,255,0.92);--thumbbg:#D8D2C8;--glowA:rgba(236,106,30,0.18);--glowB:rgba(19,144,168,0.12)}
+.phone.t-velocity-d{--bg:#121821;--text:#EAF2F5;--muted:#8FA0AB;--fire:#33B4D1;--ember:#86DCEC;--blue:#FF7A2F;--bluetext:#FFB07A;--fireText:#06222B;--nav:rgba(18,24,33,0.40);--thumbbg:#1E2730;--glowA:rgba(51,180,209,0.28);--glowB:rgba(255,122,47,0.14)}
+.phone.t-velocity-l{--bg:#E6EEF2;--text:#10303B;--muted:#4E6B76;--fire:#1390A8;--ember:#0E6E80;--blue:#EC6A1E;--bluetext:#9A3D0C;--fireText:#FFFFFF;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.85);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--nav:rgba(255,255,255,0.5);--sheen:rgba(255,255,255,0.92);--thumbbg:#CDD9DE;--glowA:rgba(19,144,168,0.16);--glowB:rgba(236,106,30,0.12)}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fire:#4A90E2;--ember:#6BADE8;--blue:#5DADE2;--bluetext:#BFE3F7;--fireText:#0A1422;--glassbd:rgba(255,255,255,0.13);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--nav:rgba(26,35,50,0.42);--thumbbg:#2C3E50;--glowA:rgba(74,144,226,0.30);--glowB:rgba(93,173,226,0.15)}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fire:#1976D2;--ember:#1565C0;--blue:#42A5F5;--bluetext:#0D47A1;--fireText:#FFFFFF;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--nav:rgba(255,255,255,0.52);--sheen:rgba(255,255,255,0.95);--thumbbg:#CFE4EC;--glowA:rgba(25,118,210,0.16);--glowB:rgba(66,165,245,0.12)}
+.phone.t-midnight-d{--bg:#141628;--text:#E8EAF6;--muted:#9FA8DA;--fire:#8089DC;--ember:#AEB6F0;--blue:#9FA8DA;--bluetext:#C5CAE9;--fireText:#0E1124;--nav:rgba(20,22,40,0.42);--thumbbg:#232542;--glowA:rgba(121,134,203,0.30);--glowB:rgba(159,168,218,0.14)}
+.phone.t-midnight-l{--bg:#E8EAF6;--text:#1A237E;--muted:#4A4E8A;--fire:#5C6BC0;--ember:#3F51B5;--blue:#7986CB;--bluetext:#283593;--fireText:#FFFFFF;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.85);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--nav:rgba(255,255,255,0.5);--sheen:rgba(255,255,255,0.92);--thumbbg:#D5D9F0;--glowA:rgba(92,107,192,0.16);--glowB:rgba(121,134,203,0.12)}
+.phone.t-spring-d{--bg:#0B2E33;--text:#E0F0F2;--muted:#93B1B5;--fire:#7CC6CE;--ember:#B8E3E9;--blue:#5AA9B1;--bluetext:#CDEFF3;--fireText:#062228;--nav:rgba(11,46,51,0.44);--thumbbg:#143A40;--glowA:rgba(124,198,206,0.26);--glowB:rgba(184,227,233,0.12)}
+.phone.t-spring-l{--bg:#EEF6F8;--text:#142828;--muted:#4A6A6E;--fire:#4F7C82;--ember:#3A6166;--blue:#78A0A8;--bluetext:#1A4A50;--fireText:#FFFFFF;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.88);--surf:rgba(255,255,255,0.7);--surfbd:rgba(20,40,40,0.08);--hair:rgba(20,40,40,0.07);--nav:rgba(255,255,255,0.52);--sheen:rgba(255,255,255,0.95);--thumbbg:#CFE6E9;--glowA:rgba(79,124,130,0.16);--glowB:rgba(147,177,181,0.12)}
+.phone.t-mono-d{--bg:#181B21;--text:#F4F6F8;--muted:#9AA1A8;--fire:#E6EAEE;--ember:#C7CDD2;--blue:#8FA0AC;--bluetext:#CDD8DF;--fireText:#1A1E24;--nav:rgba(24,27,33,0.42);--thumbbg:#252A31;--glowA:rgba(230,234,238,0.10);--glowB:rgba(143,160,172,0.10)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--fire:#3A4250;--ember:#2A313C;--blue:#7E8A94;--bluetext:#2A313C;--fireText:#FFFFFF;--glass:rgba(255,255,255,0.6);--glassbd:rgba(255,255,255,0.85);--surf:rgba(255,255,255,0.64);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--nav:rgba(255,255,255,0.5);--sheen:rgba(255,255,255,0.92);--thumbbg:#D8D8DC;--glowA:rgba(58,66,80,0.10);--glowB:rgba(126,138,148,0.10)}
+.phone{--tint:#FF7A2F}
+.phone.t-ocean-d{--tint:#5DA0E5}.phone.t-ocean-l{--tint:#1976D2}
+.phone.t-midnight-d{--tint:#9AA4EA}.phone.t-midnight-l{--tint:#7986CB}
+.phone.t-spring-d{--tint:#8FCBD2}.phone.t-spring-l{--tint:#4F7C82}
+.phone *{box-sizing:border-box}
+.glow{position:absolute;top:-90px;right:-60px;width:300px;height:250px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-50px;left:-70px;width:220px;height:200px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:14px 28px 6px;font-size:13px;font-weight:600;font-family:'JetBrains Mono'}
+.sb .r{display:flex;gap:6px;font-size:14px}
+
+.head{position:relative;z-index:3;margin:2px 14px 0;padding:12px 14px;border-radius:20px;background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4)}
+.greet{font-family:'Bricolage Grotesque';font-size:19px;font-weight:700;letter-spacing:-0.4px;margin-bottom:11px;padding-left:2px}
+.greet b{color:var(--fire)}
+.hrow{display:flex;align-items:center;gap:9px}
+.av{width:42px;height:42px;border-radius:50%;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;font-family:'Bricolage Grotesque';overflow:hidden;flex-shrink:0}
+.av img{width:100%;height:100%;object-fit:cover}
+.who{flex:1;min-width:0}
+.who .nm{font-family:'Bricolage Grotesque';font-size:14px;font-weight:700}
+.who .jt{font-size:10px;color:var(--muted);font-family:'JetBrains Mono';text-transform:uppercase;letter-spacing:0.5px;margin-top:1px}
+.gl{position:relative;height:36px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--text);font-size:17px;padding:0 10px;gap:4px}
+.gl i.s{color:var(--fire)}
+.gl .t{font-size:13px;font-weight:600;font-family:'JetBrains Mono'}
+.dot{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;border-radius:8px;background:var(--blue);color:#06222B;font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px;border:2px solid var(--bg)}
+
+.connect{position:relative;z-index:5;display:flex;align-items:center;gap:6px;margin:12px 14px 0;padding:4px;border-radius:14px;background:var(--surf);border:1px solid var(--surfbd);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.tab{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:34px;border-radius:10px;font-size:13px;font-weight:600;font-family:'Bricolage Grotesque';color:var(--muted);cursor:pointer;transition:.2s}
+.tab.io{flex:0 0 38px}
+.tab.on{background:var(--fire);color:var(--fireText)}
+.tab i{font-size:16px}
+.tab .td{width:6px;height:6px;border-radius:50%;background:var(--blue)}
+
+.strip{position:relative;z-index:2;display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;margin-top:6px}
+.strip::-webkit-scrollbar{display:none}
+.panel{flex:0 0 100%;scroll-snap-align:start;height:528px;overflow-y:auto}
+.panel::-webkit-scrollbar{display:none}
+.pad{padding:6px 14px 140px}
+.lab{font-family:'JetBrains Mono';font-size:10px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin:10px 4px 9px;display:flex;justify-content:space-between;align-items:center}
+.lab span{color:var(--fire);letter-spacing:0}
+
+.collapse{padding:8px 14px 2px}
+.substick{position:sticky;top:0;z-index:6;background:var(--bg);padding:8px 14px 9px}
+.substick.shadow{box-shadow:0 6px 12px -6px rgba(0,0,0,0.4)}
+.seg{display:flex;gap:6px;padding:3px;border-radius:12px;background:var(--surf);border:1px solid var(--surfbd)}
+.seg div{flex:1;text-align:center;padding:8px;border-radius:9px;font-size:12.5px;font-weight:600;font-family:'Bricolage Grotesque';color:var(--muted);cursor:pointer;position:relative}
+.seg div.on{background:var(--fire);color:var(--fireText)}
+.seg .nd{position:absolute;top:6px;right:12px;width:6px;height:6px;border-radius:50%;background:var(--blue)}
+.subpad{padding:11px 14px 140px}
+
+.banner{position:relative;border-radius:18px;overflow:hidden;margin-bottom:11px;height:150px;background:var(--thumbbg) center/cover}
+.banner::after{content:"";position:absolute;inset:0;background:linear-gradient(to top,rgba(14,11,9,0.93) 8%,rgba(14,11,9,0.05) 64%)}
+.btag{position:absolute;top:11px;left:11px;z-index:2;background:rgba(20,16,14,0.55);border:1px solid rgba(255,255,255,0.16);color:var(--ember);font-family:'JetBrains Mono';font-size:9px;font-weight:600;letter-spacing:1px;padding:3px 8px;border-radius:7px;text-transform:uppercase;backdrop-filter:blur(6px)}
+.bprice{position:absolute;top:11px;right:11px;z-index:2;background:var(--tint);color:#14171E;font-family:'JetBrains Mono';font-weight:700;font-size:13px;padding:3px 9px;border-radius:8px}
+.bbody{position:absolute;left:14px;right:14px;bottom:12px;z-index:2;color:#F4F2EE}
+.bbody h3{font-family:'Bricolage Grotesque';font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1}
+.bbody p{margin-top:4px;font-size:11.5px;color:#D7D0C6;line-height:1.35}
+
+.card{display:flex;gap:11px;align-items:flex-start;background:var(--surf);border:1px solid var(--surfbd);border-radius:16px;padding:11px;margin-bottom:11px}
+.card .th{width:62px;height:62px;border-radius:12px;flex-shrink:0;background:var(--thumbbg) center/cover}
+.card .ic{width:46px;height:46px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:21px;background:color-mix(in srgb,var(--tint) 14%,transparent);color:var(--tint)}
+.card .ic.b{background:rgba(54,176,201,0.16);color:var(--bluetext)}
+.card .bd{flex:1;min-width:0}
+.card h3{font-family:'Bricolage Grotesque';font-weight:600;font-size:14px;line-height:1.2}
+.card h3 .pr{font-family:'JetBrains Mono';font-weight:700;font-size:13px;color:var(--fire);float:right;margin-left:8px}
+.card p{margin-top:4px;font-size:11.5px;color:var(--muted);line-height:1.4}
+.card .tm{font-family:'JetBrains Mono';font-size:10.5px;color:var(--fire);font-weight:600;white-space:nowrap}
+.new{background:var(--blue);color:#06222B;font-size:8.5px;font-weight:800;padding:1px 6px;border-radius:5px;font-family:'JetBrains Mono'}
+
+.glasscard{background:var(--surf);border:1px solid var(--surfbd);border-radius:16px;overflow:hidden;margin-bottom:11px}
+.srow{display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--hair)}
+.srow:last-child{border-bottom:none}
+.srow .d{font-size:12.5px;font-weight:600;width:54px;font-family:'Bricolage Grotesque'}
+.srow .tm{flex:1;font-family:'JetBrains Mono';font-size:11.5px;color:var(--muted)}
+.flag{width:18px;height:18px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;font-family:'JetBrains Mono'}
+.role{background:color-mix(in srgb,var(--tint) 16%,transparent);color:var(--tint);font-size:10px;font-weight:700;padding:2px 7px;border-radius:7px;font-family:'JetBrains Mono'}
+.btns{display:flex;gap:9px;margin-bottom:11px}
+.btn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;height:42px;border-radius:13px;font-size:12.5px;font-weight:600;font-family:'Bricolage Grotesque';cursor:pointer}
+.btn.p{background:var(--fire);color:var(--fireText)}
+.btn.o{background:var(--surf);border:1px solid var(--surfbd);color:var(--text)}
+.reserve{border:1px dashed var(--glassbd);border-radius:16px;padding:12px;background:rgba(54,176,201,0.05)}
+.rh{display:flex;justify-content:space-between;align-items:center;font-family:'JetBrains Mono';font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.rh .tag{background:var(--surf);color:var(--muted);font-size:8.5px;padding:2px 7px;border-radius:6px;letter-spacing:0}
+.pick{display:flex;justify-content:space-between;align-items:center;background:var(--surf);border-radius:11px;padding:9px 11px;margin-top:9px;font-size:12px}
+.pick .pu{color:var(--bluetext);font-weight:700}
+.mini{display:flex;gap:7px;margin-top:9px}
+.mini .m{flex:1;text-align:center;background:var(--surf);border:1px solid var(--surfbd);border-radius:11px;padding:9px 4px;font-size:11px;font-weight:600;color:var(--text)}
+.mini .m.appr{background:rgba(54,176,201,0.14);border-color:rgba(54,176,201,0.3);color:var(--bluetext)}
+
+.calhead{display:flex;justify-content:space-between;align-items:center;margin:2px 2px 9px}
+.calmonth{font-family:'Bricolage Grotesque';font-size:15px;font-weight:700}
+.calright{display:flex;align-items:center;gap:10px}
+.viewtop{background:color-mix(in srgb,var(--tint) 14%,transparent);color:var(--tint);font-size:11px;font-weight:700;font-family:'JetBrains Mono';padding:4px 9px;border-radius:9px;display:none}
+.viewtop.show{display:block}
+.viewall{display:flex;align-items:center;gap:2px;color:var(--fire);font-size:12.5px;font-weight:700;font-family:'Bricolage Grotesque'}
+.calexp{color:var(--fire);font-size:19px}
+.weekrow{display:flex;align-items:center;gap:1px;margin-bottom:2px}
+.warrow{color:var(--fire);font-size:15px;padding:2px;cursor:pointer;opacity:.85}
+.week{flex:1;display:flex;gap:4px}
+.wd{flex:1;text-align:center;padding:5px 0 9px;border-radius:12px;cursor:pointer;background:var(--surf);border:1px solid var(--surfbd);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);transition:.2s}
+.wd .dn{font-size:9px;color:var(--muted);font-family:'JetBrains Mono';text-transform:uppercase}
+.wd .dc{position:relative;width:26px;height:26px;margin:2px auto 0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono';font-weight:700;font-size:13px}
+.wd.today .dc{border:2px solid var(--fire);color:var(--fire)}
+.wd.sel{background:var(--fire);border-color:var(--fire)}
+.wd.sel .dn{color:var(--fireText);opacity:.85}
+.wd.sel .dc{color:var(--fireText)}
+.wd .ev{position:absolute;left:50%;bottom:-7px;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--blue);visibility:hidden}
+.wd.hasev .ev{visibility:visible}
+.wd.sel .ev{background:var(--fireText)}
+.hint2{text-align:center;font-size:10.5px;color:var(--muted);font-family:'JetBrains Mono';letter-spacing:1px;margin:4px 0}
+
+.bottom{position:absolute;left:14px;right:14px;bottom:14px;height:62px;background:var(--nav);backdrop-filter:blur(30px) saturate(1.6);-webkit-backdrop-filter:blur(30px) saturate(1.6);border:1px solid var(--glassbd);border-radius:24px;display:flex;align-items:center;justify-content:space-around;z-index:8;box-shadow:0 10px 30px rgba(0,0,0,0.40),inset 0 1px 0 var(--sheen)}
+.navpill{position:absolute;top:8px;height:46px;border-radius:15px;background:color-mix(in srgb,var(--fire) 16%,transparent);border:1px solid color-mix(in srgb,var(--fire) 32%,transparent);transition:transform .34s cubic-bezier(.2,.8,.25,1),width .34s;z-index:0;left:0;width:0}
+.nav{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:8.5px;font-weight:600;color:var(--muted);font-family:'Bricolage Grotesque';cursor:pointer;padding:0 4px}
+.nav i{font-size:19px;transition:.2s}
+.nav.on{color:var(--fire)}
+.nav.on i{text-shadow:0 0 10px var(--fire)}
+.fab{position:absolute;right:18px;bottom:86px;width:56px;height:56px;border-radius:50%;background:var(--fire);display:flex;align-items:center;justify-content:center;color:var(--fireText);font-size:27px;z-index:14;box-shadow:0 8px 24px color-mix(in srgb,var(--tint) 55%,transparent);cursor:pointer;border:1px solid var(--ember);transition:transform .42s cubic-bezier(.2,.85,.25,1),background .32s,box-shadow .32s,border-color .32s,color .32s}
+.phone.searching .fab{transform:translate(-288px,-539px) scale(0.58);background:transparent;box-shadow:none;border-color:transparent;color:var(--fire)}
+.pal{position:absolute;inset:0;z-index:12;background:rgba(12,10,9,0.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .3s;display:flex;flex-direction:column;padding:78px 16px 0}
+.phone.t-carbon-l .pal,.phone.t-velocity-l .pal,.phone.t-ocean-l .pal{background:rgba(40,34,28,0.40)}
+.phone.searching .pal{opacity:1;pointer-events:auto}
+.palbox{background:var(--bg);border:1px solid var(--glassbd);border-radius:20px;padding:7px;transform:translateY(16px) scale(.96);opacity:0;transition:.34s cubic-bezier(.2,.8,.2,1);box-shadow:0 24px 50px rgba(0,0,0,0.5)}
+.phone.searching .palbox{transform:none;opacity:1}
+.palin{display:flex;align-items:center;height:48px;padding:0 15px 0 52px;border-bottom:1px solid var(--hair)}
+.palin input{flex:1;border:none;outline:none;background:transparent;color:var(--text);font-family:'Inter';font-size:14.5px}
+.palqt{display:flex;gap:7px;padding:11px 8px;flex-wrap:wrap}
+.palqt span{font-size:11.5px;font-weight:600;color:var(--tint);background:color-mix(in srgb,var(--tint) 12%,transparent);border:1px solid color-mix(in srgb,var(--tint) 24%,transparent);padding:6px 11px;border-radius:11px;cursor:pointer}
+.palh{font-family:'JetBrains Mono';font-size:9.5px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;padding:6px 12px 3px}
+.palr{display:flex;align-items:center;gap:11px;padding:10px 12px;font-size:13.5px;border-radius:11px;cursor:pointer}
+.palr:hover{background:var(--surf)}
+.palr i{color:var(--muted);font-size:18px}
+.palr small{margin-left:auto;color:var(--muted);font-family:'JetBrains Mono';font-size:10px}
+</style>
+</head>
+<body>
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Carbon Glow ★</span>
+    <button class="tb on" data-th="" data-lt="0">Dark</button>
+    <button class="tb" data-th="t-carbon-l" data-lt="1">Light</button></div>
+  <div class="grp"><span class="gl2">Velocity</span>
+    <button class="tb" data-th="t-velocity-d" data-lt="0">Dark</button>
+    <button class="tb" data-th="t-velocity-l" data-lt="1">Light</button></div>
+  <div class="grp"><span class="gl2">Moonstone</span>
+    <button class="tb" data-th="t-mono-d" data-lt="0">Dark</button>
+    <button class="tb" data-th="t-mono-l" data-lt="1">Light</button></div>
+  <div class="grp"><span class="gl2">Ocean ⚓</span>
+    <button class="tb" data-th="t-ocean-d" data-lt="0">Dark</button>
+    <button class="tb" data-th="t-ocean-l" data-lt="1">Light</button></div>
+  <div class="grp"><span class="gl2">Midnight</span>
+    <button class="tb" data-th="t-midnight-d" data-lt="0">Dark</button>
+    <button class="tb" data-th="t-midnight-l" data-lt="1">Light</button></div>
+  <div class="grp"><span class="gl2">Spring Nights</span>
+    <button class="tb" data-th="t-spring-d" data-lt="0">Dark</button>
+    <button class="tb" data-th="t-spring-l" data-lt="1">Light</button></div>
+</div>
+<div class="hint">swipe the connect bar · scroll the Today tab to collapse Happening Today · tap a calendar day · tap the bolt</div>
+
+<div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div>
+  <div class="sb"><span>9:41</span><span class="r"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+
+  <div class="head">
+    <div class="greet">Good evening, <b>Deanna</b></div>
+    <div class="hrow">
+      <div class="av"><img src="https://xvbajqukbakcvdrkcioi.supabase.co/storage/v1/object/public/menu-items/1779372922288.jpg" alt=""></div>
+      <div class="who"><div class="nm">Deanna Marlowe</div><div class="jt">General Manager</div></div>
+      <div class="gl"><i class="ti ti-sun s"></i><span class="t">72°</span></div>
+      <div class="gl"><i class="ti ti-mail"></i><span class="dot">3</span></div>
+      <div class="gl"><i class="ti ti-bell"></i><span class="dot">5</span></div>
+    </div>
+  </div>
+
+  <div class="connect" id="connect">
+    <div class="tab io" data-i="0"><i class="ti ti-clock-hour-4"></i></div>
+    <div class="tab on" data-i="1"><i class="ti ti-speakerphone"></i>Today</div>
+    <div class="tab" data-i="2"><i class="ti ti-calendar"></i>Events<span class="td"></span></div>
+    <div class="tab" data-i="3"><i class="ti ti-tools-kitchen-2"></i>Specials</div>
+  </div>
+
+  <div class="strip" id="strip">
+    <div class="panel"><div class="pad">
+      <div class="glasscard" style="margin-top:2px">
+        <div class="srow"><span class="d">Today</span><span class="tm">4:00 – 10:00 PM</span><span class="flag" style="background:color-mix(in srgb,var(--tint) 22%,transparent);color:var(--tint)">C</span><span class="role">Floor</span></div>
+        <div class="srow"><span class="d">Fri 20</span><span class="tm">11:00 AM – 5:00 PM</span><span class="flag" style="background:rgba(54,176,201,0.2);color:var(--bluetext)">O</span><span class="role">Floor</span></div>
+        <div class="srow"><span class="d">Sat 21</span><span class="tm">5:00 – 11:30 PM</span><span class="role">Bar</span></div>
+        <div class="srow"><span class="d">Mon 23</span><span class="tm">9:00 AM – 3:00 PM</span><span class="flag" style="background:rgba(54,176,201,0.2);color:var(--bluetext)">T</span><span class="role">Floor</span></div>
+        <div class="srow"><span class="d">Wed 25</span><span class="tm">4:00 – 10:00 PM</span><span class="role">Host</span></div>
+      </div>
+      <div class="btns"><div class="btn p"><i class="ti ti-calendar-month"></i>Full Schedule</div><div class="btn o"><i class="ti ti-users"></i>View Roster</div></div>
+      <div class="reserve">
+        <div class="rh"><span>Available for pickup · 1</span><span class="tag">Coming soon</span></div>
+        <div class="pick"><span style="font-weight:600">Sun 22 · <span style="font-family:'JetBrains Mono'">5–11 PM</span> · Server</span><span class="pu">Pick up</span></div>
+        <div class="mini"><div class="m">Request time off</div><div class="m">Release shift</div><div class="m appr">Approvals · 2</div></div>
+      </div>
+    </div></div>
+
+    <div class="panel" id="today">
+      <div class="collapse">
+        <div class="lab">Happening today <span>tonight</span></div>
+        <div class="card"><div class="th" style="background-image:url('https://xvbajqukbakcvdrkcioi.supabase.co/storage/v1/object/public/upcoming-events/1779321256606.png')"></div><div class="bd"><h3>DJ Tah</h3><p>Live music on the patio</p></div><span class="tm">9:00 PM</span></div>
+      </div>
+      <div class="substick" id="todaystick"><div class="seg" id="sub"><div class="on" data-t="ann">Announcements</div><div data-t="feat">Special Features<span class="nd"></span></div></div></div>
+      <div class="subpad">
+        <div id="ann">
+          <div class="card"><div class="th" style="background-image:url('https://xvbajqukbakcvdrkcioi.supabase.co/storage/v1/object/public/announcements/1778392275434.png')"></div><div class="bd"><h3>Update 2.2 Out Now <span class="new">NEW</span></h3><p>The biggest update yet to get us ready for summer — new menu, themes &amp; more.</p></div></div>
+          <div class="card"><div class="ic"><i class="ti ti-clipboard-list"></i></div><div class="bd"><h3>Holiday Sign-Up Sheet</h3><p>On the kitchen bulletin board — add your availability for the upcoming holidays.</p></div></div>
+          <div class="card"><div class="ic"><i class="ti ti-device-desktop"></i></div><div class="bd"><h3>POS training — Tuesday 3 PM</h3><p>Mandatory for all servers. 30 minutes, back office.</p></div></div>
+          <div class="card"><div class="ic"><i class="ti ti-umbrella"></i></div><div class="bd"><h3>Patio reopens this weekend</h3><p>Weather's turning — full patio service Friday through Sunday.</p></div></div>
+          <div class="card"><div class="ic"><i class="ti ti-shirt"></i></div><div class="bd"><h3>Summer uniforms are in</h3><p>Pick yours up from the office before your next shift.</p></div></div>
+        </div>
+        <div id="feat" style="display:none">
+          <div class="card"><div class="th" style="background-image:url('https://xvbajqukbakcvdrkcioi.supabase.co/storage/v1/object/public/special-features/1777654772077.jpg')"></div><div class="bd"><h3>Yappy Hour on the Patio</h3><p>Every Monday, May–October — bring your pup to the patio.</p></div></div>
+          <div class="card"><div class="ic b"><i class="ti ti-trophy"></i></div><div class="bd"><h3>Wine by the Bottle Contest</h3><p>Quarterly company-wide contest — results coming soon.</p></div></div>
+          <div class="card"><div class="ic b"><i class="ti ti-confetti"></i></div><div class="bd"><h3>Trivia Night — Sopranos Edition</h3><p>Thursday 7 PM. Three specialty cocktails on feature.</p></div></div>
+          <div class="card"><div class="ic b"><i class="ti ti-gift"></i></div><div class="bd"><h3>Staff appreciation dinner</h3><p>End of month — family meal on the house after close.</p></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="events">
+      <div class="collapse" style="padding-bottom:6px">
+        <div class="calhead">
+          <div class="calmonth">June 2026</div>
+          <div class="calright">
+            <div class="viewtop" id="viewtop">View Top Events</div>
+            <div class="viewall">View All <i class="ti ti-chevron-right"></i></div>
+            <i class="ti ti-calendar calexp"></i>
+          </div>
+        </div>
+        <div class="weekrow">
+          <i class="ti ti-chevron-left warrow"></i>
+          <div class="week" id="week">
+            <div class="wd" data-d="15"><div class="dn">Su</div><div class="dc">15</div><div class="ev"></div></div>
+            <div class="wd" data-d="16"><div class="dn">Mo</div><div class="dc">16</div><div class="ev"></div></div>
+            <div class="wd hasev" data-d="17"><div class="dn">Tu</div><div class="dc">17</div><div class="ev"></div></div>
+            <div class="wd" data-d="18"><div class="dn">We</div><div class="dc">18</div><div class="ev"></div></div>
+            <div class="wd today hasev" data-d="19"><div class="dn">Th</div><div class="dc">19</div><div class="ev"></div></div>
+            <div class="wd hasev" data-d="20"><div class="dn">Fr</div><div class="dc">20</div><div class="ev"></div></div>
+            <div class="wd hasev" data-d="21"><div class="dn">Sa</div><div class="dc">21</div><div class="ev"></div></div>
+          </div>
+          <i class="ti ti-chevron-right warrow"></i>
+        </div>
+      </div>
+      <div class="substick" id="eventsstick"><div class="seg" id="eseg"><div class="on">Events</div><div>Entertainment</div></div></div>
+      <div class="subpad">
+        <div class="banner" style="height:140px;background-image:url('https://xvbajqukbakcvdrkcioi.supabase.co/storage/v1/object/public/upcoming-events/1774534946060.jpg')">
+          <div class="btag">Jun 21 · 10:00 AM</div>
+          <div class="bbody"><h3>Father's Day Brunch</h3><p>$54 adult · $19 kids · reservations climbing</p></div>
+        </div>
+        <div class="card"><div class="th" style="background-image:url('https://xvbajqukbakcvdrkcioi.supabase.co/storage/v1/object/public/upcoming-events/1779324456426.jpg')"></div><div class="bd"><h3>Men of Horses</h3><p>Live music · patio stage</p></div><span class="tm">Jun 20</span></div>
+        <div class="card"><div class="th" style="background-image:url('https://xvbajqukbakcvdrkcioi.supabase.co/storage/v1/object/public/upcoming-events/1779324898420.jpg')"></div><div class="bd"><h3>Glenn &amp; Oria</h3><p>Live music · acoustic duo</p></div><span class="tm">Jun 21</span></div>
+        <div class="card"><div class="th" style="background-image:url('https://xvbajqukbakcvdrkcioi.supabase.co/storage/v1/object/public/upcoming-events/1779321256606.png')"></div><div class="bd"><h3>DJ Tah</h3><p>Live music · patio</p></div><span class="tm">Jun 19</span></div>
+      </div>
+    </div>
+
+    <div class="panel"><div class="pad">
+      <div class="banner" style="margin-top:2px;background-image:url('https://xvbajqukbakcvdrkcioi.supabase.co/storage/v1/object/public/menu-items/1779372922288.jpg')">
+        <div class="btag">Summer menu · feature</div><div class="bprice">$16</div>
+        <div class="bbody"><h3>Summer Burrata</h3><p>Heirloom tomato, mango purée, strawberry, arugula, pistachio, raspberry coulis</p></div>
+      </div>
+      <div class="card"><div class="th" style="background-image:url('https://xvbajqukbakcvdrkcioi.supabase.co/storage/v1/object/public/menu-items/1765836156728.jpg')"></div><div class="bd"><h3>Salmon <span class="pr">$34</span></h3><p>Fennel &amp; leek risotto, roasted carrots, orange beurre blanc</p></div></div>
+      <div class="card"><div class="th" style="background-image:url('https://xvbajqukbakcvdrkcioi.supabase.co/storage/v1/object/public/menu-items/1765835926645.jpg')"></div><div class="bd"><h3>Braised Short Rib <span class="pr">$32</span></h3><p>Root vegetables, garlic whipped potatoes, red wine demi-glace</p></div></div>
+      <div class="hint2">swipe → for the full menu</div>
+    </div></div>
+  </div>
+
+  <div class="bottom" id="bottom">
+    <div class="navpill" id="navpill"></div>
+    <div class="nav on"><i class="ti ti-home"></i>Welcome</div>
+    <div class="nav"><i class="ti ti-tools-kitchen-2"></i>Menus</div>
+    <div class="nav"><i class="ti ti-tool"></i>Tools</div>
+    <div class="nav"><i class="ti ti-adjustments"></i>Manage</div>
+    <div class="nav"><i class="ti ti-user"></i>Profile</div>
+  </div>
+  <div class="fab" id="fab"><i class="ti ti-bolt"></i></div>
+
+  <div class="pal" id="pal">
+    <div class="palbox">
+      <div class="palin"><input placeholder="Search anything — people, menu, tools."></div>
+      <div class="palqt"><span>Compose</span><span>Schedule</span><span>Reviews</span><span>Roster</span><span>Approvals</span></div>
+      <div class="palh">Suggested</div>
+      <div class="palr res"><i class="ti ti-user"></i>Marcus Webb — Bartender<small>person</small></div>
+      <div class="palr res"><i class="ti ti-tools-kitchen-2"></i>Summer Burrata — Specials<small>dish</small></div>
+      <div class="palr res"><i class="ti ti-calendar-event"></i>Father's Day Brunch<small>event</small></div>
+      <div class="palr res"><i class="ti ti-settings"></i>Settings → Subscription<small>setting</small></div>
+    </div>
+  </div>
+</div>
+
+<script>
+var phone=document.getElementById('phone'),body=document.body;
+document.querySelectorAll('.tb').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('.tb').forEach(function(x){x.classList.remove('on');});b.classList.add('on');
+  phone.className='phone'+(b.dataset.th?(' '+b.dataset.th):'');
+  body.classList.toggle('lt',b.dataset.lt==='1');
+});});
+var strip=document.getElementById('strip'),tabs=document.querySelectorAll('#connect .tab');
+function go(i){strip.scrollTo({left:strip.clientWidth*i,behavior:'smooth'});}
+tabs.forEach(function(t){t.addEventListener('click',function(){go(+t.dataset.i);});});
+strip.addEventListener('scroll',function(){var i=Math.round(strip.scrollLeft/strip.clientWidth);tabs.forEach(function(t){t.classList.toggle('on',+t.dataset.i===i);});});
+setTimeout(function(){strip.scrollLeft=strip.clientWidth;},60);
+function stickShadow(panelId,stickId){var p=document.getElementById(panelId),s=document.getElementById(stickId);p.addEventListener('scroll',function(){s.classList.toggle('shadow',p.scrollTop>6);});}
+stickShadow('today','todaystick');stickShadow('events','eventsstick');
+var sub=document.getElementById('sub'),ann=document.getElementById('ann'),feat=document.getElementById('feat');
+sub.querySelectorAll('div').forEach(function(d){d.addEventListener('click',function(){sub.querySelectorAll('div').forEach(function(x){x.classList.remove('on');});d.classList.add('on');ann.style.display=d.dataset.t==='ann'?'':'none';feat.style.display=d.dataset.t==='feat'?'':'none';});});
+var eseg=document.getElementById('eseg');eseg.querySelectorAll('div').forEach(function(d){d.addEventListener('click',function(){eseg.querySelectorAll('div').forEach(function(x){x.classList.remove('on');});d.classList.add('on');});});
+var week=document.getElementById('week'),viewtop=document.getElementById('viewtop');
+week.querySelectorAll('.wd').forEach(function(d){d.addEventListener('click',function(){
+  var was=d.classList.contains('sel');
+  week.querySelectorAll('.wd').forEach(function(x){x.classList.remove('sel');});
+  if(!was){d.classList.add('sel');viewtop.classList.add('show');}else{viewtop.classList.remove('show');}
+});});
+viewtop.addEventListener('click',function(){week.querySelectorAll('.wd').forEach(function(x){x.classList.remove('sel');});viewtop.classList.remove('show');});
+var navpill=document.getElementById('navpill'),navs=document.querySelectorAll('#bottom .nav');
+function movePill(el){navpill.style.width=(el.offsetWidth+10)+'px';navpill.style.transform='translateX('+(el.offsetLeft-5)+'px)';}
+navs.forEach(function(n){n.addEventListener('click',function(){navs.forEach(function(x){x.classList.remove('on');});n.classList.add('on');movePill(n);});});
+setTimeout(function(){movePill(document.querySelector('#bottom .nav.on'));},120);
+var fab=document.getElementById('fab'),pal=document.getElementById('pal');
+fab.addEventListener('click',function(){phone.classList.add('searching');});
+pal.addEventListener('click',function(e){if(e.target===pal)phone.classList.remove('searching');});
+document.querySelectorAll('.palr.res, .palqt span').forEach(function(r){r.addEventListener('click',function(){phone.classList.remove('searching');});});
+</script>
+</body>
+</html>
