@@ -332,9 +332,9 @@ export default function EmployeeRewardsScreen() {
                   ios_icon_name="gift.fill"
                   android_material_icon_name="card-giftcard"
                   size={16}
-                  color="#FFF"
+                  color={colors.fireText}
                 />
-                <Text style={styles.redeemBtnText}>{t('rewards_ui:redeem')}</Text>
+                <Text style={[styles.redeemBtnText, { color: colors.fireText }]}>{t('rewards_ui:redeem')}</Text>
               </TouchableOpacity>
             </View>
 
@@ -350,11 +350,11 @@ export default function EmployeeRewardsScreen() {
                   ios_icon_name="trophy.fill"
                   android_material_icon_name="emoji-events"
                   size={16}
-                  color={rewardsSubTab === 'leaderboard' ? '#FFF' : colors.textSecondary}
+                  color={rewardsSubTab === 'leaderboard' ? colors.fireText : colors.textSecondary}
                 />
                 <Text style={[
                   styles.subTabText,
-                  { color: rewardsSubTab === 'leaderboard' ? '#FFF' : colors.textSecondary },
+                  { color: rewardsSubTab === 'leaderboard' ? colors.fireText : colors.textSecondary },
                 ]}>
                   {t('rewards_ui:tab_leaderboard')}
                 </Text>
@@ -371,7 +371,7 @@ export default function EmployeeRewardsScreen() {
                     ios_icon_name="clock.fill"
                     android_material_icon_name="history"
                     size={16}
-                    color={rewardsSubTab === 'recent' ? '#FFF' : colors.textSecondary}
+                    color={rewardsSubTab === 'recent' ? colors.fireText : colors.textSecondary}
                   />
                   {awardsHasNew && rewardsSubTab !== 'recent' ? (
                     <View style={styles.subTabDot} />
@@ -379,7 +379,7 @@ export default function EmployeeRewardsScreen() {
                 </View>
                 <Text style={[
                   styles.subTabText,
-                  { color: rewardsSubTab === 'recent' ? '#FFF' : colors.textSecondary },
+                  { color: rewardsSubTab === 'recent' ? colors.fireText : colors.textSecondary },
                 ]}>
                   {t('rewards_ui:tab_recent')}
                 </Text>
@@ -425,7 +425,7 @@ export default function EmployeeRewardsScreen() {
                             ]}
                           >
                             <View style={[styles.leaderboardRank, { backgroundColor: getRankColor(index) }]}>
-                              <Text style={styles.leaderboardRankText}>
+                              <Text style={[styles.leaderboardRankText, index >= 3 && { color: colors.fireText }]}>
                                 {index < 3 ? ['🥇', '🥈', '🥉'][index] : `#${index + 1}`}
                               </Text>
                             </View>

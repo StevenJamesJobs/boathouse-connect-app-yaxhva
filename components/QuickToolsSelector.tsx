@@ -182,7 +182,7 @@ export default function QuickToolsSelector({
                               ios_icon_name="checkmark"
                               android_material_icon_name="check"
                               size={14}
-                              color="#FFFFFF"
+                              color={colors.fireText}
                             />
                           )}
                         </View>

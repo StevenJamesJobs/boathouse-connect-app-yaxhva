@@ -239,7 +239,7 @@ export default function MenuUploadReviewScreen() {
             <View style={styles.segmentRow}>
               {menuOptions.map((o) => (
                 <TouchableOpacity key={o.slot} style={[styles.segment, targetSlot === o.slot && { backgroundColor: colors.primary }]} onPress={() => setTargetSlot(o.slot)}>
-                  <Text style={[styles.segmentText, { color: targetSlot === o.slot ? '#FFF' : colors.text }]} numberOfLines={1}>{o.label}</Text>
+                  <Text style={[styles.segmentText, { color: targetSlot === o.slot ? colors.fireText : colors.text }]} numberOfLines={1}>{o.label}</Text>
                 </TouchableOpacity>
               ))}
             </View>
@@ -251,10 +251,10 @@ export default function MenuUploadReviewScreen() {
             <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('menu_upload.mode', 'How should this be added?')}</Text>
             <View style={styles.segmentRow}>
               <TouchableOpacity style={[styles.segment, mode === 'add' && { backgroundColor: colors.primary }]} onPress={() => setMode('add')}>
-                <Text style={[styles.segmentText, { color: mode === 'add' ? '#FFF' : colors.text }]}>{t('menu_upload.mode_add', 'Add to menu')}</Text>
+                <Text style={[styles.segmentText, { color: mode === 'add' ? colors.fireText : colors.text }]}>{t('menu_upload.mode_add', 'Add to menu')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.segment, mode === 'replace' && { backgroundColor: colors.primary }]} onPress={() => setMode('replace')}>
-                <Text style={[styles.segmentText, { color: mode === 'replace' ? '#FFF' : colors.text }]}>{t('menu_upload.mode_replace', 'Replace menu')}</Text>
+                <Text style={[styles.segmentText, { color: mode === 'replace' ? colors.fireText : colors.text }]}>{t('menu_upload.mode_replace', 'Replace menu')}</Text>
               </TouchableOpacity>
             </View>
             {mode === 'replace' && (
@@ -360,7 +360,7 @@ export default function MenuUploadReviewScreen() {
       <View style={[styles.applyBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
         <Text style={[styles.applyCount, { color: colors.textSecondary }]}>{t('menu_upload.selected_count', { defaultValue: '{{n}} items selected', n: includedCount })}</Text>
         <TouchableOpacity style={[styles.applyButton, { backgroundColor: colors.primary, opacity: applying || includedCount === 0 ? 0.6 : 1 }]} onPress={doApply} disabled={applying || includedCount === 0}>
-          {applying ? <ActivityIndicator color="#FFF" size="small" /> : <Text style={styles.applyButtonText}>{t('menu_upload.add_to_menu', 'Add to Menu')}</Text>}
+          {applying ? <ActivityIndicator color={colors.fireText} size="small" /> : <Text style={[styles.applyButtonText, { color: colors.fireText }]}>{t('menu_upload.add_to_menu', 'Add to Menu')}</Text>}
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>

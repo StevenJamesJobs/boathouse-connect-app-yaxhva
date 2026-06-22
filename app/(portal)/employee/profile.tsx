@@ -50,7 +50,7 @@ const formatShiftDate = (dateStr: string) => {
 export default function EmployeeProfileScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
   const { organizationId } = useOrganization();
   const router = useRouter();
   const { unreadCount } = useUnreadMessages();
@@ -353,7 +353,7 @@ export default function EmployeeProfileScreen() {
                 ios_icon_name="camera.fill"
                 android_material_icon_name="camera-alt"
                 size={10}
-                color="#FFFFFF"
+                color={colors.fireText}
               />
             </View>
           </TouchableOpacity>
@@ -386,9 +386,9 @@ export default function EmployeeProfileScreen() {
                 ios_icon_name="dollarsign.circle.fill"
                 android_material_icon_name="attach-money"
                 size={16}
-                color="#FFFFFF"
+                color={colors.fireText}
               />
-              <Text style={styles.bucksText}>
+              <Text style={[styles.bucksText, { color: colors.fireText }]}>
                 ${user?.mcloonesBucks ?? 0}
               </Text>
             </View>
@@ -571,9 +571,9 @@ export default function EmployeeProfileScreen() {
                     ios_icon_name="pencil"
                     android_material_icon_name="edit"
                     size={20}
-                    color="#FFFFFF"
+                    color={colors.fireText}
                   />
-                  <Text style={styles.editButtonText}>{t('profile.edit_profile')}</Text>
+                  <Text style={[styles.editButtonText, { color: colors.fireText }]}>{t('profile.edit_profile')}</Text>
                 </TouchableOpacity>
               ) : (
                 <View style={styles.buttonRow}>
@@ -582,9 +582,9 @@ export default function EmployeeProfileScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary }]} onPress={handleSave} disabled={saving}>
                     {saving ? (
-                      <ActivityIndicator color="#FFFFFF" />
+                      <ActivityIndicator color={colors.fireText} />
                     ) : (
-                      <Text style={styles.saveButtonText}>{t('profile.save_changes')}</Text>
+                      <Text style={[styles.saveButtonText, { color: colors.fireText }]}>{t('profile.save_changes')}</Text>
                     )}
                   </TouchableOpacity>
                 </View>
@@ -637,6 +637,14 @@ export default function EmployeeProfileScreen() {
             })}
           </View>
         </View>
+        <TouchableOpacity
+          style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20, marginHorizontal: 16, marginBottom: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
+          onPress={async () => { await logout(); router.replace('/login'); }}
+          activeOpacity={0.7}
+        >
+          <IconSymbol ios_icon_name="rectangle.portrait.and.arrow.right" android_material_icon_name="logout" size={20} color="#E74C3C" />
+          <Text style={{ fontSize: 15, fontWeight: '600', color: '#E74C3C' }}>{t('profile.log_out', 'Log Out')}</Text>
+        </TouchableOpacity>
       </ScrollView>
 
       <QuickToolsSelector

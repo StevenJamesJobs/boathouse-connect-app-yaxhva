@@ -13,6 +13,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useTranslation } from 'react-i18next';
+import GlassCard from '@/components/GlassCard';
+import { fonts } from '@/constants/fonts';
 
 interface WeatherInfo {
   temp: number;
@@ -42,6 +44,15 @@ export default function WelcomeHeader({
   const { unreadCount } = useUnreadMessages();
   const router = useRouter();
   const { t } = useTranslation();
+
+  // Time-aware greeting headline (first name only — adds warmth on the
+  // post-onboarding "wow" screen without truncation risk).
+  const hour = new Date().getHours();
+  const greetingKey =
+    hour < 12 ? 'welcome.good_morning' : hour < 17 ? 'welcome.good_afternoon' : 'welcome.good_evening';
+  const greetingFallback =
+    hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const firstName = (user?.name || '').trim().split(/\s+/)[0] || '';
 
   // Follow the org's own weather location (auto-derived from their address at
   // onboarding). No hardcoded fallback — a null location simply hides the chip.
@@ -98,200 +109,195 @@ export default function WelcomeHeader({
     }
   };
 
+  const messageBadge = unreadCount > 99 ? '99+' : unreadCount;
+  const notifTotal = notificationCount + newContentCount;
+  const notifBadge = notifTotal > 99 ? '99+' : notifTotal;
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.card }]}>
-      {/* Profile Photo */}
-      <TouchableOpacity onPress={handleProfilePress} style={[styles.profilePicContainer, { borderColor: colors.highlight }]}>
-        {profilePictureUrl ? (
-          <Image source={{ uri: profilePictureUrl }} style={styles.profilePic} />
-        ) : (
-          <View style={[styles.profilePicPlaceholder, { backgroundColor: colors.background }]}>
+    <GlassCard variant="glass" radius={20} style={styles.container}>
+      {/* Greeting headline */}
+      <Text style={[styles.greet, { color: colors.text }]} numberOfLines={1}>
+        {t(greetingKey, greetingFallback)}
+        {firstName ? (
+          <>
+            {', '}
+            <Text style={{ color: colors.primary }}>{firstName}</Text>
+          </>
+        ) : null}
+      </Text>
+
+      {/* Row: avatar | name+title | weather | messages | notifications */}
+      <View style={styles.hrow}>
+        <TouchableOpacity
+          onPress={handleProfilePress}
+          activeOpacity={0.7}
+          style={[styles.av, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+        >
+          {profilePictureUrl ? (
+            <Image source={{ uri: profilePictureUrl }} style={styles.avImg} />
+          ) : (
             <IconSymbol
               ios_icon_name="person.fill"
               android_material_icon_name="person"
-              size={22}
+              size={20}
               color={colors.textSecondary}
             />
-          </View>
-        )}
-      </TouchableOpacity>
+          )}
+        </TouchableOpacity>
 
-      {/* Name + Job Title */}
-      <View style={styles.nameContainer}>
-        <Text style={[styles.userName, { color: colors.text }]} numberOfLines={1}>
-          {user?.name}
-        </Text>
-        <View style={[styles.jobTitleBadge, { backgroundColor: colors.primary }]}>
-          <Text style={styles.jobTitleText} numberOfLines={1}>
-            {user?.jobTitle}
+        <View style={styles.who}>
+          <Text style={[styles.nm, { color: colors.text }]} numberOfLines={1}>
+            {user?.name}
           </Text>
+          {!!user?.jobTitle && (
+            <Text style={[styles.jt, { color: colors.textSecondary }]} numberOfLines={1}>
+              {user.jobTitle}
+            </Text>
+          )}
         </View>
-      </View>
 
-      {/* Right side: Weather + Messages + Notifications */}
-      <View style={styles.rightSection}>
-        {/* Weather Chip */}
         {weather && (
           <TouchableOpacity
-            style={[styles.weatherChip, { backgroundColor: colors.background }]}
+            style={[styles.gl, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
             onPress={onWeatherPress}
             activeOpacity={0.7}
           >
-            <Image
-              source={{ uri: weather.conditionIcon }}
-              style={styles.weatherIcon}
-            />
-            <Text style={[styles.weatherTemp, { color: colors.text }]}>
-              {weather.temp}°
-            </Text>
+            <Image source={{ uri: weather.conditionIcon }} style={styles.glWeatherIcon} />
+            <Text style={[styles.glTemp, { color: colors.text }]}>{weather.temp}°</Text>
           </TouchableOpacity>
         )}
 
-        {/* Messages Button */}
         <TouchableOpacity
-          style={[styles.iconButton, { backgroundColor: colors.primary + '18' }]}
+          style={[styles.glIcon, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
           onPress={() => router.push('/messages')}
           activeOpacity={0.7}
         >
           <IconSymbol
             ios_icon_name="envelope.fill"
             android_material_icon_name="mail"
-            size={20}
-            color={colors.primary}
+            size={18}
+            color={colors.text}
           />
           {unreadCount > 0 && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {unreadCount > 99 ? '99+' : unreadCount}
-              </Text>
+            <View style={[styles.dot, { backgroundColor: colors.blue, borderColor: colors.background }]}>
+              <Text style={styles.dotText}>{messageBadge}</Text>
             </View>
           )}
         </TouchableOpacity>
 
-        {/* Notification Bell */}
         <TouchableOpacity
-          style={[styles.iconButton, { backgroundColor: colors.primary + '18' }]}
+          style={[styles.glIcon, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
           onPress={onNotificationPress}
           activeOpacity={0.7}
         >
           <IconSymbol
             ios_icon_name="bell.fill"
             android_material_icon_name="notifications"
-            size={20}
-            color={colors.primary}
+            size={18}
+            color={colors.text}
           />
-          {(notificationCount > 0 || newContentCount > 0) && (
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>
-                {(() => {
-                  const total = notificationCount + newContentCount;
-                  return total > 99 ? '99+' : total;
-                })()}
-              </Text>
+          {notifTotal > 0 && (
+            <View style={[styles.dot, { backgroundColor: colors.blue, borderColor: colors.background }]}>
+              <Text style={styles.dotText}>{notifBadge}</Text>
             </View>
           )}
         </TouchableOpacity>
       </View>
-    </View>
+    </GlassCard>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  greet: {
+    fontFamily: fonts.display.bold,
+    fontSize: 19,
+    letterSpacing: -0.4,
+    marginBottom: 11,
+    paddingLeft: 2,
+  },
+  hrow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 16,
-    marginBottom: 12,
-    gap: 10,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+    gap: 9,
   },
-  profilePicContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  av: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     overflow: 'hidden',
-    borderWidth: 2,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  profilePic: {
+  avImg: {
     width: '100%',
     height: '100%',
     resizeMode: 'cover',
   },
-  profilePicPlaceholder: {
-    width: '100%',
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  nameContainer: {
+  who: {
     flex: 1,
-    justifyContent: 'center',
-    gap: 3,
+    minWidth: 0,
   },
-  userName: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  jobTitleBadge: {
-    alignSelf: 'flex-start',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  jobTitleText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  rightSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  weatherChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 16,
-    gap: 2,
-  },
-  weatherIcon: {
-    width: 24,
-    height: 24,
-  },
-  weatherTemp: {
+  nm: {
+    fontFamily: fonts.display.bold,
     fontSize: 14,
-    fontWeight: '700',
   },
-  iconButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  jt: {
+    fontFamily: fonts.mono.medium,
+    fontSize: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginTop: 1,
+  },
+  gl: {
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 10,
+    gap: 4,
+  },
+  glWeatherIcon: {
+    width: 22,
+    height: 22,
+  },
+  glTemp: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 13,
+  },
+  glIcon: {
+    minWidth: 40,
+    height: 36,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
     position: 'relative',
   },
-  badge: {
+  dot: {
     position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#E74C3C',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
+    top: -5,
+    right: -5,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 3,
     borderWidth: 2,
-    borderColor: '#FFFFFF',
   },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
+  dotText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#06222B',
   },
 });

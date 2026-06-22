@@ -602,7 +602,7 @@ function createStyles(colors: ReturnType<typeof useThemeColors>) {
       alignItems: 'center',
     },
     primaryButtonText: {
-      color: '#FFFFFF',
+      color: colors.fireText,
       fontSize: 16,
       fontWeight: '700',
     },

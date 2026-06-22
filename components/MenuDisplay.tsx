@@ -114,6 +114,7 @@ interface MenuDisplayProps {
     text: string;
     textSecondary: string;
     primary: string;
+    fireText: string;
     card: string;
     highlight: string;
     border: string;
@@ -784,8 +785,8 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
                     onPress={() => router.push('/menu-editor' as any)}
                     activeOpacity={0.85}
                   >
-                    <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={18} color="#FFFFFF" />
-                    <Text style={styles.setupMenuButtonText}>{t('menu_display.setup_menu_now', 'Set up Menu Now')}</Text>
+                    <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={18} color={colors.fireText} />
+                    <Text style={[styles.setupMenuButtonText, { color: colors.fireText }]}>{t('menu_display.setup_menu_now', 'Set up Menu Now')}</Text>
                   </TouchableOpacity>
                 </>
               ) : (
@@ -863,7 +864,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             <Text style={[styles.filterButtonText, { color: colors.text }]}>{t('menu_display.filter')}</Text>
             {activeFilters.length > 0 && (
               <View style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
-                <Text style={styles.filterBadgeText}>{activeFilters.length}</Text>
+                <Text style={[styles.filterBadgeText, { color: colors.fireText }]}>{activeFilters.length}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -1059,7 +1060,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
                         ios_icon_name="checkmark"
                         android_material_icon_name="check"
                         size={16}
-                        color="#FFFFFF"
+                        color={colors.fireText}
                       />
                     )}
                   </View>
@@ -1088,7 +1089,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             </ScrollView>
 
             <TouchableOpacity style={[styles.applyFiltersButton, { backgroundColor: colors.primary }]} onPress={closeFilterModal}>
-              <Text style={styles.applyFiltersButtonText}>
+              <Text style={[styles.applyFiltersButtonText, { color: colors.fireText }]}>
                 {t('menu_display.apply_filters')} {activeFilters.length > 0 && `(${activeFilters.length})`}
               </Text>
             </TouchableOpacity>

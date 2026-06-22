@@ -15,6 +15,7 @@ import {
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
 
 export interface PickedEmployee {
   id: string;
@@ -56,6 +57,9 @@ export default function EmployeePickerModal({
   onClose,
 }: EmployeePickerModalProps) {
   const { organizationId } = useOrganization();
+  // fireText (on-primary text color) comes from the theme directly so the
+  // selected row's checkmark stays readable in Moonstone without prop threading.
+  const { fireText } = useThemeColors();
   const [employees, setEmployees] = useState<EmployeeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -211,7 +215,7 @@ export default function EmployeePickerModal({
                   ios_icon_name="checkmark"
                   android_material_icon_name="check"
                   size={14}
-                  color="#FFFFFF"
+                  color={fireText}
                 />
               )}
             </View>

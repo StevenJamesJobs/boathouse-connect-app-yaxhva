@@ -379,7 +379,7 @@ export default function SettingsScreen() {
                   style={[styles.saveButton, { backgroundColor: colors.primary }]}
                   onPress={handleChangePassword}
                 >
-                  <Text style={styles.buttonText}>{t('profile.update_password')}</Text>
+                  <Text style={[styles.buttonText, { color: colors.fireText }]}>{t('profile.update_password')}</Text>
                 </TouchableOpacity>
               </View>
             </View>

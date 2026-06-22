@@ -149,7 +149,7 @@ export default function WordSearchLeaderboardScreen() {
                 style={[styles.beFirstBtn, { backgroundColor: colors.primary }]}
                 onPress={() => router.push('/word-search-game')}
               >
-                <Text style={styles.beFirstBtnText}>{t('word_search:play_now')}</Text>
+                <Text style={[styles.beFirstBtnText, { color: colors.fireText }]}>{t('word_search:play_now')}</Text>
               </TouchableOpacity>
             </View>
           ) : (
@@ -283,5 +283,5 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: '700' },
   emptyDesc: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
   beFirstBtn: { marginTop: 8, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
-  beFirstBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  beFirstBtnText: { fontWeight: '700', fontSize: 14 },
 });

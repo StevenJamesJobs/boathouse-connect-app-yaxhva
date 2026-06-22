@@ -149,7 +149,7 @@ export default function GlasswareIconPicker({
                     onPress={saveCustom}
                     disabled={!customText.trim()}
                   >
-                    <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={20} color="#FFFFFF" />
+                    <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={20} color={colors.fireText} />
                   </TouchableOpacity>
                 </View>
               </View>

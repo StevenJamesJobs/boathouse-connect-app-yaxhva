@@ -368,22 +368,22 @@ export default function ScheduleUploadScreen() {
             activeOpacity={0.8}
           >
             {uploading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={colors.fireText} />
             ) : (
               <IconSymbol
                 ios_icon_name="doc.fill"
                 android_material_icon_name="description"
                 size={26}
-                color="#FFFFFF"
+                color={colors.fireText}
               />
             )}
             <View style={styles.uploadTextContainer}>
-              <Text style={styles.uploadTitle}>
+              <Text style={[styles.uploadTitle, { color: colors.fireText }]}>
                 {uploading
                   ? t('schedule_upload.uploading', 'Uploading...')
                   : t('schedule_upload.upload_file', 'Upload File')}
               </Text>
-              <Text style={styles.uploadSubtitle}>
+              <Text style={[styles.uploadSubtitle, { color: colors.fireText }]}>
                 {t('schedule_upload.file_desc', 'PDF or Image')}
               </Text>
             </View>
@@ -397,22 +397,22 @@ export default function ScheduleUploadScreen() {
             activeOpacity={0.8}
           >
             {uploading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
+              <ActivityIndicator size="small" color={colors.fireText} />
             ) : (
               <IconSymbol
                 ios_icon_name="photo.on.rectangle"
                 android_material_icon_name="add-photo-alternate"
                 size={26}
-                color="#FFFFFF"
+                color={colors.fireText}
               />
             )}
             <View style={styles.uploadTextContainer}>
-              <Text style={styles.uploadTitle}>
+              <Text style={[styles.uploadTitle, { color: colors.fireText }]}>
                 {uploading
                   ? t('schedule_upload.uploading', 'Uploading...')
                   : t('schedule_upload.upload_images', 'Upload Images')}
               </Text>
-              <Text style={styles.uploadSubtitle}>
+              <Text style={[styles.uploadSubtitle, { color: colors.fireText }]}>
                 {t('schedule_upload.images_desc', 'From Photos')}
               </Text>
             </View>

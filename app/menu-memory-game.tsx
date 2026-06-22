@@ -183,9 +183,9 @@ export default function MenuMemoryGameScreen() {
             ios_icon_name="trophy.fill"
             android_material_icon_name="emoji-events"
             size={22}
-            color="#fff"
+            color={colors.fireText}
           />
-          <Text style={styles.leaderboardBtnText}>
+          <Text style={[styles.leaderboardBtnText, { color: colors.fireText }]}>
             {t('memory_game.leaderboard')}
           </Text>
         </TouchableOpacity>
@@ -393,7 +393,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
   },
   leaderboardBtnText: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: '700',
   },

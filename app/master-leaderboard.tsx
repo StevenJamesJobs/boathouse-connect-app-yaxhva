@@ -178,12 +178,12 @@ export default function MasterLeaderboardScreen() {
                 ios_icon_name={tab.icon.ios as any}
                 android_material_icon_name={tab.icon.android as any}
                 size={14}
-                color={isActive ? '#FFFFFF' : colors.textSecondary}
+                color={isActive ? colors.fireText : colors.textSecondary}
               />
               <Text
                 style={[
                   styles.tabLabel,
-                  { color: isActive ? '#FFFFFF' : colors.textSecondary },
+                  { color: isActive ? colors.fireText : colors.textSecondary },
                   isActive && { fontWeight: '700' },
                 ]}
               >
@@ -223,7 +223,7 @@ export default function MasterLeaderboardScreen() {
             style={[styles.playBtn, { backgroundColor: colors.primary }]}
             onPress={() => router.push('/game-hub')}
           >
-            <Text style={styles.playBtnText}>{t('master_leaderboard:play_now')}</Text>
+            <Text style={[styles.playBtnText, { color: colors.fireText }]}>{t('master_leaderboard:play_now')}</Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -323,5 +323,5 @@ const styles = StyleSheet.create({
   emptyTitle: { fontSize: 18, fontWeight: '700' },
   emptyDesc: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
   playBtn: { marginTop: 8, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
-  playBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  playBtnText: { fontWeight: '700', fontSize: 14 },
 });

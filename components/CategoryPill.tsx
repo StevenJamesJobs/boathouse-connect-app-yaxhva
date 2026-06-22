@@ -15,7 +15,8 @@ interface CategoryPillProps {
  * manager Menu Editor so both surfaces stay visually aligned.
  *
  * - `size="lg"` → category pills (padding 20/10, radius 20, font 14).
- *   Selected state uses `colors.primary` + white text.
+ *   Selected state uses `colors.primary` + `colors.fireText` (readable on the
+ *   near-white Moonstone primary).
  * - `size="sm"` → subcategory pills (padding 16/8, radius 16, font 12).
  *   Selected state uses `colors.highlight` + `colors.text`.
  *
@@ -36,7 +37,9 @@ export default function CategoryPill({
   const textStyle = isLg ? styles.lgText : styles.smText;
 
   const selectedBg = isLg ? colors.primary : colors.highlight;
-  const selectedText = isLg ? '#FFFFFF' : colors.text;
+  // lg pills fill with colors.primary → use fireText (readable in Moonstone, where
+  // primary is near-white). sm pills fill with the subtle highlight → colors.text.
+  const selectedText = isLg ? colors.fireText : colors.text;
 
   return (
     <TouchableOpacity

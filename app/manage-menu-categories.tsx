@@ -644,7 +644,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       borderColor: colors.primary,
     },
     slotSegText: { fontSize: 14, fontWeight: '600', color: colors.text },
-    slotSegTextActive: { color: '#FFFFFF' },
+    slotSegTextActive: { color: colors.fireText },
     row: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -681,7 +681,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     },
     addBtnText: { fontSize: 15, fontWeight: '600', color: colors.primary },
     primaryBtn: { marginTop: 20, backgroundColor: colors.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 10 },
-    primaryBtnText: { color: '#fff', fontWeight: '700' },
+    primaryBtnText: { color: colors.fireText, fontWeight: '700' },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', paddingHorizontal: 24 },
     modalCard: { backgroundColor: colors.card, borderRadius: 16, padding: 20 },
     modalTitle: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: 14 },
@@ -716,5 +716,5 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
     modalCancel: { paddingHorizontal: 18, paddingVertical: 10 },
     modalCancelText: { fontSize: 15, color: colors.textSecondary, fontWeight: '600' },
     modalSave: { paddingHorizontal: 22, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.primary },
-    modalSaveText: { fontSize: 15, color: '#fff', fontWeight: '700' },
+    modalSaveText: { fontSize: 15, color: colors.fireText, fontWeight: '700' },
   });

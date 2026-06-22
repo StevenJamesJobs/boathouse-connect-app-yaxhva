@@ -54,6 +54,7 @@
     "manager_portal": "Portal del Gerente"
   },
   "profile": {
+    "log_out": "Cerrar Sesión",
     "tap_to_change_photo": "Toca para cambiar la foto",
     "profile_information": "Información del Perfil",
     "notification_preferences": "Preferencias de Notificación",
@@ -348,6 +349,22 @@
     "today": "Hoy",
     "events": "Eventos",
     "specials": "Especiales"
+  },
+  "welcome": {
+    "good_morning": "Buenos días",
+    "good_afternoon": "Buenas tardes",
+    "good_evening": "Buenas noches"
+  },
+  "jolt": {
+    "placeholder": "Busca lo que sea — personas, menú, herramientas.",
+    "suggested": "Sugerencias",
+    "no_results": "Sin coincidencias",
+    "type_tool": "herramienta",
+    "type_person": "persona",
+    "type_dish": "plato",
+    "type_event": "evento",
+    "type_announcement": "anuncio",
+    "type_feature": "especial"
   },
   "manager_home": {
     "good_morning": "Buenos Días",
@@ -1442,20 +1459,8 @@
     "select_theme": "Seleccionar Tema",
     "preview": "Vista Previa",
     "current_theme": "Actual",
-    "theme_ocean": "Océano",
-    "theme_midnight": "Medianoche",
-    "theme_clean": "Limpio",
-    "theme_emerald": "Esmeralda",
-    "theme_blackgold": "Negro y Oro",
-    "theme_neonnoir": "Neón Noir",
-    "theme_urbanloft": "Loft Urbano",
-    "theme_stonepath": "Camino de Piedra",
-    "theme_watermelon": "Sandía Splash",
-    "theme_cappuccino": "Capuchino",
-    "theme_winterchill": "Noches de Primavera",
-    "theme_wildflower": "Pradera Silvestre",
-    "theme_autumn": "Hojas de Otoño",
-    "theme_summer": "Brisa de Verano"
+    "theme_moonstone": "Piedra Lunar",
+    "theme_ocean": "Océano"
   },
   "rewards_reviews_editor": {
     "title": "Editor de Recompensas y Reseñas",
@@ -1658,7 +1663,14 @@
     "your_next_shifts": "Tus Próximos Turnos",
     "full_schedule": "Horario Completo",
     "no_shifts": "Sin turnos próximos",
-    "view_todays_roster": "Ver Lista de Hoy"
+    "view_todays_roster": "Ver Lista de Hoy",
+    "view_roster": "Ver Personal",
+    "today_label": "Hoy",
+    "shift_tools": "Herramientas de Turno",
+    "coming_soon": "Próximamente",
+    "request_time_off": "Solicitar día libre",
+    "release_shift": "Liberar turno",
+    "approvals": "Aprobaciones"
   },
   "my_schedule": {
     "title": "Mi Horario",

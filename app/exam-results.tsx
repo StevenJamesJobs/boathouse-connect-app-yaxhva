@@ -237,7 +237,7 @@ export default function ExamResultsScreen() {
           style={[styles.doneButton, { backgroundColor: colors.primary }]}
           onPress={handleDone}
         >
-          <Text style={styles.doneButtonText}>{isSpanish ? 'Listo' : 'Done'}</Text>
+          <Text style={[styles.doneButtonText, { color: colors.fireText }]}>{isSpanish ? 'Listo' : 'Done'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

@@ -1,27 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  LayoutAnimation,
-  Platform,
-  UIManager,
-} from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, Text, StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
-import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
-import { useOrganization } from '@/contexts/OrganizationContext';
-
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
-
-// Module-level so the user's expand choice survives Today-tab re-renders within a single app session.
-// Resets to collapsed on app launch.
-let cachedExpanded = false;
+import { useThemeColors } from '@/hooks/useThemeColors';
+import GlassCard from '@/components/GlassCard';
+import { fonts } from '@/constants/fonts';
 
 interface Shift {
   id: string;
@@ -37,23 +21,19 @@ interface Shift {
 
 interface UpcomingShiftsCardProps {
   userId: string | undefined;
-  isManager?: boolean;
-  colors: {
-    primary: string;
-    background: string;
-    text: string;
-    textSecondary: string;
-    card: string;
-  };
 }
 
-export default function UpcomingShiftsCard({ userId, isManager = false, colors }: UpcomingShiftsCardProps) {
-  const router = useRouter();
+/**
+ * The Schedule-tab shifts card: up to 7 upcoming shifts as compact one-line
+ * rows (day · time · opener/closer/training flag · role). Self-themed via
+ * useThemeColors; the Full Schedule / View Roster buttons live in the Schedule
+ * section so managers with no shift still reach them.
+ */
+export default function UpcomingShiftsCard({ userId }: UpcomingShiftsCardProps) {
+  const colors = useThemeColors();
   const { t } = useTranslation();
-  const { organizationId } = useOrganization();
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expanded, setExpanded] = useState(cachedExpanded);
 
   useFocusEffect(
     useCallback(() => {
@@ -72,7 +52,7 @@ export default function UpcomingShiftsCard({ userId, isManager = false, colors }
         .gte('shift_date', today)
         .order('shift_date', { ascending: true })
         .order('start_time', { ascending: true })
-        .limit(5);
+        .limit(7);
 
       if (error) throw error;
       setShifts(data || []);
@@ -83,12 +63,15 @@ export default function UpcomingShiftsCard({ userId, isManager = false, colors }
     }
   };
 
-  if (loading && shifts.length === 0) return null;
-  if (!loading && shifts.length === 0) return null;
+  const todayStr = (() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+  })();
 
   const formatShiftDate = (dateStr: string) => {
+    if (dateStr === todayStr) return t('upcoming_shifts.today_label', 'Today');
     const date = new Date(dateStr + 'T00:00:00');
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+    return date.toLocaleDateString('en-US', { weekday: 'short', day: 'numeric' });
   };
 
   const formatTime = (timeStr: string) => {
@@ -99,202 +82,102 @@ export default function UpcomingShiftsCard({ userId, isManager = false, colors }
   };
 
   const getPrimaryRole = (shift: Shift) => {
-    if (shift.roles.length === 0) return '';
-    const uniqueRoles = [...new Set(shift.roles)];
-    return uniqueRoles[0];
+    if (!shift.roles || shift.roles.length === 0) return shift.room_assignment || '';
+    return [...new Set(shift.roles)][0];
   };
 
-  const toggleExpanded = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    const next = !expanded;
-    setExpanded(next);
-    cachedExpanded = next;
-  };
+  if (loading && shifts.length === 0) return null;
 
-  const renderShiftRow = (shift: Shift, index: number, total: number) => (
-    <View
-      key={shift.id}
-      style={[
-        styles.shiftRow,
-        index < total - 1 && {
-          borderBottomWidth: StyleSheet.hairlineWidth,
-          borderBottomColor: 'rgba(128,128,128,0.12)',
-        },
-      ]}
-    >
-      <Text style={[styles.shiftDate, { color: colors.text }]}>
-        {formatShiftDate(shift.shift_date)}
-      </Text>
-      <Text style={[styles.shiftTime, { color: colors.textSecondary }]}>
-        {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
-      </Text>
-      <View style={styles.shiftMeta}>
-        {shift.is_opener && (
-          <View style={[styles.flagBadge, { backgroundColor: '#4CAF5020' }]}>
-            <Text style={[styles.flagText, { color: '#4CAF50' }]}>O</Text>
-          </View>
-        )}
-        {shift.is_closer && (
-          <View style={[styles.flagBadge, { backgroundColor: '#FF980020' }]}>
-            <Text style={[styles.flagText, { color: '#FF9800' }]}>C</Text>
-          </View>
-        )}
-        {shift.is_training && (
-          <View style={[styles.flagBadge, { backgroundColor: '#2196F320' }]}>
-            <Text style={[styles.flagText, { color: '#2196F3' }]}>T</Text>
-          </View>
-        )}
-        {getPrimaryRole(shift) ? (
-          <View style={[styles.roleBadge, { backgroundColor: colors.primary + '15' }]}>
-            <Text style={[styles.roleText, { color: colors.primary }]}>
-              {getPrimaryRole(shift)}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-    </View>
-  );
+  if (!loading && shifts.length === 0) {
+    return (
+      <GlassCard variant="surface" style={styles.empty}>
+        <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+          {t('upcoming_shifts.no_shifts', 'No upcoming shifts')}
+        </Text>
+      </GlassCard>
+    );
+  }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.card }]}>
-      {/* Header row — tap anywhere except Full Schedule to toggle */}
-      <TouchableOpacity
-        style={styles.headerRow}
-        onPress={toggleExpanded}
-        activeOpacity={0.7}
-      >
-        <View style={styles.headerLeft}>
-          <IconSymbol
-            ios_icon_name="calendar.badge.clock"
-            android_material_icon_name="schedule"
-            size={18}
-            color={colors.primary}
-          />
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {t('upcoming_shifts.your_next_shifts', 'Your Next Shifts')}
-          </Text>
-          <IconSymbol
-            ios_icon_name={expanded ? 'chevron.up' : 'chevron.down'}
-            android_material_icon_name={expanded ? 'expand-less' : 'expand-more'}
-            size={16}
-            color={colors.textSecondary}
-          />
-        </View>
-        <TouchableOpacity
-          style={styles.fullScheduleButton}
-          onPress={() => router.push('/my-schedule')}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.fullScheduleText, { color: colors.primary }]}>
-            {t('upcoming_shifts.full_schedule', 'Full Schedule')}
-          </Text>
-          <IconSymbol
-            ios_icon_name="chevron.right"
-            android_material_icon_name="chevron-right"
-            size={14}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-      </TouchableOpacity>
-
-      {/* Collapsed: just the next shift inline. Expanded: full list. */}
-      {expanded
-        ? shifts.map((shift, index) => renderShiftRow(shift, index, shifts.length))
-        : renderShiftRow(shifts[0], 0, 1)}
-
-      {/* Manager-only View Today's Roster — always visible */}
-      {isManager && (
-        <TouchableOpacity
-          style={[styles.rosterButton, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(128,128,128,0.12)' }]}
-          onPress={() => router.push('/todays-roster')}
-          activeOpacity={0.7}
-        >
-          <IconSymbol
-            ios_icon_name="person.3.fill"
-            android_material_icon_name="groups"
-            size={15}
-            color={colors.primary}
-          />
-          <Text style={[styles.rosterButtonText, { color: colors.primary }]}>
-            {t('upcoming_shifts.view_todays_roster', "View Today's Roster")}
-          </Text>
-          <IconSymbol
-            ios_icon_name="chevron.right"
-            android_material_icon_name="chevron-right"
-            size={13}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-      )}
-    </View>
+    <GlassCard variant="surface" style={styles.card}>
+      {shifts.map((shift, i) => {
+        const role = getPrimaryRole(shift);
+        const last = i === shifts.length - 1;
+        return (
+          <View
+            key={shift.id}
+            style={[
+              styles.srow,
+              !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
+            ]}
+          >
+            <Text style={[styles.d, { color: colors.text }]} numberOfLines={1}>
+              {formatShiftDate(shift.shift_date)}
+            </Text>
+            <Text style={[styles.tm, { color: colors.textSecondary }]} numberOfLines={1}>
+              {formatTime(shift.start_time)} – {formatTime(shift.end_time)}
+            </Text>
+            {shift.is_closer && (
+              <View style={[styles.flag, { backgroundColor: colors.tint + '38' }]}>
+                <Text style={[styles.flagText, { color: colors.tint }]}>C</Text>
+              </View>
+            )}
+            {shift.is_opener && (
+              <View style={[styles.flag, { backgroundColor: colors.blue + '33' }]}>
+                <Text style={[styles.flagText, { color: colors.blueText }]}>O</Text>
+              </View>
+            )}
+            {shift.is_training && (
+              <View style={[styles.flag, { backgroundColor: colors.blue + '33' }]}>
+                <Text style={[styles.flagText, { color: colors.blueText }]}>T</Text>
+              </View>
+            )}
+            {!!role && (
+              <View style={[styles.role, { backgroundColor: colors.tint + '28' }]}>
+                <Text style={[styles.roleText, { color: colors.tint }]} numberOfLines={1}>
+                  {role}
+                </Text>
+              </View>
+            )}
+          </View>
+        );
+      })}
+    </GlassCard>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
+  card: {
+    marginBottom: 11,
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  empty: {
+    marginBottom: 11,
+    paddingVertical: 24,
     alignItems: 'center',
-    marginBottom: 8,
+    justifyContent: 'center',
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  headerTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  fullScheduleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-  },
-  fullScheduleText: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  shiftRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    gap: 8,
-  },
-  shiftDate: {
-    fontSize: 13,
-    fontWeight: '600',
-    width: 70,
-  },
-  shiftTime: {
+  emptyText: {
+    fontFamily: fonts.mono.medium,
     fontSize: 12,
-    flex: 1,
   },
-  shiftMeta: {
+  srow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 10,
+    paddingVertical: 11,
+    paddingHorizontal: 13,
   },
-  roleBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+  d: {
+    fontFamily: fonts.display.semibold,
+    fontSize: 12.5,
+    width: 54,
   },
-  roleText: {
-    fontSize: 10,
-    fontWeight: '600',
+  tm: {
+    flex: 1,
+    fontFamily: fonts.mono.medium,
+    fontSize: 11.5,
   },
-  flagBadge: {
+  flag: {
     width: 18,
     height: 18,
     borderRadius: 9,
@@ -302,19 +185,18 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   flagText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  role: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 7,
+  },
+  roleText: {
+    fontFamily: fonts.mono.semibold,
     fontSize: 10,
     fontWeight: '700',
-  },
-  rosterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 10,
-    marginTop: 4,
-    gap: 6,
-  },
-  rosterButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
   },
 });

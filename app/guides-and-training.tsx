@@ -331,21 +331,21 @@ export default function GuidesAndTrainingScreen() {
 
       <View style={styles.actionButtonsContainer}>
         <TouchableOpacity
-          style={[styles.actionButton, { backgroundColor: colors.accent || colors.primary }]}
+          style={[styles.actionButton, { backgroundColor: colors.primary }]}
           onPress={() => handleViewFile(guide)}
           disabled={viewingFile === guide.id}
         >
           {viewingFile === guide.id ? (
-            <ActivityIndicator size="small" color={colors.text} />
+            <ActivityIndicator size="small" color={colors.fireText} />
           ) : (
             <>
               <IconSymbol
                 ios_icon_name="eye.fill"
                 android_material_icon_name="visibility"
                 size={18}
-                color={colors.text}
+                color={colors.fireText}
               />
-              <Text style={[styles.actionButtonText, { color: colors.text }]}>View</Text>
+              <Text style={[styles.actionButtonText, { color: colors.fireText }]}>View</Text>
             </>
           )}
         </TouchableOpacity>
@@ -490,7 +490,7 @@ export default function GuidesAndTrainingScreen() {
                 style={[
                   styles.categoryTab,
                   { backgroundColor: colors.card },
-                  selectedCategory === category && { backgroundColor: colors.accent || colors.primary },
+                  selectedCategory === category && { backgroundColor: colors.primary },
                 ]}
                 onPress={() => navigateToCategory(category)}
                 onLayout={(e) => {
@@ -504,7 +504,7 @@ export default function GuidesAndTrainingScreen() {
                   style={[
                     styles.categoryTabText,
                     { color: colors.textSecondary },
-                    selectedCategory === category && { color: colors.text },
+                    selectedCategory === category && { color: colors.fireText },
                   ]}
                 >
                   {category}

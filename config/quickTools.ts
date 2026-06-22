@@ -296,7 +296,7 @@ export const QUICK_TOOLS_CATALOG: QuickToolConfig[] = [
     androidIcon: 'assignment',
     route: '/todays-roster',
     category: 'management',
-    availableTo: 'manager',
+    availableTo: 'all',
   },
   {
     id: 'notification-center',

@@ -392,7 +392,7 @@ export default function OrganizationSettingsScreen() {
       disabled={saving}
     >
       {saving ? (
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.fireText} />
       ) : (
         <Text style={styles.saveButtonText}>Save Changes</Text>
       )}
@@ -856,7 +856,7 @@ function createStyles(colors: any) {
       color: colors.textSecondary,
     },
     tabTextActive: {
-      color: '#fff',
+      color: colors.fireText,
     },
     scrollContent: {
       padding: 16,
@@ -957,7 +957,7 @@ function createStyles(colors: any) {
       color: colors.textSecondary,
     },
     segmentTextActive: {
-      color: '#fff',
+      color: colors.fireText,
     },
     joinCodeRow: {
       flexDirection: 'row',
@@ -1038,7 +1038,7 @@ function createStyles(colors: any) {
       marginTop: 8,
     },
     saveButtonText: {
-      color: '#fff',
+      color: colors.fireText,
       fontSize: 16,
       fontWeight: '700',
     },

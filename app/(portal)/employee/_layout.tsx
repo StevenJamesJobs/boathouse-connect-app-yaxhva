@@ -11,8 +11,12 @@ import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import PortalTabBar from '@/components/PortalTabBar';
+import JoltOverlay from '@/components/JoltOverlay';
+import AmbientGlow from '@/components/AmbientGlow';
+import { useSegments } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 function EmployeeHeader() {
   const router = useRouter();
@@ -68,13 +72,22 @@ function EmployeeTabBar(props: any) {
 
 export default function EmployeeLayout() {
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const colors = useThemeColors();
+  const segments = useSegments();
+  // Welcome = the index tab (last segment is not one of the other tabs).
+  const onWelcome = !['menus', 'tools', 'rewards', 'profile'].includes(segments[segments.length - 1] as string);
   return (
-    <>
-      <EmployeeHeader />
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Ambient glow only on Welcome (absolute → no layout impact); the
+          transparent spacer + transparent Welcome screen let it read edge-to-edge. */}
+      {onWelcome && <AmbientGlow />}
+      <View style={{ height: insets.top }} />
       <Tabs
         tabBar={(props) => <EmployeeTabBar {...props} />}
         screenOptions={{
           headerShown: false,
+          sceneStyle: { backgroundColor: 'transparent' },
         }}
       >
         <Tabs.Screen
@@ -148,7 +161,8 @@ export default function EmployeeLayout() {
           }}
         />
       </Tabs>
-    </>
+      <JoltOverlay role="employee" />
+    </View>
   );
 }
 

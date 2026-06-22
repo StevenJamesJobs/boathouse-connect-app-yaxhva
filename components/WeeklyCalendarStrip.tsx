@@ -8,6 +8,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
 import { IconSymbol } from '@/components/IconSymbol';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import {
   getWeekStartDate,
   getWeekDays,
@@ -34,6 +35,7 @@ interface WeeklyCalendarStripProps {
     text: string;
     textSecondary: string;
     card: string;
+    fireText: string;
   };
   events: UpcomingEvent[];
   onViewAll?: () => void;
@@ -65,6 +67,9 @@ export default function WeeklyCalendarStrip({
 }: WeeklyCalendarStripProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.language || 'en';
+  // Glass tokens (surface/surfaceBorder/blue) come from the theme directly — the
+  // `colors` prop is a subset that predates them, so avoid threading them through.
+  const tc = useThemeColors();
 
   const [currentWeekStart, setCurrentWeekStart] = useState(() =>
     getWeekStartDate(selectedDate || new Date())
@@ -215,15 +220,20 @@ export default function WeeklyCalendarStrip({
             return (
               <TouchableOpacity
                 key={index}
-                style={styles.dayColumn}
+                style={[
+                  styles.dayColumn,
+                  {
+                    backgroundColor: selected ? colors.primary : tc.surface,
+                    borderColor: selected ? colors.primary : tc.surfaceBorder,
+                  },
+                ]}
                 onPress={() => handleDatePress(day)}
                 activeOpacity={0.7}
               >
                 <Text
                   style={[
                     styles.dayName,
-                    { color: colors.textSecondary },
-                    selected && { color: colors.primary },
+                    { color: selected ? colors.fireText : colors.textSecondary },
                   ]}
                 >
                   {getShortDayName(day, locale)}
@@ -231,22 +241,14 @@ export default function WeeklyCalendarStrip({
                 <View
                   style={[
                     styles.dayCircle,
-                    today && !selected && [
-                      styles.todayCircle,
-                      { borderColor: colors.primary },
-                    ],
-                    selected && [
-                      styles.selectedCircle,
-                      { backgroundColor: colors.primary },
-                    ],
+                    today && !selected && [styles.todayCircle, { borderColor: colors.primary }],
                   ]}
                 >
                   <Text
                     style={[
                       styles.dayNumber,
-                      { color: colors.text },
-                      today && !selected && { color: colors.primary, fontWeight: '700' },
-                      selected && styles.selectedDayNumber,
+                      { color: selected ? colors.fireText : today ? colors.primary : colors.text },
+                      (selected || today) && { fontWeight: '700' },
                     ]}
                   >
                     {day.getDate()}
@@ -257,7 +259,7 @@ export default function WeeklyCalendarStrip({
                     <View
                       style={[
                         styles.eventDot,
-                        { backgroundColor: selected ? colors.primary : colors.textSecondary },
+                        { backgroundColor: selected ? colors.fireText : tc.blue },
                       ]}
                     />
                   )}
@@ -379,20 +381,26 @@ const styles = StyleSheet.create({
   dayColumn: {
     alignItems: 'center',
     flex: 1,
-    paddingVertical: 4,
+    paddingTop: 5,
+    paddingBottom: 8,
+    marginHorizontal: 2,
+    borderRadius: 12,
+    borderWidth: 1,
   },
   dayName: {
-    fontSize: 11,
-    fontWeight: '500',
-    marginBottom: 4,
+    fontSize: 10,
+    fontWeight: '600',
+    marginBottom: 2,
     textTransform: 'uppercase',
+    letterSpacing: 0.3,
   },
   dayCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: 2,
   },
   todayCircle: {
     borderWidth: 2,

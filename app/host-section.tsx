@@ -228,7 +228,7 @@ export default function HostSectionScreen() {
                 style={[styles.modalButton, { backgroundColor: colors.primary }]}
                 onPress={confirmOpen}
               >
-                <Text style={[styles.modalButtonText, { color: '#fff' }]}>Open Link</Text>
+                <Text style={[styles.modalButtonText, { color: colors.fireText }]}>Open Link</Text>
               </TouchableOpacity>
             </View>
           </View>

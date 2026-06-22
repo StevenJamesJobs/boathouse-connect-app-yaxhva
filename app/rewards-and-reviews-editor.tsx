@@ -128,7 +128,7 @@ export default function RewardsAndReviewsEditorScreen() {
       borderBottomColor: 'transparent',
     },
     activeTab: {
-      borderBottomColor: colors.highlight,
+      borderBottomColor: colors.primary,
     },
     tabText: {
       fontSize: 16,
@@ -136,7 +136,7 @@ export default function RewardsAndReviewsEditorScreen() {
       color: colors.textSecondary,
     },
     activeTabText: {
-      color: colors.highlight,
+      color: colors.primary,
     },
     scrollView: {
       flex: 1,
@@ -276,7 +276,7 @@ export default function RewardsAndReviewsEditorScreen() {
     leaderboardRankText: {
       fontSize: 16,
       fontWeight: 'bold',
-      color: colors.text,
+      color: colors.fireText,
     },
     leaderboardInfo: {
       flex: 1,
@@ -1700,7 +1700,7 @@ export default function RewardsAndReviewsEditorScreen() {
                         ios_icon_name={tab === 'leaderboard' ? 'trophy.fill' : tab === 'recent' ? 'clock.fill' : 'magnifyingglass'}
                         android_material_icon_name={tab === 'leaderboard' ? 'emoji-events' : tab === 'recent' ? 'history' : 'search'}
                         size={14}
-                        color={active ? '#FFF' : colors.textSecondary}
+                        color={active ? colors.fireText : colors.textSecondary}
                       />
                       {tab === 'recent' && managerRecentHasNew && !active ? (
                         <View style={styles.subTabDot} />
@@ -1709,7 +1709,7 @@ export default function RewardsAndReviewsEditorScreen() {
                     <Text style={{
                       fontSize: 12,
                       fontWeight: '600',
-                      color: active ? '#FFF' : colors.textSecondary,
+                      color: active ? colors.fireText : colors.textSecondary,
                     }}>
                       {tab === 'leaderboard' ? t('rewards_ui:tab_leaderboard') : tab === 'recent' ? t('rewards_ui:tab_recent_short') : t('rewards_ui:tab_lookup')}
                     </Text>

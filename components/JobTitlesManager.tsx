@@ -192,13 +192,13 @@ export default function JobTitlesManager({ colors }: Props) {
           disabled={!newTitle.trim() || adding}
         >
           {adding ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={colors.fireText} />
           ) : (
             <IconSymbol
               ios_icon_name="plus"
               android_material_icon_name="add"
               size={20}
-              color="#fff"
+              color={colors.fireText}
             />
           )}
         </TouchableOpacity>

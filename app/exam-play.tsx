@@ -496,7 +496,7 @@ export default function ExamPlayScreen() {
             style={[styles.startButton, { backgroundColor: colors.primary }]}
             onPress={handleStart}
           >
-            <Text style={styles.startButtonText}>{isSpanish ? 'Comenzar Examen' : 'Start Quiz'}</Text>
+            <Text style={[styles.startButtonText, { color: colors.fireText }]}>{isSpanish ? 'Comenzar Examen' : 'Start Quiz'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => router.back()} style={styles.cancelLink}>
@@ -543,7 +543,7 @@ export default function ExamPlayScreen() {
             onPress={handleViewResults}
             disabled={submitting}
           >
-            <Text style={styles.viewResultsText}>{isSpanish ? 'Ver Resultados Completos' : 'View Full Results'}</Text>
+            <Text style={[styles.viewResultsText, { color: colors.fireText }]}>{isSpanish ? 'Ver Resultados Completos' : 'View Full Results'}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -668,7 +668,7 @@ export default function ExamPlayScreen() {
                   activeOpacity={0.7}
                 >
                   <View style={[styles.optionLetterCircle, { backgroundColor: isSelected ? colors.primary : colors.background, borderColor: optionBorder }]}>
-                    <Text style={[styles.optionLetterText, { color: isSelected ? '#FFF' : colors.textSecondary }]}>{letter}</Text>
+                    <Text style={[styles.optionLetterText, { color: isSelected ? colors.fireText : colors.textSecondary }]}>{letter}</Text>
                   </View>
                   <Text style={[styles.optionCardText, { color: textColor }]} numberOfLines={3}>{optionText}</Text>
                   {showFeedback && isCorrectOption && (
@@ -692,7 +692,7 @@ export default function ExamPlayScreen() {
               onPress={handleNext}
               disabled={!examState.selectedOption}
             >
-              <Text style={[styles.nextButtonText, { color: examState.selectedOption ? '#FFF' : colors.textSecondary }]}>
+              <Text style={[styles.nextButtonText, { color: examState.selectedOption ? colors.fireText : colors.textSecondary }]}>
                 {examState.currentIndex >= examState.questions.length - 1
                   ? (isSpanish ? 'Enviar' : 'Submit')
                   : (isSpanish ? 'Siguiente' : 'Next')}
@@ -701,7 +701,7 @@ export default function ExamPlayScreen() {
                 ios_icon_name="arrow.right"
                 android_material_icon_name="arrow-forward"
                 size={20}
-                color={examState.selectedOption ? '#FFF' : colors.textSecondary}
+                color={examState.selectedOption ? colors.fireText : colors.textSecondary}
               />
             </TouchableOpacity>
           )}

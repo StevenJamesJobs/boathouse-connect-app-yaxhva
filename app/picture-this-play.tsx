@@ -410,7 +410,7 @@ export default function PictureThisPlayScreen() {
           style={[styles.errorBtn, { backgroundColor: colors.primary }]}
           onPress={() => router.back()}
         >
-          <Text style={styles.errorBtnText}>{t('picture_this:back')}</Text>
+          <Text style={[styles.errorBtnText, { color: colors.fireText }]}>{t('picture_this:back')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -708,8 +708,8 @@ export default function PictureThisPlayScreen() {
                   params: { category, difficulty, playMode },
                 })}
               >
-                <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="replay" size={18} color="#fff" />
-                <Text style={styles.actionBtnText}>{t('picture_this:play_again')}</Text>
+                <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="replay" size={18} color={colors.fireText} />
+                <Text style={[styles.actionBtnText, { color: colors.fireText }]}>{t('picture_this:play_again')}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity

@@ -205,7 +205,7 @@ export default function AssistantsManager({ colors }: Props) {
                             ios_icon_name="checkmark"
                             android_material_icon_name="check"
                             size={14}
-                            color="#fff"
+                            color={colors.fireText}
                           />
                         )}
                       </View>

@@ -512,14 +512,14 @@ export default function PureeSyrupRecipesEditorScreen() {
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
         {/* Add Button */}
-        <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.highlight }]} onPress={openAddModal}>
+        <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary }]} onPress={openAddModal}>
           <IconSymbol
             ios_icon_name="plus.circle.fill"
             android_material_icon_name="add-circle"
             size={24}
-            color={colors.text}
+            color={colors.fireText}
           />
-          <Text style={[styles.addButtonText, { color: colors.text }]}>{t('puree_editor:add_button')}</Text>
+          <Text style={[styles.addButtonText, { color: colors.fireText }]}>{t('puree_editor:add_button')}</Text>
         </TouchableOpacity>
 
         {/* Recipes List by Category */}
@@ -645,10 +645,10 @@ export default function PureeSyrupRecipesEditorScreen() {
                     {CATEGORIES.map((cat, index) => (
                       <TouchableOpacity
                         key={index}
-                        style={[styles.pickerOption, category === cat && { backgroundColor: colors.highlight }]}
+                        style={[styles.pickerOption, category === cat && { backgroundColor: colors.primary }]}
                         onPress={() => setCategory(cat)}
                       >
-                        <Text style={[styles.pickerOptionText, category === cat && { color: colors.text, fontWeight: '600' }]}>
+                        <Text style={[styles.pickerOptionText, category === cat && { color: colors.fireText, fontWeight: '600' }]}>
                           {cat}
                         </Text>
                       </TouchableOpacity>
@@ -695,7 +695,7 @@ export default function PureeSyrupRecipesEditorScreen() {
                   ))}
                   <TouchableOpacity style={styles.addIngredientButton} onPress={addIngredient}>
                     <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={20} color={colors.primary} />
-                    <Text style={[styles.addIngredientText, { color: colors.highlight }]}>{t('puree_editor:add_ingredient')}</Text>
+                    <Text style={[styles.addIngredientText, { color: colors.primary }]}>{t('puree_editor:add_ingredient')}</Text>
                   </TouchableOpacity>
                 </View>
               </CollapsibleSection>
@@ -782,14 +782,14 @@ export default function PureeSyrupRecipesEditorScreen() {
                     <Text style={styles.cancelButtonText}>{t('puree_editor:cancel_button')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.submitButton, { backgroundColor: colors.highlight }]}
+                    style={[styles.submitButton, { backgroundColor: colors.primary }]}
                     onPress={handleSave}
                     disabled={loading || uploadingImage}
                   >
                     {loading ? (
-                      <ActivityIndicator color={colors.text} />
+                      <ActivityIndicator color={colors.fireText} />
                     ) : (
-                      <Text style={[styles.submitButtonText, { color: colors.text }]}>
+                      <Text style={[styles.submitButtonText, { color: colors.fireText }]}>
                         {editingRecipe ? t('puree_editor:save_button') : t('puree_editor:add_save_button')}
                       </Text>
                     )}

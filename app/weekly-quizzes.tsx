@@ -189,7 +189,7 @@ export default function WeeklyQuizzesScreen() {
             style={{ backgroundColor: colors.primary, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12, marginTop: 24 }}
             onPress={() => router.push('/subscription-management' as any)}
           >
-            <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '700' }}>Upgrade to Premium</Text>
+            <Text style={{ color: colors.fireText, fontSize: 16, fontWeight: '700' }}>Upgrade to Premium</Text>
           </TouchableOpacity>
         </View>
       </View>

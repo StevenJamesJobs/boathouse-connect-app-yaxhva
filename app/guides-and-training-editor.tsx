@@ -629,7 +629,7 @@ export default function GuidesAndTrainingEditorScreen() {
             style={[
               styles.categoryTab,
               { backgroundColor: colors.card },
-              selectedCategory === category && { backgroundColor: colors.highlight },
+              selectedCategory === category && { backgroundColor: colors.primary },
             ]}
             onPress={() => setSelectedCategory(category)}
           >
@@ -637,7 +637,7 @@ export default function GuidesAndTrainingEditorScreen() {
               style={[
                 styles.categoryTabText,
                 { color: colors.textSecondary },
-                selectedCategory === category && { color: colors.text },
+                selectedCategory === category && { color: colors.fireText },
               ]}
             >
               {category}
@@ -646,14 +646,14 @@ export default function GuidesAndTrainingEditorScreen() {
         ))}
       </ScrollView>
 
-      <TouchableOpacity style={[styles.addNewItemButton, { backgroundColor: colors.highlight }]} onPress={openAddModal}>
+      <TouchableOpacity style={[styles.addNewItemButton, { backgroundColor: colors.primary }]} onPress={openAddModal}>
         <IconSymbol
           ios_icon_name="plus.circle.fill"
           android_material_icon_name="add-circle"
           size={24}
-          color={colors.text}
+          color={colors.fireText}
         />
-        <Text style={[styles.addNewItemButtonText, { color: colors.text }]}>{t('guides_training_editor.add_new_guide')}</Text>
+        <Text style={[styles.addNewItemButtonText, { color: colors.fireText }]}>{t('guides_training_editor.add_new_guide')}</Text>
       </TouchableOpacity>
 
       {loading ? (
@@ -944,14 +944,14 @@ export default function GuidesAndTrainingEditorScreen() {
                       key={index}
                       style={[
                         styles.optionButton,
-                        formData.category === category && { backgroundColor: colors.highlight, borderColor: colors.highlight },
+                        formData.category === category && { backgroundColor: colors.primary, borderColor: colors.primary },
                       ]}
                       onPress={() => setFormData({ ...formData, category })}
                     >
                       <Text
                         style={[
                           styles.optionButtonText,
-                          formData.category === category && styles.optionButtonTextActive,
+                          formData.category === category && [styles.optionButtonTextActive, { color: colors.fireText }],
                         ]}
                       >
                         {category}
@@ -982,14 +982,14 @@ export default function GuidesAndTrainingEditorScreen() {
 
               {/* Save Button */}
               <TouchableOpacity
-                style={[styles.saveButton, { backgroundColor: colors.highlight }]}
+                style={[styles.saveButton, { backgroundColor: colors.primary }]}
                 onPress={handleSave}
                 disabled={uploadingFile || uploadingThumbnail}
               >
                 {uploadingFile || uploadingThumbnail ? (
-                  <ActivityIndicator color="#1A1A1A" />
+                  <ActivityIndicator color={colors.fireText} />
                 ) : (
-                  <Text style={styles.saveButtonText}>
+                  <Text style={[styles.saveButtonText, { color: colors.fireText }]}>
                     {editingGuide ? t('guides_training_editor.save_button_update') : t('guides_training_editor.save_button_add')}
                   </Text>
                 )}

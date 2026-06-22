@@ -25,6 +25,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ThemeProvider as AppThemeProvider, useAppTheme } from "@/contexts/ThemeContext";
 import { SubscriptionProvider, useSubscription } from "@/contexts/SubscriptionContext";
 import { REVENUECAT_ENABLED, REVENUECAT_API_KEY } from "@/config/revenueCat";
+import { fontAssets } from "@/constants/fonts";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -111,6 +112,7 @@ function RootLayoutNav() {
 
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
+    ...fontAssets,
   });
   const [showSplash, setShowSplash] = React.useState(true);
 

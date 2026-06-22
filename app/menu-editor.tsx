@@ -1217,8 +1217,8 @@ export default function MenuEditorScreen() {
                       )}
                       <View style={styles.menuItemTags}>
                         {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                        {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
-                        {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
+                        {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{lunchName}</Text></View>}
+                        {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{dinnerName}</Text></View>}
                         {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
                         {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
                         {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
@@ -1246,8 +1246,8 @@ export default function MenuEditorScreen() {
                       {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
                       <View style={styles.menuItemTags}>
                         {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                        {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
-                        {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
+                        {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{lunchName}</Text></View>}
+                        {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{dinnerName}</Text></View>}
                         {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
                         {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
                         {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
@@ -1309,7 +1309,7 @@ export default function MenuEditorScreen() {
                           onPress={() => router.push('/menu-upload' as any)}
                           activeOpacity={0.85}
                         >
-                          <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={18} color="#FFFFFF" />
+                          <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={18} color={colors.fireText} />
                           <Text style={styles.uploadMenuButtonText}>{t('menu_editor:upload_menu_button', 'Upload Menu')}</Text>
                         </TouchableOpacity>
                       )}
@@ -1381,8 +1381,8 @@ export default function MenuEditorScreen() {
                                 <View style={[styles.tag, { backgroundColor: '#00897B18' }]}><Text style={[styles.tagText, { color: '#00897B' }]}>{labelForCategoryName(item.category, t, menuCats, language)}</Text></View>
                               </>)}
                               {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                              {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
-                              {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
+                              {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{lunchName}</Text></View>}
+                              {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{dinnerName}</Text></View>}
                               {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
                               {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
                               {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
@@ -1405,8 +1405,8 @@ export default function MenuEditorScreen() {
                                 <View style={[styles.tag, { backgroundColor: '#00897B18' }]}><Text style={[styles.tagText, { color: '#00897B' }]}>{labelForCategoryName(item.category, t, menuCats, language)}</Text></View>
                               </>)}
                               {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                              {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{lunchName}</Text></View>}
-                              {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={styles.tagText}>{dinnerName}</Text></View>}
+                              {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{lunchName}</Text></View>}
+                              {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{dinnerName}</Text></View>}
                               {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
                               {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
                               {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
@@ -1797,7 +1797,7 @@ export default function MenuEditorScreen() {
                       >
                         <Text style={[
                           styles.seasonTagText,
-                          { color: formData.item_season === s ? '#FFFFFF' : colors.text },
+                          { color: formData.item_season === s ? colors.fireText : colors.text },
                         ]}>
                           {seasonLabel}
                         </Text>
@@ -1888,7 +1888,7 @@ export default function MenuEditorScreen() {
                             ios_icon_name="checkmark"
                             android_material_icon_name="check"
                             size={16}
-                            color="#1A1A1A"
+                            color={colors.fireText}
                           />
                         )}
                       </View>
@@ -1916,7 +1916,7 @@ export default function MenuEditorScreen() {
                             ios_icon_name="checkmark"
                             android_material_icon_name="check"
                             size={16}
-                            color="#1A1A1A"
+                            color={colors.fireText}
                           />
                         )}
                       </View>
@@ -1951,7 +1951,7 @@ export default function MenuEditorScreen() {
                           ios_icon_name="checkmark"
                           android_material_icon_name="check"
                           size={16}
-                          color="#1A1A1A"
+                          color={colors.fireText}
                         />
                       )}
                     </View>
@@ -1977,7 +1977,7 @@ export default function MenuEditorScreen() {
                           ios_icon_name="checkmark"
                           android_material_icon_name="check"
                           size={16}
-                          color="#1A1A1A"
+                          color={colors.fireText}
                         />
                       )}
                     </View>
@@ -2003,7 +2003,7 @@ export default function MenuEditorScreen() {
                           ios_icon_name="checkmark"
                           android_material_icon_name="check"
                           size={16}
-                          color="#1A1A1A"
+                          color={colors.fireText}
                         />
                       )}
                     </View>
@@ -2029,7 +2029,7 @@ export default function MenuEditorScreen() {
                           ios_icon_name="checkmark"
                           android_material_icon_name="check"
                           size={16}
-                          color="#1A1A1A"
+                          color={colors.fireText}
                         />
                       )}
                     </View>
@@ -2051,7 +2051,7 @@ export default function MenuEditorScreen() {
                   >
                     <View style={[styles.checkboxBox, formData.is_weekly_special && styles.checkboxBoxChecked]}>
                       {formData.is_weekly_special && (
-                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={16} color="#1A1A1A" />
+                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={16} color={colors.fireText} />
                       )}
                     </View>
                     <Text style={styles.checkboxLabel}>{t('menu_editor:weekly_special_checkbox', { name: formWeeklySpecialsLabel })}</Text>
@@ -2078,7 +2078,7 @@ export default function MenuEditorScreen() {
                   disabled={uploadingImage}
                 >
                   {uploadingImage ? (
-                    <ActivityIndicator color="#1A1A1A" />
+                    <ActivityIndicator color={colors.fireText} />
                   ) : (
                     <Text style={styles.saveButtonText}>
                       {editingItem ? t('menu_editor:save_button') : t('menu_editor:add_save_button')}
@@ -2351,7 +2351,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     marginTop: 24,
   },
   uploadMenuButtonText: {
-    color: '#FFFFFF',
+    color: colors.fireText,
     fontSize: 15,
     fontWeight: '700',
   },
@@ -2764,7 +2764,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     alignItems: 'center',
   },
   shapeSegmentActive: {
-    backgroundColor: colors.highlight,
+    backgroundColor: colors.primary,
   },
   shapeSegmentText: {
     fontSize: 14,
@@ -2772,7 +2772,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: '#666666',
   },
   shapeSegmentTextActive: {
-    color: '#1A1A1A',
+    color: colors.fireText,
   },
   // Price + Display Order row
   priceOrderRow: {
@@ -2837,8 +2837,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     alignItems: 'center',
   },
   checkboxBoxChecked: {
-    backgroundColor: colors.highlight,
-    borderColor: colors.highlight,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   checkboxLabel: {
     fontSize: 14,
@@ -2846,7 +2846,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: '#1A1A1A',
   },
   saveButton: {
-    backgroundColor: colors.highlight,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
@@ -2855,7 +2855,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   saveButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: colors.fireText,
   },
   cancelButton: {
     backgroundColor: '#F5F5F5',

@@ -517,7 +517,7 @@ export default function ComposeMessageScreen() {
             <View style={styles.selectedRecipients}>
               {selectedRecipients.map((recipient, index) => (
                 <View key={index} style={[styles.recipientChip, { backgroundColor: colors.highlight }]}>
-                  <Text style={[styles.recipientChipText, { color: (user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF' }]} numberOfLines={1}>
+                  <Text style={[styles.recipientChipText, { color: colors.text }]} numberOfLines={1}>
                     {recipient.name}
                   </Text>
                   <TouchableOpacity onPress={() => handleRemoveRecipient(recipient.id)}>
@@ -525,7 +525,7 @@ export default function ComposeMessageScreen() {
                       ios_icon_name="xmark.circle.fill"
                       android_material_icon_name="cancel"
                       size={18}
-                      color={(user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF'}
+                      color={colors.text}
                     />
                   </TouchableOpacity>
                 </View>
@@ -660,9 +660,9 @@ export default function ComposeMessageScreen() {
           >
             {sending ? (
               <View style={styles.sendingContainer}>
-                <ActivityIndicator color={(user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF'} />
+                <ActivityIndicator color={colors.fireText} />
                 {(uploadingImage || uploadingFile) && (
-                  <Text style={[styles.uploadingText, { color: (user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF' }]}>
+                  <Text style={[styles.uploadingText, { color: colors.fireText }]}>
                     {t('uploading', { defaultValue: 'Uploading...' })}
                   </Text>
                 )}
@@ -673,9 +673,9 @@ export default function ComposeMessageScreen() {
                   ios_icon_name="paperplane.fill"
                   android_material_icon_name="send"
                   size={20}
-                  color={(user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF'}
+                  color={colors.fireText}
                 />
-                <Text style={[styles.sendButtonText, { color: (user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF' }]}>
+                <Text style={[styles.sendButtonText, { color: colors.fireText }]}>
                   {t('common:send', { defaultValue: 'Send' })}
                 </Text>
               </>
@@ -796,7 +796,7 @@ export default function ComposeMessageScreen() {
               style={[styles.doneButton, { backgroundColor: colors.primary || colors.highlight }]}
               onPress={() => setShowRecipientPicker(false)}
             >
-              <Text style={[styles.doneButtonText, { color: (user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF' }]}>
+              <Text style={[styles.doneButtonText, { color: colors.fireText }]}>
                 {t('done', { count: selectedRecipients.length })}
               </Text>
             </TouchableOpacity>

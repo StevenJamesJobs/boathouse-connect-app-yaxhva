@@ -12,6 +12,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 interface CheckOutCalculatorProps {
   colors: {
     primary: string;
+    fireText: string;
     card: string;
     text: string;
     textSecondary: string;
@@ -178,7 +179,7 @@ export default function CheckOutCalculator({ colors }: CheckOutCalculatorProps) 
                   ios_icon_name="checkmark"
                   android_material_icon_name="check"
                   size={16}
-                  color="#FFFFFF"
+                  color={colors.fireText}
                 />
               )}
             </View>
@@ -229,7 +230,7 @@ export default function CheckOutCalculator({ colors }: CheckOutCalculatorProps) 
                   style={[
                     styles.yesNoButtonText,
                     {
-                      color: checkUnderMyName === true ? '#FFFFFF' : colors.text,
+                      color: checkUnderMyName === true ? colors.fireText : colors.text,
                     },
                   ]}
                 >
@@ -253,7 +254,7 @@ export default function CheckOutCalculator({ colors }: CheckOutCalculatorProps) 
                   style={[
                     styles.yesNoButtonText,
                     {
-                      color: checkUnderMyName === false ? '#FFFFFF' : colors.text,
+                      color: checkUnderMyName === false ? colors.fireText : colors.text,
                     },
                   ]}
                 >
@@ -294,7 +295,7 @@ export default function CheckOutCalculator({ colors }: CheckOutCalculatorProps) 
                     {
                       color:
                         declarePercent === option.value
-                          ? '#FFFFFF'
+                          ? colors.fireText
                           : colors.text,
                     },
                   ]}
@@ -360,7 +361,7 @@ export default function CheckOutCalculator({ colors }: CheckOutCalculatorProps) 
                     {
                       color:
                         busserRunnerPercent === option.value
-                          ? '#FFFFFF'
+                          ? colors.fireText
                           : colors.text,
                     },
                   ]}
@@ -402,7 +403,7 @@ export default function CheckOutCalculator({ colors }: CheckOutCalculatorProps) 
                     {
                       color:
                         bartenderPercent === option.value
-                          ? '#FFFFFF'
+                          ? colors.fireText
                           : colors.text,
                     },
                   ]}
@@ -424,12 +425,12 @@ export default function CheckOutCalculator({ colors }: CheckOutCalculatorProps) 
           onPress={handleCalculate}
           disabled={!totalShiftSales || !cashInOutTotal}
         >
-          <Text style={styles.calculateButtonText}>Calculate</Text>
+          <Text style={[styles.calculateButtonText, { color: colors.fireText }]}>Calculate</Text>
           <IconSymbol
             ios_icon_name="equal.circle.fill"
             android_material_icon_name="calculate"
             size={20}
-            color="#FFFFFF"
+            color={colors.fireText}
           />
         </TouchableOpacity>
       </View>
@@ -663,7 +664,6 @@ const styles = StyleSheet.create({
   calculateButtonText: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#FFFFFF',
   },
   resultsCard: {
     borderRadius: 16,

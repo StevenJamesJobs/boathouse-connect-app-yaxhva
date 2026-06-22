@@ -468,9 +468,9 @@ export default function MemoryGamePlayScreen() {
                     ios_icon_name="arrow.counterclockwise"
                     android_material_icon_name="replay"
                     size={18}
-                    color="#fff"
+                    color={colors.fireText}
                   />
-                  <Text style={styles.actionButtonText}>
+                  <Text style={[styles.actionButtonText, { color: colors.fireText }]}>
                     {t('memory_game.play_again')}
                   </Text>
                 </TouchableOpacity>
@@ -484,9 +484,9 @@ export default function MemoryGamePlayScreen() {
                       ios_icon_name="arrow.right"
                       android_material_icon_name="arrow-forward"
                       size={18}
-                      color="#fff"
+                      color={colors.fireText}
                     />
-                    <Text style={styles.actionButtonText}>
+                    <Text style={[styles.actionButtonText, { color: colors.fireText }]}>
                       {t('memory_game.next_level')}
                     </Text>
                   </TouchableOpacity>

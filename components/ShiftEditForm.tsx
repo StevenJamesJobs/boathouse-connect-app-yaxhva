@@ -18,6 +18,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { JOB_TITLES } from '@/constants/jobTitles';
 import EmployeePickerModal from '@/components/EmployeePickerModal';
+import { getWeekStartDate } from '@/utils/dateUtils';
 
 export interface ShiftLike {
   id: string;
@@ -90,17 +91,14 @@ function formatDateHuman(dateStr: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
 }
 
-/** Returns the Monday on/before the given date (week_start) and the following Sunday (week_end). */
+/** Returns the Sunday (week_start) on/before the given date and the following
+ *  Saturday (week_end). Sunday-based to match dateUtils.getWeekStartDate so
+ *  schedule_uploads weeks line up with the rest of the app (no duplicate rows). */
 function weekBounds(date: Date): { start: string; end: string } {
-  const d = new Date(date);
-  d.setHours(12, 0, 0, 0);
-  const day = d.getDay(); // 0 Sun .. 6 Sat
-  const diffToMon = (day + 6) % 7; // Mon=0, Tue=1, ... Sun=6
-  const monday = new Date(d);
-  monday.setDate(d.getDate() - diffToMon);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  return { start: toISODate(monday), end: toISODate(sunday) };
+  const sunday = getWeekStartDate(date);
+  const saturday = new Date(sunday);
+  saturday.setDate(sunday.getDate() + 6);
+  return { start: toISODate(sunday), end: toISODate(saturday) };
 }
 
 /**

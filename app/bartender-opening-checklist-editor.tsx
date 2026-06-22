@@ -81,8 +81,8 @@ export default function BartenderOpeningChecklistEditorScreen() {
     modalButton: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
     cancelButton: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
     cancelButtonText: { fontSize: 16, fontWeight: '600', color: colors.text },
-    saveButton: { backgroundColor: colors.highlight },
-    saveButtonText: { fontSize: 16, fontWeight: '600', color: colors.text },
+    saveButton: { backgroundColor: colors.primary },
+    saveButtonText: { fontSize: 16, fontWeight: '600', color: colors.fireText },
   });
 
   const [categories, setCategories] = useState<ChecklistCategory[]>([]);
@@ -556,7 +556,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
                 disabled={saving}
               >
                 {saving ? (
-                  <ActivityIndicator color={colors.text} />
+                  <ActivityIndicator color={colors.fireText} />
                 ) : (
                   <Text style={styles.saveButtonText}>{t('common:save')}</Text>
                 )}
@@ -629,7 +629,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
                 disabled={saving}
               >
                 {saving ? (
-                  <ActivityIndicator color={colors.text} />
+                  <ActivityIndicator color={colors.fireText} />
                 ) : (
                   <Text style={styles.saveButtonText}>{t('common:save')}</Text>
                 )}
