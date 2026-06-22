@@ -221,7 +221,7 @@ export default function ViewAllUpcomingEventsScreen() {
   const renderEventCard = (event: UpcomingEvent, index: number) => (
     <TouchableOpacity
       key={event.id || index}
-      style={[styles.eventCard, { backgroundColor: colors.card, borderLeftColor: '#4CAF50' }]}
+      style={[styles.eventCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
       onPress={() => openDetailModal(event)}
       activeOpacity={0.7}
     >
@@ -324,6 +324,7 @@ export default function ViewAllUpcomingEventsScreen() {
         onSelectDate={setSelectedDate}
         colors={{
           primary: colors.primary,
+          fireText: colors.fireText,
           background: colors.background,
           text: colors.text,
           textSecondary: colors.darkSecondaryText,
@@ -340,7 +341,7 @@ export default function ViewAllUpcomingEventsScreen() {
               activeOpacity={0.7}
             >
               <View style={styles.subTabLabelRow}>
-                <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Event' && { color: '#FFFFFF' }]}>
+                <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Event' && { color: colors.fireText }]}>
                   {t('upcoming_events:events')}
                 </Text>
                 {eventsEventHasNew && eventsTab !== 'Event' && (
@@ -354,7 +355,7 @@ export default function ViewAllUpcomingEventsScreen() {
               activeOpacity={0.7}
             >
               <View style={styles.subTabLabelRow}>
-                <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && { color: '#FFFFFF' }]}>
+                <Text style={[styles.subTabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && { color: colors.fireText }]}>
                   {t('upcoming_events:entertainment')}
                 </Text>
                 {eventsEntertainmentHasNew && eventsTab !== 'Entertainment' && (
@@ -433,6 +434,7 @@ export default function ViewAllUpcomingEventsScreen() {
                 onSelectDate={handleMonthDateSelect}
                 colors={{
                   primary: colors.primary,
+                  fireText: colors.fireText,
                   background: colors.background,
                   text: colors.text,
                   textSecondary: colors.darkSecondaryText,
@@ -463,6 +465,7 @@ export default function ViewAllUpcomingEventsScreen() {
             textSecondary: colors.textSecondary,
             card: colors.card,
             primary: colors.primary,
+            fireText: colors.fireText,
           }}
         />
       )}
@@ -571,12 +574,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   eventCard: {
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
-    borderLeftWidth: 4,
-    boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.08)',
-    elevation: 2,
+    borderRadius: 16,
+    padding: 11,
+    marginBottom: 11,
+    borderWidth: 1,
   },
   cardRow: {
     flexDirection: 'row',

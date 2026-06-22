@@ -642,7 +642,7 @@ export default function CocktailsAZEditorScreen() {
                 style={[
                   styles.alphabetButtonText,
                   { color: colors.textSecondary },
-                  selectedLetter === null && { color: colors.text },
+                  selectedLetter === null && { color: colors.fireText },
                 ]}
               >
                 {t('cocktails_editor.all_letters')}
@@ -661,7 +661,7 @@ export default function CocktailsAZEditorScreen() {
                   style={[
                     styles.alphabetButtonText,
                     { color: colors.textSecondary },
-                    selectedLetter === letter && { color: colors.text },
+                    selectedLetter === letter && { color: colors.fireText },
                   ]}
                 >
                   {letter}
@@ -817,7 +817,7 @@ export default function CocktailsAZEditorScreen() {
                   ))}
                   <TouchableOpacity style={styles.addIngredientButton} onPress={addIngredient}>
                     <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={20} color={colors.primary} />
-                    <Text style={[styles.addIngredientText, { color: colors.highlight }]}>Add Ingredient</Text>
+                    <Text style={[styles.addIngredientText, { color: colors.primary }]}>Add Ingredient</Text>
                   </TouchableOpacity>
                 </View>
               </CollapsibleSection>

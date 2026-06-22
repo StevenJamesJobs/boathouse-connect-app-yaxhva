@@ -737,9 +737,9 @@ export default function MessagesScreen() {
             ios_icon_name="plus.circle.fill"
             android_material_icon_name="add-circle"
             size={24}
-            color={(user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF'}
+            color={colors.fireText}
           />
-          <Text style={[styles.composeButtonText, { color: (user?.role === 'manager' || user?.role === 'owner') ? colors.text : '#FFFFFF' }]}>
+          <Text style={[styles.composeButtonText, { color: colors.fireText }]}>
             {t('messages.send_new_message')}
           </Text>
         </TouchableOpacity>
@@ -900,7 +900,7 @@ function MessageCard({
                 ios_icon_name="checkmark"
                 android_material_icon_name="check"
                 size={14}
-                color="#FFFFFF"
+                color={colors.fireText}
               />
             )}
           </View>

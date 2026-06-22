@@ -7,9 +7,14 @@ import {
   ThemeMode,
   themePalettes,
 } from '@/styles/commonStyles';
+import { IS_MCLOONES } from '@/constants/buildVariant';
 
 const PALETTE_STORAGE_KEY = '@app_theme_palette';
 const MODE_STORAGE_KEY = '@app_theme_mode';
+
+// Locked redesign defaults: MyResto → Moonstone Dark, Boathouse → Ocean Dark.
+const DEFAULT_PALETTE: ThemePaletteId = IS_MCLOONES ? 'ocean' : 'moonstone';
+const DEFAULT_MODE: ThemeMode = 'dark';
 
 interface ThemeContextType {
   palette: ThemePaletteId;
@@ -21,17 +26,17 @@ interface ThemeContextType {
 }
 
 const ThemeContext = createContext<ThemeContextType>({
-  palette: 'winterchill',
-  mode: 'light',
-  resolvedMode: 'light',
-  colors: themePalettes.winterchill.light,
+  palette: DEFAULT_PALETTE,
+  mode: DEFAULT_MODE,
+  resolvedMode: 'dark',
+  colors: themePalettes[DEFAULT_PALETTE].dark,
   setPalette: async () => {},
   setMode: async () => {},
 });
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [palette, setPaletteState] = useState<ThemePaletteId>('winterchill');
-  const [mode, setModeState] = useState<ThemeMode>('light');
+  const [palette, setPaletteState] = useState<ThemePaletteId>(DEFAULT_PALETTE);
+  const [mode, setModeState] = useState<ThemeMode>(DEFAULT_MODE);
   const systemColorScheme = useColorScheme();
 
   useEffect(() => {
@@ -39,8 +44,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       AsyncStorage.getItem(PALETTE_STORAGE_KEY),
       AsyncStorage.getItem(MODE_STORAGE_KEY),
     ]).then(([savedPalette, savedMode]) => {
-      if (savedPalette && savedPalette in themePalettes) {
-        setPaletteState(savedPalette as ThemePaletteId);
+      if (savedPalette) {
+        if (savedPalette in themePalettes) {
+          setPaletteState(savedPalette as ThemePaletteId);
+        } else {
+          // The redesign regressed the old 14-theme set down to 2. A saved
+          // palette that no longer exists (e.g. 'winterchill') falls back to
+          // the variant default AND is rewritten so it normalizes once.
+          setPaletteState(DEFAULT_PALETTE);
+          AsyncStorage.setItem(PALETTE_STORAGE_KEY, DEFAULT_PALETTE).catch(() => {});
+        }
       }
       if (savedMode === 'light' || savedMode === 'dark' || savedMode === 'auto') {
         setModeState(savedMode);

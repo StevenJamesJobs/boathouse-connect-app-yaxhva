@@ -245,7 +245,7 @@ export default function WordSearchPlayScreen() {
               style={[styles.actionBtn, { backgroundColor: colors.primary }]}
               onPress={handleRestart}
             >
-              <Text style={styles.actionBtnText}>Play Again</Text>
+              <Text style={[styles.actionBtnText, { color: colors.fireText }]}>Play Again</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryBtn, { borderColor: colors.border }]}

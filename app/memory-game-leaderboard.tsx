@@ -164,7 +164,7 @@ export default function MemoryGameLeaderboardScreen() {
               style={[
                 styles.playModeTabText,
                 { color: colors.textSecondary },
-                activePlayMode === pm.key && { color: '#fff', fontWeight: '700' },
+                activePlayMode === pm.key && { color: colors.fireText, fontWeight: '700' },
               ]}
             >
               {pm.label}
@@ -213,7 +213,7 @@ export default function MemoryGameLeaderboardScreen() {
             style={[styles.playButton, { backgroundColor: colors.primary }]}
             onPress={() => router.push(`/memory-game-play?mode=${activeMode}&difficulty=1&play_mode=${activePlayMode}`)}
           >
-            <Text style={styles.playButtonText}>
+            <Text style={[styles.playButtonText, { color: colors.fireText }]}>
               {t('memory_game.be_first')}
             </Text>
           </TouchableOpacity>

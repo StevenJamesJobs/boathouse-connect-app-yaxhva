@@ -38,6 +38,7 @@ interface MonthlyCalendarProps {
   onSelectDate: (date: Date | null) => void;
   colors: {
     primary: string;
+    fireText: string;
     background: string;
     text: string;
     textSecondary: string;
@@ -225,6 +226,7 @@ export default function MonthlyCalendar({
                           { color: inMonth ? colors.text : colors.textSecondary + '50' },
                           today && !selected && { color: colors.primary, fontWeight: '700' },
                           selected && styles.selectedDayNumber,
+                          selected && { color: colors.fireText },
                         ]}
                       >
                         {day.getDate()}
@@ -323,7 +325,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   selectedDayNumber: {
-    color: '#FFFFFF',
     fontWeight: '700',
   },
   dotContainer: {

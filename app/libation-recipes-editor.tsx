@@ -582,14 +582,14 @@ export default function LibationRecipesEditorScreen() {
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
         {/* Add Button */}
-        <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.highlight }]} onPress={openAddModal}>
+        <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.primary }]} onPress={openAddModal}>
           <IconSymbol
             ios_icon_name="plus.circle.fill"
             android_material_icon_name="add-circle"
             size={24}
-            color={colors.text}
+            color={colors.fireText}
           />
-          <Text style={[styles.addButtonText, { color: colors.text }]}>{t('libation_editor.add_recipe')}</Text>
+          <Text style={[styles.addButtonText, { color: colors.fireText }]}>{t('libation_editor.add_recipe')}</Text>
         </TouchableOpacity>
 
         {/* Recipes List by Category */}
@@ -900,14 +900,14 @@ export default function LibationRecipesEditorScreen() {
                     <Text style={styles.cancelButtonText}>{t('libation_editor.cancel_button')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={[styles.submitButton, { backgroundColor: colors.highlight }]}
+                    style={[styles.submitButton, { backgroundColor: colors.primary }]}
                     onPress={handleSave}
                     disabled={loading || uploadingImage}
                   >
                     {loading ? (
-                      <ActivityIndicator color={colors.text} />
+                      <ActivityIndicator color={colors.fireText} />
                     ) : (
-                      <Text style={[styles.submitButtonText, { color: colors.text }]}>
+                      <Text style={[styles.submitButtonText, { color: colors.fireText }]}>
                         {editingRecipe ? t('libation_editor.update_button') : t('libation_editor.save_button')}
                       </Text>
                     )}

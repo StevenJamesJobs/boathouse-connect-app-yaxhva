@@ -1443,7 +1443,7 @@ export default function SpecialFeaturesEditorScreen() {
                   disabled={uploadingImage}
                 >
                   {uploadingImage ? (
-                    <ActivityIndicator color="#1A1A1A" />
+                    <ActivityIndicator color={colors.fireText} />
                   ) : (
                     <Text style={styles.saveButtonText}>
                       {editingFeature ? t('special_features_editor:save_button') : t('special_features_editor:add_save_button')}
@@ -1887,7 +1887,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     alignItems: 'center',
   },
   shapeSegmentActive: {
-    backgroundColor: colors.highlight,
+    backgroundColor: colors.primary,
   },
   shapeSegmentText: {
     fontSize: 14,
@@ -1895,7 +1895,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: '#666666',
   },
   shapeSegmentTextActive: {
-    color: '#1A1A1A',
+    color: colors.fireText,
   },
   selectedFileContainer: {
     flexDirection: 'row',
@@ -2087,7 +2087,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   saveButton: {
     flex: 1,
-    backgroundColor: colors.highlight,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -2095,7 +2095,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   saveButtonText: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#1A1A1A',
+    color: colors.fireText,
   },
   cancelButton: {
     flex: 1,

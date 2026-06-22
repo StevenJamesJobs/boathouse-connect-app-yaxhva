@@ -181,9 +181,9 @@ export default function MemoryGameEditorScreen() {
           ios_icon_name={showAddForm ? 'xmark' : 'plus'}
           android_material_icon_name={showAddForm ? 'close' : 'add'}
           size={20}
-          color="#FFF"
+          color={colors.text}
         />
-        <Text style={styles.addButtonText}>
+        <Text style={[styles.addButtonText, { color: colors.text }]}>
           {showAddForm ? t('common.cancel') : t('memory_game_editor.add_pairing')}
         </Text>
       </TouchableOpacity>
@@ -216,7 +216,7 @@ export default function MemoryGameEditorScreen() {
             placeholderTextColor={colors.textSecondary}
           />
           <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.highlight }]} onPress={handleAdd}>
-            <Text style={styles.saveButtonText}>{t('memory_game_editor.add_pairing')}</Text>
+            <Text style={[styles.saveButtonText, { color: colors.text }]}>{t('memory_game_editor.add_pairing')}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -325,7 +325,7 @@ export default function MemoryGameEditorScreen() {
               style={[
                 styles.scoreFilterText,
                 { color: colors.textSecondary },
-                scoreFilter === sf.key && { color: '#fff', fontWeight: '700' },
+                scoreFilter === sf.key && { color: colors.fireText, fontWeight: '700' },
               ]}
             >
               {sf.label}
@@ -464,7 +464,7 @@ function EditPairingForm({
           style={[styles.editButton, { backgroundColor: colors.highlight }]}
           onPress={() => onSave({ ...pairing, wine, entree, hint: hint || null })}
         >
-          <Text style={styles.editButtonTextWhite}>{t('common.save')}</Text>
+          <Text style={[styles.editButtonTextWhite, { color: colors.text }]}>{t('common.save')}</Text>
         </TouchableOpacity>
       </View>
     </View>

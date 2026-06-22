@@ -43,7 +43,7 @@ const formatShiftDate = (dateStr: string) => {
 export default function ManagerProfileScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
   const { organizationId } = useOrganization();
   const router = useRouter();
   const { unreadCount } = useUnreadMessages();
@@ -311,7 +311,7 @@ export default function ManagerProfileScreen() {
               ios_icon_name="camera.fill"
               android_material_icon_name="camera-alt"
               size={10}
-              color="#FFFFFF"
+              color={colors.text}
             />
           </View>
         </TouchableOpacity>
@@ -583,6 +583,15 @@ export default function ManagerProfileScreen() {
           })}
         </View>
       </View>
+
+      <TouchableOpacity
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20, marginHorizontal: 16, marginBottom: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}
+        onPress={async () => { await logout(); router.replace('/login'); }}
+        activeOpacity={0.7}
+      >
+        <IconSymbol ios_icon_name="rectangle.portrait.and.arrow.right" android_material_icon_name="logout" size={20} color="#E74C3C" />
+        <Text style={{ fontSize: 15, fontWeight: '600', color: '#E74C3C' }}>{t('profile.log_out', 'Log Out')}</Text>
+      </TouchableOpacity>
 
       <QuickToolsSelector
         visible={showToolSelector}

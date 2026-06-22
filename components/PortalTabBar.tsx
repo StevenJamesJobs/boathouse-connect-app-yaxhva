@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, Animated, LayoutChangeEvent } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { hexToRgba } from '@/styles/commonStyles';
@@ -26,27 +26,55 @@ export default function PortalTabBar({ state, descriptors, navigation, role, bad
   const colors = useThemeColors();
   const { mode } = useAppTheme();
   const isManager = role === 'manager' || role === 'owner';
-
-  const blurBgColor = Platform.select({
-    ios: hexToRgba(colors.tabBarBackground, isManager ? 0.80 : 0.60),
-    android: hexToRgba(colors.tabBarBackground, isManager ? 0.95 : 0.90),
-    web: hexToRgba(colors.tabBarBackground, isManager ? 0.90 : 0.85),
-  });
-
   const iconSize = isManager ? 22 : 24;
+
+  // Animated active pill that slides between tabs (measured widths).
+  const pillX = useRef(new Animated.Value(0)).current;
+  const pillW = useRef(new Animated.Value(0)).current;
+  const tabLayouts = useRef<{ x: number; width: number }[]>([]).current;
+  const [pillReady, setPillReady] = useState(false);
+
+  useEffect(() => {
+    const l = tabLayouts[state.index];
+    if (!l) return;
+    Animated.spring(pillX, { toValue: l.x, useNativeDriver: false, tension: 60, friction: 11 }).start();
+    Animated.spring(pillW, { toValue: l.width, useNativeDriver: false, tension: 60, friction: 11 }).start();
+  }, [state.index, pillReady, pillX, pillW, tabLayouts]);
+
+  const onTabLayout = (index: number, e: LayoutChangeEvent) => {
+    tabLayouts[index] = { x: e.nativeEvent.layout.x, width: e.nativeEvent.layout.width };
+    if (!pillReady && tabLayouts.filter(Boolean).length === state.routes.length) {
+      pillX.setValue(tabLayouts[state.index].x);
+      pillW.setValue(tabLayouts[state.index].width);
+      setPillReady(true);
+    }
+  };
 
   return (
     <View style={styles.floatingTabBarContainer}>
       <BlurView
         intensity={80}
         tint={mode === 'dark' ? 'dark' : 'light'}
+        experimentalBlurMethod={Platform.OS === 'android' ? 'dimezisBlurView' : undefined}
         style={[
           styles.blurContainer,
           isManager ? styles.blurContainerManager : styles.blurContainerEmployee,
-          { backgroundColor: blurBgColor },
+          { backgroundColor: colors.navTint, borderColor: colors.glassBorder },
         ]}
       >
         <View style={styles.tabBarContent}>
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.navPill,
+              {
+                backgroundColor: colors.primary + '24',
+                borderColor: colors.primary + '52',
+                width: pillW,
+                transform: [{ translateX: pillX }],
+              },
+            ]}
+          />
           {state.routes.map((route: any, index: number) => {
             const { options } = descriptors[route.key];
             const label = options.tabBarLabel ?? options.title ?? route.name;
@@ -74,6 +102,7 @@ export default function PortalTabBar({ state, descriptors, navigation, role, bad
                 accessibilityLabel={options.tabBarAccessibilityLabel}
                 testID={options.tabBarTestID}
                 onPress={onPress}
+                onLayout={(e) => onTabLayout(index, e)}
                 style={styles.tabButton}
               >
                 <View style={styles.iconContainer}>
@@ -148,6 +177,15 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
     justifyContent: 'space-around',
+    position: 'relative',
+  },
+  navPill: {
+    position: 'absolute',
+    top: 6,
+    bottom: 6,
+    left: 0,
+    borderRadius: 16,
+    borderWidth: 1,
   },
   tabButton: {
     flex: 1,

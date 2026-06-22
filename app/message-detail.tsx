@@ -515,9 +515,9 @@ export default function MessageDetailScreen() {
               ios_icon_name="arrowshape.turn.up.left.fill"
               android_material_icon_name="reply"
               size={18}
-              color="#FFFFFF"
+              color={colors.fireText}
             />
-            <Text style={[styles.replyButtonText, { color: '#FFFFFF' }]}>
+            <Text style={[styles.replyButtonText, { color: colors.fireText }]}>
               {t('reply')}
             </Text>
           </TouchableOpacity>

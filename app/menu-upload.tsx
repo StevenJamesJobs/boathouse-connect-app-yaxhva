@@ -390,9 +390,9 @@ export default function MenuUploadScreen() {
             disabled={uploading || processingId !== null}
             activeOpacity={0.85}
           >
-            {uploading ? <ActivityIndicator color="#FFF" /> : <IconSymbol ios_icon_name="doc.fill" android_material_icon_name="description" size={26} color="#FFFFFF" />}
-            <Text style={styles.uploadTitle}>{t('menu_upload.upload_pdf', 'Upload PDF')}</Text>
-            <Text style={styles.uploadSub}>{costPdf}</Text>
+            {uploading ? <ActivityIndicator color={colors.fireText} /> : <IconSymbol ios_icon_name="doc.fill" android_material_icon_name="description" size={26} color={colors.fireText} />}
+            <Text style={[styles.uploadTitle, { color: colors.fireText }]}>{t('menu_upload.upload_pdf', 'Upload PDF')}</Text>
+            <Text style={[styles.uploadSub, { color: colors.fireText }]}>{costPdf}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -401,9 +401,9 @@ export default function MenuUploadScreen() {
             disabled={uploading || processingId !== null}
             activeOpacity={0.85}
           >
-            {uploading ? <ActivityIndicator color="#FFF" /> : <IconSymbol ios_icon_name="photo.on.rectangle" android_material_icon_name="add-photo-alternate" size={26} color="#FFFFFF" />}
-            <Text style={styles.uploadTitle}>{t('menu_upload.upload_photos', 'Upload Photos')}</Text>
-            <Text style={styles.uploadSub}>{costPhoto}</Text>
+            {uploading ? <ActivityIndicator color={colors.fireText} /> : <IconSymbol ios_icon_name="photo.on.rectangle" android_material_icon_name="add-photo-alternate" size={26} color={colors.fireText} />}
+            <Text style={[styles.uploadTitle, { color: colors.fireText }]}>{t('menu_upload.upload_photos', 'Upload Photos')}</Text>
+            <Text style={[styles.uploadSub, { color: colors.fireText }]}>{costPhoto}</Text>
           </TouchableOpacity>
         </View>
 
@@ -495,7 +495,7 @@ export default function MenuUploadScreen() {
                     style={[styles.segment, deleteSlot === o.slot && { backgroundColor: colors.primary }]}
                     onPress={() => setDeleteSlot(o.slot)}
                   >
-                    <Text style={[styles.segmentText, { color: deleteSlot === o.slot ? '#FFF' : colors.text }]} numberOfLines={1}>{o.label}</Text>
+                    <Text style={[styles.segmentText, { color: deleteSlot === o.slot ? colors.fireText : colors.text }]} numberOfLines={1}>{o.label}</Text>
                   </TouchableOpacity>
                 ))}
               </View>

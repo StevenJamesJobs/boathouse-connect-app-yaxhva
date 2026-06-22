@@ -274,7 +274,7 @@ export default function CocktailsAZScreen() {
                 style={[
                   styles.alphabetButtonText,
                   { color: colors.textSecondary },
-                  selectedLetter === null && { color: colors.text },
+                  selectedLetter === null && { color: colors.fireText },
                 ]}
               >
                 {t('cocktails.all')}
@@ -293,7 +293,7 @@ export default function CocktailsAZScreen() {
                   style={[
                     styles.alphabetButtonText,
                     { color: colors.textSecondary },
-                    selectedLetter === letter && { color: colors.text },
+                    selectedLetter === letter && { color: colors.fireText },
                   ]}
                 >
                   {letter}
@@ -355,7 +355,7 @@ export default function CocktailsAZScreen() {
               <View style={styles.detailSection}>
                 <Text style={styles.detailLabel}>{t('cocktails.alcohol_type')}</Text>
                 <View style={[styles.alcoholTypeBadge, { backgroundColor: colors.primary }]}>
-                  <Text style={[styles.alcoholTypeText, { color: colors.text }]}>{selectedCocktail?.alcohol_type}</Text>
+                  <Text style={[styles.alcoholTypeText, { color: colors.fireText }]}>{selectedCocktail?.alcohol_type}</Text>
                 </View>
               </View>
 

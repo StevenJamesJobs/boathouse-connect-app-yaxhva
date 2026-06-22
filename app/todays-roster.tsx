@@ -17,6 +17,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { isManagerOrOwner } from '@/utils/roles';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
 import ManagerTabBarStatic from '@/components/ManagerTabBarStatic';
@@ -56,6 +57,8 @@ export default function TodaysRosterScreen() {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { user } = useAuth();
+  // Roster is view-all; only managers/owners can add or edit shifts.
+  const canEdit = isManagerOrOwner(user);
   const { organizationId } = useOrganization();
 
   // Build the ±30 day window anchored on today (stable for the lifetime of the screen).
@@ -263,8 +266,9 @@ export default function TodaysRosterScreen() {
                   <TouchableOpacity
                     key={shift.id}
                     style={[styles.shiftCard, { backgroundColor: colors.card }]}
-                    onPress={() => openEditShift(shift)}
-                    activeOpacity={0.7}
+                    onPress={canEdit ? () => openEditShift(shift) : undefined}
+                    disabled={!canEdit}
+                    activeOpacity={canEdit ? 0.7 : 1}
                   >
                     <View style={styles.shiftCardTop}>
                       <View style={[styles.avatar, { backgroundColor: colors.primary + '15' }]}>
@@ -331,6 +335,7 @@ export default function TodaysRosterScreen() {
         onSelectDate={handleSelectDate}
         colors={{
           primary: colors.primary,
+          fireText: colors.fireText,
           background: colors.background,
           text: colors.text,
           textSecondary: colors.textSecondary,
@@ -412,19 +417,21 @@ export default function TodaysRosterScreen() {
         style={styles.pager}
       />
 
-      {/* Floating + button — positioned above the floating tab bar */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: colors.highlight || colors.primary }]}
-        onPress={openAddShift}
-        activeOpacity={0.85}
-      >
-        <IconSymbol
-          ios_icon_name="plus"
-          android_material_icon_name="add"
-          size={28}
-          color="#FFFFFF"
-        />
-      </TouchableOpacity>
+      {/* Floating + button — managers/owners only; positioned above the floating tab bar */}
+      {canEdit && (
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: colors.primary }]}
+          onPress={openAddShift}
+          activeOpacity={0.85}
+        >
+          <IconSymbol
+            ios_icon_name="plus"
+            android_material_icon_name="add"
+            size={28}
+            color={colors.fireText}
+          />
+        </TouchableOpacity>
+      )}
 
       {/* Floating tab bar — matches the manager portal's nav bar, navigates back on tap */}
       <ManagerTabBarStatic />

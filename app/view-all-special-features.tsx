@@ -204,7 +204,7 @@ export default function ViewAllSpecialFeaturesScreen() {
             features.map((feature, index) => (
               <TouchableOpacity
                 key={index}
-                style={[styles.featureCard, { backgroundColor: colors.card }]}
+                style={[styles.featureCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
                 onPress={() => openDetailModal(feature)}
                 activeOpacity={0.7}
               >
@@ -289,6 +289,7 @@ export default function ViewAllSpecialFeaturesScreen() {
             textSecondary: colors.textSecondary,
             card: colors.card,
             primary: colors.primary,
+            fireText: colors.fireText,
           }}
         />
       )}
@@ -357,10 +358,9 @@ const styles = StyleSheet.create({
   },
   featureCard: {
     borderRadius: 16,
-    marginBottom: 16,
+    marginBottom: 11,
     overflow: 'hidden',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.2)',
-    elevation: 3,
+    borderWidth: 1,
   },
   squareLayout: {
     flexDirection: 'row',

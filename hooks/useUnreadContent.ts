@@ -232,7 +232,8 @@ export function useUnreadContent(): UnreadContentResult {
   }, []);
 
   const markTabViewed = useCallback(async (tab: ConnectBarTab) => {
-    const key = STORAGE_KEYS[tab];
+    // 'schedule' has no unread-content tracking → no key, guarded below.
+    const key = STORAGE_KEYS[tab as keyof typeof STORAGE_KEYS];
     if (!key) return;
     await AsyncStorage.setItem(key, new Date().toISOString());
 

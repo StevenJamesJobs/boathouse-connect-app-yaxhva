@@ -219,14 +219,14 @@ export default function WeeklyQuizCard({
         style={[styles.takeQuizButton, { backgroundColor: colors.primary }]}
         onPress={() => onTakeQuiz(activeExam.id)}
       >
-        <Text style={styles.takeQuizButtonText}>
+        <Text style={[styles.takeQuizButtonText, { color: colors.fireText }]}>
           {isSpanish ? 'Tomar Examen' : 'Take Quiz'}
         </Text>
         <IconSymbol
           ios_icon_name="arrow.right"
           android_material_icon_name="arrow-forward"
           size={20}
-          color="#FFF"
+          color={colors.fireText}
         />
       </TouchableOpacity>
       {eligibleQuizCount > 1 && (

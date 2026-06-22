@@ -69,12 +69,12 @@ export default function AppearanceScreen() {
             ios_icon_name="sun.max.fill"
             android_material_icon_name="light-mode"
             size={20}
-            color={mode === 'light' ? '#FFFFFF' : colors.textSecondary}
+            color={mode === 'light' ? colors.fireText : colors.textSecondary}
           />
           <Text
             style={[
               styles.modeButtonText,
-              { color: mode === 'light' ? '#FFFFFF' : colors.textSecondary },
+              { color: mode === 'light' ? colors.fireText : colors.textSecondary },
             ]}
           >
             {t('appearance.light_mode')}
@@ -92,12 +92,12 @@ export default function AppearanceScreen() {
             ios_icon_name="moon.fill"
             android_material_icon_name="dark-mode"
             size={20}
-            color={mode === 'dark' ? '#FFFFFF' : colors.textSecondary}
+            color={mode === 'dark' ? colors.fireText : colors.textSecondary}
           />
           <Text
             style={[
               styles.modeButtonText,
-              { color: mode === 'dark' ? '#FFFFFF' : colors.textSecondary },
+              { color: mode === 'dark' ? colors.fireText : colors.textSecondary },
             ]}
           >
             {t('appearance.dark_mode')}
@@ -115,12 +115,12 @@ export default function AppearanceScreen() {
             ios_icon_name="circle.lefthalf.filled"
             android_material_icon_name="brightness-auto"
             size={20}
-            color={mode === 'auto' ? '#FFFFFF' : colors.textSecondary}
+            color={mode === 'auto' ? colors.fireText : colors.textSecondary}
           />
           <Text
             style={[
               styles.modeButtonText,
-              { color: mode === 'auto' ? '#FFFFFF' : colors.textSecondary },
+              { color: mode === 'auto' ? colors.fireText : colors.textSecondary },
             ]}
           >
             {t('appearance.auto_mode')}
@@ -200,7 +200,7 @@ export default function AppearanceScreen() {
       </Text>
       <View style={[styles.livePreview, { backgroundColor: colors.background, borderColor: colors.border }]}>
         <View style={[styles.previewHeaderBar, { backgroundColor: colors.primary }]}>
-          <Text style={styles.previewHeaderText}>
+          <Text style={[styles.previewHeaderText, { color: colors.fireText }]}>
             {t(`appearance.theme_${palette}`)}
           </Text>
         </View>
@@ -359,7 +359,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   previewHeaderText: {
-    color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },

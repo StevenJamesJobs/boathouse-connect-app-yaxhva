@@ -997,7 +997,7 @@ export default function ExamEditorScreen() {
                   >
                     <Text style={[
                       styles.timeLimitOptionText,
-                      { color: questionCount === count ? '#FFF' : colors.text },
+                      { color: questionCount === count ? colors.fireText : colors.text },
                     ]}>
                       {count}
                     </Text>
@@ -1028,11 +1028,11 @@ export default function ExamEditorScreen() {
               disabled={generating}
             >
               {generating ? (
-                <ActivityIndicator color="#FFF" />
+                <ActivityIndicator color={colors.fireText} />
               ) : (
                 <>
-                  <IconSymbol ios_icon_name="wand.and.stars" android_material_icon_name="auto-awesome" size={22} color="#FFF" />
-                  <Text style={styles.generateButtonText}>Generate {questionCount} Questions</Text>
+                  <IconSymbol ios_icon_name="wand.and.stars" android_material_icon_name="auto-awesome" size={22} color={colors.fireText} />
+                  <Text style={[styles.generateButtonText, { color: colors.fireText }]}>Generate {questionCount} Questions</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -1167,7 +1167,7 @@ export default function ExamEditorScreen() {
                   >
                     <Text style={[
                       styles.timeLimitOptionText,
-                      { color: timeLimit === secs ? '#FFF' : colors.text },
+                      { color: timeLimit === secs ? colors.fireText : colors.text },
                     ]}>
                       {secs === 0 ? '∞' : formatTime(secs)}
                     </Text>
@@ -1597,7 +1597,7 @@ export default function ExamEditorScreen() {
                   style={[styles.modalSaveButton, { backgroundColor: showAddBonus ? '#F59E0B' : colors.primary }]}
                   onPress={() => handleAddCustom(showAddBonus)}
                 >
-                  <Text style={styles.modalSaveText}>
+                  <Text style={[styles.modalSaveText, !showAddBonus && { color: colors.fireText }]}>
                     {showAddBonus ? 'Add Bonus Question' : 'Add Question'}
                   </Text>
                 </TouchableOpacity>
@@ -1738,7 +1738,7 @@ export default function ExamEditorScreen() {
                     style={[styles.modalSaveButton, { backgroundColor: colors.primary }]}
                     onPress={handleSaveEdit}
                   >
-                    <Text style={styles.modalSaveText}>Save Changes</Text>
+                    <Text style={[styles.modalSaveText, { color: colors.fireText }]}>Save Changes</Text>
                   </TouchableOpacity>
                 </ScrollView>
               )}
@@ -1870,7 +1870,7 @@ export default function ExamEditorScreen() {
                       handleUpdateCategoryLabel(q, trimmed || null);
                     }}
                   >
-                    <Text style={styles.modalSaveText}>Save</Text>
+                    <Text style={[styles.modalSaveText, { color: colors.fireText }]}>Save</Text>
                   </TouchableOpacity>
                 </View>
               </View>

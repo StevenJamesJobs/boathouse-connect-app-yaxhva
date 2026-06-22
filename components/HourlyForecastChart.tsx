@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
+import { useThemeColors } from '@/hooks/useThemeColors';
 
 export interface HourlyPoint {
   /** Display label, e.g. "12 PM" (already localized by the caller). */
@@ -46,6 +47,9 @@ const PRECIP_COLOR = '#3498DB';
 
 export default function HourlyForecastChart({ hours, colors }: HourlyForecastChartProps) {
   const { t } = useTranslation();
+  // fireText (on-primary text color) is sourced from the theme directly so the
+  // active toggle stays readable in Moonstone without threading it through props.
+  const { fireText } = useThemeColors();
   const [mode, setMode] = useState<Mode>('temp');
 
   if (!hours || hours.length === 0) return null;
@@ -112,10 +116,10 @@ export default function HourlyForecastChart({ hours, colors }: HourlyForecastCha
                   ios_icon_name={m === 'temp' ? 'thermometer' : 'drop.fill'}
                   android_material_icon_name={m === 'temp' ? 'thermostat' : 'water-drop'}
                   size={13}
-                  color={active ? '#FFFFFF' : colors.textSecondary}
+                  color={active ? fireText : colors.textSecondary}
                 />
                 <Text
-                  style={[styles.toggleText, { color: active ? '#FFFFFF' : colors.textSecondary }]}
+                  style={[styles.toggleText, { color: active ? fireText : colors.textSecondary }]}
                 >
                   {t(m === 'temp' ? 'weather.hourly_temp' : 'weather.hourly_precip')}
                 </Text>

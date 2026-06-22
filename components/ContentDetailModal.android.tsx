@@ -52,6 +52,7 @@ interface ContentDetailModalProps {
     text: string;
     textSecondary: string;
     primary: string;
+    fireText: string;
     card: string;
     highlight?: string;
     border?: string;
@@ -279,9 +280,9 @@ export default function ContentDetailModal({
                     ios_icon_name="link"
                     android_material_icon_name="link"
                     size={20}
-                    color="#FFFFFF"
+                    color={colors.fireText}
                   />
-                  <Text style={styles.actionButtonText}>View More Information</Text>
+                  <Text style={[styles.actionButtonText, { color: colors.fireText }]}>View More Information</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -297,9 +298,9 @@ export default function ContentDetailModal({
                     ios_icon_name="gift.fill"
                     android_material_icon_name="card-giftcard"
                     size={20}
-                    color="#FFFFFF"
+                    color={colors.fireText}
                   />
-                  <Text style={styles.actionButtonText}>{redeemAction.label}</Text>
+                  <Text style={[styles.actionButtonText, { color: colors.fireText }]}>{redeemAction.label}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -316,9 +317,9 @@ export default function ContentDetailModal({
                       ios_icon_name="eye.fill"
                       android_material_icon_name="visibility"
                       size={20}
-                      color="#FFFFFF"
+                      color={colors.fireText}
                     />
-                    <Text style={styles.fileButtonText}>View</Text>
+                    <Text style={[styles.fileButtonText, { color: colors.fireText }]}>View</Text>
                   </TouchableOpacity>
                   
                   <TouchableOpacity
@@ -330,9 +331,9 @@ export default function ContentDetailModal({
                       ios_icon_name="arrow.down.circle.fill"
                       android_material_icon_name="download"
                       size={20}
-                      color="#FFFFFF"
+                      color={colors.fireText}
                     />
-                    <Text style={styles.fileButtonText}>Download</Text>
+                    <Text style={[styles.fileButtonText, { color: colors.fireText }]}>Download</Text>
                   </TouchableOpacity>
                 </View>
               </View>

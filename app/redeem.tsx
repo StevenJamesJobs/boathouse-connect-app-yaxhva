@@ -444,7 +444,7 @@ export default function EmployeeRedeemScreen() {
                     ]}
                     onPress={() => setShiftPeriod(p)}
                   >
-                    <Text style={{ color: shiftPeriod === p ? '#fff' : colors.text, fontWeight: '700' }}>{p}</Text>
+                    <Text style={{ color: shiftPeriod === p ? colors.fireText : colors.text, fontWeight: '700' }}>{p}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
@@ -478,7 +478,7 @@ export default function EmployeeRedeemScreen() {
                 disabled={!canConfirm}
                 onPress={() => setShowConfirm(true)}
               >
-                <Text style={styles.confirmText}>Review (${requestedBucks})</Text>
+                <Text style={[styles.confirmText, { color: canConfirm ? colors.fireText : colors.text }]}>Review (${requestedBucks})</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -525,9 +525,9 @@ export default function EmployeeRedeemScreen() {
                 disabled={submitting}
               >
                 {submitting ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={colors.fireText} />
                 ) : (
-                  <Text style={{ color: '#fff', fontWeight: '700' }}>Submit</Text>
+                  <Text style={{ color: colors.fireText, fontWeight: '700' }}>Submit</Text>
                 )}
               </TouchableOpacity>
             </View>

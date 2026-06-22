@@ -282,7 +282,7 @@ export default function HostSectionEditorScreen() {
           style={[styles.shapeBtn, value === s && { backgroundColor: colors.primary, borderColor: colors.primary }]}
           onPress={() => onChange(s)}
         >
-          <Text style={[styles.shapeText, { color: value === s ? '#fff' : colors.text }]}>
+          <Text style={[styles.shapeText, { color: value === s ? colors.fireText : colors.text }]}>
             {s === 'square' ? 'Square' : 'Banner'}
           </Text>
         </TouchableOpacity>
@@ -336,7 +336,7 @@ export default function HostSectionEditorScreen() {
           </TouchableOpacity>
 
           <TouchableOpacity style={[styles.saveButton, saving && { opacity: 0.6 }]} onPress={saveSection} disabled={saving}>
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>{sectionId ? 'Save Section' : 'Create Section'}</Text>}
+            {saving ? <ActivityIndicator color={colors.fireText} /> : <Text style={styles.saveButtonText}>{sectionId ? 'Save Section' : 'Create Section'}</Text>}
           </TouchableOpacity>
         </CollapsibleSection>
 
@@ -346,7 +346,7 @@ export default function HostSectionEditorScreen() {
             <View style={styles.tilesHeader}>
               <Text style={styles.tilesTitle}>Tiles</Text>
               <TouchableOpacity style={styles.addTileBtn} onPress={openAddTile}>
-                <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={18} color="#fff" />
+                <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={18} color={colors.fireText} />
                 <Text style={styles.addTileText}>Add Tile</Text>
               </TouchableOpacity>
             </View>
@@ -424,7 +424,7 @@ export default function HostSectionEditorScreen() {
               <TextInput style={[styles.input, styles.multiline]} value={tLinkDesc} onChangeText={setTLinkDesc} placeholder="You're about to leave the app and open..." placeholderTextColor={colors.textSecondary} multiline />
 
               <TouchableOpacity style={[styles.saveButton, savingTile && { opacity: 0.6 }]} onPress={saveTile} disabled={savingTile}>
-                {savingTile ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveButtonText}>{editingTile ? 'Save Tile' : 'Add Tile'}</Text>}
+                {savingTile ? <ActivityIndicator color={colors.fireText} /> : <Text style={styles.saveButtonText}>{editingTile ? 'Save Tile' : 'Add Tile'}</Text>}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -471,7 +471,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 14,
     alignItems: 'center', marginTop: 20,
   },
-  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  saveButtonText: { color: colors.fireText, fontSize: 16, fontWeight: '700' },
   tilesCard: {
     backgroundColor: colors.card, borderRadius: 16, padding: 16, marginTop: 16,
     boxShadow: '0px 2px 8px rgba(0,0,0,0.1)', elevation: 3,
@@ -482,7 +482,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.primary,
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 10,
   },
-  addTileText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  addTileText: { color: colors.fireText, fontWeight: '700', fontSize: 14 },
   tileRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10,
     borderTopWidth: 1, borderTopColor: colors.border,

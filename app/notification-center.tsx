@@ -343,7 +343,7 @@ export default function NotificationCenter() {
             style={[styles.tab, activeTab === 'compose' && { backgroundColor: colors.primary }]}
             onPress={() => setActiveTab('compose')}
           >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'compose' && { color: '#FFFFFF' }]}>
+            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'compose' && { color: colors.fireText }]}>
               Compose
             </Text>
           </TouchableOpacity>
@@ -354,7 +354,7 @@ export default function NotificationCenter() {
               loadSentHistory();
             }}
           >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'history' && { color: '#FFFFFF' }]}>
+            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'history' && { color: colors.fireText }]}>
               Sent History
             </Text>
           </TouchableOpacity>
@@ -659,14 +659,14 @@ export default function NotificationCenter() {
                 disabled={!title.trim() || !body.trim() || sending || (audienceMode === 'job_titles' && selectedJobTitles.length === 0)}
               >
                 {sending ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                  <ActivityIndicator color={colors.fireText} />
                 ) : (
                   <>
                     <IconSymbol
                       ios_icon_name="paperplane.fill"
                       android_material_icon_name="send"
                       size={20}
-                      color="#FFFFFF"
+                      color={colors.fireText}
                     />
                     <Text style={styles.sendButtonText}>
                       {audienceMode === 'all' ? t('notification_center.send_button') : `Send to ${selectedJobTitles.length} Group${selectedJobTitles.length !== 1 ? 's' : ''}`}
@@ -924,13 +924,13 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     paddingVertical: 16,
     borderRadius: 12,
     marginBottom: 16,
-    backgroundColor: colors.highlight,
+    backgroundColor: colors.primary,
   },
   sendButtonDisabled: {
     opacity: 0.5,
   },
   sendButtonText: {
-    color: '#FFFFFF',
+    color: colors.fireText,
     fontSize: 16,
     fontWeight: '600',
   },
@@ -992,7 +992,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: colors.text,
   },
   pickerOptionTextSelected: {
-    color: colors.highlight,
+    color: colors.text,
     fontWeight: '600',
   },
   infoContainer: {
@@ -1031,7 +1031,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     alignItems: 'center',
   },
   audienceDoneBtnText: {
-    color: '#FFFFFF',
+    color: colors.fireText,
     fontSize: 16,
     fontWeight: '600',
   },

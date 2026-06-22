@@ -167,7 +167,7 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
                 >
                   <Text
                     numberOfLines={1}
-                    style={{ color: active ? '#fff' : colors.text, fontSize: 12, fontWeight: '600' }}
+                    style={{ color: active ? colors.fireText : colors.text, fontSize: 12, fontWeight: '600' }}
                   >
                     {cat}
                   </Text>

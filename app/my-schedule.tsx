@@ -314,7 +314,7 @@ function DayRow({ day, shifts, isToday, colors, t, formatTime, getShiftDuration 
   const dateBoxBorder = isToday
     ? colors.primary
     : colors.border || 'rgba(128,128,128,0.15)';
-  const dateBoxTextColor = isToday ? '#FFFFFF' : colors.primary;
+  const dateBoxTextColor = isToday ? colors.fireText : colors.primary;
   const accentColor = isToday ? colors.primary : 'transparent';
 
   const renderDateBox = (dimmed: boolean) => (

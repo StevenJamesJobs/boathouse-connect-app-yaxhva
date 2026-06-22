@@ -165,7 +165,7 @@ export default function PictureThisLeaderboardScreen() {
             >
               <Text style={[
                 styles.modeTabText,
-                { color: active ? '#fff' : colors.textSecondary },
+                { color: active ? colors.fireText : colors.textSecondary },
                 active && { fontWeight: '700' },
               ]}>
                 {t(pm.labelKey)}
@@ -229,7 +229,7 @@ export default function PictureThisLeaderboardScreen() {
             style={[styles.playBtn, { backgroundColor: colors.primary }]}
             onPress={() => router.replace('/picture-this-game')}
           >
-            <Text style={styles.playBtnText}>Play Now</Text>
+            <Text style={[styles.playBtnText, { color: colors.fireText }]}>Play Now</Text>
           </TouchableOpacity>
         </View>
       ) : (

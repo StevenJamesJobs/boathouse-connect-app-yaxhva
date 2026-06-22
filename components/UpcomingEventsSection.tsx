@@ -51,6 +51,7 @@ interface EventColors {
   textSecondary: string;
   card: string;
   highlight: string;
+  fireText: string;
 }
 
 interface UpcomingEventsSectionProps {
@@ -232,7 +233,7 @@ export default function UpcomingEventsSection({
             onPress={() => setEventsTab('Event')}
             activeOpacity={0.7}
           >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Event' && styles.activeTabText]}>
+            <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Event' && [styles.activeTabText, { color: colors.fireText }]]}>
               {t('upcoming_events.events')}
             </Text>
           </TouchableOpacity>
@@ -241,7 +242,7 @@ export default function UpcomingEventsSection({
             onPress={() => setEventsTab('Entertainment')}
             activeOpacity={0.7}
           >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && styles.activeTabText]}>
+            <Text style={[styles.tabText, { color: colors.textSecondary }, eventsTab === 'Entertainment' && [styles.activeTabText, { color: colors.fireText }]]}>
               {t('upcoming_events.entertainment')}
             </Text>
           </TouchableOpacity>
