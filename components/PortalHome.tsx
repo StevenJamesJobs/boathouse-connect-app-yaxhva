@@ -13,8 +13,10 @@ import {
   Modal,
   Dimensions,
   FlatList,
+  Animated,
   NativeSyntheticEvent,
   NativeScrollEvent,
+  LayoutChangeEvent,
 } from 'react-native';
 import { Image } from 'expo-image';
 import { useAuth } from '@/contexts/AuthContext';
@@ -193,13 +195,24 @@ export default function PortalHome({ role }: PortalHomeProps) {
   const sectionListRef = useRef<FlatList>(null);
   // Per-leaf scroll refs so sibling sub-tab leaves stay vertically in sync (the
   // collapsed Happening-Today / calendar state carries across a sideways swipe).
-  const annScrollRef = useRef<ScrollView>(null);
-  const featScrollRef = useRef<ScrollView>(null);
-  const eventScrollRef = useRef<ScrollView>(null);
-  const entScrollRef = useRef<ScrollView>(null);
+  const annScrollRef = useRef<any>(null);
+  const featScrollRef = useRef<any>(null);
+  const eventScrollRef = useRef<any>(null);
+  const entScrollRef = useRef<any>(null);
   const activeLeafRef = useRef(1);
   const isScrollingRef = useRef(false);
   const lastMarkedSectionRef = useRef<ConnectBarTab>('today');
+
+  // Collapsing section header is rendered ONCE as a fixed overlay above the pager
+  // (not inside each leaf) so an intra-section swipe moves only the cards — the
+  // band/calendar + sub-tabs stay locked. One scroll value per section drives the
+  // collapse; both sibling leaves write the same (scroll-synced) offset.
+  const todayScrollY = useRef(new Animated.Value(0)).current;
+  const eventsScrollY = useRef(new Animated.Value(0)).current;
+  const [headerAreaHeight, setHeaderAreaHeight] = useState(0);
+  const [bandHeight, setBandHeight] = useState(0);
+  const [calendarHeight, setCalendarHeight] = useState(248);
+  const [subTabsHeight, setSubTabsHeight] = useState(62);
 
 
   // Events section state (calendar + tabs - managed here for sticky layout)
@@ -562,6 +575,12 @@ export default function PortalHome({ role }: PortalHomeProps) {
     eventFallsOnDate(event.start_date_time, event.end_date_time, new Date())
   );
 
+  // Total height each section's fixed header reserves at the top of its leaves.
+  // The collapsible portion (band / calendar) scrolls under the Connect bar; the
+  // sub-tabs pin. todayHappeningList empty → bandHeight measures 0.
+  const todayHeaderHeight = bandHeight + subTabsHeight;
+  const eventsHeaderHeight = calendarHeight + subTabsHeight;
+
   const renderEventCard = (event: UpcomingEvent, index: number) => {
     const additionalImages = contentImagesMap.get(event.id);
     let imageUrls: string[] | undefined;
@@ -681,7 +700,13 @@ export default function PortalHome({ role }: PortalHomeProps) {
       setActiveSection(liveSection as ConnectBarTab);
       setCurrentPageIndex(pageIndex);
     }
-  }, [activeSection]);
+    // The sub-tabs now live in the fixed overlay, so flip their active highlight
+    // mid-swipe to track the card content sliding underneath.
+    if (pageIndex === 1) { if (whatsHappeningTab !== 'Announcements') setWhatsHappeningTab('Announcements'); }
+    else if (pageIndex === 2) { if (whatsHappeningTab !== 'Special Features') setWhatsHappeningTab('Special Features'); }
+    else if (pageIndex === 3) { if (eventsTab !== 'Event') setEventsTab('Event'); }
+    else if (pageIndex === 4) { if (eventsTab !== 'Entertainment') setEventsTab('Entertainment'); }
+  }, [activeSection, whatsHappeningTab, eventsTab]);
 
   // Handle ConnectBar tab press — scroll to the first leaf of that section.
   const handleTabChange = useCallback((tab: ConnectBarTab) => {
@@ -899,11 +924,11 @@ export default function PortalHome({ role }: PortalHomeProps) {
 
   // ===== SECTION RENDERERS =====
 
-  // Today section: the "Happening Today" band (scrolls away) + the sticky
-  // Announcements / Special Features sub-tabs. Both render INSIDE each Today leaf
-  // (stickyHeaderIndices) so the band collapses behind the Connect bar and the
-  // sub-tabs pin under it. When there's no Happening Today, the band is an empty
-  // 0-height view and the sub-tabs sit at the top.
+  // Today section: the "Happening Today" band (collapses) + the Announcements /
+  // Special Features sub-tabs. Both render in the FIXED overlay above the pager
+  // (renderSectionHeaderOverlay) — the band translates under the Connect bar as
+  // the active leaf scrolls and the sub-tabs pin. When there's no Happening Today,
+  // the band measures 0 height and the sub-tabs sit at the top.
   const renderHappeningBand = () => {
     if (todayHappeningList.length === 0) return null;
     return (
@@ -977,25 +1002,31 @@ export default function PortalHome({ role }: PortalHomeProps) {
     </View>
   );
 
-  // FlatList leaf for Today — band (scrolls away) + sticky sub-tabs + cards.
+  // FlatList leaf for Today — CARDS ONLY. The band + sub-tabs live in the fixed
+  // overlay (see renderSectionHeaderOverlay); the leaf reserves their height as
+  // paddingTop and drives the shared collapse value as it scrolls.
   const renderTodayLeaf = (subTab: 'Announcements' | 'Special Features') => {
     const isAnn = subTab === 'Announcements';
     return (
     <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
-      <ScrollView
+      <Animated.ScrollView
         ref={isAnn ? annScrollRef : featScrollRef}
         style={styles.sectionScroll}
-        stickyHeaderIndices={[1]}
+        contentContainerStyle={{ paddingTop: todayHeaderHeight }}
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled
         scrollEventThrottle={16}
-        onScroll={(e) => {
-          if (activeLeafRef.current !== (isAnn ? 1 : 2)) return;
-          (isAnn ? featScrollRef : annScrollRef).current?.scrollTo({ y: e.nativeEvent.contentOffset.y, animated: false });
-        }}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: todayScrollY } } }],
+          {
+            useNativeDriver: true,
+            listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+              if (activeLeafRef.current !== (isAnn ? 1 : 2)) return;
+              (isAnn ? featScrollRef : annScrollRef).current?.scrollTo({ y: e.nativeEvent.contentOffset.y, animated: false });
+            },
+          }
+        )}
       >
-        <View>{renderHappeningBand()}</View>
-        {renderTodaySubTabs(subTab)}
         <View style={styles.subpad}>
           {subTab === 'Announcements' ? (
             loadingAnnouncements ? (
@@ -1025,15 +1056,15 @@ export default function PortalHome({ role }: PortalHomeProps) {
             specialFeatures.map((f, i) => renderFeatureCard(f, i))
           )}
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
     );
   };
 
-  // Events section: the calendar strip (scrolls away) + the sticky
-  // Event / Entertainment segment. Both render INSIDE each Events leaf
-  // (stickyHeaderIndices). selectedDate is lifted so both leaves' calendars stay
-  // in sync.
+  // Events section: the calendar strip (collapses) + the Event / Entertainment
+  // segment. Both render in the FIXED overlay above the pager; the calendar
+  // translates under the Connect bar as the active leaf scrolls and the segment
+  // pins. selectedDate is lifted so the (single) calendar stays in sync.
   const renderEventsCalendar = () => {
     const hasNewAdded = eventsSelectedDate === null && (['Event', 'Entertainment'] as const).some(cat => {
       const items = upcomingEvents.filter(e => e.category === cat);
@@ -1097,27 +1128,33 @@ export default function PortalHome({ role }: PortalHomeProps) {
     </View>
   );
 
-  // FlatList leaf for Events — calendar (scrolls away) + sticky seg + cards.
+  // FlatList leaf for Events — CARDS ONLY. The calendar strip + sub-tab segment
+  // live in the fixed overlay; the leaf reserves their height and drives the
+  // shared Events collapse value.
   const renderEventsLeaf = (subTab: 'Event' | 'Entertainment') => {
     const displayList = computeEventsDisplay(subTab);
     const isEvent = subTab === 'Event';
 
     return (
       <View style={[styles.sectionPage, { width: SCREEN_WIDTH }]}>
-        <ScrollView
+        <Animated.ScrollView
           ref={isEvent ? eventScrollRef : entScrollRef}
           style={styles.sectionScroll}
-          stickyHeaderIndices={[1]}
+          contentContainerStyle={{ paddingTop: eventsHeaderHeight }}
           showsVerticalScrollIndicator={false}
           nestedScrollEnabled
           scrollEventThrottle={16}
-          onScroll={(e) => {
-            if (activeLeafRef.current !== (isEvent ? 3 : 4)) return;
-            (isEvent ? entScrollRef : eventScrollRef).current?.scrollTo({ y: e.nativeEvent.contentOffset.y, animated: false });
-          }}
+          onScroll={Animated.event(
+            [{ nativeEvent: { contentOffset: { y: eventsScrollY } } }],
+            {
+              useNativeDriver: true,
+              listener: (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+                if (activeLeafRef.current !== (isEvent ? 3 : 4)) return;
+                (isEvent ? entScrollRef : eventScrollRef).current?.scrollTo({ y: e.nativeEvent.contentOffset.y, animated: false });
+              },
+            }
+          )}
         >
-          <View>{renderEventsCalendar()}</View>
-          {renderEventsSeg(subTab)}
           <View style={styles.subpad}>
             {loadingEvents ? (
               <View style={styles.loadingContainer}>
@@ -1133,7 +1170,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
               displayList.map((event, index) => renderEventCard(event, index))
             )}
           </View>
-        </ScrollView>
+        </Animated.ScrollView>
       </View>
     );
   };
@@ -1233,6 +1270,54 @@ export default function PortalHome({ role }: PortalHomeProps) {
     </View>
   );
 
+  // Fixed, collapsing section header rendered ONCE above the pager. Shows the
+  // Today band + sub-tabs or the Events calendar + sub-tabs for the active
+  // section; the collapsible part (band/calendar) translates up under the Connect
+  // bar as the active leaf scrolls, while the sub-tabs pin. Because it lives
+  // OUTSIDE the pager, an intra-section swipe leaves it locked — only the cards
+  // beneath move. onLayout measures feed back into each leaf's reserved paddingTop.
+  const renderSectionHeaderOverlay = () => {
+    const isToday = activeSection === 'today';
+    const isEvents = activeSection === 'events';
+    // headerArea measures itself on first layout; wait for it so the overlay
+    // never paints at top:0 (overlapping the Connect bar) for a frame.
+    if ((!isToday && !isEvents) || headerAreaHeight === 0) return null;
+    const headerHeight = isToday ? todayHeaderHeight : eventsHeaderHeight;
+    const collapsible = isToday ? bandHeight : calendarHeight;
+    const scrollY = isToday ? todayScrollY : eventsScrollY;
+    const translateY = scrollY.interpolate({
+      inputRange: [0, Math.max(1, collapsible)],
+      outputRange: [0, -collapsible],
+      extrapolate: 'clamp',
+    });
+    return (
+      <View
+        style={[styles.headerOverlayClip, { top: headerAreaHeight, height: headerHeight }]}
+        pointerEvents="box-none"
+      >
+        <Animated.View style={{ transform: [{ translateY }] }} pointerEvents="box-none">
+          {isToday ? (
+            <>
+              <View onLayout={(e: LayoutChangeEvent) => setBandHeight(e.nativeEvent.layout.height)}>
+                {renderHappeningBand()}
+              </View>
+              <View onLayout={(e: LayoutChangeEvent) => setSubTabsHeight(e.nativeEvent.layout.height)}>
+                {renderTodaySubTabs(whatsHappeningTab)}
+              </View>
+            </>
+          ) : (
+            <>
+              <View onLayout={(e: LayoutChangeEvent) => setCalendarHeight(e.nativeEvent.layout.height)}>
+                {renderEventsCalendar()}
+              </View>
+              {renderEventsSeg(eventsTab)}
+            </>
+          )}
+        </Animated.View>
+      </View>
+    );
+  };
+
   const renderSection = ({ item }: { item: string }) => {
     switch (item) {
       case 'schedule': return renderScheduleSection();
@@ -1249,7 +1334,10 @@ export default function PortalHome({ role }: PortalHomeProps) {
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      <View style={styles.headerArea}>
+      <View
+        style={styles.headerArea}
+        onLayout={(e: LayoutChangeEvent) => setHeaderAreaHeight(e.nativeEvent.layout.height)}
+      >
         {/* Welcome Header */}
         <View style={styles.headerPadding}>
           <WelcomeHeader
@@ -1267,8 +1355,9 @@ export default function PortalHome({ role }: PortalHomeProps) {
         </View>
       </View>
 
-      {/* Horizontal Swipeable Sections — each leaf carries its own collapsing
-          header (band/calendar) + sticky sub-tabs via stickyHeaderIndices. */}
+      {/* Horizontal Swipeable Sections — cards only. The collapsing section
+          header (band/calendar + sub-tabs) is the fixed overlay rendered below,
+          so an intra-section swipe moves only these card leaves. */}
       <FlatList
         ref={sectionListRef}
         data={FLATLIST_PAGES as unknown as string[]}
@@ -1288,6 +1377,9 @@ export default function PortalHome({ role }: PortalHomeProps) {
           index,
         })}
       />
+
+      {/* Fixed collapsing section header — locked across intra-section swipes. */}
+      {renderSectionHeaderOverlay()}
 
       {/* Notification Dropdown */}
       <NotificationDropdown
@@ -1349,6 +1441,15 @@ const styles = StyleSheet.create({
   headerPadding: {
     paddingTop: 12,
     paddingHorizontal: 16,
+  },
+  // Fixed section-header overlay: clips the band/calendar as it collapses under
+  // the Connect bar; sits above the pager but below the header area (zIndex 10).
+  headerOverlayClip: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    overflow: 'hidden',
+    zIndex: 5,
   },
   sectionPage: {
     flex: 1,
