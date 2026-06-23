@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manage redesign — 4 concepts · MyResto / Boathouse Connect</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.11.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:16px;padding:24px 12px 60px;background:#0C0D11;font-family:'Inter',system-ui,sans-serif}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:center;max-width:760px}
+.grp{display:flex;gap:6px;align-items:center;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.grp .gl2{font-family:'JetBrains Mono';font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s;display:flex;align-items:center;gap:5px}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb i{font-size:14px}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono';text-align:center;max-width:560px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+
+/* ---------- phone shell ---------- */
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --fire:#E6EAEE; --ember:#C7CDD2; --blue:#8FA0AC; --bluetext:#CDD8DF; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --nav:rgba(24,27,33,0.55); --sheen:rgba(255,255,255,0.13); --thumbbg:#252A31; --glowA:rgba(230,234,238,0.12); --glowB:rgba(255,122,47,0.10);
+  position:relative;width:392px;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column
+}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--fire:#3A4250;--ember:#2A313C;--blue:#7E8A94;--bluetext:#2A313C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--nav:rgba(255,255,255,0.62);--sheen:rgba(255,255,255,0.92);--thumbbg:#D8D8DC;--glowA:rgba(58,66,80,0.10);--glowB:rgba(236,106,30,0.12)}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fire:#4A90E2;--ember:#6BADE8;--blue:#5DADE2;--bluetext:#BFE3F7;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--nav:rgba(26,35,50,0.55);--sheen:rgba(255,255,255,0.13);--thumbbg:#2C3E50;--glowA:rgba(74,144,226,0.32);--glowB:rgba(93,173,226,0.16)}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fire:#1976D2;--ember:#1565C0;--blue:#42A5F5;--bluetext:#0D47A1;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--nav:rgba(255,255,255,0.62);--sheen:rgba(255,255,255,0.95);--thumbbg:#CFE4EC;--glowA:rgba(25,118,210,0.18);--glowB:rgba(66,165,245,0.13)}
+
+/* ---------- ambient edge-to-edge glow ---------- */
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.glow3{position:absolute;bottom:40px;right:-70px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 70%);z-index:0;pointer-events:none;opacity:.7}
+
+/* ---------- status bar ---------- */
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono';color:var(--text)}
+.sb .ri{display:flex;gap:7px;align-items:center;font-size:14px}
+
+/* ---------- scrollable screen ---------- */
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 96px}
+.screen::-webkit-scrollbar{display:none}
+.design{display:none;padding:6px 16px 0;animation:fade .35s ease}
+.design.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ---------- shared bits ---------- */
+.concept{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:7px;margin:4px 2px 14px}
+.concept b{color:var(--tint);letter-spacing:1.4px}
+.concept .ln{flex:1;height:1px;background:var(--hair)}
+
+.greet{position:relative;z-index:3;display:flex;align-items:center;gap:12px;margin:2px 0 4px;padding:2px}
+.greet .av{width:44px;height:44px;border-radius:14px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque';font-weight:700;font-size:16px;color:var(--text);backdrop-filter:blur(14px);flex-shrink:0}
+.greet .gt h1{font-family:'Bricolage Grotesque';font-size:21px;font-weight:700;letter-spacing:-0.5px;line-height:1.05}
+.greet .gt h1 b{color:var(--fire)}
+.greet .gt p{font-family:'JetBrains Mono';font-size:10px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.greet .bell{margin-left:auto;width:40px;height:40px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--text);font-size:18px;position:relative;backdrop-filter:blur(14px)}
+.greet .bell .nd{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;border-radius:8px;background:var(--blue);color:var(--bg);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono';border:2px solid var(--bg)}
+
+.zlabel{font-family:'JetBrains Mono';font-size:10px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:18px 2px 11px}
+.zlabel .ct{color:var(--tint);letter-spacing:.4px}
+.zlabel .ln{flex:1;height:1px;background:var(--hair)}
+
+/* icon tile */
+.gic{border-radius:13px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tint) 15%,transparent);color:var(--tint);flex-shrink:0}
+.owner-tag{font-family:'JetBrains Mono';font-size:8px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--bluetext);background:color-mix(in srgb,var(--blue) 18%,transparent);border:1px solid color-mix(in srgb,var(--blue) 30%,transparent);padding:2px 6px;border-radius:6px}
+.chev{color:var(--muted);font-size:16px;margin-left:auto;flex-shrink:0}
+.newpill{font-family:'JetBrains Mono';font-size:8.5px;font-weight:700;letter-spacing:.4px;background:var(--blue);color:var(--bg);padding:2px 6px;border-radius:5px}
+
+/* =====================================================================
+   DESIGN 1 — BENTO  (no tabs, asymmetric, everything visible)
+   ===================================================================== */
+.bento{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.bcard{background:var(--surf);border:1px solid var(--surfbd);border-radius:20px;backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);padding:14px;position:relative;overflow:hidden;cursor:pointer;transition:.18s}
+.bcard:active{transform:scale(.985)}
+.bcard.wide{grid-column:1 / -1}
+.bcard.feature{grid-column:1 / -1;padding:16px}
+.bcard .gic{width:46px;height:46px;font-size:23px;margin-bottom:11px}
+.bcard h3{font-family:'Bricolage Grotesque';font-weight:700;font-size:15.5px;letter-spacing:-.2px;line-height:1.15}
+.bcard p{font-family:'Inter';font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.35}
+.bcard .meta{font-family:'JetBrains Mono';font-size:10px;font-weight:600;color:var(--tint);margin-top:9px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.bcard .meta .dotsep{width:3px;height:3px;border-radius:2px;background:var(--muted);opacity:.6}
+.feature .top{display:flex;align-items:flex-start;gap:13px}
+.feature .gic{margin-bottom:0;width:52px;height:52px;font-size:26px}
+.feature h3{font-size:18px}
+.feature .chips{display:flex;gap:7px;margin-top:13px;flex-wrap:wrap}
+.feature .chip{font-family:'JetBrains Mono';font-size:10.5px;font-weight:600;color:var(--text);background:var(--glass);border:1px solid var(--glassbd);padding:6px 10px;border-radius:10px;display:flex;align-items:center;gap:5px}
+.feature .chip i{font-size:13px;color:var(--tint)}
+.feature .chip b{color:var(--tint);font-weight:700}
+.statchip{font-family:'JetBrains Mono';font-weight:700;color:var(--text);background:var(--glass);border:1px solid var(--glassbd);padding:3px 8px;border-radius:8px;font-size:11px}
+.statchip b{color:var(--tint)}
+
+/* =====================================================================
+   DESIGN 2 — DRAWERS  (collapsible accordion, descriptive rows)
+   ===================================================================== */
+.drawer{background:var(--surf);border:1px solid var(--surfbd);border-radius:18px;backdrop-filter:blur(16px) saturate(1.3);-webkit-backdrop-filter:blur(16px) saturate(1.3);margin-bottom:11px;overflow:hidden}
+.dhead{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer}
+.dhead .gic{width:42px;height:42px;font-size:21px}
+.dhead .dt{flex:1}
+.dhead h3{font-family:'Bricolage Grotesque';font-weight:700;font-size:15px;letter-spacing:-.2px}
+.dhead p{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.dhead .dchev{color:var(--muted);font-size:18px;transition:transform .25s}
+.drawer.open .dhead .dchev{transform:rotate(180deg)}
+.dbody{max-height:0;overflow:hidden;transition:max-height .32s ease}
+.drawer.open .dbody{max-height:760px}
+.dbody-inner{padding:0 10px 8px}
+.drow{display:flex;align-items:center;gap:12px;padding:11px 8px;border-top:1px solid var(--hair);cursor:pointer}
+.drow .gic{width:38px;height:38px;font-size:18px;border-radius:11px}
+.drow .rt{flex:1;min-width:0}
+.drow h4{font-family:'Bricolage Grotesque';font-weight:600;font-size:14px;display:flex;align-items:center;gap:7px}
+.drow p{font-family:'Inter';font-size:11.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.drow .rmeta{font-family:'JetBrains Mono';font-size:9.5px;color:var(--tint);font-weight:600;flex-shrink:0;text-align:right}
+/* nested assistant sub-drawer */
+.subdrawer{margin:6px 0 4px;border:1px dashed var(--glassbd);border-radius:13px;overflow:hidden;background:color-mix(in srgb,var(--tint) 5%,transparent)}
+.subhead{display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer}
+.subhead .gic{width:32px;height:32px;font-size:16px;border-radius:9px}
+.subhead h4{font-family:'Bricolage Grotesque';font-weight:600;font-size:13.5px;flex:1}
+.subhead .dchev{color:var(--muted);font-size:16px;transition:transform .25s}
+.subdrawer.open .dchev{transform:rotate(180deg)}
+.subbody{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.subdrawer.open .subbody{max-height:300px}
+.roles{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:4px 11px 12px}
+.rolechip{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:11px;background:var(--glass);border:1px solid var(--glassbd);cursor:pointer}
+.rolechip i{color:var(--tint);font-size:16px}
+.rolechip span{font-family:'Bricolage Grotesque';font-weight:600;font-size:12.5px}
+
+/* =====================================================================
+   DESIGN 3 — ELEVATED TABS + PINNED RAIL  (rich list cards)
+   ===================================================================== */
+.rail{display:flex;gap:9px;overflow-x:auto;padding:3px 0 5px;margin:0 -16px;padding-left:16px;padding-right:16px;scrollbar-width:none}
+.rail::-webkit-scrollbar{display:none}
+.pin{flex-shrink:0;width:104px;background:var(--surf);border:1px solid var(--surfbd);border-radius:15px;padding:12px;backdrop-filter:blur(14px);cursor:pointer}
+.pin .gic{width:38px;height:38px;font-size:19px;margin-bottom:9px}
+.pin h4{font-family:'Bricolage Grotesque';font-weight:600;font-size:12.5px;line-height:1.15}
+.pin p{font-family:'JetBrains Mono';font-size:9px;color:var(--tint);margin-top:4px;font-weight:600}
+.seg{display:flex;background:var(--glass);border:1px solid var(--glassbd);border-radius:13px;padding:4px;gap:4px;backdrop-filter:blur(16px);margin:14px 0 4px;position:sticky;top:0;z-index:5}
+.seg div{flex:1;text-align:center;padding:9px 6px;border-radius:9px;font-size:12.5px;font-weight:600;font-family:'Bricolage Grotesque';color:var(--muted);cursor:pointer;transition:.18s}
+.seg div.on{background:var(--fire);color:var(--fireText)}
+.tabpane{display:none}
+.tabpane.on{display:block;animation:fade .3s ease}
+.lcard{display:flex;align-items:center;gap:13px;background:var(--surf);border:1px solid var(--surfbd);border-radius:16px;padding:13px;backdrop-filter:blur(14px) saturate(1.3);margin-top:10px;cursor:pointer;transition:.18s}
+.lcard:active{transform:scale(.99)}
+.lcard .gic{width:46px;height:46px;font-size:22px}
+.lcard .lt{flex:1;min-width:0}
+.lcard h3{font-family:'Bricolage Grotesque';font-weight:600;font-size:15px;letter-spacing:-.1px;display:flex;align-items:center;gap:8px}
+.lcard p{font-family:'Inter';font-size:12px;color:var(--muted);margin-top:3px;line-height:1.3}
+.lcard .lm{font-family:'JetBrains Mono';font-size:9.5px;color:var(--tint);font-weight:600;margin-top:6px;letter-spacing:.3px}
+
+/* =====================================================================
+   DESIGN 4 — COMMAND CENTER  (the wild one)
+   ===================================================================== */
+.cmdsearch{display:flex;align-items:center;gap:10px;background:var(--glass);border:1px solid var(--glassbd);border-radius:15px;padding:13px 15px;backdrop-filter:blur(16px) saturate(1.3);margin:12px 0 4px;cursor:pointer}
+.cmdsearch .jolt{width:30px;height:30px;border-radius:9px;background:color-mix(in srgb,var(--tint) 16%,transparent);display:flex;align-items:center;justify-content:center;color:var(--tint);font-size:17px;flex-shrink:0}
+.cmdsearch span{font-family:'Inter';font-size:13.5px;color:var(--muted);flex:1}
+.cmdsearch kbd{font-family:'JetBrains Mono';font-size:10px;color:var(--muted);border:1px solid var(--glassbd);border-radius:6px;padding:2px 6px;background:var(--surf)}
+.stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:5px}
+.stat{background:var(--surf);border:1px solid var(--surfbd);border-radius:15px;padding:12px 12px 11px;backdrop-filter:blur(14px) saturate(1.3);position:relative;overflow:hidden}
+.stat .sh{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono';font-size:8.5px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.stat .sh i{font-size:13px;color:var(--tint)}
+.stat .num{font-family:'JetBrains Mono';font-weight:700;font-size:23px;color:var(--text);margin-top:7px;line-height:1;letter-spacing:-.5px}
+.stat .num small{font-size:12px;color:var(--muted);font-weight:600}
+.stat .sub{font-family:'Inter';font-size:10px;color:var(--muted);margin-top:4px}
+.stat.accent{background:color-mix(in srgb,var(--tint) 12%,transparent);border-color:color-mix(in srgb,var(--tint) 26%,transparent)}
+.stat.accent .num{color:var(--tint)}
+.stat.blue{background:color-mix(in srgb,var(--blue) 12%,transparent);border-color:color-mix(in srgb,var(--blue) 26%,transparent)}
+.stat.blue .sh i,.stat.blue .num{color:var(--bluetext)}
+
+.feed{background:var(--surf);border:1px solid var(--surfbd);border-radius:17px;backdrop-filter:blur(14px) saturate(1.3);overflow:hidden;margin-top:9px}
+.feed .frow{display:flex;align-items:center;gap:11px;padding:11px 14px;border-top:1px solid var(--hair)}
+.feed .frow:first-child{border-top:none}
+.feed .fic{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;background:color-mix(in srgb,var(--tint) 14%,transparent);color:var(--tint)}
+.feed .fic.b{background:color-mix(in srgb,var(--blue) 16%,transparent);color:var(--bluetext)}
+.feed .ft{flex:1;min-width:0}
+.feed .ft h4{font-family:'Inter';font-weight:600;font-size:12.5px;line-height:1.25}
+.feed .ft h4 b{color:var(--tint);font-weight:700}
+.feed .ago{font-family:'JetBrains Mono';font-size:9px;color:var(--muted);flex-shrink:0}
+
+.dir{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}
+.dchip{display:flex;align-items:center;gap:9px;background:var(--surf);border:1px solid var(--surfbd);border-radius:13px;padding:11px;backdrop-filter:blur(12px);cursor:pointer}
+.dchip .gic{width:34px;height:34px;font-size:16px;border-radius:10px}
+.dchip h4{font-family:'Bricolage Grotesque';font-weight:600;font-size:12.5px;line-height:1.1}
+.dchip p{font-family:'JetBrains Mono';font-size:8.5px;color:var(--muted);margin-top:2px;letter-spacing:.3px}
+.dchip.full{grid-column:1 / -1}
+
+/* ---------- bottom nav ---------- */
+.bottom{position:absolute;left:0;right:0;bottom:0;z-index:8;display:flex;justify-content:space-around;align-items:center;padding:10px 14px 26px;background:var(--nav);border-top:1px solid var(--glassbd);backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5)}
+.nav{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-family:'Bricolage Grotesque';font-size:9.5px;font-weight:600;position:relative}
+.nav i{font-size:21px}
+.nav.on{color:var(--fire)}
+.nav.on i{filter:drop-shadow(0 0 8px color-mix(in srgb,var(--tint) 60%,transparent))}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Moonstone</span>
+    <button class="tb on" data-th="">Dark</button>
+    <button class="tb" data-th="t-mono-l">Light</button></div>
+  <div class="grp"><span class="gl2">Ocean</span>
+    <button class="tb" data-th="t-ocean-d">Dark</button>
+    <button class="tb" data-th="t-ocean-l">Light</button></div>
+  <div class="grp"><span class="gl2">Design</span>
+    <button class="db on" data-d="1"><i class="ti ti-layout-dashboard"></i>Bento</button>
+    <button class="db" data-d="2"><i class="ti ti-layout-list"></i>Drawers</button>
+    <button class="db" data-d="3"><i class="ti ti-layout-navbar"></i>Tabs + Rail</button>
+    <button class="db" data-d="4"><i class="ti ti-command"></i>Command</button></div>
+</div>
+
+<div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+
+  <div class="sb"><span>11:31</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+
+  <div class="screen" id="screen">
+
+    <!-- ============ DESIGN 1 — BENTO ============ -->
+    <div class="design on" data-design="1">
+      <div class="greet">
+        <div class="av">DM</div>
+        <div class="gt"><h1>Manage, <b>Deanna</b></h1><p>Owner · McLoone's</p></div>
+        <div class="bell"><i class="ti ti-bell"></i><span class="nd">3</span></div>
+      </div>
+      <div class="concept"><b>Bento</b> · no tabs · everything at a glance<span class="ln"></span></div>
+
+      <div class="zlabel">News Feed <span class="ct">· 3 live</span><span class="ln"></span></div>
+      <div class="bento">
+        <div class="bcard feature">
+          <div class="top">
+            <div class="gic"><i class="ti ti-speakerphone"></i></div>
+            <div style="flex:1"><h3>Announcements</h3><p>Post notices to your whole team — pinned to everyone's Welcome feed.</p></div>
+          </div>
+          <div class="chips">
+            <div class="chip"><i class="ti ti-circle-filled"></i><b>3</b> live</div>
+            <div class="chip"><i class="ti ti-sparkles"></i><b>1</b> new today</div>
+            <div class="chip" style="margin-left:auto"><i class="ti ti-plus"></i>New</div>
+          </div>
+        </div>
+        <div class="bcard"><div class="gic"><i class="ti ti-star"></i></div><h3>Special Features</h3><span class="meta">2 active</span></div>
+        <div class="bcard"><div class="gic"><i class="ti ti-calendar-event"></i></div><h3>Events</h3><span class="meta">4 upcoming</span></div>
+      </div>
+
+      <div class="zlabel">Team &amp; Training <span class="ct">· crew tools</span><span class="ln"></span></div>
+      <div class="bento">
+        <div class="bcard feature">
+          <div class="top">
+            <div class="gic"><i class="ti ti-message-chatbot"></i></div>
+            <div style="flex:1"><h3>Assistant Editors</h3><p>The in-app guides each role sees — recipes, steps, checklists.</p></div>
+          </div>
+          <div class="chips">
+            <div class="chip"><i class="ti ti-receipt"></i>Server</div>
+            <div class="chip"><i class="ti ti-glass-cocktail"></i>Bar</div>
+            <div class="chip"><i class="ti ti-bell-school"></i>Host</div>
+            <div class="chip"><i class="ti ti-chef-hat"></i>Kitchen</div>
+          </div>
+        </div>
+        <div class="bcard"><div class="gic"><i class="ti ti-book"></i></div><h3>Guides &amp; Training</h3><span class="meta">18 docs</span></div>
+        <div class="bcard"><div class="gic"><i class="ti ti-device-gamepad-2"></i></div><h3>Game Hub</h3><span class="meta">6 quizzes</span></div>
+        <div class="bcard wide" style="display:flex;align-items:center;gap:13px">
+          <div class="gic" style="width:46px;height:46px;font-size:23px"><i class="ti ti-tools-kitchen-2"></i></div>
+          <div style="flex:1"><h3>Menu Editor</h3><p>Items, categories, prices &amp; AI menu upload.</p></div>
+          <span class="statchip"><b>210</b> items</span>
+        </div>
+      </div>
+
+      <div class="zlabel">Management <span class="ct">· owner</span><span class="ln"></span></div>
+      <div class="bento">
+        <div class="bcard"><div class="gic"><i class="ti ti-users"></i></div><h3>Employees</h3><span class="meta">14 staff</span></div>
+        <div class="bcard"><div class="gic"><i class="ti ti-calendar-time"></i></div><h3>Schedules</h3><span class="meta">Wk of Jun 23</span></div>
+        <div class="bcard wide" style="display:flex;align-items:center;gap:13px">
+          <div class="gic" style="width:46px;height:46px;font-size:23px"><i class="ti ti-bell-ringing"></i></div>
+          <div style="flex:1"><h3>Notifications</h3><p>Broadcast a push to staff or a single role.</p></div>
+          <span class="chev"><i class="ti ti-chevron-right"></i></span>
+        </div>
+        <div class="bcard"><div class="gic"><i class="ti ti-settings"></i></div><h3>Org Settings <span class="owner-tag">Owner</span></h3><span class="meta">Branding · access</span></div>
+        <div class="bcard"><div class="gic"><i class="ti ti-credit-card"></i></div><h3>Subscription <span class="owner-tag">Owner</span></h3><span class="meta">Premium · 9d</span></div>
+      </div>
+      <div style="height:20px"></div>
+    </div>
+
+    <!-- ============ DESIGN 2 — DRAWERS ============ -->
+    <div class="design" data-design="2">
+      <div class="greet">
+        <div class="av">DM</div>
+        <div class="gt"><h1>Manage, <b>Deanna</b></h1><p>Owner · McLoone's</p></div>
+        <div class="bell"><i class="ti ti-bell"></i><span class="nd">3</span></div>
+      </div>
+      <div class="concept"><b>Drawers</b> · expand a group, scan the rows<span class="ln"></span></div>
+
+      <div class="drawer open">
+        <div class="dhead"><div class="gic"><i class="ti ti-news"></i></div><div class="dt"><h3>News Feed</h3><p>3 editors · 3 live</p></div><i class="ti ti-chevron-down dchev"></i></div>
+        <div class="dbody"><div class="dbody-inner">
+          <div class="drow"><div class="gic"><i class="ti ti-speakerphone"></i></div><div class="rt"><h4>Announcements <span class="newpill">1 NEW</span></h4><p>Team-wide notices on the Welcome feed</p></div><span class="rmeta">3 live</span></div>
+          <div class="drow"><div class="gic"><i class="ti ti-star"></i></div><div class="rt"><h4>Special Features</h4><p>Promote dishes, drinks &amp; moments</p></div><span class="rmeta">2 active</span></div>
+          <div class="drow"><div class="gic"><i class="ti ti-calendar-event"></i></div><div class="rt"><h4>Events</h4><p>What's happening &amp; entertainment</p></div><span class="rmeta">4 up</span></div>
+        </div></div>
+      </div>
+
+      <div class="drawer">
+        <div class="dhead"><div class="gic"><i class="ti ti-users-group"></i></div><div class="dt"><h3>Team &amp; Training</h3><p>4 areas · staff-facing</p></div><i class="ti ti-chevron-down dchev"></i></div>
+        <div class="dbody"><div class="dbody-inner">
+          <div class="drow"><div class="gic"><i class="ti ti-book"></i></div><div class="rt"><h4>Guides &amp; Training</h4><p>Manuals, PDFs &amp; onboarding docs</p></div><span class="rmeta">18 docs</span></div>
+          <div class="drow"><div class="gic"><i class="ti ti-device-gamepad-2"></i></div><div class="rt"><h4>Game Hub</h4><p>Quizzes &amp; training games</p></div><span class="rmeta">6</span></div>
+          <div class="drow"><div class="gic"><i class="ti ti-tools-kitchen-2"></i></div><div class="rt"><h4>Menu Editor</h4><p>Items, categories &amp; AI upload</p></div><span class="rmeta">210</span></div>
+          <div class="subdrawer">
+            <div class="subhead"><div class="gic"><i class="ti ti-message-chatbot"></i></div><h4>Assistant Editors</h4><span class="rmeta" style="margin-right:8px">4 roles</span><i class="ti ti-chevron-down dchev"></i></div>
+            <div class="subbody"><div class="roles">
+              <div class="rolechip"><i class="ti ti-receipt"></i><span>Server</span></div>
+              <div class="rolechip"><i class="ti ti-glass-cocktail"></i><span>Bar</span></div>
+              <div class="rolechip"><i class="ti ti-bell-school"></i><span>Host</span></div>
+              <div class="rolechip"><i class="ti ti-chef-hat"></i><span>Kitchen</span></div>
+            </div></div>
+          </div>
+        </div></div>
+      </div>
+
+      <div class="drawer">
+        <div class="dhead"><div class="gic"><i class="ti ti-building-store"></i></div><div class="dt"><h3>Management</h3><p>5 areas · the big stuff</p></div><i class="ti ti-chevron-down dchev"></i></div>
+        <div class="dbody"><div class="dbody-inner">
+          <div class="drow"><div class="gic"><i class="ti ti-users"></i></div><div class="rt"><h4>Employees</h4><p>Roster, roles &amp; accounts</p></div><span class="rmeta">14</span></div>
+          <div class="drow"><div class="gic"><i class="ti ti-calendar-time"></i></div><div class="rt"><h4>Schedules</h4><p>Upload &amp; manage shifts</p></div><span class="rmeta">Jun 23</span></div>
+          <div class="drow"><div class="gic"><i class="ti ti-bell-ringing"></i></div><div class="rt"><h4>Notifications</h4><p>Broadcast a push to staff</p></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+          <div class="drow"><div class="gic"><i class="ti ti-settings"></i></div><div class="rt"><h4>Org Settings <span class="owner-tag">Owner</span></h4><p>Branding, menus, jobs &amp; access</p></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+          <div class="drow"><div class="gic"><i class="ti ti-credit-card"></i></div><div class="rt"><h4>Subscription <span class="owner-tag">Owner</span></h4><p>Plan &amp; billing</p></div><span class="rmeta">Premium</span></div>
+        </div></div>
+      </div>
+      <div style="height:20px"></div>
+    </div>
+
+    <!-- ============ DESIGN 3 — TABS + RAIL ============ -->
+    <div class="design" data-design="3">
+      <div class="greet">
+        <div class="av">DM</div>
+        <div class="gt"><h1>Manage, <b>Deanna</b></h1><p>Owner · McLoone's</p></div>
+        <div class="bell"><i class="ti ti-bell"></i><span class="nd">3</span></div>
+      </div>
+      <div class="concept"><b>Tabs + Rail</b> · pinned shortcuts, rich cards<span class="ln"></span></div>
+
+      <div class="zlabel">Pinned<span class="ln"></span></div>
+      <div class="rail">
+        <div class="pin"><div class="gic"><i class="ti ti-speakerphone"></i></div><h4>Announce</h4><p>3 live</p></div>
+        <div class="pin"><div class="gic"><i class="ti ti-calendar-time"></i></div><h4>Schedules</h4><p>Wk Jun 23</p></div>
+        <div class="pin"><div class="gic"><i class="ti ti-tools-kitchen-2"></i></div><h4>Menu</h4><p>210 items</p></div>
+        <div class="pin"><div class="gic"><i class="ti ti-users"></i></div><h4>Employees</h4><p>14 staff</p></div>
+      </div>
+
+      <div class="seg" id="seg3">
+        <div class="on" data-p="nf">News Feed</div>
+        <div data-p="team">Team</div>
+        <div data-p="mgmt">Management</div>
+      </div>
+
+      <div class="tabpane on" data-p="nf">
+        <div class="lcard"><div class="gic"><i class="ti ti-speakerphone"></i></div><div class="lt"><h3>Announcements <span class="newpill">1 NEW</span></h3><p>Team-wide notices pinned to the Welcome feed</p><div class="lm">3 LIVE · LAST POSTED 4H AGO</div></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+        <div class="lcard"><div class="gic"><i class="ti ti-star"></i></div><div class="lt"><h3>Special Features</h3><p>Promote a dish, a drink, or a moment</p><div class="lm">2 ACTIVE</div></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+        <div class="lcard"><div class="gic"><i class="ti ti-calendar-event"></i></div><div class="lt"><h3>Events</h3><p>What's happening &amp; entertainment</p><div class="lm">4 UPCOMING</div></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+      </div>
+
+      <div class="tabpane" data-p="team">
+        <div class="lcard"><div class="gic"><i class="ti ti-message-chatbot"></i></div><div class="lt"><h3>Assistant Editors</h3><p>Server · Bar · Host · Kitchen guides</p><div class="lm">4 ROLES</div></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+        <div class="lcard"><div class="gic"><i class="ti ti-book"></i></div><div class="lt"><h3>Guides &amp; Training</h3><p>Manuals, PDFs &amp; onboarding docs</p><div class="lm">18 DOCS</div></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+        <div class="lcard"><div class="gic"><i class="ti ti-device-gamepad-2"></i></div><div class="lt"><h3>Game Hub</h3><p>Quizzes &amp; training games</p><div class="lm">6 GAMES</div></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+        <div class="lcard"><div class="gic"><i class="ti ti-tools-kitchen-2"></i></div><div class="lt"><h3>Menu Editor</h3><p>Items, categories, prices &amp; AI upload</p><div class="lm">210 ITEMS · 2 MENUS</div></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+      </div>
+
+      <div class="tabpane" data-p="mgmt">
+        <div class="lcard"><div class="gic"><i class="ti ti-users"></i></div><div class="lt"><h3>Employees</h3><p>Roster, roles &amp; staff accounts</p><div class="lm">14 STAFF</div></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+        <div class="lcard"><div class="gic"><i class="ti ti-calendar-time"></i></div><div class="lt"><h3>Schedules</h3><p>Upload &amp; manage weekly shifts</p><div class="lm">WEEK OF JUN 23</div></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+        <div class="lcard"><div class="gic"><i class="ti ti-bell-ringing"></i></div><div class="lt"><h3>Notifications</h3><p>Broadcast a push to staff or a role</p><div class="lm">BROADCAST CENTER</div></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+        <div class="lcard"><div class="gic"><i class="ti ti-settings"></i></div><div class="lt"><h3>Org Settings <span class="owner-tag">Owner</span></h3><p>Branding, menus, jobs &amp; access</p><div class="lm">4 SECTIONS</div></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+        <div class="lcard"><div class="gic"><i class="ti ti-credit-card"></i></div><div class="lt"><h3>Subscription <span class="owner-tag">Owner</span></h3><p>Plan &amp; billing</p><div class="lm">PREMIUM · 9-DAY TRIAL</div></div><span class="chev"><i class="ti ti-chevron-right"></i></span></div>
+      </div>
+      <div style="height:20px"></div>
+    </div>
+
+    <!-- ============ DESIGN 4 — COMMAND CENTER ============ -->
+    <div class="design" data-design="4">
+      <div class="greet">
+        <div class="av">DM</div>
+        <div class="gt"><h1>Good morning, <b>Deanna</b></h1><p>Owner · McLoone's · Command Center</p></div>
+      </div>
+      <div class="cmdsearch"><div class="jolt"><i class="ti ti-bolt"></i></div><span>Search or jump to anything…</span><kbd>Jolt</kbd></div>
+
+      <div class="zlabel">Today at a glance<span class="ln"></span></div>
+      <div class="stats">
+        <div class="stat accent"><div class="sh"><i class="ti ti-users"></i>On shift</div><div class="num">8<small>/14</small></div><div class="sub">staff clocked in</div></div>
+        <div class="stat"><div class="sh"><i class="ti ti-speakerphone"></i>Live posts</div><div class="num">5</div><div class="sub">2 new today</div></div>
+        <div class="stat"><div class="sh"><i class="ti ti-calendar-time"></i>This week</div><div class="num">23</div><div class="sub">shifts scheduled</div></div>
+        <div class="stat blue"><div class="sh"><i class="ti ti-star-filled"></i>Rating</div><div class="num">4.7<small>★</small></div><div class="sub">212 reviews</div></div>
+        <div class="stat"><div class="sh"><i class="ti ti-tools-kitchen-2"></i>Menu</div><div class="num">210</div><div class="sub">items · 2 menus</div></div>
+        <div class="stat accent"><div class="sh"><i class="ti ti-crown"></i>Plan</div><div class="num" style="font-size:17px;margin-top:9px">Premium</div><div class="sub">9-day trial left</div></div>
+      </div>
+
+      <div class="zlabel">Recent activity<span class="ln"></span></div>
+      <div class="feed">
+        <div class="frow"><div class="fic b"><i class="ti ti-star-filled"></i></div><div class="ft"><h4>New <b>5★</b> Google review from Maria G.</h4></div><span class="ago">12m</span></div>
+        <div class="frow"><div class="fic"><i class="ti ti-calendar-up"></i></div><div class="ft"><h4>Schedule uploaded — week of Jun 23</h4></div><span class="ago">1h</span></div>
+        <div class="frow"><div class="fic"><i class="ti ti-device-gamepad-2"></i></div><div class="ft"><h4><b>3</b> staff completed the Wine Training quiz</h4></div><span class="ago">2h</span></div>
+        <div class="frow"><div class="fic"><i class="ti ti-speakerphone"></i></div><div class="ft"><h4>Announcement "6/23 Staff Meeting" posted</h4></div><span class="ago">4h</span></div>
+        <div class="frow"><div class="fic"><i class="ti ti-tools-kitchen-2"></i></div><div class="ft"><h4>Summer Burrata added to the Dinner menu</h4></div><span class="ago">1d</span></div>
+      </div>
+
+      <div class="zlabel">All tools<span class="ct">· tap a group label to filter</span><span class="ln"></span></div>
+      <div class="dir">
+        <div class="dchip full" style="background:transparent;border:none;padding:6px 2px 0"><span style="font-family:'JetBrains Mono';font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--tint)">News Feed</span></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-speakerphone"></i></div><div><h4>Announcements</h4><p>3 LIVE</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-star"></i></div><div><h4>Special Features</h4><p>2 ACTIVE</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-calendar-event"></i></div><div><h4>Events</h4><p>4 UPCOMING</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-bell-ringing"></i></div><div><h4>Notifications</h4><p>BROADCAST</p></div></div>
+
+        <div class="dchip full" style="background:transparent;border:none;padding:8px 2px 0"><span style="font-family:'JetBrains Mono';font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--tint)">Team &amp; Training</span></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-message-chatbot"></i></div><div><h4>Assistants</h4><p>4 ROLES</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-book"></i></div><div><h4>Guides</h4><p>18 DOCS</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-device-gamepad-2"></i></div><div><h4>Game Hub</h4><p>6 GAMES</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-tools-kitchen-2"></i></div><div><h4>Menu Editor</h4><p>210 ITEMS</p></div></div>
+
+        <div class="dchip full" style="background:transparent;border:none;padding:8px 2px 0"><span style="font-family:'JetBrains Mono';font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--bluetext)">Management · Owner</span></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-users"></i></div><div><h4>Employees</h4><p>14 STAFF</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-calendar-time"></i></div><div><h4>Schedules</h4><p>WK JUN 23</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-settings"></i></div><div><h4>Org Settings</h4><p>BRANDING</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-credit-card"></i></div><div><h4>Subscription</h4><p>PREMIUM</p></div></div>
+      </div>
+      <div style="height:20px"></div>
+    </div>
+
+  </div>
+
+  <!-- bottom nav -->
+  <div class="bottom">
+    <div class="nav"><i class="ti ti-home"></i>Welcome</div>
+    <div class="nav"><i class="ti ti-book-2"></i>Menus</div>
+    <div class="nav"><i class="ti ti-tools"></i>Tools</div>
+    <div class="nav on"><i class="ti ti-adjustments-horizontal"></i>Manage</div>
+    <div class="nav"><i class="ti ti-user"></i>Profile</div>
+  </div>
+</div>
+
+<div class="hint">Switch <b>theme</b> (Moonstone / Ocean · Dark / Light) and <b>design</b> above · tap drawers, sub-drawers &amp; tabs to interact · this is a static mockup of the <b>Manager / Owner Manage page</b></div>
+
+<script>
+// theme switch
+document.querySelectorAll('.grp .tb').forEach(function(b){
+  b.addEventListener('click',function(){
+    document.querySelectorAll('.grp .tb').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on');
+    document.getElementById('phone').className='phone '+(b.dataset.th||'');
+  });
+});
+// design switch
+document.querySelectorAll('.db').forEach(function(b){
+  b.addEventListener('click',function(){
+    document.querySelectorAll('.db').forEach(function(x){x.classList.remove('on');});
+    b.classList.add('on');
+    document.querySelectorAll('.design').forEach(function(d){d.classList.toggle('on',d.dataset.design===b.dataset.d);});
+    document.getElementById('screen').scrollTop=0;
+  });
+});
+// drawers (design 2)
+document.querySelectorAll('.drawer .dhead').forEach(function(h){
+  h.addEventListener('click',function(){h.parentElement.classList.toggle('open');});
+});
+document.querySelectorAll('.subdrawer .subhead').forEach(function(h){
+  h.addEventListener('click',function(e){e.stopPropagation();h.parentElement.classList.toggle('open');});
+});
+// tabs (design 3)
+var seg=document.getElementById('seg3');
+if(seg){seg.querySelectorAll('div').forEach(function(d){
+  d.addEventListener('click',function(){
+    seg.querySelectorAll('div').forEach(function(x){x.classList.remove('on');});
+    d.classList.add('on');
+    document.querySelectorAll('[data-design="3"] .tabpane').forEach(function(p){p.classList.toggle('on',p.dataset.p===d.dataset.p);});
+  });
+});}
+</script>
+</body>
+</html>

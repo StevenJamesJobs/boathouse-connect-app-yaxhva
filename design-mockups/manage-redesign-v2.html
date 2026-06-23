@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manage — Command Center v2 · MyResto / Boathouse Connect</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.11.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:16px;padding:24px 12px 60px;background:#0C0D11;font-family:'Inter',system-ui,sans-serif}
+
+/* toolbar */
+.toolbar{display:flex;flex-wrap:wrap;gap:18px;align-items:center;justify-content:center;max-width:760px}
+.grp{display:flex;gap:6px;align-items:center;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.grp .gl2{font-family:'JetBrains Mono';font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s;display:flex;align-items:center;gap:5px}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb i{font-size:14px}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono';text-align:center;max-width:600px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+
+/* phone shell */
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --fire:#E6EAEE; --ember:#C7CDD2; --blue:#8FA0AC; --bluetext:#CDD8DF; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --nav:rgba(24,27,33,0.55); --sheen:rgba(255,255,255,0.13); --thumbbg:#252A31; --glowA:rgba(230,234,238,0.12); --glowB:rgba(255,122,47,0.10);
+  position:relative;width:392px;height:844px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column
+}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--fire:#3A4250;--ember:#2A313C;--blue:#7E8A94;--bluetext:#2A313C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--nav:rgba(255,255,255,0.62);--sheen:rgba(255,255,255,0.92);--thumbbg:#D8D8DC;--glowA:rgba(58,66,80,0.10);--glowB:rgba(236,106,30,0.12)}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fire:#4A90E2;--ember:#6BADE8;--blue:#5DADE2;--bluetext:#BFE3F7;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--nav:rgba(26,35,50,0.55);--sheen:rgba(255,255,255,0.13);--thumbbg:#2C3E50;--glowA:rgba(74,144,226,0.32);--glowB:rgba(93,173,226,0.16)}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fire:#1976D2;--ember:#1565C0;--blue:#42A5F5;--bluetext:#0D47A1;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--nav:rgba(255,255,255,0.62);--sheen:rgba(255,255,255,0.95);--thumbbg:#CFE4EC;--glowA:rgba(25,118,210,0.18);--glowB:rgba(66,165,245,0.13)}
+
+/* ambient edge-to-edge glow */
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.glow3{position:absolute;bottom:30px;right:-70px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 70%);z-index:0;pointer-events:none;opacity:.7}
+
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono';color:var(--text)}
+.sb .ri{display:flex;gap:7px;align-items:center;font-size:14px}
+
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 16px 100px}
+.screen::-webkit-scrollbar{display:none}
+
+/* ===== Welcome header (reused verbatim from Welcome page) ===== */
+.head{position:relative;z-index:5;margin:6px 16px 0;padding:13px 14px;border-radius:20px;background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(18px) saturate(1.4);-webkit-backdrop-filter:blur(18px) saturate(1.4)}
+.greet{font-family:'Bricolage Grotesque';font-size:19px;font-weight:700;letter-spacing:-0.4px;margin-bottom:11px;padding-left:2px;color:var(--text)}
+.greet b{color:var(--fire)}
+.hrow{display:flex;align-items:center;gap:9px}
+.av{width:42px;height:42px;border-radius:50%;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;font-family:'Bricolage Grotesque';color:var(--text);flex-shrink:0}
+.who{flex:1;min-width:0}
+.who .nm{font-family:'Bricolage Grotesque';font-size:14px;font-weight:700;color:var(--text)}
+.who .jt{font-size:10px;color:var(--muted);font-family:'JetBrains Mono';text-transform:uppercase;letter-spacing:0.5px;margin-top:1px}
+.gl{position:relative;height:36px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--text);font-size:17px;padding:0 10px;gap:5px}
+.gl.ic{width:38px;padding:0}
+.gl i.s{color:var(--tint)}
+.gl .t{font-size:13px;font-weight:600;font-family:'JetBrains Mono'}
+.dot{position:absolute;top:-5px;right:-5px;min-width:16px;height:16px;border-radius:8px;background:var(--blue);color:var(--bg);font-size:9px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px;border:2px solid var(--bg);font-family:'JetBrains Mono'}
+
+/* ===== Jolt bar ===== */
+.joltbar{position:relative;z-index:3;display:flex;align-items:center;gap:11px;background:var(--glass);border:1px solid var(--glassbd);border-radius:15px;padding:11px 14px;backdrop-filter:blur(16px) saturate(1.3);margin-top:11px;cursor:pointer}
+.joltbar .jolt{width:32px;height:32px;border-radius:10px;background:color-mix(in srgb,var(--tint) 17%,transparent);display:flex;align-items:center;justify-content:center;color:var(--tint);font-size:18px;flex-shrink:0;box-shadow:0 0 0 0 color-mix(in srgb,var(--tint) 45%,transparent);animation:landed 2.4s ease-out 1}
+@keyframes landed{0%{transform:translate(120px,46px) scale(1.5);opacity:0}24%{transform:none;opacity:1;box-shadow:0 0 18px 3px color-mix(in srgb,var(--tint) 55%,transparent)}100%{box-shadow:0 0 0 0 transparent}}
+.joltbar span{font-family:'Inter';font-size:13.5px;color:var(--muted);flex:1}
+
+/* ===== two-tab segmented ===== */
+.seg2{display:none;gap:4px;background:var(--glass);border:1px solid var(--glassbd);border-radius:13px;padding:4px;backdrop-filter:blur(16px);margin-top:13px;position:sticky;top:0;z-index:6}
+.lay-two .seg2{display:flex}
+.seg2 div{flex:1;text-align:center;padding:9px 6px;border-radius:9px;font-size:12.5px;font-weight:600;font-family:'Bricolage Grotesque';color:var(--muted);cursor:pointer;transition:.18s;display:flex;align-items:center;justify-content:center;gap:6px}
+.seg2 div.on{background:var(--fire);color:var(--fireText)}
+.seg2 i{font-size:15px}
+
+/* panes */
+.pane{display:none}
+.lay-one .pane{display:block}                /* one-page: stacked, both visible */
+/* two-tab: horizontal swipe pager (mirrors the Welcome page — header locked, jolt collapses, tabs pin, content swipes) */
+.lay-two .panes{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
+.lay-two .panes::-webkit-scrollbar{display:none}
+.lay-two .pane{display:block;flex:0 0 100%;min-width:100%;scroll-snap-align:start}
+@keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+.zlabel{font-family:'JetBrains Mono';font-size:10px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:16px 2px 11px}
+.zlabel .ct{color:var(--tint);letter-spacing:.4px}
+.zlabel .ln{flex:1;height:1px;background:var(--hair)}
+.lay-two .pane-today .topl{display:none}  /* tab already names it */
+
+/* ===== cockpit flip tiles ===== */
+.cock{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.lay-two .pane-today .cock{margin-top:12px}
+.ct{height:118px;perspective:1100px;cursor:pointer}
+.ct-in{position:relative;width:100%;height:100%;transition:transform .55s cubic-bezier(.4,.1,.25,1);transform-style:preserve-3d}
+.ct.flip .ct-in{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;border-radius:16px;border:1px solid var(--surfbd);background:var(--surf);backdrop-filter:blur(14px) saturate(1.3);-webkit-backdrop-filter:blur(14px) saturate(1.3);padding:12px 13px;display:flex;flex-direction:column;overflow:hidden}
+.ct.accent .face.front{background:color-mix(in srgb,var(--tint) 11%,transparent);border-color:color-mix(in srgb,var(--tint) 24%,transparent)}
+.ct.blue .face.front{background:color-mix(in srgb,var(--blue) 12%,transparent);border-color:color-mix(in srgb,var(--blue) 26%,transparent)}
+.face.back{transform:rotateY(180deg);justify-content:center;gap:7px}
+.cth{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono';font-size:9px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted)}
+.cth i{font-size:14px;color:var(--tint)}
+.ct.blue .cth i{color:var(--bluetext)}
+.flipnote{margin-left:auto;color:var(--muted);font-size:12px;opacity:.5}
+.bignum{font-family:'JetBrains Mono';font-weight:700;font-size:26px;color:var(--text);line-height:1;letter-spacing:-.5px;margin-top:auto}
+.ct.accent .bignum{color:var(--tint)}.ct.blue .bignum{color:var(--bluetext)}
+.bignum small{font-size:12px;color:var(--muted);font-weight:600}
+.csub{font-family:'Inter';font-size:10.5px;color:var(--muted);margin-top:3px}
+.ssbottom{margin-top:auto;display:flex;flex-direction:column;gap:7px}
+.duo{display:flex;gap:16px;align-items:center}
+.di{display:flex;align-items:baseline;gap:5px}
+.di i{font-size:15px;color:var(--tint);align-self:center}
+.di b{font-family:'JetBrains Mono';font-weight:700;font-size:23px;color:var(--tint);letter-spacing:-.5px}
+.di span{font-family:'JetBrains Mono';font-size:9px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.myshift{display:flex;align-items:center;gap:6px;font-family:'Inter';font-size:10.5px;font-weight:500;color:var(--text);background:var(--glass);border:1px solid var(--glassbd);border-radius:9px;padding:5px 9px}
+.myshift i{font-size:13px;color:var(--tint);flex-shrink:0}
+.rows2{margin-top:auto;display:flex;flex-direction:column;gap:5px}
+.rows2 .r{font-family:'Inter';font-size:12px;color:var(--text);display:flex;align-items:center;gap:7px}
+.rows2 .r b{font-family:'JetBrains Mono';font-weight:700;font-size:14px;color:var(--tint);min-width:14px}
+.menutop{font-family:'JetBrains Mono';font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--tint);font-weight:700}
+/* flip back buttons */
+.fbtn{display:flex;align-items:center;justify-content:center;gap:6px;height:30px;border-radius:10px;font-family:'Bricolage Grotesque';font-weight:600;font-size:11px;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer}
+.fbtn i{font-size:13px}
+.fbtn.p{background:var(--fire);color:var(--fireText);border-color:transparent}
+.backh{font-family:'JetBrains Mono';font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);text-align:center;margin-bottom:1px}
+.fclose{position:absolute;top:7px;right:9px;color:var(--muted);font-size:13px;opacity:.6}
+/* dynamic state-driven glow: a tile lights up in the accent when it needs setup, calms to neutral once populated */
+.vneed{display:none}
+.needs .vset{display:none}
+.needs .vneed{display:inline}
+.setupcue{display:none;align-items:center;gap:3px;font-family:'JetBrains Mono';font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--tint);background:color-mix(in srgb,var(--tint) 18%,transparent);border:1px solid color-mix(in srgb,var(--tint) 40%,transparent);padding:2px 7px;border-radius:6px;margin-left:auto}
+.needs .t-attn .flipnote{display:none}
+.needs .t-attn .setupcue{display:inline-flex}
+.needs .t-attn .cth,.needs .t-attn .cth i{color:var(--tint)}
+/* highlighted (right column, settled state): subtle, same accent for all — no pulse */
+.hl .face.front{border-color:color-mix(in srgb,var(--tint) 24%,transparent);background:color-mix(in srgb,var(--tint) 7%,transparent)}
+/* needs-attention glow (toned down): wins over .hl via specificity */
+.needs .t-attn .face.front{border-color:color-mix(in srgb,var(--tint) 46%,transparent);background:color-mix(in srgb,var(--tint) 9%,transparent);animation:attn 3s ease-in-out infinite}
+@keyframes attn{0%,100%{box-shadow:0 0 11px -6px color-mix(in srgb,var(--tint) 24%,transparent)}50%{box-shadow:0 0 19px -3px color-mix(in srgb,var(--tint) 42%,transparent)}}
+
+/* ===== recent activity (collapsible) ===== */
+.activity{background:var(--surf);border:1px solid var(--surfbd);border-radius:16px;backdrop-filter:blur(14px) saturate(1.3);overflow:hidden;margin-top:11px}
+.acth{display:flex;align-items:center;gap:10px;padding:13px 14px;cursor:pointer}
+.acth .ai{width:30px;height:30px;border-radius:9px;background:color-mix(in srgb,var(--tint) 15%,transparent);color:var(--tint);display:flex;align-items:center;justify-content:center;font-size:16px}
+.acth h3{font-family:'Bricolage Grotesque';font-weight:700;font-size:14px;flex:1}
+.acth .cnt{font-family:'JetBrains Mono';font-size:9px;font-weight:700;color:var(--bg);background:var(--blue);border-radius:6px;padding:2px 7px}
+.acth .dchev{color:var(--muted);font-size:18px;transition:transform .25s}
+.activity.open .acth .dchev{transform:rotate(180deg)}
+.acbody{max-height:0;overflow:hidden;transition:max-height .35s ease}
+.activity.open .acbody{max-height:540px}
+.frow{display:flex;align-items:center;gap:11px;padding:10px 14px;border-top:1px solid var(--hair)}
+.fic{width:29px;height:29px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:color-mix(in srgb,var(--tint) 14%,transparent);color:var(--tint)}
+.fic.b{background:color-mix(in srgb,var(--blue) 16%,transparent);color:var(--bluetext)}
+.ft{flex:1;min-width:0}
+.ft h4{font-family:'Inter';font-weight:500;font-size:12px;line-height:1.3;color:var(--text)}
+.ft h4 b{color:var(--tint);font-weight:700}
+.ago{font-family:'JetBrains Mono';font-size:9px;color:var(--muted);flex-shrink:0}
+
+/* ===== all tools directory ===== */
+.glabel{font-family:'JetBrains Mono';font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--tint);margin:15px 2px 9px;font-weight:700}
+.glabel.own{color:var(--bluetext)}
+.dir{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.dchip{display:flex;align-items:center;gap:10px;background:var(--surf);border:1px solid var(--surfbd);border-radius:14px;padding:12px;backdrop-filter:blur(12px);cursor:pointer;transition:.16s}
+.dchip:active{transform:scale(.98)}
+.dchip .gic{width:36px;height:36px;font-size:18px;border-radius:11px;display:flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tint) 15%,transparent);color:var(--tint);flex-shrink:0}
+.dchip h4{font-family:'Bricolage Grotesque';font-weight:600;font-size:13px;line-height:1.1;color:var(--text)}
+.dchip p{font-family:'JetBrains Mono';font-size:8.5px;color:var(--muted);margin-top:3px;letter-spacing:.3px}
+.owner-tag{font-family:'JetBrains Mono';font-size:7.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--bluetext);background:color-mix(in srgb,var(--blue) 18%,transparent);border:1px solid color-mix(in srgb,var(--blue) 30%,transparent);padding:1px 5px;border-radius:5px;margin-left:5px;vertical-align:middle}
+
+/* bottom nav */
+.bottom{position:absolute;left:0;right:0;bottom:0;z-index:8;display:flex;justify-content:space-around;align-items:center;padding:10px 14px 26px;background:var(--nav);border-top:1px solid var(--glassbd);backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5)}
+.nav{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-family:'Bricolage Grotesque';font-size:9.5px;font-weight:600}
+.nav i{font-size:21px}
+.nav.on{color:var(--fire)}
+.nav.on i{filter:drop-shadow(0 0 8px color-mix(in srgb,var(--tint) 60%,transparent))}
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Moonstone</span>
+    <button class="tb on" data-th="">Dark</button>
+    <button class="tb" data-th="t-mono-l">Light</button></div>
+  <div class="grp"><span class="gl2">Ocean</span>
+    <button class="tb" data-th="t-ocean-d">Dark</button>
+    <button class="tb" data-th="t-ocean-l">Light</button></div>
+  <div class="grp"><span class="gl2">Layout</span>
+    <button class="lb on" data-lay="two"><i class="ti ti-layout-navbar"></i>Two-Tab</button>
+    <button class="lb" data-lay="one"><i class="ti ti-layout-list"></i>One-Page</button></div>
+  <div class="grp"><span class="gl2">Org state</span>
+    <button class="ob on" data-need="0"><i class="ti ti-circle-check"></i>Dialed-in</button>
+    <button class="ob" data-need="1"><i class="ti ti-alert-circle"></i>Getting set up</button></div>
+</div>
+
+<div class="phone lay-two" id="phone">
+  <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+
+  <div class="sb"><span>11:31</span><span class="ri"><i class="ti ti-antenna-bars-5"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+
+  <!-- Welcome header (reused from Welcome page) — LOCKED above the scroll -->
+  <div class="head">
+    <div class="greet">Good morning, <b>Deanna</b></div>
+    <div class="hrow">
+      <div class="av">DM</div>
+      <div class="who"><div class="nm">Deanna</div><div class="jt">Owner · McLoone's</div></div>
+      <div class="gl"><i class="ti ti-sun s"></i><span class="t">57°</span></div>
+      <div class="gl ic"><i class="ti ti-mail"></i><span class="dot">2</span></div>
+      <div class="gl ic"><i class="ti ti-bell"></i><span class="dot">3</span></div>
+    </div>
+  </div>
+
+  <div class="screen" id="screen">
+
+    <!-- Jolt search bar (bolt lands here on navigation) -->
+    <div class="joltbar"><div class="jolt"><i class="ti ti-bolt"></i></div><span>Search or jump to anything…</span></div>
+
+    <!-- two-tab segmented control -->
+    <div class="seg2" id="seg2">
+      <div class="on" data-p="today"><i class="ti ti-layout-dashboard"></i>Today at a glance</div>
+      <div data-p="tools"><i class="ti ti-apps"></i>All Tools</div>
+    </div>
+
+    <div class="panes" id="panes">
+    <!-- ===================== PANE: TODAY ===================== -->
+    <div class="pane pane-today on" data-p="today">
+      <div class="zlabel topl">Today at a glance<span class="ln"></span></div>
+
+      <div class="cock">
+        <!-- Live Posts (left column · lighter) -->
+        <div class="ct">
+          <div class="ct-in">
+            <div class="face front">
+              <div class="cth"><i class="ti ti-speakerphone"></i>Live Posts<span class="flipnote"><i class="ti ti-switch-horizontal"></i></span></div>
+              <div class="rows2"><div class="r"><b><span class="vset">3</span><span class="vneed">1</span></b> Announcements</div><div class="r"><b><span class="vset">2</span><span class="vneed">0</span></b> Special Features</div></div>
+            </div>
+            <div class="face back">
+              <i class="ti ti-x fclose"></i><div class="backh">Open editor</div>
+              <div class="fbtn p"><i class="ti ti-speakerphone"></i>Announcements</div>
+              <div class="fbtn"><i class="ti ti-star"></i>Special Features</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scheduled Shifts (right column · highlighted, attention-capable) -->
+        <div class="ct hl t-attn">
+          <div class="ct-in">
+            <div class="face front">
+              <div class="cth"><i class="ti ti-calendar-week"></i>Scheduled Shifts<span class="flipnote"><i class="ti ti-switch-horizontal"></i></span><span class="setupcue">Set up →</span></div>
+              <div class="ssbottom">
+                <div class="duo">
+                  <div class="di"><i class="ti ti-sun"></i><b><span class="vset">6</span><span class="vneed">0</span></b><span>AM</span></div>
+                  <div class="di"><i class="ti ti-moon"></i><b><span class="vset">9</span><span class="vneed">0</span></b><span>PM</span></div>
+                </div>
+                <div class="myshift"><i class="ti ti-clock-hour-9"></i><span class="vset">Your shift · 10a–8p</span><span class="vneed">Upload your first schedule</span></div>
+              </div>
+            </div>
+            <div class="face back">
+              <i class="ti ti-x fclose"></i><div class="backh">Open</div>
+              <div class="fbtn p"><i class="ti ti-users"></i>Open Roster</div>
+              <div class="fbtn"><i class="ti ti-calendar-time"></i>Open Schedules</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Next 7 Days (left column · lighter, attention-capable) -->
+        <div class="ct t-attn">
+          <div class="ct-in">
+            <div class="face front">
+              <div class="cth"><i class="ti ti-calendar-event"></i>Next 7 Days<span class="flipnote"><i class="ti ti-switch-horizontal"></i></span><span class="setupcue">Set up →</span></div>
+              <div class="rows2"><div class="r"><b><span class="vset">4</span><span class="vneed">0</span></b> Events</div><div class="r"><b><span class="vset">2</span><span class="vneed">0</span></b> Entertainment</div></div>
+            </div>
+            <div class="face back">
+              <i class="ti ti-x fclose"></i><div class="backh">Open</div>
+              <div class="fbtn p"><i class="ti ti-list-details"></i>View All</div>
+              <div class="fbtn"><i class="ti ti-calendar-event"></i>Events Editor</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Rating (right column · highlighted, attention-capable) -->
+        <div class="ct hl t-attn">
+          <div class="ct-in">
+            <div class="face front">
+              <div class="cth"><i class="ti ti-star-filled"></i>Rating<span class="flipnote"><i class="ti ti-switch-horizontal"></i></span><span class="setupcue">Set up →</span></div>
+              <div class="bignum"><span class="vset">4.7<small> ★</small></span><span class="vneed">—</span></div>
+              <div class="csub"><span class="vset">212 Google reviews</span><span class="vneed">Connect Google reviews</span></div>
+            </div>
+            <div class="face back">
+              <i class="ti ti-x fclose"></i><div class="backh">Reviews</div>
+              <div class="fbtn p"><i class="ti ti-star"></i>Open Reviews</div>
+              <div class="fbtn"><i class="ti ti-refresh"></i>Refresh Reviews</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Menu (left column · lighter, attention-capable → "Set Up Menu" when empty) -->
+        <div class="ct t-attn">
+          <div class="ct-in">
+            <div class="face front">
+              <div class="cth"><span class="menutop">2 Menus</span><span class="flipnote"><i class="ti ti-switch-horizontal"></i></span><span class="setupcue">Set up →</span></div>
+              <div class="bignum"><span class="vset">210</span><span class="vneed">0</span><small> items</small></div>
+              <div class="csub"><span class="vset">12 Featured Specials</span><span class="vneed">Set up your menu</span></div>
+            </div>
+            <div class="face back">
+              <i class="ti ti-x fclose"></i><div class="backh">Menu</div>
+              <div class="fbtn p"><i class="ti ti-tools-kitchen-2"></i>Menu Editor</div>
+              <div class="fbtn"><i class="ti ti-adjustments"></i>Menu Config</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Plan (right column · highlighted) -->
+        <div class="ct hl">
+          <div class="ct-in">
+            <div class="face front">
+              <div class="cth"><i class="ti ti-crown"></i>Plan<span class="flipnote"><i class="ti ti-switch-horizontal"></i></span></div>
+              <div class="bignum" style="font-size:19px;margin-top:auto">Premium</div>
+              <div class="csub">9-day trial left</div>
+            </div>
+            <div class="face back">
+              <i class="ti ti-x fclose"></i><div class="backh">Subscription</div>
+              <div class="fbtn p"><i class="ti ti-credit-card"></i>Manage Subscription</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- recent activity (collapsed by default) -->
+      <div class="activity" id="activity">
+        <div class="acth">
+          <div class="ai"><i class="ti ti-activity"></i></div>
+          <h3>Recent Activity</h3>
+          <span class="cnt">5 new</span>
+          <i class="ti ti-chevron-down dchev"></i>
+        </div>
+        <div class="acbody">
+          <div class="frow"><div class="fic b"><i class="ti ti-star-filled"></i></div><div class="ft"><h4>New <b>5★</b> Google review from Maria G.</h4></div><span class="ago">12m</span></div>
+          <div class="frow"><div class="fic"><i class="ti ti-calendar-up"></i></div><div class="ft"><h4>Schedule uploaded — week of Jun 23</h4></div><span class="ago">1h</span></div>
+          <div class="frow"><div class="fic"><i class="ti ti-device-gamepad-2"></i></div><div class="ft"><h4><b>3</b> staff completed the Wine Training quiz</h4></div><span class="ago">2h</span></div>
+          <div class="frow"><div class="fic"><i class="ti ti-speakerphone"></i></div><div class="ft"><h4>Announcement "6/23 Staff Meeting" posted</h4></div><span class="ago">4h</span></div>
+          <div class="frow"><div class="fic"><i class="ti ti-trophy"></i></div><div class="ft"><h4>Marco passed Jenna on the Game Hub leaderboard</h4></div><span class="ago">6h</span></div>
+          <div class="frow"><div class="fic"><i class="ti ti-tools-kitchen-2"></i></div><div class="ft"><h4>Summer Burrata added to the Dinner menu</h4></div><span class="ago">1d</span></div>
+          <div class="frow"><div class="fic"><i class="ti ti-file-upload"></i></div><div class="ft"><h4>New event flyer "Live Jazz Friday" uploaded</h4></div><span class="ago">2d</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===================== PANE: ALL TOOLS ===================== -->
+    <div class="pane pane-tools" data-p="tools">
+      <div class="glabel" style="margin-top:18px">News Feed</div>
+      <div class="dir">
+        <div class="dchip"><div class="gic"><i class="ti ti-speakerphone"></i></div><div><h4>Announcements</h4><p>3 LIVE · 1 NEW</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-star"></i></div><div><h4>Special Features</h4><p>2 ACTIVE</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-calendar-event"></i></div><div><h4>Events</h4><p>4 UPCOMING</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-bell-ringing"></i></div><div><h4>Notifications</h4><p>BROADCAST</p></div></div>
+      </div>
+
+      <div class="glabel">Team &amp; Training</div>
+      <div class="dir">
+        <div class="dchip"><div class="gic"><i class="ti ti-message-chatbot"></i></div><div><h4>Assistants</h4><p>4 ROLES</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-book"></i></div><div><h4>Guides &amp; Training</h4><p>18 DOCS</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-device-gamepad-2"></i></div><div><h4>Game Hub</h4><p>6 GAMES</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-tools-kitchen-2"></i></div><div><h4>Menu Editor</h4><p>210 ITEMS</p></div></div>
+      </div>
+
+      <div class="glabel own">Management · Owner</div>
+      <div class="dir">
+        <div class="dchip"><div class="gic"><i class="ti ti-users"></i></div><div><h4>Employees</h4><p>14 STAFF</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-calendar-time"></i></div><div><h4>Schedules</h4><p>WK JUN 23</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-settings"></i></div><div><h4>Org Settings <span class="owner-tag">Owner</span></h4><p>BRANDING · ACCESS</p></div></div>
+        <div class="dchip"><div class="gic"><i class="ti ti-credit-card"></i></div><div><h4>Subscription <span class="owner-tag">Owner</span></h4><p>PREMIUM · 9D</p></div></div>
+      </div>
+    </div>
+    </div><!-- /panes -->
+
+    <div style="height:24px"></div>
+  </div>
+
+  <div class="bottom">
+    <div class="nav"><i class="ti ti-home"></i>Welcome</div>
+    <div class="nav"><i class="ti ti-book-2"></i>Menus</div>
+    <div class="nav"><i class="ti ti-tools"></i>Tools</div>
+    <div class="nav on"><i class="ti ti-adjustments-horizontal"></i>Manage</div>
+    <div class="nav"><i class="ti ti-user"></i>Profile</div>
+  </div>
+</div>
+
+<div class="hint">Switch <b>theme</b>, <b>layout</b> &amp; <b>Org state</b> above — flip <b>Org state → Getting set up</b> to watch tiles <b>glow when they need attention</b> · tap a cockpit tile to flip it for actions · tap Recent Activity to expand</div>
+
+<script>
+var phone=document.getElementById('phone');
+// theme
+document.querySelectorAll('.grp .tb').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('.grp .tb').forEach(function(x){x.classList.remove('on');});b.classList.add('on');
+  var lay=phone.classList.contains('lay-one')?'lay-one':'lay-two';
+  var needs=phone.classList.contains('needs')?'needs':'';
+  phone.className='phone '+lay+' '+needs+' '+(b.dataset.th||'');
+});});
+// layout
+document.querySelectorAll('.lb').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('.lb').forEach(function(x){x.classList.remove('on');});b.classList.add('on');
+  phone.classList.toggle('lay-one',b.dataset.lay==='one');
+  phone.classList.toggle('lay-two',b.dataset.lay==='two');
+  document.getElementById('screen').scrollTop=0;
+  var _pn=document.getElementById('panes'); if(_pn){_pn.scrollLeft=0;}
+  var _sg=document.getElementById('seg2'); _sg.querySelectorAll('div').forEach(function(x,ix){x.classList.toggle('on',ix===0);});
+});});
+// org state (dynamic glow demo)
+document.querySelectorAll('.ob').forEach(function(b){b.addEventListener('click',function(){
+  document.querySelectorAll('.ob').forEach(function(x){x.classList.remove('on');});b.classList.add('on');
+  phone.classList.toggle('needs',b.dataset.need==='1');
+});});
+// two-tab segmented + horizontal swipe pager (mirrors the Welcome page)
+var seg=document.getElementById('seg2');
+var panes=document.getElementById('panes');
+var paneList=['today','tools'];
+function setActiveTab(p){seg.querySelectorAll('div').forEach(function(x){x.classList.toggle('on',x.dataset.p===p);});}
+seg.querySelectorAll('div').forEach(function(d){d.addEventListener('click',function(){
+  var i=paneList.indexOf(d.dataset.p);
+  if(panes && getComputedStyle(panes).display==='flex'){panes.scrollTo({left:i*panes.clientWidth,behavior:'smooth'});}
+  setActiveTab(d.dataset.p);
+});});
+if(panes){var _t;panes.addEventListener('scroll',function(){clearTimeout(_t);_t=setTimeout(function(){var i=Math.round(panes.scrollLeft/panes.clientWidth);setActiveTab(paneList[i]||'today');},40);});}
+// flip cards
+document.querySelectorAll('.ct').forEach(function(c){c.addEventListener('click',function(){c.classList.toggle('flip');});});
+document.querySelectorAll('.fbtn').forEach(function(b){b.addEventListener('click',function(e){e.stopPropagation();});});
+// recent activity collapse
+var act=document.getElementById('activity');
+act.querySelector('.acth').addEventListener('click',function(){act.classList.toggle('open');});
+</script>
+</body>
+</html>
