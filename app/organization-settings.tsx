@@ -47,6 +47,7 @@ export default function OrganizationSettingsScreen() {
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('branding');
   const [saving, setSaving] = useState(false);
+  const [savingGmaps, setSavingGmaps] = useState(false);
   const [regeneratingCode, setRegeneratingCode] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
@@ -299,31 +300,54 @@ export default function OrganizationSettingsScreen() {
 
       await refreshOrganization();
 
-      // If the Google Maps query was just added or changed, import reviews now
-      // so the owner sees them right away (mirrors the onboarding auto-import).
-      let reviewMsg = '';
+      // If the Google Maps query was just added or changed, import reviews — but
+      // DON'T block the Save spinner on it. The Outscraper scrape can be slow (or
+      // time out server-side), so kick it off in the background and refresh the
+      // org when it lands. (The Mon/Thu auto-refresh + the Update button retry it.)
       if (queryChanged) {
-        try {
-          const { data: imp, error: impErr } = await supabase.functions.invoke('import-google-reviews', {
-            body: { source: 'manual', user_id: user?.id, organization_id: organizationId, backfill: true },
-          });
-          if (impErr) throw impErr;
-          if (!imp?.success) throw new Error(imp?.error || 'Import failed');
-          const n = imp.reviews_upserted ?? 0;
-          reviewMsg = n > 0
-            ? `\n\nImported ${n} Google review${n === 1 ? '' : 's'} for this location.`
-            : '\n\nNo Google reviews found for that location yet — they\'ll appear automatically once customers post them.';
-        } catch (e: any) {
-          console.error('[OrgSettings] Review import on save failed:', e);
-          reviewMsg = '\n\nWe couldn\'t import reviews from that location right now, but it\'s saved and we\'ll keep trying automatically.';
-        }
+        Alert.alert('Saved', 'Organization settings updated.\n\nWe\'re importing Google reviews for this location now — they\'ll appear shortly. You can re-import anytime with the Update button next to the Google Maps field.');
+        supabase.functions
+          .invoke('import-google-reviews', { body: { source: 'manual', user_id: user?.id, organization_id: organizationId, backfill: true } })
+          .then(() => refreshOrganization())
+          .catch((e: any) => console.error('[OrgSettings] background review import failed:', e));
+      } else {
+        Alert.alert('Saved', 'Organization settings updated successfully.');
       }
-
-      Alert.alert('Saved', 'Organization settings updated successfully.' + reviewMsg);
     } catch (err: any) {
       Alert.alert('Error', err.message || 'Failed to save settings.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Save ONLY the Google Maps location + re-import reviews, without a full
+  // settings save. Lets the owner re-try a changed/failed location quickly.
+  const handleUpdateGoogleMaps = async () => {
+    const q = googleMapsQuery.trim();
+    if (!q) {
+      Alert.alert('Error', 'Enter a Google Maps location first.');
+      return;
+    }
+    setSavingGmaps(true);
+    try {
+      const { data, error } = await (supabase.rpc as any)('update_organization_settings', {
+        p_organization_id: organizationId,
+        p_user_id: user!.id,
+        p_google_maps_query: q,
+      });
+      if (error) throw error;
+      const result = typeof data === 'string' ? JSON.parse(data) : data;
+      if (!result?.success) throw new Error(result?.error || 'Failed to save location.');
+      await refreshOrganization();
+      setSavingGmaps(false);
+      Alert.alert('Location saved', "Saved! We're importing Google reviews for this location — they'll appear shortly.");
+      supabase.functions
+        .invoke('import-google-reviews', { body: { source: 'manual', user_id: user?.id, organization_id: organizationId, backfill: true } })
+        .then(() => refreshOrganization())
+        .catch((e: any) => console.error('[OrgSettings] background review import failed:', e));
+    } catch (e: any) {
+      setSavingGmaps(false);
+      Alert.alert('Error', e?.message || 'Failed to save location.');
     }
   };
 
@@ -598,9 +622,24 @@ export default function OrganizationSettingsScreen() {
                   placeholder="e.g. McLoone's Boathouse, 9 Cherry Lane, West Orange NJ"
                   placeholderTextColor={colors.textSecondary}
                 />
+                <TouchableOpacity
+                  onPress={handleUpdateGoogleMaps}
+                  disabled={savingGmaps}
+                  activeOpacity={0.85}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, alignSelf: 'flex-start', marginTop: 8, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 10, backgroundColor: colors.primary }}
+                >
+                  {savingGmaps ? (
+                    <ActivityIndicator size="small" color={colors.fireText} />
+                  ) : (
+                    <>
+                      <IconSymbol ios_icon_name="magnifyingglass" android_material_icon_name="search" size={15} color={colors.fireText} />
+                      <Text style={{ color: colors.fireText, fontWeight: '700', fontSize: 13 }}>Update &amp; Import Reviews</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
                 <Text style={styles.fieldHint}>
                   Enter your restaurant's name and address exactly as it appears on Google Maps. We'll import
-                  your Google Reviews from this location — saving a new or changed entry imports them right away.
+                  your Google Reviews from this location — tap Update &amp; Import (or save settings) to fetch them.
                 </Text>
               </View>
             </View>

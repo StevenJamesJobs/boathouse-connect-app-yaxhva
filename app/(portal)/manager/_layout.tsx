@@ -75,13 +75,15 @@ export default function ManagerLayout() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const segments = useSegments();
-  // Welcome = the index tab (last segment is not one of the other tabs).
-  const onWelcome = !['menus', 'tools', 'manage', 'profile'].includes(segments[segments.length - 1] as string);
+  // Ambient glow flows edge-to-edge on the glass screens (Welcome = the index
+  // tab + Manage = the Command Center). Excludes the still-solid tabs; the
+  // transparent spacer + transparent scenes let it read continuously.
+  const lastSeg = segments[segments.length - 1] as string;
+  const showAmbient = !['menus', 'tools', 'profile'].includes(lastSeg);
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Ambient glow only on Welcome (absolute → no layout impact); the
-          transparent spacer + transparent Welcome screen let it read edge-to-edge. */}
-      {onWelcome && <AmbientGlow />}
+      {/* Ambient glow on the glass screens (absolute → no layout impact). */}
+      {showAmbient && <AmbientGlow />}
       <View style={{ height: insets.top }} />
       <Tabs
         tabBar={(props) => <ManagerTabBar {...props} />}

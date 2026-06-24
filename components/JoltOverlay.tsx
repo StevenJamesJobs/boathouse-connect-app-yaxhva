@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -40,6 +40,14 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const FAB_SIZE = 56;
 const FAB_RIGHT = 18;
 const FAB_BOTTOM = 118;
+
+// Lets other surfaces (e.g. the Manage Command Center's Jolt search bar) open
+// the palette without prop-drilling. Only the active portal's JoltOverlay is
+// mounted, so the registry holds the live instance.
+const joltOpeners = new Set<() => void>();
+export function triggerJolt() {
+  joltOpeners.forEach((open) => open());
+}
 
 /**
  * Jolt — the floating bolt command palette. Mounted as a sibling in each portal
@@ -170,6 +178,16 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
     Animated.timing(anim, { toValue: 1, duration: 320, useNativeDriver: true }).start();
     setTimeout(() => inputRef.current?.focus(), 340);
   };
+
+  // Register a stable opener (calls the latest openJolt closure) so external
+  // surfaces can trigger the palette via triggerJolt().
+  const openRef = useRef(openJolt);
+  openRef.current = openJolt;
+  useEffect(() => {
+    const opener = () => openRef.current();
+    joltOpeners.add(opener);
+    return () => { joltOpeners.delete(opener); };
+  }, []);
 
   const closeJolt = () => {
     Keyboard.dismiss();

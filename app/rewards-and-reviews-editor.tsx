@@ -20,7 +20,7 @@ import {
 import { Image } from 'expo-image';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -85,6 +85,7 @@ export default function RewardsAndReviewsEditorScreen() {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const router = useRouter();
+  const params = useLocalSearchParams<{ tab?: string }>();
   const colors = useThemeColors();
 
   const styles = StyleSheet.create({
@@ -695,6 +696,14 @@ export default function RewardsAndReviewsEditorScreen() {
   const { hasNew: managerRecentHasNew, markRecentViewed: markManagerRecentViewed } = useUnreadAwards();
   const [activeTab, setActiveTab] = useState<'rewards' | 'reviews'>('rewards');
   const [loading, setLoading] = useState(false);
+
+  // Honor a ?tab= route param so callers (e.g. the Manage cockpit Rating /
+  // Rewards tiles) can deep-link straight to the Reviews or Rewards tab.
+  useEffect(() => {
+    if (params?.tab === 'reviews' || params?.tab === 'rewards') {
+      setActiveTab(params.tab);
+    }
+  }, [params?.tab]);
 
   // Rewards state
   const [showRewardModal, setShowRewardModal] = useState(false);
