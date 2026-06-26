@@ -54,12 +54,16 @@ const STATUS_COLOR: Record<RedemptionStatus, string> = {
 
 export function RedemptionRequestCard({ row, managerView, onApprove, onDeny, onPress }: Props) {
   const colors = useThemeColors();
-  const icon = TYPE_ICON[row.request_type];
+  const icon = TYPE_ICON[row.request_type] || { ios: 'star.circle.fill', android: 'stars' };
+  // Custom options aren't in the built-in maps — their name IS the snapshot.
+  const isCustom = !TYPE_LABEL[row.request_type];
+  const typeLabel = TYPE_LABEL[row.request_type] || row.item_name_snapshot || 'Custom Reward';
 
   const detailLine = (() => {
     if (row.request_type === 'food_beverage') {
       return row.item_name_snapshot || 'Menu item';
     }
+    if (isCustom) return '';
     const parts: string[] = [];
     if (row.shift_date) parts.push(new Date(row.shift_date + 'T00:00:00').toLocaleDateString());
     if (row.shift_period) parts.push(row.shift_period);
@@ -71,7 +75,7 @@ export function RedemptionRequestCard({ row, managerView, onApprove, onDeny, onP
   const wrapProps: any = onPress ? { onPress: () => onPress(row), activeOpacity: 0.7 } : {};
 
   return (
-    <Wrap {...wrapProps} style={[styles.card, { backgroundColor: colors.card }]}>
+    <Wrap {...wrapProps} style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
       <View style={styles.headerRow}>
         <View style={[styles.iconWrap, { backgroundColor: colors.primary + '15' }]}>
           <IconSymbol
@@ -85,10 +89,12 @@ export function RedemptionRequestCard({ row, managerView, onApprove, onDeny, onP
           {managerView && row.user_name ? (
             <Text style={[styles.requester, { color: colors.text }]}>{row.user_name}</Text>
           ) : null}
-          <Text style={[styles.typeLabel, { color: colors.text }]}>{TYPE_LABEL[row.request_type]}</Text>
-          <Text style={[styles.detail, { color: colors.textSecondary }]} numberOfLines={2}>
-            {detailLine}
-          </Text>
+          <Text style={[styles.typeLabel, { color: colors.text }]}>{typeLabel}</Text>
+          {!!detailLine && (
+            <Text style={[styles.detail, { color: colors.textSecondary }]} numberOfLines={2}>
+              {detailLine}
+            </Text>
+          )}
         </View>
         <View style={styles.amountCol}>
           <Text style={[styles.amount, { color: colors.primary }]}>${row.bucks_amount}</Text>
@@ -130,11 +136,10 @@ export function RedemptionRequestCard({ row, managerView, onApprove, onDeny, onP
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 12,
+    borderRadius: 15,
     padding: 14,
     marginBottom: 10,
-    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.08)',
-    elevation: 2,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
   headerRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   iconWrap: {

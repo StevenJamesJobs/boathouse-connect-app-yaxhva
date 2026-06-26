@@ -18,6 +18,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { RedemptionRequestCard, RedemptionRequestRow } from '@/components/RedemptionRequestCard';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import AmbientGlow from '@/components/AmbientGlow';
+import { fonts } from '@/constants/fonts';
 
 const TYPE_LABELS: Record<string, string> = {
   food_beverage: 'Food & Beverages',
@@ -167,12 +169,13 @@ export default function ManagerApprovalsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
+      <AmbientGlow />
+      <View style={[styles.header, { backgroundColor: 'transparent', borderBottomWidth: 0 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.glass, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' }]}>
+          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerText, { color: colors.text }]}>Redemption Approvals</Text>
-        <View style={{ width: 32 }} />
+        <Text style={[styles.headerText, { color: colors.text, fontFamily: fonts.display.bold }]}>Redemption Approvals</Text>
+        <View style={{ width: 38 }} />
       </View>
 
       {loading ? (

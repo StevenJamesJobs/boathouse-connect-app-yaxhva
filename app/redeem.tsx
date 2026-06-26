@@ -18,6 +18,8 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/translateContent';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -26,6 +28,9 @@ import { useNotification } from '@/contexts/NotificationContext';
 import { MenuItemSearchPicker, PickedMenuItem } from '@/components/MenuItemSearchPicker';
 import { RedemptionRequestCard, RedemptionRequestRow, RedemptionType } from '@/components/RedemptionRequestCard';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useRedemptionSettings, foodRedeemCost, RedemptionCustomOption } from '@/hooks/useRedemptionSettings';
+import AmbientGlow from '@/components/AmbientGlow';
+import { fonts } from '@/constants/fonts';
 
 const SECTION_COST = 10;
 const SIDE_WORK_COST = 5;
@@ -87,10 +92,12 @@ export default function EmployeeRedeemScreen() {
   }>();
   const colors = useThemeColors();
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
   const currencyName = organization.reward_currency_name;
   const { sendNotification } = useNotification();
+  const { settings: rset, loading: rsetLoading, customOptions } = useRedemptionSettings();
 
   const [balance, setBalance] = useState(0);
   const [pending, setPending] = useState<RedemptionRequestRow[]>([]);
@@ -98,6 +105,7 @@ export default function EmployeeRedeemScreen() {
   const [submitting, setSubmitting] = useState(false);
 
   const [activeOption, setActiveOption] = useState<RedemptionType | null>(null);
+  const [activeCustom, setActiveCustom] = useState<RedemptionCustomOption | null>(null);
   const [showMenuPicker, setShowMenuPicker] = useState(false);
   const [pickedItem, setPickedItem] = useState<PickedMenuItem | null>(null);
   const [shiftDate, setShiftDate] = useState<Date>(() => new Date());
@@ -109,6 +117,28 @@ export default function EmployeeRedeemScreen() {
   const reservedBucks = useMemo(
     () => pending.reduce((sum, r) => sum + r.bucks_amount, 0),
     [pending]
+  );
+
+  // Only the built-in options the org has enabled, with their configured costs
+  // (F&B shows full vs half-price per the org's mode).
+  const visibleOptions = useMemo(
+    () =>
+      OPTIONS.filter((o) =>
+        o.type === 'food_beverage' ? rset.food_enabled
+          : o.type === 'section' ? rset.section_enabled
+          : o.type === 'side_work' ? rset.sidework_enabled
+          : o.type === 'side_work_free' ? rset.freeshift_enabled
+          : false
+      ).map((o) => ({
+        ...o,
+        costLabel:
+          o.type === 'food_beverage'
+            ? rset.food_mode === 'half'
+              ? t('rewards_ui:redeem_half_price', 'Half price')
+              : t('rewards_ui:redeem_item_price', 'Item price')
+            : `$${o.type === 'section' ? rset.section_cost : o.type === 'side_work' ? rset.sidework_cost : rset.freeshift_cost}`,
+      })),
+    [rset, t]
   );
   const available = balance - reservedBucks;
 
@@ -160,13 +190,14 @@ export default function EmployeeRedeemScreen() {
   const prefilledRef = React.useRef(false);
   useEffect(() => {
     if (prefilledRef.current) return;
+    if (rsetLoading) return; // wait for settings so half-price is applied correctly
     if (!params?.prefillItemId || !params?.prefillItemPrice || !params?.prefillItemName) return;
     const trimmed = String(params.prefillItemPrice).trim();
     const m = trimmed.match(/^\$?(\d+(?:\.\d{1,2})?)$/);
     if (!m) return;
     const n = parseFloat(m[1]);
     if (!isFinite(n) || n <= 0) return;
-    const bucks = Math.ceil(n);
+    const bucks = foodRedeemCost(n, rset.food_mode);
     setActiveOption('food_beverage');
     setPickedItem({
       source: (params.prefillItemSource as 'menu_items' | 'weekly_specials') || 'menu_items',
@@ -178,10 +209,11 @@ export default function EmployeeRedeemScreen() {
     });
     setShowConfirm(true);
     prefilledRef.current = true;
-  }, [params?.prefillItemId, params?.prefillItemPrice, params?.prefillItemName, params?.prefillItemSource]);
+  }, [params?.prefillItemId, params?.prefillItemPrice, params?.prefillItemName, params?.prefillItemSource, rsetLoading, rset.food_mode]);
 
   const resetForm = () => {
     setActiveOption(null);
+    setActiveCustom(null);
     setPickedItem(null);
     setComment('');
     setShiftDate(new Date());
@@ -189,28 +221,38 @@ export default function EmployeeRedeemScreen() {
   };
 
   const onPickOption = (type: RedemptionType) => {
+    setActiveCustom(null);
     setActiveOption(type);
     if (type === 'food_beverage') {
       setShowMenuPicker(true);
     }
   };
 
+  // Custom options redeem straight to the confirm step (no shift form).
+  const onPickCustom = (opt: RedemptionCustomOption) => {
+    setActiveOption(null);
+    setActiveCustom(opt);
+    setShowConfirm(true);
+  };
+
   const requestedBucks = (() => {
+    if (activeCustom) return activeCustom.cost;
     if (activeOption === 'food_beverage') return pickedItem?.bucksCost ?? 0;
-    if (activeOption === 'section') return SECTION_COST;
-    if (activeOption === 'side_work') return SIDE_WORK_COST;
-    if (activeOption === 'side_work_free') return SIDE_WORK_FREE_COST;
+    if (activeOption === 'section') return rset.section_cost;
+    if (activeOption === 'side_work') return rset.sidework_cost;
+    if (activeOption === 'side_work_free') return rset.freeshift_cost;
     return 0;
   })();
 
   const canConfirm = (() => {
+    if (activeCustom) return true;
     if (!activeOption) return false;
     if (activeOption === 'food_beverage') return !!pickedItem;
     return !!shiftDate && !!shiftPeriod;
   })();
 
   const onSubmit = async () => {
-    if (!user?.id || !activeOption) return;
+    if (!user?.id || (!activeOption && !activeCustom)) return;
     if (requestedBucks > available) {
       Alert.alert(
         'Not enough bucks',
@@ -221,18 +263,19 @@ export default function EmployeeRedeemScreen() {
     setSubmitting(true);
     try {
       const isFood = activeOption === 'food_beverage';
-      const dateStr = isFood ? null : shiftDate.toISOString().slice(0, 10);
+      const isCustom = !!activeCustom;
+      const dateStr = (isFood || isCustom) ? null : shiftDate.toISOString().slice(0, 10);
 
       const { data: requestId, error } = await supabase.rpc('submit_redemption_request', {
         p_user_id: user.id,
-        p_request_type: activeOption,
+        p_request_type: (isCustom ? 'custom' : activeOption) as any,
         p_bucks_amount: requestedBucks,
         p_menu_item_id: isFood && pickedItem?.source === 'menu_items' ? pickedItem.id : null,
         p_weekly_special_id: isFood && pickedItem?.source === 'weekly_specials' ? pickedItem.id : null,
-        p_item_name_snapshot: isFood ? pickedItem?.name ?? null : null,
+        p_item_name_snapshot: isFood ? (pickedItem?.name ?? null) : isCustom ? activeCustom!.label : null,
         p_shift_date: dateStr,
-        p_shift_period: isFood ? null : shiftPeriod,
-        p_comment: isFood ? null : comment || null,
+        p_shift_period: (isFood || isCustom) ? null : shiftPeriod,
+        p_comment: (isFood || isCustom) ? null : comment || null,
         p_organization_id: organizationId,
       });
 
@@ -242,7 +285,7 @@ export default function EmployeeRedeemScreen() {
       }
 
       const optionMatch = OPTIONS.find((o) => o.type === activeOption);
-      const optionLabel = optionMatch ? t(optionMatch.titleKey) : 'Redemption';
+      const optionLabel = activeCustom ? activeCustom.label : optionMatch ? t(optionMatch.titleKey) : 'Redemption';
       const notifTitle = '💰 Redemption Request';
       const notifBody = `${user.name || 'An employee'} requested ${optionLabel} ($${requestedBucks}).`;
 
@@ -298,16 +341,17 @@ export default function EmployeeRedeemScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
+      <AmbientGlow />
+      <View style={[styles.header, { backgroundColor: 'transparent', borderBottomWidth: 0 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.glass, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' }]}>
+          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerText, { color: colors.text }]}>Redeem Rewards</Text>
-        <View style={{ width: 32 }} />
+        <Text style={[styles.headerText, { color: colors.text, fontFamily: fonts.display.bold }]}>{t('rewards_ui:redeem_title', 'Redeem Rewards')}</Text>
+        <View style={{ width: 38 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scroll}>
-        <View style={[styles.balanceCard, { backgroundColor: colors.card }]}>
+        <View style={[styles.balanceCard, { backgroundColor: colors.surface }]}>
           <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>Available {currencyName}</Text>
           <Text style={[styles.balanceAmount, { color: colors.primary }]}>${available}</Text>
           {reservedBucks > 0 && (
@@ -317,47 +361,72 @@ export default function EmployeeRedeemScreen() {
           )}
         </View>
 
-        <View style={[styles.aboutCard, { backgroundColor: colors.card }]}>
-          <Text style={[styles.aboutTitle, { color: colors.text }]}>What you can redeem</Text>
-          <Text style={[styles.aboutLine, { color: colors.textSecondary }]}>
-            • Food & Beverages — at the item&apos;s menu price
-          </Text>
-          <Text style={[styles.aboutLine, { color: colors.textSecondary }]}>
-            • Choose Your Own Section — $10
-          </Text>
-          <Text style={[styles.aboutLine, { color: colors.textSecondary }]}>
-            • Choose Your Own Side Work — $5
-          </Text>
-          <Text style={[styles.aboutLine, { color: colors.textSecondary }]}>
-            • Side Work Free Shift — $25
-          </Text>
-          <Text style={[styles.aboutFooter, { color: colors.textSecondary }]}>
-            All redemptions need manager approval before bucks are deducted.
-          </Text>
-        </View>
+        {!rset.redemptions_enabled ? (
+          <View style={[styles.aboutCard, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.aboutTitle, { color: colors.text }]}>{t('rewards_ui:redeem_off_title', 'Redemptions are off')}</Text>
+            <Text style={[styles.aboutLine, { color: colors.textSecondary }]}>
+              {t('rewards_ui:redeem_off_msg', 'Your manager has paused cashing in bucks right now. Check back soon!')}
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={[styles.aboutCard, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.aboutTitle, { color: colors.text }]}>{t('rewards_ui:redeem_what_title', 'What you can redeem')}</Text>
+              {visibleOptions.map((opt) => (
+                <Text key={opt.type} style={[styles.aboutLine, { color: colors.textSecondary }]}>
+                  • {t(opt.titleKey)} — {opt.costLabel}
+                </Text>
+              ))}
+              {customOptions.map((opt) => (
+                <Text key={opt.id} style={[styles.aboutLine, { color: colors.textSecondary }]}>
+                  • {getLocalizedField(opt, 'label', language)} — ${opt.cost}
+                </Text>
+              ))}
+              <Text style={[styles.aboutFooter, { color: colors.textSecondary }]}>
+                {t('rewards_ui:redeem_approval_note', 'All redemptions need manager approval before bucks are deducted.')}
+              </Text>
+            </View>
 
-        {OPTIONS.map((opt) => (
-          <TouchableOpacity
-            key={opt.type}
-            style={[styles.optionCard, { backgroundColor: colors.card }]}
-            onPress={() => onPickOption(opt.type)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.optionIcon, { backgroundColor: colors.primary + '15' }]}>
-              <IconSymbol
-                ios_icon_name={opt.iosIcon as any}
-                android_material_icon_name={opt.androidIcon as any}
-                size={24}
-                color={colors.primary}
-              />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.optionTitle, { color: colors.text }]}>{t(opt.titleKey)}</Text>
-              <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>{t(opt.descriptionKey)}</Text>
-            </View>
-            <Text style={[styles.optionCost, { color: colors.primary }]}>{opt.costLabel}</Text>
-          </TouchableOpacity>
-        ))}
+            {visibleOptions.map((opt) => (
+              <TouchableOpacity
+                key={opt.type}
+                style={[styles.optionCard, { backgroundColor: colors.surface }]}
+                onPress={() => onPickOption(opt.type)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: colors.primary + '15' }]}>
+                  <IconSymbol
+                    ios_icon_name={opt.iosIcon as any}
+                    android_material_icon_name={opt.androidIcon as any}
+                    size={24}
+                    color={colors.primary}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.optionTitle, { color: colors.text }]}>{t(opt.titleKey)}</Text>
+                  <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>{t(opt.descriptionKey)}</Text>
+                </View>
+                <Text style={[styles.optionCost, { color: colors.primary }]}>{opt.costLabel}</Text>
+              </TouchableOpacity>
+            ))}
+            {customOptions.map((opt) => (
+              <TouchableOpacity
+                key={opt.id}
+                style={[styles.optionCard, { backgroundColor: colors.surface }]}
+                onPress={() => onPickCustom(opt)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.optionIcon, { backgroundColor: colors.primary + '15' }]}>
+                  <IconSymbol ios_icon_name="star.circle.fill" android_material_icon_name="stars" size={24} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.optionTitle, { color: colors.text }]}>{getLocalizedField(opt, 'label', language)}</Text>
+                </View>
+                <Text style={[styles.optionCost, { color: colors.primary }]}>${opt.cost}</Text>
+              </TouchableOpacity>
+            ))}
+          </>
+        )}
 
         <Text style={[styles.sectionHeader, { color: colors.text }]}>Pending Requests</Text>
         {loading ? (
@@ -409,7 +478,7 @@ export default function EmployeeRedeemScreen() {
             <ScrollView contentContainerStyle={styles.modalBody}>
               <Text style={[styles.fieldLabel, { color: colors.text }]}>Shift Date</Text>
               <TouchableOpacity
-                style={[styles.fieldRow, { backgroundColor: colors.card }]}
+                style={[styles.fieldRow, { backgroundColor: colors.surface }]}
                 onPress={() => setShowDatePicker(true)}
               >
                 <Text style={{ color: colors.text }}>{shiftDate.toLocaleDateString()}</Text>
@@ -457,7 +526,7 @@ export default function EmployeeRedeemScreen() {
                   : 'Notes (optional)'}
               </Text>
               <TextInput
-                style={[styles.textInput, { backgroundColor: colors.card, color: colors.text }]}
+                style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text }]}
                 placeholder={
                   activeOption === 'section'
                     ? 'e.g. Patio Section 3'
@@ -488,9 +557,13 @@ export default function EmployeeRedeemScreen() {
       {/* Confirmation */}
       <Modal visible={showConfirm} animationType="fade" transparent onRequestClose={() => setShowConfirm(false)}>
         <View style={styles.confirmOverlay}>
-          <View style={[styles.confirmCard, { backgroundColor: colors.card }]}>
+          <View style={[styles.confirmCard, { backgroundColor: colors.surface }]}>
             <Text style={[styles.confirmTitle, { color: colors.text }]}>Confirm redemption</Text>
-            {activeOption === 'food_beverage' ? (
+            {activeCustom ? (
+              <Text style={[styles.confirmLine, { color: colors.text }]}>
+                {getLocalizedField(activeCustom, 'label', language)} — ${activeCustom.cost}
+              </Text>
+            ) : activeOption === 'food_beverage' ? (
               <Text style={[styles.confirmLine, { color: colors.text }]}>
                 {pickedItem?.name} — {pickedItem?.priceText} ({pickedItem?.bucksCost} bucks)
               </Text>
@@ -514,7 +587,7 @@ export default function EmployeeRedeemScreen() {
             <View style={styles.confirmActions}>
               <TouchableOpacity
                 style={[styles.confirmBtnSm, { backgroundColor: colors.border }]}
-                onPress={() => setShowConfirm(false)}
+                onPress={() => { setShowConfirm(false); setActiveCustom(null); }}
                 disabled={submitting}
               >
                 <Text style={{ color: colors.text, fontWeight: '700' }}>Back</Text>

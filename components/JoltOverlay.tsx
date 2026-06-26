@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Animated,
+  Easing,
   Dimensions,
   Pressable,
   ScrollView,
@@ -40,6 +41,7 @@ const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const FAB_SIZE = 56;
 const FAB_RIGHT = 18;
 const FAB_BOTTOM = 118;
+const DOCK_SCALE = 32 / FAB_SIZE; // shrink the 56px FAB to the bar's 32px slot
 
 // Lets other surfaces (e.g. the Manage Command Center's Jolt search bar) open
 // the palette without prop-drilling. Only the active portal's JoltOverlay is
@@ -47,6 +49,25 @@ const FAB_BOTTOM = 118;
 const joltOpeners = new Set<() => void>();
 export function triggerJolt() {
   joltOpeners.forEach((open) => open());
+}
+
+// Lets the Manage Command Center hand the bolt a docking target — the screen-
+// space center of its search-bar bolt slot. When set, the FAB flies from its
+// corner into that slot; cleared (null) → it flies back. ONLY Manage uses this,
+// gated to that screen's focus + expanded-header state, so the app-wide launcher
+// is untouched everywhere else. Mirrors joltOpeners (live active-portal instance).
+const joltDockSetters = new Set<(t: { x: number; y: number } | null) => void>();
+export function setJoltDockTarget(target: { x: number; y: number } | null) {
+  joltDockSetters.forEach((set) => set(target));
+}
+
+// Lets Manage fade the docked bolt out WITH the search bar when the header
+// collapses (instead of flying it back to the corner) and fade it back in when
+// the bar reappears. The bolt only returns to its corner on navigation away
+// (Manage clears the dock target on blur).
+const joltDockHiddenSetters = new Set<(hidden: boolean) => void>();
+export function setJoltDockHidden(hidden: boolean) {
+  joltDockHiddenSetters.forEach((set) => set(hidden));
 }
 
 /**
@@ -70,6 +91,31 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
   const loadedRef = useRef(false);
   const anim = useRef(new Animated.Value(0)).current;
   const inputRef = useRef<TextInput>(null);
+
+  // FAB docking (Manage only). dockTarget = the bar slot's screen center, or null.
+  // dockAnim 0 = corner, 1 = docked; it composes ADDITIVELY with `anim` (palette
+  // open), so a tap on the docked bolt flies smoothly dock → palette box.
+  const [dockTarget, setDockTarget] = useState<{ x: number; y: number } | null>(null);
+  // Last non-null dock coords. Kept even after dockTarget clears so the fly-BACK
+  // (dockAnim 1→0) has real coords to animate from — otherwise the distance
+  // recomputes to 0 the instant the target clears and the bolt JUMPS to the
+  // corner instead of flying. dockAnim=0 pins it to the corner regardless.
+  const [dockCoords, setDockCoords] = useState<{ x: number; y: number } | null>(null);
+  const dockAnim = useRef(new Animated.Value(0)).current;
+  const openStateRef = useRef(open);
+  openStateRef.current = open;
+
+  // dockHidden fades the bolt out in place when the Manage header collapses
+  // (stays docked, just invisible) and back in when the bar reappears.
+  const [dockHidden, setDockHidden] = useState(false);
+  const dockHideAnim = useRef(new Animated.Value(1)).current; // 1 = visible, 0 = hidden
+
+  // The FAB's measured resting center (window coords). Measuring beats computing
+  // from Dimensions, which mis-handles the safe-area bottom inset and made the
+  // bolt land ~30px too low. dockTranslate uses this so it lands exactly on the
+  // bar slot (also measured, in the same window coordinate space).
+  const fabRef = useRef<any>(null);
+  const [fabRest, setFabRest] = useState<{ x: number; y: number } | null>(null);
 
   const isMgr = role === 'manager';
 
@@ -176,6 +222,11 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
     setOpen(true);
     loadIndex();
     Animated.timing(anim, { toValue: 1, duration: 320, useNativeDriver: true }).start();
+    // If docked in the Manage bar, release the dock as the palette opens so the
+    // additive transforms blend dock → palette box (no jump back to the corner).
+    if (dockTarget) {
+      Animated.timing(dockAnim, { toValue: 0, duration: 320, useNativeDriver: true }).start();
+    }
     setTimeout(() => inputRef.current?.focus(), 340);
   };
 
@@ -189,12 +240,75 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
     return () => { joltOpeners.delete(opener); };
   }, []);
 
+  // Register the dock-target setter (Manage hands us the bar-slot coords). Cache
+  // the coords on the way in so the fly-back keeps a real start point.
+  useEffect(() => {
+    const set = (t: { x: number; y: number } | null) => {
+      setDockTarget(t);
+      if (t) setDockCoords(t);
+    };
+    joltDockSetters.add(set);
+    return () => { joltDockSetters.delete(set); };
+  }, []);
+
+  // Register the dock-hidden setter (Manage fades the bolt with its collapsing bar).
+  useEffect(() => {
+    const set = (h: boolean) => setDockHidden(h);
+    joltDockHiddenSetters.add(set);
+    return () => { joltDockHiddenSetters.delete(set); };
+  }, []);
+
+  // Fade the bolt out/in when Manage hides it (collapsed header) — in place, not
+  // back to the corner.
+  useEffect(() => {
+    Animated.timing(dockHideAnim, {
+      toValue: dockHidden ? 0 : 1,
+      duration: 160,
+      useNativeDriver: true,
+    }).start();
+  }, [dockHidden, dockHideAnim]);
+
+  // Measure the FAB's true resting center once (after layout), with retries.
+  useEffect(() => {
+    let tries = 0;
+    const measure = () => {
+      const n = fabRef.current;
+      if (n && typeof n.measureInWindow === 'function') {
+        n.measureInWindow((x: number, y: number, w: number, h: number) => {
+          if (w || h) setFabRest({ x: x + w / 2, y: y + h / 2 });
+          else if (tries++ < 6) setTimeout(measure, 300);
+        });
+      } else if (tries++ < 6) {
+        setTimeout(measure, 300);
+      }
+    };
+    const t = setTimeout(measure, 350);
+    return () => clearTimeout(t);
+  }, []);
+
+  // Fly the FAB to/from the dock target when it changes — but NOT while the
+  // palette is open (openJolt/closeJolt own dockAnim during open/close). The
+  // fly-BACK to the corner is a touch longer for a graceful "return home".
+  useEffect(() => {
+    if (openStateRef.current) return;
+    Animated.timing(dockAnim, {
+      toValue: dockTarget ? 1 : 0,
+      duration: dockTarget ? 380 : 440,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [dockTarget, dockAnim]);
+
   const closeJolt = () => {
     Keyboard.dismiss();
     Animated.timing(anim, { toValue: 0, duration: 240, useNativeDriver: true }).start(() => {
       setOpen(false);
       setQuery('');
     });
+    // Re-dock into the Manage bar if we're still there (target still set).
+    if (dockTarget) {
+      Animated.timing(dockAnim, { toValue: 1, duration: 240, useNativeDriver: true }).start();
+    }
   };
 
   const pick = (r: JoltResult) => {
@@ -229,6 +343,22 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
   const flyTranslateY = anim.interpolate({ inputRange: [0, 1], outputRange: [0, flyY] });
   const flyScale = anim.interpolate({ inputRange: [0, 1], outputRange: [1, 0.55] });
   const circleOpacity = anim.interpolate({ inputRange: [0, 0.6, 1], outputRange: [1, 0, 0] });
+
+  // Dock = corner → Manage bar slot. Composes additively with the fly-to-box.
+  // Use the MEASURED rest center when available (exact landing); fall back to the
+  // computed center before the first measurement resolves.
+  const fcx = fabRest ? fabRest.x : fabCenterX;
+  const fcy = fabRest ? fabRest.y : fabCenterY;
+  // Drive the distance off the CACHED coords (persist through the fly-back);
+  // dockAnim (0=corner, 1=docked) decides where along that path the bolt sits.
+  const dockX = dockCoords ? dockCoords.x - fcx : 0;
+  const dockY = dockCoords ? dockCoords.y - fcy : 0;
+  const dockTranslateX = dockAnim.interpolate({ inputRange: [0, 1], outputRange: [0, dockX] });
+  const dockTranslateY = dockAnim.interpolate({ inputRange: [0, 1], outputRange: [0, dockY] });
+  const dockScaleV = dockAnim.interpolate({ inputRange: [0, 1], outputRange: [1, DOCK_SCALE] });
+  const fabTranslateX = Animated.add(dockTranslateX, flyTranslateX);
+  const fabTranslateY = Animated.add(dockTranslateY, flyTranslateY);
+  const fabScale = Animated.multiply(dockScaleV, flyScale);
 
   return (
     <>
@@ -296,10 +426,12 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
         </View>
       )}
 
-      {/* The bolt — FAB that flies up to become the search icon */}
+      {/* The bolt — FAB that flies up to become the search icon (and docks into
+          the Manage bar when given a target). */}
       <Animated.View
-        style={[styles.fab, { transform: [{ translateX: flyTranslateX }, { translateY: flyTranslateY }, { scale: flyScale }] }]}
-        pointerEvents="box-none"
+        ref={fabRef}
+        style={[styles.fab, { opacity: dockHideAnim, transform: [{ translateX: fabTranslateX }, { translateY: fabTranslateY }, { scale: fabScale }] }]}
+        pointerEvents={dockHidden ? 'none' : 'box-none'}
       >
         <Pressable onPress={open ? undefined : openJolt} style={styles.fabPress} disabled={open}>
           <Animated.View
