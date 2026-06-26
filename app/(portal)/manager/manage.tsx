@@ -31,7 +31,7 @@ import GlassCard from '@/components/GlassCard';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import ContentDetailModal from '@/components/ContentDetailModal';
 import WeatherDetailModal from '@/components/WeatherDetailModal';
-import { triggerJolt } from '@/components/JoltOverlay';
+import { triggerJolt, setJoltDockTarget, setJoltDockHidden } from '@/components/JoltOverlay';
 import ManageEmployeesPane from '@/components/ManageEmployeesPane';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -480,31 +480,116 @@ export default function ManagerManageScreen() {
     Animated.timing(boltAnim, { toValue: 1, duration: 620, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
   }, [boltAnim]);
 
+  // Jolt FAB docking: hand the real corner bolt this bar's slot coords so it flies
+  // in physically. dockActive hides the static boltAnim placeholder (the FAB sits
+  // there instead). If measurement ever fails, dockActive stays false and the
+  // boltAnim fly-in remains the safe fallback — the app-wide launcher is untouched.
+  const joltIconRef = useRef<any>(null);
+  const [dockActive, setDockActive] = useState(false);
+  const dockActiveRef = useRef(false);
+  const dockHiddenRef = useRef(false);
+  // Resets the pager to the top (expanded header) on focus, so the bolt always
+  // measures the search bar's EXPANDED slot — never a collapsed/translated-up
+  // position from a prior visit. Assigned below where the leaf refs exist.
+  const resetCollapseRef = useRef<(() => void) | null>(null);
+  const measureAndDock = useCallback(() => {
+    if (dockActiveRef.current) return; // already docked this focus
+    const node = joltIconRef.current;
+    if (!node || typeof node.measureInWindow !== 'function') return;
+    node.measureInWindow((x: number, y: number, w: number, h: number) => {
+      if (!w && !h) return; // not laid out yet
+      setJoltDockTarget({ x: x + w / 2, y: y + h / 2 });
+      dockActiveRef.current = true;
+      setDockActive(true);
+    });
+  }, []);
+
   useFocusEffect(useCallback(() => {
     loadTileData();
     loadActivity();
     loadSeen();
-    playBoltLand();
-  }, [loadTileData, loadActivity, loadSeen, playBoltLand]));
+    // Return to the top so the header is expanded before we measure the slot
+    // (prevents docking to a collapsed/translated-up position on return visits).
+    resetCollapseRef.current?.();
+    // Try to dock the real FAB into the bar slot (a couple of attempts as layout
+    // settles). If docking never takes, fall back to the safe static fly-in so
+    // the bar still shows a bolt — the app-wide launcher is never left bare.
+    const t1 = setTimeout(measureAndDock, 200);
+    const t2 = setTimeout(measureAndDock, 480);
+    const tFallback = setTimeout(() => { if (!dockActiveRef.current) playBoltLand(); }, 540);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(tFallback);
+      // FAB flies back to its corner ONLY on navigation away.
+      setJoltDockTarget(null);
+      setJoltDockHidden(false);
+      dockActiveRef.current = false;
+      dockHiddenRef.current = false;
+      setDockActive(false);
+    };
+  }, [loadTileData, loadActivity, loadSeen, playBoltLand, measureAndDock]));
 
   // Manual Google-review refresh (premium-gated; honors the same path as the
   // Reviews editor). The 10/month cap is a deferred follow-up.
-  const handleRefreshReviews = useCallback(() => {
+  // Consume one manual refresh (owner-gated, billing-period cap) then fire the
+  // async import. The Mon/Thu auto-refresh is free and doesn't count.
+  const doRefreshReviews = useCallback(async () => {
+    try {
+      const { data: cap } = await (supabase as any).rpc('consume_review_refresh', {
+        p_user_id: user?.id,
+        p_organization_id: organizationId,
+      });
+      if (!cap?.ok) {
+        Alert.alert(
+          t('manager_manage.refresh_limit_title', 'No refreshes left'),
+          t('manager_manage.refresh_limit_msg', "You've used all your manual refreshes for this subscription period. Reviews still refresh automatically every Monday & Thursday.")
+        );
+        return;
+      }
+      Alert.alert(
+        t('manager_manage.refresh_started_title', 'Refreshing reviews'),
+        t('manager_manage.refresh_started_msg', "We're fetching your latest Google reviews — they'll update on the tile shortly.")
+      );
+      supabase.functions
+        .invoke('import-google-reviews', { body: { source: 'manual', user_id: user?.id, organization_id: organizationId } })
+        .then(() => loadTileData())
+        .catch((e) => console.warn('[Manage] review refresh failed', e));
+    } catch (e) {
+      console.warn('[Manage] consume refresh failed', e);
+    }
+  }, [user?.id, organizationId, t, loadTileData]);
+
+  // Owner-only manual refresh, capped per billing period. Shows the count + the
+  // auto-refresh reminder before consuming a credit. Managers never see this.
+  const handleRefreshReviews = useCallback(async () => {
     if (!hasPremium) {
       router.push('/subscription-management');
       return;
     }
-    // The Outscraper scrape can be slow (and occasionally times out server-side),
-    // so don't block the UI — kick it off and let the tile refetch when it lands.
+    if (!isOwner) return;
+    let remaining = 0;
+    try {
+      const { data } = await (supabase as any).rpc('get_review_refresh_quota', {
+        p_user_id: user?.id,
+        p_organization_id: organizationId,
+      });
+      if (data?.success) remaining = data.remaining ?? 0;
+    } catch {
+      // fall through with remaining = 0
+    }
     Alert.alert(
-      t('manager_manage.refresh_started_title', 'Refreshing reviews'),
-      t('manager_manage.refresh_started_msg', "We're fetching your latest Google reviews — they'll update on the tile shortly.")
+      t('manager_manage.refresh_confirm_title', 'Refresh Google Reviews?'),
+      t('manager_manage.refresh_confirm_msg', {
+        count: remaining,
+        defaultValue: `Reviews refresh automatically every Monday & Thursday morning and don't count toward your limit. You have ${remaining} manual refreshes left this subscription period.`,
+      }),
+      [
+        { text: t('common:not_now', 'Not now'), style: 'cancel' },
+        { text: t('manager_manage.refresh_now', 'Refresh now'), onPress: () => doRefreshReviews() },
+      ]
     );
-    supabase.functions
-      .invoke('import-google-reviews', { body: { source: 'manual', user_id: user?.id, organization_id: organizationId } })
-      .then(() => loadTileData())
-      .catch((e) => console.warn('[Manage] review refresh failed', e));
-  }, [hasPremium, organizationId, user?.id, t, router, loadTileData]);
+  }, [hasPremium, isOwner, organizationId, user?.id, t, router, doRefreshReviews]);
 
   // Save the org's Google Maps location (owner-gated RPC, COALESCE-safe) then
   // import reviews — the Rating tile's "Add Google Maps Location" setup flow.
@@ -638,6 +723,24 @@ export default function ManagerManageScreen() {
     extrapolate: 'clamp',
   });
 
+  // While docked, FADE the bolt out with the search bar when the header collapses
+  // and back in when it reappears — it stays put (no fly-to-corner). The bolt only
+  // returns to the corner on navigation away (cleared in the focus cleanup above).
+  useEffect(() => {
+    const id = manageScrollY.addListener(({ value }) => {
+      if (!dockActiveRef.current) return;
+      const collapsed = value > collapsible * 0.45;
+      if (collapsed && !dockHiddenRef.current) {
+        setJoltDockHidden(true);
+        dockHiddenRef.current = true;
+      } else if (!collapsed && dockHiddenRef.current) {
+        setJoltDockHidden(false);
+        dockHiddenRef.current = false;
+      }
+    });
+    return () => manageScrollY.removeListener(id);
+  }, [collapsible, manageScrollY]);
+
   const goTab = useCallback((index: number) => {
     setActiveTab(index);
     activeLeafRef.current = index;
@@ -675,6 +778,13 @@ export default function ManagerManageScreen() {
         });
       },
     });
+
+  // Reset every leaf + the shared collapse value to the top. Called on focus so
+  // the bolt docks to the expanded slot (see resetCollapseRef above).
+  resetCollapseRef.current = () => {
+    manageScrollY.setValue(0);
+    leafRefs.forEach((ref) => ref.current?.scrollTo?.({ y: 0, animated: false }));
+  };
 
   // ---- Cockpit — 6 live flip tiles with dynamic setup-glow ----
   const setUp = t('manager_manage.set_up', 'Set up →');
@@ -794,12 +904,12 @@ export default function ManagerManageScreen() {
           ratingOk
             ? [
                 { label: t('manager_manage.open_reviews', 'Open Reviews'), android: 'star', ios: 'star.fill', primary: true, onPress: () => router.push({ pathname: '/rewards-and-reviews-editor', params: { tab: 'reviews' } }) },
-                { label: t('manager_manage.refresh_reviews', 'Refresh Reviews'), android: 'refresh', ios: 'arrow.clockwise', onPress: handleRefreshReviews },
+                ...(isOwner ? [{ label: t('manager_manage.refresh_reviews', 'Refresh Reviews'), android: 'refresh', ios: 'arrow.clockwise', onPress: handleRefreshReviews }] : []),
               ]
             : tiles.reviewsConnected
             ? [
                 { label: t('manager_manage.edit_google_maps', 'Edit Location'), android: 'edit-location-alt', ios: 'mappin.and.ellipse', primary: true, onPress: openGmModal },
-                { label: t('manager_manage.refresh_reviews', 'Refresh Reviews'), android: 'refresh', ios: 'arrow.clockwise', onPress: handleRefreshReviews },
+                ...(isOwner ? [{ label: t('manager_manage.refresh_reviews', 'Refresh Reviews'), android: 'refresh', ios: 'arrow.clockwise', onPress: handleRefreshReviews }] : []),
               ]
             : [
                 { label: t('manager_manage.add_google_maps', 'Add Google Maps Location'), android: 'add-location-alt', ios: 'mappin.and.ellipse', primary: true, onPress: openGmModal },
@@ -1056,22 +1166,32 @@ export default function ManagerManageScreen() {
           <View onLayout={(e: LayoutChangeEvent) => setJoltBarHeight(e.nativeEvent.layout.height)} style={styles.joltWrap}>
             <GlassCard variant="glass" radius={15} style={styles.joltBar}>
               <Pressable style={styles.joltPress} onPress={triggerJolt}>
-                <Animated.View
-                  style={[
-                    styles.joltIcon,
-                    { backgroundColor: colors.tint + '2B' },
-                    {
-                      opacity: boltAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }),
-                      transform: [
-                        { translateX: boltAnim.interpolate({ inputRange: [0, 1], outputRange: [70, 0] }) },
-                        { translateY: boltAnim.interpolate({ inputRange: [0, 1], outputRange: [36, 0] }) },
-                        { scale: boltAnim.interpolate({ inputRange: [0, 1], outputRange: [1.5, 1] }) },
-                      ],
-                    },
-                  ]}
-                >
-                  <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="bolt" size={18} color={colors.tint} />
-                </Animated.View>
+                {/* Static slot wrapper — the ref the FAB measures (no transform,
+                    so measureInWindow returns the true slot position). The
+                    animated bolt inside is the fallback fly-in / placeholder. */}
+                <View ref={joltIconRef} style={styles.joltIcon}>
+                  <Animated.View
+                    style={[
+                      StyleSheet.absoluteFill,
+                      styles.joltIconFill,
+                      { backgroundColor: colors.tint + '2B' },
+                      {
+                        // Hidden while the real FAB is docked here (it sits in this
+                        // slot instead); otherwise plays the safe fly-in fallback.
+                        opacity: dockActive
+                          ? 0
+                          : boltAnim.interpolate({ inputRange: [0, 0.4, 1], outputRange: [0, 1, 1] }),
+                        transform: [
+                          { translateX: boltAnim.interpolate({ inputRange: [0, 1], outputRange: [70, 0] }) },
+                          { translateY: boltAnim.interpolate({ inputRange: [0, 1], outputRange: [36, 0] }) },
+                          { scale: boltAnim.interpolate({ inputRange: [0, 1], outputRange: [1.5, 1] }) },
+                        ],
+                      },
+                    ]}
+                  >
+                    <IconSymbol ios_icon_name="bolt.fill" android_material_icon_name="bolt" size={18} color={colors.tint} />
+                  </Animated.View>
+                </View>
                 <Text style={[styles.joltText, { color: colors.textSecondary }]} numberOfLines={1}>
                   {t('manager_manage.jolt_bar', 'Search or jump to anything…')}
                 </Text>
@@ -1257,7 +1377,8 @@ const styles = StyleSheet.create({
   joltWrap: { paddingHorizontal: 16, paddingTop: 0 },
   joltBar: { paddingHorizontal: 14, paddingVertical: 11 },
   joltPress: { flexDirection: 'row', alignItems: 'center', gap: 11 },
-  joltIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  joltIcon: { width: 32, height: 32 },
+  joltIconFill: { borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   joltText: { flex: 1, fontFamily: fonts.body.regular, fontSize: 13.5 },
   segWrap: { paddingHorizontal: 16, paddingTop: 11 },
   seg: { flexDirection: 'row', padding: 4, gap: 4 },

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rewards &amp; Reviews — Glass Redesign v2 (Creative, refined)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.11.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:10px;padding:26px 12px 70px;background:#0C0D11;font-family:'Inter',system-ui,sans-serif;color:#D6D9DE}
+h1{font-family:'Bricolage Grotesque';font-size:22px;font-weight:800;letter-spacing:-.4px;color:#F4F6F8;margin-top:4px}
+.sub{color:#6E7681;font-size:12.5px;font-family:'JetBrains Mono';text-align:center;max-width:780px;line-height:1.7}
+.sub b{color:#AEB4BD;font-weight:600}
+.rack{display:flex;flex-wrap:wrap;gap:30px 26px;align-items:flex-start;justify-content:center;max-width:1300px;margin-top:14px}
+.col{display:flex;flex-direction:column;align-items:center;gap:12px}
+.cap{max-width:392px;text-align:center}
+.cap .tag{display:inline-block;font-family:'JetBrains Mono';font-size:9.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:#5DA0E5;background:rgba(93,160,229,0.12);border:1px solid rgba(93,160,229,0.28);padding:4px 11px;border-radius:8px}
+.cap h2{font-family:'Bricolage Grotesque';font-size:16px;font-weight:700;color:#F4F6F8;margin-top:9px}
+.cap p{font-size:11.5px;color:#8A9099;line-height:1.6;margin-top:6px;font-family:'JetBrains Mono'}
+
+.phone{
+  --bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fire:#4A90E2;--ember:#6BADE8;--blue:#5DADE2;--bluetext:#BFE3F7;--fireText:#0A1422;--tint:#5DA0E5;
+  --glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);
+  --nav:rgba(26,35,50,0.55);--glowA:rgba(74,144,226,0.32);--glowB:rgba(93,173,226,0.16);
+  --good:#34C759;--bad:#FF6B6B;--gold:#FFD45E;--silver:#C9D2DC;--bronze:#E08A4B;--google:#5DA0E5;
+  position:relative;width:392px;height:844px;background:var(--bg);border-radius:46px;border:1px solid #2A3344;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);display:flex;flex-direction:column
+}
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.glow3{position:absolute;bottom:40px;left:-70px;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 70%);z-index:0;pointer-events:none;opacity:.7}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:15px 30px 2px;font-size:13px;font-weight:600;font-family:'JetBrains Mono';color:var(--text)}
+.sb .ri{display:flex;gap:7px;align-items:center;font-size:14px}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 16px 30px}
+.screen::-webkit-scrollbar{display:none}
+
+/* identity rail (back + title + active-tab subtitle, NO bell) */
+.idbar{position:relative;z-index:4;display:flex;align-items:center;gap:12px;padding:14px 2px 2px}
+.bk{width:38px;height:38px;border-radius:12px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center;color:var(--text);font-size:19px;flex-shrink:0;backdrop-filter:blur(14px)}
+.idttl{font-family:'Bricolage Grotesque';font-weight:700;font-size:18px;letter-spacing:-.3px;color:var(--text);flex:1;min-width:0}
+.idttl small{display:block;font-family:'JetBrains Mono';font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--tint);font-weight:700;margin-top:2px}
+
+/* ===== nav tiles (replace the Rewards/Reviews tabs) ===== */
+.navtiles{display:flex;gap:10px;margin-top:9px}
+.ntile{flex:1;border-radius:18px;border:1px solid var(--surfbd);background:var(--surf);backdrop-filter:blur(14px) saturate(1.3);padding:13px 14px;position:relative;cursor:pointer;overflow:hidden;transition:.18s}
+.ntile.on{border-color:color-mix(in srgb,var(--tint) 36%,transparent);background:color-mix(in srgb,var(--tint) 11%,transparent)}
+.ntile .nlbl{font-family:'JetBrains Mono';font-size:9px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-weight:600;display:flex;align-items:center;gap:5px}
+.ntile.on .nlbl{color:var(--tint)}
+.ntile .nlbl i{font-size:13px}
+.ntile .nnum{font-family:'JetBrains Mono';font-weight:700;font-size:28px;letter-spacing:-1px;line-height:1;margin-top:9px;color:var(--text);display:flex;align-items:center;gap:6px}
+.ntile.on .nnum{color:var(--tint)}
+.ntile .nsub{font-family:'JetBrains Mono';font-size:9px;color:var(--muted);margin-top:6px;letter-spacing:.3px}
+.rtag{font-family:'JetBrains Mono';font-size:8px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--gold);background:color-mix(in srgb,var(--gold) 16%,transparent);border:1px solid color-mix(in srgb,var(--gold) 32%,transparent);padding:2px 6px;border-radius:6px}
+.goav{position:absolute;top:13px;right:12px;color:var(--muted);font-size:14px;opacity:.4}
+.ntile.on .goav{color:var(--tint);opacity:.8}
+
+/* ===== action bar (Rewards) ===== */
+.acts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:11px}
+.act{position:relative;border-radius:15px;border:1px solid var(--surfbd);background:var(--surf);backdrop-filter:blur(12px);padding:13px 4px 11px;display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer}
+.act i{font-size:21px;color:var(--tint)}
+.act span{font-family:'Bricolage Grotesque';font-size:11px;font-weight:600;color:var(--text)}
+.act .nb{position:absolute;top:-6px;right:-5px;min-width:18px;height:18px;border-radius:9px;background:var(--bad);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px;border:2px solid var(--bg);font-family:'JetBrains Mono'}
+
+/* ===== sub-tabs ===== */
+.sub3{display:flex;gap:4px;background:var(--glass);border:1px solid var(--glassbd);border-radius:13px;padding:4px;margin-top:14px;backdrop-filter:blur(14px)}
+.sub3 div{flex:1;text-align:center;padding:8px 4px;border-radius:9px;font-size:11.5px;font-weight:600;font-family:'Bricolage Grotesque';color:var(--muted);display:flex;align-items:center;justify-content:center;gap:5px;position:relative;cursor:pointer}
+.sub3 div.on{background:var(--surf);border:1px solid var(--surfbd);color:var(--text)}
+.sub3 i{font-size:14px}
+.sub3 .rd{position:absolute;top:4px;right:8px;width:7px;height:7px;border-radius:50%;background:var(--bad)}
+
+.zlabel{font-family:'JetBrains Mono';font-size:9.5px;font-weight:600;letter-spacing:1.3px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:16px 2px 9px}
+.zlabel .ln{flex:1;height:1px;background:var(--hair)}
+.lcard{display:flex;align-items:center;gap:12px;border-radius:15px;border:1px solid var(--surfbd);background:var(--surf);backdrop-filter:blur(12px);padding:11px 13px;margin-bottom:8px}
+.medal{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono';font-weight:700;font-size:14px;flex-shrink:0;color:var(--fireText)}
+.medal.g{background:linear-gradient(135deg,#FFE08A,#F5B638)}.medal.s{background:linear-gradient(135deg,#E4EAF1,#AEB9C6)}.medal.b{background:linear-gradient(135deg,#F0B07E,#D2783C)}
+.medal.n{background:color-mix(in srgb,var(--tint) 16%,transparent);color:var(--tint);border:1px solid color-mix(in srgb,var(--tint) 28%,transparent)}
+.lbody{flex:1;min-width:0}
+.lname{font-family:'Bricolage Grotesque';font-weight:700;font-size:14.5px;color:var(--text)}
+.ljob{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.lbucks{font-family:'JetBrains Mono';font-weight:700;font-size:17px;color:var(--tint);letter-spacing:-.5px}
+
+/* ===== review actions + cards ===== */
+.rvbtns{display:flex;gap:9px;margin-top:13px}
+.rvb{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;height:46px;border-radius:14px;font-family:'Bricolage Grotesque';font-weight:600;font-size:13px;cursor:pointer}
+.rvb.add{background:var(--surf);border:1px solid var(--surfbd);color:var(--text)}
+.rvb.ref{background:color-mix(in srgb,var(--google) 16%,transparent);border:1px solid color-mix(in srgb,var(--google) 32%,transparent);color:var(--bluetext)}
+.rvb i{font-size:17px}
+.rvb .lim{font-family:'JetBrains Mono';font-size:9px;font-weight:700;background:color-mix(in srgb,var(--google) 22%,transparent);padding:1px 6px;border-radius:6px;color:var(--bluetext)}
+.rev{border-radius:16px;border:1px solid var(--surfbd);background:var(--surf);backdrop-filter:blur(12px);padding:14px;margin-bottom:9px}
+.rvhead{display:flex;align-items:center;gap:10px}
+.rvav{width:34px;height:34px;border-radius:50%;background:color-mix(in srgb,var(--tint) 18%,transparent);display:flex;align-items:center;justify-content:center;color:var(--tint);font-size:16px;flex-shrink:0;font-family:'Bricolage Grotesque';font-weight:700}
+.rvname{font-family:'Bricolage Grotesque';font-weight:700;font-size:14px;color:var(--text);flex:1}
+.rvstars{display:flex;gap:1px;color:var(--gold);font-size:12px;margin-top:3px}
+.rvtext{font-size:12.5px;line-height:1.55;color:var(--text);opacity:.92;margin-top:9px}
+.rvreply{margin-top:10px;padding:9px 11px;border-radius:11px;background:var(--glass);border-left:2px solid var(--tint)}
+.rvreply .rl{font-family:'JetBrains Mono';font-size:8.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--tint)}
+.rvreply p{font-size:11.5px;line-height:1.5;color:var(--muted);margin-top:4px}
+.rvdate{font-family:'JetBrains Mono';font-size:9px;color:var(--muted);margin-top:9px}
+.gbadge{display:inline-flex;align-items:center;gap:4px;font-family:'JetBrains Mono';font-size:8.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--google);background:color-mix(in srgb,var(--google) 14%,transparent);border:1px solid color-mix(in srgb,var(--google) 30%,transparent);padding:2px 7px;border-radius:6px}
+
+/* ===== modal + confirm ===== */
+.mphone .screen{filter:blur(2px) brightness(.6)}
+.scrim{position:absolute;inset:0;z-index:9;background:rgba(6,10,18,0.5)}
+.sheet{position:absolute;left:0;right:0;bottom:0;z-index:10;background:color-mix(in srgb,var(--bg) 82%,transparent);border-top:1px solid var(--glassbd);border-radius:26px 26px 0 0;backdrop-filter:blur(30px) saturate(1.4);-webkit-backdrop-filter:blur(30px) saturate(1.4);padding:8px 18px 26px;max-height:80%;overflow-y:auto;box-shadow:0 -24px 60px rgba(0,0,0,.5)}
+.sheet::-webkit-scrollbar{display:none}
+.grab{width:40px;height:5px;border-radius:3px;background:var(--glassbd);margin:6px auto 14px}
+.mtitle{font-family:'Bricolage Grotesque';font-weight:700;font-size:18px;color:var(--text);display:flex;align-items:center;justify-content:space-between}
+.mtitle i{color:var(--muted);font-size:20px}
+.flbl{font-family:'JetBrains Mono';font-size:9.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);font-weight:600;margin:16px 2px 7px}
+.finput{height:46px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:center;padding:0 14px;color:var(--text);font-size:14px;font-family:'Inter'}
+.farea{min-height:74px;border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);padding:12px 14px;color:var(--muted);font-size:13px;line-height:1.5;font-family:'Inter'}
+.echip{display:flex;align-items:center;gap:10px;height:50px;border-radius:13px;background:color-mix(in srgb,var(--tint) 12%,transparent);border:1px solid color-mix(in srgb,var(--tint) 26%,transparent);padding:0 13px}
+.echip .ea{width:32px;height:32px;border-radius:50%;background:color-mix(in srgb,var(--tint) 20%,transparent);display:flex;align-items:center;justify-content:center;color:var(--tint);font-weight:700;font-family:'Bricolage Grotesque';font-size:13px}
+.echip .en{font-family:'Bricolage Grotesque';font-weight:700;font-size:14px;color:var(--text)}
+.echip .ej{font-family:'JetBrains Mono';font-size:9px;text-transform:uppercase;color:var(--muted);margin-top:1px}
+.echip .ck{margin-left:auto;color:var(--tint);font-size:20px}
+.rdseg{display:flex;gap:9px;margin-top:7px}
+.rdopt{flex:1;height:50px;border-radius:13px;border:1px solid var(--glassbd);background:var(--glass);display:flex;align-items:center;justify-content:center;gap:8px;font-family:'Bricolage Grotesque';font-weight:600;font-size:14px;color:var(--muted)}
+.rdopt.on.g{background:color-mix(in srgb,var(--good) 16%,transparent);border-color:color-mix(in srgb,var(--good) 40%,transparent);color:var(--good)}
+.rdopt i{font-size:18px}
+.amtprev{font-family:'JetBrains Mono';font-size:11px;color:var(--muted);margin-top:8px;padding-left:2px}
+.amtprev b{color:var(--good);font-weight:700}
+.toggle{display:flex;align-items:center;gap:11px;margin-top:14px}
+.tsw{width:46px;height:27px;border-radius:14px;background:color-mix(in srgb,var(--good) 80%,transparent);position:relative;flex-shrink:0}
+.tsw::after{content:'';position:absolute;top:3px;right:3px;width:21px;height:21px;border-radius:50%;background:#fff}
+.tgl{font-family:'Inter';font-size:12.5px;color:var(--text)}
+.tgl small{display:block;color:var(--muted);font-size:10.5px;margin-top:2px}
+.msubmit{height:50px;border-radius:14px;background:var(--fire);color:var(--fireText);display:flex;align-items:center;justify-content:center;gap:8px;font-family:'Bricolage Grotesque';font-weight:700;font-size:15px;margin-top:20px}
+.confirm{position:absolute;left:24px;right:24px;top:50%;transform:translateY(-50%);z-index:11;background:color-mix(in srgb,var(--bg) 88%,transparent);border:1px solid var(--glassbd);border-radius:20px;backdrop-filter:blur(30px) saturate(1.4);-webkit-backdrop-filter:blur(30px) saturate(1.4);padding:20px 18px;box-shadow:0 30px 70px rgba(0,0,0,.55)}
+.confirm .ci{width:46px;height:46px;border-radius:14px;background:color-mix(in srgb,var(--google) 16%,transparent);border:1px solid color-mix(in srgb,var(--google) 30%,transparent);display:flex;align-items:center;justify-content:center;color:var(--google);font-size:24px;margin-bottom:12px}
+.confirm h3{font-family:'Bricolage Grotesque';font-weight:700;font-size:16px;color:var(--text)}
+.confirm p{font-size:12px;line-height:1.55;color:var(--muted);margin-top:8px}
+.confirm p b{color:var(--bluetext);font-weight:700}
+.confirm .cbtns{display:flex;gap:9px;margin-top:16px}
+.confirm .cb{flex:1;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'Bricolage Grotesque';font-weight:600;font-size:13px}
+.confirm .cb.no{background:var(--glass);border:1px solid var(--glassbd);color:var(--muted)}
+.confirm .cb.yes{background:var(--fire);color:var(--fireText)}
+
+.bottom{position:absolute;left:0;right:0;bottom:0;z-index:8;display:flex;justify-content:space-around;align-items:center;padding:9px 14px 24px;background:var(--nav);border-top:1px solid var(--glassbd);backdrop-filter:blur(26px) saturate(1.5);-webkit-backdrop-filter:blur(26px) saturate(1.5)}
+.nav{display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-family:'Bricolage Grotesque';font-size:9.5px;font-weight:600}
+.nav i{font-size:20px}.nav.on{color:var(--tint)}
+</style>
+</head>
+<body>
+<h1>Rewards &amp; Reviews — Creative, refined</h1>
+<p class="sub">Per your notes: <b>no hero, no bell</b>; the two <b>tiles replace the tabs</b> (tap to switch — active tile = current page); "Rating" tile renamed <b>Reviews</b> with the rating + a Rating tag. Shown in <b>both</b> states + the modal.</p>
+
+<div class="rack">
+
+  <!-- ============ REWARDS VIEW ============ -->
+  <div class="col">
+    <div class="cap"><span class="tag">View A · Rewards</span><h2>My Bucks tile active</h2><p>Tiles → owner/manager action bar → Leaderboard/Recent/Lookup → leaderboard cards.</p></div>
+    <div class="phone">
+      <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+      <div class="sb"><span>1:53</span><span class="ri"><i class="ti ti-cell-signal-4"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+      <div class="screen">
+        <div class="idbar"><div class="bk"><i class="ti ti-chevron-left"></i></div><div class="idttl">Rewards &amp; Reviews<small>Rewards</small></div></div>
+        <!-- nav tiles -->
+        <div class="navtiles">
+          <div class="ntile on">
+            <div class="nlbl"><i class="ti ti-coin"></i>My MyResto Bucks</div>
+            <div class="nnum">1,250</div>
+            <div class="nsub">Your balance</div>
+          </div>
+          <div class="ntile">
+            <i class="ti ti-chevron-right goav"></i>
+            <div class="nlbl"><i class="ti ti-star"></i>Reviews</div>
+            <div class="nnum">4.9 <span class="rtag"><i class="ti ti-star-filled" style="font-size:9px"></i> Rating</span></div>
+            <div class="nsub">10 Google reviews</div>
+          </div>
+        </div>
+        <!-- owner/manager action bar -->
+        <div class="acts">
+          <div class="act"><i class="ti ti-gift"></i><span>Reward</span></div>
+          <div class="act"><i class="ti ti-circle-minus"></i><span>Deduct</span></div>
+          <div class="act"><i class="ti ti-rotate"></i><span>Reset</span></div>
+          <div class="act"><span class="nb">2</span><i class="ti ti-checklist"></i><span>Approve</span></div>
+        </div>
+        <!-- sub tabs (owner/manager: 3; employees would see Leaderboard/Recent only) -->
+        <div class="sub3"><div class="on"><i class="ti ti-trophy"></i>Leaderboard</div><div><i class="ti ti-clock"></i>Recent<span class="rd"></span></div><div><i class="ti ti-search"></i>Lookup</div></div>
+        <div class="zlabel">Top earners<span class="ln"></span></div>
+        <div class="lcard"><div class="medal g">1</div><div class="lbody"><div class="lname">Deanna G.</div><div class="ljob">General Manager</div></div><div class="lbucks">$980</div></div>
+        <div class="lcard"><div class="medal s">2</div><div class="lbody"><div class="lname">Marcus T.</div><div class="ljob">Bartender</div></div><div class="lbucks">$845</div></div>
+        <div class="lcard"><div class="medal b">3</div><div class="lbody"><div class="lname">Priya N.</div><div class="ljob">Server</div></div><div class="lbucks">$720</div></div>
+        <div class="lcard"><div class="medal n">4</div><div class="lbody"><div class="lname">Jordan K.</div><div class="ljob">Host</div></div><div class="lbucks">$610</div></div>
+      </div>
+      <div class="bottom"><div class="nav"><i class="ti ti-home"></i>Welcome</div><div class="nav"><i class="ti ti-tools-kitchen-2"></i>Menus</div><div class="nav"><i class="ti ti-tool"></i>Tools</div><div class="nav on"><i class="ti ti-adjustments"></i>Manage</div><div class="nav"><i class="ti ti-user"></i>Profile</div></div>
+    </div>
+  </div>
+
+  <!-- ============ REVIEWS VIEW ============ -->
+  <div class="col">
+    <div class="cap"><span class="tag">View B · Reviews</span><h2>Reviews tile active</h2><p>Tap the Reviews tile → Add Review / Refresh (owner: "# left") → glass review cards with owner replies.</p></div>
+    <div class="phone">
+      <div class="glow"></div><div class="glow2"></div><div class="glow3"></div>
+      <div class="sb"><span>1:53</span><span class="ri"><i class="ti ti-cell-signal-4"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+      <div class="screen">
+        <div class="idbar"><div class="bk"><i class="ti ti-chevron-left"></i></div><div class="idttl">Rewards &amp; Reviews<small>Reviews</small></div></div>
+        <!-- nav tiles (Reviews now active) -->
+        <div class="navtiles">
+          <div class="ntile">
+            <i class="ti ti-chevron-right goav"></i>
+            <div class="nlbl"><i class="ti ti-coin"></i>My MyResto Bucks</div>
+            <div class="nnum">1,250</div>
+            <div class="nsub">Your balance</div>
+          </div>
+          <div class="ntile on">
+            <div class="nlbl"><i class="ti ti-star"></i>Reviews</div>
+            <div class="nnum">4.9 <span class="rtag"><i class="ti ti-star-filled" style="font-size:9px"></i> Rating</span></div>
+            <div class="nsub">10 Google reviews</div>
+          </div>
+        </div>
+        <!-- review actions -->
+        <div class="rvbtns">
+          <div class="rvb add"><i class="ti ti-plus"></i>Add Review</div>
+          <div class="rvb ref"><i class="ti ti-refresh"></i>Refresh<span class="lim">8 left</span></div>
+        </div>
+        <div class="zlabel">Guest reviews<span class="ln"></span></div>
+        <div class="rev">
+          <div class="rvhead"><div class="rvav"><i class="ti ti-user"></i></div><div style="flex:1"><div class="rvname">Tony Dee</div><div class="rvstars"><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i></div></div><span class="gbadge"><i class="ti ti-brand-google"></i>G</span></div>
+          <div class="rvtext">Perfect location. Spotlessly clean. Friendly staff and a great vibe — we'll be back next time we're in town.</div>
+          <div class="rvreply"><div class="rl">Owner reply</div><p>Thank you Tony! We can't wait to host you again. 🙌</p></div>
+          <div class="rvdate">Jun 18, 2026</div>
+        </div>
+        <div class="rev">
+          <div class="rvhead"><div class="rvav">J</div><div style="flex:1"><div class="rvname">Jeffrey C.</div><div class="rvstars"><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star"></i></div></div><span class="gbadge"><i class="ti ti-brand-google"></i>G</span></div>
+          <div class="rvtext">Overall, I would stay here again. We had a lovely dinner and the cocktails were creative.</div>
+          <div class="rvdate">Jun 15, 2026</div>
+        </div>
+        <div class="rev">
+          <div class="rvhead"><div class="rvav">S</div><div style="flex:1"><div class="rvname">Sarah M.</div><div class="rvstars"><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i><i class="ti ti-star-filled"></i></div></div></div>
+          <div class="rvtext">Best brunch in town — the staff treated our whole party like family.</div>
+          <div class="rvdate">Jun 10, 2026 · Added by manager</div>
+        </div>
+      </div>
+      <div class="bottom"><div class="nav"><i class="ti ti-home"></i>Welcome</div><div class="nav"><i class="ti ti-tools-kitchen-2"></i>Menus</div><div class="nav"><i class="ti ti-tool"></i>Tools</div><div class="nav on"><i class="ti ti-adjustments"></i>Manage</div><div class="nav"><i class="ti ti-user"></i>Profile</div></div>
+    </div>
+  </div>
+
+  <!-- ============ MODAL + CAP ============ -->
+  <div class="col">
+    <div class="cap"><span class="tag">Forms &amp; Cap</span><h2>Reward modal + refresh cap</h2><p>Polished glass sheet + the owner-only refresh-limit confirmation (kept as you liked it).</p></div>
+    <div class="phone mphone">
+      <div class="glow"></div><div class="glow2"></div>
+      <div class="sb"><span>1:53</span><span class="ri"><i class="ti ti-cell-signal-4"></i><i class="ti ti-wifi"></i><i class="ti ti-battery-3"></i></span></div>
+      <div class="screen"><div class="idbar"><div class="bk"><i class="ti ti-chevron-left"></i></div><div class="idttl">Rewards &amp; Reviews<small>Rewards</small></div></div></div>
+      <div class="scrim"></div>
+      <div class="sheet">
+        <div class="grab"></div>
+        <div class="mtitle">Reward an Employee<i class="ti ti-x"></i></div>
+        <div class="flbl">Employee</div>
+        <div class="echip"><div class="ea">M</div><div><div class="en">Marcus T.</div><div class="ej">Bartender</div></div><i class="ti ti-circle-check-filled ck"></i></div>
+        <div class="flbl">Action</div>
+        <div class="rdseg"><div class="rdopt on g"><i class="ti ti-plus"></i>Reward</div><div class="rdopt"><i class="ti ti-minus"></i>Deduct</div></div>
+        <div class="flbl">Amount</div>
+        <div class="finput">50</div>
+        <div class="amtprev">Will add <b>+$50</b> to MyResto Bucks</div>
+        <div class="flbl">Reason</div>
+        <div class="farea">Crushed it on a packed Friday night — covered two sections solo.</div>
+        <div class="toggle"><div class="tsw"></div><div class="tgl">Visible to employee<small>They'll see this award in their feed</small></div></div>
+        <div class="msubmit"><i class="ti ti-gift"></i>Give Reward</div>
+      </div>
+      <div class="confirm">
+        <div class="ci"><i class="ti ti-refresh"></i></div>
+        <h3>Refresh Google Reviews?</h3>
+        <p>Reviews refresh <b>automatically every Monday &amp; Thursday morning</b> and don't count toward your limit. You have <b>8 manual refreshes left</b> this subscription period.</p>
+        <div class="cbtns"><div class="cb no">Not now</div><div class="cb yes">Refresh now</div></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

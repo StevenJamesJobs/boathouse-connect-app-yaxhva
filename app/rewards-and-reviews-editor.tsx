@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
+  Pressable,
   Alert,
   Modal,
   ActivityIndicator,
@@ -14,15 +15,22 @@ import {
   Platform,
   FlatList,
   Dimensions,
+  Animated,
+  Easing,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import GlassCard from '@/components/GlassCard';
+import AmbientGlow from '@/components/AmbientGlow';
+import { fonts } from '@/constants/fonts';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -87,605 +95,8 @@ export default function RewardsAndReviewsEditorScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ tab?: string }>();
   const colors = useThemeColors();
-
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingTop: 48,
-      paddingBottom: 16,
-      backgroundColor: colors.card,
-      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-      elevation: 3,
-    },
-    backButton: {
-      padding: 8,
-      width: 40,
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: colors.text,
-    },
-    tabContainer: {
-      flexDirection: 'row',
-      backgroundColor: colors.card,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      paddingHorizontal: 16,
-      paddingTop: 8,
-    },
-    tab: {
-      flex: 1,
-      paddingVertical: 12,
-      alignItems: 'center',
-      borderBottomWidth: 3,
-      borderBottomColor: 'transparent',
-    },
-    activeTab: {
-      borderBottomColor: colors.primary,
-    },
-    tabText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.textSecondary,
-    },
-    activeTabText: {
-      color: colors.primary,
-    },
-    scrollView: {
-      flex: 1,
-    },
-    rewardsStaticHeader: {
-      paddingTop: 20,
-      paddingHorizontal: 16,
-    },
-    contentContainer: {
-      paddingTop: 20,
-      paddingHorizontal: 16,
-      paddingBottom: 100,
-    },
-    actionButtonsRow: {
-      flexDirection: 'row',
-      gap: 12,
-      marginBottom: 20,
-    },
-    quickActionsCard: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 20,
-      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-      elevation: 3,
-    },
-    quickActionsRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      gap: 8,
-    },
-    quickActionButton: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 12,
-      paddingVertical: 12,
-      paddingHorizontal: 4,
-    },
-    quickActionIconContainer: {
-      position: 'relative',
-    },
-    quickActionBadge: {
-      position: 'absolute',
-      top: -6,
-      right: -8,
-    },
-    quickActionLabel: {
-      fontSize: 11,
-      fontWeight: '600',
-      marginTop: 6,
-      textAlign: 'center',
-    },
-    subTabDot: {
-      position: 'absolute',
-      top: -4,
-      right: -6,
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: '#E74C3C',
-    },
-    actionButton: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 12,
-      paddingVertical: 16,
-      gap: 8,
-      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-      elevation: 3,
-    },
-    rewardButton: {
-      backgroundColor: colors.highlight,
-    },
-    resetButton: {
-      backgroundColor: '#FF9800',
-    },
-    actionButtonText: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      color: colors.text,
-    },
-    rewardButtonText: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: colors.text,
-    },
-    bucksCard: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 24,
-      alignItems: 'center',
-      marginBottom: 20,
-      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-      elevation: 3,
-    },
-    bucksLabel: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      marginBottom: 8,
-    },
-    bucksAmount: {
-      fontSize: 48,
-      fontWeight: 'bold',
-      color: colors.primary,
-    },
-    section: {
-      marginBottom: 24,
-    },
-    sectionTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 12,
-    },
-    leaderboardItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 8,
-      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-      elevation: 3,
-    },
-    leaderboardRank: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.highlight,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 12,
-    },
-    leaderboardRankText: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      color: colors.fireText,
-    },
-    leaderboardInfo: {
-      flex: 1,
-    },
-    leaderboardName: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 4,
-    },
-    leaderboardJob: {
-      fontSize: 14,
-      color: colors.textSecondary,
-    },
-    leaderboardBucks: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: colors.primary,
-    },
-    transactionItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 8,
-      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-      elevation: 3,
-    },
-    transactionInfo: {
-      flex: 1,
-      marginRight: 12,
-    },
-    transactionEmployee: {
-      fontSize: 17,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 4,
-    },
-    transactionDescription: {
-      fontSize: 15,
-      color: colors.text,
-      marginBottom: 4,
-    },
-    transactionDate: {
-      fontSize: 12,
-      color: colors.textSecondary,
-    },
-    hiddenBadge: {
-      fontSize: 11,
-      color: '#FF9800',
-      fontStyle: 'italic',
-      marginTop: 4,
-    },
-    transactionRight: {
-      alignItems: 'flex-end',
-      gap: 8,
-    },
-    transactionAmount: {
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    positiveAmount: {
-      color: '#4CAF50',
-    },
-    negativeAmount: {
-      color: '#F44336',
-    },
-    transactionActions: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    actionIconButton: {
-      padding: 4,
-    },
-    emptyText: {
-      textAlign: 'center',
-      fontSize: 16,
-      color: colors.textSecondary,
-      marginTop: 20,
-    },
-    reviewCard: {
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 12,
-      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-      elevation: 3,
-    },
-    reviewHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'flex-start',
-      marginBottom: 12,
-    },
-    reviewHeaderLeft: {
-      flex: 1,
-    },
-    reviewGuestName: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    starsContainer: {
-      flexDirection: 'row',
-      gap: 4,
-    },
-    reviewActions: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    reviewText: {
-      fontSize: 14,
-      color: colors.text,
-      lineHeight: 20,
-      marginBottom: 8,
-    },
-    reviewDate: {
-      fontSize: 12,
-      color: colors.textSecondary,
-    },
-    googleReviewAuthorRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      marginBottom: 8,
-    },
-    authorPhoto: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-    },
-    authorPhotoFallback: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    googleBadge: {
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      backgroundColor: '#FFFFFF',
-      borderWidth: 1,
-      borderColor: '#E0E0E0',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    googleBadgeText: {
-      fontSize: 13,
-      fontWeight: 'bold' as const,
-      color: '#4285F4',
-    },
-    ownerReplyContainer: {
-      borderLeftWidth: 3,
-      paddingLeft: 12,
-      marginBottom: 8,
-      marginTop: 4,
-    },
-    ownerReplyLabel: {
-      fontSize: 12,
-      fontWeight: '600' as const,
-      marginBottom: 4,
-    },
-    ownerReplyText: {
-      fontSize: 13,
-      lineHeight: 18,
-      color: colors.text,
-    },
-    loadingOverlay: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'flex-end',
-    },
-    modalContent: {
-      backgroundColor: colors.background,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      maxHeight: '90%',
-    },
-    modalHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 24,
-      paddingTop: 24,
-      paddingBottom: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.highlight,
-    },
-    modalTitle: {
-      fontSize: 22,
-      fontWeight: 'bold',
-      color: colors.text,
-    },
-    modalForm: {
-      paddingHorizontal: 24,
-      paddingTop: 16,
-    },
-    formField: {
-      marginBottom: 20,
-    },
-    formLabel: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: 8,
-    },
-    formInput: {
-      backgroundColor: colors.card,
-      borderRadius: 8,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      fontSize: 16,
-      color: colors.text,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    formInputDisabled: {
-      opacity: 0.6,
-    },
-    formInputTextDisabled: {
-      fontSize: 16,
-      color: colors.textSecondary,
-    },
-    textArea: {
-      minHeight: 100,
-      textAlignVertical: 'top',
-    },
-    formNote: {
-      fontSize: 12,
-      color: colors.textSecondary,
-      marginTop: 4,
-      fontStyle: 'italic',
-    },
-    searchResults: {
-      backgroundColor: colors.card,
-      borderRadius: 8,
-      marginTop: 8,
-      maxHeight: 200,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    searchResultItem: {
-      padding: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    searchResultName: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: 4,
-    },
-    searchResultJob: {
-      fontSize: 14,
-      color: colors.textSecondary,
-    },
-    selectedEmployee: {
-      backgroundColor: colors.highlight,
-      borderRadius: 8,
-      padding: 12,
-      marginTop: 8,
-    },
-    selectedEmployeeText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    selectedEmployeeBalance: {
-      fontSize: 13,
-      color: colors.text,
-      marginTop: 4,
-    },
-    toggleContainer: {
-      flexDirection: 'row',
-      gap: 12,
-    },
-    toggleOptionButton: {
-      flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-      borderRadius: 8,
-      backgroundColor: colors.card,
-      borderWidth: 2,
-      borderColor: colors.border,
-      gap: 8,
-    },
-    toggleOptionButtonActive: {
-      borderWidth: 2,
-    },
-    toggleOptionButtonReward: {
-      backgroundColor: '#4CAF50',
-      borderColor: '#4CAF50',
-    },
-    toggleOptionButtonDeduct: {
-      backgroundColor: '#F44336',
-      borderColor: '#F44336',
-    },
-    toggleOptionText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.textSecondary,
-    },
-    toggleOptionTextActive: {
-      color: '#FFFFFF',
-    },
-    amountPreview: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      marginTop: 8,
-      fontStyle: 'italic',
-    },
-    visibilityToggle: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    toggleButton: {
-      width: 60,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: colors.border,
-      padding: 4,
-      justifyContent: 'center',
-    },
-    toggleButtonActive: {
-      backgroundColor: colors.highlight,
-    },
-    toggleCircle: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: colors.text,
-    },
-    toggleCircleActive: {
-      alignSelf: 'flex-end',
-    },
-    ratingSelector: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    submitButton: {
-      backgroundColor: colors.highlight,
-      borderRadius: 8,
-      paddingVertical: 16,
-      alignItems: 'center',
-      marginTop: 8,
-      marginBottom: 24,
-    },
-    submitButtonText: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: colors.text,
-    },
-    resetWarning: {
-      backgroundColor: '#FFF3CD',
-      borderRadius: 8,
-      padding: 16,
-      marginBottom: 24,
-      fontSize: 14,
-      color: '#856404',
-      lineHeight: 20,
-    },
-    resetSection: {
-      marginBottom: 24,
-    },
-    resetSectionTitle: {
-      fontSize: 18,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 16,
-    },
-    resetSingleButton: {
-      backgroundColor: '#FF9800',
-    },
-    resetAllButton: {
-      backgroundColor: '#F44336',
-    },
-    resetAllWarning: {
-      fontSize: 14,
-      color: colors.textSecondary,
-      marginBottom: 16,
-      lineHeight: 20,
-    },
-    divider: {
-      height: 1,
-      backgroundColor: colors.border,
-      marginVertical: 24,
-    },
-  });
-
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
@@ -694,6 +105,12 @@ export default function RewardsAndReviewsEditorScreen() {
   const { sendNotification } = useNotification();
   const { pendingCount } = usePendingApprovals();
   const { hasNew: managerRecentHasNew, markRecentViewed: markManagerRecentViewed } = useUnreadAwards();
+
+  // Role gating: managers/owners manage; only the OWNER can manually refresh
+  // Google reviews (they pay for the subscription / Outscraper usage).
+  const isOwner = user?.role === 'owner';
+  const isManagerOrOwner = user?.role === 'owner' || user?.role === 'manager';
+
   const [activeTab, setActiveTab] = useState<'rewards' | 'reviews'>('rewards');
   const [loading, setLoading] = useState(false);
 
@@ -732,23 +149,15 @@ export default function RewardsAndReviewsEditorScreen() {
   const [editDescription, setEditDescription] = useState('');
   const [editIsReward, setEditIsReward] = useState(true);
 
-  // Sub-tab state
+  // Sub-tab state. Employees see Leaderboard + Recent; managers/owners also Lookup.
   const [rewardsSubTab, setRewardsSubTab] = useState<'leaderboard' | 'recent' | 'lookup'>('leaderboard');
-  const subTabPagerRef = useRef<FlatList>(null);
-  const SUB_PAGES = ['leaderboard', 'recent', 'lookup'] as const;
-  const goToSubTab = (tab: typeof SUB_PAGES[number]) => {
-    const idx = SUB_PAGES.indexOf(tab);
-    subTabPagerRef.current?.scrollToIndex({ index: idx, animated: true });
+  const SUB_PAGES = useMemo(
+    () => (isManagerOrOwner ? (['leaderboard', 'recent', 'lookup'] as const) : (['leaderboard', 'recent'] as const)),
+    [isManagerOrOwner]
+  );
+  const goToSubTab = (tab: 'leaderboard' | 'recent' | 'lookup') => {
     setRewardsSubTab(tab);
     if (tab === 'recent') markManagerRecentViewed();
-  };
-  const handleSubTabScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-    const next = SUB_PAGES[idx];
-    if (next && next !== rewardsSubTab) {
-      setRewardsSubTab(next);
-      if (next === 'recent') markManagerRecentViewed();
-    }
   };
 
   // Employee lookup state
@@ -770,6 +179,43 @@ export default function RewardsAndReviewsEditorScreen() {
     review_date: new Date().toISOString().split('T')[0],
     display_order: 0,
   });
+
+  // Owner-only manual-refresh allowance for the current billing period.
+  const [refreshRemaining, setRefreshRemaining] = useState<number | null>(null);
+  // My Bucks tile "flips" (owner/manager) to reveal Redeem Settings access.
+  const [bucksSettings, setBucksSettings] = useState(false);
+  // First-visit glow on the My Bucks tile until the owner opens Redeem Settings.
+  const [redeemGlow, setRedeemGlow] = useState(false);
+  const glowAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!isManagerOrOwner || !organizationId) return;
+    AsyncStorage.getItem(`@redeem_settings_seen:${organizationId}`).then((v) => {
+      if (!v) {
+        setRedeemGlow(true);
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(glowAnim, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            Animated.timing(glowAnim, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          ])
+        ).start();
+      }
+    });
+  }, [isManagerOrOwner, organizationId, glowAnim]);
+
+  const openRedeemSettings = useCallback(() => {
+    if (organizationId) AsyncStorage.setItem(`@redeem_settings_seen:${organizationId}`, '1');
+    setRedeemGlow(false);
+    router.push('/redeem-settings' as any);
+  }, [organizationId, router]);
+
+  // Aggregate Google rating (published only) — shown on the Reviews tile.
+  const { ratingAvg, ratingCount } = useMemo(() => {
+    const pub = googleReviews.filter((r) => r.is_published);
+    const count = pub.length;
+    const avg = count ? pub.reduce((s, r) => s + (r.review_rating || 0), 0) / count : 0;
+    return { ratingAvg: avg, ratingCount: count };
+  }, [googleReviews]);
 
   const fetchEmployees = useCallback(async () => {
     try {
@@ -832,7 +278,7 @@ export default function RewardsAndReviewsEditorScreen() {
       if (transData && transData.length > 0) {
         // Get unique user IDs
         const userIds = [...new Set(transData.map(t => t.user_id))];
-        
+
         // Fetch user names separately
         const { data: usersData, error: usersError } = await supabase
           .from('users')
@@ -842,14 +288,13 @@ export default function RewardsAndReviewsEditorScreen() {
         if (!usersError && usersData) {
           // Create a map of user IDs to names
           const userMap = new Map(usersData.map(u => [u.id, u.name]));
-          
+
           // Combine transaction data with user names
           const transactionsWithNames = transData.map(trans => ({
             ...trans,
             user_name: userMap.get(trans.user_id) || 'Unknown Employee'
           }));
-          
-          console.log('Fetched transactions with names:', transactionsWithNames);
+
           setRecentTransactions(transactionsWithNames);
         } else {
           console.error('Error fetching user names:', usersError);
@@ -898,6 +343,20 @@ export default function RewardsAndReviewsEditorScreen() {
     }
   }, [organizationId]);
 
+  // Owner-only: load the remaining manual refreshes for the billing period.
+  const fetchRefreshQuota = useCallback(async () => {
+    if (!isOwner || !user?.id || !organizationId) return;
+    try {
+      const { data } = await (supabase as any).rpc('get_review_refresh_quota', {
+        p_user_id: user.id,
+        p_organization_id: organizationId,
+      });
+      if (data?.success) setRefreshRemaining(data.remaining ?? 0);
+    } catch (e) {
+      console.warn('refresh quota error', e);
+    }
+  }, [isOwner, user?.id, organizationId]);
+
   const allReviews: ReviewItem[] = useMemo(() => {
     const manual: ReviewItem[] = reviews.map((r) => ({ ...r, source: 'manual' as const }));
     const google: ReviewItem[] = googleReviews.map((r) => ({ ...r, source: 'google' as const }));
@@ -913,7 +372,8 @@ export default function RewardsAndReviewsEditorScreen() {
     fetchRewardsData();
     fetchReviews();
     fetchGoogleReviews();
-  }, [fetchEmployees, fetchRewardsData, fetchReviews, fetchGoogleReviews]);
+    fetchRefreshQuota();
+  }, [fetchEmployees, fetchRewardsData, fetchReviews, fetchGoogleReviews, fetchRefreshQuota]);
 
   useEffect(() => {
     if (searchQuery) {
@@ -1061,7 +521,6 @@ export default function RewardsAndReviewsEditorScreen() {
           onPress: async () => {
             try {
               setLoading(true);
-              console.log('Starting reset for user:', resetSelectedEmployee.id);
 
               // Step 1: Delete all transactions for this user
               const { error: deleteError } = await supabase
@@ -1069,11 +528,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 .delete()
                 .eq('user_id', resetSelectedEmployee.id);
 
-              if (deleteError) {
-                console.error('Error deleting transactions:', deleteError);
-                throw deleteError;
-              }
-              console.log('Transactions deleted successfully');
+              if (deleteError) throw deleteError;
 
               // Step 2: Recalculate the balance from remaining transactions (should be 0)
               const { data: sumData, error: sumError } = await supabase
@@ -1081,40 +536,18 @@ export default function RewardsAndReviewsEditorScreen() {
                 .select('amount')
                 .eq('user_id', resetSelectedEmployee.id);
 
-              if (sumError) {
-                console.error('Error calculating sum:', sumError);
-                throw sumError;
-              }
+              if (sumError) throw sumError;
 
-              // Calculate total from remaining transactions
               const totalBucks = sumData?.reduce((sum, trans) => sum + trans.amount, 0) || 0;
-              console.log('Calculated total bucks from remaining transactions:', totalBucks);
 
               // Step 3: Update user's bucks to the calculated total (should be 0)
-              const { data: updateData, error: updateError } = await supabase
+              const { error: updateError } = await supabase
                 .from('users')
                 .update({ mcloones_bucks: totalBucks })
                 .eq('id', resetSelectedEmployee.id)
                 .select();
 
-              if (updateError) {
-                console.error('Error updating user bucks:', updateError);
-                throw updateError;
-              }
-              console.log('User bucks updated successfully:', updateData);
-
-              // Step 4: Verify the update
-              const { data: verifyData, error: verifyError } = await supabase
-                .from('users')
-                .select('mcloones_bucks')
-                .eq('id', resetSelectedEmployee.id)
-                .single();
-
-              if (verifyError) {
-                console.error('Error verifying update:', verifyError);
-              } else {
-                console.log('Verified user bucks after reset:', verifyData);
-              }
+              if (updateError) throw updateError;
 
               Alert.alert(t('common:success'), t('rewards_reviews_editor:reset_success', { name: resetSelectedEmployee.name, currencyName }));
               setShowResetBucksModal(false);
@@ -1146,7 +579,6 @@ export default function RewardsAndReviewsEditorScreen() {
           onPress: async () => {
             try {
               setLoading(true);
-              console.log('Starting reset for all users');
 
               // Step 1: Delete all transactions
               const { error: deleteError } = await supabase
@@ -1154,11 +586,7 @@ export default function RewardsAndReviewsEditorScreen() {
                 .delete()
                 .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
 
-              if (deleteError) {
-                console.error('Error deleting all transactions:', deleteError);
-                throw deleteError;
-              }
-              console.log('All transactions deleted successfully');
+              if (deleteError) throw deleteError;
 
               // Step 2: Get all active users
               const { data: allUsers, error: fetchError } = await supabase
@@ -1167,16 +595,11 @@ export default function RewardsAndReviewsEditorScreen() {
                 .eq('organization_id', organizationId)
                 .eq('is_active', true);
 
-              if (fetchError) {
-                console.error('Error fetching users:', fetchError);
-                throw fetchError;
-              }
-              console.log('Found users to reset:', allUsers?.length);
+              if (fetchError) throw fetchError;
 
               // Step 3: For each user, recalculate their balance from remaining transactions (should be 0)
               if (allUsers && allUsers.length > 0) {
                 for (const userRecord of allUsers) {
-                  // Calculate sum of remaining transactions for this user
                   const { data: sumData, error: sumError } = await supabase
                     .from('rewards_transactions')
                     .select('amount')
@@ -1187,10 +610,8 @@ export default function RewardsAndReviewsEditorScreen() {
                     continue;
                   }
 
-                  // Calculate total from remaining transactions
                   const totalBucks = sumData?.reduce((sum, trans) => sum + trans.amount, 0) || 0;
 
-                  // Update user's bucks to the calculated total (should be 0)
                   const { error: updateError } = await supabase
                     .from('users')
                     .update({ mcloones_bucks: totalBucks })
@@ -1199,25 +620,6 @@ export default function RewardsAndReviewsEditorScreen() {
                   if (updateError) {
                     console.error(`Error updating user ${userRecord.id}:`, updateError);
                   }
-                }
-              }
-
-              console.log('All users bucks updated successfully');
-
-              // Step 4: Verify the update
-              const { data: verifyData, error: verifyError } = await supabase
-                .from('users')
-                .select('id, name, mcloones_bucks')
-                .eq('organization_id', organizationId)
-                .eq('is_active', true);
-
-              if (verifyError) {
-                console.error('Error verifying update:', verifyError);
-              } else {
-                console.log('Verified users after reset:', verifyData);
-                const nonZeroUsers = verifyData?.filter(u => u.mcloones_bucks !== 0);
-                if (nonZeroUsers && nonZeroUsers.length > 0) {
-                  console.warn('Warning: Some users still have non-zero bucks:', nonZeroUsers);
                 }
               }
 
@@ -1272,15 +674,8 @@ export default function RewardsAndReviewsEditorScreen() {
       // Calculate the final amount based on Reward/Deduct toggle
       const finalAmount = editIsReward ? parseInt(editAmount) : -parseInt(editAmount);
 
-      console.log('Updating transaction:', {
-        manager_id: user.id,
-        transaction_id: editingTransaction.id,
-        new_amount: finalAmount,
-        new_description: editDescription,
-      });
-
       // Use the database function to update transaction and recalculate balance
-      const { data, error } = await supabase.rpc('update_transaction_and_balance', {
+      const { error } = await supabase.rpc('update_transaction_and_balance', {
         p_manager_id: user.id,
         p_transaction_id: editingTransaction.id,
         p_new_amount: finalAmount,
@@ -1288,12 +683,7 @@ export default function RewardsAndReviewsEditorScreen() {
         p_organization_id: organizationId,
       });
 
-      if (error) {
-        console.error('Error from database function:', error);
-        throw error;
-      }
-
-      console.log('Transaction updated successfully, result:', data);
+      if (error) throw error;
 
       Alert.alert(t('common:success'), t('rewards_reviews_editor:transaction_updated'));
       setShowEditTransactionModal(false);
@@ -1347,7 +737,7 @@ export default function RewardsAndReviewsEditorScreen() {
   const handleHideTransaction = async (transaction: RewardTransaction) => {
     const newVisibility = !transaction.is_visible;
     const actionText = newVisibility ? 'show' : 'hide';
-    
+
     Alert.alert(
       newVisibility ? t('rewards_reviews_editor:hide_transaction_title_show') : t('rewards_reviews_editor:hide_transaction_title_hide'),
       newVisibility ? t('rewards_reviews_editor:hide_transaction_confirm_show') : t('rewards_reviews_editor:hide_transaction_confirm_hide'),
@@ -1496,21 +886,19 @@ export default function RewardsAndReviewsEditorScreen() {
     ]);
   };
 
-  const renderStars = (rating: number) => {
-    return (
-      <View style={styles.starsContainer}>
-        {[1, 2, 3, 4, 5].map((star) => (
-          <IconSymbol
-            key={star}
-            ios_icon_name={star <= rating ? 'star.fill' : 'star'}
-            android_material_icon_name={star <= rating ? 'star' : 'star-border'}
-            size={20}
-            color={star <= rating ? '#FFD700' : colors.textSecondary}
-          />
-        ))}
-      </View>
-    );
-  };
+  const renderStars = (rating: number, size = 14) => (
+    <View style={styles.starsRow}>
+      {[1, 2, 3, 4, 5].map((star) => (
+        <IconSymbol
+          key={star}
+          ios_icon_name={star <= rating ? 'star.fill' : 'star'}
+          android_material_icon_name={star <= rating ? 'star' : 'star-border'}
+          size={size}
+          color={star <= rating ? '#FFD45E' : colors.textSecondary}
+        />
+      ))}
+    </View>
+  );
 
   const handleHideGoogleReview = (review: GoogleReview) => {
     const newPublished = !review.is_published;
@@ -1543,31 +931,41 @@ export default function RewardsAndReviewsEditorScreen() {
     );
   };
 
-  const handleRefreshGoogleReviews = async () => {
-    if (!hasPremium) {
-      Alert.alert(
-        'Premium Feature',
-        'Automatic Google Reviews import requires the Premium plan ($15/mo).',
-        [
-          { text: 'Not Now', style: 'cancel' },
-          { text: 'Upgrade', onPress: () => router.push('/subscription-management' as any) },
-        ]
-      );
-      return;
-    }
-
+  // Owner-only manual refresh, capped per billing period. The Mon/Thu auto
+  // refresh is free and does NOT count toward this limit.
+  const doRefreshGoogleReviews = async () => {
     try {
       setRefreshingGoogle(true);
+      // Reserve one refresh credit (owner-gated, billing-period cap).
+      const { data: cap, error: capErr } = await (supabase as any).rpc('consume_review_refresh', {
+        p_user_id: user?.id,
+        p_organization_id: organizationId,
+      });
+      if (capErr) throw capErr;
+      if (!cap?.ok) {
+        if (cap?.reason === 'limit_reached') {
+          setRefreshRemaining(0);
+          Alert.alert(t('rewards_reviews_editor:refresh_limit_title'), t('rewards_reviews_editor:refresh_limit_message'));
+        } else {
+          Alert.alert(t('common:error'), t('rewards_reviews_editor:refresh_error'));
+        }
+        return;
+      }
+      setRefreshRemaining(cap.remaining ?? 0);
+
       const { data, error } = await supabase.functions.invoke('import-google-reviews', {
         body: { source: 'manual', user_id: user?.id, organization_id: organizationId },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Import failed');
+      // The import runs asynchronously (submitted to Outscraper, ingested later
+      // via webhook), so there's no synchronous count — tell the owner it's
+      // importing and refetch shortly so newly-landed reviews appear.
       Alert.alert(
-        t('rewards_reviews_editor:refresh_success_title'),
-        t('rewards_reviews_editor:refresh_success_message', { count: data.reviews_upserted })
+        t('rewards_reviews_editor:refresh_queued_title'),
+        t('rewards_reviews_editor:refresh_queued_message')
       );
-      fetchGoogleReviews();
+      setTimeout(() => fetchGoogleReviews(), 4000);
     } catch (error: any) {
       console.error('Error refreshing Google reviews:', error);
       Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:refresh_error'));
@@ -1576,1069 +974,817 @@ export default function RewardsAndReviewsEditorScreen() {
     }
   };
 
+  const handleRefreshGoogleReviews = () => {
+    if (!hasPremium) {
+      Alert.alert(
+        t('rewards_reviews_editor:premium_feature_title'),
+        t('rewards_reviews_editor:premium_feature_msg'),
+        [
+          { text: t('common:not_now'), style: 'cancel' },
+          { text: t('rewards_reviews_editor:upgrade'), onPress: () => router.push('/subscription-management' as any) },
+        ]
+      );
+      return;
+    }
+    if (!isOwner) return; // owners only — the button is hidden for managers
+    const remaining = refreshRemaining ?? 0;
+    Alert.alert(
+      t('rewards_reviews_editor:refresh_confirm_title'),
+      t('rewards_reviews_editor:refresh_confirm_message', { count: remaining }),
+      [
+        { text: t('common:not_now'), style: 'cancel' },
+        { text: t('rewards_reviews_editor:refresh_now'), onPress: doRefreshGoogleReviews },
+      ]
+    );
+  };
+
+  // ── Reusable bits ──────────────────────────────────────────────────────
+  // A plain function (NOT a nested component) so the modal's TextInputs keep
+  // focus across re-renders — a `<Sheet/>` component redefined each render would
+  // remount and drop focus on every keystroke.
+  const sheetShell = (title: string, onClose: () => void, children: React.ReactNode) => (
+    <View style={styles.sheetWrap}>
+      <Pressable style={styles.scrim} onPress={onClose} />
+      <GlassCard variant="glass" radius={26} intensity={32} style={styles.sheet}>
+        <View style={styles.grab} />
+        <View style={styles.mtitleRow}>
+          <Text style={styles.mtitle}>{title}</Text>
+          <Pressable onPress={onClose} hitSlop={10}>
+            <IconSymbol ios_icon_name="xmark" android_material_icon_name="close" size={20} color={colors.textSecondary} />
+          </Pressable>
+        </View>
+        <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          {children}
+        </ScrollView>
+      </GlassCard>
+    </View>
+  );
+
+  const amountPreview = (amount: string, reward: boolean) => {
+    const n = parseInt(amount);
+    if (!amount || isNaN(n)) return null;
+    return (
+      <Text style={styles.amtPrev}>
+        {reward ? t('rewards_reviews_editor:amount_preview_add', 'Will add') : t('rewards_reviews_editor:amount_preview_deduct', 'Will deduct')}{' '}
+        <Text style={{ color: reward ? '#34C759' : '#FF6B6B', fontFamily: fonts.mono.semibold }}>
+          {reward ? '+' : '-'}${n}
+        </Text>{' '}
+        {t('rewards_reviews_editor:amount_preview_suffix', { currencyName, defaultValue: `to ${currencyName}` })}
+      </Text>
+    );
+  };
+
+  // ── Render ─────────────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('rewards_reviews_editor:title')}</Text>
-        <View style={styles.backButton} />
-      </View>
+      <AmbientGlow />
 
-      {/* Tab Selector */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'rewards' && styles.activeTab]}
-          onPress={() => setActiveTab('rewards')}
-        >
-          <Text style={[styles.tabText, activeTab === 'rewards' && styles.activeTabText]}>
-            {t('rewards_reviews_editor:tab_rewards')}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'reviews' && styles.activeTab]}
-          onPress={() => setActiveTab('reviews')}
-        >
-          <Text style={[styles.tabText, activeTab === 'reviews' && styles.activeTabText]}>
-            {t('rewards_reviews_editor:tab_reviews')}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Content */}
-      {activeTab === 'rewards' ? (
+      {/* Identity rail: back + title + active-tab subtitle (no hero, no bell) */}
+      <View style={[styles.idbar, { paddingTop: insets.top + 8 }]}>
+        <Pressable style={styles.bk} onPress={() => router.back()} hitSlop={8}>
+          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.text} />
+        </Pressable>
         <View style={{ flex: 1 }}>
-          <View style={styles.rewardsStaticHeader}>
-            {/* Quick Actions Grid: Reward / Deduct / Reset / Approvals */}
-            <View style={styles.quickActionsCard}>
-              <View style={styles.quickActionsRow}>
-                <TouchableOpacity
-                  style={[styles.quickActionButton, { backgroundColor: colors.primary + '20' }]}
-                  onPress={() => {
-                    setIsReward(true);
-                    setShowRewardModal(true);
-                  }}
-                >
-                  <IconSymbol ios_icon_name="gift.fill" android_material_icon_name="card-giftcard" size={24} color={colors.primary} />
-                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('rewards_ui:manager_reward')}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.quickActionButton, { backgroundColor: colors.primary + '20' }]}
-                  onPress={() => {
-                    setIsReward(false);
-                    setShowRewardModal(true);
-                  }}
-                >
-                  <IconSymbol ios_icon_name="minus.circle.fill" android_material_icon_name="remove-circle" size={24} color={colors.primary} />
-                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('rewards_ui:manager_deduct')}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.quickActionButton, { backgroundColor: colors.primary + '20' }]}
-                  onPress={() => setShowResetBucksModal(true)}
-                >
-                  <IconSymbol ios_icon_name="arrow.counterclockwise.circle.fill" android_material_icon_name="refresh" size={24} color={colors.primary} />
-                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('rewards_ui:manager_reset')}</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.quickActionButton, { backgroundColor: colors.primary + '20' }]}
-                  onPress={() => router.push('/manager-approvals' as any)}
-                >
-                  <View style={styles.quickActionIconContainer}>
-                    <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={24} color={colors.primary} />
-                    {pendingCount > 0 && (
-                      <View style={styles.quickActionBadge}>
-                        <MessageBadge count={pendingCount} size="small" />
-                      </View>
-                    )}
-                  </View>
-                  <Text style={[styles.quickActionLabel, { color: colors.text }]}>{t('rewards_ui:manager_approvals')}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* My Bucks */}
-            <View style={styles.bucksCard}>
-              <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={32} color={colors.primary} />
-              <Text style={styles.bucksLabel}>{t('rewards_reviews_editor:my_bucks_label', { currencyName })}</Text>
-              <Text style={styles.bucksAmount}>${myBucks}</Text>
-            </View>
-
-            {/* Sub-Tab Selector: Leaderboard / Recent Awards / Employee Lookup */}
-            <View style={{
-              flexDirection: 'row',
-              backgroundColor: colors.card,
-              borderRadius: 12,
-              padding: 4,
-              marginBottom: 16,
-              boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-              elevation: 3,
-            }}>
-              {(['leaderboard', 'recent', 'lookup'] as const).map((tab) => {
-                const active = rewardsSubTab === tab;
-                return (
-                  <TouchableOpacity
-                    key={tab}
-                    style={{
-                      flex: 1,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      paddingVertical: 10,
-                      borderRadius: 10,
-                      gap: 4,
-                      backgroundColor: active ? colors.primary : 'transparent',
-                    }}
-                    onPress={() => goToSubTab(tab)}
-                  >
-                    <View style={{ position: 'relative' }}>
-                      <IconSymbol
-                        ios_icon_name={tab === 'leaderboard' ? 'trophy.fill' : tab === 'recent' ? 'clock.fill' : 'magnifyingglass'}
-                        android_material_icon_name={tab === 'leaderboard' ? 'emoji-events' : tab === 'recent' ? 'history' : 'search'}
-                        size={14}
-                        color={active ? colors.fireText : colors.textSecondary}
-                      />
-                      {tab === 'recent' && managerRecentHasNew && !active ? (
-                        <View style={styles.subTabDot} />
-                      ) : null}
-                    </View>
-                    <Text style={{
-                      fontSize: 12,
-                      fontWeight: '600',
-                      color: active ? colors.fireText : colors.textSecondary,
-                    }}>
-                      {tab === 'leaderboard' ? t('rewards_ui:tab_leaderboard') : tab === 'recent' ? t('rewards_ui:tab_recent_short') : t('rewards_ui:tab_lookup')}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-          </View>
-
-          {/* Sub-Tab Content — horizontal pager: leaderboard / recent / lookup */}
-          <FlatList
-            ref={subTabPagerRef}
-            data={SUB_PAGES as unknown as string[]}
-            keyExtractor={(item) => item}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={handleSubTabScroll}
-            bounces={false}
-            getItemLayout={(_, index) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * index, index })}
-            style={{ flex: 1 }}
-            renderItem={({ item }) => (
-              <ScrollView
-                style={{ width: SCREEN_WIDTH }}
-                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 8, paddingBottom: 100 }}
-                showsVerticalScrollIndicator={false}
-                nestedScrollEnabled
-              >
-            {item === 'lookup' ? (
-              <View style={styles.section}>
-                {/* Employee Search */}
-                <TextInput
-                  style={[styles.formInput, { marginBottom: 12 }]}
-                  value={lookupSearchQuery}
-                  onChangeText={(text) => {
-                    setLookupSearchQuery(text);
-                    if (!text) {
-                      setLookupEmployee(null);
-                      setLookupTransactions([]);
-                    }
-                  }}
-                  placeholder="Search employee by name..."
-                  placeholderTextColor={colors.textSecondary}
-                />
-                {lookupFilteredEmployees.length > 0 && !lookupEmployee && (
-                  <View style={[styles.searchResults, { marginBottom: 12, marginTop: 0 }]}>
-                    {lookupFilteredEmployees.slice(0, 5).map((emp) => (
-                      <TouchableOpacity
-                        key={emp.id}
-                        style={styles.searchResultItem}
-                        onPress={() => handleSelectLookupEmployee(emp)}
-                      >
-                        <Text style={styles.searchResultName}>{emp.name}</Text>
-                        <Text style={styles.searchResultJob}>{emp.job_title} — ${emp.mcloones_bucks || 0}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-
-                {lookupEmployee && (
-                  <>
-                    {/* Employee Bucks Card */}
-                    <View style={[styles.bucksCard, { marginBottom: 16, paddingVertical: 16 }]}>
-                      <Text style={[styles.leaderboardName, { fontSize: 18, color: colors.text, marginBottom: 4 }]}>{lookupEmployee.name}</Text>
-                      <Text style={[styles.leaderboardJob, { color: colors.textSecondary, marginBottom: 8 }]}>{lookupEmployee.job_title}</Text>
-                      <Text style={[styles.bucksAmount, { fontSize: 36 }]}>${lookupEmployee.mcloones_bucks || 0}</Text>
-                      <Text style={[styles.bucksLabel, { marginTop: 2 }]}>{currencyName} Balance</Text>
-                    </View>
-
-                    {/* Employee Transactions */}
-                    <Text style={styles.sectionTitle}>Transaction History</Text>
-                    {lookupTransactions.length === 0 ? (
-                      <Text style={styles.emptyText}>No transactions found</Text>
-                    ) : (
-                      lookupTransactions.map((trans, index) => (
-                        <View key={trans.id || index} style={styles.transactionItem}>
-                          <View style={styles.transactionInfo}>
-                            <Text style={styles.transactionDescription}>{trans.description}</Text>
-                            <Text style={styles.transactionDate}>
-                              {new Date(trans.created_at).toLocaleDateString()}
-                            </Text>
-                            {!trans.is_visible && (
-                              <Text style={styles.hiddenBadge}>(hidden)</Text>
-                            )}
-                          </View>
-                          <View style={styles.transactionRight}>
-                            <Text
-                              style={[
-                                styles.transactionAmount,
-                                trans.amount > 0 ? styles.positiveAmount : styles.negativeAmount,
-                              ]}
-                            >
-                              {trans.amount > 0 ? '+' : ''}${trans.amount}
-                            </Text>
-                          </View>
-                        </View>
-                      ))
-                    )}
-                  </>
-                )}
-              </View>
-            ) : item === 'leaderboard' ? (
-              <View style={styles.section}>
-                {topEmployees.length === 0 ? (
-                  <Text style={styles.emptyText}>No leaderboard data yet</Text>
-                ) : (
-                  topEmployees.map((emp, index) => (
-                    <View key={emp.id || index} style={styles.leaderboardItem}>
-                      <View style={[styles.leaderboardRank, {
-                        backgroundColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : colors.primary,
-                      }]}>
-                        <Text style={styles.leaderboardRankText}>
-                          {index < 3 ? ['🥇', '🥈', '🥉'][index] : `#${index + 1}`}
-                        </Text>
-                      </View>
-                      <View style={styles.leaderboardInfo}>
-                        <Text style={styles.leaderboardName}>{emp.name}</Text>
-                        <Text style={styles.leaderboardJob}>{emp.job_title}</Text>
-                      </View>
-                      <Text style={styles.leaderboardBucks}>${emp.mcloones_bucks || 0}</Text>
-                    </View>
-                  ))
-                )}
-              </View>
-            ) : (
-              <View style={styles.section}>
-                {recentTransactions.length === 0 ? (
-                  <Text style={styles.emptyText}>{t('rewards_reviews_editor:no_transactions')}</Text>
-                ) : (
-                  recentTransactions.map((trans, index) => (
-                    <View key={trans.id || index} style={styles.transactionItem}>
-                      <View style={styles.transactionInfo}>
-                        <Text style={styles.transactionEmployee}>
-                          {trans.user_name || 'Unknown Employee'}
-                        </Text>
-                        <Text style={styles.transactionDescription}>{trans.description}</Text>
-                        <Text style={styles.transactionDate}>
-                          {new Date(trans.created_at).toLocaleDateString()}
-                        </Text>
-                        {!trans.is_visible && (
-                          <Text style={styles.hiddenBadge}>{t('rewards_reviews_editor:hidden_badge')}</Text>
-                        )}
-                      </View>
-                      <View style={styles.transactionRight}>
-                        <Text
-                          style={[
-                            styles.transactionAmount,
-                            trans.amount > 0 ? styles.positiveAmount : styles.negativeAmount,
-                          ]}
-                        >
-                          {trans.amount > 0 ? '+' : ''}${trans.amount}
-                        </Text>
-                        <View style={styles.transactionActions}>
-                          <TouchableOpacity
-                            onPress={() => handleEditTransaction(trans)}
-                            style={styles.actionIconButton}
-                          >
-                            <IconSymbol
-                              ios_icon_name="pencil.circle.fill"
-                              android_material_icon_name="edit"
-                              size={24}
-                              color={colors.primary}
-                            />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            onPress={() => handleHideTransaction(trans)}
-                            style={styles.actionIconButton}
-                          >
-                            <IconSymbol
-                              ios_icon_name={trans.is_visible ? 'eye.slash.fill' : 'eye.fill'}
-                              android_material_icon_name={trans.is_visible ? 'visibility-off' : 'visibility'}
-                              size={24}
-                              color={trans.is_visible ? '#FF9800' : '#4CAF50'}
-                            />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            onPress={() => handleDeleteTransaction(trans)}
-                            style={styles.actionIconButton}
-                          >
-                            <IconSymbol
-                              ios_icon_name="trash.fill"
-                              android_material_icon_name="delete"
-                              size={24}
-                              color="#F44336"
-                            />
-                          </TouchableOpacity>
-                        </View>
-                      </View>
-                    </View>
-                  ))
-                )}
-              </View>
-            )}
-              </ScrollView>
-            )}
-          />
+          <Text style={styles.idTitle}>{t('rewards_reviews_editor:title', 'Rewards & Reviews')}</Text>
+          <Text style={styles.idSub}>
+            {activeTab === 'rewards' ? t('rewards_reviews_editor:tab_rewards', 'Rewards') : t('rewards_reviews_editor:tab_reviews', 'Reviews')}
+          </Text>
         </View>
-      ) : (
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-          <>
-            {/* Action Buttons Row */}
-            <View style={styles.actionButtonsRow}>
-              <TouchableOpacity
-                style={[styles.actionButton, styles.rewardButton]}
-                onPress={() => {
-                  resetReviewForm();
-                  setShowReviewModal(true);
-                }}
-              >
-                <IconSymbol
-                  ios_icon_name="plus.circle.fill"
-                  android_material_icon_name="add-circle"
-                  size={24}
-                  color={colors.text}
-                />
-                <Text style={styles.actionButtonText}>{t('rewards_reviews_editor:add_review_button')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.actionButton, { backgroundColor: '#4285F4' }]}
-                onPress={handleRefreshGoogleReviews}
-                disabled={refreshingGoogle}
-              >
-                {refreshingGoogle ? (
-                  <ActivityIndicator size="small" color="#FFF" />
-                ) : (
-                  <IconSymbol
-                    ios_icon_name="arrow.clockwise"
-                    android_material_icon_name="refresh"
-                    size={24}
-                    color="#FFF"
-                  />
-                )}
-                <Text style={[styles.actionButtonText, { color: '#FFF' }]}>
-                  {refreshingGoogle ? t('rewards_reviews_editor:refreshing_reviews') : t('rewards_reviews_editor:refresh_google_reviews')}
-                </Text>
-                {!hasPremium && (
-                  <IconSymbol
-                    ios_icon_name="lock.fill"
-                    android_material_icon_name="lock"
-                    size={11}
-                    color="rgba(255,255,255,0.6)"
-                  />
-                )}
-              </TouchableOpacity>
-            </View>
+      </View>
 
-            {/* All Reviews List */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>{t('rewards_reviews_editor:guest_reviews_title')}</Text>
-              {allReviews.length === 0 ? (
-                <Text style={styles.emptyText}>{t('rewards_reviews_editor:no_reviews')}</Text>
-              ) : (
-                allReviews.map((review, index) => (
-                  <View key={review.id || index} style={styles.reviewCard}>
-                    {review.source === 'google' ? (
-                      <>
-                        <View style={styles.reviewHeader}>
-                          <View style={styles.reviewHeaderLeft}>
-                            <View style={styles.googleReviewAuthorRow}>
-                              {review.author_image ? (
-                                <Image
-                                  source={review.author_image}
-                                  style={styles.authorPhoto}
-                                  contentFit="cover"
-                                />
-                              ) : (
-                                <View style={[styles.authorPhotoFallback, { backgroundColor: colors.primary + '20' }]}>
-                                  <IconSymbol
-                                    ios_icon_name="person.fill"
-                                    android_material_icon_name="person"
-                                    size={18}
-                                    color={colors.primary}
-                                  />
-                                </View>
-                              )}
-                              <Text style={[styles.reviewGuestName, { flex: 1, marginBottom: 0 }]}>{review.author_title}</Text>
-                              <View style={styles.googleBadge}>
-                                <Text style={styles.googleBadgeText}>G</Text>
-                              </View>
-                            </View>
-                            {renderStars(review.review_rating)}
-                          </View>
-                          <View style={styles.reviewActions}>
-                            <TouchableOpacity onPress={() => handleHideGoogleReview(review)}>
-                              <IconSymbol
-                                ios_icon_name={review.is_published ? 'eye.fill' : 'eye.slash.fill'}
-                                android_material_icon_name={review.is_published ? 'visibility' : 'visibility-off'}
-                                size={28}
-                                color={review.is_published ? '#4CAF50' : '#FF9800'}
-                              />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                        {!review.is_published && (
-                          <Text style={styles.hiddenBadge}>{t('rewards_reviews_editor:hidden_review_badge')}</Text>
-                        )}
-                        {review.review_text ? (
-                          <Text style={styles.reviewText}>
-                            {getLocalizedField(review, 'review_text', language)}
-                          </Text>
-                        ) : null}
-                        {review.owner_answer ? (
-                          <View style={[styles.ownerReplyContainer, { borderLeftColor: colors.primary }]}>
-                            <Text style={[styles.ownerReplyLabel, { color: colors.primary }]}>
-                              {t('rewards_reviews_editor:owner_reply_label')}
-                            </Text>
-                            <Text style={styles.ownerReplyText}>
-                              {getLocalizedField(review, 'owner_answer', language)}
-                            </Text>
-                          </View>
-                        ) : null}
-                        <Text style={styles.reviewDate}>
-                          {new Date(review.review_datetime_utc).toLocaleDateString()}
-                        </Text>
-                      </>
-                    ) : (
-                      <>
-                        <View style={styles.reviewHeader}>
-                          <View style={styles.reviewHeaderLeft}>
-                            <Text style={styles.reviewGuestName}>{review.guest_name}</Text>
-                            {renderStars(review.rating)}
-                          </View>
-                          <View style={styles.reviewActions}>
-                            <TouchableOpacity onPress={() => handleEditReview(review)}>
-                              <IconSymbol
-                                ios_icon_name="pencil.circle.fill"
-                                android_material_icon_name="edit"
-                                size={28}
-                                color={colors.primary}
-                              />
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => handleDeleteReview(review.id)}>
-                              <IconSymbol
-                                ios_icon_name="trash.circle.fill"
-                                android_material_icon_name="delete"
-                                size={28}
-                                color="#F44336"
-                              />
-                            </TouchableOpacity>
-                          </View>
-                        </View>
-                        <Text style={styles.reviewText}>{review.review_text}</Text>
-                        <Text style={styles.reviewDate}>
-                          {new Date(review.review_date).toLocaleDateString()}
-                        </Text>
-                      </>
-                    )}
-                  </View>
-                ))
+      <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+        {/* Nav tiles — these REPLACE the tab bar (tap to switch views) */}
+        <View style={styles.navtiles}>
+          <Pressable
+            style={[styles.ntile, activeTab === 'rewards' && styles.ntileOn]}
+            onPress={() => {
+              if (activeTab !== 'rewards') { setActiveTab('rewards'); setBucksSettings(false); }
+              else if (isManagerOrOwner) { setBucksSettings((v) => !v); }
+            }}
+          >
+            {redeemGlow && isManagerOrOwner && activeTab === 'rewards' && !bucksSettings && (
+              <Animated.View
+                pointerEvents="none"
+                style={[StyleSheet.absoluteFill, { borderRadius: 18, borderWidth: 1.5, borderColor: colors.tint, opacity: glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.2, 0.95] }) }]}
+              />
+            )}
+            {activeTab !== 'rewards' && (
+              <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={14} color={colors.textSecondary} style={styles.goav} />
+            )}
+            {activeTab === 'rewards' && isManagerOrOwner && (
+              <IconSymbol ios_icon_name={bucksSettings ? 'arrow.uturn.backward' : 'gearshape.fill'} android_material_icon_name={bucksSettings ? 'undo' : 'settings'} size={13} color={colors.tint} style={styles.goav} />
+            )}
+            {bucksSettings && isManagerOrOwner ? (
+              <>
+                <View style={styles.nlblRow}>
+                  <IconSymbol ios_icon_name="gift.fill" android_material_icon_name="card-giftcard" size={13} color={colors.tint} />
+                  <Text style={[styles.nlbl, { color: colors.tint }]} numberOfLines={1}>{t('rewards_reviews_editor:redeem_label', 'Redeem')}</Text>
+                </View>
+                <Pressable style={styles.redeemSettingsBtn} onPress={openRedeemSettings}>
+                  <IconSymbol ios_icon_name="slider.horizontal.3" android_material_icon_name="tune" size={15} color={colors.fireText} />
+                  <Text style={styles.redeemSettingsTxt}>{t('rewards_reviews_editor:redeem_settings', 'Redeem Settings')}</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <View style={styles.nlblRow}>
+                  <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="paid" size={13} color={activeTab === 'rewards' ? colors.tint : colors.textSecondary} />
+                  <Text style={[styles.nlbl, activeTab === 'rewards' && { color: colors.tint }]} numberOfLines={1}>
+                    {t('rewards_reviews_editor:my_bucks_label', { currencyName, defaultValue: `My ${currencyName}` })}
+                  </Text>
+                </View>
+                <Text style={[styles.nnum, activeTab === 'rewards' && { color: colors.tint }]}>{myBucks.toLocaleString()}</Text>
+                <Text style={styles.nsub}>{t('rewards_reviews_editor:your_balance', 'Your balance')}</Text>
+              </>
+            )}
+          </Pressable>
+
+          <Pressable style={[styles.ntile, activeTab === 'reviews' && styles.ntileOn]} onPress={() => setActiveTab('reviews')}>
+            {activeTab !== 'reviews' && (
+              <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={14} color={colors.textSecondary} style={styles.goav} />
+            )}
+            <View style={styles.nlblRow}>
+              <IconSymbol ios_icon_name="star.fill" android_material_icon_name="star" size={13} color={activeTab === 'reviews' ? colors.tint : colors.textSecondary} />
+              <Text style={[styles.nlbl, activeTab === 'reviews' && { color: colors.tint }]} numberOfLines={1}>
+                {t('rewards_reviews_editor:tab_reviews', 'Reviews')}
+              </Text>
+            </View>
+            <View style={styles.nnumRow}>
+              <Text style={[styles.nnum, activeTab === 'reviews' && { color: colors.tint }]}>{ratingCount ? ratingAvg.toFixed(1) : '—'}</Text>
+              {ratingCount > 0 && (
+                <View style={styles.rtag}>
+                  <IconSymbol ios_icon_name="star.fill" android_material_icon_name="star" size={9} color="#FFD45E" />
+                  <Text style={styles.rtagTxt}>{t('rewards_reviews_editor:rating', 'Rating')}</Text>
+                </View>
               )}
             </View>
-          </>
-        </ScrollView>
-      )}
+            <Text style={styles.nsub}>{t('rewards_reviews_editor:n_google_reviews', { count: ratingCount, defaultValue: `${ratingCount} Google reviews` })}</Text>
+          </Pressable>
+        </View>
 
-      {/* Loading Overlay */}
+        {activeTab === 'rewards' ? renderRewards() : renderReviews()}
+      </ScrollView>
+
+      {renderRewardModal()}
+      {renderResetModal()}
+      {renderEditTransactionModal()}
+      {renderReviewModal()}
+
       {loading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={colors.primary} />
+        <View style={styles.loadingOverlay} pointerEvents="none">
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       )}
-
-      {/* Reward Modal */}
-      <Modal visible={showRewardModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('rewards_reviews_editor:reward_modal_title')}</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowRewardModal(false);
-                  resetRewardForm();
-                }}
-              >
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalForm}>
-              {/* Employee Search */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('rewards_reviews_editor:search_employee_label')}</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                  placeholder={t('rewards_reviews_editor:search_employee_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                />
-                {filteredEmployees.length > 0 && (
-                  <View style={styles.searchResults}>
-                    {filteredEmployees.map((emp, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.searchResultItem}
-                        onPress={() => {
-                          setSelectedEmployee(emp);
-                          setSearchQuery(emp.name);
-                          setFilteredEmployees([]);
-                        }}
-                      >
-                        <Text style={styles.searchResultName}>{emp.name}</Text>
-                        <Text style={styles.searchResultJob}>{emp.job_title}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                )}
-                {selectedEmployee && (
-                  <View style={styles.selectedEmployee}>
-                    <Text style={styles.selectedEmployeeText}>
-                      {t('rewards_reviews_editor:selected_prefix', { name: selectedEmployee.name })}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Reward/Deduct Toggle */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('rewards_reviews_editor:action_type_label')}</Text>
-                <View style={styles.toggleContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.toggleOptionButton,
-                      isReward && styles.toggleOptionButtonActive,
-                      isReward && styles.toggleOptionButtonReward,
-                    ]}
-                    onPress={() => setIsReward(true)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="plus.circle.fill"
-                      android_material_icon_name="add-circle"
-                      size={24}
-                      color={isReward ? '#FFFFFF' : colors.textSecondary}
-                    />
-                    <Text
-                      style={[
-                        styles.toggleOptionText,
-                        isReward && styles.toggleOptionTextActive,
-                      ]}
-                    >
-                      {t('rewards_reviews_editor:reward_action')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.toggleOptionButton,
-                      !isReward && styles.toggleOptionButtonActive,
-                      !isReward && styles.toggleOptionButtonDeduct,
-                    ]}
-                    onPress={() => setIsReward(false)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="minus.circle.fill"
-                      android_material_icon_name="remove-circle"
-                      size={24}
-                      color={!isReward ? '#FFFFFF' : colors.textSecondary}
-                    />
-                    <Text
-                      style={[
-                        styles.toggleOptionText,
-                        !isReward && styles.toggleOptionTextActive,
-                      ]}
-                    >
-                      {t('rewards_reviews_editor:deduct_action')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Amount */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('rewards_reviews_editor:amount_label')}</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={rewardAmount}
-                  onChangeText={setRewardAmount}
-                  placeholder={t('rewards_reviews_editor:amount_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                />
-                {rewardAmount && (
-                  <Text style={styles.amountPreview}>
-                    {isReward ? t('rewards_reviews_editor:amount_preview_add') : t('rewards_reviews_editor:amount_preview_deduct')}{' '}
-                    <Text style={{ color: isReward ? '#4CAF50' : '#F44336', fontWeight: 'bold' }}>
-                      {isReward ? '+' : '-'}${rewardAmount}
-                    </Text>
-                    {' '}{t('rewards_reviews_editor:amount_preview_suffix', { currencyName })}
-                  </Text>
-                )}
-              </View>
-
-              {/* Description */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('rewards_reviews_editor:description_label')}</Text>
-                <TextInput
-                  style={[styles.formInput, styles.textArea]}
-                  value={rewardDescription}
-                  onChangeText={setRewardDescription}
-                  placeholder={isReward ? t('rewards_reviews_editor:description_placeholder_reward') : t('rewards_reviews_editor:description_placeholder_deduct')}
-                  placeholderTextColor={colors.textSecondary}
-                  multiline
-                  numberOfLines={4}
-                />
-              </View>
-
-              {/* Visibility Toggle */}
-              <View style={styles.formField}>
-                <View style={styles.visibilityToggle}>
-                  <Text style={styles.formLabel}>{t('rewards_reviews_editor:visible_to_employees')}</Text>
-                  <TouchableOpacity
-                    style={[styles.toggleButton, isVisible && styles.toggleButtonActive]}
-                    onPress={() => setIsVisible(!isVisible)}
-                  >
-                    <View
-                      style={[
-                        styles.toggleCircle,
-                        isVisible && styles.toggleCircleActive,
-                      ]}
-                    />
-                  </TouchableOpacity>
-                </View>
-                <Text style={styles.formNote}>
-                  {t('rewards_reviews_editor:visibility_note')}
-                </Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={handleRewardEmployee}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color={colors.text} />
-                ) : (
-                  <Text style={styles.submitButtonText}>
-                    {isReward ? t('rewards_reviews_editor:submit_reward') : t('rewards_reviews_editor:submit_deduction')}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Reset Bucks Modal */}
-      <Modal visible={showResetBucksModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('rewards_reviews_editor:reset_modal_title', { currencyName })}</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowResetBucksModal(false);
-                  setResetSelectedEmployee(null);
-                  setResetSearchQuery('');
-                }}
-              >
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalForm}>
-              <Text style={styles.resetWarning}>
-                {t('rewards_reviews_editor:reset_warning')}
-              </Text>
-
-              {/* Reset Single User */}
-              <View style={styles.resetSection}>
-                <Text style={styles.resetSectionTitle}>{t('rewards_reviews_editor:reset_single_title')}</Text>
-                <View style={styles.formField}>
-                  <Text style={styles.formLabel}>{t('rewards_reviews_editor:search_reset_employee_label')}</Text>
-                  <TextInput
-                    style={styles.formInput}
-                    value={resetSearchQuery}
-                    onChangeText={setResetSearchQuery}
-                    placeholder={t('rewards_reviews_editor:search_employee_placeholder')}
-                    placeholderTextColor={colors.textSecondary}
-                  />
-                  {resetFilteredEmployees.length > 0 && (
-                    <View style={styles.searchResults}>
-                      {resetFilteredEmployees.map((emp, index) => (
-                        <TouchableOpacity
-                          key={index}
-                          style={styles.searchResultItem}
-                          onPress={() => {
-                            setResetSelectedEmployee(emp);
-                            setResetSearchQuery(emp.name);
-                            setResetFilteredEmployees([]);
-                          }}
-                        >
-                          <Text style={styles.searchResultName}>{emp.name}</Text>
-                          <Text style={styles.searchResultJob}>
-                            {emp.job_title} - Current: ${emp.mcloones_bucks || 0}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
-                  {resetSelectedEmployee && (
-                    <View style={styles.selectedEmployee}>
-                      <Text style={styles.selectedEmployeeText}>
-                        {t('rewards_reviews_editor:selected_prefix', { name: resetSelectedEmployee.name })}
-                      </Text>
-                      <Text style={styles.selectedEmployeeBalance}>
-                        Current Balance: ${resetSelectedEmployee.mcloones_bucks || 0}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                <TouchableOpacity
-                  style={[styles.submitButton, styles.resetSingleButton]}
-                  onPress={handleResetSingleUser}
-                  disabled={loading || !resetSelectedEmployee}
-                >
-                  {loading ? (
-                    <ActivityIndicator color={colors.text} />
-                  ) : (
-                    <Text style={styles.submitButtonText}>{t('rewards_reviews_editor:reset_selected_button')}</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-
-              {/* Divider */}
-              <View style={styles.divider} />
-
-              {/* Reset All Users */}
-              <View style={styles.resetSection}>
-                <Text style={styles.resetSectionTitle}>{t('rewards_reviews_editor:reset_all_title')}</Text>
-                <Text style={styles.resetAllWarning}>
-                  {t('rewards_reviews_editor:reset_all_warning', { currencyName })}
-                </Text>
-
-                <TouchableOpacity
-                  style={[styles.submitButton, styles.resetAllButton]}
-                  onPress={handleResetAllUsers}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <ActivityIndicator color={colors.text} />
-                  ) : (
-                    <Text style={styles.submitButtonText}>{t('rewards_reviews_editor:reset_all_button')}</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Edit Transaction Modal */}
-      <Modal visible={showEditTransactionModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('rewards_reviews_editor:edit_transaction_title')}</Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowEditTransactionModal(false);
-                  setEditingTransaction(null);
-                }}
-              >
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalForm}>
-              {/* Employee Info (Read-only) */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('rewards_reviews_editor:employee_label')}</Text>
-                <View style={[styles.formInput, styles.formInputDisabled]}>
-                  <Text style={styles.formInputTextDisabled}>
-                    {editingTransaction?.user_name || 'Unknown Employee'}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Reward/Deduct Toggle */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('rewards_reviews_editor:action_type_label')}</Text>
-                <View style={styles.toggleContainer}>
-                  <TouchableOpacity
-                    style={[
-                      styles.toggleOptionButton,
-                      editIsReward && styles.toggleOptionButtonActive,
-                      editIsReward && styles.toggleOptionButtonReward,
-                    ]}
-                    onPress={() => setEditIsReward(true)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="plus.circle.fill"
-                      android_material_icon_name="add-circle"
-                      size={24}
-                      color={editIsReward ? '#FFFFFF' : colors.textSecondary}
-                    />
-                    <Text
-                      style={[
-                        styles.toggleOptionText,
-                        editIsReward && styles.toggleOptionTextActive,
-                      ]}
-                    >
-                      {t('rewards_reviews_editor:reward_action')}
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.toggleOptionButton,
-                      !editIsReward && styles.toggleOptionButtonActive,
-                      !editIsReward && styles.toggleOptionButtonDeduct,
-                    ]}
-                    onPress={() => setEditIsReward(false)}
-                  >
-                    <IconSymbol
-                      ios_icon_name="minus.circle.fill"
-                      android_material_icon_name="remove-circle"
-                      size={24}
-                      color={!editIsReward ? '#FFFFFF' : colors.textSecondary}
-                    />
-                    <Text
-                      style={[
-                        styles.toggleOptionText,
-                        !editIsReward && styles.toggleOptionTextActive,
-                      ]}
-                    >
-                      {t('rewards_reviews_editor:deduct_action')}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Amount */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('rewards_reviews_editor:amount_label')}</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={editAmount}
-                  onChangeText={setEditAmount}
-                  placeholder={t('rewards_reviews_editor:amount_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                />
-                {editAmount && (
-                  <Text style={styles.amountPreview}>
-                    {editIsReward ? t('rewards_reviews_editor:amount_preview_add') : t('rewards_reviews_editor:amount_preview_deduct')}{' '}
-                    <Text style={{ color: editIsReward ? '#4CAF50' : '#F44336', fontWeight: 'bold' }}>
-                      {editIsReward ? '+' : '-'}${editAmount}
-                    </Text>
-                    {' '}{t('rewards_reviews_editor:amount_preview_suffix', { currencyName })}
-                  </Text>
-                )}
-              </View>
-
-              {/* Description */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('rewards_reviews_editor:description_label')}</Text>
-                <TextInput
-                  style={[styles.formInput, styles.textArea]}
-                  value={editDescription}
-                  onChangeText={setEditDescription}
-                  placeholder={editIsReward ? t('rewards_reviews_editor:description_placeholder_reward') : t('rewards_reviews_editor:description_placeholder_deduct')}
-                  placeholderTextColor={colors.textSecondary}
-                  multiline
-                  numberOfLines={4}
-                />
-              </View>
-
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={handleSaveEditTransaction}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color={colors.text} />
-                ) : (
-                  <Text style={styles.submitButtonText}>{t('rewards_reviews_editor:save_changes')}</Text>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Review Modal */}
-      <Modal visible={showReviewModal} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingReview ? t('rewards_reviews_editor:edit_review_modal_title') : t('rewards_reviews_editor:add_review_modal_title')}
-              </Text>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowReviewModal(false);
-                  resetReviewForm();
-                }}
-              >
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.modalForm}>
-              {/* Guest Name */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('rewards_reviews_editor:guest_name_label')}</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={reviewForm.guest_name}
-                  onChangeText={(text) =>
-                    setReviewForm({ ...reviewForm, guest_name: text })
-                  }
-                  placeholder={t('rewards_reviews_editor:guest_name_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-
-              {/* Rating */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('rewards_reviews_editor:rating_label')}</Text>
-                <View style={styles.ratingSelector}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <TouchableOpacity
-                      key={star}
-                      onPress={() => setReviewForm({ ...reviewForm, rating: star })}
-                    >
-                      <IconSymbol
-                        ios_icon_name={star <= reviewForm.rating ? 'star.fill' : 'star'}
-                        android_material_icon_name={
-                          star <= reviewForm.rating ? 'star' : 'star-border'
-                        }
-                        size={40}
-                        color={star <= reviewForm.rating ? '#FFD700' : colors.textSecondary}
-                      />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Review Text */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('rewards_reviews_editor:review_label')}</Text>
-                <TextInput
-                  style={[styles.formInput, styles.textArea]}
-                  value={reviewForm.review_text}
-                  onChangeText={(text) =>
-                    setReviewForm({ ...reviewForm, review_text: text })
-                  }
-                  placeholder={t('rewards_reviews_editor:review_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                  multiline
-                  numberOfLines={6}
-                />
-              </View>
-
-              {/* Review Date */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('rewards_reviews_editor:review_date_label')}</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={reviewForm.review_date}
-                  onChangeText={(text) =>
-                    setReviewForm({ ...reviewForm, review_date: text })
-                  }
-                  placeholder={t('rewards_reviews_editor:review_date_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                />
-              </View>
-
-              {/* Display Order */}
-              <View style={styles.formField}>
-                <Text style={styles.formLabel}>{t('rewards_reviews_editor:display_order_label')}</Text>
-                <TextInput
-                  style={styles.formInput}
-                  value={reviewForm.display_order.toString()}
-                  onChangeText={(text) =>
-                    setReviewForm({ ...reviewForm, display_order: parseInt(text) || 0 })
-                  }
-                  placeholder={t('rewards_reviews_editor:display_order_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                  keyboardType="numeric"
-                />
-              </View>
-
-              <TouchableOpacity
-                style={styles.submitButton}
-                onPress={handleSaveReview}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color={colors.text} />
-                ) : (
-                  <Text style={styles.submitButtonText}>
-                    {editingReview ? t('rewards_reviews_editor:update_review_button') : t('rewards_reviews_editor:add_review_submit')}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
     </KeyboardAvoidingView>
   );
+
+  // ── Rewards view ───────────────────────────────────────────────────────
+  function renderRewards() {
+    return (
+      <>
+        {isManagerOrOwner && (
+          <View style={styles.acts}>
+            <Pressable style={styles.act} onPress={() => { setIsReward(true); setShowRewardModal(true); }}>
+              <IconSymbol ios_icon_name="gift.fill" android_material_icon_name="card-giftcard" size={21} color={colors.tint} />
+              <Text style={styles.actTxt}>{t('rewards_ui:manager_reward', 'Reward')}</Text>
+            </Pressable>
+            <Pressable style={styles.act} onPress={() => { setIsReward(false); setShowRewardModal(true); }}>
+              <IconSymbol ios_icon_name="minus.circle.fill" android_material_icon_name="remove-circle" size={21} color={colors.tint} />
+              <Text style={styles.actTxt}>{t('rewards_ui:manager_deduct', 'Deduct')}</Text>
+            </Pressable>
+            <Pressable style={styles.act} onPress={() => setShowResetBucksModal(true)}>
+              <IconSymbol ios_icon_name="arrow.counterclockwise.circle.fill" android_material_icon_name="refresh" size={21} color={colors.tint} />
+              <Text style={styles.actTxt}>{t('rewards_ui:manager_reset', 'Reset')}</Text>
+            </Pressable>
+            <Pressable style={styles.act} onPress={() => router.push('/manager-approvals' as any)}>
+              {pendingCount > 0 && <View style={styles.actBadge}><Text style={styles.actBadgeTxt}>{pendingCount}</Text></View>}
+              <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={21} color={colors.tint} />
+              <Text style={styles.actTxt}>{t('rewards_ui:manager_approvals', 'Approve')}</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {/* Sub-tabs */}
+        <View style={styles.sub3}>
+          {SUB_PAGES.map((p) => {
+            const on = rewardsSubTab === p;
+            const meta = p === 'leaderboard'
+              ? { ios: 'trophy.fill', android: 'emoji-events', label: t('rewards_ui:tab_leaderboard', 'Leaderboard') }
+              : p === 'recent'
+              ? { ios: 'clock.fill', android: 'history', label: t('rewards_ui:tab_recent_short', 'Recent') }
+              : { ios: 'magnifyingglass', android: 'search', label: t('rewards_ui:tab_lookup', 'Lookup') };
+            return (
+              <Pressable key={p} style={[styles.sub3Item, on && styles.sub3On]} onPress={() => goToSubTab(p)}>
+                <IconSymbol ios_icon_name={meta.ios} android_material_icon_name={meta.android} size={14} color={on ? colors.text : colors.textSecondary} />
+                <Text style={[styles.sub3Txt, on && { color: colors.text }]} numberOfLines={1}>{meta.label}</Text>
+                {p === 'recent' && managerRecentHasNew && !on && <View style={styles.sub3Dot} />}
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {rewardsSubTab === 'leaderboard'
+          ? renderLeaderboard()
+          : rewardsSubTab === 'recent'
+          ? renderRecent()
+          : renderLookup()}
+      </>
+    );
+  }
+
+  function renderLeaderboard() {
+    return (
+      <View style={styles.pad2}>
+        <Text style={styles.zlabel}>{t('rewards_ui:tab_leaderboard', 'Leaderboard')}</Text>
+        {topEmployees.length === 0 ? (
+          <Text style={styles.empty}>{t('rewards_reviews_editor:no_leaderboard', 'No leaderboard data yet')}</Text>
+        ) : (
+          topEmployees.map((emp, i) => (
+            <GlassCard key={emp.id} variant="surface" radius={15} style={styles.lcard}>
+              <View style={[styles.medal, i === 0 ? styles.mGold : i === 1 ? styles.mSilver : i === 2 ? styles.mBronze : styles.mNeutral]}>
+                <Text style={[styles.medalTxt, i > 2 && { color: colors.tint }]}>{i + 1}</Text>
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.lname} numberOfLines={1}>{emp.name}</Text>
+                <Text style={styles.ljob} numberOfLines={1}>{emp.job_title}</Text>
+              </View>
+              <Text style={styles.lbucks}>${(emp.mcloones_bucks || 0).toLocaleString()}</Text>
+            </GlassCard>
+          ))
+        )}
+      </View>
+    );
+  }
+
+  function renderRecent() {
+    return (
+      <View style={styles.pad2}>
+        <Text style={styles.zlabel}>{t('rewards_ui:tab_recent_short', 'Recent Awards')}</Text>
+        {recentTransactions.length === 0 ? (
+          <Text style={styles.empty}>{t('rewards_reviews_editor:no_transactions', 'No recent activity')}</Text>
+        ) : (
+          recentTransactions.map((trans) => (
+            <GlassCard key={trans.id} variant="surface" radius={15} style={styles.txCard}>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.txName} numberOfLines={1}>
+                  {trans.user_name}
+                  {!trans.is_visible && <Text style={styles.hiddenTag}>  {t('rewards_reviews_editor:hidden_badge', '(hidden)')}</Text>}
+                </Text>
+                <Text style={styles.txDesc} numberOfLines={2}>{trans.description}</Text>
+                <Text style={styles.txDate}>{new Date(trans.created_at).toLocaleDateString()}</Text>
+              </View>
+              <View style={styles.txRight}>
+                <Text style={[styles.txAmt, { color: trans.amount > 0 ? '#34C759' : '#FF6B6B' }]}>
+                  {trans.amount > 0 ? '+' : '-'}${Math.abs(trans.amount)}
+                </Text>
+                {isManagerOrOwner && (
+                  <View style={styles.txIcons}>
+                    <Pressable onPress={() => handleEditTransaction(trans)} hitSlop={6}>
+                      <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={17} color={colors.tint} />
+                    </Pressable>
+                    <Pressable onPress={() => handleHideTransaction(trans)} hitSlop={6}>
+                      <IconSymbol
+                        ios_icon_name={trans.is_visible ? 'eye.slash.fill' : 'eye.fill'}
+                        android_material_icon_name={trans.is_visible ? 'visibility-off' : 'visibility'}
+                        size={17}
+                        color={trans.is_visible ? '#E0A23C' : '#34C759'}
+                      />
+                    </Pressable>
+                    <Pressable onPress={() => handleDeleteTransaction(trans)} hitSlop={6}>
+                      <IconSymbol ios_icon_name="trash.fill" android_material_icon_name="delete" size={17} color="#FF6B6B" />
+                    </Pressable>
+                  </View>
+                )}
+              </View>
+            </GlassCard>
+          ))
+        )}
+      </View>
+    );
+  }
+
+  function renderLookup() {
+    return (
+      <View style={styles.pad2}>
+        <GlassCard variant="glass" radius={14} style={styles.searchBar}>
+          <IconSymbol ios_icon_name="magnifyingglass" android_material_icon_name="search" size={17} color={colors.textSecondary} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder={t('rewards_reviews_editor:lookup_placeholder', 'Search employee by name…')}
+            placeholderTextColor={colors.textSecondary}
+            value={lookupSearchQuery}
+            onChangeText={setLookupSearchQuery}
+          />
+        </GlassCard>
+
+        {lookupFilteredEmployees.length > 0 && !lookupEmployee && (
+          <View style={styles.resultList}>
+            {lookupFilteredEmployees.slice(0, 5).map((emp) => (
+              <Pressable key={emp.id} style={styles.resultRow} onPress={() => handleSelectLookupEmployee(emp)}>
+                <Text style={styles.resultName}>{emp.name}</Text>
+                <Text style={styles.resultSub}>{emp.job_title} · ${emp.mcloones_bucks || 0}</Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        {lookupEmployee && (
+          <>
+            <GlassCard variant="surface" radius={16} style={styles.lookupCard}>
+              <Text style={styles.lookupName}>{lookupEmployee.name}</Text>
+              <Text style={styles.lookupJob}>{lookupEmployee.job_title}</Text>
+              <Text style={styles.lookupBucks}>${(lookupEmployee.mcloones_bucks || 0).toLocaleString()}</Text>
+              <Text style={styles.lookupBal}>{t('rewards_reviews_editor:balance_label', { currencyName, defaultValue: `${currencyName} Balance` })}</Text>
+            </GlassCard>
+            <Text style={styles.zlabel}>{t('rewards_reviews_editor:transaction_history', 'Transaction History')}</Text>
+            {lookupTransactions.length === 0 ? (
+              <Text style={styles.empty}>{t('rewards_reviews_editor:no_transactions_found', 'No transactions found')}</Text>
+            ) : (
+              lookupTransactions.map((trans) => (
+                <GlassCard key={trans.id} variant="surface" radius={14} style={styles.txCard}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.txDesc} numberOfLines={2}>{trans.description}</Text>
+                    <Text style={styles.txDate}>{new Date(trans.created_at).toLocaleDateString()}</Text>
+                  </View>
+                  <Text style={[styles.txAmt, { color: trans.amount > 0 ? '#34C759' : '#FF6B6B' }]}>
+                    {trans.amount > 0 ? '+' : '-'}${Math.abs(trans.amount)}
+                  </Text>
+                </GlassCard>
+              ))
+            )}
+          </>
+        )}
+      </View>
+    );
+  }
+
+  // ── Reviews view ───────────────────────────────────────────────────────
+  function renderReviews() {
+    return (
+      <View>
+        <View style={styles.rvbtns}>
+          {isManagerOrOwner && (
+            <Pressable style={[styles.rvb, styles.rvbAdd]} onPress={() => { resetReviewForm(); setShowReviewModal(true); }}>
+              <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={17} color={colors.text} />
+              <Text style={[styles.rvbTxt, { color: colors.text }]}>{t('rewards_reviews_editor:add_review_button', 'Add Review')}</Text>
+            </Pressable>
+          )}
+          {isOwner && (
+            <Pressable style={[styles.rvb, styles.rvbRef]} onPress={handleRefreshGoogleReviews} disabled={refreshingGoogle}>
+              {refreshingGoogle ? (
+                <ActivityIndicator size="small" color={colors.blueText} />
+              ) : (
+                <>
+                  <IconSymbol ios_icon_name="arrow.clockwise" android_material_icon_name="refresh" size={16} color={colors.blueText} />
+                  <Text style={[styles.rvbTxt, { color: colors.blueText }]}>{t('rewards_reviews_editor:refresh_short', 'Refresh')}</Text>
+                  {refreshRemaining !== null && (
+                    <View style={styles.refLim}><Text style={styles.refLimTxt}>{t('rewards_reviews_editor:n_left', { count: refreshRemaining, defaultValue: `${refreshRemaining} left` })}</Text></View>
+                  )}
+                </>
+              )}
+            </Pressable>
+          )}
+        </View>
+
+        <Text style={styles.zlabel}>{t('rewards_reviews_editor:guest_reviews_title', 'Guest reviews')}</Text>
+        {allReviews.length === 0 ? (
+          <Text style={styles.empty}>{t('rewards_reviews_editor:no_reviews', 'No reviews yet')}</Text>
+        ) : (
+          allReviews.map((review) =>
+            review.source === 'google' ? renderGoogleReview(review) : renderManualReview(review)
+          )
+        )}
+      </View>
+    );
+  }
+
+  function renderGoogleReview(review: GoogleReview & { source: 'google' }) {
+    const text = getLocalizedField(review as any, 'review_text', language);
+    const reply = getLocalizedField(review as any, 'owner_answer', language);
+    return (
+      <GlassCard key={review.id} variant="surface" radius={16} style={styles.rev}>
+        <View style={styles.rvHead}>
+          {review.author_image ? (
+            <Image source={{ uri: review.author_image }} style={styles.rvAvImg} />
+          ) : (
+            <View style={styles.rvAv}><IconSymbol ios_icon_name="person.fill" android_material_icon_name="person" size={16} color={colors.tint} /></View>
+          )}
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.rvName} numberOfLines={1}>{review.author_title}</Text>
+            {renderStars(review.review_rating, 12)}
+          </View>
+          <View style={styles.gBadge}><Text style={styles.gBadgeTxt}>G</Text></View>
+          {isManagerOrOwner && (
+            <Pressable onPress={() => handleHideGoogleReview(review)} hitSlop={6} style={{ marginLeft: 8 }}>
+              <IconSymbol
+                ios_icon_name={review.is_published ? 'eye.fill' : 'eye.slash.fill'}
+                android_material_icon_name={review.is_published ? 'visibility' : 'visibility-off'}
+                size={18}
+                color={review.is_published ? '#34C759' : '#E0A23C'}
+              />
+            </Pressable>
+          )}
+        </View>
+        {!review.is_published && <Text style={styles.hiddenTag}>{t('rewards_reviews_editor:hidden_review_badge', '(hidden)')}</Text>}
+        {!!text && <Text style={styles.rvText}>{text}</Text>}
+        {!!reply && (
+          <View style={styles.rvReply}>
+            <Text style={styles.rvReplyLbl}>{t('rewards_reviews_editor:owner_reply_label', 'Owner reply')}</Text>
+            <Text style={styles.rvReplyTxt}>{reply}</Text>
+          </View>
+        )}
+        <Text style={styles.rvDate}>{new Date(review.review_datetime_utc).toLocaleDateString()}</Text>
+      </GlassCard>
+    );
+  }
+
+  function renderManualReview(review: GuestReview & { source: 'manual' }) {
+    return (
+      <GlassCard key={review.id} variant="surface" radius={16} style={styles.rev}>
+        <View style={styles.rvHead}>
+          <View style={styles.rvAv}><Text style={styles.rvAvTxt}>{review.guest_name?.charAt(0)?.toUpperCase() || '?'}</Text></View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={styles.rvName} numberOfLines={1}>{review.guest_name}</Text>
+            {renderStars(review.rating, 12)}
+          </View>
+          {isManagerOrOwner && (
+            <View style={styles.txIcons}>
+              <Pressable onPress={() => handleEditReview(review)} hitSlop={6}>
+                <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={17} color={colors.tint} />
+              </Pressable>
+              <Pressable onPress={() => handleDeleteReview(review.id)} hitSlop={6}>
+                <IconSymbol ios_icon_name="trash.fill" android_material_icon_name="delete" size={17} color="#FF6B6B" />
+              </Pressable>
+            </View>
+          )}
+        </View>
+        {!!review.review_text && <Text style={styles.rvText}>{review.review_text}</Text>}
+        <Text style={styles.rvDate}>{new Date(review.review_date).toLocaleDateString()}</Text>
+      </GlassCard>
+    );
+  }
+
+  // ── Modals (glass bottom sheets) ───────────────────────────────────────
+  function renderRewardModal() {
+    return (
+      <Modal visible={showRewardModal} transparent animationType="slide" onRequestClose={() => setShowRewardModal(false)}>
+        {sheetShell(isReward ? t('rewards_reviews_editor:reward_modal_title', 'Reward an Employee') : t('rewards_reviews_editor:deduct_modal_title', 'Deduct Bucks'), () => { setShowRewardModal(false); resetRewardForm(); }, (<>
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:search_employee_label', 'Employee')}</Text>
+          {selectedEmployee ? (
+            <View style={styles.echip}>
+              <View style={styles.echipAv}><Text style={styles.echipAvTxt}>{selectedEmployee.name.charAt(0).toUpperCase()}</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.echipName}>{selectedEmployee.name}</Text>
+                <Text style={styles.echipJob}>{selectedEmployee.job_title}</Text>
+              </View>
+              <Pressable onPress={() => { setSelectedEmployee(null); setSearchQuery(''); }} hitSlop={8}>
+                <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={20} color={colors.textSecondary} />
+              </Pressable>
+            </View>
+          ) : (
+            <>
+              <GlassCard variant="glass" radius={13} style={styles.searchBar}>
+                <IconSymbol ios_icon_name="magnifyingglass" android_material_icon_name="search" size={17} color={colors.textSecondary} />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder={t('rewards_reviews_editor:search_employee_placeholder', 'Search by name…')}
+                  placeholderTextColor={colors.textSecondary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
+                />
+              </GlassCard>
+              {filteredEmployees.slice(0, 6).map((emp) => (
+                <Pressable key={emp.id} style={styles.resultRow} onPress={() => { setSelectedEmployee(emp); setSearchQuery(emp.name); setFilteredEmployees([]); }}>
+                  <Text style={styles.resultName}>{emp.name}</Text>
+                  <Text style={styles.resultSub}>{emp.job_title}</Text>
+                </Pressable>
+              ))}
+            </>
+          )}
+
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:action_type_label', 'Action')}</Text>
+          <View style={styles.rdseg}>
+            <Pressable style={[styles.rdopt, isReward && styles.rdoptGood]} onPress={() => setIsReward(true)}>
+              <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={18} color={isReward ? '#34C759' : colors.textSecondary} />
+              <Text style={[styles.rdoptTxt, isReward && { color: '#34C759' }]}>{t('rewards_reviews_editor:reward_action', 'Reward')}</Text>
+            </Pressable>
+            <Pressable style={[styles.rdopt, !isReward && styles.rdoptBad]} onPress={() => setIsReward(false)}>
+              <IconSymbol ios_icon_name="minus.circle.fill" android_material_icon_name="remove-circle" size={18} color={!isReward ? '#FF6B6B' : colors.textSecondary} />
+              <Text style={[styles.rdoptTxt, !isReward && { color: '#FF6B6B' }]}>{t('rewards_reviews_editor:deduct_action', 'Deduct')}</Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:amount_label', 'Amount')}</Text>
+          <TextInput
+            style={styles.finput}
+            placeholder={t('rewards_reviews_editor:amount_placeholder', 'Enter amount')}
+            placeholderTextColor={colors.textSecondary}
+            value={rewardAmount}
+            onChangeText={setRewardAmount}
+            keyboardType="numeric"
+          />
+          {amountPreview(rewardAmount, isReward)}
+
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:description_label', 'Reason')}</Text>
+          <TextInput
+            style={styles.farea}
+            placeholder={isReward ? t('rewards_reviews_editor:description_placeholder_reward', 'What is this reward for?') : t('rewards_reviews_editor:description_placeholder_deduct', 'Reason for the deduction')}
+            placeholderTextColor={colors.textSecondary}
+            value={rewardDescription}
+            onChangeText={setRewardDescription}
+            multiline
+          />
+
+          <View style={styles.toggleRow}>
+            <Pressable style={[styles.tsw, { backgroundColor: isVisible ? '#34C759' : colors.glassBorder }]} onPress={() => setIsVisible(!isVisible)}>
+              <View style={[styles.tswKnob, { alignSelf: isVisible ? 'flex-end' : 'flex-start' }]} />
+            </Pressable>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.tglTxt}>{t('rewards_reviews_editor:visible_to_employees', 'Visible to employee')}</Text>
+              <Text style={styles.tglSub}>{t('rewards_reviews_editor:visibility_note', "They'll see this in their feed")}</Text>
+            </View>
+          </View>
+
+          <Pressable style={styles.msubmit} onPress={handleRewardEmployee} disabled={loading}>
+            <IconSymbol ios_icon_name={isReward ? 'gift.fill' : 'minus.circle.fill'} android_material_icon_name={isReward ? 'card-giftcard' : 'remove-circle'} size={18} color={colors.fireText} />
+            <Text style={styles.msubmitTxt}>{isReward ? t('rewards_reviews_editor:submit_reward', 'Give Reward') : t('rewards_reviews_editor:submit_deduction', 'Deduct Bucks')}</Text>
+          </Pressable>
+        </>))}
+      </Modal>
+    );
+  }
+
+  function renderResetModal() {
+    return (
+      <Modal visible={showResetBucksModal} transparent animationType="slide" onRequestClose={() => setShowResetBucksModal(false)}>
+        {sheetShell(t('rewards_reviews_editor:reset_modal_title', { currencyName, defaultValue: `Reset ${currencyName}` }), () => setShowResetBucksModal(false), (<>
+          <View style={styles.warnBox}><Text style={styles.warnTxt}>{t('rewards_reviews_editor:reset_warning', 'Resetting deletes all transactions and zeroes the balance. This cannot be undone.')}</Text></View>
+
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:reset_single_title', 'Reset a single user')}</Text>
+          <GlassCard variant="glass" radius={13} style={styles.searchBar}>
+            <IconSymbol ios_icon_name="magnifyingglass" android_material_icon_name="search" size={17} color={colors.textSecondary} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={t('rewards_reviews_editor:search_employee_placeholder', 'Search by name…')}
+              placeholderTextColor={colors.textSecondary}
+              value={resetSearchQuery}
+              onChangeText={setResetSearchQuery}
+            />
+          </GlassCard>
+          {resetFilteredEmployees.slice(0, 6).map((emp) => (
+            <Pressable key={emp.id} style={styles.resultRow} onPress={() => { setResetSelectedEmployee(emp); setResetSearchQuery(emp.name); setResetFilteredEmployees([]); }}>
+              <Text style={styles.resultName}>{emp.name}</Text>
+              <Text style={styles.resultSub}>{emp.job_title} · ${emp.mcloones_bucks || 0}</Text>
+            </Pressable>
+          ))}
+          {resetSelectedEmployee && (
+            <View style={styles.echip}>
+              <View style={styles.echipAv}><Text style={styles.echipAvTxt}>{resetSelectedEmployee.name.charAt(0).toUpperCase()}</Text></View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.echipName}>{resetSelectedEmployee.name}</Text>
+                <Text style={styles.echipJob}>{t('rewards_reviews_editor:current_balance', { defaultValue: 'Current' })}: ${resetSelectedEmployee.mcloones_bucks || 0}</Text>
+              </View>
+            </View>
+          )}
+          <Pressable style={[styles.msubmit, { backgroundColor: '#E0A23C' }]} onPress={handleResetSingleUser} disabled={!resetSelectedEmployee || loading}>
+            <Text style={styles.msubmitTxt}>{t('rewards_reviews_editor:reset_selected_button', 'Reset Selected User')}</Text>
+          </Pressable>
+
+          <View style={styles.divider} />
+
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:reset_all_title', 'Reset everyone')}</Text>
+          <Text style={styles.resetAllWarn}>{t('rewards_reviews_editor:reset_all_warning', { currencyName, defaultValue: `Zeroes ${currencyName} for ALL employees.` })}</Text>
+          <Pressable style={[styles.msubmit, { backgroundColor: '#FF6B6B' }]} onPress={handleResetAllUsers} disabled={loading}>
+            <Text style={styles.msubmitTxt}>{t('rewards_reviews_editor:reset_all_button', 'Reset All Users')}</Text>
+          </Pressable>
+        </>))}
+      </Modal>
+    );
+  }
+
+  function renderEditTransactionModal() {
+    return (
+      <Modal visible={showEditTransactionModal} transparent animationType="slide" onRequestClose={() => setShowEditTransactionModal(false)}>
+        {sheetShell(t('rewards_reviews_editor:edit_transaction_title', 'Edit Transaction'), () => { setShowEditTransactionModal(false); setEditingTransaction(null); }, (<>
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:employee_label', 'Employee')}</Text>
+          <View style={[styles.finput, { justifyContent: 'center', opacity: 0.7 }]}><Text style={{ color: colors.textSecondary, fontFamily: fonts.body.regular }}>{editingTransaction?.user_name}</Text></View>
+
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:action_type_label', 'Action')}</Text>
+          <View style={styles.rdseg}>
+            <Pressable style={[styles.rdopt, editIsReward && styles.rdoptGood]} onPress={() => setEditIsReward(true)}>
+              <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={18} color={editIsReward ? '#34C759' : colors.textSecondary} />
+              <Text style={[styles.rdoptTxt, editIsReward && { color: '#34C759' }]}>{t('rewards_reviews_editor:reward_action', 'Reward')}</Text>
+            </Pressable>
+            <Pressable style={[styles.rdopt, !editIsReward && styles.rdoptBad]} onPress={() => setEditIsReward(false)}>
+              <IconSymbol ios_icon_name="minus.circle.fill" android_material_icon_name="remove-circle" size={18} color={!editIsReward ? '#FF6B6B' : colors.textSecondary} />
+              <Text style={[styles.rdoptTxt, !editIsReward && { color: '#FF6B6B' }]}>{t('rewards_reviews_editor:deduct_action', 'Deduct')}</Text>
+            </Pressable>
+          </View>
+
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:amount_label', 'Amount')}</Text>
+          <TextInput style={styles.finput} value={editAmount} onChangeText={setEditAmount} keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
+          {amountPreview(editAmount, editIsReward)}
+
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:description_label', 'Reason')}</Text>
+          <TextInput style={styles.farea} value={editDescription} onChangeText={setEditDescription} multiline placeholderTextColor={colors.textSecondary} />
+
+          <Pressable style={styles.msubmit} onPress={handleSaveEditTransaction} disabled={loading}>
+            <Text style={styles.msubmitTxt}>{t('rewards_reviews_editor:save_changes', 'Save Changes')}</Text>
+          </Pressable>
+        </>))}
+      </Modal>
+    );
+  }
+
+  function renderReviewModal() {
+    return (
+      <Modal visible={showReviewModal} transparent animationType="slide" onRequestClose={() => setShowReviewModal(false)}>
+        {sheetShell(editingReview ? t('rewards_reviews_editor:edit_review_modal_title', 'Edit Review') : t('rewards_reviews_editor:add_review_modal_title', 'Add Review'), () => { setShowReviewModal(false); resetReviewForm(); }, (<>
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:guest_name_label', 'Guest name')}</Text>
+          <TextInput
+            style={styles.finput}
+            placeholder={t('rewards_reviews_editor:guest_name_placeholder', 'Guest name')}
+            placeholderTextColor={colors.textSecondary}
+            value={reviewForm.guest_name}
+            onChangeText={(v) => setReviewForm({ ...reviewForm, guest_name: v })}
+          />
+
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:rating_label', 'Rating')}</Text>
+          <View style={styles.starsPick}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Pressable key={star} onPress={() => setReviewForm({ ...reviewForm, rating: star })} hitSlop={4}>
+                <IconSymbol
+                  ios_icon_name={star <= reviewForm.rating ? 'star.fill' : 'star'}
+                  android_material_icon_name={star <= reviewForm.rating ? 'star' : 'star-border'}
+                  size={36}
+                  color={star <= reviewForm.rating ? '#FFD45E' : colors.textSecondary}
+                />
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:review_label', 'Review')}</Text>
+          <TextInput
+            style={[styles.farea, { minHeight: 110 }]}
+            placeholder={t('rewards_reviews_editor:review_placeholder', 'What did they say?')}
+            placeholderTextColor={colors.textSecondary}
+            value={reviewForm.review_text}
+            onChangeText={(v) => setReviewForm({ ...reviewForm, review_text: v })}
+            multiline
+          />
+
+          <Text style={styles.flbl}>{t('rewards_reviews_editor:review_date_label', 'Date')}</Text>
+          <TextInput
+            style={styles.finput}
+            placeholder={t('rewards_reviews_editor:review_date_placeholder', 'YYYY-MM-DD')}
+            placeholderTextColor={colors.textSecondary}
+            value={reviewForm.review_date}
+            onChangeText={(v) => setReviewForm({ ...reviewForm, review_date: v })}
+          />
+
+          <Pressable style={styles.msubmit} onPress={handleSaveReview} disabled={loading}>
+            <Text style={styles.msubmitTxt}>{editingReview ? t('rewards_reviews_editor:update_review_button', 'Update Review') : t('rewards_reviews_editor:add_review_submit', 'Add Review')}</Text>
+          </Pressable>
+        </>))}
+      </Modal>
+    );
+  }
+
+  // Styles are declared after the render functions but hoisted into scope via
+  // the `styles` const below (created once per theme change).
 }
+
+const makeStyles = (colors: ReturnType<typeof useThemeColors>) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    idbar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 6, zIndex: 5 },
+    bk: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.glass, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' },
+    idTitle: { fontFamily: fonts.display.bold, fontSize: 19, color: colors.text, letterSpacing: -0.3 },
+    idSub: { fontFamily: fonts.mono.semibold, fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.tint, marginTop: 2 },
+
+    screen: { flex: 1, zIndex: 2 },
+    screenContent: { paddingHorizontal: 16, paddingBottom: 60 },
+
+    navtiles: { flexDirection: 'row', gap: 10, marginTop: 9 },
+    ntile: { flex: 1, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth + 0.5, borderColor: colors.surfaceBorder, backgroundColor: colors.surface, padding: 13, overflow: 'hidden' },
+    ntileOn: { borderColor: colors.tint + '5C', backgroundColor: colors.tint + '1C' },
+    goav: { position: 'absolute', top: 13, right: 12, opacity: 0.5 },
+    nlblRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    nlbl: { fontFamily: fonts.mono.medium, fontSize: 9, letterSpacing: 0.6, textTransform: 'uppercase', color: colors.textSecondary, flexShrink: 1 },
+    nnum: { fontFamily: fonts.mono.semibold, fontSize: 28, letterSpacing: -1, color: colors.text, marginTop: 9 },
+    nnumRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 9 },
+    nsub: { fontFamily: fonts.mono.medium, fontSize: 9, color: colors.textSecondary, marginTop: 6 },
+    rtag: { flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFD45E26', borderWidth: StyleSheet.hairlineWidth, borderColor: '#FFD45E52', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 },
+    redeemSettingsBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 38, borderRadius: 11, backgroundColor: colors.primary, marginTop: 12 },
+    redeemSettingsTxt: { fontFamily: fonts.display.semibold, fontSize: 11.5, color: colors.fireText },
+    rtagTxt: { fontFamily: fonts.mono.semibold, fontSize: 8, letterSpacing: 0.4, textTransform: 'uppercase', color: '#E0A23C' },
+
+    acts: { flexDirection: 'row', gap: 8, marginTop: 11 },
+    act: { flex: 1, borderRadius: 15, borderWidth: StyleSheet.hairlineWidth + 0.5, borderColor: colors.surfaceBorder, backgroundColor: colors.surface, paddingVertical: 12, alignItems: 'center', gap: 7 },
+    actTxt: { fontFamily: fonts.display.semibold, fontSize: 11, color: colors.text },
+    actBadge: { position: 'absolute', top: -6, right: -5, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: '#FF6B6B', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4, borderWidth: 2, borderColor: colors.background, zIndex: 2 },
+    actBadgeTxt: { fontFamily: fonts.mono.semibold, fontSize: 9.5, color: '#fff' },
+
+    sub3: { flexDirection: 'row', gap: 4, backgroundColor: colors.glass, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.glassBorder, borderRadius: 13, padding: 4, marginTop: 14 },
+    sub3Item: { flex: 1, paddingVertical: 8, borderRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+    sub3On: { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.surfaceBorder },
+    sub3Txt: { fontFamily: fonts.display.semibold, fontSize: 11.5, color: colors.textSecondary },
+    sub3Dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#FF6B6B' },
+
+    pad2: { paddingTop: 4 },
+    zlabel: { fontFamily: fonts.mono.semibold, fontSize: 9.5, letterSpacing: 1.3, textTransform: 'uppercase', color: colors.textSecondary, marginTop: 16, marginBottom: 9, marginHorizontal: 2 },
+    empty: { fontFamily: fonts.mono.medium, fontSize: 12, color: colors.textSecondary, textAlign: 'center', paddingVertical: 26 },
+
+    lcard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 11, marginBottom: 8 },
+    medal: { width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' },
+    medalTxt: { fontFamily: fonts.mono.semibold, fontSize: 14, color: '#1A1E24' },
+    mGold: { backgroundColor: '#F5C542' }, mSilver: { backgroundColor: '#C3CCD6' }, mBronze: { backgroundColor: '#DC8A4A' },
+    mNeutral: { backgroundColor: colors.tint + '29', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.tint + '47' },
+    lname: { fontFamily: fonts.display.bold, fontSize: 14.5, color: colors.text },
+    ljob: { fontFamily: fonts.mono.medium, fontSize: 9.5, letterSpacing: 0.4, textTransform: 'uppercase', color: colors.textSecondary, marginTop: 2 },
+    lbucks: { fontFamily: fonts.mono.semibold, fontSize: 17, color: colors.tint, letterSpacing: -0.5 },
+
+    txCard: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12, marginBottom: 8 },
+    txName: { fontFamily: fonts.display.bold, fontSize: 14, color: colors.text },
+    txDesc: { fontFamily: fonts.body.regular, fontSize: 12.5, color: colors.text, marginTop: 3, opacity: 0.9 },
+    txDate: { fontFamily: fonts.mono.medium, fontSize: 9, color: colors.textSecondary, marginTop: 5 },
+    txRight: { alignItems: 'flex-end', gap: 6 },
+    txAmt: { fontFamily: fonts.mono.semibold, fontSize: 16, letterSpacing: -0.5 },
+    txIcons: { flexDirection: 'row', gap: 11, alignItems: 'center' },
+    hiddenTag: { fontFamily: fonts.mono.medium, fontSize: 10, color: '#E0A23C', fontStyle: 'italic' },
+
+    searchBar: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 13, height: 46, marginTop: 4 },
+    searchInput: { flex: 1, fontFamily: fonts.body.regular, fontSize: 14, color: colors.text, paddingVertical: 0 },
+    resultList: { marginTop: 6 },
+    resultRow: { paddingVertical: 11, paddingHorizontal: 6, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
+    resultName: { fontFamily: fonts.display.semibold, fontSize: 14, color: colors.text },
+    resultSub: { fontFamily: fonts.mono.medium, fontSize: 10, color: colors.textSecondary, marginTop: 2 },
+    lookupCard: { padding: 16, marginTop: 10, alignItems: 'center' },
+    lookupName: { fontFamily: fonts.display.bold, fontSize: 18, color: colors.text },
+    lookupJob: { fontFamily: fonts.mono.medium, fontSize: 10, textTransform: 'uppercase', color: colors.textSecondary, marginTop: 2 },
+    lookupBucks: { fontFamily: fonts.mono.semibold, fontSize: 34, color: colors.tint, letterSpacing: -1, marginTop: 8 },
+    lookupBal: { fontFamily: fonts.mono.medium, fontSize: 10, textTransform: 'uppercase', color: colors.textSecondary, marginTop: 2 },
+
+    rvbtns: { flexDirection: 'row', gap: 9, marginTop: 14 },
+    rvb: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, height: 46, borderRadius: 14 },
+    rvbAdd: { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth + 0.5, borderColor: colors.surfaceBorder },
+    rvbRef: { backgroundColor: colors.blue + '29', borderWidth: StyleSheet.hairlineWidth + 0.5, borderColor: colors.blue + '52' },
+    rvbTxt: { fontFamily: fonts.display.semibold, fontSize: 13 },
+    refLim: { backgroundColor: colors.blue + '38', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 6 },
+    refLimTxt: { fontFamily: fonts.mono.semibold, fontSize: 9, color: colors.blueText },
+
+    rev: { padding: 14, marginBottom: 9 },
+    rvHead: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    rvAv: { width: 34, height: 34, borderRadius: 17, backgroundColor: colors.tint + '2E', alignItems: 'center', justifyContent: 'center' },
+    rvAvImg: { width: 34, height: 34, borderRadius: 17 },
+    rvAvTxt: { fontFamily: fonts.display.bold, fontSize: 15, color: colors.tint },
+    rvName: { fontFamily: fonts.display.bold, fontSize: 14, color: colors.text },
+    rvText: { fontFamily: fonts.body.regular, fontSize: 12.5, lineHeight: 19, color: colors.text, opacity: 0.92, marginTop: 9 },
+    rvReply: { marginTop: 10, padding: 11, borderRadius: 11, backgroundColor: colors.glass, borderLeftWidth: 2, borderLeftColor: colors.tint },
+    rvReplyLbl: { fontFamily: fonts.mono.semibold, fontSize: 8.5, letterSpacing: 0.5, textTransform: 'uppercase', color: colors.tint },
+    rvReplyTxt: { fontFamily: fonts.body.regular, fontSize: 11.5, lineHeight: 17, color: colors.textSecondary, marginTop: 4 },
+    rvDate: { fontFamily: fonts.mono.medium, fontSize: 9, color: colors.textSecondary, marginTop: 9 },
+    gBadge: { width: 22, height: 22, borderRadius: 11, backgroundColor: colors.blue + '26', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.blue + '47', alignItems: 'center', justifyContent: 'center' },
+    gBadgeTxt: { fontFamily: fonts.mono.semibold, fontSize: 11, color: colors.blueText },
+    starsRow: { flexDirection: 'row', gap: 1, marginTop: 3 },
+
+    // modals
+    sheetWrap: { flex: 1, justifyContent: 'flex-end' },
+    scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(6,10,18,0.5)' },
+    sheet: { paddingHorizontal: 18, paddingBottom: 28, paddingTop: 8, maxHeight: '88%' },
+    grab: { width: 40, height: 5, borderRadius: 3, backgroundColor: colors.glassBorder, alignSelf: 'center', marginTop: 6, marginBottom: 14 },
+    mtitleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+    mtitle: { fontFamily: fonts.display.bold, fontSize: 18, color: colors.text },
+    flbl: { fontFamily: fonts.mono.semibold, fontSize: 9.5, letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textSecondary, marginTop: 16, marginBottom: 7, marginHorizontal: 2 },
+    finput: { height: 46, borderRadius: 13, backgroundColor: colors.glass, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.glassBorder, paddingHorizontal: 14, color: colors.text, fontSize: 14, fontFamily: fonts.body.regular },
+    farea: { minHeight: 80, borderRadius: 13, backgroundColor: colors.glass, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.glassBorder, paddingHorizontal: 14, paddingVertical: 12, color: colors.text, fontSize: 13, lineHeight: 19, fontFamily: fonts.body.regular, textAlignVertical: 'top' },
+    echip: { flexDirection: 'row', alignItems: 'center', gap: 10, height: 52, borderRadius: 13, backgroundColor: colors.tint + '1F', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.tint + '42', paddingHorizontal: 13, marginTop: 4 },
+    echipAv: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.tint + '33', alignItems: 'center', justifyContent: 'center' },
+    echipAvTxt: { fontFamily: fonts.display.bold, fontSize: 13, color: colors.tint },
+    echipName: { fontFamily: fonts.display.bold, fontSize: 14, color: colors.text },
+    echipJob: { fontFamily: fonts.mono.medium, fontSize: 9, textTransform: 'uppercase', color: colors.textSecondary, marginTop: 1 },
+    rdseg: { flexDirection: 'row', gap: 9 },
+    rdopt: { flex: 1, height: 50, borderRadius: 13, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.glassBorder, backgroundColor: colors.glass, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+    rdoptGood: { backgroundColor: '#34C75926', borderColor: '#34C75966' },
+    rdoptBad: { backgroundColor: '#FF6B6B26', borderColor: '#FF6B6B66' },
+    rdoptTxt: { fontFamily: fonts.display.semibold, fontSize: 14, color: colors.textSecondary },
+    amtPrev: { fontFamily: fonts.mono.medium, fontSize: 11, color: colors.textSecondary, marginTop: 8, marginLeft: 2 },
+    toggleRow: { flexDirection: 'row', alignItems: 'center', gap: 11, marginTop: 16 },
+    tsw: { width: 46, height: 27, borderRadius: 14, padding: 3, justifyContent: 'center' },
+    tswKnob: { width: 21, height: 21, borderRadius: 11, backgroundColor: '#fff' },
+    tglTxt: { fontFamily: fonts.body.medium, fontSize: 12.5, color: colors.text },
+    tglSub: { fontFamily: fonts.body.regular, fontSize: 10.5, color: colors.textSecondary, marginTop: 2 },
+    msubmit: { height: 50, borderRadius: 14, backgroundColor: colors.primary, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 22 },
+    msubmitTxt: { fontFamily: fonts.display.bold, fontSize: 15, color: colors.fireText },
+    starsPick: { flexDirection: 'row', gap: 8, marginTop: 2 },
+    warnBox: { backgroundColor: '#E0A23C1F', borderWidth: StyleSheet.hairlineWidth, borderColor: '#E0A23C4D', borderRadius: 12, padding: 12, marginTop: 6 },
+    warnTxt: { fontFamily: fonts.body.medium, fontSize: 12, color: '#E0A23C', lineHeight: 17 },
+    resetAllWarn: { fontFamily: fonts.body.regular, fontSize: 12, color: colors.textSecondary, fontStyle: 'italic', lineHeight: 17 },
+    divider: { height: 1, backgroundColor: colors.hairline, marginVertical: 22 },
+
+    loadingOverlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.25)', zIndex: 20 },
+  });

@@ -231,7 +231,9 @@ export default function SetupWizardScreen() {
       // The query is now saved on the org — refresh context so Org Settings and
       // the rest of the app pick it up (and don't prompt for it again).
       await refreshOrganization();
-      setImportResult({ success: true, count: data.reviews_upserted ?? 0 });
+      // Async import: the submit just queues the Outscraper scrape; reviews are
+      // ingested later via webhook, so there's no synchronous count to show.
+      setImportResult({ success: true, count: 0 });
     } catch (err: any) {
       console.error('[SetupWizard] Import reviews error:', err);
       setImportResult({ success: false, count: 0, error: err?.message });
@@ -659,7 +661,7 @@ export default function SetupWizardScreen() {
         )}
       </TouchableOpacity>
 
-      {importResult && importResult.success && importResult.count > 0 && (
+      {importResult && importResult.success && (
         <View style={[styles.resultCard, styles.resultCardSuccess]}>
           <IconSymbol
             ios_icon_name="checkmark.circle.fill"
@@ -668,22 +670,8 @@ export default function SetupWizardScreen() {
             color="#34A853"
           />
           <Text style={styles.resultCardText}>
-            Found {importResult.count} review{importResult.count === 1 ? '' : 's'}! They're waiting for
-            you to see in the Tools page of the app after you review and complete onboarding on the next
-            page.
-          </Text>
-        </View>
-      )}
-      {importResult && importResult.success && importResult.count === 0 && (
-        <View style={[styles.resultCard, styles.resultCardInfo]}>
-          <IconSymbol
-            ios_icon_name="info.circle.fill"
-            android_material_icon_name="info"
-            size={20}
-            color={splashColors.primary}
-          />
-          <Text style={styles.resultCardText}>
-            No reviews found yet — they'll appear here once customers leave them on Google.
+            Your Google reviews are importing now! They'll appear in the Tools page of the app
+            shortly, after you review and complete onboarding on the next page.
           </Text>
         </View>
       )}
@@ -759,7 +747,7 @@ export default function SetupWizardScreen() {
             </Text>
             <Text style={styles.cardDetail}>
               {importResult && importResult.success
-                ? `${importResult.count} review${importResult.count === 1 ? '' : 's'} imported`
+                ? 'Importing now — will appear shortly'
                 : 'Will import automatically'}
             </Text>
           </>

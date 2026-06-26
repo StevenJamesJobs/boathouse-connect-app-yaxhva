@@ -29,6 +29,7 @@ import { useRouter } from 'expo-router';
 import SeasonSelector, { type Season } from '@/components/SeasonSelector';
 import { menuIconAndroid } from '@/constants/menuIcons';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
+import { useRedemptionSettings, foodRedeemCost } from '@/hooks/useRedemptionSettings';
 import {
   labelForCategoryName,
   labelForSubcategoryName,
@@ -219,6 +220,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     if (perMenu) setActiveFilters((prev) => prev.filter((f) => f !== 'lunch' && f !== 'dinner'));
   }, [perMenu]);
   const { user } = useAuth();
+  const { settings: redemptionSettings } = useRedemptionSettings();
   const router = useRouter();
 
   const pagerRef = useRef<FlatList>(null);
@@ -1102,9 +1104,10 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         const trimmed = (selectedMenuItem.price || '').trim();
         const m = trimmed.match(/^\$?(\d+(?:\.\d{1,2})?)$/);
         const parsedPrice = m ? parseFloat(m[1]) : NaN;
-        const bucksCost = isFinite(parsedPrice) && parsedPrice > 0 ? Math.ceil(parsedPrice) : null;
+        const bucksCost = isFinite(parsedPrice) && parsedPrice > 0 ? foodRedeemCost(parsedPrice, redemptionSettings.food_mode) : null;
         const isInactive = (selectedMenuItem as any).is_active === false;
-        const showRedeem = user?.role === 'employee' && bucksCost !== null && !isInactive;
+        const showRedeem = user?.role === 'employee' && bucksCost !== null && !isInactive
+          && redemptionSettings.redemptions_enabled && redemptionSettings.food_enabled;
         const item = selectedMenuItem;
         return (
           <ContentDetailModal

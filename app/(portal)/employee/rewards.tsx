@@ -21,6 +21,10 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useRedemptionSettings } from '@/hooks/useRedemptionSettings';
+import AmbientGlow from '@/components/AmbientGlow';
+import { fonts } from '@/constants/fonts';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
@@ -75,6 +79,8 @@ type RewardsSubTab = 'leaderboard' | 'recent';
 export default function EmployeeRewardsScreen() {
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
+  const { settings: redemptionSettings } = useRedemptionSettings();
+  const insets = useSafeAreaInsets();
   const currencyName = organization.reward_currency_name;
   const { t } = useTranslation();
   const { language } = useLanguage();
@@ -111,6 +117,10 @@ export default function EmployeeRewardsScreen() {
   // Reviews state
   const [reviews, setReviews] = useState<GuestReview[]>([]);
   const [googleReviews, setGoogleReviews] = useState<GoogleReview[]>([]);
+
+  // Aggregate Google rating for the Reviews tile (mirrors the manager page).
+  const ratingCount = googleReviews.length;
+  const ratingAvg = ratingCount ? googleReviews.reduce((s, r) => s + (r.review_rating || 0), 0) / ratingCount : 0;
 
   const fetchRewardsData = useCallback(async () => {
     try {
@@ -293,23 +303,59 @@ export default function EmployeeRewardsScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Main Tab Selector */}
-      <View style={[styles.tabContainer, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'rewards' && { borderBottomColor: colors.primary }]}
-          onPress={() => setActiveTab('rewards')}
-        >
-          <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'rewards' && { color: colors.primary }]}>
-            Rewards
-          </Text>
+      <AmbientGlow />
+      {/* Compact glass header (mirrors the manager Rewards page) */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 6, zIndex: 5 }}>
+        <TouchableOpacity onPress={() => router.back()} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: colors.glass, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' }}>
+          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.text} />
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'reviews' && { borderBottomColor: colors.primary }]}
-          onPress={() => setActiveTab('reviews')}
-        >
-          <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'reviews' && { color: colors.primary }]}>
-            Reviews
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontFamily: fonts.display.bold, fontSize: 19, color: colors.text, letterSpacing: -0.3 }}>{t('rewards_reviews_editor:title', 'Rewards & Reviews')}</Text>
+          <Text style={{ fontFamily: fonts.mono.semibold, fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.tint, marginTop: 2 }}>
+            {activeTab === 'rewards' ? t('rewards_reviews_editor:tab_rewards', 'Rewards') : t('rewards_reviews_editor:tab_reviews', 'Reviews')}
           </Text>
+        </View>
+      </View>
+
+      {/* Nav tiles replace the old tabs */}
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 9, paddingHorizontal: 16, zIndex: 2 }}>
+        <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveTab('rewards')}
+          style={{ flex: 1, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth + 0.5, borderColor: activeTab === 'rewards' ? colors.tint + '5C' : colors.surfaceBorder, backgroundColor: activeTab === 'rewards' ? colors.tint + '1C' : colors.surface, padding: 13, overflow: 'hidden' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="paid" size={13} color={activeTab === 'rewards' ? colors.tint : colors.textSecondary} />
+            <Text style={{ fontFamily: fonts.mono.medium, fontSize: 9, letterSpacing: 0.6, textTransform: 'uppercase', color: activeTab === 'rewards' ? colors.tint : colors.textSecondary }} numberOfLines={1}>
+              {t('rewards_reviews_editor:my_bucks_label', { currencyName, defaultValue: `My ${currencyName}` })}
+            </Text>
+          </View>
+          <Text style={{ fontFamily: fonts.mono.semibold, fontSize: 26, letterSpacing: -1, color: activeTab === 'rewards' ? colors.tint : colors.text, marginTop: 8 }}>${myBucks}</Text>
+          {redemptionSettings.redemptions_enabled ? (
+            <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 34, borderRadius: 10, backgroundColor: colors.primary, marginTop: 10 }} onPress={() => router.push('/redeem' as any)}>
+              <IconSymbol ios_icon_name="gift.fill" android_material_icon_name="card-giftcard" size={14} color={colors.fireText} />
+              <Text style={{ fontFamily: fonts.display.semibold, fontSize: 11.5, color: colors.fireText }}>{t('rewards_ui:redeem')}</Text>
+            </TouchableOpacity>
+          ) : (
+            <Text style={{ fontFamily: fonts.mono.medium, fontSize: 9, color: colors.textSecondary, marginTop: 6 }}>{t('rewards_reviews_editor:your_balance', 'Your balance')}</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity activeOpacity={0.85} onPress={() => setActiveTab('reviews')}
+          style={{ flex: 1, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth + 0.5, borderColor: activeTab === 'reviews' ? colors.tint + '5C' : colors.surfaceBorder, backgroundColor: activeTab === 'reviews' ? colors.tint + '1C' : colors.surface, padding: 13, overflow: 'hidden' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+            <IconSymbol ios_icon_name="star.fill" android_material_icon_name="star" size={13} color={activeTab === 'reviews' ? colors.tint : colors.textSecondary} />
+            <Text style={{ fontFamily: fonts.mono.medium, fontSize: 9, letterSpacing: 0.6, textTransform: 'uppercase', color: activeTab === 'reviews' ? colors.tint : colors.textSecondary }} numberOfLines={1}>
+              {t('rewards_reviews_editor:tab_reviews', 'Reviews')}
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 }}>
+            <Text style={{ fontFamily: fonts.mono.semibold, fontSize: 26, letterSpacing: -1, color: activeTab === 'reviews' ? colors.tint : colors.text }}>{ratingCount ? ratingAvg.toFixed(1) : '—'}</Text>
+            {ratingCount > 0 && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 3, backgroundColor: '#FFD45E26', borderWidth: StyleSheet.hairlineWidth, borderColor: '#FFD45E52', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                <IconSymbol ios_icon_name="star.fill" android_material_icon_name="star" size={9} color="#FFD45E" />
+                <Text style={{ fontFamily: fonts.mono.semibold, fontSize: 8, letterSpacing: 0.4, textTransform: 'uppercase', color: '#E0A23C' }}>{t('rewards_reviews_editor:rating', 'Rating')}</Text>
+              </View>
+            )}
+          </View>
+          <Text style={{ fontFamily: fonts.mono.medium, fontSize: 9, color: colors.textSecondary, marginTop: 6 }}>{t('rewards_reviews_editor:n_google_reviews', { count: ratingCount, defaultValue: `${ratingCount} Google reviews` })}</Text>
         </TouchableOpacity>
       </View>
 
@@ -320,25 +366,7 @@ export default function EmployeeRewardsScreen() {
           <View style={styles.subTabHeader}>
             <ExamRewardBlurb />
 
-            <View style={[styles.bucksCard, { backgroundColor: colors.card }]}>
-              <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={32} color={colors.primary} />
-              <Text style={[styles.bucksLabel, { color: colors.textSecondary }]}>My {currencyName}</Text>
-              <Text style={[styles.bucksAmount, { color: colors.primary }]}>${myBucks}</Text>
-              <TouchableOpacity
-                style={[styles.redeemBtn, { backgroundColor: colors.primary }]}
-                onPress={() => router.push('/redeem' as any)}
-              >
-                <IconSymbol
-                  ios_icon_name="gift.fill"
-                  android_material_icon_name="card-giftcard"
-                  size={16}
-                  color={colors.fireText}
-                />
-                <Text style={[styles.redeemBtnText, { color: colors.fireText }]}>{t('rewards_ui:redeem')}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={[styles.subTabContainer, { backgroundColor: colors.card }]}>
+            <View style={[styles.subTabContainer, { backgroundColor: colors.surface }]}>
               <TouchableOpacity
                 style={[
                   styles.subTab,
@@ -420,7 +448,7 @@ export default function EmployeeRewardsScreen() {
                             key={emp.id}
                             style={[
                               styles.leaderboardItem,
-                              { backgroundColor: colors.card },
+                              { backgroundColor: colors.surface },
                               isCurrentUser && { borderWidth: 2, borderColor: colors.primary },
                             ]}
                           >
@@ -452,7 +480,7 @@ export default function EmployeeRewardsScreen() {
                       recentTransactions.map((trans, index) => {
                         const denied = trans.isDenied;
                         return (
-                          <View key={trans.id || index} style={[styles.transactionItem, { backgroundColor: colors.card }]}>
+                          <View key={trans.id || index} style={[styles.transactionItem, { backgroundColor: colors.surface }]}>
                             <View style={[
                               styles.transactionIcon,
                               { backgroundColor: denied ? '#FFEBEE' : trans.amount > 0 ? '#E8F5E9' : '#FFEBEE' },
@@ -515,7 +543,7 @@ export default function EmployeeRewardsScreen() {
               </View>
             ) : (
               allReviews.map((review, index) => (
-                <View key={review.id || index} style={[styles.reviewCard, { backgroundColor: colors.card }]}>
+                <View key={review.id || index} style={[styles.reviewCard, { backgroundColor: colors.surface }]}>
                   {review.source === 'google' ? (
                     <>
                       <View style={styles.reviewHeader}>
