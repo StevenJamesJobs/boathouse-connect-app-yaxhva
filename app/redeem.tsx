@@ -30,6 +30,8 @@ import { RedemptionRequestCard, RedemptionRequestRow, RedemptionType } from '@/c
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRedemptionSettings, foodRedeemCost, RedemptionCustomOption } from '@/hooks/useRedemptionSettings';
 import AmbientGlow from '@/components/AmbientGlow';
+import BottomNavBar from '@/components/BottomNavBar';
+import GlassCard from '@/components/GlassCard';
 import { fonts } from '@/constants/fonts';
 
 const SECTION_COST = 10;
@@ -557,16 +559,23 @@ export default function EmployeeRedeemScreen() {
       {/* Confirmation */}
       <Modal visible={showConfirm} animationType="fade" transparent onRequestClose={() => setShowConfirm(false)}>
         <View style={styles.confirmOverlay}>
-          <View style={[styles.confirmCard, { backgroundColor: colors.surface }]}>
+          <GlassCard variant="glass" radius={18} intensity={55} style={styles.confirmCard}>
             <Text style={[styles.confirmTitle, { color: colors.text }]}>Confirm redemption</Text>
             {activeCustom ? (
               <Text style={[styles.confirmLine, { color: colors.text }]}>
                 {getLocalizedField(activeCustom, 'label', language)} — ${activeCustom.cost}
               </Text>
             ) : activeOption === 'food_beverage' ? (
-              <Text style={[styles.confirmLine, { color: colors.text }]}>
-                {pickedItem?.name} — {pickedItem?.priceText} ({pickedItem?.bucksCost} bucks)
-              </Text>
+              <>
+                <Text style={[styles.confirmLine, { color: colors.text }]}>
+                  {pickedItem?.name} — {pickedItem?.priceText} → ${pickedItem?.bucksCost} {currencyName}
+                </Text>
+                {rset.food_mode === 'half' && (
+                  <Text style={[styles.confirmLine, { color: colors.primary, fontWeight: '700' }]}>
+                    {t('rewards_ui:redeem_half_price', 'Half price')}
+                  </Text>
+                )}
+              </>
             ) : (
               <>
                 <Text style={[styles.confirmLine, { color: colors.text }]}>
@@ -604,9 +613,11 @@ export default function EmployeeRedeemScreen() {
                 )}
               </TouchableOpacity>
             </View>
-          </View>
+          </GlassCard>
         </View>
       </Modal>
+
+      <BottomNavBar activeTab="rewards" />
     </View>
   );
 }
@@ -673,9 +684,12 @@ const styles = StyleSheet.create({
   confirmText: { color: '#fff', fontWeight: '700', fontSize: 16 },
 
   confirmOverlay: {
-    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24,
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.62)', justifyContent: 'center', padding: 24,
   },
-  confirmCard: { borderRadius: 16, padding: 20 },
+  confirmCard: {
+    borderRadius: 16, padding: 20,
+    boxShadow: '0px 12px 32px rgba(0, 0, 0, 0.45)', elevation: 12,
+  },
   confirmTitle: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
   confirmLine: { fontSize: 14, marginBottom: 6 },
   confirmFootnote: { fontSize: 12, marginTop: 12, fontStyle: 'italic' },

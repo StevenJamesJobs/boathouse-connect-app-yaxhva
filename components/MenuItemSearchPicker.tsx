@@ -13,6 +13,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useRedemptionSettings, foodRedeemCost } from '@/hooks/useRedemptionSettings';
 
 export interface PickedMenuItem {
   source: 'menu_items' | 'weekly_specials';
@@ -40,16 +41,17 @@ interface RawRow {
 /**
  * Strict price parser: only accepts a single dollar amount like "$18.99", "12.99",
  * "$5", "5". Rejects ranges ("$16 - $34"), free text ("Market Price"), or anything
- * with multiple numeric tokens. Returns the bucks cost (rounded up).
+ * with multiple numeric tokens. Returns the raw dollar amount (NOT yet converted to
+ * bucks — the caller applies the org's full/half redemption mode).
  */
-function parsePriceToBucks(priceText: string): number | null {
+function parsePriceAmount(priceText: string): number | null {
   if (!priceText) return null;
   const trimmed = priceText.trim();
   const match = trimmed.match(/^\$?(\d+(?:\.\d{1,2})?)$/);
   if (!match) return null;
   const n = parseFloat(match[1]);
   if (!isFinite(n) || n <= 0) return null;
-  return Math.ceil(n);
+  return n;
 }
 
 const CATEGORY_PILLS = ['All', 'Weekly Specials', 'Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
@@ -57,6 +59,7 @@ const CATEGORY_PILLS = ['All', 'Weekly Specials', 'Lunch', 'Dinner', 'Libations'
 export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
+  const { settings: redemptionSettings } = useRedemptionSettings();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [loading, setLoading] = useState(false);
@@ -105,8 +108,11 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
     const q = query.trim().toLowerCase();
     return rows
       .map<PickedMenuItem | null>((r) => {
-        const bucks = parsePriceToBucks(r.price);
-        if (bucks == null) return null;
+        const amount = parsePriceAmount(r.price);
+        if (amount == null) return null;
+        // Apply the org's redemption mode (full vs half price) so the picker
+        // matches the menu detail modal and the redeem confirm step.
+        const bucks = foodRedeemCost(amount, redemptionSettings.food_mode);
         return {
           source: r.source,
           id: r.id,
@@ -131,7 +137,7 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
         return true;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [rows, query, activeCategory]);
+  }, [rows, query, activeCategory, redemptionSettings.food_mode]);
 
   const handleClose = () => {
     setQuery('');

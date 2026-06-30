@@ -21,15 +21,18 @@ import {
   NativeScrollEvent,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
 import { Image } from 'expo-image';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import GlassCard from '@/components/GlassCard';
 import AmbientGlow from '@/components/AmbientGlow';
+import BottomNavBar from '@/components/BottomNavBar';
+import JoltOverlay from '@/components/JoltOverlay';
 import { fonts } from '@/constants/fonts';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -160,6 +163,24 @@ export default function RewardsAndReviewsEditorScreen() {
     if (tab === 'recent') markManagerRecentViewed();
   };
 
+  // Horizontal swipe between the Rewards sub-tabs (Leaderboard/Recent/Lookup).
+  // Edge-aware: hitSlop excludes the left ~30px so the native swipe-back-from-left
+  // to the previous screen is preserved; failOffsetY lets the vertical scroll (and
+  // the header collapse it drives) work untouched — only clearly-horizontal swipes
+  // switch tabs.
+  const onBodySwipe = (e: any) => {
+    if (e?.nativeEvent?.state !== State.END) return;
+    if (activeTab !== 'rewards') return;
+    const { translationX = 0, velocityX = 0 } = e.nativeEvent;
+    const pages = SUB_PAGES as readonly ('leaderboard' | 'recent' | 'lookup')[];
+    const i = pages.indexOf(rewardsSubTab);
+    if ((translationX <= -55 || velocityX < -650) && i < pages.length - 1) {
+      goToSubTab(pages[i + 1]);
+    } else if ((translationX >= 55 || velocityX > 650) && i > 0) {
+      goToSubTab(pages[i - 1]);
+    }
+  };
+
   // Employee lookup state
   const [lookupSearchQuery, setLookupSearchQuery] = useState('');
   const [lookupFilteredEmployees, setLookupFilteredEmployees] = useState<Employee[]>([]);
@@ -187,6 +208,33 @@ export default function RewardsAndReviewsEditorScreen() {
   // First-visit glow on the My Bucks tile until the owner opens Redeem Settings.
   const [redeemGlow, setRedeemGlow] = useState(false);
   const glowAnim = useRef(new Animated.Value(0)).current;
+
+  // ── Sticky / collapsing header ─────────────────────────────────────────
+  // The title + nav tiles stay locked; on the Rewards tab the action bar
+  // (Reward/Deduct/Reset/Approve) collapses up behind the tiles as the list
+  // scrolls, and the Leaderboard/Recent/Lookup sub-tabs pin under the tiles.
+  const scrollRef = useRef<any>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const [headerBlockH, setHeaderBlockH] = useState(0);
+  const [actsH, setActsH] = useState(0);
+  const collapseDist = Math.max(1, actsH);
+  const collapseTranslate = scrollY.interpolate({
+    inputRange: [0, collapseDist],
+    outputRange: [0, -collapseDist],
+    extrapolate: 'clamp',
+  });
+  const actsOpacity = scrollY.interpolate({
+    inputRange: [0, collapseDist * 0.75],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  // Reset the collapse whenever the active tab or sub-tab changes so a switch
+  // always shows the full header (and never leaves the list scrolled past its
+  // new, shorter content).
+  useEffect(() => {
+    scrollY.setValue(0);
+    scrollRef.current?.scrollTo?.({ y: 0, animated: false });
+  }, [activeTab, rewardsSubTab, scrollY]);
 
   useEffect(() => {
     if (!isManagerOrOwner || !organizationId) return;
@@ -374,6 +422,16 @@ export default function RewardsAndReviewsEditorScreen() {
     fetchGoogleReviews();
     fetchRefreshQuota();
   }, [fetchEmployees, fetchRewardsData, fetchReviews, fetchGoogleReviews, fetchRefreshQuota]);
+
+  // Re-fetch on focus (e.g. returning from the Approvals screen) so an approved
+  // or denied redemption immediately updates the leaderboard balances + the
+  // Recent list — no manual navigate-away-and-back needed.
+  useFocusEffect(
+    useCallback(() => {
+      fetchEmployees();
+      fetchRewardsData();
+    }, [fetchEmployees, fetchRewardsData])
+  );
 
   useEffect(() => {
     if (searchQuery) {
@@ -1043,20 +1101,59 @@ export default function RewardsAndReviewsEditorScreen() {
     >
       <AmbientGlow />
 
-      {/* Identity rail: back + title + active-tab subtitle (no hero, no bell) */}
-      <View style={[styles.idbar, { paddingTop: insets.top + 8 }]}>
-        <Pressable style={styles.bk} onPress={() => router.back()} hitSlop={8}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.text} />
-        </Pressable>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.idTitle}>{t('rewards_reviews_editor:title', 'Rewards & Reviews')}</Text>
-          <Text style={styles.idSub}>
-            {activeTab === 'rewards' ? t('rewards_reviews_editor:tab_rewards', 'Rewards') : t('rewards_reviews_editor:tab_reviews', 'Reviews')}
-          </Text>
-        </View>
-      </View>
+      {/* Scrolling content sits UNDER the fixed header; paddingTop reserves the
+          header's full (expanded) height so the first row tucks under the
+          pinned sub-tabs once the action bar collapses. The PanGestureHandler
+          adds horizontal swipe between the Rewards sub-tabs while preserving
+          vertical scroll (failOffsetY) and the native left-edge back-swipe
+          (hitSlop excludes the left edge). */}
+      <PanGestureHandler
+        enabled={activeTab === 'rewards'}
+        activeOffsetX={[-20, 20]}
+        failOffsetY={[-15, 15]}
+        hitSlop={{ left: -30 }}
+        onHandlerStateChange={onBodySwipe}
+      >
+        <Animated.ScrollView
+          ref={scrollRef}
+          style={styles.screen}
+          contentContainerStyle={[styles.screenContent, { paddingTop: (headerBlockH || 240) + 6 }]}
+          showsVerticalScrollIndicator={false}
+          scrollEventThrottle={16}
+          onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
+        >
+          {activeTab === 'rewards' ? renderRewards() : renderReviews()}
+        </Animated.ScrollView>
+      </PanGestureHandler>
 
-      <ScrollView style={styles.screen} contentContainerStyle={styles.screenContent} showsVerticalScrollIndicator={false}>
+      {/* Fixed, collapsing header: identity rail + nav tiles stay LOCKED; on the
+          Rewards tab the action bar collapses up behind the tiles and the
+          Leaderboard/Recent/Lookup sub-tabs pin underneath. */}
+      <View
+        style={styles.fixedTop}
+        onLayout={(e) => setHeaderBlockH(e.nativeEvent.layout.height)}
+        pointerEvents="box-none"
+      >
+        {/* Locked head (title + nav tiles) over an OPAQUE backdrop so the list
+            scrolling up is hidden behind the translucent tiles; the glow is
+            re-drawn so the header still reads edge-to-edge. */}
+        <View style={[styles.lockedHead, { paddingTop: insets.top + 8 }]}>
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
+            <AmbientGlow />
+          </View>
+        <View style={styles.idbar}>
+          <Pressable style={styles.bk} onPress={() => router.back()} hitSlop={8}>
+            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.text} />
+          </Pressable>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.idTitle}>{t('rewards_reviews_editor:title', 'Rewards & Reviews')}</Text>
+            <Text style={styles.idSub}>
+              {activeTab === 'rewards' ? t('rewards_reviews_editor:tab_rewards', 'Rewards') : t('rewards_reviews_editor:tab_reviews', 'Reviews')}
+            </Text>
+          </View>
+        </View>
+
         {/* Nav tiles — these REPLACE the tab bar (tap to switch views) */}
         <View style={styles.navtiles}>
           <Pressable
@@ -1125,9 +1222,34 @@ export default function RewardsAndReviewsEditorScreen() {
             <Text style={styles.nsub}>{t('rewards_reviews_editor:n_google_reviews', { count: ratingCount, defaultValue: `${ratingCount} Google reviews` })}</Text>
           </Pressable>
         </View>
+        </View>
 
-        {activeTab === 'rewards' ? renderRewards() : renderReviews()}
-      </ScrollView>
+        {/* The collapsing controls (action bar on Rewards, Add Review/Refresh on
+            Reviews) fade up behind the tiles as you scroll. On Rewards the
+            sub-tabs then PIN under the tiles over an opaque strip so the list
+            tucks cleanly behind them; on Reviews there's nothing pinned, so the
+            cards tuck straight behind the tiles. */}
+        <View style={styles.clip}>
+          <Animated.View style={{ transform: [{ translateY: collapseTranslate }] }}>
+            <Animated.View style={{ opacity: actsOpacity }} onLayout={(e) => setActsH(e.nativeEvent.layout.height)}>
+              {activeTab === 'rewards'
+                ? (isManagerOrOwner ? renderActionBar() : null)
+                : renderReviewButtons()}
+            </Animated.View>
+            {activeTab === 'rewards' && (
+              <View style={styles.subTabsWrap}>
+                <View style={[styles.subTabsBackdrop, { backgroundColor: colors.background }]} pointerEvents="none" />
+                {renderSubTabs()}
+              </View>
+            )}
+          </Animated.View>
+        </View>
+      </View>
+
+      <BottomNavBar activeTab="manage" />
+      {/* This editor is a pushed route (outside the tab layout), so render the
+          Jolt companion here too — the corner FAB / command palette. */}
+      <JoltOverlay role="manager" />
 
       {renderRewardModal()}
       {renderResetModal()}
@@ -1143,50 +1265,57 @@ export default function RewardsAndReviewsEditorScreen() {
   );
 
   // ── Rewards view ───────────────────────────────────────────────────────
+  // The action bar + sub-tabs live in the FIXED header overlay (so they lock /
+  // collapse); only the list lives in the scroll body.
+  function renderActionBar() {
+    return (
+      <View style={styles.acts}>
+        <Pressable style={styles.act} onPress={() => { setIsReward(true); setShowRewardModal(true); }}>
+          <IconSymbol ios_icon_name="gift.fill" android_material_icon_name="card-giftcard" size={21} color={colors.tint} />
+          <Text style={styles.actTxt}>{t('rewards_ui:manager_reward', 'Reward')}</Text>
+        </Pressable>
+        <Pressable style={styles.act} onPress={() => { setIsReward(false); setShowRewardModal(true); }}>
+          <IconSymbol ios_icon_name="minus.circle.fill" android_material_icon_name="remove-circle" size={21} color={colors.tint} />
+          <Text style={styles.actTxt}>{t('rewards_ui:manager_deduct', 'Deduct')}</Text>
+        </Pressable>
+        <Pressable style={styles.act} onPress={() => setShowResetBucksModal(true)}>
+          <IconSymbol ios_icon_name="arrow.counterclockwise.circle.fill" android_material_icon_name="refresh" size={21} color={colors.tint} />
+          <Text style={styles.actTxt}>{t('rewards_ui:manager_reset', 'Reset')}</Text>
+        </Pressable>
+        <Pressable style={styles.act} onPress={() => router.push('/manager-approvals' as any)}>
+          {pendingCount > 0 && <View style={styles.actBadge}><Text style={styles.actBadgeTxt}>{pendingCount}</Text></View>}
+          <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={21} color={colors.tint} />
+          <Text style={styles.actTxt}>{t('rewards_ui:manager_approvals', 'Approve')}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  function renderSubTabs() {
+    return (
+      <View style={styles.sub3}>
+        {SUB_PAGES.map((p) => {
+          const on = rewardsSubTab === p;
+          const meta = p === 'leaderboard'
+            ? { ios: 'trophy.fill', android: 'emoji-events', label: t('rewards_ui:tab_leaderboard', 'Leaderboard') }
+            : p === 'recent'
+            ? { ios: 'clock.fill', android: 'history', label: t('rewards_ui:tab_recent_short', 'Recent') }
+            : { ios: 'magnifyingglass', android: 'search', label: t('rewards_ui:tab_lookup', 'Lookup') };
+          return (
+            <Pressable key={p} style={[styles.sub3Item, on && styles.sub3On]} onPress={() => goToSubTab(p)}>
+              <IconSymbol ios_icon_name={meta.ios} android_material_icon_name={meta.android} size={14} color={on ? colors.text : colors.textSecondary} />
+              <Text style={[styles.sub3Txt, on && { color: colors.text }]} numberOfLines={1}>{meta.label}</Text>
+              {p === 'recent' && managerRecentHasNew && !on && <View style={styles.sub3Dot} />}
+            </Pressable>
+          );
+        })}
+      </View>
+    );
+  }
+
   function renderRewards() {
     return (
       <>
-        {isManagerOrOwner && (
-          <View style={styles.acts}>
-            <Pressable style={styles.act} onPress={() => { setIsReward(true); setShowRewardModal(true); }}>
-              <IconSymbol ios_icon_name="gift.fill" android_material_icon_name="card-giftcard" size={21} color={colors.tint} />
-              <Text style={styles.actTxt}>{t('rewards_ui:manager_reward', 'Reward')}</Text>
-            </Pressable>
-            <Pressable style={styles.act} onPress={() => { setIsReward(false); setShowRewardModal(true); }}>
-              <IconSymbol ios_icon_name="minus.circle.fill" android_material_icon_name="remove-circle" size={21} color={colors.tint} />
-              <Text style={styles.actTxt}>{t('rewards_ui:manager_deduct', 'Deduct')}</Text>
-            </Pressable>
-            <Pressable style={styles.act} onPress={() => setShowResetBucksModal(true)}>
-              <IconSymbol ios_icon_name="arrow.counterclockwise.circle.fill" android_material_icon_name="refresh" size={21} color={colors.tint} />
-              <Text style={styles.actTxt}>{t('rewards_ui:manager_reset', 'Reset')}</Text>
-            </Pressable>
-            <Pressable style={styles.act} onPress={() => router.push('/manager-approvals' as any)}>
-              {pendingCount > 0 && <View style={styles.actBadge}><Text style={styles.actBadgeTxt}>{pendingCount}</Text></View>}
-              <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={21} color={colors.tint} />
-              <Text style={styles.actTxt}>{t('rewards_ui:manager_approvals', 'Approve')}</Text>
-            </Pressable>
-          </View>
-        )}
-
-        {/* Sub-tabs */}
-        <View style={styles.sub3}>
-          {SUB_PAGES.map((p) => {
-            const on = rewardsSubTab === p;
-            const meta = p === 'leaderboard'
-              ? { ios: 'trophy.fill', android: 'emoji-events', label: t('rewards_ui:tab_leaderboard', 'Leaderboard') }
-              : p === 'recent'
-              ? { ios: 'clock.fill', android: 'history', label: t('rewards_ui:tab_recent_short', 'Recent') }
-              : { ios: 'magnifyingglass', android: 'search', label: t('rewards_ui:tab_lookup', 'Lookup') };
-            return (
-              <Pressable key={p} style={[styles.sub3Item, on && styles.sub3On]} onPress={() => goToSubTab(p)}>
-                <IconSymbol ios_icon_name={meta.ios} android_material_icon_name={meta.android} size={14} color={on ? colors.text : colors.textSecondary} />
-                <Text style={[styles.sub3Txt, on && { color: colors.text }]} numberOfLines={1}>{meta.label}</Text>
-                {p === 'recent' && managerRecentHasNew && !on && <View style={styles.sub3Dot} />}
-              </Pressable>
-            );
-          })}
-        </View>
-
         {rewardsSubTab === 'leaderboard'
           ? renderLeaderboard()
           : rewardsSubTab === 'recent'
@@ -1323,33 +1452,39 @@ export default function RewardsAndReviewsEditorScreen() {
   }
 
   // ── Reviews view ───────────────────────────────────────────────────────
+  // The Add Review / Refresh buttons live in the FIXED header overlay so they
+  // lock while the review cards scroll underneath.
+  function renderReviewButtons() {
+    return (
+      <View style={styles.rvbtns}>
+        {isManagerOrOwner && (
+          <Pressable style={[styles.rvb, styles.rvbAdd]} onPress={() => { resetReviewForm(); setShowReviewModal(true); }}>
+            <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={17} color={colors.text} />
+            <Text style={[styles.rvbTxt, { color: colors.text }]}>{t('rewards_reviews_editor:add_review_button', 'Add Review')}</Text>
+          </Pressable>
+        )}
+        {isOwner && (
+          <Pressable style={[styles.rvb, styles.rvbRef]} onPress={handleRefreshGoogleReviews} disabled={refreshingGoogle}>
+            {refreshingGoogle ? (
+              <ActivityIndicator size="small" color={colors.blueText} />
+            ) : (
+              <>
+                <IconSymbol ios_icon_name="arrow.clockwise" android_material_icon_name="refresh" size={16} color={colors.blueText} />
+                <Text style={[styles.rvbTxt, { color: colors.blueText }]}>{t('rewards_reviews_editor:refresh_short', 'Refresh')}</Text>
+                {refreshRemaining !== null && (
+                  <View style={styles.refLim}><Text style={styles.refLimTxt}>{t('rewards_reviews_editor:n_left', { count: refreshRemaining, defaultValue: `${refreshRemaining} left` })}</Text></View>
+                )}
+              </>
+            )}
+          </Pressable>
+        )}
+      </View>
+    );
+  }
+
   function renderReviews() {
     return (
       <View>
-        <View style={styles.rvbtns}>
-          {isManagerOrOwner && (
-            <Pressable style={[styles.rvb, styles.rvbAdd]} onPress={() => { resetReviewForm(); setShowReviewModal(true); }}>
-              <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={17} color={colors.text} />
-              <Text style={[styles.rvbTxt, { color: colors.text }]}>{t('rewards_reviews_editor:add_review_button', 'Add Review')}</Text>
-            </Pressable>
-          )}
-          {isOwner && (
-            <Pressable style={[styles.rvb, styles.rvbRef]} onPress={handleRefreshGoogleReviews} disabled={refreshingGoogle}>
-              {refreshingGoogle ? (
-                <ActivityIndicator size="small" color={colors.blueText} />
-              ) : (
-                <>
-                  <IconSymbol ios_icon_name="arrow.clockwise" android_material_icon_name="refresh" size={16} color={colors.blueText} />
-                  <Text style={[styles.rvbTxt, { color: colors.blueText }]}>{t('rewards_reviews_editor:refresh_short', 'Refresh')}</Text>
-                  {refreshRemaining !== null && (
-                    <View style={styles.refLim}><Text style={styles.refLimTxt}>{t('rewards_reviews_editor:n_left', { count: refreshRemaining, defaultValue: `${refreshRemaining} left` })}</Text></View>
-                  )}
-                </>
-              )}
-            </Pressable>
-          )}
-        </View>
-
         <Text style={styles.zlabel}>{t('rewards_reviews_editor:guest_reviews_title', 'Guest reviews')}</Text>
         {allReviews.length === 0 ? (
           <Text style={styles.empty}>{t('rewards_reviews_editor:no_reviews', 'No reviews yet')}</Text>
@@ -1661,15 +1796,27 @@ export default function RewardsAndReviewsEditorScreen() {
 const makeStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    idbar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 6, zIndex: 5 },
+    idbar: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingBottom: 6 },
     bk: { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.glass, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' },
     idTitle: { fontFamily: fonts.display.bold, fontSize: 19, color: colors.text, letterSpacing: -0.3 },
     idSub: { fontFamily: fonts.mono.semibold, fontSize: 9, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.tint, marginTop: 2 },
 
-    screen: { flex: 1, zIndex: 2 },
-    screenContent: { paddingHorizontal: 16, paddingBottom: 60 },
+    screen: { flex: 1 },
+    screenContent: { paddingHorizontal: 16, paddingBottom: 120 },
 
-    navtiles: { flexDirection: 'row', gap: 10, marginTop: 9 },
+    // Fixed, collapsing header overlay. NO zIndex — it's rendered after the
+    // scroll (so it paints over the list) but before the nav bar + Jolt palette
+    // in JSX (so those, rendered later, stay on top). An explicit high zIndex
+    // here would clip the Jolt palette (which is a plain absolute View, not a Modal).
+    fixedTop: { position: 'absolute', top: 0, left: 0, right: 0 },
+    lockedHead: { paddingBottom: 6, overflow: 'hidden' },
+    clip: { overflow: 'hidden', paddingHorizontal: 16, paddingTop: 2 },
+    // Pinned sub-tabs sit over a full-bleed opaque strip (extends past the clip's
+    // 16px padding to the screen edges) so the list is hidden behind them.
+    subTabsWrap: { position: 'relative' },
+    subTabsBackdrop: { position: 'absolute', top: 0, bottom: -2, left: -16, right: -16 },
+
+    navtiles: { flexDirection: 'row', gap: 10, marginTop: 9, paddingHorizontal: 16 },
     ntile: { flex: 1, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth + 0.5, borderColor: colors.surfaceBorder, backgroundColor: colors.surface, padding: 13, overflow: 'hidden' },
     ntileOn: { borderColor: colors.tint + '5C', backgroundColor: colors.tint + '1C' },
     goav: { position: 'absolute', top: 13, right: 12, opacity: 0.5 },
