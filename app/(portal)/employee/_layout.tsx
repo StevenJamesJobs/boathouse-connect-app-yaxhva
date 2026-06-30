@@ -76,12 +76,18 @@ export default function EmployeeLayout() {
   const colors = useThemeColors();
   const segments = useSegments();
   // Welcome = the index tab (last segment is not one of the other tabs).
-  const onWelcome = !['menus', 'tools', 'rewards', 'profile'].includes(segments[segments.length - 1] as string);
+  const lastSegment = segments[segments.length - 1] as string;
+  const onWelcome = !['menus', 'tools', 'rewards', 'profile'].includes(lastSegment);
+  // Rewards is a transparent, edge-to-edge glass screen like Welcome — render the
+  // ambient glow at the layout level so it reads behind the status-bar spacer
+  // (otherwise the parent's solid background shows as a strip at the very top).
+  const onRewards = lastSegment === 'rewards';
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      {/* Ambient glow only on Welcome (absolute → no layout impact); the
-          transparent spacer + transparent Welcome screen let it read edge-to-edge. */}
-      {onWelcome && <AmbientGlow />}
+      {/* Ambient glow on the transparent, edge-to-edge tabs (Welcome + Rewards);
+          absolute → no layout impact; the transparent spacer + transparent screen
+          let it read edge-to-edge under the status bar. */}
+      {(onWelcome || onRewards) && <AmbientGlow />}
       <View style={{ height: insets.top }} />
       <Tabs
         tabBar={(props) => <EmployeeTabBar {...props} />}

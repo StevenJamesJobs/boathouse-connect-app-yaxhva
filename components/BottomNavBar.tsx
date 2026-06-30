@@ -140,6 +140,7 @@ const styles = StyleSheet.create({
     left: 10,
     right: 10,
     alignItems: 'center',
+    elevation: 12,
   },
   blurContainer: {
     width: '100%',

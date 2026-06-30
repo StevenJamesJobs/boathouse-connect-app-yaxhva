@@ -15,14 +15,14 @@ import {
 import { Image } from 'expo-image';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRedemptionSettings } from '@/hooks/useRedemptionSettings';
-import AmbientGlow from '@/components/AmbientGlow';
+import GlassCard from '@/components/GlassCard';
 import { fonts } from '@/constants/fonts';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -92,17 +92,30 @@ export default function EmployeeRewardsScreen() {
   const [loading, setLoading] = useState(true);
   const subTabPagerRef = useRef<FlatList>(null);
   const SUB_PAGES: RewardsSubTab[] = ['leaderboard', 'recent'];
+  // The pager prepends an invisible "Tools" bridge page at index 0: swiping RIGHT
+  // past Leaderboard lands on it and navigates to the Tools tab (a smooth, native
+  // way to go "back" to Tools — which sits left of Rewards in the nav) while the
+  // Leaderboard↔Recent swipe stays intact. Real sub-tabs live at indices 1+.
+  const TOOLS_BRIDGE = '__tools_bridge__';
+  const PAGER_PAGES: string[] = [TOOLS_BRIDGE, ...SUB_PAGES];
+  const pageIndexOf = (tab: RewardsSubTab) => PAGER_PAGES.indexOf(tab);
 
   const goToSubTab = (tab: RewardsSubTab) => {
-    const idx = SUB_PAGES.indexOf(tab);
-    subTabPagerRef.current?.scrollToIndex({ index: idx, animated: true });
+    subTabPagerRef.current?.scrollToIndex({ index: pageIndexOf(tab), animated: true });
     setRewardsSubTab(tab);
     if (tab === 'recent') markRecentViewed();
   };
 
   const handleSubTabScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-    const next = SUB_PAGES[idx];
+    if (idx === 0) {
+      // Landed on the Tools bridge → snap back (so returning shows the last
+      // sub-tab, not the empty page) and navigate to the Tools tab.
+      subTabPagerRef.current?.scrollToIndex({ index: pageIndexOf(rewardsSubTab), animated: false });
+      router.replace('/(portal)/employee/tools' as any);
+      return;
+    }
+    const next = PAGER_PAGES[idx] as RewardsSubTab;
     if (next && next !== rewardsSubTab) {
       setRewardsSubTab(next);
       if (next === 'recent') markRecentViewed();
@@ -270,6 +283,14 @@ export default function EmployeeRewardsScreen() {
     fetchGoogleReviews();
   }, [fetchRewardsData, fetchReviews, fetchGoogleReviews]);
 
+  // Refetch the bucks balance + leaderboard on focus so an approved/denied
+  // redemption reflects right away when the employee returns to this tab.
+  useFocusEffect(
+    useCallback(() => {
+      fetchRewardsData();
+    }, [fetchRewardsData])
+  );
+
   const getRankColor = (index: number) => {
     if (index === 0) return '#FFD700'; // Gold
     if (index === 1) return '#C0C0C0'; // Silver
@@ -277,16 +298,16 @@ export default function EmployeeRewardsScreen() {
     return colors.primary;
   };
 
-  const renderStars = (rating: number) => {
+  const renderStars = (rating: number, size = 12) => {
     return (
       <View style={styles.starsContainer}>
         {[1, 2, 3, 4, 5].map((star) => (
           <IconSymbol
             key={star}
             ios_icon_name={star <= rating ? 'star.fill' : 'star'}
-            android_material_icon_name={star <= rating ? 'star' : 'star_border'}
-            size={20}
-            color={star <= rating ? '#FFD700' : colors.textSecondary}
+            android_material_icon_name={star <= rating ? 'star' : 'star-border'}
+            size={size}
+            color={star <= rating ? '#FFD45E' : colors.textSecondary}
           />
         ))}
       </View>
@@ -302,10 +323,13 @@ export default function EmployeeRewardsScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <AmbientGlow />
-      {/* Compact glass header (mirrors the manager Rewards page) */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: insets.top + 8, paddingBottom: 6, zIndex: 5 }}>
+    // Transparent — the employee tab _layout renders the ambient glow behind the
+    // status-bar spacer so it reads edge-to-edge (no solid strip up top).
+    <View style={styles.container}>
+      {/* Compact glass header (mirrors the manager Rewards page). The employee
+          tab _layout already renders an insets.top spacer, so only a small top
+          pad here (otherwise the title is double-inset). */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingTop: 8, paddingBottom: 6, zIndex: 5 }}>
         <TouchableOpacity onPress={() => router.back()} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: colors.glass, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' }}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.text} />
         </TouchableOpacity>
@@ -366,40 +390,34 @@ export default function EmployeeRewardsScreen() {
           <View style={styles.subTabHeader}>
             <ExamRewardBlurb />
 
-            <View style={[styles.subTabContainer, { backgroundColor: colors.surface }]}>
+            <View style={[styles.subTabContainer, { backgroundColor: colors.glass, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.glassBorder }]}>
               <TouchableOpacity
-                style={[
-                  styles.subTab,
-                  rewardsSubTab === 'leaderboard' && { backgroundColor: colors.primary },
-                ]}
+                style={[styles.subTab, rewardsSubTab === 'leaderboard' && [styles.subTabActive, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]]}
                 onPress={() => goToSubTab('leaderboard')}
               >
                 <IconSymbol
                   ios_icon_name="trophy.fill"
                   android_material_icon_name="emoji-events"
-                  size={16}
-                  color={rewardsSubTab === 'leaderboard' ? colors.fireText : colors.textSecondary}
+                  size={14}
+                  color={rewardsSubTab === 'leaderboard' ? colors.text : colors.textSecondary}
                 />
                 <Text style={[
                   styles.subTabText,
-                  { color: rewardsSubTab === 'leaderboard' ? colors.fireText : colors.textSecondary },
-                ]}>
+                  { color: rewardsSubTab === 'leaderboard' ? colors.text : colors.textSecondary },
+                ]} numberOfLines={1}>
                   {t('rewards_ui:tab_leaderboard')}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[
-                  styles.subTab,
-                  rewardsSubTab === 'recent' && { backgroundColor: colors.primary },
-                ]}
+                style={[styles.subTab, rewardsSubTab === 'recent' && [styles.subTabActive, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]]}
                 onPress={() => goToSubTab('recent')}
               >
                 <View style={{ position: 'relative' }}>
                   <IconSymbol
                     ios_icon_name="clock.fill"
                     android_material_icon_name="history"
-                    size={16}
-                    color={rewardsSubTab === 'recent' ? colors.fireText : colors.textSecondary}
+                    size={14}
+                    color={rewardsSubTab === 'recent' ? colors.text : colors.textSecondary}
                   />
                   {awardsHasNew && rewardsSubTab !== 'recent' ? (
                     <View style={styles.subTabDot} />
@@ -407,26 +425,31 @@ export default function EmployeeRewardsScreen() {
                 </View>
                 <Text style={[
                   styles.subTabText,
-                  { color: rewardsSubTab === 'recent' ? colors.fireText : colors.textSecondary },
-                ]}>
+                  { color: rewardsSubTab === 'recent' ? colors.text : colors.textSecondary },
+                ]} numberOfLines={1}>
                   {t('rewards_ui:tab_recent')}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* Horizontal pager — sub-tab content swipes between Leaderboard / Recent */}
+          {/* Horizontal pager — swipes between the Tools bridge (index 0) /
+              Leaderboard / Recent */}
           <FlatList
             ref={subTabPagerRef}
-            data={SUB_PAGES}
+            data={PAGER_PAGES}
             keyExtractor={(item) => item}
             horizontal
             pagingEnabled
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={handleSubTabScroll}
             bounces={false}
+            initialScrollIndex={pageIndexOf(rewardsSubTab)}
             getItemLayout={(_, index) => ({ length: SCREEN_WIDTH, offset: SCREEN_WIDTH * index, index })}
             renderItem={({ item }) => (
+              item === TOOLS_BRIDGE ? (
+                <View style={{ width: SCREEN_WIDTH }} />
+              ) : (
               <ScrollView
                 style={{ width: SCREEN_WIDTH }}
                 contentContainerStyle={styles.contentContainer}
@@ -448,22 +471,25 @@ export default function EmployeeRewardsScreen() {
                             key={emp.id}
                             style={[
                               styles.leaderboardItem,
-                              { backgroundColor: colors.surface },
-                              isCurrentUser && { borderWidth: 2, borderColor: colors.primary },
+                              { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.surfaceBorder },
+                              isCurrentUser && { borderWidth: 1.5, borderColor: colors.tint },
                             ]}
                           >
-                            <View style={[styles.leaderboardRank, { backgroundColor: getRankColor(index) }]}>
-                              <Text style={[styles.leaderboardRankText, index >= 3 && { color: colors.fireText }]}>
-                                {index < 3 ? ['🥇', '🥈', '🥉'][index] : `#${index + 1}`}
-                              </Text>
+                            <View style={[
+                              styles.leaderboardRank,
+                              index < 3
+                                ? { backgroundColor: getRankColor(index) }
+                                : { backgroundColor: colors.tint + '29', borderWidth: StyleSheet.hairlineWidth, borderColor: colors.tint + '47' },
+                            ]}>
+                              <Text style={[styles.leaderboardRankText, index >= 3 && { color: colors.tint }]}>{index + 1}</Text>
                             </View>
                             <View style={styles.leaderboardInfo}>
-                              <Text style={[styles.leaderboardName, { color: colors.text }]}>
+                              <Text style={[styles.leaderboardName, { color: colors.text }]} numberOfLines={1}>
                                 {emp.name}{isCurrentUser ? ' (You)' : ''}
                               </Text>
-                              <Text style={[styles.leaderboardJob, { color: colors.textSecondary }]}>{emp.job_title}</Text>
+                              <Text style={[styles.leaderboardJob, { color: colors.textSecondary }]} numberOfLines={1}>{emp.job_title}</Text>
                             </View>
-                            <Text style={[styles.leaderboardBucks, { color: colors.primary }]}>${emp.mcloones_bucks || 0}</Text>
+                            <Text style={[styles.leaderboardBucks, { color: colors.tint }]}>${(emp.mcloones_bucks || 0).toLocaleString()}</Text>
                           </View>
                         );
                       })
@@ -480,7 +506,7 @@ export default function EmployeeRewardsScreen() {
                       recentTransactions.map((trans, index) => {
                         const denied = trans.isDenied;
                         return (
-                          <View key={trans.id || index} style={[styles.transactionItem, { backgroundColor: colors.surface }]}>
+                          <View key={trans.id || index} style={[styles.transactionItem, { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.surfaceBorder }]}>
                             <View style={[
                               styles.transactionIcon,
                               { backgroundColor: denied ? '#FFEBEE' : trans.amount > 0 ? '#E8F5E9' : '#FFEBEE' },
@@ -522,11 +548,12 @@ export default function EmployeeRewardsScreen() {
                   </View>
                 )}
               </ScrollView>
+              )
             )}
           />
         </View>
       ) : (
-        <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
+        <ScrollView style={[styles.scrollView, { marginTop: 10 }]} contentContainerStyle={styles.contentContainer}>
           <View style={styles.section}>
             {allReviews.length === 0 ? (
               <View style={styles.placeholderContainer}>
@@ -543,33 +570,24 @@ export default function EmployeeRewardsScreen() {
               </View>
             ) : (
               allReviews.map((review, index) => (
-                <View key={review.id || index} style={[styles.reviewCard, { backgroundColor: colors.surface }]}>
+                <GlassCard key={review.id || index} variant="surface" radius={16} style={styles.reviewCard}>
                   {review.source === 'google' ? (
                     <>
                       <View style={styles.reviewHeader}>
-                        <View style={styles.googleReviewAuthorRow}>
-                          {review.author_image ? (
-                            <Image
-                              source={review.author_image}
-                              style={styles.authorPhoto}
-                              contentFit="cover"
-                            />
-                          ) : (
-                            <View style={[styles.authorPhotoFallback, { backgroundColor: colors.primary + '20' }]}>
-                              <IconSymbol
-                                ios_icon_name="person.fill"
-                                android_material_icon_name="person"
-                                size={18}
-                                color={colors.primary}
-                              />
-                            </View>
-                          )}
-                          <Text style={[styles.reviewGuestName, { color: colors.text, flex: 1 }]}>{review.author_title}</Text>
-                          <View style={styles.googleBadge}>
-                            <Text style={styles.googleBadgeText}>G</Text>
+                        {review.author_image ? (
+                          <Image source={review.author_image} style={styles.authorPhoto} contentFit="cover" />
+                        ) : (
+                          <View style={[styles.authorPhotoFallback, { backgroundColor: colors.tint + '2E' }]}>
+                            <IconSymbol ios_icon_name="person.fill" android_material_icon_name="person" size={16} color={colors.tint} />
                           </View>
+                        )}
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={[styles.reviewGuestName, { color: colors.text }]} numberOfLines={1}>{review.author_title}</Text>
+                          {renderStars(review.review_rating, 12)}
                         </View>
-                        {renderStars(review.review_rating)}
+                        <View style={styles.googleBadge}>
+                          <Text style={styles.googleBadgeText}>G</Text>
+                        </View>
                       </View>
                       {review.review_text ? (
                         <Text style={[styles.reviewText, { color: colors.text }]}>
@@ -577,11 +595,11 @@ export default function EmployeeRewardsScreen() {
                         </Text>
                       ) : null}
                       {review.owner_answer ? (
-                        <View style={[styles.ownerReplyContainer, { borderLeftColor: colors.primary }]}>
-                          <Text style={[styles.ownerReplyLabel, { color: colors.primary }]}>
+                        <View style={[styles.ownerReplyContainer, { backgroundColor: colors.glass, borderLeftColor: colors.tint }]}>
+                          <Text style={[styles.ownerReplyLabel, { color: colors.tint }]}>
                             {t('rewards_reviews_editor:owner_reply_label')}
                           </Text>
-                          <Text style={[styles.ownerReplyText, { color: colors.text }]}>
+                          <Text style={[styles.ownerReplyText, { color: colors.textSecondary }]}>
                             {getLocalizedField(review, 'owner_answer', language)}
                           </Text>
                         </View>
@@ -593,8 +611,13 @@ export default function EmployeeRewardsScreen() {
                   ) : (
                     <>
                       <View style={styles.reviewHeader}>
-                        <Text style={[styles.reviewGuestName, { color: colors.text }]}>{review.guest_name}</Text>
-                        {renderStars(review.rating)}
+                        <View style={[styles.authorPhotoFallback, { backgroundColor: colors.tint + '2E' }]}>
+                          <Text style={[styles.reviewAvatarInitial, { color: colors.tint }]}>{review.guest_name?.charAt(0)?.toUpperCase() || '?'}</Text>
+                        </View>
+                        <View style={{ flex: 1, minWidth: 0 }}>
+                          <Text style={[styles.reviewGuestName, { color: colors.text }]} numberOfLines={1}>{review.guest_name}</Text>
+                          {renderStars(review.rating, 12)}
+                        </View>
                       </View>
                       <Text style={[styles.reviewText, { color: colors.text }]}>{review.review_text}</Text>
                       <Text style={[styles.reviewDate, { color: colors.textSecondary }]}>
@@ -602,7 +625,7 @@ export default function EmployeeRewardsScreen() {
                       </Text>
                     </>
                   )}
-                </View>
+                </GlassCard>
               ))
             )}
           </View>
@@ -703,27 +726,29 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  // Sub-tabs
+  // Sub-tabs (match the manager Rewards page)
   subTabContainer: {
     flexDirection: 'row',
-    borderRadius: 12,
+    gap: 4,
+    borderRadius: 13,
     padding: 4,
     marginBottom: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
   },
   subTab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 10,
-    gap: 6,
+    paddingVertical: 8,
+    borderRadius: 9,
+    gap: 5,
+  },
+  subTabActive: {
+    borderWidth: StyleSheet.hairlineWidth,
   },
   subTabText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.display.semibold,
+    fontSize: 11.5,
   },
 
   // Section
@@ -731,54 +756,55 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
-  // Leaderboard
+  // Leaderboard (match the manager Rewards page)
   leaderboardItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
-    padding: 14,
+    gap: 12,
+    borderRadius: 15,
+    padding: 11,
     marginBottom: 8,
-    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.08)',
-    elevation: 2,
   },
   leaderboardRank: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
   leaderboardRankText: {
+    fontFamily: fonts.mono.semibold,
     fontSize: 14,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
+    color: '#1A1E24',
   },
   leaderboardInfo: {
     flex: 1,
+    minWidth: 0,
   },
   leaderboardName: {
-    fontSize: 15,
-    fontWeight: 'bold',
+    fontFamily: fonts.display.bold,
+    fontSize: 14.5,
     marginBottom: 2,
   },
   leaderboardJob: {
-    fontSize: 13,
+    fontFamily: fonts.mono.medium,
+    fontSize: 9.5,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   leaderboardBucks: {
+    fontFamily: fonts.mono.semibold,
     fontSize: 17,
-    fontWeight: 'bold',
+    letterSpacing: -0.5,
   },
 
-  // Transactions
+  // Transactions (match the manager Rewards page)
   transactionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 15,
+    padding: 12,
     marginBottom: 8,
-    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.08)',
-    elevation: 2,
   },
   transactionIcon: {
     width: 36,
@@ -791,22 +817,26 @@ const styles = StyleSheet.create({
   transactionInfo: {
     flex: 1,
     marginRight: 12,
+    minWidth: 0,
   },
   transactionEmployee: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    marginBottom: 2,
+    fontFamily: fonts.display.bold,
+    fontSize: 14,
+    marginBottom: 3,
   },
   transactionDescription: {
-    fontSize: 13,
-    marginBottom: 2,
+    fontFamily: fonts.body.regular,
+    fontSize: 12.5,
+    marginBottom: 3,
   },
   transactionDate: {
-    fontSize: 11,
+    fontFamily: fonts.mono.medium,
+    fontSize: 9,
   },
   transactionAmount: {
-    fontSize: 17,
-    fontWeight: 'bold',
+    fontFamily: fonts.mono.semibold,
+    fontSize: 16,
+    letterSpacing: -0.5,
   },
   positiveAmount: {
     color: '#4CAF50',
@@ -826,33 +856,41 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  // Reviews
+  // Reviews (match the manager Rewards page)
   reviewCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 11,
   },
   reviewHeader: {
-    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
   },
   reviewGuestName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 8,
+    fontFamily: fonts.display.bold,
+    fontSize: 14,
+  },
+  reviewAvatarInitial: {
+    fontFamily: fonts.display.bold,
+    fontSize: 15,
   },
   starsContainer: {
     flexDirection: 'row',
-    gap: 4,
+    gap: 1,
+    marginTop: 3,
   },
   reviewText: {
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: 8,
+    fontFamily: fonts.body.regular,
+    fontSize: 12.5,
+    lineHeight: 19,
+    opacity: 0.92,
+    marginTop: 9,
   },
   reviewDate: {
-    fontSize: 12,
+    fontFamily: fonts.mono.medium,
+    fontSize: 9,
+    marginTop: 9,
   },
   googleReviewAuthorRow: {
     flexDirection: 'row',
@@ -861,14 +899,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   authorPhoto: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
   },
   authorPhotoFallback: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -876,31 +914,34 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
+    backgroundColor: '#4285F420',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#4285F455',
     alignItems: 'center',
     justifyContent: 'center',
   },
   googleBadgeText: {
-    fontSize: 13,
-    fontWeight: 'bold' as const,
+    fontFamily: fonts.mono.semibold,
+    fontSize: 11,
     color: '#4285F4',
   },
   ownerReplyContainer: {
-    borderLeftWidth: 3,
-    paddingLeft: 12,
-    marginBottom: 8,
-    marginTop: 4,
+    borderLeftWidth: 2,
+    borderRadius: 11,
+    padding: 11,
+    marginTop: 10,
   },
   ownerReplyLabel: {
-    fontSize: 12,
-    fontWeight: '600' as const,
+    fontFamily: fonts.mono.semibold,
+    fontSize: 8.5,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
     marginBottom: 4,
   },
   ownerReplyText: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontFamily: fonts.body.regular,
+    fontSize: 11.5,
+    lineHeight: 17,
   },
   placeholderContainer: {
     flex: 1,
