@@ -26,6 +26,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import BottomNavBar from '@/components/BottomNavBar';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { PictureThisCategory, PictureThisPlayMode } from '@/utils/game/pictureThisGenerator';
 
 interface Entry {
@@ -62,6 +63,7 @@ export default function PictureThisLeaderboardScreen() {
   const { user } = useAuth();
   const { organizationId } = useOrganization();
   const { t } = useTranslation();
+  const { open: openMiniProfile } = useMiniProfile();
 
   const [activePlayMode, setActivePlayMode] = useState<PictureThisPlayMode>('lives');
   const [activeCategory, setActiveCategory] = useState<PictureThisCategory>('food');
@@ -99,12 +101,14 @@ export default function PictureThisLeaderboardScreen() {
     const rank = index + 1;
     const isMe = item.user_id === user?.id;
     return (
-      <View
+      <TouchableOpacity
         style={[
           styles.entry,
           { backgroundColor: isMe ? colors.primary + '12' : colors.card },
           isMe && { borderColor: colors.primary, borderWidth: 1.5 },
         ]}
+        onPress={() => openMiniProfile(item.user_id)}
+        activeOpacity={0.7}
       >
         <View style={styles.rankBox}>
           {rank <= 3 ? (
@@ -133,7 +137,7 @@ export default function PictureThisLeaderboardScreen() {
         <Text style={[styles.score, { color: colors.primary }]}>
           {item.total_score.toLocaleString()}
         </Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 

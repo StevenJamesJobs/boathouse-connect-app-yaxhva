@@ -21,6 +21,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { useRedemptionSettings } from '@/hooks/useRedemptionSettings';
 import GlassCard from '@/components/GlassCard';
 import { fonts } from '@/constants/fonts';
@@ -79,6 +80,7 @@ type RewardsSubTab = 'leaderboard' | 'recent';
 export default function EmployeeRewardsScreen() {
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
+  const { open: openMiniProfile } = useMiniProfile();
   const { settings: redemptionSettings } = useRedemptionSettings();
   const insets = useSafeAreaInsets();
   const currencyName = organization.reward_currency_name;
@@ -467,8 +469,10 @@ export default function EmployeeRewardsScreen() {
                       topEmployees.map((emp, index) => {
                         const isCurrentUser = emp.id === user?.id;
                         return (
-                          <View
+                          <TouchableOpacity
                             key={emp.id}
+                            onPress={() => openMiniProfile(emp.id)}
+                            activeOpacity={0.75}
                             style={[
                               styles.leaderboardItem,
                               { backgroundColor: colors.surface, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.surfaceBorder },
@@ -490,7 +494,7 @@ export default function EmployeeRewardsScreen() {
                               <Text style={[styles.leaderboardJob, { color: colors.textSecondary }]} numberOfLines={1}>{emp.job_title}</Text>
                             </View>
                             <Text style={[styles.leaderboardBucks, { color: colors.tint }]}>${(emp.mcloones_bucks || 0).toLocaleString()}</Text>
-                          </View>
+                          </TouchableOpacity>
                         );
                       })
                     )}

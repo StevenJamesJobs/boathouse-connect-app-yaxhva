@@ -17,6 +17,7 @@ import { GameMode, PlayMode, GAME_MODE_INFO, LeaderboardEntry } from '@/types/ga
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
 
 export default function MemoryGameLeaderboardScreen() {
   const router = useRouter();
@@ -24,6 +25,7 @@ export default function MemoryGameLeaderboardScreen() {
   const colors = useThemeColors();
   const { user } = useAuth();
   const { organizationId } = useOrganization();
+  const { open: openMiniProfile } = useMiniProfile();
   const [activePlayMode, setActivePlayMode] = useState<PlayMode>('lives');
   const [activeMode, setActiveMode] = useState<GameMode>('wine_pairings');
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
@@ -83,12 +85,14 @@ export default function MemoryGameLeaderboardScreen() {
     const rankIcon = getRankIcon(rank);
 
     return (
-      <View
+      <TouchableOpacity
         style={[
           styles.entryRow,
           { backgroundColor: isCurrentUser ? colors.primary + '10' : colors.card },
           isCurrentUser && { borderColor: colors.primary, borderWidth: 1 },
         ]}
+        onPress={() => openMiniProfile(item.user_id)}
+        activeOpacity={0.7}
       >
         {/* Rank */}
         <View style={styles.rankContainer}>
@@ -127,7 +131,7 @@ export default function MemoryGameLeaderboardScreen() {
         <Text style={[styles.bestScore, { color: colors.primary }]}>
           {item.best_score.toLocaleString()}
         </Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 

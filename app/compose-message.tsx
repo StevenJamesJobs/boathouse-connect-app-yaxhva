@@ -55,7 +55,11 @@ export default function ComposeMessageScreen() {
   const replyAllRecipientIds = params.replyAllRecipientIds as string;
   const replySubject = params.replySubject as string;
   const isReplyAll = params.isReplyAll === 'true';
-  
+
+  // Direct-message deep link (e.g. from a mini-profile card's Message button):
+  // pre-select this recipient and skip the picker.
+  const directRecipientId = params.recipientId as string;
+
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
   const [selectedRecipients, setSelectedRecipients] = useState<User[]>([]);
@@ -116,6 +120,28 @@ export default function ComposeMessageScreen() {
       loadReplyRecipients();
     }
   }, [replyToMessageId, replyToSenderId, replySubject, loadReplyRecipients]);
+
+  // Direct message: pre-select the target recipient from the deep link.
+  const loadDirectRecipient = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name, job_title, job_titles, role')
+        .eq('id', directRecipientId)
+        .single();
+      if (error) throw error;
+      if (data) setSelectedRecipients([data] as any);
+    } catch (error) {
+      console.error('Error loading direct recipient:', error);
+    }
+  }, [directRecipientId]);
+
+  useEffect(() => {
+    // Only when arriving with a direct recipient and not in a reply flow.
+    if (directRecipientId && !replyToMessageId) {
+      loadDirectRecipient();
+    }
+  }, [directRecipientId, replyToMessageId, loadDirectRecipient]);
 
   const loadUsers = useCallback(async () => {
     try {

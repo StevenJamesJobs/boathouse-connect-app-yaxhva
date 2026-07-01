@@ -13,14 +13,23 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Share,
+  Pressable,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
+import MultiSelectField from '@/components/MultiSelectField';
+import AmbientGlow from '@/components/AmbientGlow';
+import { displayHandle } from '@/utils/displayHandle';
+import { fonts } from '@/constants/fonts';
 
 interface Employee {
   id: string;
@@ -42,6 +51,8 @@ export default function EmployeeEditorScreen() {
   const { t } = useTranslation('employee_editor');
   const colors = useThemeColors();
   const { organizationId, organization } = useOrganization();
+  const { user } = useAuth();
+  const { open: openMiniProfile } = useMiniProfile();
   const { activeJobTitles: JOB_TITLE_OPTIONS } = useOrgJobTitles();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -51,6 +62,8 @@ export default function EmployeeEditorScreen() {
   const [showInactive, setShowInactive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
 
   // New employee form state
@@ -197,6 +210,60 @@ export default function EmployeeEditorScreen() {
     });
   };
 
+  const handleDeleteEmployee = (employee: Employee) => {
+    Alert.alert(
+      t('delete_title', { defaultValue: 'Delete Employee' }),
+      t('delete_confirm', {
+        name: employee.name,
+        defaultValue: 'Delete {{name}}? This permanently removes their account and cannot be undone.',
+      }),
+      [
+        { text: t('common:cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+        {
+          text: t('delete', { defaultValue: 'Delete' }),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await (supabase.rpc as any)('delete_employee', {
+                p_actor_id: user?.id,
+                p_employee_id: employee.id,
+                p_organization_id: organizationId,
+              });
+              if (error) throw error;
+              fetchEmployees();
+            } catch (error: any) {
+              Alert.alert(t('common:error'), error?.message || t('error_delete', { defaultValue: 'Could not delete employee' }));
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const shareMessage = t('manager_manage:emp_share_msg', {
+    org: organization?.name || '',
+    code: organization?.join_code || '',
+    pw: organization?.default_password || '',
+    defaultValue: 'Join {{org}} on the team app! Use sign-up code {{code}} and temporary password {{pw}} to create your account.',
+  });
+
+  const copyCode = async () => {
+    if (!organization?.join_code) return;
+    await Clipboard.setStringAsync(organization.join_code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1600);
+  };
+
+  const shareCode = async () => {
+    if (!organization?.join_code) {
+      Alert.alert(t('manager_manage:emp_share_title', 'Invite Employees'), t('manager_manage:emp_no_code', 'No sign-up code is available yet.'));
+      return;
+    }
+    try {
+      await Share.share({ message: shareMessage });
+    } catch {}
+  };
+
   const handleToggleActive = async (employee: Employee) => {
     try {
       console.log('Toggling active status for employee:', employee.name, 'Current status:', employee.is_active);
@@ -240,19 +307,6 @@ export default function EmployeeEditorScreen() {
     return data.publicUrl;
   };
 
-  const toggleJobTitle = (title: string) => {
-    const currentTitles = [...newEmployee.job_titles];
-    const index = currentTitles.indexOf(title);
-    
-    if (index > -1) {
-      currentTitles.splice(index, 1);
-    } else {
-      currentTitles.push(title);
-    }
-    
-    console.log('Job titles updated to:', currentTitles);
-    setNewEmployee({ ...newEmployee, job_titles: currentTitles });
-  };
 
   const getJobTitlesDisplay = (employee: Employee) => {
     // Prioritize job_titles array if it exists and has items
@@ -277,6 +331,7 @@ export default function EmployeeEditorScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
+      <AmbientGlow />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -288,14 +343,24 @@ export default function EmployeeEditorScreen() {
           />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('title')}</Text>
-        <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.addButton}>
-          <IconSymbol
-            ios_icon_name="plus.circle.fill"
-            android_material_icon_name="add-circle"
-            size={28}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={() => setShowShareModal(true)} style={styles.addButton}>
+            <IconSymbol
+              ios_icon_name="person.2.badge.plus"
+              android_material_icon_name="group-add"
+              size={25}
+              color={colors.tint}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setShowAddModal(true)} style={styles.addButton}>
+            <IconSymbol
+              ios_icon_name="plus.circle.fill"
+              android_material_icon_name="add-circle"
+              size={28}
+              color={colors.primary}
+            />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Search Bar */}
@@ -355,9 +420,10 @@ export default function EmployeeEditorScreen() {
             filteredEmployees.map((employee, index) => {
               const profilePictureUrl = getProfilePictureUrl(employee.profile_picture_url);
               
+              const handle = displayHandle(employee.name, employee.username);
               return (
                 <View key={index} style={styles.employeeCard}>
-                  <View style={styles.employeeInfo}>
+                  <TouchableOpacity style={styles.employeeInfo} onPress={() => openMiniProfile(employee.id)} activeOpacity={0.7}>
                     <View style={styles.employeeAvatar}>
                       {profilePictureUrl ? (
                         <Image
@@ -368,39 +434,39 @@ export default function EmployeeEditorScreen() {
                         <IconSymbol
                           ios_icon_name="person.circle.fill"
                           android_material_icon_name="account-circle"
-                          size={50}
+                          size={46}
                           color={colors.primary}
                         />
                       )}
                     </View>
                     <View style={styles.employeeDetails}>
-                      <Text style={styles.employeeName}>{employee.name}</Text>
-                      <Text style={styles.employeeRole}>{getJobTitlesDisplay(employee)}</Text>
-                      <Text style={styles.employeeUsername}>@{employee.username}</Text>
+                      <Text style={styles.employeeName} numberOfLines={1}>{employee.name}</Text>
+                      <Text style={styles.employeeRole} numberOfLines={1}>{getJobTitlesDisplay(employee)}</Text>
+                      <View style={styles.metaRow}>
+                        {!!handle && <Text style={styles.employeeUsername} numberOfLines={1}>@{handle}</Text>}
+                        <TouchableOpacity
+                          onPress={() => handleToggleActive(employee)}
+                          hitSlop={6}
+                          style={[styles.statusChip, { backgroundColor: (employee.is_active ? '#4CAF50' : '#F44336') + '1F' }]}
+                          activeOpacity={0.7}
+                        >
+                          <View style={[styles.statusDot, { backgroundColor: employee.is_active ? '#4CAF50' : '#F44336' }]} />
+                          <Text style={[styles.statusChipText, { color: employee.is_active ? '#4CAF50' : '#F44336' }]}>
+                            {employee.is_active ? t('active', { defaultValue: 'Active' }) : t('inactive', { defaultValue: 'Inactive' })}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                   <View style={styles.employeeActions}>
-                    <TouchableOpacity
-                      style={styles.editButton}
-                      onPress={() => handleEditEmployee(employee)}
-                    >
-                      <IconSymbol
-                        ios_icon_name="pencil.circle.fill"
-                        android_material_icon_name="edit"
-                        size={36}
-                        color={colors.primary}
-                      />
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => openMiniProfile(employee.id)} hitSlop={6}>
+                      <IconSymbol ios_icon_name="person.crop.circle" android_material_icon_name="account-circle" size={22} color={colors.textSecondary} />
                     </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.statusButton}
-                      onPress={() => handleToggleActive(employee)}
-                    >
-                      <IconSymbol
-                        ios_icon_name={employee.is_active ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
-                        android_material_icon_name={employee.is_active ? 'check-circle' : 'cancel'}
-                        size={36}
-                        color={employee.is_active ? '#4CAF50' : '#F44336'}
-                      />
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleEditEmployee(employee)} hitSlop={6}>
+                      <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.tint} />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleDeleteEmployee(employee)} hitSlop={6}>
+                      <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color="#F44336" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -508,27 +574,13 @@ export default function EmployeeEditorScreen() {
 
               <View style={styles.formField}>
                 <Text style={styles.formLabel}>{t('job_titles_label')}</Text>
-                <View style={styles.jobTitlesContainer}>
-                  {JOB_TITLE_OPTIONS.map((title, idx) => (
-                    <TouchableOpacity
-                      key={idx}
-                      style={styles.checkboxRow}
-                      onPress={() => toggleJobTitle(title)}
-                    >
-                      <View style={styles.checkbox}>
-                        {newEmployee.job_titles.includes(title) && (
-                          <IconSymbol
-                            ios_icon_name="checkmark"
-                            android_material_icon_name="check"
-                            size={18}
-                            color={colors.primary}
-                          />
-                        )}
-                      </View>
-                      <Text style={styles.checkboxLabel}>{title}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <MultiSelectField
+                  options={JOB_TITLE_OPTIONS}
+                  selected={newEmployee.job_titles}
+                  onChange={(next) => setNewEmployee({ ...newEmployee, job_titles: next })}
+                  title={t('job_titles_label')}
+                  placeholder={t('job_titles_label')}
+                />
               </View>
 
               <View style={styles.formField}>
@@ -598,6 +650,42 @@ export default function EmployeeEditorScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Share / invite modal */}
+      <Modal visible={showShareModal} transparent animationType="fade" onRequestClose={() => setShowShareModal(false)}>
+        <Pressable style={styles.shareScrim} onPress={() => setShowShareModal(false)}>
+          <Pressable style={[styles.shareCard, { backgroundColor: colors.card, borderColor: colors.glassBorder }]} onPress={() => {}}>
+            <View style={styles.shareHeader}>
+              <View style={[styles.shareIcon, { backgroundColor: colors.tint + '26' }]}>
+                <IconSymbol ios_icon_name="person.2.fill" android_material_icon_name="group-add" size={18} color={colors.tint} />
+              </View>
+              <Text style={[styles.shareTitle, { color: colors.text }]}>{t('manager_manage:emp_share_title', 'Invite Employees')}</Text>
+            </View>
+            <Text style={[styles.shareCodeLabel, { color: colors.textSecondary }]}>{t('manager_manage:emp_share_code_label', 'Sign-up code')}</Text>
+            <Text style={[styles.shareCode, { color: colors.tint }]}>{organization?.join_code || '—'}</Text>
+            <View style={styles.shareBtns}>
+              <TouchableOpacity style={[styles.shareBtn, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]} onPress={copyCode} activeOpacity={0.85}>
+                <IconSymbol ios_icon_name="doc.on.doc" android_material_icon_name="content-copy" size={15} color={colors.text} />
+                <Text style={[styles.shareBtnText, { color: colors.text }]}>{copied ? t('manager_manage:emp_copied', 'Copied!') : t('manager_manage:emp_copy', 'Copy')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.shareBtn, { backgroundColor: colors.primary, borderColor: 'transparent' }]} onPress={shareCode} activeOpacity={0.85}>
+                <IconSymbol ios_icon_name="square.and.arrow.up" android_material_icon_name="ios-share" size={15} color={colors.fireText} />
+                <Text style={[styles.shareBtnText, { color: colors.fireText }]}>{t('manager_manage:emp_share_via', 'Share')}</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={[styles.sharePw, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+              <Text style={[styles.sharePwLabel, { color: colors.textSecondary }]}>{t('manager_manage:emp_default_pw_label', 'Default password (read-only)')}</Text>
+              <Text style={[styles.sharePwVal, { color: colors.text }]}>{organization?.default_password || '—'}</Text>
+            </View>
+            <Text style={[styles.shareHint, { color: colors.textSecondary }]}>
+              {t('manager_manage:emp_share_hint', "Share this code so new staff can create their own account. They'll be asked to set a new password on first login.")}
+            </Text>
+            <TouchableOpacity style={[styles.shareClose, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]} onPress={() => setShowShareModal(false)} activeOpacity={0.85}>
+              <Text style={[styles.shareBtnText, { color: colors.text }]}>{t('manager_manage:go_back', 'Go Back')}</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -618,39 +706,42 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 16,
-    backgroundColor: colors.card,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
+    paddingTop: 52,
+    paddingBottom: 12,
   },
   backButton: {
     padding: 8,
   },
   headerTitle: {
+    fontFamily: fonts.display.bold,
     fontSize: 20,
-    fontWeight: 'bold',
     color: colors.text,
   },
   addButton: {
     padding: 8,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface,
     marginHorizontal: 16,
-    marginTop: 16,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
     borderRadius: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    borderColor: colors.surfaceBorder,
   },
   searchInput: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
+    marginLeft: 10,
+    fontFamily: fonts.body.regular,
+    fontSize: 15,
     color: colors.text,
   },
   toggleContainer: {
@@ -663,23 +754,22 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     alignItems: 'center',
   },
   toggleCheckbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: colors.highlight,
-    marginRight: 12,
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: colors.tint,
+    marginRight: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.card,
   },
   toggleCheckboxActive: {
-    backgroundColor: colors.highlight,
+    backgroundColor: colors.tint,
   },
   toggleLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
+    fontFamily: fonts.body.medium,
+    fontSize: 13,
+    color: colors.textSecondary,
   },
   contentContainer: {
     flex: 1,
@@ -696,7 +786,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   emptyText: {
     textAlign: 'center',
-    fontSize: 16,
+    fontFamily: fonts.body.regular,
+    fontSize: 15,
     color: colors.textSecondary,
     marginTop: 40,
   },
@@ -704,12 +795,12 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.card,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    borderColor: colors.surfaceBorder,
   },
   employeeInfo: {
     flexDirection: 'row',
@@ -717,77 +808,103 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     flex: 1,
   },
   employeeAvatar: {
-    marginRight: 12,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    marginRight: 11,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   profileImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
   },
   employeeDetails: {
     flex: 1,
+    minWidth: 0,
   },
   employeeName: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.display.semibold,
+    fontSize: 14.5,
     color: colors.text,
-    marginBottom: 4,
   },
   employeeRole: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 2,
-  },
-  employeeUsername: {
+    fontFamily: fonts.body.regular,
     fontSize: 12,
     color: colors.textSecondary,
+    marginTop: 1,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  employeeUsername: {
+    fontFamily: fonts.mono.medium,
+    fontSize: 10.5,
+    color: colors.textSecondary,
+    flexShrink: 1,
+  },
+  statusChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusChipText: {
+    fontFamily: fonts.mono.medium,
+    fontSize: 9.5,
   },
   employeeActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
+    paddingLeft: 8,
   },
-  editButton: {
-    padding: 4,
-  },
-  statusButton: {
-    padding: 4,
+  actionBtn: {
+    padding: 3,
   },
   alphabetNav: {
-    width: 40,
-    backgroundColor: colors.card,
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-    marginRight: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
+    width: 38,
+    backgroundColor: colors.surface,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    borderColor: colors.surfaceBorder,
+    marginRight: 12,
+    marginLeft: 4,
   },
   alphabetNavContent: {
-    paddingVertical: 8,
+    paddingVertical: 6,
     alignItems: 'center',
   },
   alphabetButton: {
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 26,
     justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 2,
-    borderRadius: 16,
+    marginVertical: 1,
+    borderRadius: 13,
   },
   alphabetButtonActive: {
-    backgroundColor: colors.highlight,
+    backgroundColor: colors.tint,
   },
   alphabetButtonText: {
+    fontFamily: fonts.mono.semibold,
     fontSize: 12,
-    fontWeight: '600',
     color: colors.textSecondary,
   },
   alphabetButtonTextActive: {
-    color: colors.text,
+    color: colors.fireText,
   },
   modalOverlay: {
     flex: 1,
@@ -804,116 +921,111 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.highlight,
+    paddingHorizontal: 22,
+    paddingTop: 20,
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.hairline,
   },
   modalTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
+    fontFamily: fonts.display.bold,
+    fontSize: 19,
     color: colors.text,
   },
   modalForm: {
-    paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingHorizontal: 22,
+    paddingTop: 14,
   },
   formField: {
-    marginBottom: 20,
+    marginBottom: 18,
   },
   formLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.display.semibold,
+    fontSize: 13,
     color: colors.text,
-    marginBottom: 8,
+    marginBottom: 7,
   },
   formInput: {
-    backgroundColor: colors.card,
-    borderRadius: 8,
-    paddingHorizontal: 16,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 16,
+    fontFamily: fonts.body.regular,
+    fontSize: 15,
     color: colors.text,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.surfaceBorder,
   },
   formInputDisabled: {
     opacity: 0.6,
+    justifyContent: 'center',
   },
   formInputTextDisabled: {
-    fontSize: 16,
+    fontFamily: fonts.mono.medium,
+    fontSize: 14,
     color: colors.textSecondary,
   },
   formNote: {
-    fontSize: 12,
+    fontFamily: fonts.body.regular,
+    fontSize: 11.5,
     color: colors.textSecondary,
-    marginTop: 4,
+    marginTop: 5,
     fontStyle: 'italic',
-  },
-  jobTitlesContainer: {
-    backgroundColor: colors.card,
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: colors.highlight,
-    marginRight: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxLabel: {
-    fontSize: 16,
-    color: colors.text,
   },
   roleSelector: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   roleButton: {
     flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: colors.card,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.surfaceBorder,
     alignItems: 'center',
   },
   roleButtonActive: {
-    backgroundColor: colors.highlight,
-    borderColor: colors.highlight,
+    backgroundColor: colors.primary,
+    borderColor: 'transparent',
   },
   roleButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.display.semibold,
+    fontSize: 14,
     color: colors.textSecondary,
   },
   roleButtonTextActive: {
-    color: colors.text,
+    color: colors.fireText,
   },
   submitButton: {
-    backgroundColor: colors.highlight,
-    borderRadius: 8,
-    paddingVertical: 16,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 15,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
     marginBottom: 24,
   },
   submitButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
+    fontFamily: fonts.display.bold,
+    fontSize: 16,
+    color: colors.fireText,
   },
+
+  // Share / invite modal
+  shareScrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center', padding: 24 },
+  shareCard: { width: '100%', maxWidth: 420, borderRadius: 20, borderWidth: 1, padding: 18 },
+  shareHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
+  shareIcon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  shareTitle: { fontFamily: fonts.display.bold, fontSize: 16, flex: 1 },
+  shareCodeLabel: { fontFamily: fonts.mono.medium, fontSize: 10, letterSpacing: 1, textTransform: 'uppercase' },
+  shareCode: { fontFamily: fonts.mono.semibold, fontSize: 26, letterSpacing: 1, marginTop: 4, marginBottom: 12 },
+  shareBtns: { flexDirection: 'row', gap: 10 },
+  shareBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingVertical: 12, borderRadius: 12, borderWidth: 1 },
+  shareBtnText: { fontFamily: fonts.display.semibold, fontSize: 13 },
+  sharePw: { borderWidth: 1, borderRadius: 12, paddingHorizontal: 13, paddingVertical: 10, marginTop: 12 },
+  sharePwLabel: { fontFamily: fonts.mono.medium, fontSize: 9, letterSpacing: 0.6, textTransform: 'uppercase' },
+  sharePwVal: { fontFamily: fonts.mono.semibold, fontSize: 15, marginTop: 3 },
+  shareHint: { fontFamily: fonts.body.regular, fontSize: 11.5, lineHeight: 16, marginTop: 12 },
+  shareClose: { marginTop: 14, paddingVertical: 12, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
 });
