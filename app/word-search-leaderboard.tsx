@@ -24,6 +24,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import {
   WORD_SEARCH_CATEGORIES,
   WORD_SEARCH_CATEGORY_INFO,
@@ -48,6 +49,7 @@ export default function WordSearchLeaderboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { organizationId } = useOrganization();
+  const { open: openMiniProfile } = useMiniProfile();
   const pagerRef = useRef<FlatList>(null);
 
   const [activeCategory, setActiveCategory] = useState<WordSearchCategory>('weekly_specials');
@@ -94,12 +96,14 @@ export default function WordSearchLeaderboardScreen() {
     const isMe = item.user_id === user?.id;
     const rank = index + 1;
     return (
-      <View
+      <TouchableOpacity
         style={[
           styles.entry,
           { backgroundColor: isMe ? colors.primary + '15' : colors.card },
           isMe && { borderColor: colors.primary, borderWidth: 1.5 },
         ]}
+        onPress={() => openMiniProfile(item.user_id)}
+        activeOpacity={0.7}
       >
         <Text style={styles.rank}>
           {rank <= 3 ? RANK_EMOJIS[rank - 1] : `${rank}.`}
@@ -124,7 +128,7 @@ export default function WordSearchLeaderboardScreen() {
           </Text>
         </View>
         <Text style={[styles.entryScore, { color: colors.primary }]}>{item.best_score}</Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 

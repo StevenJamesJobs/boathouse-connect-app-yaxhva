@@ -24,6 +24,7 @@ import { NotificationProvider } from "@/contexts/NotificationContext";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { ThemeProvider as AppThemeProvider, useAppTheme } from "@/contexts/ThemeContext";
 import { SubscriptionProvider, useSubscription } from "@/contexts/SubscriptionContext";
+import { MiniProfileProvider } from "@/contexts/MiniProfileContext";
 import { REVENUECAT_ENABLED, REVENUECAT_API_KEY } from "@/config/revenueCat";
 import { fontAssets } from "@/constants/fonts";
 
@@ -269,20 +270,22 @@ function RootLayoutNav() {
         <WidgetProvider>
           <NotificationProvider>
             <GestureHandlerRootView style={{ flex: 1 }}>
-              <Stack screenOptions={{ headerShown: false }}>
-                <Stack.Screen name="index" />
-                <Stack.Screen name="login" />
-                <Stack.Screen name="onboarding" />
-                <Stack.Screen name="join" />
-                <Stack.Screen name="change-password" options={{ gestureEnabled: false }} />
-                <Stack.Screen name="(portal)" />
-                <Stack.Screen name="exam-play" options={{ gestureEnabled: false }} />
-                <Stack.Screen name="picture-this-play" options={{ gestureEnabled: false }} />
-                <Stack.Screen name="word-search-play" options={{ gestureEnabled: false }} />
-                <Stack.Screen name="memory-game-play" options={{ gestureEnabled: false }} />
-                <Stack.Screen name="subscription-management" />
-                <Stack.Screen name="paywall" options={{ gestureEnabled: false }} />
-              </Stack>
+              <MiniProfileProvider>
+                <Stack screenOptions={{ headerShown: false }}>
+                  <Stack.Screen name="index" />
+                  <Stack.Screen name="login" />
+                  <Stack.Screen name="onboarding" />
+                  <Stack.Screen name="join" />
+                  <Stack.Screen name="change-password" options={{ gestureEnabled: false }} />
+                  <Stack.Screen name="(portal)" />
+                  <Stack.Screen name="exam-play" options={{ gestureEnabled: false }} />
+                  <Stack.Screen name="picture-this-play" options={{ gestureEnabled: false }} />
+                  <Stack.Screen name="word-search-play" options={{ gestureEnabled: false }} />
+                  <Stack.Screen name="memory-game-play" options={{ gestureEnabled: false }} />
+                  <Stack.Screen name="subscription-management" />
+                  <Stack.Screen name="paywall" options={{ gestureEnabled: false }} />
+                </Stack>
+              </MiniProfileProvider>
               <SystemBars style="auto" />
             </GestureHandlerRootView>
           </NotificationProvider>

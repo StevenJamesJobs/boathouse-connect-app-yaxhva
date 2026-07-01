@@ -22,6 +22,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import * as ImagePicker from 'expo-image-picker';
 import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
+import AmbientGlow from '@/components/AmbientGlow';
+import MultiSelectField from '@/components/MultiSelectField';
+import { fonts } from '@/constants/fonts';
 
 interface Employee {
   id: string;
@@ -86,22 +89,6 @@ export default function EmployeeDetailScreen() {
       fetchEmployee();
     }
   }, [employeeId, fetchEmployee]);
-
-  const toggleJobTitle = (title: string) => {
-    if (!employee) return;
-    
-    const currentTitles = [...(employee.job_titles || [])];
-    const index = currentTitles.indexOf(title);
-    
-    if (index > -1) {
-      currentTitles.splice(index, 1);
-    } else {
-      currentTitles.push(title);
-    }
-    
-    console.log('Job titles updated to:', currentTitles);
-    setEmployee({ ...employee, job_titles: currentTitles });
-  };
 
   const handleSave = async () => {
     if (!employee) return;
@@ -330,6 +317,7 @@ export default function EmployeeDetailScreen() {
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      <AmbientGlow />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
@@ -419,27 +407,13 @@ export default function EmployeeDetailScreen() {
 
           <View style={styles.formField}>
             <Text style={styles.formLabel}>{t('job_titles')}</Text>
-            <View style={styles.jobTitlesContainer}>
-              {JOB_TITLE_OPTIONS.map((title, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  style={styles.checkboxRow}
-                  onPress={() => toggleJobTitle(title)}
-                >
-                  <View style={styles.checkbox}>
-                    {employee.job_titles && employee.job_titles.includes(title) && (
-                      <IconSymbol
-                        ios_icon_name="checkmark"
-                        android_material_icon_name="check"
-                        size={18}
-                        color={colors.primary}
-                      />
-                    )}
-                  </View>
-                  <Text style={styles.checkboxLabel}>{title}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            <MultiSelectField
+              options={JOB_TITLE_OPTIONS}
+              selected={employee.job_titles || []}
+              onChange={(next) => setEmployee({ ...employee, job_titles: next })}
+              title={t('job_titles')}
+              placeholder={t('job_titles')}
+            />
           </View>
 
           <View style={styles.formField}>
@@ -491,7 +465,7 @@ export default function EmployeeDetailScreen() {
             disabled={saving}
           >
             {saving ? (
-              <ActivityIndicator color={colors.text} />
+              <ActivityIndicator color={colors.fireText} />
             ) : (
               <Text style={styles.saveButtonText}>{t('save_changes')}</Text>
             )}
@@ -559,18 +533,15 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 16,
-    backgroundColor: colors.card,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
+    paddingTop: 52,
+    paddingBottom: 14,
   },
   backButton: {
     padding: 8,
   },
   headerTitle: {
+    fontFamily: fonts.display.bold,
     fontSize: 20,
-    fontWeight: 'bold',
     color: colors.text,
   },
   deleteButton: {
@@ -580,13 +551,13 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     flex: 1,
   },
   contentContainer: {
-    paddingTop: 20,
+    paddingTop: 12,
     paddingHorizontal: 16,
     paddingBottom: 100,
   },
   profileSection: {
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 22,
   },
   avatarContainer: {
     position: 'relative',
@@ -601,7 +572,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: colors.highlight,
+    backgroundColor: colors.primary,
     borderRadius: 20,
     width: 40,
     height: 40,
@@ -611,26 +582,28 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     borderColor: colors.background,
   },
   uploadHint: {
-    fontSize: 14,
+    fontFamily: fonts.body.regular,
+    fontSize: 13,
     color: colors.textSecondary,
     fontStyle: 'italic',
   },
   card: {
-    backgroundColor: colors.card,
+    backgroundColor: colors.surface,
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
+    padding: 18,
+    marginBottom: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    borderColor: colors.surfaceBorder,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontFamily: fonts.display.bold,
+    fontSize: 17,
     color: colors.text,
     marginBottom: 8,
   },
   sectionDescription: {
-    fontSize: 14,
+    fontFamily: fonts.body.regular,
+    fontSize: 13.5,
     color: colors.textSecondary,
     marginBottom: 16,
   },
@@ -638,111 +611,89 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     marginBottom: 16,
   },
   formLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.display.semibold,
+    fontSize: 13,
     color: colors.text,
     marginBottom: 8,
   },
   formInput: {
-    backgroundColor: colors.highlight,
-    borderRadius: 8,
-    paddingHorizontal: 16,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    fontSize: 16,
+    fontFamily: fonts.body.regular,
+    fontSize: 15,
     color: colors.text,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.surfaceBorder,
   },
   formInputDisabled: {
     opacity: 0.6,
   },
   formInputTextDisabled: {
-    fontSize: 16,
+    fontFamily: fonts.body.regular,
+    fontSize: 15,
     color: colors.textSecondary,
   },
   formNote: {
-    fontSize: 12,
+    fontFamily: fonts.body.regular,
+    fontSize: 11.5,
     color: colors.textSecondary,
-    marginTop: 4,
+    marginTop: 5,
     fontStyle: 'italic',
-  },
-  jobTitlesContainer: {
-    backgroundColor: colors.highlight,
-    borderRadius: 8,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: colors.text,
-    marginRight: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.card,
-  },
-  checkboxLabel: {
-    fontSize: 16,
-    color: colors.text,
   },
   roleSelector: {
     flexDirection: 'row',
-    gap: 12,
+    gap: 10,
   },
   roleButton: {
     flex: 1,
     paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    backgroundColor: colors.background,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.surfaceBorder,
     alignItems: 'center',
   },
   roleButtonActive: {
-    backgroundColor: colors.highlight,
-    borderColor: colors.highlight,
+    backgroundColor: colors.primary,
+    borderColor: 'transparent',
   },
   roleButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.display.semibold,
+    fontSize: 14,
     color: colors.textSecondary,
   },
   roleButtonTextActive: {
-    color: colors.text,
+    color: colors.fireText,
   },
   saveButton: {
-    backgroundColor: colors.highlight,
-    borderRadius: 8,
-    paddingVertical: 16,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+    paddingVertical: 15,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   saveButtonText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
+    fontFamily: fonts.display.bold,
+    fontSize: 16,
+    color: colors.fireText,
   },
   resetButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.highlight,
-    borderRadius: 8,
-    paddingVertical: 12,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.surfaceBorder,
+    borderRadius: 12,
+    paddingVertical: 13,
     paddingHorizontal: 16,
   },
   resetButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.display.semibold,
+    fontSize: 15,
     color: colors.text,
     marginLeft: 8,
   },
@@ -752,8 +703,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     justifyContent: 'space-between',
   },
   statusLabel: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.display.semibold,
+    fontSize: 15,
     color: colors.text,
   },
   statusBadge: {
@@ -762,8 +713,8 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     borderRadius: 20,
   },
   statusBadgeText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.body.semibold,
+    fontSize: 13,
     color: '#FFFFFF',
   },
 });

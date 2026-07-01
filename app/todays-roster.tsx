@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { isManagerOrOwner } from '@/utils/roles';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
 import ManagerTabBarStatic from '@/components/ManagerTabBarStatic';
 import ShiftEditForm, { ShiftLike } from '@/components/ShiftEditForm';
@@ -60,6 +61,7 @@ export default function TodaysRosterScreen() {
   // Roster is view-all; only managers/owners can add or edit shifts.
   const canEdit = isManagerOrOwner(user);
   const { organizationId } = useOrganization();
+  const { open: openMiniProfile } = useMiniProfile();
 
   // Build the ±30 day window anchored on today (stable for the lifetime of the screen).
   const days = useMemo(() => {
@@ -266,16 +268,30 @@ export default function TodaysRosterScreen() {
                   <TouchableOpacity
                     key={shift.id}
                     style={[styles.shiftCard, { backgroundColor: colors.card }]}
-                    onPress={canEdit ? () => openEditShift(shift) : undefined}
-                    disabled={!canEdit}
-                    activeOpacity={canEdit ? 0.7 : 1}
+                    // Managers tap the row to edit; everyone else taps to open the
+                    // coworker's mini-profile card. (Managers can still open the
+                    // card via the avatar below.)
+                    onPress={
+                      canEdit
+                        ? () => openEditShift(shift)
+                        : shift.user_id
+                        ? () => openMiniProfile(shift.user_id as string)
+                        : undefined
+                    }
+                    disabled={!canEdit && !shift.user_id}
+                    activeOpacity={canEdit || shift.user_id ? 0.7 : 1}
                   >
                     <View style={styles.shiftCardTop}>
-                      <View style={[styles.avatar, { backgroundColor: colors.primary + '15' }]}>
+                      <TouchableOpacity
+                        style={[styles.avatar, { backgroundColor: colors.primary + '15' }]}
+                        onPress={() => shift.user_id && openMiniProfile(shift.user_id as string)}
+                        disabled={!shift.user_id}
+                        activeOpacity={0.7}
+                      >
                         <Text style={[styles.avatarText, { color: colors.primary }]}>
                           {(shift.employee_name || '?').charAt(0).toUpperCase()}
                         </Text>
-                      </View>
+                      </TouchableOpacity>
 
                       <View style={styles.shiftInfo}>
                         <Text style={[styles.employeeName, { color: colors.text }]}>

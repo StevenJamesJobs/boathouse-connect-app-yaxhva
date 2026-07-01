@@ -1,4 +1,20 @@
 {
+  "multi_select": {
+    "title": "Seleccionar",
+    "placeholder": "Seleccionar…",
+    "done": "Listo",
+    "no_options": "No hay opciones disponibles"
+  },
+  "mini_profile": {
+    "next_shift": "Próximo turno",
+    "no_upcoming_shift": "Sin turnos",
+    "rank": "Rango de juego",
+    "unranked": "Sin clasificar",
+    "bucks": "Bucks",
+    "message": "Mensaje",
+    "edit": "Editar",
+    "not_found": "No se pudo cargar este perfil."
+  },
   "common": {
     "to_editor": "Al Editor",
     "to_user": "Al Usuario",
@@ -1281,6 +1297,12 @@
     "job_title_server": "Servidor"
   },
   "employee_editor": {
+    "delete_title": "Eliminar empleado",
+    "delete_confirm": "¿Eliminar a {{name}}? Esto elimina permanentemente su cuenta y no se puede deshacer.",
+    "delete": "Eliminar",
+    "error_delete": "No se pudo eliminar al empleado",
+    "active": "Activo",
+    "inactive": "Inactivo",
     "title": "Editor de Empleados",
     "search_placeholder": "Buscar empleados...",
     "show_inactive": "Mostrar Empleados Inactivos",

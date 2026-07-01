@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { getAvailableTools } from '@/config/quickTools';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { fonts } from '@/constants/fonts';
 
 type JoltRole = 'employee' | 'manager';
@@ -83,6 +84,7 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
   const router = useRouter();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
+  const { open: openMiniProfile } = useMiniProfile();
 
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -149,29 +151,33 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
       const homePath = `/(portal)/${role}` as const;
       const tasks: Promise<void>[] = [];
 
-      if (isMgr) {
-        tasks.push(
-          (async () => {
-            const { data } = await supabase
-              .from('users')
-              .select('id, name, job_title')
-              .eq('organization_id', organizationId)
-              .eq('is_active', true)
-              .order('name', { ascending: true });
-            setPeople(
-              (data || []).map((u: any) => ({
-                id: `person-${u.id}`,
-                type: 'person' as const,
-                label: u.name,
-                subtitle: u.job_title || undefined,
-                iosIcon: 'person.fill',
-                androidIcon: 'person',
-                go: () => router.push({ pathname: '/employee-detail', params: { employeeId: u.id } } as any),
-              }))
-            );
-          })()
-        );
-      }
+      // People — every role can now search coworkers (was manager-only). Tapping
+      // opens the shared read-only mini-profile card (managers get an Edit button
+      // inside it); no role gate here.
+      tasks.push(
+        (async () => {
+          const { data } = await supabase
+            .from('users')
+            .select('id, name, job_title, job_titles')
+            .eq('organization_id', organizationId)
+            .eq('is_active', true)
+            .order('name', { ascending: true });
+          setPeople(
+            (data || []).map((u: any) => ({
+              id: `person-${u.id}`,
+              type: 'person' as const,
+              label: u.name,
+              subtitle:
+                (Array.isArray(u.job_titles) && u.job_titles.length > 0
+                  ? u.job_titles.join(' · ')
+                  : u.job_title) || undefined,
+              iosIcon: 'person.fill',
+              androidIcon: 'person',
+              go: () => openMiniProfile(u.id),
+            }))
+          );
+        })()
+      );
 
       tasks.push(
         (async () => {

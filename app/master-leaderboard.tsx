@@ -23,6 +23,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { refreshAllUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
 
 type LeaderboardTab = 'overall' | 'memory' | 'word_search' | 'picture_this';
 
@@ -56,6 +57,7 @@ export default function MasterLeaderboardScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { organizationId } = useOrganization();
+  const { open: openMiniProfile } = useMiniProfile();
 
   const [activeTab, setActiveTab] = useState<LeaderboardTab>('overall');
   const [entries, setEntries] = useState<MasterLeaderboardEntry[]>([]);
@@ -100,12 +102,14 @@ export default function MasterLeaderboardScreen() {
     const isMe = item.user_id === user?.id;
 
     return (
-      <View
+      <TouchableOpacity
         style={[
           styles.entry,
           { backgroundColor: isMe ? colors.primary + '12' : colors.card },
           isMe && { borderColor: colors.primary, borderWidth: 1.5 },
         ]}
+        onPress={() => openMiniProfile(item.user_id)}
+        activeOpacity={0.7}
       >
         {/* Rank */}
         <View style={styles.rankBox}>
@@ -141,7 +145,7 @@ export default function MasterLeaderboardScreen() {
         <Text style={[styles.score, { color: colors.primary }]}>
           {item.total_score.toLocaleString()}
         </Text>
-      </View>
+      </TouchableOpacity>
     );
   };
 

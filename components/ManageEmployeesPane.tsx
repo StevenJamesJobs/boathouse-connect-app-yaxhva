@@ -23,10 +23,14 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 import GlassCard from '@/components/GlassCard';
+import MultiSelectField from '@/components/MultiSelectField';
+import { displayHandle } from '@/utils/displayHandle';
 import { fonts } from '@/constants/fonts';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -58,6 +62,8 @@ export default function ManageEmployeesPane({ width, scrollRef, onScroll, header
   const router = useRouter();
   const { t } = useTranslation();
   const { organizationId, organization } = useOrganization();
+  const { user } = useAuth();
+  const { open: openMiniProfile } = useMiniProfile();
   const { activeJobTitles: JOB_TITLE_OPTIONS } = useOrgJobTitles();
 
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -108,13 +114,6 @@ export default function ManageEmployeesPane({ width, scrollRef, onScroll, header
 
   const jobTitlesDisplay = (e: Employee) =>
     e.job_titles && e.job_titles.length > 0 ? e.job_titles.join(', ') : e.job_title || t('employee_editor.no_job_title', 'No job title');
-
-  const toggleJobTitle = (title: string) => {
-    setNewEmployee((p) => {
-      const has = p.job_titles.includes(title);
-      return { ...p, job_titles: has ? p.job_titles.filter((x) => x !== title) : [...p.job_titles, title] };
-    });
-  };
 
   const handleAdd = async () => {
     if (!newEmployee.username || !newEmployee.name || !newEmployee.email) {
@@ -167,6 +166,36 @@ export default function ManageEmployeesPane({ width, scrollRef, onScroll, header
     } catch (e) {
       Alert.alert(t('common.error', 'Error'), t('employee_editor.error_toggle_status', 'Could not update status'));
     }
+  };
+
+  const handleDelete = (emp: Employee) => {
+    Alert.alert(
+      t('employee_editor.delete_title', 'Delete Employee'),
+      t('employee_editor.delete_confirm', {
+        name: emp.name,
+        defaultValue: 'Delete {{name}}? This permanently removes their account and cannot be undone.',
+      }),
+      [
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
+        {
+          text: t('employee_editor.delete', 'Delete'),
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const { error } = await (supabase.rpc as any)('delete_employee', {
+                p_actor_id: user?.id,
+                p_employee_id: emp.id,
+                p_organization_id: organizationId!,
+              });
+              if (error) throw error;
+              fetchEmployees();
+            } catch (e: any) {
+              Alert.alert(t('common.error', 'Error'), e?.message || t('employee_editor.error_delete', 'Could not delete employee'));
+            }
+          },
+        },
+      ]
+    );
   };
 
   const shareMessage = t('manager_manage.emp_share_msg', {
@@ -252,20 +281,34 @@ export default function ManageEmployeesPane({ width, scrollRef, onScroll, header
                   <View style={styles.cardText}>
                     <Text style={[styles.cardName, { color: colors.text }]} numberOfLines={1}>{emp.name}</Text>
                     <Text style={[styles.cardRole, { color: colors.textSecondary }]} numberOfLines={1}>{jobTitlesDisplay(emp)}</Text>
-                    <Text style={[styles.cardUser, { color: colors.textSecondary }]} numberOfLines={1}>@{emp.username}</Text>
+                    <View style={styles.cardMetaRow}>
+                      {!!displayHandle(emp.name, emp.username) && (
+                        <Text style={[styles.cardUser, { color: colors.textSecondary }]} numberOfLines={1}>@{displayHandle(emp.name, emp.username)}</Text>
+                      )}
+                      {/* Active/inactive status — tap to toggle (quick deactivate/reactivate) */}
+                      <TouchableOpacity
+                        onPress={() => handleToggleActive(emp)}
+                        hitSlop={6}
+                        style={[styles.statusChip, { backgroundColor: (emp.is_active ? '#4CAF50' : '#F44336') + '1F' }]}
+                        activeOpacity={0.7}
+                      >
+                        <View style={[styles.statusDot, { backgroundColor: emp.is_active ? '#4CAF50' : '#F44336' }]} />
+                        <Text style={[styles.statusChipText, { color: emp.is_active ? '#4CAF50' : '#F44336' }]}>
+                          {emp.is_active ? t('employee_editor.active', 'Active') : t('employee_editor.inactive', 'Inactive')}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
                 <View style={styles.cardActions}>
+                  <TouchableOpacity onPress={() => openMiniProfile(emp.id)} hitSlop={6} style={styles.actionBtn}>
+                    <IconSymbol ios_icon_name="person.crop.circle" android_material_icon_name="account-circle" size={21} color={colors.textSecondary} />
+                  </TouchableOpacity>
                   <TouchableOpacity onPress={() => router.push({ pathname: '/employee-detail', params: { employeeId: emp.id } })} hitSlop={6} style={styles.actionBtn}>
                     <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={20} color={colors.tint} />
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => handleToggleActive(emp)} hitSlop={6} style={styles.actionBtn}>
-                    <IconSymbol
-                      ios_icon_name={emp.is_active ? 'checkmark.circle.fill' : 'xmark.circle.fill'}
-                      android_material_icon_name={emp.is_active ? 'check-circle' : 'cancel'}
-                      size={22}
-                      color={emp.is_active ? '#4CAF50' : '#F44336'}
-                    />
+                  <TouchableOpacity onPress={() => handleDelete(emp)} hitSlop={6} style={styles.actionBtn}>
+                    <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={20} color="#F44336" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -311,16 +354,13 @@ export default function ManageEmployeesPane({ width, scrollRef, onScroll, header
                 <TextInput style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]} value={newEmployee.email} onChangeText={(v) => setNewEmployee((p) => ({ ...p, email: v }))} placeholder={t('employee_editor.email_placeholder', 'Email')} placeholderTextColor={colors.textSecondary} keyboardType="email-address" autoCapitalize="none" />
               </Field>
               <Field label={t('employee_editor.job_titles_label', 'Job Titles')} colors={colors}>
-                <View style={[styles.jobBox, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
-                  {JOB_TITLE_OPTIONS.map((title: string) => (
-                    <TouchableOpacity key={title} style={styles.checkRow} onPress={() => toggleJobTitle(title)} activeOpacity={0.7}>
-                      <View style={[styles.check, { borderColor: colors.tint, backgroundColor: newEmployee.job_titles.includes(title) ? colors.tint : 'transparent' }]}>
-                        {newEmployee.job_titles.includes(title) && <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={13} color={colors.fireText} />}
-                      </View>
-                      <Text style={[styles.checkLabel, { color: colors.text }]}>{title}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <MultiSelectField
+                  options={JOB_TITLE_OPTIONS}
+                  selected={newEmployee.job_titles}
+                  onChange={(next) => setNewEmployee((p) => ({ ...p, job_titles: next }))}
+                  title={t('employee_editor.job_titles_label', 'Job Titles')}
+                  placeholder={t('employee_editor.job_titles_label', 'Job Titles')}
+                />
               </Field>
               <Field label={t('employee_editor.phone_number_label', 'Phone Number')} colors={colors}>
                 <TextInput style={[styles.input, { color: colors.text, backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]} value={newEmployee.phone_number} onChangeText={(v) => setNewEmployee((p) => ({ ...p, phone_number: v }))} placeholder={t('employee_editor.phone_number_placeholder', 'Phone number')} placeholderTextColor={colors.textSecondary} keyboardType="phone-pad" />
@@ -427,8 +467,12 @@ const styles = StyleSheet.create({
   cardText: { flex: 1, minWidth: 0 },
   cardName: { fontFamily: fonts.display.semibold, fontSize: 14.5 },
   cardRole: { fontFamily: fonts.body.regular, fontSize: 12, marginTop: 1 },
-  cardUser: { fontFamily: fonts.mono.medium, fontSize: 10.5, marginTop: 1 },
-  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  cardMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 },
+  cardUser: { fontFamily: fonts.mono.medium, fontSize: 10.5, flexShrink: 1 },
+  statusChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 8 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
+  statusChipText: { fontFamily: fonts.mono.medium, fontSize: 9.5 },
+  cardActions: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   actionBtn: { padding: 3 },
 
   azWrap: { position: 'absolute', right: 6, bottom: 96, width: AZ_WIDTH, zIndex: 6 },

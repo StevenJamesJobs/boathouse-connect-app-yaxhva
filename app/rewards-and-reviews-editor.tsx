@@ -37,6 +37,7 @@ import { fonts } from '@/constants/fonts';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -103,6 +104,7 @@ export default function RewardsAndReviewsEditorScreen() {
 
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
+  const { open: openMiniProfile } = useMiniProfile();
   const { hasPremium } = useSubscription();
   const currencyName = organization.reward_currency_name;
   const { sendNotification } = useNotification();
@@ -1333,16 +1335,18 @@ export default function RewardsAndReviewsEditorScreen() {
           <Text style={styles.empty}>{t('rewards_reviews_editor:no_leaderboard', 'No leaderboard data yet')}</Text>
         ) : (
           topEmployees.map((emp, i) => (
-            <GlassCard key={emp.id} variant="surface" radius={15} style={styles.lcard}>
-              <View style={[styles.medal, i === 0 ? styles.mGold : i === 1 ? styles.mSilver : i === 2 ? styles.mBronze : styles.mNeutral]}>
-                <Text style={[styles.medalTxt, i > 2 && { color: colors.tint }]}>{i + 1}</Text>
-              </View>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={styles.lname} numberOfLines={1}>{emp.name}</Text>
-                <Text style={styles.ljob} numberOfLines={1}>{emp.job_title}</Text>
-              </View>
-              <Text style={styles.lbucks}>${(emp.mcloones_bucks || 0).toLocaleString()}</Text>
-            </GlassCard>
+            <TouchableOpacity key={emp.id} onPress={() => openMiniProfile(emp.id)} activeOpacity={0.75}>
+              <GlassCard variant="surface" radius={15} style={styles.lcard}>
+                <View style={[styles.medal, i === 0 ? styles.mGold : i === 1 ? styles.mSilver : i === 2 ? styles.mBronze : styles.mNeutral]}>
+                  <Text style={[styles.medalTxt, i > 2 && { color: colors.tint }]}>{i + 1}</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.lname} numberOfLines={1}>{emp.name}</Text>
+                  <Text style={styles.ljob} numberOfLines={1}>{emp.job_title}</Text>
+                </View>
+                <Text style={styles.lbucks}>${(emp.mcloones_bucks || 0).toLocaleString()}</Text>
+              </GlassCard>
+            </TouchableOpacity>
           ))
         )}
       </View>

@@ -1,4 +1,20 @@
 {
+  "multi_select": {
+    "title": "Select",
+    "placeholder": "Select…",
+    "done": "Done",
+    "no_options": "No options available"
+  },
+  "mini_profile": {
+    "next_shift": "Next shift",
+    "no_upcoming_shift": "None scheduled",
+    "rank": "Game rank",
+    "unranked": "Unranked",
+    "bucks": "Bucks",
+    "message": "Message",
+    "edit": "Edit",
+    "not_found": "Could not load this profile."
+  },
   "common": {
     "to_editor": "To Editor",
     "to_user": "To User",
@@ -1281,6 +1297,12 @@
     "job_title_server": "Server"
   },
   "employee_editor": {
+    "delete_title": "Delete Employee",
+    "delete_confirm": "Delete {{name}}? This permanently removes their account and cannot be undone.",
+    "delete": "Delete",
+    "error_delete": "Could not delete employee",
+    "active": "Active",
+    "inactive": "Inactive",
     "title": "Employee Editor",
     "search_placeholder": "Search employees...",
     "show_inactive": "Show Inactive Employees",

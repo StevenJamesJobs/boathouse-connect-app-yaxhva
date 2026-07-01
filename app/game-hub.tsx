@@ -27,6 +27,7 @@ import { MessageBadge } from '@/components/MessageBadge';
 import { hexToRgba } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { useOrganization } from '../contexts/OrganizationContext';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
@@ -198,6 +199,7 @@ export default function GameHubScreen() {
   const { user } = useAuth();
   const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
   const { organizationId } = useOrganization();
+  const { open: openMiniProfile } = useMiniProfile();
   const { hasPremium } = useSubscription();
   const [topLeaders, setTopLeaders] = useState<LeaderboardEntry[]>([]);
   const [loadingLeaders, setLoadingLeaders] = useState(true);
@@ -319,7 +321,12 @@ export default function GameHubScreen() {
           ) : topLeaders.length > 0 ? (
             <View style={styles.top3Container}>
               {topLeaders.map((leader, index) => (
-                <View key={leader.user_id} style={[styles.leaderRow, { borderTopColor: colors.border }]}>
+                <TouchableOpacity
+                  key={leader.user_id}
+                  style={[styles.leaderRow, { borderTopColor: colors.border }]}
+                  onPress={() => openMiniProfile(leader.user_id)}
+                  activeOpacity={0.7}
+                >
                   <Text style={styles.rankMedal}>{RANK_MEDALS[index]}</Text>
                   {leader.profile_picture_url ? (
                     <Image source={{ uri: leader.profile_picture_url }} style={styles.leaderAvatar} />
@@ -336,7 +343,7 @@ export default function GameHubScreen() {
                   <Text style={[styles.leaderScore, { color: colors.primary }]}>
                     {leader.total_score.toLocaleString()}
                   </Text>
-                </View>
+                </TouchableOpacity>
               ))}
             </View>
           ) : (
