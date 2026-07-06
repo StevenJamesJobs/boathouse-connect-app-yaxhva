@@ -5,7 +5,9 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   TextInput,
+  Switch,
   Alert,
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -21,6 +23,11 @@ import { sendCustomNotification } from '@/utils/notificationHelpers';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AmbientGlow from '@/components/AmbientGlow';
+import GlassCard from '@/components/GlassCard';
+import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
+import { fonts } from '@/constants/fonts';
 
 const JOB_TITLE_OPTIONS = [
   'Banquet Captain',
@@ -36,18 +43,19 @@ const JOB_TITLE_OPTIONS = [
   'Server',
 ];
 
-interface SentNotification {
+interface DismissedItem {
   id: string;
-  title: string;
-  body: string;
-  created_at: string;
-  data: any;
+  notification_type: string;
+  item_id: string;
+  dismissed_title: string | null;
+  dismissed_at: string;
 }
 
 export default function NotificationCenter() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { organizationId } = useOrganization();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -69,103 +77,89 @@ export default function NotificationCenter() {
   const [destination, setDestination] = useState('');
   const [showDestinationPicker, setShowDestinationPicker] = useState(false);
   const [sending, setSending] = useState(false);
+  const [sendPush, setSendPush] = useState(true);
+
+  // Message field auto-grow (mirrors the bartender recipe editors)
+  const [bodyH, setBodyH] = useState(100);
+  const [bodyDragH, setBodyDragH] = useState(0);
 
   // Audience targeting
   const [audienceMode, setAudienceMode] = useState<'all' | 'job_titles'>('all');
   const [selectedJobTitles, setSelectedJobTitles] = useState<string[]>([]);
   const [showAudiencePicker, setShowAudiencePicker] = useState(false);
 
-  // Sent notification history
-  const [activeTab, setActiveTab] = useState<'compose' | 'history'>('compose');
-  const [sentNotifications, setSentNotifications] = useState<SentNotification[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+  // Recently Dismissed (replaces the retired Sent History)
+  const [activeTab, setActiveTab] = useState<'compose' | 'dismissed'>('compose');
+  const [dismissedItems, setDismissedItems] = useState<DismissedItem[]>([]);
+  const [loadingDismissed, setLoadingDismissed] = useState(false);
+  const [restoringId, setRestoringId] = useState<string | null>(null);
 
   const maxTitleLength = 50;
   const maxBodyLength = 200;
 
-  const loadSentHistory = useCallback(async () => {
-    setLoadingHistory(true);
+  const loadDismissed = useCallback(async () => {
+    setLoadingDismissed(true);
     try {
       const { data, error } = await (supabase
-        .from('custom_notifications') as any)
-        .select('id, title, body, created_at, data')
+        .from('shade_dismissals') as any)
+        .select('id, notification_type, item_id, dismissed_title, dismissed_at')
         .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false })
+        .order('dismissed_at', { ascending: false })
         .limit(40);
 
-      if (!error && data) {
-        // Hide auto-fired system notifications (e.g. leaderboard pass)
-        // from the manager-facing Sent History — those are system-driven,
-        // not manager-initiated, and would otherwise flood this view.
-        const filtered = (data as SentNotification[]).filter(
-          (n: any) => n?.data?.notificationType !== 'leaderboard_pass'
-        ).slice(0, 20);
-        setSentNotifications(filtered);
-      }
+      if (!error && data) setDismissedItems(data as DismissedItem[]);
     } catch (err) {
-      console.error('Error loading sent history:', err);
+      console.error('Error loading dismissed items:', err);
     }
-    setLoadingHistory(false);
-  }, []);
+    setLoadingDismissed(false);
+  }, [organizationId]);
 
   useFocusEffect(
     useCallback(() => {
-      if (activeTab === 'history') {
-        loadSentHistory();
+      if (activeTab === 'dismissed') {
+        loadDismissed();
       }
-    }, [activeTab])
+    }, [activeTab, loadDismissed])
   );
 
-  const handleDeleteNotification = (notif: SentNotification) => {
+  const handleRestore = (item: DismissedItem) => {
     Alert.alert(
-      'Delete Notification',
-      `Remove "${notif.title}" from the notification shade for all users?`,
+      t('notification_center.restore_title', 'Restore notification?'),
+      t('notification_center.restore_body', "This brings it back to every staff member's notification shade. It does not affect the underlying announcement, event, feature, or special."),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
-          style: 'destructive',
+          text: t('notification_center.restore', 'Restore'),
+          style: 'default',
           onPress: async () => {
-            setDeletingId(notif.id);
+            setRestoringId(item.id);
             try {
-              // Dismiss the linked source item from the shade (if we know its ID)
-              const linkedType = notif.data?.notificationType;
-              const sourceId = notif.data?.source_item_id;
-              const typeMap: Record<string, string> = {
-                announcement: 'announcement',
-                event: 'upcoming_event',
-                special_feature: 'special_feature',
-                weekly_special: 'weekly_special',
-              };
-              if (sourceId && linkedType && typeMap[linkedType]) {
-                await (supabase.from('shade_dismissals') as any)
-                  .insert({ notification_type: typeMap[linkedType], item_id: sourceId, dismissed_by: user?.id, organization_id: organizationId })
-                  .then(() => {}, () => {});
-              }
-
-              // Also dismiss the custom_notification row itself from the shade
-              await (supabase.from('shade_dismissals') as any)
-                .insert({ notification_type: 'custom_notification', item_id: notif.id, dismissed_by: user?.id, organization_id: organizationId })
-                .then(() => {}, () => {});
-
-              // Delete the custom_notifications row (removes from Sent History)
               const { error } = await (supabase
-                .from('custom_notifications') as any)
+                .from('shade_dismissals') as any)
                 .delete()
-                .eq('id', notif.id);
-
+                .eq('id', item.id);
               if (error) throw error;
-              setSentNotifications(prev => prev.filter(n => n.id !== notif.id));
+              setDismissedItems(prev => prev.filter(d => d.id !== item.id));
             } catch (err) {
-              console.error('Error deleting notification:', err);
-              Alert.alert('Error', 'Failed to delete notification.');
+              console.error('Error restoring notification:', err);
+              Alert.alert(t('common.error', 'Error'), t('notification_center.restore_error', 'Failed to restore. Please try again.'));
             }
-            setDeletingId(null);
+            setRestoringId(null);
           },
         },
       ]
     );
+  };
+
+  const typeLabel = (type: string) => {
+    switch (type) {
+      case 'announcement': return t('notification_center.type_announcement', 'Announcement');
+      case 'special_feature': return t('notification_center.type_feature', 'Special Feature');
+      case 'upcoming_event': return t('notification_center.type_event', 'Event');
+      case 'weekly_special': return t('notification_center.type_special', 'Special');
+      case 'custom_notification': return t('notification_center.type_custom', 'Notification');
+      default: return type;
+    }
   };
 
   const toggleJobTitle = (title: string) => {
@@ -243,20 +237,24 @@ export default function NotificationCenter() {
         extraData.job_titles = selectedJobTitles;
       }
 
-      // Always log to Sent History (single source of truth — edge function no longer logs)
+      // Insert the shade row so the broadcast shows in every staff member's
+      // notification shade (+ badge), whether or not a push is also sent.
       try {
         await (supabase.from('custom_notifications') as any).insert({
           title,
           body,
           sent_by: user?.id,
           organization_id: organizationId,
-          data: { ...extraData, notificationType: 'custom' },
+          data: { ...extraData, notificationType: 'custom', notificationSkipped: !sendPush },
         });
       } catch (err) {
         console.error('Failed to log notification:', err);
       }
 
-      await sendCustomNotification(title, body, Object.keys(extraData).length > 0 ? extraData : undefined, organizationId);
+      // Physical push only when the toggle is on; silent = shade + badge only.
+      if (sendPush) {
+        await sendCustomNotification(title, body, Object.keys(extraData).length > 0 ? extraData : undefined, organizationId);
+      }
 
       Alert.alert(
         t('notification_center.sent_title'),
@@ -270,6 +268,8 @@ export default function NotificationCenter() {
               setDestination('');
               setAudienceMode('all');
               setSelectedJobTitles([]);
+              setSendPush(true);
+              setBodyDragH(0);
             },
           },
         ]
@@ -318,51 +318,53 @@ export default function NotificationCenter() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
+        <AmbientGlow />
+
+        {/* Compact glass header (matches Rewards & Reviews) */}
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+          <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={8}>
             <IconSymbol
               ios_icon_name="chevron.left"
-              android_material_icon_name="arrow-back"
-              size={24}
-              color={colors.primary}
+              android_material_icon_name="chevron-left"
+              size={22}
+              color={colors.text}
             />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>
-            {t('notification_center.title')}
-          </Text>
-          <View style={{ width: 40 }} />
+          </Pressable>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>{t('notification_center.title')}</Text>
+            <Text style={styles.headerSub}>
+              {activeTab === 'compose'
+                ? t('notification_center.tab_compose', 'Compose')
+                : t('notification_center.tab_dismissed', 'Recently Dismissed')}
+            </Text>
+          </View>
         </View>
 
-        {/* Tabs: Compose / Sent History */}
+        {/* Glass segmented tabs: Compose / Recently Dismissed */}
         <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'compose' && { backgroundColor: colors.primary }]}
+          <Pressable
+            style={[styles.tab, activeTab === 'compose' && styles.tabOn]}
             onPress={() => setActiveTab('compose')}
           >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'compose' && { color: colors.fireText }]}>
-              Compose
+            <IconSymbol ios_icon_name="paperplane.fill" android_material_icon_name="send" size={14} color={activeTab === 'compose' ? colors.text : colors.textSecondary} />
+            <Text style={[styles.tabText, activeTab === 'compose' && { color: colors.text }]}>
+              {t('notification_center.tab_compose', 'Compose')}
             </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tab, activeTab === 'history' && { backgroundColor: colors.primary }]}
-            onPress={() => {
-              setActiveTab('history');
-              loadSentHistory();
-            }}
+          </Pressable>
+          <Pressable
+            style={[styles.tab, activeTab === 'dismissed' && styles.tabOn]}
+            onPress={() => { setActiveTab('dismissed'); loadDismissed(); }}
           >
-            <Text style={[styles.tabText, { color: colors.textSecondary }, activeTab === 'history' && { color: colors.fireText }]}>
-              Sent History
+            <IconSymbol ios_icon_name="clock.arrow.circlepath" android_material_icon_name="history" size={14} color={activeTab === 'dismissed' ? colors.text : colors.textSecondary} />
+            <Text style={[styles.tabText, activeTab === 'dismissed' && { color: colors.text }]}>
+              {t('notification_center.tab_dismissed', 'Recently Dismissed')}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         </View>
 
         {activeTab === 'compose' ? (
           <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-            <View style={styles.card}>
+            <GlassCard variant="surface" radius={16} style={styles.card}>
               <View style={styles.iconContainer}>
                 <IconSymbol
                   ios_icon_name="megaphone.fill"
@@ -444,21 +446,29 @@ export default function NotificationCenter() {
                     {body.length}/{maxBodyLength}
                   </Text>
                 </View>
-                <TextInput
-                  style={styles.bodyInput}
-                  placeholder={t('notification_center.message_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                  value={body}
-                  onChangeText={(text) => {
-                    if (text.length <= maxBodyLength) {
-                      setBody(text);
-                    }
-                  }}
-                  maxLength={maxBodyLength}
-                  multiline
-                  numberOfLines={4}
-                  textAlignVertical="top"
-                />
+                <View>
+                  <TextInput
+                    style={[styles.bodyInput, { minHeight: Math.max(100, bodyDragH) }]}
+                    placeholder={t('notification_center.message_placeholder')}
+                    placeholderTextColor={colors.textSecondary}
+                    value={body}
+                    onChangeText={(text) => {
+                      if (text.length <= maxBodyLength) {
+                        setBody(text);
+                      }
+                    }}
+                    maxLength={maxBodyLength}
+                    multiline
+                    scrollEnabled={false}
+                    textAlignVertical="top"
+                    onContentSizeChange={(e) => setBodyH(e.nativeEvent.contentSize.height)}
+                  />
+                  <ProcedureResizeHandle
+                    height={Math.max(100, bodyH, bodyDragH)}
+                    minHeight={100}
+                    onResize={setBodyDragH}
+                  />
+                </View>
               </View>
 
               {/* Destination Picker */}
@@ -649,6 +659,24 @@ export default function NotificationCenter() {
                 </View>
               )}
 
+              {/* Silent send toggle */}
+              <View style={styles.toggleRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.inputLabel}>{t('notification_center.push_toggle', 'Send push notification')}</Text>
+                  <Text style={styles.toggleHint}>
+                    {sendPush
+                      ? t('notification_center.push_on_hint', 'Staff get a phone alert + it shows in their shade.')
+                      : t('notification_center.push_off_hint', 'Silent — shows in the shade + badge only, no phone alert.')}
+                  </Text>
+                </View>
+                <Switch
+                  value={sendPush}
+                  onValueChange={setSendPush}
+                  trackColor={{ true: colors.primary, false: colors.border }}
+                  thumbColor={colors.fireText}
+                />
+              </View>
+
               {/* Send Button */}
               <TouchableOpacity
                 style={[
@@ -687,91 +715,69 @@ export default function NotificationCenter() {
                   {t('notification_center.preferences_hint')}
                 </Text>
               </View>
-            </View>
+            </GlassCard>
           </ScrollView>
         ) : (
-          /* Sent History Tab */
+          /* Recently Dismissed Tab */
           <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-            <View style={styles.card}>
+            <GlassCard variant="surface" radius={16} style={styles.card}>
               <View style={styles.iconContainer}>
                 <IconSymbol
                   ios_icon_name="clock.arrow.circlepath"
                   android_material_icon_name="history"
-                  size={48}
+                  size={44}
                   color={colors.primary}
                 />
               </View>
-              <Text style={styles.cardTitle}>Sent Notifications</Text>
+              <Text style={styles.cardTitle}>{t('notification_center.dismissed_title', 'Recently Dismissed')}</Text>
               <Text style={styles.cardDescription}>
-                View and manage recently sent notifications. Deleting a notification removes it from the notification shade for all users.
+                {t('notification_center.dismissed_desc', "Notifications you've cleared from everyone's shade. Restore one to bring it back for all staff — this never deletes the underlying announcement, event, feature, or special.")}
               </Text>
 
-              {loadingHistory ? (
+              {loadingDismissed ? (
                 <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} />
-              ) : sentNotifications.length === 0 ? (
+              ) : dismissedItems.length === 0 ? (
                 <View style={styles.historyEmpty}>
                   <Text style={[styles.historyEmptyText, { color: colors.textSecondary }]}>
-                    No notifications sent yet.
+                    {t('notification_center.dismissed_empty', 'Nothing dismissed recently.')}
                   </Text>
                 </View>
               ) : (
-                sentNotifications.map((notif) => (
-                  <View key={notif.id} style={[styles.historyItem, { borderColor: colors.border }]}>
+                dismissedItems.map((item) => (
+                  <View key={item.id} style={[styles.historyItem, { borderColor: colors.surfaceBorder }]}>
                     <View style={styles.historyItemContent}>
                       <View style={styles.historyItemTitleRow}>
                         <Text style={[styles.historyItemTitle, { color: colors.text }]} numberOfLines={1}>
-                          {notif.title}
+                          {item.dismissed_title || t('notification_center.dismissed_untitled', 'Dismissed notification')}
                         </Text>
-                        {notif.data?.notificationType && notif.data.notificationType !== 'custom' && (
-                          <View style={[styles.historyTypeBadge, { backgroundColor: colors.primary + '20' }]}>
-                            <Text style={[styles.historyTypeBadgeText, { color: colors.primary }]}>
-                              {notif.data.notificationType === 'announcement' ? 'Announcement' :
-                               notif.data.notificationType === 'event' ? 'Event' :
-                               notif.data.notificationType === 'special_feature' ? 'Special Feature' :
-                               notif.data.notificationType}
-                            </Text>
-                          </View>
-                        )}
+                        <View style={[styles.historyTypeBadge, { backgroundColor: colors.primary + '20' }]}>
+                          <Text style={[styles.historyTypeBadgeText, { color: colors.primary }]}>
+                            {typeLabel(item.notification_type)}
+                          </Text>
+                        </View>
                       </View>
-                      <Text style={[styles.historyItemBody, { color: colors.textSecondary }]} numberOfLines={2}>
-                        {notif.body}
+                      <Text style={[styles.historyItemTime, { color: colors.textSecondary }]}>
+                        {t('notification_center.dismissed_ago', 'Dismissed')} {getTimeAgo(item.dismissed_at)}
                       </Text>
-                      <View style={styles.historyItemMeta}>
-                        <Text style={[styles.historyItemTime, { color: colors.textSecondary }]}>
-                          {getTimeAgo(notif.created_at)}
-                        </Text>
-                        {notif.data?.notificationSkipped && (
-                          <Text style={[styles.historyItemSkipped, { color: '#F59E0B' }]}>
-                            Not sent to staff
-                          </Text>
-                        )}
-                        {notif.data?.job_titles && (
-                          <Text style={[styles.historyItemAudience, { color: colors.primary }]}>
-                            To: {(notif.data.job_titles as string[]).join(', ')}
-                          </Text>
-                        )}
-                      </View>
                     </View>
                     <TouchableOpacity
-                      style={styles.historyDeleteBtn}
-                      onPress={() => handleDeleteNotification(notif)}
-                      disabled={deletingId === notif.id}
+                      style={[styles.restoreBtn, { backgroundColor: colors.primary }]}
+                      onPress={() => handleRestore(item)}
+                      disabled={restoringId === item.id}
                     >
-                      {deletingId === notif.id ? (
-                        <ActivityIndicator size="small" color="#FF3B30" />
+                      {restoringId === item.id ? (
+                        <ActivityIndicator size="small" color={colors.fireText} />
                       ) : (
-                        <IconSymbol
-                          ios_icon_name="trash.fill"
-                          android_material_icon_name="delete"
-                          size={20}
-                          color="#FF3B30"
-                        />
+                        <>
+                          <IconSymbol ios_icon_name="arrow.uturn.backward" android_material_icon_name="undo" size={14} color={colors.fireText} />
+                          <Text style={[styles.restoreBtnText, { color: colors.fireText }]}>{t('notification_center.restore', 'Restore')}</Text>
+                        </>
                       )}
                     </TouchableOpacity>
                   </View>
                 ))
               )}
-            </View>
+            </GlassCard>
           </ScrollView>
         )}
       </View>
@@ -787,38 +793,63 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 12,
     paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 16,
-    borderBottomWidth: 0,
-    backgroundColor: colors.card,
+    paddingBottom: 10,
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: colors.card,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 8,
+    gap: 4,
+    backgroundColor: colors.glass,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
+    borderRadius: 13,
+    padding: 4,
+    marginHorizontal: 16,
+    marginBottom: 12,
   },
   tab: {
     flex: 1,
-    paddingVertical: 10,
+    paddingVertical: 9,
+    borderRadius: 9,
+    flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 10,
-    backgroundColor: colors.background,
+    justifyContent: 'center',
+    gap: 5,
+  },
+  tabOn: {
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.surfaceBorder,
   },
   tabText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 12,
+    fontFamily: fonts.display.semibold,
+    color: colors.textSecondary,
   },
   backButton: {
-    padding: 8,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: colors.glass,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '600',
+    fontSize: 19,
+    fontFamily: fonts.display.bold,
     color: colors.text,
+    letterSpacing: -0.3,
+  },
+  headerSub: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 9,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: colors.tint,
+    marginTop: 2,
   },
   content: {
     flex: 1,
@@ -827,14 +858,7 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     padding: 16,
   },
   card: {
-    borderRadius: 16,
-    padding: 24,
-    backgroundColor: colors.card,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 3,
+    padding: 22,
   },
   iconContainer: {
     alignItems: 'center',
@@ -842,13 +866,14 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   cardTitle: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontFamily: fonts.display.bold,
     textAlign: 'center',
     marginBottom: 8,
     color: colors.text,
   },
   cardDescription: {
     fontSize: 14,
+    fontFamily: fonts.body.regular,
     lineHeight: 20,
     textAlign: 'center',
     marginBottom: 24,
@@ -864,32 +889,36 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     marginBottom: 8,
   },
   inputLabel: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontFamily: fonts.display.semibold,
     color: colors.text,
   },
   characterCount: {
     fontSize: 12,
+    fontFamily: fonts.mono.medium,
     color: colors.textSecondary,
   },
   titleInput: {
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 12,
     padding: 12,
     fontSize: 16,
-    backgroundColor: colors.background,
+    fontFamily: fonts.body.regular,
+    backgroundColor: colors.glass,
     color: colors.text,
-    borderColor: colors.border,
+    borderColor: colors.glassBorder,
   },
   bodyInput: {
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 12,
     padding: 12,
+    paddingBottom: 22,
     fontSize: 16,
+    fontFamily: fonts.body.regular,
     minHeight: 100,
-    backgroundColor: colors.background,
+    backgroundColor: colors.glass,
     color: colors.text,
-    borderColor: colors.border,
+    borderColor: colors.glassBorder,
   },
   previewContainer: {
     marginBottom: 20,
@@ -938,11 +967,11 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
     borderRadius: 12,
     padding: 12,
-    backgroundColor: colors.background,
-    borderColor: colors.border,
+    backgroundColor: colors.glass,
+    borderColor: colors.glassBorder,
   },
   destinationSelectorText: {
     fontSize: 16,
@@ -1105,5 +1134,30 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
   },
   historyDeleteBtn: {
     padding: 8,
+  },
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 20,
+  },
+  toggleHint: {
+    fontSize: 12,
+    fontFamily: fonts.body.regular,
+    color: colors.textSecondary,
+    marginTop: 3,
+    lineHeight: 16,
+  },
+  restoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  restoreBtnText: {
+    fontSize: 13,
+    fontFamily: fonts.display.semibold,
   },
 });

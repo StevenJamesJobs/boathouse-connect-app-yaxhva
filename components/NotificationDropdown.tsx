@@ -23,6 +23,9 @@ import { fetchContentImagesBatch } from '@/utils/contentImages';
 import { stripFormattingTags } from '@/components/FormattedText';
 import { useUnreadContent } from '@/hooks/useUnreadContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import GlassCard from '@/components/GlassCard';
+import { fonts } from '@/constants/fonts';
+import { Image } from 'expo-image';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PAGE_SIZE = 25;
@@ -416,19 +419,21 @@ export default function NotificationDropdown({
   const handleDeleteNotification = async (item: NotificationItem) => {
     setDeletingId(item.id);
     try {
-      await (supabase.from('shade_dismissals') as any)
+      // Global hide-list: include organization_id (NOT NULL — so the dismiss actually
+      // persists) and snapshot the title for the Recently Dismissed / undo view.
+      const { error } = await (supabase.from('shade_dismissals') as any)
         .insert({
           notification_type: item.type,
           item_id: item.id,
           dismissed_by: user?.id,
+          organization_id: organizationId,
+          dismissed_title: item.title,
         });
+      // 23505 = already dismissed (unique on type + item_id) — treat as success.
+      if (error && error.code !== '23505') throw error;
       setNotifications(prev => prev.filter(n => !(n.id === item.id && n.type === item.type)));
-    } catch (err: any) {
-      if (err?.code === '23505') {
-        setNotifications(prev => prev.filter(n => !(n.id === item.id && n.type === item.type)));
-      } else {
-        console.error('Error dismissing notification:', err);
-      }
+    } catch (err) {
+      console.error('Error dismissing notification:', err);
     }
     setDeletingId(null);
   };
@@ -451,6 +456,19 @@ export default function NotificationDropdown({
     return text.length > max ? text.substring(0, max) + '...' : text;
   };
 
+  // Subtle uppercase label showing the item kind (muted/tint mono, not the loud
+  // per-type colors). Generic custom notifications get none — their own title is
+  // self-describing.
+  const typeLabel = (type: NotificationType): string => {
+    switch (type) {
+      case 'announcement': return t('notification_center.type_announcement', 'Announcement');
+      case 'special_feature': return t('notification_center.type_feature', 'Special Feature');
+      case 'upcoming_event': return t('notification_center.type_event', 'Event');
+      case 'weekly_special': return t('notification_center.type_special', 'Special');
+      default: return '';
+    }
+  };
+
   return (
     <Modal
       visible={visible}
@@ -460,23 +478,44 @@ export default function NotificationDropdown({
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <View
-          style={[styles.dropdown, { backgroundColor: colors.card }]}
+          style={styles.dropdownWrap}
           onStartShouldSetResponder={() => true}
         >
-          <View>
+          <GlassCard variant="glass" radius={16} intensity={44}>
+            {/* Semi-opaque backing so text stays readable over busy content behind the glass */}
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.card, opacity: 0.5 }]} pointerEvents="none" />
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { borderBottomColor: colors.hairline }]}>
               <Text style={[styles.headerTitle, { color: colors.text }]}>
                 {t('notifications.title', 'Notifications')}
               </Text>
-              <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={24}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
+              <View style={styles.headerActions}>
+                {isManager && (
+                  <TouchableOpacity
+                    onPress={() => { onClose(); router.push('/notification-center' as any); }}
+                    style={[styles.sendPill, { backgroundColor: colors.primary }]}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  >
+                    <IconSymbol
+                      ios_icon_name="paperplane.fill"
+                      android_material_icon_name="send"
+                      size={13}
+                      color={colors.fireText}
+                    />
+                    <Text style={[styles.sendPillText, { color: colors.fireText }]}>
+                      {t('notifications.send', 'Send')}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity onPress={onClose} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <IconSymbol
+                    ios_icon_name="xmark.circle.fill"
+                    android_material_icon_name="cancel"
+                    size={24}
+                    color={colors.textSecondary}
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Content */}
@@ -515,19 +554,23 @@ export default function NotificationDropdown({
                     <TouchableOpacity
                       style={[
                         styles.notificationItem,
-                        index < visibleCount - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border || '#F0F0F0' },
+                        index < visibleCount - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.hairline },
                       ]}
                       onPress={() => handleItemPress(item)}
                       activeOpacity={0.7}
                     >
-                      <View style={[styles.iconCircle, { backgroundColor: config.color }]}>
-                        <IconSymbol
-                          ios_icon_name={config.iconIos as any}
-                          android_material_icon_name={config.iconAndroid as any}
-                          size={16}
-                          color="#FFFFFF"
-                        />
-                      </View>
+                      {item.rawData?.thumbnail_url ? (
+                        <Image source={{ uri: item.rawData.thumbnail_url }} style={styles.iconThumb} contentFit="cover" />
+                      ) : (
+                        <View style={[styles.iconCircle, { backgroundColor: config.color + '22', borderColor: config.color + '55', borderWidth: StyleSheet.hairlineWidth }]}>
+                          <IconSymbol
+                            ios_icon_name={config.iconIos as any}
+                            android_material_icon_name={config.iconAndroid as any}
+                            size={18}
+                            color={config.color}
+                          />
+                        </View>
+                      )}
                       <View style={styles.notificationContent}>
                         <Text style={[styles.notificationTitle, { color: colors.text }]} numberOfLines={1}>
                           {item.title}
@@ -536,9 +579,16 @@ export default function NotificationDropdown({
                           {truncate(item.subtitle)}
                         </Text>
                       </View>
-                      <Text style={[styles.timeAgo, { color: colors.textSecondary }]}>
-                        {getTimeAgo(item.createdAt)}
-                      </Text>
+                      <View style={styles.metaCol}>
+                        {typeLabel(item.type) ? (
+                          <Text style={[styles.metaType, { color: colors.tint }]} numberOfLines={1}>
+                            {typeLabel(item.type)}
+                          </Text>
+                        ) : null}
+                        <Text style={[styles.timeAgo, { color: colors.textSecondary }]}>
+                          {getTimeAgo(item.createdAt)}
+                        </Text>
+                      </View>
                       {isManager && (
                         <TouchableOpacity
                           style={styles.deleteBtn}
@@ -566,7 +616,7 @@ export default function NotificationDropdown({
                 }}
               />
             )}
-          </View>
+          </GlassCard>
         </View>
       </Pressable>
     </Modal>
@@ -581,11 +631,10 @@ const styles = StyleSheet.create({
     paddingTop: 140,
     paddingHorizontal: 16,
   },
-  dropdown: {
+  dropdownWrap: {
     borderRadius: 16,
     boxShadow: '0px 8px 24px rgba(0, 0, 0, 0.15)',
     elevation: 8,
-    overflow: 'hidden',
   },
   header: {
     flexDirection: 'row',
@@ -598,7 +647,24 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontFamily: fonts.display.bold,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  sendPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  sendPillText: {
+    fontSize: 12,
+    fontFamily: fonts.display.semibold,
   },
   loadingContainer: {
     paddingVertical: 30,
@@ -621,24 +687,41 @@ const styles = StyleSheet.create({
   iconCircle: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  iconThumb: {
+    width: 36,
+    height: 36,
+    borderRadius: 11,
   },
   notificationContent: {
     flex: 1,
     gap: 2,
   },
+  metaCol: {
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  metaType: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 8.5,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    maxWidth: 92,
+  },
   notificationTitle: {
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.display.semibold,
   },
   notificationSubtitle: {
     fontSize: 12,
+    fontFamily: fonts.body.regular,
   },
   timeAgo: {
     fontSize: 12,
-    fontWeight: '500',
+    fontFamily: fonts.mono.medium,
   },
   deleteBtn: {
     padding: 4,
