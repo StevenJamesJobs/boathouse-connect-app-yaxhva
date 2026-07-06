@@ -443,37 +443,9 @@ export default function UpcomingEventsEditorScreen() {
         }
         console.log('Upcoming event created successfully');
 
-        // Look up the newly created event's ID for shade dismissal linking
-        let sourceItemId: string | undefined;
-        try {
-          const { data: created } = await (supabase.from('upcoming_events') as any)
-            .select('id')
-            .eq('title', formData.title)
-            .eq('organization_id', organizationId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-          sourceItemId = created?.id;
-        } catch {}
-
-        // Always log to Sent History (single source of truth — edge function no longer logs)
-        try {
-          await (supabase.from('custom_notifications') as any).insert({
-            title: '📅 New Event',
-            body: formData.title,
-            sent_by: user?.id,
-            organization_id: organizationId,
-            data: {
-              notificationType: 'event',
-              notificationSkipped: !shouldSendNotification,
-              category: formData.category,
-              startDateTime: startDateTime?.toISOString() || null,
-              source_item_id: sourceItemId || null,
-            },
-          });
-        } catch (err) {
-          console.error('Failed to log notification:', err);
-        }
+        // The new event shows in the notification shade live (via the upcoming_events
+        // table). No separate custom_notifications "log" row — that parallel
+        // Sent-History system was retired (it caused shade/history drift).
 
         // Send the actual push only when toggle is on
         if (shouldSendNotification) {
