@@ -3205,6 +3205,7 @@ export type Database = {
       }
       create_user: {
         Args: {
+          p_actor_id?: string
           p_email: string
           p_job_title: string
           p_name: string
@@ -3854,6 +3855,8 @@ export type Database = {
       update_password: {
         Args: {
           new_password: string
+          p_actor_id?: string
+          p_current_password?: string
           p_organization_id?: string
           user_id: string
         }
@@ -4040,6 +4043,7 @@ export type Database = {
       }
       upsert_organization_subscription: {
         Args: {
+          p_actor_id?: string
           p_current_period_end?: string
           p_current_period_start?: string
           p_is_sandbox?: boolean
