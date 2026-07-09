@@ -61,9 +61,11 @@ export function useUnreadQuizzes() {
         .in('exam_id', examIds)
         .eq('user_id', user.id);
 
+      // A quiz counts as "read" only once actually completed (completed_at set) — a
+      // started-but-unsubmitted row must NOT clear the badge.
       const completedExamIds = new Set(
         (results || [])
-          .filter((r: any) => r.completed_at || r.correct_count != null)
+          .filter((r: any) => r.completed_at != null)
           .map((r: any) => r.exam_id)
       );
 
