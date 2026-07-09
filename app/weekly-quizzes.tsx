@@ -115,11 +115,13 @@ export default function WeeklyQuizzesScreen() {
         let result: WeeklyQuizCardResult | null = null;
         if (user?.id) {
           const { data: resultData } = await (supabase.from('exam_results' as any) as any)
-            .select('correct_count, total_questions, bucks_awarded, exam_id')
+            .select('correct_count, total_questions, bucks_awarded, exam_id, completed_at')
             .eq('exam_id', exam.id)
             .eq('user_id', user.id)
             .limit(1);
-          if (resultData && resultData.length > 0) {
+          // Only a COMPLETED row counts as taken. A started-but-unsubmitted row (e.g. a submit
+          // that failed) must still show "Take Quiz" so the user isn't trapped with no way in.
+          if (resultData && resultData.length > 0 && resultData[0].completed_at) {
             result = resultData[0] as WeeklyQuizCardResult;
           }
         }

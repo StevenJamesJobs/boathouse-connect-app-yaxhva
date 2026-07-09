@@ -840,7 +840,7 @@ export default function ExamEditorScreen() {
 
     Alert.alert(
       'Allow Retake',
-      `This will reset ${entry.name}'s quiz result and allow them to retake the quiz. Their ${currencyName} from this quiz will NOT be revoked. Continue?`,
+      `This will reset ${entry.name}'s quiz result and allow them to retake the quiz. Any ${currencyName} earned from this quiz will be reversed. Continue?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -848,18 +848,14 @@ export default function ExamEditorScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Delete their exam result (including started_at record)
-              await (supabase
-                .from('exam_results' as any) as any)
-                .delete()
-                .eq('exam_id', currentExam.id)
-                .eq('user_id', entry.user_id);
-
-              // Also delete any reward dismissals for this result
-              await (supabase
-                .from('exam_reward_dismissals' as any) as any)
-                .delete()
-                .eq('user_id', entry.user_id);
+              // Reset via gated RPC: deletes the result + dismissals and claws back awarded bucks
+              const { error: resetError } = await (supabase.rpc as any)('reset_user_exam_attempt', {
+                p_exam_id: currentExam.id,
+                p_user_id: entry.user_id,
+                p_organization_id: organizationId,
+                p_actor_id: user?.id,
+              });
+              if (resetError) throw resetError;
 
               // Refresh tracker data
               await fetchCompletionData(currentExam.id);

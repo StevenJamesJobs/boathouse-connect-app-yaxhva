@@ -104,6 +104,7 @@ export default function SettingsScreen() {
         new_password: newPassword,
         p_actor_id: user.id,
         p_organization_id: organizationId,
+        p_current_password: currentPassword,
       });
       if (updateError) throw updateError;
       Alert.alert(t('common.success'), t('profile.password_changed'));

@@ -29,7 +29,7 @@ export default function ChangePasswordScreen() {
   const [error, setError] = useState('');
   const router = useRouter();
   const { user, refreshUser } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
 
   // Animation values
   const headerOpacity = useRef(new Animated.Value(0)).current;
@@ -100,6 +100,7 @@ export default function ChangePasswordScreen() {
         new_password: newPassword,
         p_actor_id: user.id,
         p_organization_id: organizationId,
+        p_current_password: organization?.default_password,
       });
 
       if (updateError) {

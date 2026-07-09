@@ -135,6 +135,7 @@ export default function ManageEmployeesPane({ width, scrollRef, onScroll, header
         p_role: newEmployee.role,
         p_password: organization?.default_password || 'changeme',
         p_organization_id: organizationId!,
+        p_actor_id: user?.id,
       });
       if (error) throw error;
       const { error: jtError } = await supabase.rpc('update_user_job_titles', {

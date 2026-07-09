@@ -161,6 +161,7 @@ export default function EmployeeEditorScreen() {
         p_role: newEmployee.role,
         p_password: newEmployee.password,
         p_organization_id: organizationId,
+        p_actor_id: user?.id,
       });
 
       if (error) {

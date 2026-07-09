@@ -170,7 +170,7 @@ export default function ExamPlayScreen() {
           .eq('user_id', user.id)
           .maybeSingle();
 
-        if (existingResult?.completed_at && existingResult?.correct_count > 0) {
+        if (existingResult?.completed_at) {
           // Already completed — redirect back
           Alert.alert(
             isSpanish ? 'Examen Completado' : 'Quiz Already Completed',

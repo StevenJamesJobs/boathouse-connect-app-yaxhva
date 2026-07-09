@@ -171,10 +171,13 @@ export function calculateResults(
   const correctCount = standardCorrect + (bonusCorrect ? 1 : 0);
   const totalQuestions = state.questions.length;
 
-  let totalBucksAwarded = standardBucks + (bonusCorrect ? bonusBucksValue : 0);
-  if (!rewardsEnabled) {
-    totalBucksAwarded = 0;
-  }
+  // McLoones bucks are stored as integers (users.mcloones_bucks / rewards_transactions.amount),
+  // and submit_exam_and_award_bucks takes an integer p_bucks_awarded. The $1/N per-quiz split
+  // produces fractional sums (e.g. 0.67), which Postgres rejects for an integer param and made
+  // the whole submit fail silently. Round the per-quiz total to a whole number.
+  let totalBucksAwarded = rewardsEnabled
+    ? Math.round(standardBucks + (bonusCorrect ? bonusBucksValue : 0))
+    : 0;
 
   const timeSeconds = state.startTime
     ? Math.floor((Date.now() - state.startTime) / 1000)
