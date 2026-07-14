@@ -13,8 +13,8 @@ import {
   ViewStyle,
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
-import { supabase } from '@/app/integrations/supabase/client';
-import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 import { useThemeColors } from '@/hooks/useThemeColors';
 
 export interface PickedEmployee {
@@ -56,7 +56,7 @@ export default function EmployeePickerModal({
   onSelect,
   onClose,
 }: EmployeePickerModalProps) {
-  const { organizationId } = useOrganization();
+  const { user } = useAuth();
   // fireText (on-primary text color) comes from the theme directly so the
   // selected row's checkmark stays readable in Moonstone without prop threading.
   const { fireText } = useThemeColors();
@@ -70,19 +70,12 @@ export default function EmployeePickerModal({
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, name, job_title, job_titles, is_active')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('name', { ascending: true });
+      const roster = await getOrgDirectory(user?.id ?? '');
       if (cancelled) return;
-      if (error) {
-        console.error('EmployeePickerModal: fetch error', error);
-        setEmployees([]);
-      } else {
-        setEmployees((data ?? []) as EmployeeRow[]);
-      }
+      const data = roster
+        .filter((r) => r.is_active)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setEmployees(data);
       setLoading(false);
     })();
     return () => {

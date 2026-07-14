@@ -36,6 +36,7 @@ import ManageEmployeesPane from '@/components/ManageEmployeesPane';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { weeklySpecialsNames } from '@/utils/categoryNames';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 import { getWeekStartDate, eventFallsOnDate } from '@/utils/dateUtils';
 import { fonts } from '@/constants/fonts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -345,8 +346,8 @@ export default function ManagerManageScreen() {
         supabase.from('schedule_uploads').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('week_start', weekStartIso),
         supabase.from('google_reviews').select('review_rating').eq('organization_id', organizationId).eq('is_published', true),
         supabase.from('menu_items').select('category, is_weekly_special').eq('organization_id', organizationId).eq('is_active', true),
-        supabase.from('users').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('is_active', true),
-        supabase.from('users').select('name, mcloones_bucks').eq('organization_id', organizationId).eq('is_active', true).order('mcloones_bucks', { ascending: false, nullsFirst: false }).limit(3),
+        getOrgDirectory(user?.id).then((rows) => ({ count: rows.filter((r) => r.is_active).length })),
+        getOrgDirectory(user?.id).then((rows) => ({ data: rows.filter((r) => r.is_active).sort((a, b) => (b.mcloones_bucks || 0) - (a.mcloones_bucks || 0)).slice(0, 3) })),
         supabase.rpc('get_master_leaderboard_overall', { p_limit: 3, p_organization_id: organizationId }),
       ]);
       // Resilient extraction — a single failed query degrades to zeros instead

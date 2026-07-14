@@ -17,6 +17,7 @@ import { Swipeable } from 'react-native-gesture-handler';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -65,6 +66,10 @@ export default function MessagesScreen() {
   const loadInboxMessages = useCallback(async () => {
     if (!user?.id) return;
 
+    // Roster for sender/recipient name/title/avatar hydration (replaces the users(...) embeds).
+    const dir = await getOrgDirectory(user.id);
+    const dirById = new Map(dir.map((r) => [r.id, r]));
+
     // Get all messages where user is a recipient, grouped by thread
     const { data, error } = await supabase
       .from('message_recipients')
@@ -83,12 +88,7 @@ export default function MessagesScreen() {
           file_name,
           parent_message_id,
           thread_id,
-          created_at,
-          sender:users!messages_sender_id_fkey (
-            name,
-            job_title,
-            profile_picture_url
-          )
+          created_at
         )
       `)
       .eq('recipient_id', user.id)
@@ -115,14 +115,10 @@ export default function MessagesScreen() {
         // Load all recipients for this message
         const { data: recipients } = await supabase
           .from('message_recipients')
-          .select(`
-            recipient:users (
-              name
-            )
-          `)
+          .select('recipient_id')
           .eq('message_id', msg.id);
 
-        const recipientNames = recipients?.map((r: any) => r.recipient?.name).filter(Boolean) || [];
+        const recipientNames = recipients?.map((r: any) => dirById.get(r.recipient_id)?.name).filter(Boolean) || [];
 
         // Count replies in this thread
         const { count: replyCount } = await supabase
@@ -160,9 +156,9 @@ export default function MessagesScreen() {
           parent_message_id: msg.parent_message_id,
           thread_id: msg.thread_id,
           created_at: msg.created_at,
-          sender_name: msg.sender?.name || 'Unknown',
-          sender_job_title: msg.sender?.job_title || '',
-          sender_profile_picture: msg.sender?.profile_picture_url || null,
+          sender_name: dirById.get(msg.sender_id)?.name || 'Unknown',
+          sender_job_title: dirById.get(msg.sender_id)?.job_title || '',
+          sender_profile_picture: dirById.get(msg.sender_id)?.profile_picture_url || null,
           is_read: !hasUnreadInThread,
           recipient_count: recipientNames.length,
           recipient_id: item.recipient_id,
@@ -193,6 +189,9 @@ export default function MessagesScreen() {
   const loadSentMessages = useCallback(async () => {
     if (!user?.id) return;
 
+    const dir = await getOrgDirectory(user.id);
+    const dirById = new Map(dir.map((r) => [r.id, r]));
+
     const { data, error } = await supabase
       .from('messages')
       .select(`
@@ -208,10 +207,7 @@ export default function MessagesScreen() {
         created_at,
         recipients:message_recipients (
           id,
-          recipient:users (
-            name,
-            job_title
-          )
+          recipient_id
         )
       `)
       .eq('sender_id', user.id)
@@ -232,7 +228,7 @@ export default function MessagesScreen() {
       }
 
       const threadId = msg.thread_id || msg.id;
-      const recipientNames = msg.recipients?.map((r: any) => r.recipient?.name).filter(Boolean) || [];
+      const recipientNames = msg.recipients?.map((r: any) => dirById.get(r.recipient_id)?.name).filter(Boolean) || [];
 
       if (!threadMap.has(threadId)) {
         // Count replies in this thread

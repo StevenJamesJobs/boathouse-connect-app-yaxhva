@@ -79,11 +79,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchOrgById = useCallback(async (orgId: string) => {
-    const { data: orgData, error: orgError } = await (supabase
-      .from('organizations' as any)
-      .select('*')
-      .eq('id', orgId)
-      .single() as any);
+    // Org derived from the acting user server-side (member-gated); orgId is always the user's own org.
+    const { data: orgRows, error: orgError } = await supabase.rpc('get_org', { p_actor_id: user?.id });
+    const orgData: any = Array.isArray(orgRows) ? orgRows[0] : orgRows;
 
     if (orgError || !orgData) {
       console.error('[OrganizationContext] Error fetching organization:', orgError);
@@ -116,7 +114,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         games_use_sample_data: orgData.games_use_sample_data ?? true,
       });
     }
-  }, []);
+  }, [user?.id]);
 
   const refreshOrganization = useCallback(async () => {
     if (organizationId) {
@@ -136,15 +134,12 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
     async function fetchOrg() {
       try {
-        const { data, error } = await (supabase
-          .from('users')
-          .select('organization_id')
-          .eq('id', user!.id)
-          .single() as any);
+        const { data, error } = await supabase.rpc('get_me', { p_user_id: user!.id });
 
         if (cancelled) return;
 
-        if (error || !data?.organization_id) {
+        const row = Array.isArray(data) ? data[0] : data;
+        if (error || !row?.organization_id) {
           console.error('[OrganizationContext] Error fetching organization_id:', error);
           setOrganizationId(null);
           setOrganization(DEFAULT_ORG);
@@ -152,8 +147,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        setOrganizationId(data.organization_id);
-        await fetchOrgById(data.organization_id);
+        setOrganizationId(row.organization_id);
+        await fetchOrgById(row.organization_id);
         if (!cancelled) setIsLoading(false);
       } catch (err) {
         if (!cancelled) {

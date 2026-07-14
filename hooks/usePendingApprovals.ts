@@ -25,7 +25,7 @@ export function usePendingApprovals() {
   const isManager = user?.role === 'manager' || user?.role === 'owner';
 
   const loadCount = useCallback(async () => {
-    if (!isManager || !organizationId) {
+    if (!isManager || !user?.id) {
       setPendingCount(0);
       setLoading(false);
       return;
@@ -33,11 +33,9 @@ export function usePendingApprovals() {
 
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const { data, error } = await (supabase
-        .from('redemption_requests' as any) as any)
-        .select('id, request_type, shift_date')
-        .eq('status', 'pending')
-        .eq('organization_id', organizationId);
+      const { data, error } = await supabase.rpc('get_pending_redemptions', {
+        p_actor_id: user.id,
+      });
 
       if (error) {
         console.error('Error loading pending approvals:', error);
@@ -52,7 +50,7 @@ export function usePendingApprovals() {
     } finally {
       setLoading(false);
     }
-  }, [isManager, organizationId]);
+  }, [isManager, user?.id]);
 
   useEffect(() => {
     loadCount();

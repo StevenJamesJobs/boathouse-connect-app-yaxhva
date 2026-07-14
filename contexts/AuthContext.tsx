@@ -28,6 +28,40 @@ if (typeof window !== 'undefined' || Platform.OS !== 'web') {
   }
 }
 
+type FetchResult =
+  | { status: 'ok'; user: User }
+  | { status: 'not_found' }
+  | { status: 'error' };
+
+// Map a users-row shape (from the login_user / get_me RPCs) to the app User model.
+function mapRowToUser(row: any): User {
+  let jobTitleDisplay = '';
+  let jobTitlesArray: string[] = [];
+  if (row.job_titles && Array.isArray(row.job_titles) && row.job_titles.length > 0) {
+    jobTitlesArray = row.job_titles;
+    jobTitleDisplay = row.job_titles.join(', ');
+  } else if (row.job_title) {
+    jobTitlesArray = [row.job_title];
+    jobTitleDisplay = row.job_title;
+  }
+  return {
+    id: row.id,
+    username: row.username,
+    name: row.name,
+    email: row.email,
+    jobTitle: jobTitleDisplay,
+    jobTitles: jobTitlesArray,
+    phoneNumber: row.phone_number || '',
+    role: row.role as 'employee' | 'manager' | 'owner',
+    organizationId: row.organization_id,
+    profilePictureUrl: row.profile_picture_url || undefined,
+    badgeTitle: row.badge_title || undefined,
+    mcloonesBucks: row.mcloones_bucks || 0,
+    quickTools: row.quick_tools ? (Array.isArray(row.quick_tools) ? row.quick_tools : JSON.parse(row.quick_tools)) : undefined,
+    forcePasswordChange: row.force_password_change || false,
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [authState, setAuthState] = useState<AuthState>({
     user: null,
@@ -35,61 +69,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: false,
   });
 
-  const fetchUserFromDatabase = async (userId: string): Promise<User | null> => {
+  const fetchUserFromDatabase = async (userId: string): Promise<FetchResult> => {
     try {
-      console.log('[AuthContext] Fetching user data from database for user:', userId);
-      
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
+      console.log('[AuthContext] Fetching user data via get_me for user:', userId);
+
+      const { data, error } = await supabase.rpc('get_me', { p_user_id: userId });
 
       if (error) {
-        console.log('[AuthContext] Error fetching user from database:', error.message);
-        return null;
+        // Transport/permission error — NOT proof the account was deleted. Do not wipe the session.
+        console.log('[AuthContext] get_me error:', error.message);
+        return { status: 'error' };
       }
 
-      if (!userData) {
-        console.log('[AuthContext] User not found in database');
-        return null;
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) {
+        console.log('[AuthContext] User not found via get_me');
+        return { status: 'not_found' };
       }
 
-      // Get job title display - prefer job_titles array, fallback to job_title
-      let jobTitleDisplay = '';
-      let jobTitlesArray: string[] = [];
-      
-      if (userData.job_titles && Array.isArray(userData.job_titles) && userData.job_titles.length > 0) {
-        jobTitlesArray = userData.job_titles;
-        jobTitleDisplay = userData.job_titles.join(', ');
-      } else if (userData.job_title) {
-        jobTitlesArray = [userData.job_title];
-        jobTitleDisplay = userData.job_title;
-      }
-
-      // Map database user to app user format
-      const user: User = {
-        id: userData.id,
-        username: userData.username,
-        name: userData.name,
-        email: userData.email,
-        jobTitle: jobTitleDisplay,
-        jobTitles: jobTitlesArray,
-        phoneNumber: userData.phone_number || '',
-        role: userData.role as 'employee' | 'manager' | 'owner',
-        organizationId: userData.organization_id,
-        profilePictureUrl: userData.profile_picture_url || undefined,
-        badgeTitle: userData.badge_title || undefined,
-        mcloonesBucks: userData.mcloones_bucks || 0,
-        quickTools: userData.quick_tools ? (Array.isArray(userData.quick_tools) ? userData.quick_tools : JSON.parse(userData.quick_tools)) : undefined,
-        forcePasswordChange: userData.force_password_change || false,
-      };
-
+      const user = mapRowToUser(row);
       console.log('[AuthContext] User data fetched successfully, org:', user.organizationId, 'job titles:', user.jobTitles);
-      return user;
+      return { status: 'ok', user };
     } catch (error) {
-      console.log('[AuthContext] Exception fetching user from database:', error);
-      return null;
+      console.log('[AuthContext] Exception in get_me:', error);
+      return { status: 'error' };
     }
   };
 
@@ -130,20 +133,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log('[AuthContext] Loaded user from storage:', storedUser.name);
             
             // Fetch the latest user data from database to get updated profile picture and job titles
-            const freshUser = await fetchUserFromDatabase(storedUser.id);
-            
-            if (freshUser) {
+            const result = await fetchUserFromDatabase(storedUser.id);
+
+            if (result.status === 'ok') {
+              const freshUser = result.user;
               // Update storage with fresh data
               await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
 
               // Update cached org branding
               if (freshUser.organizationId) {
                 try {
-                  const { data: orgData } = await supabase
-                    .from('organizations')
-                    .select('name, logo_url')
-                    .eq('id', freshUser.organizationId)
-                    .single();
+                  const { data: orgRows } = await supabase.rpc('get_org', { p_actor_id: freshUser.id });
+                  const orgData: any = Array.isArray(orgRows) ? orgRows[0] : orgRows;
                   if (orgData) {
                     await AsyncStorage.setItem('@mrc_last_org', JSON.stringify({
                       orgId: freshUser.organizationId,
@@ -161,8 +162,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 isAuthenticated: true,
               });
               return;
+            } else if (result.status === 'error') {
+              // Defense-in-depth: a transient/permission error is NOT proof the account is gone.
+              // Keep the cached session rather than logging the user out — this prevents a stale
+              // client from being bricked (session erased) during the eventual RLS teardown.
+              console.log('[AuthContext] get_me unavailable; keeping cached session');
+              setAuthState({
+                user: storedUser as User,
+                isLoading: false,
+                isAuthenticated: true,
+              });
+              return;
             } else {
-              console.log('[AuthContext] Could not fetch fresh user data, clearing stored auth');
+              // not_found — the account genuinely no longer exists; clear stored auth.
+              console.log('[AuthContext] User no longer exists, clearing stored auth');
               await AsyncStorage.removeItem(STORAGE_KEY);
               await AsyncStorage.removeItem(REMEMBER_ME_KEY);
             }
@@ -212,15 +225,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       
       console.log('[AuthContext] Refreshing user data...');
-      const freshUser = await fetchUserFromDatabase(authState.user.id);
-      
-      if (freshUser && AsyncStorage) {
+      const result = await fetchUserFromDatabase(authState.user.id);
+
+      if (result.status === 'ok') {
+        const freshUser = result.user;
         // Update storage
-        const rememberMe = await AsyncStorage.getItem(REMEMBER_ME_KEY);
-        if (rememberMe === 'true') {
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
+        if (AsyncStorage) {
+          const rememberMe = await AsyncStorage.getItem(REMEMBER_ME_KEY);
+          if (rememberMe === 'true') {
+            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
+          }
         }
-        
+
         setAuthState({
           user: freshUser,
           isLoading: false,
@@ -228,6 +244,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         console.log('[AuthContext] User data refreshed successfully');
       }
+      // On 'error' or 'not_found', leave the current session untouched (don't disrupt an active session).
     } catch (error) {
       console.log('[AuthContext] Error refreshing user:', error);
     }
@@ -240,73 +257,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Clean username - remove any leading zeros and whitespace
       const cleanUsername = username.trim();
       
-      console.log('[AuthContext] Querying database for username:', cleanUsername);
+      console.log('[AuthContext] Authenticating via login_user for username:', cleanUsername);
 
-      // Query Supabase for user by username
-      const { data: userData, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('username', cleanUsername)
-        .single();
-
-      if (error) {
-        console.log('[AuthContext] Database error:', error.message);
-        return false;
-      }
-
-      if (!userData) {
-        console.log('[AuthContext] User not found in database');
-        return false;
-      }
-
-      console.log('[AuthContext] User found:', userData.name);
-
-      // Verify password using the database function
-      const { data: passwordValid, error: verifyError } = await supabase.rpc('verify_password', {
-        user_id: userData.id,
-        password: password,
-        p_organization_id: null,
+      // Authenticate server-side: case-insensitive, constant-time, and the password hash never
+      // leaves the database. Returns 0 rows for BOTH an unknown username and a wrong password.
+      const { data, error } = await supabase.rpc('login_user', {
+        p_username: cleanUsername,
+        p_password: password,
       });
 
-      if (verifyError) {
-        console.log('[AuthContext] Password verification error:', verifyError.message);
+      if (error) {
+        console.log('[AuthContext] login_user error:', error.message);
         return false;
       }
 
-      if (!passwordValid) {
-        console.log('[AuthContext] Invalid password');
+      const row = Array.isArray(data) ? data[0] : data;
+      if (!row) {
+        console.log('[AuthContext] Invalid username or password');
         return false;
       }
 
-      // Get job title display - prefer job_titles array, fallback to job_title
-      let jobTitleDisplay = '';
-      let jobTitlesArray: string[] = [];
-      
-      if (userData.job_titles && Array.isArray(userData.job_titles) && userData.job_titles.length > 0) {
-        jobTitlesArray = userData.job_titles;
-        jobTitleDisplay = userData.job_titles.join(', ');
-      } else if (userData.job_title) {
-        jobTitlesArray = [userData.job_title];
-        jobTitleDisplay = userData.job_title;
-      }
-
-      // Map database user to app user format
-      const user: User = {
-        id: userData.id,
-        username: userData.username,
-        name: userData.name,
-        email: userData.email,
-        jobTitle: jobTitleDisplay,
-        jobTitles: jobTitlesArray,
-        phoneNumber: userData.phone_number || '',
-        role: userData.role as 'employee' | 'manager' | 'owner',
-        organizationId: userData.organization_id,
-        profilePictureUrl: userData.profile_picture_url || undefined,
-        badgeTitle: userData.badge_title || undefined,
-        mcloonesBucks: userData.mcloones_bucks || 0,
-        quickTools: userData.quick_tools ? (Array.isArray(userData.quick_tools) ? userData.quick_tools : JSON.parse(userData.quick_tools)) : undefined,
-        forcePasswordChange: userData.force_password_change || false,
-      };
+      const user = mapRowToUser(row);
 
       // Store auth state if AsyncStorage is available
       if (AsyncStorage) {
@@ -326,16 +297,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
 
       // Cache org branding for login screen (hybrid approach)
-      if (AsyncStorage && userData.organization_id) {
+      if (AsyncStorage && user.organizationId) {
         try {
-          const { data: orgData } = await supabase
-            .from('organizations')
-            .select('name, logo_url')
-            .eq('id', userData.organization_id)
-            .single();
+          const { data: orgRows } = await supabase.rpc('get_org', { p_actor_id: user.id });
+          const orgData: any = Array.isArray(orgRows) ? orgRows[0] : orgRows;
           if (orgData) {
             await AsyncStorage.setItem('@mrc_last_org', JSON.stringify({
-              orgId: userData.organization_id,
+              orgId: user.organizationId,
               orgName: orgData.name,
               logoUrl: orgData.logo_url,
             }));

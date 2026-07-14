@@ -138,16 +138,15 @@ export default function JoinScreen() {
       // suffix if that's already taken.
       const base = deriveUsername(firstName, lastName);
       const username = await findAvailableUsername(base, async (candidate) => {
-        const { data } = await supabase
-          .from('users')
-          .select('id')
-          .eq('username', candidate)
-          .maybeSingle();
-        return !!data;
+        // check_username_available returns TRUE when the name is free; "taken" is its negation.
+        const { data: available } = await supabase.rpc('check_username_available', {
+          p_username: candidate,
+        });
+        return !available;
       });
 
-      // Create user via RPC
-      const { data: newUserId, error: createError } = await supabase.rpc('create_user', {
+      // Create user via RPC (self-signup: create_user forces role=employee and force_password_change=true)
+      const { error: createError } = await supabase.rpc('create_user', {
         p_username: username,
         p_name: fullName,
         p_email: email.trim() || '',
@@ -161,18 +160,6 @@ export default function JoinScreen() {
       if (createError) {
         console.error('[Join] Error creating user:', createError);
         throw createError;
-      }
-
-      // Set force_password_change flag
-      if (newUserId) {
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({ force_password_change: true } as any)
-          .eq('id', newUserId);
-
-        if (updateError) {
-          console.error('[Join] Error setting force_password_change:', updateError);
-        }
       }
 
       // Auto-login
