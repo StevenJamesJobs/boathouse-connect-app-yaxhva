@@ -17,6 +17,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 import ShiftEditForm from '@/components/ShiftEditForm';
 import * as Haptics from 'expo-haptics';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -139,14 +140,10 @@ export default function ManualScheduleScreen() {
 
   const loadUsers = async () => {
     try {
-      const { data, error } = await (supabase
-        .from('users') as any)
-        .select('id, name, username, job_title, job_titles')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('name', { ascending: true });
-
-      if (error) throw error;
+      const directory = await getOrgDirectory(user?.id);
+      const data = directory
+        .filter((r) => r.is_active)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       setUsers(data || []);
     } catch (error) {
       console.error('Error loading users:', error);

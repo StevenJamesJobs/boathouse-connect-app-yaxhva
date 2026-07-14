@@ -29,6 +29,7 @@ import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
 import MultiSelectField from '@/components/MultiSelectField';
 import AmbientGlow from '@/components/AmbientGlow';
 import { displayHandle } from '@/utils/displayHandle';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 import { fonts } from '@/constants/fonts';
 
 interface Employee {
@@ -120,15 +121,16 @@ export default function EmployeeEditorScreen() {
     try {
       console.log('Fetching employees...');
       setLoading(true);
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('name', { ascending: true });
-
-      if (error) throw error;
+      // Hardened RPC read: org-scoped roster for the acting (logged-in) manager.
+      // getOrgDirectory is already scoped to the actor's organization, so the
+      // .eq('organization_id', ...) filter is dropped. Ordering by name is done
+      // client-side to preserve the original .order('name', { ascending: true }).
+      const roster = await getOrgDirectory(user?.id);
+      const data = [...roster].sort((a, b) =>
+        (a.name || '').localeCompare(b.name || '')
+      );
       console.log('Fetched employees:', data?.length);
-      setEmployees(data || []);
+      setEmployees(data as unknown as Employee[]);
     } catch (error) {
       console.error('Error fetching employees:', error);
       Alert.alert(t('common:error'), t('error_fetch'));
@@ -176,6 +178,7 @@ export default function EmployeeEditorScreen() {
         p_user_id: data,
         p_job_titles: newEmployee.job_titles,
         p_organization_id: organizationId,
+        p_actor_id: user?.id,
       });
 
       if (updateError) {
@@ -276,6 +279,7 @@ export default function EmployeeEditorScreen() {
         p_user_id: employee.id,
         p_is_active: newStatus,
         p_organization_id: organizationId,
+        p_actor_id: user?.id,
       });
 
       if (error) {

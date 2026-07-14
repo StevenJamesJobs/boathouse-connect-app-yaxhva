@@ -66,7 +66,7 @@ export default function MasterLeaderboardScreen() {
   const loadData = useCallback(async (tab: LeaderboardTab) => {
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc(RPC_MAP[tab], { p_limit: 20, p_organization_id: organizationId });
+      const { data, error } = await supabase.rpc(RPC_MAP[tab] as any, { p_limit: 20, p_organization_id: organizationId });
       if (!error && data) {
         setEntries(data as MasterLeaderboardEntry[]);
       } else {

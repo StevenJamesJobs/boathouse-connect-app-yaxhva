@@ -25,12 +25,13 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useNotification } from '@/contexts/NotificationContext';
 import { uploadMessageImage, validateImageSize } from '@/utils/messageImages';
 import { uploadMessageFile, validateFileSize, getFileIconInfo } from '@/utils/messageFiles';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 
 interface User {
   id: string;
   name: string;
-  job_title: string;
-  job_titles: string[];
+  job_title: string | null;
+  job_titles: string[] | null;
   role: string;
 }
 
@@ -81,25 +82,15 @@ export default function ComposeMessageScreen() {
       if (isReplyAll && replyAllRecipientIds) {
         // Reply All: Load all original recipients + sender
         const recipientIds = replyAllRecipientIds.split(',').filter(id => id !== user?.id);
-        
-        const { data, error } = await supabase
-          .from('users')
-          .select('id, name, job_title, job_titles, role')
-          .in('id', recipientIds);
 
-        if (error) throw error;
-        setSelectedRecipients(data || []);
+        const dir = await getOrgDirectory(user?.id || '');
+        setSelectedRecipients(dir.filter(r => recipientIds.includes(r.id)));
       } else if (replyToSenderId) {
         // Reply: Load only the sender
-        const { data, error } = await supabase
-          .from('users')
-          .select('id, name, job_title, job_titles, role')
-          .eq('id', replyToSenderId)
-          .single();
-
-        if (error) throw error;
-        if (data) {
-          setSelectedRecipients([data]);
+        const dir = await getOrgDirectory(user?.id || '');
+        const sender = dir.find(r => r.id === replyToSenderId);
+        if (sender) {
+          setSelectedRecipients([sender]);
         }
       }
     } catch (error) {
@@ -124,17 +115,13 @@ export default function ComposeMessageScreen() {
   // Direct message: pre-select the target recipient from the deep link.
   const loadDirectRecipient = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, name, job_title, job_titles, role')
-        .eq('id', directRecipientId)
-        .single();
-      if (error) throw error;
-      if (data) setSelectedRecipients([data] as any);
+      const dir = await getOrgDirectory(user?.id || '');
+      const recipient = dir.find(r => r.id === directRecipientId);
+      if (recipient) setSelectedRecipients([recipient] as any);
     } catch (error) {
       console.error('Error loading direct recipient:', error);
     }
-  }, [directRecipientId]);
+  }, [directRecipientId, user?.id]);
 
   useEffect(() => {
     // Only when arriving with a direct recipient and not in a reply flow.
@@ -145,19 +132,15 @@ export default function ComposeMessageScreen() {
 
   const loadUsers = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, name, job_title, job_titles, role')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .neq('id', user?.id || '')
-        .order('name');
+      const dir = await getOrgDirectory(user?.id || '');
+      const data = dir
+        .filter(r => r.is_active)
+        .filter(r => r.id !== (user?.id || ''))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-      if (error) throw error;
-      
       console.log('Loaded users:', data?.length);
       console.log('Sample user job_titles:', data?.[0]?.job_titles);
-      
+
       setAllUsers(data || []);
     } catch (error) {
       console.error('Error loading users:', error);

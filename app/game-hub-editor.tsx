@@ -24,6 +24,8 @@ import { IconSymbol } from '@/components/IconSymbol';
 import HeaderNavButton from '@/components/HeaderNavButton';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 
 interface EditorCard {
   titleKey: string;
@@ -80,6 +82,8 @@ export default function GameHubEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { organizationId, organization, refreshOrganization } = useOrganization();
+  const { user } = useAuth();
+  const authActorId = user?.id; // stable actor id — the search-result render loops shadow `user`
   const [resettingAll, setResettingAll] = useState(false);
 
   // "Use sample game data" toggle — see utils/game/gameSource.ts. ON = games
@@ -138,6 +142,7 @@ export default function GameHubEditorScreen() {
                 p_user_id: user.user_id,
                 p_is_test: willBeTest,
                 p_organization_id: organizationId,
+                p_actor_id: authActorId,
               });
               if (error) throw error;
               setSearchResults(prev => prev.map(r =>
@@ -233,16 +238,14 @@ export default function GameHubEditorScreen() {
     setSearching(true);
     setHasSearched(true);
     try {
-      // Find users matching the search
-      const { data: users, error } = await (supabase
-        .from('users') as any)
-        .select('id, name, profile_picture_url, is_test_user')
-        .eq('organization_id', organizationId)
-        .ilike('name', `%${query}%`)
-        .eq('is_active', true)
-        .limit(10) as any;
+      // Find users matching the search (org-scoped roster via hardened RPC helper)
+      const directory = await getOrgDirectory(user?.id);
+      const users = directory
+        .filter((r) => r.is_active)
+        .filter((r) => r.name?.toLowerCase().includes(query.toLowerCase()))
+        .slice(0, 10);
 
-      if (error || !users || users.length === 0) {
+      if (!users || users.length === 0) {
         setSearchResults([]);
         setSearching(false);
         return;

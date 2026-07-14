@@ -18,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { RedemptionRequestCard, RedemptionRequestRow } from '@/components/RedemptionRequestCard';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 import AmbientGlow from '@/components/AmbientGlow';
 import { fonts } from '@/constants/fonts';
 
@@ -46,12 +47,9 @@ export default function ManagerApprovalsScreen() {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const { data: reqs } = await (supabase
-        .from('redemption_requests' as any) as any)
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+      const { data: reqs } = await supabase.rpc('get_pending_redemptions', {
+        p_actor_id: user?.id,
+      });
 
       const today = new Date().toISOString().slice(0, 10);
       const filtered = ((reqs as any[]) || []).filter((r) => {
@@ -62,10 +60,7 @@ export default function ManagerApprovalsScreen() {
       const userIds = [...new Set(filtered.map((r) => r.user_id))];
       const userMap = new Map<string, string>();
       if (userIds.length) {
-        const { data: users } = await supabase
-          .from('users')
-          .select('id, name')
-          .in('id', userIds);
+        const users = (await getOrgDirectory(user?.id)).filter((r) => userIds.includes(r.id));
         (users || []).forEach((u: any) => userMap.set(u.id, u.name));
       }
       setRows(
@@ -74,7 +69,7 @@ export default function ManagerApprovalsScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id, organizationId]);
 
   useEffect(() => {
     refresh();

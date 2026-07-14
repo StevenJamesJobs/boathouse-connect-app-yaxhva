@@ -48,23 +48,19 @@ export function useUnreadAwards() {
       }
 
       if (isManager) {
-        let query = supabase
-          .from('rewards_transactions')
-          .select('id', { count: 'exact', head: true })
-          .eq('is_visible', true)
-          .gt('created_at', cutoff);
-        if (organizationId) query = query.eq('organization_id', organizationId);
-        const { count: c } = await query;
+        const { data: c } = await supabase.rpc('get_unread_awards_count', {
+          p_actor_id: user.id,
+          p_since: cutoff,
+        });
         setCount(c || 0);
         return;
       }
 
-      const { count: c } = await (supabase
-        .from('redemption_requests' as any) as any)
-        .select('id', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .in('status', ['approved', 'denied'])
-        .gt('decided_at', cutoff);
+      const { data: rows } = await supabase.rpc('get_my_redemptions', {
+        p_user_id: user.id,
+        p_statuses: ['approved', 'denied'],
+      });
+      const c = ((rows as any[]) || []).filter((r) => r.decided_at && r.decided_at > cutoff).length;
       setCount(c || 0);
     } catch (err) {
       console.error('Error checking unread awards:', err);

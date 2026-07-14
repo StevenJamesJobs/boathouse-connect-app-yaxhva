@@ -31,6 +31,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import GlassCard from '@/components/GlassCard';
 import MultiSelectField from '@/components/MultiSelectField';
 import { displayHandle } from '@/utils/displayHandle';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 import { fonts } from '@/constants/fonts';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -84,21 +85,20 @@ export default function ManageEmployeesPane({ width, scrollRef, onScroll, header
   });
 
   const fetchEmployees = useCallback(async () => {
-    if (!organizationId) return;
+    const actorId = user?.id;
+    if (!actorId) return;
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('name', { ascending: true });
-      if (error) throw error;
-      setEmployees((data || []) as Employee[]);
+      // Hardened roster read: org is derived server-side from the actor; sort by name client-side
+      // to preserve the previous .order('name', { ascending: true }) behavior.
+      const roster = await getOrgDirectory(actorId);
+      const sorted = [...roster].sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      setEmployees(sorted as unknown as Employee[]);
     } catch (e) {
       console.error('Employees pane fetch error', e);
     } finally {
       setLoading(false);
     }
-  }, [organizationId]);
+  }, [user?.id]);
 
   useFocusEffect(useCallback(() => { fetchEmployees(); }, [fetchEmployees]));
 
@@ -142,6 +142,7 @@ export default function ManageEmployeesPane({ width, scrollRef, onScroll, header
         p_user_id: newId,
         p_job_titles: newEmployee.job_titles,
         p_organization_id: organizationId!,
+        p_actor_id: user?.id,
       });
       if (jtError) throw jtError;
       setSubmitting(false);
@@ -161,6 +162,7 @@ export default function ManageEmployeesPane({ width, scrollRef, onScroll, header
         p_user_id: emp.id,
         p_is_active: !emp.is_active,
         p_organization_id: organizationId!,
+        p_actor_id: user?.id,
       });
       if (error) throw error;
       fetchEmployees();

@@ -20,6 +20,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 import { getAvailableTools } from '@/config/quickTools';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { fonts } from '@/constants/fonts';
@@ -156,12 +157,9 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
       // inside it); no role gate here.
       tasks.push(
         (async () => {
-          const { data } = await supabase
-            .from('users')
-            .select('id, name, job_title, job_titles')
-            .eq('organization_id', organizationId)
-            .eq('is_active', true)
-            .order('name', { ascending: true });
+          const data = (await getOrgDirectory(user?.id || ''))
+            .filter((r) => r.is_active)
+            .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           setPeople(
             (data || []).map((u: any) => ({
               id: `person-${u.id}`,

@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { formatTime } from '@/utils/exam/examEngine';
 import QuestionReviewList, { QuestionReviewEntry } from '@/components/QuestionReviewList';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 
 interface AnswerRecord {
   question_id: string;
@@ -92,18 +93,9 @@ export default function ExamAnswerReviewScreen() {
         return;
       }
 
-      // Fetch user
-      const { data: uData, error: uError } = await supabase
-        .from('users')
-        .select('name, profile_picture_url')
-        .eq('id', params.userId as string)
-        .maybeSingle();
-
-      if (uError) {
-        console.error('exam-answer-review: failed to load user', uError);
-        setLoadError(uError.message || 'Failed to load user.');
-        return;
-      }
+      // Fetch user via hardened org-directory helper (org-scoped by the actor).
+      const directory = await getOrgDirectory(user?.id as string);
+      const uData = directory.find((r) => r.id === (params.userId as string));
 
       if (uData) {
         setTargetUser({

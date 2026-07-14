@@ -18,6 +18,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -64,6 +65,10 @@ export default function MessageDetailScreen() {
     try {
       setLoading(true);
 
+      // Roster for sender/recipient name/title/avatar hydration (replaces the users(...) embeds).
+      const dir = await getOrgDirectory(user?.id || '');
+      const dirById = new Map(dir.map((r) => [r.id, r]));
+
       // Load the main message first
       const { data: mainMessage, error: mainError } = await supabase
         .from('messages')
@@ -75,12 +80,7 @@ export default function MessageDetailScreen() {
           image_url,
           file_url,
           file_name,
-          created_at,
-          sender:users!messages_sender_id_fkey (
-            name,
-            job_title,
-            profile_picture_url
-          )
+          created_at
         `)
         .eq('id', messageId)
         .single();
@@ -90,19 +90,14 @@ export default function MessageDetailScreen() {
       // Load all recipients of the original message
       const { data: recipients, error: recipientsError } = await supabase
         .from('message_recipients')
-        .select(`
-          recipient_id,
-          recipient:users (
-            name
-          )
-        `)
+        .select('recipient_id')
         .eq('message_id', messageId);
 
       if (recipientsError) throw recipientsError;
 
       // Store all recipient IDs and names
       const recipientIds = recipients?.map(r => r.recipient_id) || [];
-      const recipientNames = recipients?.map(r => r.recipient?.name).filter(Boolean) || [];
+      const recipientNames = recipients?.map(r => dirById.get(r.recipient_id)?.name).filter((n): n is string => Boolean(n)) || [];
       const allIds = [mainMessage.sender_id, ...recipientIds].filter(id => id !== user?.id);
       setAllRecipientIds(allIds);
 
@@ -117,12 +112,7 @@ export default function MessageDetailScreen() {
           image_url,
           file_url,
           file_name,
-          created_at,
-          sender:users!messages_sender_id_fkey (
-            name,
-            job_title,
-            profile_picture_url
-          )
+          created_at
         `)
         .or(`id.eq.${messageId},thread_id.eq.${threadId}`)
         .order('created_at', { ascending: true });
@@ -132,9 +122,9 @@ export default function MessageDetailScreen() {
       const formattedMessages: MessageThread[] = (threadMessages || [mainMessage]).map((msg: any) => ({
         id: msg.id,
         sender_id: msg.sender_id,
-        sender_name: msg.sender?.name || 'Unknown',
-        sender_job_title: msg.sender?.job_title || '',
-        sender_profile_picture: msg.sender?.profile_picture_url || null,
+        sender_name: dirById.get(msg.sender_id)?.name || 'Unknown',
+        sender_job_title: dirById.get(msg.sender_id)?.job_title || '',
+        sender_profile_picture: dirById.get(msg.sender_id)?.profile_picture_url || null,
         subject: msg.subject,
         body: msg.body,
         image_url: msg.image_url || null,

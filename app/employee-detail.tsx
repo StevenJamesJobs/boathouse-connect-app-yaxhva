@@ -59,22 +59,23 @@ export default function EmployeeDetailScreen() {
     try {
       setLoading(true);
       console.log('Fetching employee with ID:', employeeId);
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', employeeId)
-        .single();
+      const { data, error } = await supabase.rpc('get_employee', {
+        p_actor_id: user?.id ?? '',
+        p_employee_id: employeeId as string,
+      });
 
       if (error) throw error;
-      console.log('Fetched employee data:', data);
-      console.log('Employee job_titles:', data.job_titles);
-      
+      const row: any = Array.isArray(data) ? data[0] : data;
+      if (!row) throw new Error('Employee not found');
+      console.log('Fetched employee data:', row);
+      console.log('Employee job_titles:', row.job_titles);
+
       // Ensure job_titles is an array
-      if (!data.job_titles || !Array.isArray(data.job_titles)) {
-        data.job_titles = [];
+      if (!row.job_titles || !Array.isArray(row.job_titles)) {
+        row.job_titles = [];
       }
-      
-      setEmployee(data);
+
+      setEmployee(row);
     } catch (error) {
       console.error('Error fetching employee:', error);
       Alert.alert(t('common:error'), t('error_load'));
@@ -82,7 +83,7 @@ export default function EmployeeDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [employeeId, router]);
+  }, [employeeId, router, user?.id]);
 
   useEffect(() => {
     if (employeeId) {
@@ -132,6 +133,7 @@ export default function EmployeeDetailScreen() {
         p_user_id: employee.id,
         p_job_titles: employee.job_titles,
         p_organization_id: organizationId,
+        p_actor_id: user?.id,
       });
 
       if (updateError) {
@@ -239,11 +241,13 @@ export default function EmployeeDetailScreen() {
         .from('profile-pictures')
         .getPublicUrl(fileName);
 
-      // Update user record
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ profile_picture_url: urlData.publicUrl })
-        .eq('id', employee.id);
+      // Update user record via the gated RPC (manager sets an employee's photo).
+      const { error: updateError } = await supabase.rpc('update_profile_picture', {
+        user_id: employee.id,
+        picture_url: urlData.publicUrl,
+        p_organization_id: organizationId,
+        p_actor_id: user?.id,
+      });
 
       if (updateError) throw updateError;
 

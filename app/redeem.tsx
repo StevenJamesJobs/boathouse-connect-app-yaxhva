@@ -23,6 +23,7 @@ import { getLocalizedField } from '@/utils/translateContent';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { MenuItemSearchPicker, PickedMenuItem } from '@/components/MenuItemSearchPicker';
@@ -148,19 +149,14 @@ export default function EmployeeRedeemScreen() {
     if (!user?.id) return;
     setLoading(true);
     try {
-      const { data: u } = await (supabase
-        .from('users') as any)
-        .select('mcloones_bucks')
-        .eq('id', user.id)
-        .single();
+      const { data: meRows } = await supabase.rpc('get_me', { p_user_id: user.id });
+      const u = (meRows as any)?.[0];
       setBalance((u as any)?.mcloones_bucks ?? 0);
 
-      const { data: rows } = await (supabase
-        .from('redemption_requests' as any) as any)
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
+      const { data: rows } = await supabase.rpc('get_my_redemptions', {
+        p_user_id: user.id,
+        p_statuses: ['pending'],
+      });
 
       const today = new Date().toISOString().slice(0, 10);
       const filtered = ((rows as any[]) || []).filter((r) => {
@@ -313,13 +309,9 @@ export default function EmployeeRedeemScreen() {
 
       // Push to all managers
       try {
-        const { data: managers } = await supabase
-          .from('users')
-          .select('id')
-          .eq('organization_id', organizationId)
-          .in('role', ['manager', 'owner'])
-          .eq('is_active', true);
-        const managerIds = (managers || []).map((m: any) => m.id);
+        const managers = (await getOrgDirectory(user.id))
+          .filter((r) => (r.role === 'manager' || r.role === 'owner') && r.is_active);
+        const managerIds = managers.map((m) => m.id);
         if (managerIds.length > 0) {
           await sendNotification({
             userIds: managerIds,

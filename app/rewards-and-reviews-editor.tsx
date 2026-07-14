@@ -35,6 +35,7 @@ import BottomNavBar from '@/components/BottomNavBar';
 import JoltOverlay from '@/components/JoltOverlay';
 import { fonts } from '@/constants/fonts';
 import { supabase } from '@/app/integrations/supabase/client';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
@@ -269,56 +270,55 @@ export default function RewardsAndReviewsEditorScreen() {
 
   const fetchEmployees = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, username, name, job_title, mcloones_bucks')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      setEmployees(data || []);
+      const dir = await getOrgDirectory(user?.id || '');
+      const data = dir
+        .filter((r) => r.is_active)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+        .map((r) => ({
+          id: r.id,
+          username: r.username,
+          name: r.name,
+          job_title: r.job_title ?? '',
+          mcloones_bucks: r.mcloones_bucks ?? 0,
+        }));
+      setEmployees(data);
     } catch (error) {
       console.error('Error fetching employees:', error);
     }
-  }, [organizationId]);
+  }, [user?.id]);
 
   const fetchRewardsData = useCallback(async () => {
     try {
       // Fetch current user's bucks
       if (user?.id) {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('mcloones_bucks')
-          .eq('id', user.id)
-          .single();
-
-        if (!userError && userData) {
-          setMyBucks(userData.mcloones_bucks || 0);
+        const { data: meData, error: meError } = await (supabase as any).rpc('get_me', { p_user_id: user?.id });
+        const me = meData?.[0];
+        if (!meError && me) {
+          setMyBucks(me.mcloones_bucks || 0);
         }
       }
 
       // Fetch top 10 employees
-      const { data: topData, error: topError } = await supabase
-        .from('users')
-        .select('id, name, job_title, mcloones_bucks')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('mcloones_bucks', { ascending: false })
-        .limit(10);
-
-      if (!topError && topData) {
-        setTopEmployees(topData);
-      }
+      const dir = await getOrgDirectory(user?.id || '');
+      const topData = dir
+        .filter((r) => r.is_active)
+        .sort((a, b) => (b.mcloones_bucks || 0) - (a.mcloones_bucks || 0))
+        .slice(0, 10)
+        .map((r) => ({
+          id: r.id,
+          username: r.username,
+          name: r.name,
+          job_title: r.job_title ?? '',
+          mcloones_bucks: r.mcloones_bucks ?? 0,
+        }));
+      setTopEmployees(topData);
 
       // Fetch last 5 transactions with user names
       // Managers can see ALL transactions (including hidden ones)
-      const { data: transData, error: transError } = await supabase
-        .from('rewards_transactions')
-        .select('id, user_id, amount, description, is_visible, created_at')
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false })
-        .limit(5);
+      const { data: transData, error: transError } = await supabase.rpc('get_org_transactions', {
+        p_actor_id: user?.id,
+        p_limit: 5,
+      });
 
       if (transError) {
         console.error('Error fetching transactions:', transError);
@@ -330,29 +330,18 @@ export default function RewardsAndReviewsEditorScreen() {
         const userIds = [...new Set(transData.map(t => t.user_id))];
 
         // Fetch user names separately
-        const { data: usersData, error: usersError } = await supabase
-          .from('users')
-          .select('id, name')
-          .in('id', userIds);
+        const usersData = (await getOrgDirectory(user?.id || '')).filter((r) => userIds.includes(r.id));
 
-        if (!usersError && usersData) {
-          // Create a map of user IDs to names
-          const userMap = new Map(usersData.map(u => [u.id, u.name]));
+        // Create a map of user IDs to names
+        const userMap = new Map(usersData.map(u => [u.id, u.name]));
 
-          // Combine transaction data with user names
-          const transactionsWithNames = transData.map(trans => ({
-            ...trans,
-            user_name: userMap.get(trans.user_id) || 'Unknown Employee'
-          }));
+        // Combine transaction data with user names
+        const transactionsWithNames = transData.map(trans => ({
+          ...trans,
+          user_name: userMap.get(trans.user_id) || 'Unknown Employee'
+        }));
 
-          setRecentTransactions(transactionsWithNames);
-        } else {
-          console.error('Error fetching user names:', usersError);
-          setRecentTransactions(transData.map(trans => ({
-            ...trans,
-            user_name: 'Unknown Employee'
-          })));
-        }
+        setRecentTransactions(transactionsWithNames);
       } else {
         setRecentTransactions([]);
       }
@@ -476,12 +465,11 @@ export default function RewardsAndReviewsEditorScreen() {
 
   const fetchEmployeeTransactions = async (employeeId: string, employeeName: string) => {
     try {
-      const { data: transData, error: transError } = await supabase
-        .from('rewards_transactions')
-        .select('id, user_id, amount, description, is_visible, created_at')
-        .eq('user_id', employeeId)
-        .order('created_at', { ascending: false })
-        .limit(20);
+      const { data: transData, error: transError } = await supabase.rpc('get_user_transactions', {
+        p_actor_id: user?.id,
+        p_user_id: employeeId,
+        p_limit: 20,
+      });
 
       if (!transError && transData) {
         setLookupTransactions((transData as any[]).map((t: any) => ({ ...t, user_name: employeeName })));
@@ -520,13 +508,12 @@ export default function RewardsAndReviewsEditorScreen() {
       // Calculate the final amount based on Reward/Deduct toggle
       const finalAmount = isReward ? parseInt(rewardAmount) : -parseInt(rewardAmount);
 
-      const { error } = await supabase.from('rewards_transactions').insert({
-        user_id: selectedEmployee.id,
-        amount: finalAmount,
-        description: rewardDescription,
-        is_visible: isVisible,
-        created_by: user?.id,
-        organization_id: organizationId,
+      const { error } = await supabase.rpc('award_bucks', {
+        p_actor_id: user?.id,
+        p_user_id: selectedEmployee.id,
+        p_amount: finalAmount,
+        p_description: rewardDescription,
+        p_is_visible: isVisible,
       });
 
       if (error) throw error;
@@ -582,32 +569,13 @@ export default function RewardsAndReviewsEditorScreen() {
             try {
               setLoading(true);
 
-              // Step 1: Delete all transactions for this user
-              const { error: deleteError } = await supabase
-                .from('rewards_transactions')
-                .delete()
-                .eq('user_id', resetSelectedEmployee.id);
+              // Gated, org-scoped, ledger-consistent reset in one RPC.
+              const { error: resetError } = await supabase.rpc('reset_user_bucks', {
+                p_actor_id: user?.id,
+                p_target_user_id: resetSelectedEmployee.id,
+              });
 
-              if (deleteError) throw deleteError;
-
-              // Step 2: Recalculate the balance from remaining transactions (should be 0)
-              const { data: sumData, error: sumError } = await supabase
-                .from('rewards_transactions')
-                .select('amount')
-                .eq('user_id', resetSelectedEmployee.id);
-
-              if (sumError) throw sumError;
-
-              const totalBucks = sumData?.reduce((sum, trans) => sum + trans.amount, 0) || 0;
-
-              // Step 3: Update user's bucks to the calculated total (should be 0)
-              const { error: updateError } = await supabase
-                .from('users')
-                .update({ mcloones_bucks: totalBucks })
-                .eq('id', resetSelectedEmployee.id)
-                .select();
-
-              if (updateError) throw updateError;
+              if (resetError) throw resetError;
 
               Alert.alert(t('common:success'), t('rewards_reviews_editor:reset_success', { name: resetSelectedEmployee.name, currencyName }));
               setShowResetBucksModal(false);
@@ -640,48 +608,13 @@ export default function RewardsAndReviewsEditorScreen() {
             try {
               setLoading(true);
 
-              // Step 1: Delete all transactions
-              const { error: deleteError } = await supabase
-                .from('rewards_transactions')
-                .delete()
-                .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all rows
+              // Owner-only, org-scoped, ledger-consistent reset in one RPC. The DELETE is now
+              // scoped to the acting owner's organization, which fixes the former cross-org wipe.
+              const { error: resetAllError } = await supabase.rpc('reset_all_bucks', {
+                p_actor_id: user?.id,
+              });
 
-              if (deleteError) throw deleteError;
-
-              // Step 2: Get all active users
-              const { data: allUsers, error: fetchError } = await supabase
-                .from('users')
-                .select('id')
-                .eq('organization_id', organizationId)
-                .eq('is_active', true);
-
-              if (fetchError) throw fetchError;
-
-              // Step 3: For each user, recalculate their balance from remaining transactions (should be 0)
-              if (allUsers && allUsers.length > 0) {
-                for (const userRecord of allUsers) {
-                  const { data: sumData, error: sumError } = await supabase
-                    .from('rewards_transactions')
-                    .select('amount')
-                    .eq('user_id', userRecord.id);
-
-                  if (sumError) {
-                    console.error(`Error calculating sum for user ${userRecord.id}:`, sumError);
-                    continue;
-                  }
-
-                  const totalBucks = sumData?.reduce((sum, trans) => sum + trans.amount, 0) || 0;
-
-                  const { error: updateError } = await supabase
-                    .from('users')
-                    .update({ mcloones_bucks: totalBucks })
-                    .eq('id', userRecord.id);
-
-                  if (updateError) {
-                    console.error(`Error updating user ${userRecord.id}:`, updateError);
-                  }
-                }
-              }
+              if (resetAllError) throw resetAllError;
 
               Alert.alert(t('common:success'), t('rewards_reviews_editor:reset_all_success', { currencyName }));
               setShowResetBucksModal(false);
@@ -771,11 +704,11 @@ export default function RewardsAndReviewsEditorScreen() {
             try {
               setLoading(true);
 
-              // Delete the transaction (balance is NOT affected)
-              const { error: deleteError } = await supabase
-                .from('rewards_transactions')
-                .delete()
-                .eq('id', transaction.id);
+              // Delete the transaction (gated; balance is NOT affected, matching prior behavior)
+              const { error: deleteError } = await supabase.rpc('delete_transaction', {
+                p_actor_id: user?.id,
+                p_transaction_id: transaction.id,
+              });
 
               if (deleteError) throw deleteError;
 
@@ -809,11 +742,12 @@ export default function RewardsAndReviewsEditorScreen() {
             try {
               setLoading(true);
 
-              // Update the transaction visibility (balance is NOT affected)
-              const { error: visibilityError } = await supabase
-                .from('rewards_transactions')
-                .update({ is_visible: newVisibility })
-                .eq('id', transaction.id);
+              // Update the transaction visibility via the gated RPC (balance is NOT affected)
+              const { error: visibilityError } = await supabase.rpc('set_transaction_visibility', {
+                p_actor_id: user?.id,
+                p_transaction_id: transaction.id,
+                p_is_visible: newVisibility,
+              });
 
               if (visibilityError) throw visibilityError;
 
@@ -1063,7 +997,10 @@ export default function RewardsAndReviewsEditorScreen() {
   // focus across re-renders — a `<Sheet/>` component redefined each render would
   // remount and drop focus on every keystroke.
   const sheetShell = (title: string, onClose: () => void, children: React.ReactNode) => (
-    <View style={styles.sheetWrap}>
+    <KeyboardAvoidingView
+      style={styles.sheetWrap}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <Pressable style={styles.scrim} onPress={onClose} />
       <GlassCard variant="glass" radius={26} intensity={32} style={styles.sheet}>
         <View style={styles.grab} />
@@ -1077,7 +1014,7 @@ export default function RewardsAndReviewsEditorScreen() {
           {children}
         </ScrollView>
       </GlassCard>
-    </View>
+    </KeyboardAvoidingView>
   );
 
   const amountPreview = (amount: string, reward: boolean) => {

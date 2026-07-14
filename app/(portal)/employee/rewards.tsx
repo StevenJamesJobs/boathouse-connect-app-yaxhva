@@ -31,6 +31,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
 import ExamRewardBlurb from '@/components/ExamRewardBlurb';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 
 interface Employee {
   id: string;
@@ -141,39 +142,32 @@ export default function EmployeeRewardsScreen() {
     try {
       setLoading(true);
 
-      // Fetch current user's bucks
+      // Fetch current user's bucks (own row via hardened get_me RPC)
       if (user?.id) {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('mcloones_bucks')
-          .eq('id', user.id)
-          .single();
+        const { data: meData, error: userError } = await supabase.rpc('get_me', { p_user_id: user?.id });
+        const userData = (meData as any[])?.[0];
 
         if (!userError && userData) {
           setMyBucks(userData.mcloones_bucks || 0);
         }
       }
 
-      // Fetch top 10 employees
-      const { data: topData, error: topError } = await supabase
-        .from('users')
-        .select('id, name, job_title, mcloones_bucks')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('mcloones_bucks', { ascending: false })
-        .limit(10);
-
-      if (!topError && topData) {
-        setTopEmployees(topData);
+      // Fetch top 10 employees (org roster via hardened getOrgDirectory,
+      // active-only, ranked by bucks desc, top 10 — filtered client-side)
+      if (user?.id) {
+        const roster = await getOrgDirectory(user.id);
+        const topData = roster
+          .filter((r) => r.is_active)
+          .sort((a, b) => (b.mcloones_bucks || 0) - (a.mcloones_bucks || 0))
+          .slice(0, 10);
+        setTopEmployees(topData as Employee[]);
       }
 
       // Fetch last 10 transactions (filter visible on client, show 5)
-      const { data: transData, error: transError } = await supabase
-        .from('rewards_transactions')
-        .select('id, user_id, amount, description, is_visible, created_at')
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false })
-        .limit(15);
+      const { data: transData, error: transError } = await supabase.rpc('get_org_transactions', {
+        p_actor_id: user?.id,
+        p_limit: 15,
+      });
 
       if (transError) {
         console.error('Error fetching transactions:', transError);
@@ -187,13 +181,10 @@ export default function EmployeeRewardsScreen() {
       // own Recent Awards as a "denied" entry (no balance change).
       let deniedEntries: RewardTransaction[] = [];
       if (user?.id) {
-        const { data: deniedRows } = await (supabase
-          .from('redemption_requests' as any) as any)
-          .select('id, user_id, bucks_amount, request_type, item_name_snapshot, decided_at, decision_reason')
-          .eq('user_id', user.id)
-          .eq('status', 'denied')
-          .order('decided_at', { ascending: false })
-          .limit(10);
+        const { data: deniedRows } = await supabase.rpc('get_my_redemptions', {
+          p_user_id: user.id,
+          p_statuses: ['denied'],
+        });
         deniedEntries = ((deniedRows as any[]) || []).map((r) => ({
           id: `denied_${r.id}`,
           user_id: r.user_id,
@@ -210,12 +201,9 @@ export default function EmployeeRewardsScreen() {
 
       const userIds = [...new Set(visibleTransactions.map((t: any) => t.user_id))];
       let userMap = new Map<string, string>();
-      if (userIds.length > 0) {
-        const { data: usersData } = await (supabase
-          .from('users') as any)
-          .select('id, name')
-          .in('id', userIds);
-        if (usersData) userMap = new Map((usersData as any[]).map((u: any) => [u.id, u.name]));
+      if (userIds.length > 0 && user?.id) {
+        const usersData = (await getOrgDirectory(user.id)).filter((r) => userIds.includes(r.id));
+        if (usersData) userMap = new Map(usersData.map((u) => [u.id, u.name] as [string, string]));
       }
 
       const decoratedTx: RewardTransaction[] = visibleTransactions.map((trans: any) => ({

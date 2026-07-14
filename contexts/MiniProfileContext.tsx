@@ -119,11 +119,7 @@ export function MiniProfileProvider({ children }: { children: React.ReactNode })
 
       const today = new Date().toISOString().split('T')[0];
       const results = await Promise.allSettled([
-        supabase
-          .from('users')
-          .select('id, name, username, job_titles, job_title, badge_title, profile_picture_url, mcloones_bucks, role')
-          .eq('id', userId)
-          .single(),
+        supabase.rpc('get_user_card', { p_actor_id: user?.id ?? '', p_user_id: userId }),
         supabase
           .from('staff_schedules')
           .select('shift_date, start_time, end_time, roles')
@@ -142,7 +138,10 @@ export function MiniProfileProvider({ children }: { children: React.ReactNode })
 
       const userRes = results[0];
       if (userRes.status === 'fulfilled' && (userRes.value as any).data) {
-        setData((userRes.value as any).data as MiniProfileData);
+        const cardRow = ((userRes.value as any).data as MiniProfileData[])?.[0];
+        if (cardRow) {
+          setData(cardRow as MiniProfileData);
+        }
       }
 
       const shiftRes = results[1];
@@ -162,7 +161,7 @@ export function MiniProfileProvider({ children }: { children: React.ReactNode })
 
       setLoading(false);
     },
-    [organizationId]
+    [organizationId, user?.id]
   );
 
   const open = useCallback(

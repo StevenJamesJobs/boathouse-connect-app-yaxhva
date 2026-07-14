@@ -108,15 +108,7 @@ export default function ChangePasswordScreen() {
         throw updateError;
       }
 
-      // Clear the force_password_change flag
-      const { error: flagError } = await supabase
-        .from('users')
-        .update({ force_password_change: false } as any)
-        .eq('id', user.id);
-
-      if (flagError) {
-        console.error('[ChangePassword] Error clearing flag:', flagError);
-      }
+      // force_password_change is now cleared server-side by update_password on a self-service change.
 
       // Refresh user data so forcePasswordChange becomes false
       await refreshUser();

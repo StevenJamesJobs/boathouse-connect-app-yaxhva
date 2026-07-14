@@ -3067,6 +3067,228 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      reset_all_bucks: {
+        Args: { p_actor_id?: string }
+        Returns: undefined
+      }
+      reset_user_bucks: {
+        Args: { p_actor_id?: string; p_target_user_id: string }
+        Returns: undefined
+      }
+      award_bucks: {
+        Args: {
+          p_actor_id?: string
+          p_amount: number
+          p_description: string
+          p_is_visible?: boolean
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      get_org: {
+        Args: { p_actor_id?: string }
+        Returns: {
+          address: string
+          allow_self_signup: boolean
+          city: string
+          default_password: string
+          games_use_sample_data: boolean
+          google_maps_query: string
+          header_icon: string
+          id: string
+          join_code: string
+          latitude: number
+          logo_url: string
+          longitude: number
+          menu_1_icon: string
+          menu_1_name: string
+          menu_2_icon: string
+          menu_2_name: string
+          menu_category_scope: string
+          menu_count: number
+          name: string
+          owner_id: string
+          reward_currency_name: string
+          slug: string
+          state: string
+          weather_location: string
+          zip: string
+        }[]
+      }
+      get_org_id_by_slug: {
+        Args: { p_slug: string }
+        Returns: string
+      }
+      get_org_transactions: {
+        Args: { p_actor_id?: string; p_limit?: number }
+        Returns: {
+          amount: number
+          created_at: string
+          description: string
+          id: string
+          is_visible: boolean
+          user_id: string
+        }[]
+      }
+      get_user_transactions: {
+        Args: { p_actor_id?: string; p_limit?: number; p_user_id: string }
+        Returns: {
+          amount: number
+          created_at: string
+          description: string
+          id: string
+          is_visible: boolean
+          user_id: string
+        }[]
+      }
+      get_unread_awards_count: {
+        Args: { p_actor_id?: string; p_since: string }
+        Returns: number
+      }
+      get_pending_redemptions: {
+        Args: { p_actor_id?: string }
+        Returns: {
+          bucks_amount: number
+          comment: string
+          created_at: string
+          decided_at: string
+          decided_by: string
+          decision_reason: string
+          id: string
+          item_name_snapshot: string
+          menu_item_id: string
+          organization_id: string
+          request_type: string
+          shift_date: string
+          shift_period: string
+          status: string
+          user_id: string
+          weekly_special_id: string
+        }[]
+      }
+      get_my_redemptions: {
+        Args: { p_statuses: string[]; p_user_id: string }
+        Returns: {
+          bucks_amount: number
+          comment: string
+          created_at: string
+          decided_at: string
+          decided_by: string
+          decision_reason: string
+          id: string
+          item_name_snapshot: string
+          menu_item_id: string
+          organization_id: string
+          request_type: string
+          shift_date: string
+          shift_period: string
+          status: string
+          user_id: string
+          weekly_special_id: string
+        }[]
+      }
+      delete_transaction: {
+        Args: { p_actor_id?: string; p_transaction_id: string }
+        Returns: undefined
+      }
+      set_transaction_visibility: {
+        Args: { p_actor_id?: string; p_is_visible: boolean; p_transaction_id: string }
+        Returns: undefined
+      }
+      login_user: {
+        Args: { p_password: string; p_username: string }
+        Returns: {
+          badge_title: string
+          email: string
+          force_password_change: boolean
+          id: string
+          job_title: string
+          job_titles: string[]
+          mcloones_bucks: number
+          name: string
+          organization_id: string
+          phone_number: string
+          profile_picture_url: string
+          quick_tools: Json
+          role: string
+          username: string
+        }[]
+      }
+      get_me: {
+        Args: { p_user_id: string }
+        Returns: {
+          badge_title: string
+          email: string
+          force_password_change: boolean
+          id: string
+          job_title: string
+          job_titles: string[]
+          mcloones_bucks: number
+          name: string
+          organization_id: string
+          phone_number: string
+          profile_picture_url: string
+          quick_tools: Json
+          role: string
+          username: string
+        }[]
+      }
+      get_org_directory: {
+        Args: { p_actor_id: string }
+        Returns: {
+          badge_title: string
+          email: string
+          id: string
+          is_active: boolean
+          is_test_user: boolean
+          job_title: string
+          job_titles: string[]
+          mcloones_bucks: number
+          name: string
+          phone_number: string
+          profile_picture_url: string
+          role: string
+          username: string
+        }[]
+      }
+      get_employee: {
+        Args: { p_actor_id: string; p_employee_id: string }
+        Returns: {
+          badge_title: string
+          email: string
+          force_password_change: boolean
+          id: string
+          is_active: boolean
+          is_test_user: boolean
+          job_title: string
+          job_titles: string[]
+          mcloones_bucks: number
+          name: string
+          organization_id: string
+          phone_number: string
+          profile_picture_url: string
+          role: string
+          username: string
+        }[]
+      }
+      get_user_card: {
+        Args: { p_actor_id: string; p_user_id: string }
+        Returns: {
+          badge_title: string
+          id: string
+          job_title: string
+          job_titles: string[]
+          mcloones_bucks: number
+          name: string
+          profile_picture_url: string
+          role: string
+          username: string
+        }[]
+      }
+      check_username_available: {
+        Args: { p_username: string }
+        Returns: boolean
+      }
       approve_redemption_request: {
         Args: {
           p_manager_id: string
@@ -3592,6 +3814,7 @@ export type Database = {
       }
       set_user_test_flag: {
         Args: {
+          p_actor_id?: string
           p_is_test: boolean
           p_organization_id?: string
           p_user_id: string
@@ -3873,6 +4096,7 @@ export type Database = {
       }
       update_profile_picture: {
         Args: {
+          p_actor_id?: string
           p_organization_id?: string
           picture_url: string
           user_id: string
@@ -4013,6 +4237,7 @@ export type Database = {
       }
       update_user_active_status: {
         Args: {
+          p_actor_id?: string
           p_is_active: boolean
           p_organization_id?: string
           p_user_id: string
@@ -4021,6 +4246,7 @@ export type Database = {
       }
       update_user_job_titles: {
         Args: {
+          p_actor_id?: string
           p_job_titles: string[]
           p_organization_id?: string
           p_user_id: string

@@ -236,6 +236,7 @@ export default function ManagerProfileScreen() {
         user_id: user.id,
         picture_url: urlData.publicUrl,
         p_organization_id: organizationId,
+        p_actor_id: user.id,
       });
 
       if (updateError) {

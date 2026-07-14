@@ -21,6 +21,8 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { getOrgDirectory } from '@/utils/orgDirectory';
 import { useTranslation } from 'react-i18next';
 import ShiftEditForm from '@/components/ShiftEditForm';
 
@@ -63,6 +65,7 @@ export default function ScheduleReviewScreen() {
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const { upload_id } = useLocalSearchParams<{ upload_id: string }>();
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -134,13 +137,11 @@ export default function ScheduleReviewScreen() {
       setShifts(shiftData || []);
 
       // Load all users for assignment
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('id, name, username')
-        .eq('organization_id', organizationId)
-        .order('name', { ascending: true });
+      const directory = await getOrgDirectory(user?.id);
+      const userData = directory
+        .map((r) => ({ id: r.id, name: r.name, username: r.username }))
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
 
-      if (userError) throw userError;
       setUsers(userData || []);
     } catch (error) {
       console.error('Error loading review data:', error);
