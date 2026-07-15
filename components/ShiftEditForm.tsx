@@ -16,9 +16,9 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { JOB_TITLES } from '@/constants/jobTitles';
 import EmployeePickerModal from '@/components/EmployeePickerModal';
-import { getWeekStartDate } from '@/utils/dateUtils';
 
 export interface ShiftLike {
   id: string;
@@ -91,61 +91,6 @@ function formatDateHuman(dateStr: string): string {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
 }
 
-/** Returns the Sunday (week_start) on/before the given date and the following
- *  Saturday (week_end). Sunday-based to match dateUtils.getWeekStartDate so
- *  schedule_uploads weeks line up with the rest of the app (no duplicate rows). */
-function weekBounds(date: Date): { start: string; end: string } {
-  const sunday = getWeekStartDate(date);
-  const saturday = new Date(sunday);
-  saturday.setDate(sunday.getDate() + 6);
-  return { start: toISODate(sunday), end: toISODate(saturday) };
-}
-
-/**
- * Find or create a schedule_uploads row whose week covers the given date.
- * Used when a manager adds a shift from the Roster and we don't have an
- * upload context to attach it to.
- */
-async function resolveUploadIdForDate(
-  shiftDate: string,
-  currentUserId: string | undefined,
-  organizationId: string
-): Promise<string> {
-  // Look for a completed upload whose week contains shiftDate
-  const { data: existing, error: findErr } = await supabase
-    .from('schedule_uploads')
-    .select('id')
-    .eq('organization_id', organizationId)
-    .lte('week_start', shiftDate)
-    .gte('week_end', shiftDate)
-    .eq('status', 'completed')
-    .order('created_at', { ascending: false })
-    .limit(1);
-
-  if (findErr) throw findErr;
-  if (existing && existing.length > 0) return existing[0].id;
-
-  // None found — create a placeholder "Manual Entry" upload for the containing week
-  const { start, end } = weekBounds(new Date(shiftDate + 'T00:00:00'));
-  const { data: created, error: createErr } = await supabase
-    .from('schedule_uploads')
-    .insert({
-      organization_id: organizationId,
-      uploaded_by: currentUserId,
-      file_url: '',
-      file_name: 'Manual Entry',
-      week_start: start,
-      week_end: end,
-      status: 'completed',
-      parsed_shifts_count: 0,
-    })
-    .select('id')
-    .single();
-
-  if (createErr) throw createErr;
-  return created.id;
-}
-
 export default function ShiftEditForm({
   visible,
   mode,
@@ -161,6 +106,7 @@ export default function ShiftEditForm({
 }: ShiftEditFormProps) {
   const { mode: themeMode } = useAppTheme();
   const { organizationId } = useOrganization();
+  const { user: authUser } = useAuth();
   const pickerTheme: 'light' | 'dark' = themeMode === 'dark' ? 'dark' : 'light';
   const [saving, setSaving] = useState(false);
 
@@ -251,14 +197,20 @@ export default function ShiftEditForm({
       };
 
       if (mode === 'edit' && shift) {
-        const { error } = await supabase
-          .from('staff_schedules')
-          .update({
-            ...shiftData,
-            employee_name: selectedEmployee.name,
-            user_id: selectedEmployee.id,
-          })
-          .eq('id', shift.id);
+        // Manager-gated RPC; org membership of both actor and assignee enforced server-side.
+        const { error } = await supabase.rpc('update_shift', {
+          p_actor_id: authUser?.id ?? '',
+          p_shift_id: shift.id,
+          p_user_id: selectedEmployee.id ?? undefined,
+          p_employee_name: selectedEmployee.name,
+          p_shift_date: shiftData.shift_date,
+          p_start_time: shiftData.start_time,
+          p_end_time: shiftData.end_time,
+          p_roles: shiftData.roles,
+          p_is_opener: shiftData.is_opener,
+          p_is_closer: shiftData.is_closer,
+          p_is_training: shiftData.is_training,
+        });
         if (error) throw error;
 
         onClose();
@@ -266,37 +218,23 @@ export default function ShiftEditForm({
         return;
       }
 
-      // ADD mode
-      let targetUploadId = uploadId;
-      if (!targetUploadId) {
-        targetUploadId = await resolveUploadIdForDate(dateStr, currentUserId, organizationId);
-      }
-
-      const { error: insertErr } = await supabase.from('staff_schedules').insert({
-        organization_id: organizationId,
-        upload_id: targetUploadId,
-        user_id: selectedEmployee.id,
-        employee_name: selectedEmployee.name,
-        ...shiftData,
-        room_assignment: roomAssignment,
+      // ADD mode — add_shift resolves/creates the covering upload row server-side
+      // (the old resolveUploadIdForDate) and keeps parsed_shifts_count in sync.
+      const { error: insertErr } = await supabase.rpc('add_shift', {
+        p_actor_id: authUser?.id ?? '',
+        p_employee_name: selectedEmployee.name,
+        p_shift_date: shiftData.shift_date,
+        p_start_time: shiftData.start_time,
+        p_end_time: shiftData.end_time,
+        p_upload_id: uploadId ?? undefined,
+        p_user_id: selectedEmployee.id ?? undefined,
+        p_roles: shiftData.roles,
+        p_is_opener: shiftData.is_opener,
+        p_is_closer: shiftData.is_closer,
+        p_is_training: shiftData.is_training,
+        p_room_assignment: roomAssignment ?? undefined,
       });
       if (insertErr) throw insertErr;
-
-      // Keep parsed_shifts_count in sync when possible (best-effort)
-      try {
-        const { count } = await supabase
-          .from('staff_schedules')
-          .select('id', { count: 'exact', head: true })
-          .eq('upload_id', targetUploadId);
-        if (typeof count === 'number') {
-          await supabase
-            .from('schedule_uploads')
-            .update({ parsed_shifts_count: count })
-            .eq('id', targetUploadId);
-        }
-      } catch (_) {
-        /* non-fatal */
-      }
 
       onClose();
       onSaved();
@@ -321,29 +259,12 @@ export default function ShiftEditForm({
           onPress: async () => {
             try {
               setSaving(true);
-              const { error } = await supabase
-                .from('staff_schedules')
-                .delete()
-                .eq('id', shift.id);
+              // Gated delete; parsed_shifts_count is resynced inside the RPC.
+              const { error } = await supabase.rpc('delete_shift', {
+                p_actor_id: authUser?.id ?? '',
+                p_shift_id: shift.id,
+              });
               if (error) throw error;
-
-              // Best-effort: update parsed_shifts_count
-              if (shift.upload_id) {
-                try {
-                  const { count } = await supabase
-                    .from('staff_schedules')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('upload_id', shift.upload_id);
-                  if (typeof count === 'number') {
-                    await supabase
-                      .from('schedule_uploads')
-                      .update({ parsed_shifts_count: count })
-                      .eq('id', shift.upload_id);
-                  }
-                } catch (_) {
-                  /* non-fatal */
-                }
-              }
 
               onClose();
               onSaved();

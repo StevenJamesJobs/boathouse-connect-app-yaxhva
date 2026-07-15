@@ -161,19 +161,15 @@ export default function CocktailsAZEditorScreen() {
     try {
       setLoading(true);
       console.log('Loading cocktails from table: cocktails');
-      const { data, error } = await supabase
-        .from('cocktails')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('name', { ascending: true });
+      const { data, error } = await supabase.rpc('get_cocktails', { p_actor_id: user?.id ?? '' });
 
       if (error) {
         console.error('Error loading cocktails:', error);
         throw error;
       }
-      console.log('Loaded cocktails:', data);
-      setCocktails(data || []);
+      const sorted = (data || []).slice().sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
+      console.log('Loaded cocktails:', sorted);
+      setCocktails(sorted);
     } catch (error) {
       console.error('Error loading cocktails:', error);
       Alert.alert(t('common.error'), t('cocktails_editor.no_cocktails'));
@@ -361,15 +357,9 @@ export default function CocktailsAZEditorScreen() {
           throw error;
         }
         console.log('Cocktail added successfully');
-        const { data: newItems } = await supabase
-          .from('cocktails')
-          .select('id')
-          .eq('name', name.trim())
-          .eq('organization_id', organizationId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-        if (newItems?.[0] && procedureEs.trim()) {
-          await saveTranslations('cocktails', newItems[0].id, { procedure_es: procedureEs }, organizationId);
+        // insert_cocktail returns the new id — use it directly (no follow-up read needed).
+        if (data && procedureEs.trim()) {
+          await saveTranslations('cocktails', data as string, { procedure_es: procedureEs }, organizationId);
         }
         Alert.alert(t('common.success'), t('cocktails_editor.cocktail_added'));
       }

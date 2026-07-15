@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, Redirect } from 'expo-router';
+import { isManagerOrOwner } from '@/utils/roles';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
@@ -75,11 +76,20 @@ export default function ManagerLayout() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const segments = useSegments();
+  const { user } = useAuth();
   // Ambient glow flows edge-to-edge on the glass screens (Welcome = the index
   // tab + Manage = the Command Center). Excludes the still-solid tabs; the
   // transparent spacer + transparent scenes let it read continuously.
   const lastSeg = segments[segments.length - 1] as string;
   const showAmbient = !['menus', 'tools', 'profile'].includes(lastSeg);
+
+  // Role guard: the manager shell (incl. Manage) is for managers/owners only.
+  // An employee who reaches a /(portal)/manager URL — deep link, stale route,
+  // or a shared screen's tab bar — is sent to their own portal instead.
+  if (user && !isManagerOrOwner(user)) {
+    return <Redirect href="/(portal)/employee" />;
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Ambient glow on the glass screens (absolute → no layout impact). */}

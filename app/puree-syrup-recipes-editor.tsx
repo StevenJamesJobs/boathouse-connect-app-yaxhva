@@ -84,20 +84,16 @@ export default function PureeSyrupRecipesEditorScreen() {
     try {
       setLoading(true);
       console.log('Loading puree syrup recipes from table: puree_syrup_recipes');
-      const { data, error } = await supabase
-        .from('puree_syrup_recipes')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('category', { ascending: true })
-        .order('display_order', { ascending: true });
+      const { data, error } = await supabase.rpc('get_puree_syrup_recipes', { p_actor_id: user?.id ?? '' });
 
       if (error) {
         console.error('Error loading puree syrup recipes:', error);
         throw error;
       }
-      console.log('Loaded puree syrup recipes:', data);
-      setRecipes(data || []);
+      const sorted = (data || []).slice().sort((a: any, b: any) =>
+        (a.category || '').localeCompare(b.category || '') || (a.display_order ?? 0) - (b.display_order ?? 0));
+      console.log('Loaded puree syrup recipes:', sorted);
+      setRecipes(sorted as any);
     } catch (error) {
       console.error('Error loading puree syrup recipes:', error);
       Alert.alert(t('common:error'), t('puree_editor:load_error'));
@@ -284,15 +280,9 @@ export default function PureeSyrupRecipesEditorScreen() {
           throw error;
         }
         console.log('Puree syrup recipe added successfully');
-        const { data: newItems } = await supabase
-          .from('puree_syrup_recipes')
-          .select('id')
-          .eq('name', name.trim())
-          .eq('organization_id', organizationId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-        if (newItems?.[0] && procedureEs.trim()) {
-          await saveTranslations('puree_syrup_recipes', newItems[0].id, { procedure_es: procedureEs }, organizationId);
+        // insert_puree_syrup_recipe returns the new id — use it directly.
+        if (data && procedureEs.trim()) {
+          await saveTranslations('puree_syrup_recipes', data as string, { procedure_es: procedureEs }, organizationId);
         }
         Alert.alert(t('common:success'), t('puree_editor:created_success'));
       }

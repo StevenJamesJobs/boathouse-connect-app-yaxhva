@@ -28,6 +28,7 @@ import { GlasswareGlyph } from '@/components/GlasswareIconPicker';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Cocktail {
   id: string;
@@ -69,6 +70,7 @@ export default function CocktailsAZScreen() {
   const { language } = useLanguage();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -112,16 +114,13 @@ export default function CocktailsAZScreen() {
   const loadCocktails = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('cocktails')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('name', { ascending: true });
+      // Member-gated RPC (org derived server-side); re-sort A-Z to preserve this screen's order.
+      const { data, error } = await supabase.rpc('get_cocktails', { p_actor_id: user?.id ?? '' });
 
       if (error) throw error;
-      console.log('Loaded cocktails:', data);
-      setCocktails(data || []);
+      const sorted = (data || []).slice().sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
+      console.log('Loaded cocktails:', sorted);
+      setCocktails(sorted);
     } catch (error) {
       console.error('Error loading cocktails:', error);
     } finally {

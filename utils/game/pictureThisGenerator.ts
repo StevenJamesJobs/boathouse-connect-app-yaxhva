@@ -69,12 +69,12 @@ const PRICE_RANGES = {
 };
 
 // ─── Pool loaders ──────────────────────────────────────────────────────────
-export async function loadPool(category: PictureThisCategory, organizationId: string, useSampleData: boolean): Promise<MenuItem[]> {
+export async function loadPool(category: PictureThisCategory, organizationId: string, useSampleData: boolean, actorId: string = ''): Promise<MenuItem[]> {
   const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
 
   // Resolve the source org's CURRENT built-in category names by system_key so
   // renamed categories still pool correctly; fall back to the canonical literal.
-  const resolver = await fetchMenuCategoryResolver(sourceOrgId);
+  const resolver = await fetchMenuCategoryResolver(actorId, sourceOrgId);
   const namesOr = (key: string, fallback: string): string[] => {
     const n = resolver.namesForKeys([key]);
     return n.length ? n : [fallback];
@@ -85,30 +85,22 @@ export async function loadPool(category: PictureThisCategory, organizationId: st
   const libN = namesOr('cat.libations', 'Libations');
   const wineN = namesOr('cat.wine', 'Wine');
 
-  let query = (supabase.from('menu_items') as any)
-    .select(
-      'id, name, description, category, subcategory, thumbnail_url, price, glass_price, bottle_price, member_bottle_price, location, display_order'
-    )
-    .eq('is_active', true)
-    .not('thumbnail_url', 'is', null);
-  query = query.eq('organization_id', sourceOrgId);
+  let cats: string[] = [];
+  if (category === 'food') cats = [...lunchN, ...dinnerN, ...wsN];
+  else if (category === 'libations') cats = libN;
+  else if (category === 'wine') cats = wineN;
+  else if (category === 'menu_prices') cats = [...lunchN, ...dinnerN, ...wsN, ...libN, ...wineN];
 
-  if (category === 'food') {
-    query = query.in('category', [...lunchN, ...dinnerN, ...wsN]);
-  } else if (category === 'libations') {
-    query = query.in('category', libN);
-  } else if (category === 'wine') {
-    query = query.in('category', wineN);
-  } else if (category === 'menu_prices') {
-    query = query.in('category', [...lunchN, ...dinnerN, ...wsN, ...libN, ...wineN]);
-  }
-
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc('get_menu_items', {
+    p_actor_id: actorId, p_source_org: sourceOrgId, p_categories: cats.length ? cats : undefined,
+  });
   if (error || !data) {
     console.error('[pictureThisGenerator] Pool load error:', error);
     return [];
   }
-  let items = data as MenuItem[];
+  // RPC returns all matching active items; keep only those with a thumbnail (was a
+  // .not('thumbnail_url','is',null) filter in the old query).
+  let items = (data as MenuItem[]).filter((i) => i.thumbnail_url != null);
 
   // Exclude the Weekly Specials summary card (display_order = 0)
   const wsSet = new Set(wsN);
@@ -136,9 +128,10 @@ export async function loadPool(category: PictureThisCategory, organizationId: st
 export async function resolvePriceCategoryNames(
   organizationId: string,
   useSampleData: boolean,
+  actorId: string = '',
 ): Promise<{ wineNames: string[]; libationNames: string[] }> {
   const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
-  const resolver = await fetchMenuCategoryResolver(sourceOrgId);
+  const resolver = await fetchMenuCategoryResolver(actorId, sourceOrgId);
   const wineNames = resolver.namesForKeys(['cat.wine']);
   const libationNames = resolver.namesForKeys(['cat.libations']);
   return {

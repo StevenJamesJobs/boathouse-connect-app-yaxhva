@@ -163,19 +163,24 @@ export default function EmployeeRewardsScreen() {
         setTopEmployees(topData as Employee[]);
       }
 
-      // Fetch last 10 transactions (filter visible on client, show 5)
-      const { data: transData, error: transError } = await supabase.rpc('get_org_transactions', {
-        p_actor_id: user?.id,
-        p_limit: 15,
-      });
-
-      if (transError) {
-        console.error('Error fetching transactions:', transError);
-        return;
+      // Fetch last 10 transactions (filter visible on client, show 5). Guard on user?.id:
+      // get_org_transactions has no p_actor_id default, so on logout/login the undefined arg
+      // is dropped by supabase-js and PostgREST can't resolve the overload (PGRST202).
+      let transData: any[] = [];
+      if (user?.id) {
+        const { data, error: transError } = await supabase.rpc('get_org_transactions', {
+          p_actor_id: user.id,
+          p_limit: 15,
+        });
+        if (transError) {
+          console.error('Error fetching transactions:', transError);
+          return;
+        }
+        transData = (data as any[]) || [];
       }
 
       // Visible transactions (shared across all employees)
-      const visibleTransactions = ((transData as any[]) || []).filter((t: any) => t.is_visible === true);
+      const visibleTransactions = transData.filter((t: any) => t.is_visible === true);
 
       // Denied redemption requests for the current user only — surface in their
       // own Recent Awards as a "denied" entry (no balance change).
@@ -224,16 +229,13 @@ export default function EmployeeRewardsScreen() {
 
   const fetchReviews = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('guest_reviews')
-        .select('id, guest_name, rating, review_text, review_date')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true })
-        .order('review_date', { ascending: false });
+      // Member-gated RPC (active-only, org derived server-side).
+      const { data, error } = await supabase.rpc('get_org_guest_reviews', {
+        p_actor_id: user?.id ?? '',
+      });
 
       if (!error && data) {
-        setReviews(data);
+        setReviews(data as any);
       }
     } catch (error) {
       console.error('Error fetching reviews:', error);
@@ -242,12 +244,10 @@ export default function EmployeeRewardsScreen() {
 
   const fetchGoogleReviews = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('google_reviews')
-        .select('id, author_title, author_image, review_rating, review_text, review_text_es, review_datetime_utc, owner_answer, owner_answer_es')
-        .eq('organization_id', organizationId)
-        .eq('is_published', true)
-        .order('review_datetime_utc', { ascending: false });
+      // Member-gated RPC (published-only for non-managers, org derived server-side).
+      const { data, error } = await supabase.rpc('get_org_google_reviews', {
+        p_actor_id: user?.id ?? '',
+      });
 
       if (!error && data) {
         setGoogleReviews(data as GoogleReview[]);

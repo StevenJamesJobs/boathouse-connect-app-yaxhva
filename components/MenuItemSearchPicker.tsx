@@ -13,6 +13,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useRedemptionSettings, foodRedeemCost } from '@/hooks/useRedemptionSettings';
 
 export interface PickedMenuItem {
@@ -59,6 +60,7 @@ const CATEGORY_PILLS = ['All', 'Weekly Specials', 'Lunch', 'Dinner', 'Libations'
 export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const { settings: redemptionSettings } = useRedemptionSettings();
   const [query, setQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('All');
@@ -72,11 +74,7 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
     (async () => {
       try {
         const [menuRes, specialsRes] = await Promise.all([
-          supabase
-            .from('menu_items')
-            .select('id, name, category, price, is_active')
-            .eq('organization_id', organizationId)
-            .eq('is_active', true),
+          supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '' }),
           (supabase.from('weekly_specials') as any).select('id, name, day_of_week, price').eq('organization_id', organizationId),
         ]);
         if (cancelled) return;

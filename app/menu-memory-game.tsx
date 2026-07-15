@@ -46,23 +46,19 @@ export default function MenuMemoryGameScreen() {
     const modes: GameMode[] = ['wine_pairings', 'ingredients_dishes', 'cocktail_ingredients'];
     const stats: Record<string, ModeStats | null> = {};
 
-    for (const mode of modes) {
-      const { data } = await supabase
-        .from('game_scores')
-        .select('score, difficulty, completed')
-        .eq('user_id', user.id)
-        .eq('game_mode', mode)
-        .order('score', { ascending: false }) as { data: { score: number; difficulty: number; completed: boolean }[] | null };
+    // One self-only RPC returns per-mode aggregates (replaces 3 table reads).
+    const { data } = await supabase.rpc('get_my_game_stats', { p_actor_id: user.id });
+    const byMode = new Map<string, any>((data || []).map((row: any) => [row.game_mode, row]));
 
-      if (data && data.length > 0) {
-        stats[mode] = {
-          best_score: data[0].score,
-          games_played: data.length,
-          highest_difficulty: Math.max(...data.filter(d => d.completed).map(d => d.difficulty), 0),
-        };
-      } else {
-        stats[mode] = null;
-      }
+    for (const mode of modes) {
+      const row = byMode.get(mode);
+      stats[mode] = row
+        ? {
+            best_score: row.best_score,
+            games_played: Number(row.games_played),
+            highest_difficulty: row.highest_completed_difficulty,
+          }
+        : null;
     }
 
     setModeStats(stats as Record<GameMode, ModeStats | null>);

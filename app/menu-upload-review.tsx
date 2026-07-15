@@ -89,18 +89,16 @@ export default function MenuUploadReviewScreen() {
       if (!uploadId || !organizationId) return;
       try {
         setLoading(true);
-        const { data, error } = await (supabase.from('menu_uploads' as any) as any)
-          .select('parsed_result, status')
-          .eq('id', uploadId)
-          .single();
+        const { data: uplRows, error } = await supabase.rpc('get_menu_uploads', {
+          p_actor_id: user?.id ?? '', p_upload_id: uploadId,
+        });
         if (error) throw error;
         if (cancelled) return;
+        const data: any = Array.isArray(uplRows) ? uplRows[0] : null;
         setTree(normalizeTree(data?.parsed_result));
         setCocktails(Array.isArray(data?.parsed_result?.flagged_cocktails) ? data.parsed_result.flagged_cocktails : []);
         // existing item names for a duplicate hint
-        const { data: items } = await (supabase.from('menu_items' as any) as any)
-          .select('name')
-          .eq('organization_id', organizationId);
+        const { data: items } = await supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '' });
         if (!cancelled && items) setExistingNames(new Set(items.map((i: any) => String(i.name || '').toLowerCase())));
       } catch (e) {
         console.error('load review error', e);

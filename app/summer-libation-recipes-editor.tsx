@@ -103,19 +103,15 @@ export default function SummerLibationRecipesEditorScreen() {
   const loadRecipes = useCallback(async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('summer_libation_recipes')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('category', { ascending: true })
-        .order('display_order', { ascending: true });
+      const { data, error } = await supabase.rpc('get_summer_libation_recipes', { p_actor_id: user?.id ?? '' });
 
       if (error) {
         console.error('Error loading summer libation recipes:', error);
         throw error;
       }
-      setRecipes(data || []);
+      const sorted = (data || []).slice().sort((a: any, b: any) =>
+        (a.category || '').localeCompare(b.category || '') || (a.display_order ?? 0) - (b.display_order ?? 0));
+      setRecipes(sorted as any);
     } catch (error) {
       console.error('Error loading summer libation recipes:', error);
       Alert.alert(t('common.error'), t('summer_libation_editor.no_recipes'));
@@ -303,15 +299,9 @@ export default function SummerLibationRecipesEditorScreen() {
           console.error('Error adding summer libation recipe:', error);
           throw error;
         }
-        const { data: newRecipes } = await supabase
-          .from('summer_libation_recipes')
-          .select('id')
-          .eq('name', name.trim())
-          .eq('organization_id', organizationId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-        if (newRecipes?.[0] && procedureEs.trim()) {
-          await saveTranslations('summer_libation_recipes', newRecipes[0].id, { procedure_es: procedureEs }, organizationId);
+        // insert_summer_libation_recipe returns the new id — use it directly.
+        if (data && procedureEs.trim()) {
+          await saveTranslations('summer_libation_recipes', data as string, { procedure_es: procedureEs }, organizationId);
         }
         Alert.alert(t('common.success'), t('summer_libation_editor.recipe_added'));
       }

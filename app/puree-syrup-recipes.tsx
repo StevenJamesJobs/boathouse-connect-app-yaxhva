@@ -26,6 +26,7 @@ import FormattedText from '@/components/FormattedText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PureeSyrupRecipe {
   id: string;
@@ -50,6 +51,7 @@ export default function PureeSyrupRecipesScreen() {
   const { language } = useLanguage();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const [recipes, setRecipes] = useState<PureeSyrupRecipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecipe, setSelectedRecipe] = useState<PureeSyrupRecipe | null>(null);
@@ -64,19 +66,15 @@ export default function PureeSyrupRecipesScreen() {
     try {
       setLoading(true);
       console.log('Loading puree syrup recipes from table: puree_syrup_recipes');
-      const { data, error } = await supabase
-        .from('puree_syrup_recipes')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
+      const { data, error } = await supabase.rpc('get_puree_syrup_recipes', { p_actor_id: user?.id ?? '' });
 
       if (error) {
         console.error('Error loading puree syrup recipes:', error);
         throw error;
       }
-      console.log('Loaded puree syrup recipes:', data);
-      setRecipes(data || []);
+      const sorted = (data || []).slice().sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
+      console.log('Loaded puree syrup recipes:', sorted);
+      setRecipes(sorted as any);
     } catch (error) {
       console.error('Error loading puree syrup recipes:', error);
     } finally {

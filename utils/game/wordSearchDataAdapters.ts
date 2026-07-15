@@ -31,7 +31,8 @@ export async function getWordsForCategory(
   category: WordSearchCategory,
   difficulty: WordSearchDifficulty,
   organizationId: string,
-  useSampleData: boolean
+  useSampleData: boolean,
+  actorId: string = ''
 ): Promise<RawWordItem[]> {
   const config = getDifficultyConfig(difficulty);
   // Resolve the source org once (own data, or the Boathouse sample when the
@@ -41,7 +42,7 @@ export async function getWordsForCategory(
   // Resolve the source org's CURRENT built-in category names by system_key, so
   // renamed categories still match. Fall back to the canonical literal when the
   // org hasn't seeded that built-in.
-  const resolver = await fetchMenuCategoryResolver(sourceOrgId);
+  const resolver = await fetchMenuCategoryResolver(actorId, sourceOrgId);
   const namesOr = (key: string, fallback: string): string[] => {
     const n = resolver.namesForKeys([key]);
     return n.length ? n : [fallback];
@@ -49,15 +50,15 @@ export async function getWordsForCategory(
 
   switch (category) {
     case 'weekly_specials':
-      return fetchMenuItemWords(namesOr('cat.weekly_specials', 'Weekly Specials'), config.itemCount, sourceOrgId);
+      return fetchMenuItemWords(namesOr('cat.weekly_specials', 'Weekly Specials'), config.itemCount, sourceOrgId, actorId);
     case 'lunch':
-      return fetchMenuItemWords(namesOr('cat.lunch', 'Lunch'), config.itemCount, sourceOrgId);
+      return fetchMenuItemWords(namesOr('cat.lunch', 'Lunch'), config.itemCount, sourceOrgId, actorId);
     case 'dinner':
-      return fetchMenuItemWords(namesOr('cat.dinner', 'Dinner'), config.itemCount, sourceOrgId);
+      return fetchMenuItemWords(namesOr('cat.dinner', 'Dinner'), config.itemCount, sourceOrgId, actorId);
     case 'happy_hour':
-      return fetchMenuItemWords(namesOr('cat.happy_hour', 'Happy Hour'), config.itemCount, sourceOrgId);
+      return fetchMenuItemWords(namesOr('cat.happy_hour', 'Happy Hour'), config.itemCount, sourceOrgId, actorId);
     case 'libations':
-      return fetchLibationWords(config.itemCount, sourceOrgId, namesOr('cat.libations', 'Libations'));
+      return fetchLibationWords(config.itemCount, sourceOrgId, namesOr('cat.libations', 'Libations'), actorId);
     default:
       return [];
   }
@@ -68,17 +69,16 @@ export async function getWordsForCategory(
 async function fetchMenuItemWords(
   categories: string[],
   itemCount: number,
-  organizationId: string
+  organizationId: string,
+  actorId: string = ''
 ): Promise<RawWordItem[]> {
   try {
-    let query = supabase
-      .from('menu_items')
-      .select('name, description')
-      .eq('is_active', true)
-      .in('category', categories)
-      .not('description', 'is', null);
-    query = query.eq('organization_id', organizationId);
-    const { data, error } = await query;
+    // organizationId is the resolved source org (own or sample); RPC returns all matching
+    // active items — filter non-null description client-side.
+    const { data: raw, error } = await supabase.rpc('get_menu_items', {
+      p_actor_id: actorId, p_source_org: organizationId, p_categories: categories,
+    });
+    const data = ((raw as any[]) || []).filter((m) => m.description != null);
 
     if (error || !data || data.length === 0) {
       return getFallbackWords();
@@ -110,27 +110,22 @@ async function fetchMenuItemWords(
 async function fetchLibationWords(
   itemCount: number,
   organizationId: string,
-  libationCategoryNames: string[]
+  libationCategoryNames: string[],
+  actorId: string = ''
 ): Promise<RawWordItem[]> {
   try {
-    // Primary: libation_recipes (JSONB ingredients — cleanest data)
-    let recipeQuery = supabase
-      .from('libation_recipes')
-      .select('name, ingredients, category')
-      .eq('is_active', true)
-      .not('ingredients', 'is', null);
-    recipeQuery = recipeQuery.eq('organization_id', organizationId);
-    const { data: recipes, error: recipeError } = await recipeQuery;
+    // Primary: libation_recipes (JSONB ingredients — cleanest data) via member-gated RPC
+    // (organizationId here is the resolved source org — own or the sample org).
+    const { data: recipes, error: recipeError } = await supabase.rpc('get_libation_recipes', {
+      p_actor_id: actorId,
+      p_source_org: organizationId,
+    });
 
-    // Secondary: menu_items in the org's Libations category (resolved by key)
-    let menuQuery = supabase
-      .from('menu_items')
-      .select('name, description')
-      .eq('is_active', true)
-      .in('category', libationCategoryNames)
-      .not('description', 'is', null);
-    menuQuery = menuQuery.eq('organization_id', organizationId);
-    const { data: menuLibations, error: menuError } = await menuQuery;
+    // Secondary: menu_items in the org's Libations category (resolved by key), via RPC.
+    const { data: rawLib, error: menuError } = await supabase.rpc('get_menu_items', {
+      p_actor_id: actorId, p_source_org: organizationId, p_categories: libationCategoryNames,
+    });
+    const menuLibations = ((rawLib as any[]) || []).filter((m) => m.description != null);
 
     const allWords: RawWordItem[] = [];
 

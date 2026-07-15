@@ -6,29 +6,26 @@ import { resolveGameSourceOrgId } from './gameSource';
 import { fetchMenuCategoryResolver } from '@/utils/categoryNames';
 
 // Generate card pairs for a specific game mode and pair count
-export async function generateCards(mode: GameMode, pairCount: number, organizationId: string, useSampleData: boolean): Promise<CardData[]> {
+export async function generateCards(mode: GameMode, pairCount: number, organizationId: string, useSampleData: boolean, actorId: string = ''): Promise<CardData[]> {
   switch (mode) {
     case 'wine_pairings':
-      return await generateWinePairingCards(pairCount, organizationId, useSampleData);
+      return await generateWinePairingCards(pairCount, organizationId, useSampleData, actorId);
     case 'ingredients_dishes':
-      return await generateIngredientDishCards(pairCount, organizationId, useSampleData);
+      return await generateIngredientDishCards(pairCount, organizationId, useSampleData, actorId);
     case 'cocktail_ingredients':
-      return await generateCocktailCards(pairCount, organizationId, useSampleData);
+      return await generateCocktailCards(pairCount, organizationId, useSampleData, actorId);
   }
 }
 
 // Mode 1: Wine & Entree Pairings (from DB with static fallback)
-async function generateWinePairingCards(pairCount: number, organizationId: string, useSampleData: boolean): Promise<CardData[]> {
+async function generateWinePairingCards(pairCount: number, organizationId: string, useSampleData: boolean, actorId: string = ''): Promise<CardData[]> {
   const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
-  // Try fetching from DB first
+  // Try fetching from DB first (member-gated RPC; sourceOrgId is the org's own or the sample org)
   try {
-    let query = (supabase
-      .from('wine_pairings' as any) as any)
-      .select('wine, entree, hint')
-      .eq('is_active', true)
-      .order('display_order');
-    query = query.eq('organization_id', sourceOrgId);
-    const { data: dbPairings, error } = await query;
+    const { data: dbPairings, error } = await supabase.rpc('get_wine_pairings', {
+      p_actor_id: actorId,
+      p_source_org: sourceOrgId,
+    });
 
     if (!error && dbPairings && dbPairings.length > 0) {
       const selected = selectRandom(dbPairings as any[], pairCount);
@@ -66,24 +63,21 @@ async function generateWinePairingCards(pairCount: number, organizationId: strin
 }
 
 // Mode 2: Ingredients to Dishes (from menu_items table)
-async function generateIngredientDishCards(pairCount: number, organizationId: string, useSampleData: boolean): Promise<CardData[]> {
+async function generateIngredientDishCards(pairCount: number, organizationId: string, useSampleData: boolean, actorId: string = ''): Promise<CardData[]> {
   const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
   // Resolve the source org's current Dinner/Lunch names by system_key (renames-safe).
-  const resolver = await fetchMenuCategoryResolver(sourceOrgId);
+  const resolver = await fetchMenuCategoryResolver(actorId, sourceOrgId);
   const foodCats = resolver.namesForKeys(['cat.dinner', 'cat.lunch']);
   const categories = foodCats.length ? foodCats : ['Dinner', 'Lunch'];
-  let menuQuery = supabase
-    .from('menu_items')
-    .select('id, name, description')
-    .eq('is_active', true)
-    .in('category', categories)
-    .not('description', 'is', null);
-  menuQuery = menuQuery.eq('organization_id', sourceOrgId);
-  const { data: menuItems, error } = await menuQuery as { data: { id: string; name: string; description: string | null }[] | null; error: any };
+  const { data: rawItems, error } = await supabase.rpc('get_menu_items', {
+    p_actor_id: actorId, p_source_org: sourceOrgId, p_categories: categories,
+  });
+  // RPC returns all matching active items; the description-non-null filter is applied below.
+  const menuItems = ((rawItems as any[]) || []).filter((m) => m.description != null) as { id: string; name: string; description: string | null }[];
 
   if (error || !menuItems || menuItems.length === 0) {
     // Fallback to wine pairings if menu data unavailable
-    return generateWinePairingCards(pairCount, organizationId, useSampleData);
+    return generateWinePairingCards(pairCount, organizationId, useSampleData, actorId);
   }
 
   // Parse descriptions to extract key ingredients
@@ -114,27 +108,15 @@ async function generateIngredientDishCards(pairCount: number, organizationId: st
 }
 
 // Mode 3: Cocktail Ingredients to Cocktails (from cocktails + libation_recipes)
-async function generateCocktailCards(pairCount: number, organizationId: string, useSampleData: boolean): Promise<CardData[]> {
+async function generateCocktailCards(pairCount: number, organizationId: string, useSampleData: boolean, actorId: string = ''): Promise<CardData[]> {
   const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
-  // Fetch from both tables
+  // Fetch from both tables via member-gated RPCs (sourceOrgId = own org or the sample org).
   type CocktailRow = { id: string; name: string; ingredients: string | null; alcohol_type: string };
   type LibationRow = { id: string; name: string; ingredients: any; category: string };
 
-  let cocktailQuery = supabase
-    .from('cocktails')
-    .select('id, name, ingredients, alcohol_type')
-    .eq('is_active', true);
-  cocktailQuery = cocktailQuery.eq('organization_id', sourceOrgId);
-
-  let libationQuery = supabase
-    .from('libation_recipes')
-    .select('id, name, ingredients, category')
-    .eq('is_active', true);
-  libationQuery = libationQuery.eq('organization_id', sourceOrgId);
-
   const [cocktailsResult, libationsResult] = await Promise.all([
-    cocktailQuery as unknown as { data: CocktailRow[] | null; error: any },
-    libationQuery as unknown as { data: LibationRow[] | null; error: any },
+    supabase.rpc('get_cocktails', { p_actor_id: actorId, p_source_org: sourceOrgId }) as unknown as { data: CocktailRow[] | null; error: any },
+    supabase.rpc('get_libation_recipes', { p_actor_id: actorId, p_source_org: sourceOrgId }) as unknown as { data: LibationRow[] | null; error: any },
   ]);
 
   const allPairs: { ingredient: string; cocktail: string; id: string }[] = [];

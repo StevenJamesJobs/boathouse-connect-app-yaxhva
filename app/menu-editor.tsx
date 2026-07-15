@@ -234,15 +234,8 @@ export default function MenuEditorScreen() {
       // Active-menu items (season-scoped) feed the swipe pager; the full set
       // (all menus) backs the whole-database search.
       const [scoped, all] = await Promise.all([
-        (supabase.from('menu_items') as any)
-          .select('*')
-          .eq('organization_id', organizationId)
-          .in('season', [season, 'both'])
-          .order('display_order', { ascending: true }),
-        (supabase.from('menu_items') as any)
-          .select('*')
-          .eq('organization_id', organizationId)
-          .order('display_order', { ascending: true }),
+        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_season: season }),
+        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '' }),
       ]);
 
       if (scoped.error) throw scoped.error;
@@ -602,17 +595,10 @@ export default function MenuEditorScreen() {
         console.log('Menu item created successfully');
         Alert.alert(t('common:success'), t('menu_editor:created_success'));
 
-        // Save Spanish translations for newly created item
+        // Save Spanish translations for newly created item (create_menu_item returns its id).
         if (formData.name_es || formData.description_es || formData.location_es) {
-          const { data: newItem } = await supabase
-            .from('menu_items')
-            .select('id')
-            .eq('organization_id', organizationId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-          if (newItem) {
-            await saveTranslations('menu_items', newItem.id, {
+          if (data) {
+            await saveTranslations('menu_items', data as string, {
               name_es: formData.name_es,
               description_es: formData.description_es,
               ...(isWine ? { location_es: formData.location_es } : {}),
@@ -698,10 +684,13 @@ export default function MenuEditorScreen() {
     if (ai >= 0) newMenuItems[ai] = { ...newMenuItems[ai], display_order: currentOrder };
     setMenuItems(newMenuItems);
     try {
-      await Promise.all([
-        supabase.from('menu_items').update({ display_order: aboveOrder }).eq('id', currentItem.id).eq('organization_id', organizationId),
-        supabase.from('menu_items').update({ display_order: currentOrder }).eq('id', aboveItem.id).eq('organization_id', organizationId),
-      ]);
+      // Persist the whole filtered group's new order (reindexed 0..N-1) via the gated RPC,
+      // then reload so the editor reflects the DB's normalized display_order live.
+      const { error } = await supabase.rpc('reorder_menu_items', {
+        p_actor_id: user?.id ?? '', p_ordered_ids: items.map((i) => i.id),
+      });
+      if (error) throw error;
+      loadMenuItems();
     } catch (error) {
       console.error('Error moving menu item up:', error);
       loadMenuItems();
@@ -725,10 +714,11 @@ export default function MenuEditorScreen() {
     if (bi >= 0) newMenuItems[bi] = { ...newMenuItems[bi], display_order: currentOrder };
     setMenuItems(newMenuItems);
     try {
-      await Promise.all([
-        supabase.from('menu_items').update({ display_order: belowOrder }).eq('id', currentItem.id).eq('organization_id', organizationId),
-        supabase.from('menu_items').update({ display_order: currentOrder }).eq('id', belowItem.id).eq('organization_id', organizationId),
-      ]);
+      const { error } = await supabase.rpc('reorder_menu_items', {
+        p_actor_id: user?.id ?? '', p_ordered_ids: items.map((i) => i.id),
+      });
+      if (error) throw error;
+      loadMenuItems();
     } catch (error) {
       console.error('Error moving menu item down:', error);
       loadMenuItems();
@@ -756,11 +746,10 @@ export default function MenuEditorScreen() {
     reordered.splice(currentIndex, 1);
     reordered.splice(newIndex, 0, item);
     try {
-      await Promise.all(
-        reordered.map((it, idx) =>
-          supabase.from('menu_items').update({ display_order: idx }).eq('id', it.id).eq('organization_id', organizationId)
-        )
-      );
+      const { error } = await supabase.rpc('reorder_menu_items', {
+        p_actor_id: user?.id ?? '', p_ordered_ids: reordered.map((it) => it.id),
+      });
+      if (error) throw error;
     } catch (error) {
       console.error('Error applying position change:', error);
     }
@@ -845,10 +834,10 @@ export default function MenuEditorScreen() {
     });
     setMenuItems(newMenuItems);
     try {
-      const updates = reorderedData.map((item, index) =>
-        supabase.from('menu_items').update({ display_order: index }).eq('id', item.id).eq('organization_id', organizationId)
-      );
-      await Promise.all(updates);
+      const { error } = await supabase.rpc('reorder_menu_items', {
+        p_actor_id: user?.id ?? '', p_ordered_ids: reorderedData.map((item) => item.id),
+      });
+      if (error) throw error;
       console.log('Drag reorder persisted successfully');
     } catch (error) {
       console.error('Error persisting drag reorder:', error);

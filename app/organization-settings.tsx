@@ -62,6 +62,7 @@ export default function OrganizationSettingsScreen() {
   const [googleMapsQuery, setGoogleMapsQuery] = useState('');
   const [rewardCurrencyName, setRewardCurrencyName] = useState('');
   const [allowSelfSignup, setAllowSelfSignup] = useState(true);
+  const [staffCanViewRoster, setStaffCanViewRoster] = useState(true);
   const [menuCount, setMenuCount] = useState<1 | 2>(2);
   const [menu1Name, setMenu1Name] = useState('');
   const [menu2Name, setMenu2Name] = useState('');
@@ -82,6 +83,7 @@ export default function OrganizationSettingsScreen() {
     setGoogleMapsQuery(organization.google_maps_query || '');
     setRewardCurrencyName(organization.reward_currency_name);
     setAllowSelfSignup(organization.allow_self_signup);
+    setStaffCanViewRoster(organization.staff_can_view_roster);
     setMenuCount(organization.menu_count);
     setMenuScope(organization.menu_category_scope);
     setMenu1Name(organization.menu_1_name);
@@ -174,7 +176,7 @@ export default function OrganizationSettingsScreen() {
   };
 
   const uploadLogo = async (uri: string) => {
-    if (!organizationId) return;
+    if (!organizationId || !user?.id) return;
     setUploadingLogo(true);
     try {
       const base64 = await FileSystem.readAsStringAsync(uri, {
@@ -205,10 +207,13 @@ export default function OrganizationSettingsScreen() {
         .from('organization-logos')
         .getPublicUrl(fileName);
 
-      await (supabase
-        .from('organizations' as any)
-        .update({ logo_url: urlData.publicUrl, updated_at: new Date().toISOString() })
-        .eq('id', organizationId) as any);
+      const { data: logoRes, error: logoError } = await supabase.rpc('set_org_logo', {
+        p_actor_id: user.id,
+        p_logo_url: urlData.publicUrl,
+      });
+      if (logoError) throw logoError;
+      const logoResult: any = typeof logoRes === 'string' ? JSON.parse(logoRes) : logoRes;
+      if (logoResult && logoResult.success === false) throw new Error(logoResult.error);
 
       setLogoPreview(urlData.publicUrl);
       await refreshOrganization();
@@ -228,10 +233,14 @@ export default function OrganizationSettingsScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await (supabase
-              .from('organizations' as any)
-              .update({ logo_url: null, updated_at: new Date().toISOString() })
-              .eq('id', organizationId) as any);
+            if (!user?.id) return;
+            // p_logo_url omitted → the RPC clears the logo (sets NULL).
+            const { data: remRes, error: remError } = await supabase.rpc('set_org_logo', {
+              p_actor_id: user.id,
+            });
+            if (remError) throw remError;
+            const remResult: any = typeof remRes === 'string' ? JSON.parse(remRes) : remRes;
+            if (remResult && remResult.success === false) throw new Error(remResult.error);
             setLogoPreview(null);
             await refreshOrganization();
           } catch (err: any) {
@@ -281,6 +290,7 @@ export default function OrganizationSettingsScreen() {
         p_google_maps_query: googleMapsQuery.trim() || null,
         p_reward_currency_name: rewardCurrencyName.trim() || 'Bucks',
         p_allow_self_signup: allowSelfSignup,
+        p_staff_can_view_roster: staffCanViewRoster,
         p_menu_count: menuCount,
         p_menu_1_name: menu1Name.trim() || 'Menu 1',
         p_menu_2_name: menu2Name.trim() || 'Menu 2',
@@ -815,6 +825,20 @@ export default function OrganizationSettingsScreen() {
                 onValueChange={setAllowSelfSignup}
                 trackColor={{ false: colors.border, true: colors.primary + '80' }}
                 thumbColor={allowSelfSignup ? colors.primary : colors.textSecondary}
+              />
+            </View>
+
+            {/* Staff Roster Visibility Toggle */}
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.fieldLabel}>Staff Can View Roster</Text>
+                <Text style={styles.fieldHint}>Employees can browse the day roster to see coworkers' shifts. Managers always can.</Text>
+              </View>
+              <Switch
+                value={staffCanViewRoster}
+                onValueChange={setStaffCanViewRoster}
+                trackColor={{ false: colors.border, true: colors.primary + '80' }}
+                thumbColor={staffCanViewRoster ? colors.primary : colors.textSecondary}
               />
             </View>
 

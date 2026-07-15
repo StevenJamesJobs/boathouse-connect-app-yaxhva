@@ -95,14 +95,17 @@ export default function GameHubEditorScreen() {
   }, [organization.games_use_sample_data]);
 
   const handleToggleSampleData = async (value: boolean) => {
+    if (!authActorId) return;
     setUseSampleData(value); // optimistic
     setSavingSample(true);
     try {
-      const { error } = await (supabase
-        .from('organizations') as any)
-        .update({ games_use_sample_data: value })
-        .eq('id', organizationId);
+      const { data, error } = await supabase.rpc('set_org_games_sample_flag', {
+        p_actor_id: authActorId,
+        p_value: value,
+      });
       if (error) throw error;
+      const result: any = typeof data === 'string' ? JSON.parse(data) : data;
+      if (result && result.success === false) throw new Error(result.error);
       await refreshOrganization();
     } catch (err) {
       console.error('[GameHubEditor] toggle sample data error:', err);
@@ -251,48 +254,32 @@ export default function GameHubEditorScreen() {
         return;
       }
 
-      // Get scores for each user
-      const results: UserScoreResult[] = [];
-      for (const user of users) {
-        // Memory game scores
-        const { data: memoryScores } = await (supabase
-          .from('game_scores') as any)
-          .select('score')
-          .eq('user_id', user.id)
-          .eq('completed', true);
+      // One manager-gated aggregate RPC replaces three queries per user.
+      const { data: totalsData, error: totalsError } = await supabase.rpc('get_org_game_totals', {
+        p_actor_id: authActorId ?? '',
+      });
+      if (totalsError) throw totalsError;
+      const totalsById = new Map<string, any>((totalsData || []).map((t: any) => [t.user_id, t]));
 
-        // Word search scores
-        const { data: wsScores } = await (supabase
-          .from('word_search_scores') as any)
-          .select('score')
-          .eq('user_id', user.id)
-          .eq('completed', true);
-
-        // Picture This scores
-        const { data: ptScores } = await (supabase
-          .from('picture_this_scores') as any)
-          .select('score')
-          .eq('user_id', user.id)
-          .eq('completed', true);
-
-        const memoryTotal = (memoryScores || []).reduce((sum: number, s: any) => sum + s.score, 0);
-        const wsTotal = (wsScores || []).reduce((sum: number, s: any) => sum + s.score, 0);
-        const ptTotal = (ptScores || []).reduce((sum: number, s: any) => sum + s.score, 0);
-
-        results.push({
+      const results: UserScoreResult[] = users.map((user: any) => {
+        const totals = totalsById.get(user.id);
+        const memoryTotal = Number(totals?.memory_score ?? 0);
+        const wsTotal = Number(totals?.word_search_score ?? 0);
+        const ptTotal = Number(totals?.picture_this_score ?? 0);
+        return {
           user_id: user.id,
           name: user.name,
           profile_picture_url: user.profile_picture_url,
           memory_score: memoryTotal,
-          memory_games: (memoryScores || []).length,
+          memory_games: Number(totals?.memory_games ?? 0),
           word_search_score: wsTotal,
-          word_search_games: (wsScores || []).length,
+          word_search_games: Number(totals?.word_search_games ?? 0),
           picture_this_score: ptTotal,
-          picture_this_games: (ptScores || []).length,
+          picture_this_games: Number(totals?.picture_this_games ?? 0),
           total_score: memoryTotal + wsTotal + ptTotal,
           is_test_user: !!user.is_test_user,
-        });
-      }
+        };
+      });
 
       setSearchResults(results);
     } catch (err) {
@@ -314,23 +301,15 @@ export default function GameHubEditorScreen() {
           onPress: async () => {
             setResettingUserId(user.user_id);
             try {
-              const { error: memError } = await (supabase
-                .from('game_scores') as any)
-                .delete()
-                .eq('user_id', user.user_id);
+              // Manager-gated, same-org enforced; clears all three score tables in one call.
+              const { data: resetRes, error: resetError } = await supabase.rpc('reset_user_game_scores', {
+                p_actor_id: authActorId ?? '',
+                p_user_id: user.user_id,
+              });
+              const resetResult: any = typeof resetRes === 'string' ? JSON.parse(resetRes) : resetRes;
 
-              const { error: wsError } = await (supabase
-                .from('word_search_scores') as any)
-                .delete()
-                .eq('user_id', user.user_id);
-
-              const { error: ptError } = await (supabase
-                .from('picture_this_scores') as any)
-                .delete()
-                .eq('user_id', user.user_id);
-
-              if (memError || wsError || ptError) {
-                console.error('Direct delete failed, errors:', memError, wsError, ptError);
+              if (resetError || (resetResult && resetResult.success === false)) {
+                console.error('Reset RPC failed:', resetError || resetResult?.error);
                 Alert.alert(t('game_hub_editor:error'), t('game_hub_editor:generic_error'));
               } else {
                 Alert.alert(t('game_hub_editor:done'), t('game_hub_editor:all_reset_msg'));

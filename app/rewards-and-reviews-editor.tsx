@@ -313,10 +313,15 @@ export default function RewardsAndReviewsEditorScreen() {
         }));
       setTopEmployees(topData);
 
-      // Fetch last 5 transactions with user names
-      // Managers can see ALL transactions (including hidden ones)
+      // Fetch last 5 transactions with user names. Managers can see ALL transactions
+      // (including hidden ones). Guard on user?.id: get_org_transactions has no p_actor_id
+      // default, so a logged-out call drops the arg and PostgREST 404s the overload (PGRST202).
+      if (!user?.id) {
+        setRecentTransactions([]);
+        return;
+      }
       const { data: transData, error: transError } = await supabase.rpc('get_org_transactions', {
-        p_actor_id: user?.id,
+        p_actor_id: user.id,
         p_limit: 5,
       });
 
@@ -352,15 +357,12 @@ export default function RewardsAndReviewsEditorScreen() {
 
   const fetchReviews = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('guest_reviews')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('display_order', { ascending: true })
-        .order('review_date', { ascending: false });
+      const { data, error } = await supabase.rpc('get_org_guest_reviews', {
+        p_actor_id: user?.id ?? '',
+      });
 
       if (error) throw error;
-      setReviews(data || []);
+      setReviews((data || []) as any);
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
@@ -368,11 +370,11 @@ export default function RewardsAndReviewsEditorScreen() {
 
   const fetchGoogleReviews = useCallback(async () => {
     try {
-      const { data, error } = await supabase
-        .from('google_reviews')
-        .select('id, author_title, author_image, review_rating, review_text, review_text_es, review_datetime_utc, owner_answer, owner_answer_es, is_published')
-        .eq('organization_id', organizationId)
-        .order('review_datetime_utc', { ascending: false });
+      // Manager editor sees unpublished reviews too (the toggle target).
+      const { data, error } = await supabase.rpc('get_org_google_reviews', {
+        p_actor_id: user?.id ?? '',
+        p_include_unpublished: true,
+      });
 
       if (!error && data) {
         setGoogleReviews(data as GoogleReview[]);
@@ -789,37 +791,21 @@ export default function RewardsAndReviewsEditorScreen() {
 
       setLoading(true);
 
-      if (editingReview) {
-        // Update existing review
-        const { error } = await supabase
-          .from('guest_reviews')
-          .update({
-            guest_name: reviewForm.guest_name,
-            rating: reviewForm.rating,
-            review_text: reviewForm.review_text,
-            review_date: reviewForm.review_date,
-            display_order: reviewForm.display_order,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', editingReview.id);
-
-        if (error) throw error;
-        Alert.alert(t('common:success'), t('rewards_reviews_editor:review_updated'));
-      } else {
-        // Create new review
-        const { error } = await supabase.from('guest_reviews').insert({
-          guest_name: reviewForm.guest_name,
-          rating: reviewForm.rating,
-          review_text: reviewForm.review_text,
-          review_date: reviewForm.review_date,
-          display_order: reviewForm.display_order,
-          created_by: user?.id,
-          organization_id: organizationId,
-        });
-
-        if (error) throw error;
-        Alert.alert(t('common:success'), t('rewards_reviews_editor:review_added'));
-      }
+      // One manager-gated upsert (p_review_id present = update, absent = insert).
+      const { error } = await supabase.rpc('upsert_guest_review', {
+        p_actor_id: user?.id ?? '',
+        p_guest_name: reviewForm.guest_name,
+        p_rating: reviewForm.rating,
+        p_review_text: reviewForm.review_text,
+        p_review_date: reviewForm.review_date,
+        p_display_order: reviewForm.display_order,
+        p_review_id: editingReview?.id ?? undefined,
+      });
+      if (error) throw error;
+      Alert.alert(
+        t('common:success'),
+        editingReview ? t('rewards_reviews_editor:review_updated') : t('rewards_reviews_editor:review_added'),
+      );
 
       setShowReviewModal(false);
       resetReviewForm();
@@ -863,10 +849,10 @@ export default function RewardsAndReviewsEditorScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            const { error } = await supabase
-              .from('guest_reviews')
-              .delete()
-              .eq('id', reviewId);
+            const { error } = await supabase.rpc('delete_guest_review', {
+              p_actor_id: user?.id ?? '',
+              p_review_id: reviewId,
+            });
 
             if (error) throw error;
             Alert.alert(t('common:success'), t('rewards_reviews_editor:review_deleted'));
@@ -906,10 +892,11 @@ export default function RewardsAndReviewsEditorScreen() {
           onPress: async () => {
             try {
               setLoading(true);
-              const { error } = await supabase
-                .from('google_reviews')
-                .update({ is_published: newPublished })
-                .eq('id', review.id);
+              const { error } = await supabase.rpc('set_google_review_published', {
+                p_actor_id: user?.id ?? '',
+                p_review_id: review.id,
+                p_published: newPublished,
+              });
               if (error) throw error;
               Alert.alert(t('common:success'), newPublished ? t('rewards_reviews_editor:review_shown') : t('rewards_reviews_editor:review_hidden'));
               fetchGoogleReviews();

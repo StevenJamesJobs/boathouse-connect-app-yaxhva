@@ -217,11 +217,20 @@ export default function NotificationDropdown({
       // system_key → follows renames) PLUS any item FEATURED via is_weekly_special
       // (overlay). Featured-but-not-categorized items surface by their feature
       // time (updated_at). Merge + dedupe by id.
-      const wsNames = await weeklySpecialsNames(organizationId);
-      const [byCatSpecials, byFlagSpecials] = await Promise.all([
-        supabase.from('menu_items').select('*').eq('organization_id', organizationId).in('category', wsNames).eq('is_active', true).order('created_at', { ascending: false }).limit(SOURCE_FETCH_LIMIT),
-        supabase.from('menu_items').select('*').eq('organization_id', organizationId).eq('is_weekly_special', true).eq('is_active', true).order('updated_at', { ascending: false }).limit(SOURCE_FETCH_LIMIT),
+      const wsNames = await weeklySpecialsNames(user?.id ?? '');
+      // RPC returns all matching active items; apply the recency sort + cap client-side.
+      const [byCatRpc, byFlagRpc] = await Promise.all([
+        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_categories: wsNames }),
+        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_weekly_special: true }),
       ]);
+      const byCatSpecials = {
+        data: ((byCatRpc.data as any[]) || [])
+          .slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, SOURCE_FETCH_LIMIT),
+      };
+      const byFlagSpecials = {
+        data: ((byFlagRpc.data as any[]) || [])
+          .slice().sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || '')).slice(0, SOURCE_FETCH_LIMIT),
+      };
       const specialsById = new Map<string, any>();
       for (const s of (byCatSpecials.data || [])) specialsById.set(s.id, { ...s, __ts: s.created_at });
       for (const s of (byFlagSpecials.data || [])) {

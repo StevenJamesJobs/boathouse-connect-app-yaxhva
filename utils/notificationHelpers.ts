@@ -184,21 +184,17 @@ export async function notifyLeaderboardPassed(
     const passed = (data ?? []) as Array<{ user_id: string; name: string }>;
     if (passed.length === 0) return;
 
-    // Write per-recipient shade rows so each passed user sees the entry in
-    // their personal notification dropdown. data.targetUserId scopes the row
-    // to that user; data.notificationType excludes it from manager Sent History.
-    const shadeRows = passed.map((p) => ({
-      title,
-      body,
-      sent_by: playerUserId,
-      data: {
-        type: 'custom',
-        notificationType: 'leaderboard_pass',
-        destination: 'master-leaderboard',
-        targetUserId: p.user_id,
-      },
-    }));
-    const { error: insertError } = await (supabase.from('custom_notifications') as any).insert(shadeRows);
+    // Write per-recipient shade rows (server-side) so each passed user sees the entry in
+    // their personal notification dropdown. The DEFINER RPC derives organization_id from the
+    // actor, sets sent_by, and stamps data.targetUserId per recipient — it works for an
+    // employee player (the direct insert used to fail the manager-only INSERT policy) and
+    // supplies the NOT NULL organization_id the old insert omitted.
+    const { error: insertError } = await supabase.rpc('add_leaderboard_pass_notifications', {
+      p_actor_id: playerUserId,
+      p_recipient_ids: passed.map((p) => p.user_id),
+      p_title: title,
+      p_body: body,
+    });
     if (insertError) {
       console.error('[notifyLeaderboardPassed] shade insert error:', insertError);
       // Continue to push even if shade insert failed.

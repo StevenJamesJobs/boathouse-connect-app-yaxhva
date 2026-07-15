@@ -11,17 +11,17 @@ import {
   ScrollView,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function JoinCodeScreen() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ organizationId: string }>();
-  const { organizationId: contextOrgId, organization } = useOrganization();
-  const organizationId = params.organizationId || contextOrgId;
+  const { organization } = useOrganization();
+  const { user } = useAuth();
 
   const [joinCode, setJoinCode] = useState<string | null>(null);
   const [orgName, setOrgName] = useState<string>(organization.name);
@@ -30,23 +30,21 @@ export default function JoinCodeScreen() {
 
   useEffect(() => {
     async function fetchCode() {
-      if (!organizationId) {
+      if (!user?.id) {
         setIsLoading(false);
         return;
       }
 
       try {
-        const { data, error } = await supabase
-          .from('organizations')
-          .select('join_code, name')
-          .eq('id', organizationId)
-          .single();
+        // Member-gated: get_org returns the caller's own org (join_code included).
+        const { data, error } = await supabase.rpc('get_org', { p_actor_id: user.id });
+        const row: any = Array.isArray(data) ? data[0] : data;
 
         if (error) {
           console.error('[JoinCode] Fetch error:', error);
-        } else if (data) {
-          setJoinCode(data.join_code);
-          setOrgName(data.name || organization.name);
+        } else if (row) {
+          setJoinCode(row.join_code);
+          setOrgName(row.name || organization.name);
         }
       } catch (err) {
         console.error('[JoinCode] Unexpected error:', err);
@@ -56,7 +54,8 @@ export default function JoinCodeScreen() {
     }
 
     fetchCode();
-  }, [organizationId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
   const handleCopy = async () => {
     if (!joinCode) return;

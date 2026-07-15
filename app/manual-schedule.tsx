@@ -153,17 +153,15 @@ export default function ManualScheduleScreen() {
   const loadShifts = async () => {
     try {
       setLoading(true);
-      const { data, error } = await (supabase
-        .from('staff_schedules') as any)
-        .select('*')
-        .eq('organization_id', organizationId)
-        .gte('shift_date', currentWeek.startStr)
-        .lte('shift_date', currentWeek.endStr)
-        .order('shift_date', { ascending: true })
-        .order('start_time', { ascending: true });
+      // Manager-gated org schedule for the visible week (org derived server-side).
+      const { data, error } = await supabase.rpc('get_org_schedule', {
+        p_actor_id: user?.id ?? '',
+        p_start_date: currentWeek.startStr,
+        p_end_date: currentWeek.endStr,
+      });
 
       if (error) throw error;
-      setShifts(data || []);
+      setShifts((data || []) as any);
     } catch (error) {
       console.error('Error loading shifts:', error);
       Alert.alert('Error', 'Failed to load schedule data.');
@@ -298,10 +296,11 @@ export default function ManualScheduleScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await (supabase.from('staff_schedules') as any)
-                .delete()
-                .eq('id', shift.id)
-                .eq('organization_id', organizationId);
+              const { error } = await supabase.rpc('delete_shift', {
+                p_actor_id: user?.id ?? '',
+                p_shift_id: shift.id,
+              });
+              if (error) throw error;
               loadShifts();
             } catch (error) {
               console.error('Delete shift error:', error);

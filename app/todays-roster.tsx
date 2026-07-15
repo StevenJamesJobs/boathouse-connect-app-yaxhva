@@ -21,7 +21,7 @@ import { isManagerOrOwner } from '@/utils/roles';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
-import ManagerTabBarStatic from '@/components/ManagerTabBarStatic';
+import PortalTabBarStatic from '@/components/PortalTabBarStatic';
 import ShiftEditForm, { ShiftLike } from '@/components/ShiftEditForm';
 import { isSameDay } from '@/utils/dateUtils';
 
@@ -92,14 +92,12 @@ export default function TodaysRosterScreen() {
     const iso = toISODate(date);
     setLoadingByDate((prev) => ({ ...prev, [iso]: true }));
     try {
-      const { data, error } = await supabase
-        .from('staff_schedules')
-        .select(
-          'id, upload_id, employee_name, user_id, shift_date, start_time, end_time, roles, is_closer, is_opener, is_training, room_assignment'
-        )
-        .eq('organization_id', organizationId)
-        .eq('shift_date', iso)
-        .order('start_time', { ascending: true });
+      // Member-gated org roster (server enforces the owner's staff_can_view_roster
+      // setting for employees; managers/owners always pass).
+      const { data, error } = await supabase.rpc('get_org_roster', {
+        p_actor_id: user?.id ?? '',
+        p_date: iso,
+      });
       if (error) throw error;
       setShiftsByDate((prev) => ({ ...prev, [iso]: (data || []) as RosterShift[] }));
     } catch (error) {
@@ -450,7 +448,7 @@ export default function TodaysRosterScreen() {
       )}
 
       {/* Floating tab bar — matches the manager portal's nav bar, navigates back on tap */}
-      <ManagerTabBarStatic />
+      <PortalTabBarStatic />
 
       {/* Shift edit form */}
       <ShiftEditForm

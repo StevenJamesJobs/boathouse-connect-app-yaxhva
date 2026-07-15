@@ -100,13 +100,11 @@ export default function MenuUploadScreen() {
     if (!organizationId) return;
     try {
       setLoading(true);
-      const { data, error } = await (supabase.from('menu_uploads' as any) as any)
-        .select('id, file_name, source_type, status, items_inserted, credits_charged, was_free, error_message, created_at')
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false })
-        .limit(15);
+      const { data, error } = await supabase.rpc('get_menu_uploads', {
+        p_actor_id: user?.id ?? '', p_limit: 15,
+      });
       if (error) throw error;
-      setUploads(data || []);
+      setUploads((data || []) as any);
     } catch (e) {
       console.error('Error loading menu uploads:', e);
     } finally {
@@ -125,10 +123,10 @@ export default function MenuUploadScreen() {
   useEffect(() => {
     if (!processingId) return;
     const interval = setInterval(async () => {
-      const { data } = await (supabase.from('menu_uploads' as any) as any)
-        .select('id, status, error_message')
-        .eq('id', processingId)
-        .single();
+      const { data: pollRows } = await supabase.rpc('get_menu_uploads', {
+        p_actor_id: user?.id ?? '', p_upload_id: processingId,
+      });
+      const data: any = Array.isArray(pollRows) ? pollRows[0] : null;
       if (data && data.status !== 'processing') {
         const id = processingId;
         setProcessingId(null);
@@ -166,26 +164,21 @@ export default function MenuUploadScreen() {
     pageCount: number,
     additionalImageUrls: string[] = []
   ) => {
-    const { data: record, error: insertError } = await (supabase.from('menu_uploads' as any) as any)
-      .insert({
-        organization_id: organizationId,
-        uploaded_by: user?.id,
-        file_url: fileUrl,
-        file_name: displayName,
-        source_type: sourceType,
-        page_count: pageCount,
-        status: 'processing',
-      })
-      .select('id')
-      .single();
+    const { data: newId, error: insertError } = await supabase.rpc('create_menu_upload', {
+      p_actor_id: user?.id ?? '',
+      p_file_url: fileUrl,
+      p_file_name: displayName,
+      p_source_type: sourceType,
+      p_page_count: pageCount,
+    });
     if (insertError) throw insertError;
 
-    setProcessingId(record.id);
+    setProcessingId(newId as string);
 
     const { error: fnError } = await supabase.functions.invoke('parse-menu', {
       body: {
         file_url: fileUrl,
-        upload_id: record.id,
+        upload_id: newId,
         user_id: user?.id,
         organization_id: organizationId,
         media_type: mediaType,

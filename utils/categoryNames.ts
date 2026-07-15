@@ -18,16 +18,19 @@ export interface OrgCategoryNames {
   byBehavior: Record<string, string[]>;
 }
 
-export async function fetchOrgCategoryNames(organizationId: string): Promise<OrgCategoryNames> {
+// All resolvers now take the ACTING user's id (org derived server-side by the member-gated
+// get_menu_categories/get_menu_subcategories RPCs). An optional sourceOrg is honored only when
+// it's the actor's own org or the designated sample org (games' "use sample data" path).
+export async function fetchOrgCategoryNames(actorId: string, sourceOrg?: string): Promise<OrgCategoryNames> {
   const bySystemKey: Record<string, string> = {};
   const namesBySystemKey: Record<string, string[]> = {};
   const byBehavior: Record<string, string[]> = {};
-  if (!organizationId) return { bySystemKey, namesBySystemKey, byBehavior };
+  if (!actorId) return { bySystemKey, namesBySystemKey, byBehavior };
   try {
-    const { data } = await (supabase
-      .from('menu_categories' as any) as any)
-      .select('display_name, system_key, filter_behavior')
-      .eq('organization_id', organizationId);
+    const { data } = await supabase.rpc('get_menu_categories', {
+      p_actor_id: actorId,
+      p_source_org: sourceOrg,
+    });
     for (const c of (data || []) as any[]) {
       if (c.system_key) {
         bySystemKey[c.system_key] = c.display_name;
@@ -47,15 +50,15 @@ export async function fetchOrgCategoryNames(organizationId: string): Promise<Org
 /** Current display name of the org's Weekly Specials category (falls back to the
  *  canonical English name if not yet seeded). Single-name; prefer
  *  weeklySpecialsNames() in per-menu-aware code. */
-export async function weeklySpecialsName(organizationId: string): Promise<string> {
-  const { bySystemKey } = await fetchOrgCategoryNames(organizationId);
+export async function weeklySpecialsName(actorId: string, sourceOrg?: string): Promise<string> {
+  const { bySystemKey } = await fetchOrgCategoryNames(actorId, sourceOrg);
   return bySystemKey['cat.weekly_specials'] || 'Weekly Specials';
 }
 
 /** ALL distinct current names of the org's Weekly Specials category across menu
  *  slots (per-menu mode can have more than one). Use with .in('category', names). */
-export async function weeklySpecialsNames(organizationId: string): Promise<string[]> {
-  const { namesBySystemKey } = await fetchOrgCategoryNames(organizationId);
+export async function weeklySpecialsNames(actorId: string, sourceOrg?: string): Promise<string[]> {
+  const { namesBySystemKey } = await fetchOrgCategoryNames(actorId, sourceOrg);
   const names = namesBySystemKey['cat.weekly_specials'];
   return names && names.length ? names : ['Weekly Specials'];
 }
@@ -73,17 +76,13 @@ export interface MenuCategoryResolver {
   cocktailFedSubNames: string[];
 }
 
-export async function fetchMenuCategoryResolver(organizationId: string): Promise<MenuCategoryResolver> {
+export async function fetchMenuCategoryResolver(actorId: string, sourceOrg?: string): Promise<MenuCategoryResolver> {
   const empty: MenuCategoryResolver = { namesForKeys: () => [], cocktailFedSubNames: [] };
-  if (!organizationId) return empty;
+  if (!actorId) return empty;
   try {
     const [catRes, subRes] = await Promise.all([
-      (supabase.from('menu_categories' as any) as any)
-        .select('display_name, system_key')
-        .eq('organization_id', organizationId),
-      (supabase.from('menu_subcategories' as any) as any)
-        .select('display_name, is_cocktail_fed')
-        .eq('organization_id', organizationId),
+      supabase.rpc('get_menu_categories', { p_actor_id: actorId, p_source_org: sourceOrg }),
+      supabase.rpc('get_menu_subcategories', { p_actor_id: actorId, p_source_org: sourceOrg }),
     ]);
     const byKey: Record<string, string[]> = {};
     for (const c of (catRes.data || []) as any[]) {

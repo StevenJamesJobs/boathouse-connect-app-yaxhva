@@ -3110,6 +3110,7 @@ export type Database = {
           owner_id: string
           reward_currency_name: string
           slug: string
+          staff_can_view_roster: boolean
           state: string
           weather_location: string
           zip: string
@@ -3194,6 +3195,319 @@ export type Database = {
       set_transaction_visibility: {
         Args: { p_actor_id?: string; p_is_visible: boolean; p_transaction_id: string }
         Returns: undefined
+      }
+      set_org_games_sample_flag: {
+        Args: { p_actor_id: string; p_value: boolean }
+        Returns: Json
+      }
+      set_org_logo: {
+        Args: { p_actor_id: string; p_logo_url?: string }
+        Returns: Json
+      }
+      set_org_menu_category_scope: {
+        Args: { p_organization_id: string; p_scope: string; p_user_id: string }
+        Returns: Json
+      }
+      lookup_join_code: {
+        Args: { p_join_code: string }
+        Returns: {
+          allow_self_signup: boolean
+          org_name: string
+        }[]
+      }
+      get_my_shifts: {
+        Args: { p_actor_id: string; p_end_date?: string; p_limit?: number; p_start_date: string }
+        Returns: {
+          end_time: string
+          id: string
+          is_closer: boolean
+          is_opener: boolean
+          is_training: boolean
+          roles: string[]
+          room_assignment: string
+          shift_date: string
+          start_time: string
+        }[]
+      }
+      get_user_next_shift: {
+        Args: { p_actor_id: string; p_user_id: string }
+        Returns: {
+          end_time: string
+          roles: string[]
+          shift_date: string
+          start_time: string
+        }[]
+      }
+      get_org_roster: {
+        Args: { p_actor_id: string; p_date: string }
+        Returns: {
+          employee_name: string
+          end_time: string
+          id: string
+          is_closer: boolean
+          is_opener: boolean
+          is_training: boolean
+          roles: string[]
+          room_assignment: string
+          shift_date: string
+          start_time: string
+          upload_id: string
+          user_id: string
+        }[]
+      }
+      get_org_schedule: {
+        Args: { p_actor_id: string; p_end_date: string; p_start_date: string }
+        Returns: {
+          employee_name: string
+          end_time: string
+          id: string
+          is_closer: boolean
+          is_opener: boolean
+          is_training: boolean
+          roles: string[]
+          room_assignment: string
+          shift_date: string
+          start_time: string
+          upload_id: string
+          user_id: string
+        }[]
+      }
+      get_upload_shifts: {
+        Args: { p_actor_id: string; p_upload_id: string }
+        Returns: {
+          employee_name: string
+          end_time: string
+          id: string
+          is_closer: boolean
+          is_opener: boolean
+          is_training: boolean
+          roles: string[]
+          room_assignment: string
+          shift_date: string
+          start_time: string
+          upload_id: string
+          user_id: string
+        }[]
+      }
+      get_org_uploads: {
+        Args: { p_actor_id: string; p_limit?: number; p_upload_id?: string; p_week_start?: string }
+        Returns: {
+          created_at: string
+          error_message: string
+          file_name: string
+          file_url: string
+          id: string
+          parsed_shifts_count: number
+          status: string
+          unmatched_employees: Json
+          uploaded_by: string
+          week_end: string
+          week_start: string
+        }[]
+      }
+      get_latest_schedule_upload_at: {
+        Args: { p_actor_id: string }
+        Returns: string
+      }
+      add_shift: {
+        Args: {
+          p_actor_id: string
+          p_employee_name: string
+          p_end_time: string
+          p_is_closer?: boolean
+          p_is_opener?: boolean
+          p_is_training?: boolean
+          p_roles?: string[]
+          p_room_assignment?: string
+          p_shift_date: string
+          p_start_time: string
+          p_upload_id?: string
+          p_user_id?: string
+        }
+        Returns: string
+      }
+      update_shift: {
+        Args: {
+          p_actor_id: string
+          p_employee_name?: string
+          p_end_time?: string
+          p_is_closer?: boolean
+          p_is_opener?: boolean
+          p_is_training?: boolean
+          p_roles?: string[]
+          p_room_assignment?: string
+          p_shift_date?: string
+          p_shift_id: string
+          p_start_time?: string
+          p_user_id?: string
+        }
+        Returns: boolean
+      }
+      delete_shift: {
+        Args: { p_actor_id: string; p_shift_id: string }
+        Returns: boolean
+      }
+      assign_upload_shifts: {
+        Args: { p_actor_id: string; p_employee_name: string; p_upload_id: string; p_user_id?: string }
+        Returns: boolean
+      }
+      create_schedule_upload: {
+        Args: {
+          p_actor_id: string
+          p_file_name: string
+          p_file_url: string
+          p_status?: string
+          p_week_end: string
+          p_week_start: string
+        }
+        Returns: string
+      }
+      delete_schedule_upload: {
+        Args: { p_actor_id: string; p_upload_id: string }
+        Returns: boolean
+      }
+      get_org_guest_reviews: {
+        Args: { p_actor_id: string }
+        Returns: {
+          display_order: number
+          guest_name: string
+          id: string
+          is_active: boolean
+          rating: number
+          review_date: string
+          review_text: string
+        }[]
+      }
+      get_org_google_reviews: {
+        Args: { p_actor_id: string; p_include_unpublished?: boolean; p_limit?: number }
+        Returns: {
+          author_image: string
+          author_title: string
+          id: string
+          is_published: boolean
+          owner_answer: string
+          owner_answer_es: string
+          review_datetime_utc: string
+          review_rating: number
+          review_text: string
+          review_text_es: string
+        }[]
+      }
+      get_my_game_stats: {
+        Args: { p_actor_id: string }
+        Returns: {
+          best_score: number
+          game_mode: string
+          games_played: number
+          highest_completed_difficulty: number
+        }[]
+      }
+      get_org_game_totals: {
+        Args: { p_actor_id: string }
+        Returns: {
+          memory_games: number
+          memory_score: number
+          picture_this_games: number
+          picture_this_score: number
+          user_id: string
+          word_search_games: number
+          word_search_score: number
+        }[]
+      }
+      get_org_exam_activity: {
+        Args: { p_actor_id: string; p_since: string }
+        Returns: {
+          completed_at: string
+          id: string
+        }[]
+      }
+      submit_memory_game_score: {
+        Args: {
+          p_actor_id: string
+          p_completed?: boolean
+          p_difficulty: number
+          p_game_mode: string
+          p_lives_remaining?: number
+          p_pairs_matched?: number
+          p_play_mode: string
+          p_score: number
+          p_time_seconds?: number
+          p_total_pairs?: number
+        }
+        Returns: string
+      }
+      submit_word_search_score: {
+        Args: {
+          p_actor_id: string
+          p_category: string
+          p_completed?: boolean
+          p_difficulty: string
+          p_play_mode: string
+          p_score: number
+          p_time_seconds?: number
+          p_total_words?: number
+          p_words_found?: number
+        }
+        Returns: string
+      }
+      submit_picture_this_score: {
+        Args: {
+          p_actor_id: string
+          p_bonus_points?: number
+          p_category: string
+          p_completed?: boolean
+          p_difficulty: string
+          p_lives_remaining?: number
+          p_play_mode: string
+          p_questions_correct?: number
+          p_questions_total?: number
+          p_score: number
+          p_time_seconds?: number
+        }
+        Returns: string
+      }
+      reset_user_game_scores: {
+        Args: { p_actor_id: string; p_user_id: string }
+        Returns: Json
+      }
+      upsert_guest_review: {
+        Args: {
+          p_actor_id: string
+          p_display_order?: number
+          p_guest_name: string
+          p_rating: number
+          p_review_date: string
+          p_review_id?: string
+          p_review_text: string
+        }
+        Returns: string
+      }
+      delete_guest_review: {
+        Args: { p_actor_id: string; p_review_id: string }
+        Returns: boolean
+      }
+      set_google_review_published: {
+        Args: { p_actor_id: string; p_published: boolean; p_review_id: string }
+        Returns: boolean
+      }
+      join_signup: {
+        Args: { p_email?: string; p_join_code: string; p_name: string; p_username: string }
+        Returns: {
+          badge_title: string
+          email: string
+          force_password_change: boolean
+          id: string
+          job_title: string
+          job_titles: string[]
+          mcloones_bucks: number
+          name: string
+          organization_id: string
+          phone_number: string
+          profile_picture_url: string
+          quick_tools: Json
+          role: string
+          username: string
+        }[]
       }
       login_user: {
         Args: { p_password: string; p_username: string }
@@ -3652,7 +3966,279 @@ export type Database = {
           user_id: string
         }[]
       }
-      get_unread_leaderboard_pass_count: { Args: never; Returns: number }
+      get_unread_leaderboard_pass_count: { Args: { p_user_id: string }; Returns: number }
+      add_leaderboard_pass_notifications: {
+        Args: { p_actor_id: string; p_body: string; p_recipient_ids: string[]; p_title: string }
+        Returns: number
+      }
+      get_checklist_categories: {
+        Args: { p_actor_id: string; p_bartender: boolean; p_checklist_type?: string }
+        Returns: {
+          checklist_type: string
+          display_order: number
+          id: string
+          name: string
+        }[]
+      }
+      get_checklist_items: {
+        Args: { p_actor_id: string; p_bartender: boolean; p_checklist_type?: string }
+        Returns: {
+          category_id: string
+          display_order: number
+          id: string
+          text: string
+        }[]
+      }
+      get_my_checklist_progress: {
+        Args: { p_actor_id: string; p_bartender: boolean; p_date: string }
+        Returns: {
+          checklist_item_id: string
+          completed: boolean
+        }[]
+      }
+      set_checklist_progress: {
+        Args: {
+          p_actor_id: string
+          p_bartender: boolean
+          p_completed: boolean
+          p_date: string
+          p_item_id: string
+        }
+        Returns: undefined
+      }
+      upsert_checklist_category: {
+        Args: {
+          p_actor_id: string
+          p_bartender: boolean
+          p_category_id?: string
+          p_checklist_type: string
+          p_name: string
+        }
+        Returns: string
+      }
+      delete_checklist_category: {
+        Args: { p_actor_id: string; p_bartender: boolean; p_category_id: string }
+        Returns: boolean
+      }
+      upsert_checklist_item: {
+        Args: {
+          p_actor_id: string
+          p_bartender: boolean
+          p_category_id: string
+          p_item_id?: string
+          p_text: string
+        }
+        Returns: string
+      }
+      delete_checklist_item: {
+        Args: { p_actor_id: string; p_bartender: boolean; p_item_id: string }
+        Returns: boolean
+      }
+      get_cocktails: {
+        Args: { p_actor_id: string; p_source_org?: string }
+        Returns: {
+          alcohol_type: string
+          display_order: number
+          garnish: string
+          glassware: string
+          id: string
+          ingredients: string
+          is_active: boolean
+          name: string
+          organization_id: string
+          procedure: string
+          procedure_es: string
+          thumbnail_url: string
+        }[]
+      }
+      get_libation_recipes: {
+        Args: { p_actor_id: string; p_source_org?: string }
+        Returns: {
+          category: string
+          display_order: number
+          garnish: string
+          glassware: string
+          id: string
+          ingredients: Json
+          is_active: boolean
+          is_featured: boolean
+          name: string
+          organization_id: string
+          price: string
+          procedure: string
+          procedure_es: string
+          subcategory_id: string
+          thumbnail_url: string
+        }[]
+      }
+      get_summer_libation_recipes: {
+        Args: { p_actor_id: string; p_source_org?: string }
+        Returns: {
+          category: string
+          display_order: number
+          garnish: string
+          glassware: string
+          id: string
+          ingredients: Json
+          is_active: boolean
+          is_featured: boolean
+          name: string
+          organization_id: string
+          price: string
+          procedure: string
+          procedure_es: string
+          subcategory_id: string
+          thumbnail_url: string
+        }[]
+      }
+      get_puree_syrup_recipes: {
+        Args: { p_actor_id: string; p_source_org?: string }
+        Returns: {
+          category: string
+          display_order: number
+          id: string
+          ingredients: Json
+          is_active: boolean
+          name: string
+          organization_id: string
+          procedure: string
+          procedure_es: string
+          thumbnail_url: string
+        }[]
+      }
+      get_wine_pairings: {
+        Args: { p_actor_id: string; p_include_inactive?: boolean; p_source_org?: string }
+        Returns: {
+          display_order: number
+          entree: string
+          hint: string
+          id: string
+          is_active: boolean
+          organization_id: string
+          wine: string
+        }[]
+      }
+      insert_wine_pairing: {
+        Args: { p_display_order?: number; p_entree: string; p_hint?: string; p_user_id: string; p_wine: string }
+        Returns: string
+      }
+      update_wine_pairing: {
+        Args: { p_entree: string; p_hint?: string; p_pairing_id: string; p_user_id: string; p_wine: string }
+        Returns: boolean
+      }
+      delete_wine_pairing: {
+        Args: { p_pairing_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      set_wine_pairing_active: {
+        Args: { p_is_active: boolean; p_pairing_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      get_menu_items: {
+        Args: {
+          p_actor_id: string
+          p_categories?: string[]
+          p_season?: string
+          p_source_org?: string
+          p_weekly_special?: boolean
+        }
+        Returns: {
+          available_for_dinner: boolean
+          available_for_lunch: boolean
+          bottle_price: string
+          category: string
+          created_at: string
+          created_by: string
+          description: string
+          description_es: string
+          display_order: number
+          flavor_profile: string
+          flavor_profile_es: string
+          glass_price: string
+          id: string
+          is_active: boolean
+          is_gluten_free: boolean
+          is_gluten_free_available: boolean
+          is_vegetarian: boolean
+          is_vegetarian_available: boolean
+          is_weekly_special: boolean
+          location: string
+          location_es: string
+          member_bottle_price: string
+          name: string
+          name_es: string
+          organization_id: string
+          price: string
+          season: string
+          subcategory: string
+          thumbnail_shape: string
+          thumbnail_url: string
+          unique_selling_points: string
+          unique_selling_points_es: string
+          updated_at: string
+        }[]
+      }
+      reorder_menu_items: {
+        Args: { p_actor_id: string; p_ordered_ids: string[] }
+        Returns: boolean
+      }
+      get_menu_categories: {
+        Args: { p_actor_id: string; p_menu_slot?: number; p_source_org?: string }
+        Returns: {
+          color: string
+          display_name: string
+          display_name_es: string
+          display_order: number
+          filter_behavior: string
+          id: string
+          is_hidden: boolean
+          menu_slot: number
+          organization_id: string
+          system_key: string
+        }[]
+      }
+      get_menu_subcategories: {
+        Args: { p_actor_id: string; p_menu_slot?: number; p_source_org?: string }
+        Returns: {
+          category_id: string
+          display_name: string
+          display_name_es: string
+          display_order: number
+          id: string
+          is_cocktail_fed: boolean
+          is_hidden: boolean
+          menu_slot: number
+          organization_id: string
+          system_key: string
+        }[]
+      }
+      get_menu_uploads: {
+        Args: { p_actor_id: string; p_limit?: number; p_upload_id?: string }
+        Returns: {
+          apply_mode: string
+          created_at: string
+          credits_charged: number
+          error_message: string
+          file_name: string
+          id: string
+          items_inserted: number
+          parsed_result: Json
+          source_type: string
+          status: string
+          target_menu_slot: number
+          was_free: boolean
+        }[]
+      }
+      create_menu_upload: {
+        Args: {
+          p_actor_id: string
+          p_file_name: string
+          p_file_url: string
+          p_page_count: number
+          p_source_type: string
+        }
+        Returns: string
+      }
       get_unread_message_count: {
         Args: { p_organization_id?: string; user_id: string }
         Returns: number
@@ -3750,7 +4336,7 @@ export type Database = {
         }
         Returns: string
       }
-      mark_leaderboard_viewed: { Args: never; Returns: undefined }
+      mark_leaderboard_viewed: { Args: { p_user_id: string }; Returns: undefined }
       regenerate_join_code: {
         Args: { p_organization_id: string; p_user_id: string }
         Returns: Json
@@ -4068,6 +4654,7 @@ export type Database = {
           p_name?: string
           p_organization_id: string
           p_reward_currency_name?: string
+          p_staff_can_view_roster?: boolean
           p_state?: string
           p_user_id: string
           p_weather_location?: string
