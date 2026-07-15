@@ -376,13 +376,10 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   // search corpus. (For the non-active menu the cocktail subcategory names
   // resolve best-effort against the active tree — fine for search.)
   const buildItemsForSeason = async (seasonKey: Season): Promise<MenuItem[]> => {
-    const { data, error } = await (supabase
-      .from('menu_items') as any)
-      .select('*')
-      .eq('organization_id', organizationId)
-      .eq('is_active', true)
-      .in('season', [seasonKey, 'both'])
-      .order('display_order', { ascending: true });
+    const { data, error } = await supabase.rpc('get_menu_items', {
+      p_actor_id: user?.id ?? '',
+      p_season: seasonKey,
+    });
 
     if (error) throw error;
     let items: MenuItem[] = data || [];

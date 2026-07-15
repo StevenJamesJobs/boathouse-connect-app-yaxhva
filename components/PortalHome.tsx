@@ -21,6 +21,7 @@ import {
 import { Image } from 'expo-image';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { isManagerOrOwner } from '@/utils/roles';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -285,15 +286,15 @@ export default function PortalHome({ role }: PortalHomeProps) {
     setLoadingFeatures(true);
 
     try {
-      const wsNames = await weeklySpecialsNames(organizationId);
+      const wsNames = await weeklySpecialsNames(user?.id ?? '');
       const [specialsResult, announcementsResult, eventsResult, featuresResult] = await Promise.all([
         // Weekly Specials = items categorized as Weekly Specials PLUS any item
         // flagged is_weekly_special (overlay — the item stays in its home
         // category but is featured here too). Merge + dedupe by id.
         (async () => {
           const [byCategory, flagged] = await Promise.all([
-            supabase.from('menu_items').select('*').eq('organization_id', organizationId).in('category', wsNames).eq('is_active', true),
-            supabase.from('menu_items').select('*').eq('organization_id', organizationId).eq('is_weekly_special', true).eq('is_active', true),
+            supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_categories: wsNames }),
+            supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_weekly_special: true }),
           ]);
           const byId = new Map<string, any>();
           for (const row of [...(byCategory.data || []), ...(flagged.data || [])]) byId.set(row.id, row);
@@ -1222,16 +1223,18 @@ export default function PortalHome({ role }: PortalHomeProps) {
               {t('upcoming_shifts.full_schedule', 'Full Schedule')}
             </Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.schedBtn, styles.schedBtnOutline, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
-            onPress={() => router.push('/todays-roster')}
-            activeOpacity={0.85}
-          >
-            <IconSymbol ios_icon_name="person.3.fill" android_material_icon_name="groups" size={16} color={colors.text} />
-            <Text style={[styles.schedBtnText, { color: colors.text }]}>
-              {t('upcoming_shifts.view_roster', 'View Roster')}
-            </Text>
-          </TouchableOpacity>
+          {(isManagerOrOwner(user) || organization.staff_can_view_roster) && (
+            <TouchableOpacity
+              style={[styles.schedBtn, styles.schedBtnOutline, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
+              onPress={() => router.push('/todays-roster')}
+              activeOpacity={0.85}
+            >
+              <IconSymbol ios_icon_name="person.3.fill" android_material_icon_name="groups" size={16} color={colors.text} />
+              <Text style={[styles.schedBtnText, { color: colors.text }]}>
+                {t('upcoming_shifts.view_roster', 'View Roster')}
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Reserved (design-only) — swap / time-off / approvals land here later. */}

@@ -297,7 +297,7 @@ export default function ExamEditorScreen() {
   };
 
   const generateAndSaveQuestions = async (examId: string, cycleKey: string) => {
-    const generatedQuestions = await generateQuizQuestions(examType, cycleKey, questionCount, organizationId ?? '');
+    const generatedQuestions = await generateQuizQuestions(examType, cycleKey, questionCount, organizationId ?? '', user?.id ?? '');
 
     const questionsToInsert = generatedQuestions.map((q, index) => ({
       exam_id: examId,
@@ -653,6 +653,7 @@ export default function ExamEditorScreen() {
           organizationId ?? '',
           [],
           `${currentExam.cycle_key}-photo-refresh-${question.id}-${Date.now()}`,
+          user?.id ?? '',
         );
         if (photo && photo.question_text !== question.question_text) {
           newQuestion = photo;
@@ -662,7 +663,7 @@ export default function ExamEditorScreen() {
       if (!newQuestion) {
         // Generate a batch of questions and pick one that's different from the current
         const cycleKey = currentExam.cycle_key + '-refresh-' + Date.now().toString(36);
-        const generated = await generateQuizQuestions(examType, cycleKey, 5, organizationId ?? '');
+        const generated = await generateQuizQuestions(examType, cycleKey, 5, organizationId ?? '', user?.id ?? '');
 
         // Find one that doesn't duplicate existing questions
         const existingTexts = new Set(questions.map(q => q.question_text));

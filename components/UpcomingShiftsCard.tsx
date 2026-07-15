@@ -45,14 +45,12 @@ export default function UpcomingShiftsCard({ userId }: UpcomingShiftsCardProps) 
     try {
       setLoading(true);
       const today = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
-        .from('staff_schedules')
-        .select('id, shift_date, start_time, end_time, roles, is_closer, is_opener, is_training, room_assignment')
-        .eq('user_id', userId)
-        .gte('shift_date', today)
-        .order('shift_date', { ascending: true })
-        .order('start_time', { ascending: true })
-        .limit(7);
+      // Self-only RPC (userId here is always the signed-in user).
+      const { data, error } = await supabase.rpc('get_my_shifts', {
+        p_actor_id: userId as string,
+        p_start_date: today,
+        p_limit: 7,
+      });
 
       if (error) throw error;
       setShifts(data || []);

@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { PlayMode } from '@/types/game';
 
 interface WinePairing {
@@ -36,6 +37,7 @@ export default function MemoryGameEditorScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'pairings' | 'scoreboard'>('pairings');
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>('all');
   const [pairings, setPairings] = useState<WinePairing[]>([]);
@@ -48,16 +50,16 @@ export default function MemoryGameEditorScreen() {
 
   const fetchPairings = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('wine_pairings' as any)
-      .select('*')
-      .eq('organization_id', organizationId)
-      .order('display_order');
+    // Manager tool: include inactive pairings so the active/inactive toggle can reactivate them.
+    const { data, error } = await supabase.rpc('get_wine_pairings', {
+      p_actor_id: user?.id ?? '',
+      p_include_inactive: true,
+    });
     if (!error && data) {
       setPairings(data as any[]);
     }
     setLoading(false);
-  }, [organizationId]);
+  }, [user?.id]);
 
   useEffect(() => {
     fetchPairings();
@@ -68,15 +70,12 @@ export default function MemoryGameEditorScreen() {
       Alert.alert(t('common.error'), t('memory_game_editor.fields_required'));
       return;
     }
-    const nextOrder = pairings.length > 0 ? Math.max(...pairings.map(p => p.display_order)) + 1 : 1;
-    const { error } = await (supabase.from('wine_pairings' as any) as any)
-      .insert({
-        wine: newWine.trim(),
-        entree: newEntree.trim(),
-        hint: newHint.trim() || null,
-        display_order: nextOrder,
-        organization_id: organizationId,
-      });
+    const { error } = await supabase.rpc('insert_wine_pairing', {
+      p_user_id: user?.id ?? '',
+      p_wine: newWine.trim(),
+      p_entree: newEntree.trim(),
+      p_hint: newHint.trim() || undefined,
+    });
     if (error) {
       Alert.alert(t('common.error'), error.message);
     } else {
@@ -89,14 +88,13 @@ export default function MemoryGameEditorScreen() {
   };
 
   const handleUpdate = async (pairing: WinePairing) => {
-    const { error } = await (supabase.from('wine_pairings' as any) as any)
-      .update({
-        wine: pairing.wine,
-        entree: pairing.entree,
-        hint: pairing.hint,
-      })
-      .eq('id', pairing.id)
-      .eq('organization_id', organizationId);
+    const { error } = await supabase.rpc('update_wine_pairing', {
+      p_user_id: user?.id ?? '',
+      p_pairing_id: pairing.id,
+      p_wine: pairing.wine,
+      p_entree: pairing.entree,
+      p_hint: pairing.hint ?? undefined,
+    });
     if (error) {
       Alert.alert(t('common.error'), error.message);
     } else {
@@ -115,7 +113,7 @@ export default function MemoryGameEditorScreen() {
           text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
-            await (supabase.from('wine_pairings' as any) as any).delete().eq('id', pairing.id).eq('organization_id', organizationId);
+            await supabase.rpc('delete_wine_pairing', { p_user_id: user?.id ?? '', p_pairing_id: pairing.id });
             fetchPairings();
           },
         },
@@ -124,10 +122,11 @@ export default function MemoryGameEditorScreen() {
   };
 
   const handleToggleActive = async (pairing: WinePairing) => {
-    await (supabase.from('wine_pairings' as any) as any)
-      .update({ is_active: !pairing.is_active })
-      .eq('id', pairing.id)
-      .eq('organization_id', organizationId);
+    await supabase.rpc('set_wine_pairing_active', {
+      p_user_id: user?.id ?? '',
+      p_pairing_id: pairing.id,
+      p_is_active: !pairing.is_active,
+    });
     fetchPairings();
   };
 

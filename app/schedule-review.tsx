@@ -111,13 +111,12 @@ export default function ScheduleReviewScreen() {
     try {
       setLoading(true);
 
-      // Load upload info
-      const { data: uploadData } = await supabase
-        .from('schedule_uploads')
-        .select('week_start, week_end')
-        .eq('id', upload_id)
-        .eq('organization_id', organizationId)
-        .single();
+      // Load upload info (manager-gated; upload must belong to the actor's org)
+      const { data: uploadRows } = await supabase.rpc('get_org_uploads', {
+        p_actor_id: user?.id ?? '',
+        p_upload_id: upload_id,
+      });
+      const uploadData = Array.isArray(uploadRows) ? uploadRows[0] : uploadRows;
 
       if (uploadData) {
         setWeekStart(uploadData.week_start);
@@ -125,16 +124,13 @@ export default function ScheduleReviewScreen() {
       }
 
       // Load shifts for this upload
-      const { data: shiftData, error: shiftError } = await supabase
-        .from('staff_schedules')
-        .select('*')
-        .eq('upload_id', upload_id)
-        .order('employee_name', { ascending: true })
-        .order('shift_date', { ascending: true })
-        .order('start_time', { ascending: true });
+      const { data: shiftData, error: shiftError } = await supabase.rpc('get_upload_shifts', {
+        p_actor_id: user?.id ?? '',
+        p_upload_id: upload_id,
+      });
 
       if (shiftError) throw shiftError;
-      setShifts(shiftData || []);
+      setShifts((shiftData || []) as any);
 
       // Load all users for assignment
       const directory = await getOrgDirectory(user?.id);
@@ -243,28 +239,16 @@ export default function ScheduleReviewScreen() {
       setSaving(true);
       setAssignModalVisible(false);
 
-      // Update all shifts for this employee in this upload
-      const { error } = await supabase
-        .from('staff_schedules')
-        .update({ user_id: userId })
-        .eq('upload_id', upload_id)
-        .eq('employee_name', selectedEmployee);
+      // One gated RPC updates every shift for this employee in this upload AND
+      // recomputes unmatched_employees server-side from what's actually linked.
+      const { error } = await supabase.rpc('assign_upload_shifts', {
+        p_actor_id: user?.id ?? '',
+        p_upload_id: upload_id,
+        p_employee_name: selectedEmployee,
+        p_user_id: userId ?? undefined,
+      });
 
       if (error) throw error;
-
-      // Update unmatched_employees in upload record
-      const newUnmatched = groupedShifts
-        .filter((g) => {
-          if (g.employee_name === selectedEmployee) return userId === null;
-          return !g.user_id;
-        })
-        .map((g) => g.employee_name);
-
-      await supabase
-        .from('schedule_uploads')
-        .update({ unmatched_employees: newUnmatched })
-        .eq('id', upload_id)
-        .eq('organization_id', organizationId);
 
       // Reload data
       await loadData();
@@ -294,15 +278,12 @@ export default function ScheduleReviewScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await supabase.from('staff_schedules').delete().eq('id', shift.id).eq('organization_id', organizationId);
-
-              // Update count
-              const newCount = shifts.length - 1;
-              await supabase
-                .from('schedule_uploads')
-                .update({ parsed_shifts_count: newCount })
-                .eq('id', upload_id)
-                .eq('organization_id', organizationId);
+              // Gated delete; parsed_shifts_count is resynced inside the RPC.
+              const { error } = await supabase.rpc('delete_shift', {
+                p_actor_id: user?.id ?? '',
+                p_shift_id: shift.id,
+              });
+              if (error) throw error;
 
               await loadData();
             } catch (error) {

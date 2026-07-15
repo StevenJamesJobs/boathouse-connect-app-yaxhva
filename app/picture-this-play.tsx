@@ -139,10 +139,10 @@ export default function PictureThisPlayScreen() {
       setPoolError(null);
       try {
         if (category === 'menu_prices') {
-          const { libationNames } = await resolvePriceCategoryNames(organizationId ?? '', organization.games_use_sample_data);
+          const { libationNames } = await resolvePriceCategoryNames(organizationId ?? '', organization.games_use_sample_data, user?.id ?? '');
           if (!cancelled) libationNamesRef.current = libationNames;
         }
-        const data = await loadPool(category, organizationId ?? '', organization.games_use_sample_data);
+        const data = await loadPool(category, organizationId ?? '', organization.games_use_sample_data, user?.id ?? '');
         if (cancelled) return;
         if (data.length < 4) {
           setPoolError('Not enough menu items in this category to play. Try a different category.');
@@ -356,19 +356,19 @@ export default function PictureThisPlayScreen() {
       const finalCorrect = questionsCorrect;
       const elapsed = playMode === 'timed' ? TIMED_SECONDS - timeRemaining : undefined;
 
-      await (supabase.from('picture_this_scores') as any).insert({
-        user_id: user.id,
-        organization_id: organizationId,
-        category,
-        difficulty,
-        play_mode: playMode,
-        score: finalTotalScore,
-        questions_correct: finalCorrect,
-        questions_total: history.length,
-        bonus_points: bonusPoints + extraCompletion + extraPerfect,
-        time_seconds: elapsed,
-        lives_remaining: playMode === 'lives' ? lives : 0,
-        completed: true,
+      // Self-submit RPC: the player is the actor, org derived server-side.
+      await supabase.rpc('submit_picture_this_score', {
+        p_actor_id: user.id,
+        p_category: category,
+        p_difficulty: difficulty,
+        p_play_mode: playMode,
+        p_score: finalTotalScore,
+        p_questions_correct: finalCorrect,
+        p_questions_total: history.length,
+        p_bonus_points: bonusPoints + extraCompletion + extraPerfect,
+        p_time_seconds: elapsed,
+        p_lives_remaining: playMode === 'lives' ? lives : 0,
+        p_completed: true,
       });
       setScoreSaved(true);
 

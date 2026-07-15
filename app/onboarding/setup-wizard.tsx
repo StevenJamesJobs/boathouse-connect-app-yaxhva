@@ -71,12 +71,9 @@ export default function SetupWizardScreen() {
     useCallback(() => {
       let cancelled = false;
       (async () => {
-        if (!organizationId) return;
-        const { count } = await (supabase
-          .from('menu_items' as any)
-          .select('id', { count: 'exact', head: true })
-          .eq('organization_id', organizationId) as any);
-        if (!cancelled) setMenuUploaded((count ?? 0) > 0);
+        if (!organizationId || !user?.id) return;
+        const { data: menuRows } = await supabase.rpc('get_menu_items', { p_actor_id: user.id });
+        if (!cancelled) setMenuUploaded(((menuRows as any[]) || []).length > 0);
       })();
       return () => {
         cancelled = true;
@@ -114,28 +111,39 @@ export default function SetupWizardScreen() {
   // of the app reflects it immediately via refreshOrganization. Returns false on
   // failure so the caller can keep the user on the step.
   const persistMenuConfig = async (): Promise<boolean> => {
-    if (!organizationId) return false;
+    if (!organizationId || !user?.id) return false;
     const menuCount = hasSeasonalMenus ? 2 : 1;
     const scope: 'shared' | 'per_menu' = hasSeasonalMenus ? categoryScope : 'shared';
     console.log('[SetupWizard] Saving menu config:', {
       organizationId, menuCount, scope, menu1Icon, menu2Icon, headerIcon,
     });
-    const { error } = await supabase
-      .from('organizations')
-      .update({
-        menu_count: menuCount,
-        menu_category_scope: scope,
-        menu_1_name: menu1Name.trim() || 'Menu 1',
-        // menu_2_name is NOT NULL; menu_count governs display, so keep a valid
-        // placeholder even with one menu.
-        menu_2_name: menu2Name.trim() || 'Menu 2',
-        menu_1_icon: menu1Icon,
-        menu_2_icon: menu2Icon,
-        header_icon: headerIcon,
-      })
-      .eq('id', organizationId);
-    if (error) {
-      console.error('[SetupWizard] Save menu config error:', error);
+    const { data: settingsRes, error: settingsError } = await supabase.rpc('update_organization_settings', {
+      p_organization_id: organizationId,
+      p_user_id: user.id,
+      p_menu_count: menuCount,
+      p_menu_1_name: menu1Name.trim() || 'Menu 1',
+      // menu_2_name is NOT NULL; menu_count governs display, so keep a valid
+      // placeholder even with one menu.
+      p_menu_2_name: menu2Name.trim() || 'Menu 2',
+      p_menu_1_icon: menu1Icon,
+      p_menu_2_icon: menu2Icon,
+      p_header_icon: headerIcon,
+    });
+    const settingsResult: any = typeof settingsRes === 'string' ? JSON.parse(settingsRes) : settingsRes;
+    if (settingsError || (settingsResult && settingsResult.success === false)) {
+      console.error('[SetupWizard] Save menu config error:', settingsError || settingsResult?.error);
+      return false;
+    }
+    // The scope goes through its own RPC, which also materializes the per-menu
+    // category trees when switching to per_menu (the old direct write skipped that).
+    const { data: scopeRes, error: scopeError } = await supabase.rpc('set_org_menu_category_scope', {
+      p_organization_id: organizationId,
+      p_user_id: user.id,
+      p_scope: scope,
+    });
+    const scopeResult: any = typeof scopeRes === 'string' ? JSON.parse(scopeRes) : scopeRes;
+    if (scopeError || (scopeResult && scopeResult.success === false)) {
+      console.error('[SetupWizard] Save menu scope error:', scopeError || scopeResult?.error);
       return false;
     }
     // Per-menu mode needs the slot-1/slot-2 category trees materialized from the
@@ -203,7 +211,7 @@ export default function SetupWizardScreen() {
 
   const handleImportReviews = async () => {
     const query = googleMapsQuery.trim();
-    if (!query || !organizationId) return;
+    if (!query || !organizationId || !user?.id) return;
 
     setImportingReviews(true);
     setImportResult(null);
@@ -211,11 +219,14 @@ export default function SetupWizardScreen() {
     try {
       // Save the query first so it persists even if the import errors out — the
       // Mon/Thu cron will then pick it up for this org.
-      const { error: saveError } = await supabase
-        .from('organizations')
-        .update({ google_maps_query: query })
-        .eq('id', organizationId);
+      const { data: saveRes, error: saveError } = await supabase.rpc('update_organization_settings', {
+        p_organization_id: organizationId,
+        p_user_id: user.id,
+        p_google_maps_query: query,
+      });
       if (saveError) throw saveError;
+      const saveResult: any = typeof saveRes === 'string' ? JSON.parse(saveRes) : saveRes;
+      if (saveResult && saveResult.success === false) throw new Error(saveResult.error);
 
       const { data, error } = await supabase.functions.invoke('import-google-reviews', {
         body: {
@@ -312,13 +323,15 @@ export default function SetupWizardScreen() {
       // idempotently persist the Google Maps query, in case it was typed on
       // step 3 but never imported (the cron will then pick it up). No-op if
       // empty; non-fatal so onboarding is never blocked by it.
-      if (googleMapsQuery.trim()) {
-        const { error: queryError } = await supabase
-          .from('organizations')
-          .update({ google_maps_query: googleMapsQuery.trim() })
-          .eq('id', organizationId);
-        if (queryError) {
-          console.error('[SetupWizard] Save google_maps_query error:', queryError);
+      if (googleMapsQuery.trim() && organizationId && user?.id) {
+        const { data: queryRes, error: queryError } = await supabase.rpc('update_organization_settings', {
+          p_organization_id: organizationId,
+          p_user_id: user.id,
+          p_google_maps_query: googleMapsQuery.trim(),
+        });
+        const queryResult: any = typeof queryRes === 'string' ? JSON.parse(queryRes) : queryRes;
+        if (queryError || (queryResult && queryResult.success === false)) {
+          console.error('[SetupWizard] Save google_maps_query error:', queryError || queryResult?.error);
         }
       }
 

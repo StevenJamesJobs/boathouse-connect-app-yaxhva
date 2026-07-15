@@ -85,25 +85,20 @@ export default function MyScheduleScreen() {
       const rangeEnd = new Date(weekStarts[weekStarts.length - 1]);
       rangeEnd.setDate(rangeEnd.getDate() + 6);
 
-      const { data, error } = await supabase
-        .from('staff_schedules')
-        .select('id, shift_date, start_time, end_time, roles, is_closer, is_opener, is_training, room_assignment')
-        .eq('user_id', user?.id as string)
-        .gte('shift_date', toISODate(rangeStart))
-        .lte('shift_date', toISODate(rangeEnd))
-        .order('shift_date', { ascending: true })
-        .order('start_time', { ascending: true });
+      // Self-only RPC: the server returns the acting user's shifts, nobody else's.
+      const { data, error } = await supabase.rpc('get_my_shifts', {
+        p_actor_id: user?.id as string,
+        p_start_date: toISODate(rangeStart),
+        p_end_date: toISODate(rangeEnd),
+      });
 
       if (error) throw error;
       setShifts(data || []);
 
-      const { data: uploadData } = await (supabase as any)
-        .from('schedule_uploads')
-        .select('created_at')
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false })
-        .limit(1);
-      setLastUploadAt(uploadData?.[0]?.created_at ?? null);
+      const { data: uploadAt } = await supabase.rpc('get_latest_schedule_upload_at', {
+        p_actor_id: user?.id as string,
+      });
+      setLastUploadAt((uploadAt as string | null) ?? null);
     } catch (error) {
       console.error('Error loading schedule:', error);
     } finally {

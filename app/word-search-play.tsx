@@ -77,7 +77,7 @@ export default function WordSearchPlayScreen() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const rawWords = await getWordsForCategory(category, difficulty, organizationId ?? '', organization.games_use_sample_data);
+      const rawWords = await getWordsForCategory(category, difficulty, organizationId ?? '', organization.games_use_sample_data, user?.id ?? '');
       if (cancelled) return;
       const generated = generateWordSearchPuzzle(rawWords, difficulty);
       setPuzzle(generated);
@@ -125,17 +125,17 @@ export default function WordSearchPlayScreen() {
         ? calculateWordSearchScore(foundWordIds.length, timeRemaining, playMode, difficulty)
         : score;
 
-      supabase.from('word_search_scores').insert({
-        user_id: user.id,
-        organization_id: organizationId,
-        category,
-        difficulty,
-        play_mode: playMode,
-        score: finalScore,
-        words_found: foundWordIds.length,
-        total_words: puzzle.words.length,
-        time_seconds: elapsedSeconds,
-        completed: phase === 'won',
+      // Self-submit RPC: the player is the actor, org derived server-side.
+      supabase.rpc('submit_word_search_score', {
+        p_actor_id: user.id,
+        p_category: category,
+        p_difficulty: difficulty,
+        p_play_mode: playMode,
+        p_score: finalScore,
+        p_words_found: foundWordIds.length,
+        p_total_words: puzzle.words.length,
+        p_time_seconds: elapsedSeconds,
+        p_completed: phase === 'won',
       }).then(() => {
         if (phase === 'won' && finalScore > 0) {
           notifyLeaderboardPassed(
@@ -158,7 +158,7 @@ export default function WordSearchPlayScreen() {
     setScore(0);
     setElapsedSeconds(0);
     setSelectedCells([]);
-    const rawWords = await getWordsForCategory(category, difficulty, organizationId ?? '', organization.games_use_sample_data);
+    const rawWords = await getWordsForCategory(category, difficulty, organizationId ?? '', organization.games_use_sample_data, user?.id ?? '');
     const generated = generateWordSearchPuzzle(rawWords, difficulty);
     setPuzzle(generated);
     setPhase('playing');

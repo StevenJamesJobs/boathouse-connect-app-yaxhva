@@ -53,25 +53,22 @@ export default function BartenderClosingChecklistScreen() {
     try {
       setLoading(true);
 
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('bartender_checklist_categories')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('checklist_type', 'closing')
-        .eq('is_active', true)
-        .order('display_order');
+      const { data: categoriesData, error: categoriesError } = await supabase.rpc('get_checklist_categories', {
+        p_actor_id: user?.id ?? '',
+        p_bartender: true,
+        p_checklist_type: 'closing',
+      });
 
       if (categoriesError) {
         console.error('Error loading categories:', categoriesError);
         throw categoriesError;
       }
 
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('bartender_checklist_items')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('display_order');
+      const { data: itemsData, error: itemsError } = await supabase.rpc('get_checklist_items', {
+        p_actor_id: user?.id ?? '',
+        p_bartender: true,
+        p_checklist_type: 'closing',
+      });
 
       if (itemsError) {
         console.error('Error loading items:', itemsError);
@@ -79,11 +76,11 @@ export default function BartenderClosingChecklistScreen() {
       }
 
       const today = new Date().toISOString().split('T')[0];
-      const { data: progressData, error: progressError } = await supabase
-        .from('user_bartender_checklist_progress')
-        .select('*')
-        .eq('user_id', user?.id)
-        .eq('completed_date', today);
+      const { data: progressData, error: progressError } = await supabase.rpc('get_my_checklist_progress', {
+        p_actor_id: user?.id ?? '',
+        p_bartender: true,
+        p_date: today,
+      });
 
       if (progressError) {
         console.error('Error loading progress:', progressError);
@@ -154,35 +151,17 @@ export default function BartenderClosingChecklistScreen() {
         return cat;
       }));
 
-      if (newCompleted) {
-        const { error } = await supabase
-          .from('user_bartender_checklist_progress')
-          .upsert({
-            user_id: user?.id,
-            checklist_item_id: itemId,
-            completed: true,
-            completed_date: today,
-            organization_id: organizationId,
-          }, {
-            onConflict: 'user_id,checklist_item_id,completed_date',
-          });
+      const { error } = await supabase.rpc('set_checklist_progress', {
+        p_actor_id: user?.id ?? '',
+        p_bartender: true,
+        p_item_id: itemId,
+        p_completed: newCompleted,
+        p_date: today,
+      });
 
-        if (error) {
-          console.error('Error updating progress:', error);
-          throw error;
-        }
-      } else {
-        const { error } = await supabase
-          .from('user_bartender_checklist_progress')
-          .delete()
-          .eq('user_id', user?.id)
-          .eq('checklist_item_id', itemId)
-          .eq('completed_date', today);
-
-        if (error) {
-          console.error('Error deleting progress:', error);
-          throw error;
-        }
+      if (error) {
+        console.error('Error updating progress:', error);
+        throw error;
       }
 
       console.log('Item toggled successfully');

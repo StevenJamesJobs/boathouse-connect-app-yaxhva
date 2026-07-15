@@ -31,8 +31,11 @@ export function useUnreadLeaderboardPasses() {
       return;
     }
     try {
-      // Per-user count derived from auth.uid() server-side — takes no args.
-      const { data, error } = await supabase.rpc('get_unread_leaderboard_pass_count');
+      // Per-user count — pass the user id explicitly (auth.uid() is NULL in this app's
+      // custom username/password auth, so the old no-arg overload always returned 0).
+      const { data, error } = await supabase.rpc('get_unread_leaderboard_pass_count', {
+        p_user_id: user.id,
+      });
       if (error) {
         console.error('Error loading leaderboard pass count:', error);
         return;

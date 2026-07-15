@@ -87,10 +87,14 @@ export default function MasterLeaderboardScreen() {
   // the unread-pass badge across all surfaces (app icon, nav, tile, button).
   useFocusEffect(
     useCallback(() => {
-      supabase.rpc('mark_leaderboard_viewed', { p_organization_id: organizationId }).then(() => {
-        refreshAllUnreadLeaderboardPasses();
-      });
-    }, [])
+      if (user?.id) {
+        // Pass the user id explicitly — the old no-arg function keyed off auth.uid() (NULL
+        // here) and the client even passed p_organization_id, which it never accepted.
+        supabase.rpc('mark_leaderboard_viewed', { p_user_id: user.id }).then(() => {
+          refreshAllUnreadLeaderboardPasses();
+        });
+      }
+    }, [user?.id])
   );
 
   const handleTabPress = (tab: LeaderboardTab) => {

@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { weeklySpecialsNames } from '@/utils/categoryNames';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { ConnectBarTab } from '@/components/ConnectBar';
 
 const STORAGE_KEYS = {
@@ -68,6 +69,7 @@ interface UnreadContentResult {
 
 export function useUnreadContent(): UnreadContentResult {
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const [todayHasNew, setTodayHasNew] = useState(false);
   const [eventsHasNew, setEventsHasNew] = useState(false);
   const [specialsHasNew, setSpecialsHasNew] = useState(false);
@@ -199,27 +201,20 @@ export function useUnreadContent(): UnreadContentResult {
 
       // Check "Specials" tab: menu_items in the org's Weekly Specials category
       // (resolved by system_key so it follows owner renames).
-      const wsNames = await weeklySpecialsNames(organizationId || '');
+      const wsNames = await weeklySpecialsNames(user?.id ?? '');
       const specialsCutoff = specialsTs || new Date(0).toISOString();
       // Two sources of "new specials": items newly CREATED in the Weekly
       // Specials category, and existing items just FEATURED via is_weekly_special
       // (the feature toggle bumps updated_at). Dedupe by id.
-      let byCatQuery = (supabase.from('menu_items') as any)
-        .select('id')
-        .in('category', wsNames)
-        .gt('created_at', specialsCutoff);
-      let byFlagQuery = (supabase.from('menu_items') as any)
-        .select('id')
-        .eq('is_weekly_special', true)
-        .gt('updated_at', specialsCutoff);
-      if (organizationId) {
-        byCatQuery = byCatQuery.eq('organization_id', organizationId);
-        byFlagQuery = byFlagQuery.eq('organization_id', organizationId);
-      }
-      const [byCatRes, byFlagRes] = await Promise.all([byCatQuery, byFlagQuery]);
+      // RPC returns active items (with created_at/updated_at); apply the "new since cutoff"
+      // filter client-side (the RPC has no time-cutoff param).
+      const [byCatRes, byFlagRes] = await Promise.all([
+        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_categories: wsNames }),
+        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_weekly_special: true }),
+      ]);
       const specialIds = new Set<string>([
-        ...((byCatRes.data || []) as any[]).map((r) => r.id),
-        ...((byFlagRes.data || []) as any[]).map((r) => r.id),
+        ...((byCatRes.data || []) as any[]).filter((r) => (r.created_at || '') > specialsCutoff).map((r) => r.id),
+        ...((byFlagRes.data || []) as any[]).filter((r) => (r.updated_at || '') > specialsCutoff).map((r) => r.id),
       ]);
       const specialsCount = specialIds.size;
       setSpecialsHasNew(specialsCount > 0);

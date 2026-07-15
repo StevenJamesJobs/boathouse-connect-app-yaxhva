@@ -26,6 +26,7 @@ import FormattedText from '@/components/FormattedText';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
 import { cocktailFedSubOptions, resolveRecipeSubId } from '@/utils/menuCategoryLabels';
 
@@ -55,6 +56,7 @@ export default function LibationRecipesScreen() {
   const { language } = useLanguage();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   // Menu 1 → slot 1 in per-menu scope (shared scope ignores the slot).
   const { categories: menuCats } = useMenuCategories({ includeHidden: true, menuSlot: 1 });
   const [recipes, setRecipes] = useState<LibationRecipe[]>([]);
@@ -71,19 +73,15 @@ export default function LibationRecipesScreen() {
     try {
       setLoading(true);
       console.log('Loading libation recipes from table: libation_recipes');
-      const { data, error } = await supabase
-        .from('libation_recipes')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
+      const { data, error } = await supabase.rpc('get_libation_recipes', { p_actor_id: user?.id ?? '' });
 
       if (error) {
         console.error('Error loading libation recipes:', error);
         throw error;
       }
-      console.log('Loaded libation recipes:', data);
-      setRecipes(data || []);
+      const sorted = (data || []).slice().sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
+      console.log('Loaded libation recipes:', sorted);
+      setRecipes(sorted as any);
     } catch (error) {
       console.error('Error loading libation recipes:', error);
     } finally {

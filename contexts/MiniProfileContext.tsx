@@ -117,18 +117,10 @@ export function MiniProfileProvider({ children }: { children: React.ReactNode })
       setRank(null);
       setScore(null);
 
-      const today = new Date().toISOString().split('T')[0];
       const results = await Promise.allSettled([
         supabase.rpc('get_user_card', { p_actor_id: user?.id ?? '', p_user_id: userId }),
-        supabase
-          .from('staff_schedules')
-          .select('shift_date, start_time, end_time, roles')
-          .eq('user_id', userId)
-          .gte('shift_date', today)
-          .order('shift_date', { ascending: true })
-          .order('start_time', { ascending: true })
-          .limit(1)
-          .maybeSingle(),
+        // Same-org gated: a coworker's next shift only, resolved server-side.
+        supabase.rpc('get_user_next_shift', { p_actor_id: user?.id ?? '', p_user_id: userId }),
         organizationId
           ? supabase.rpc('get_master_leaderboard_overall', { p_limit: 200, p_organization_id: organizationId })
           : Promise.resolve({ data: null } as any),
@@ -146,7 +138,9 @@ export function MiniProfileProvider({ children }: { children: React.ReactNode })
 
       const shiftRes = results[1];
       if (shiftRes.status === 'fulfilled' && (shiftRes.value as any).data) {
-        setNextShift((shiftRes.value as any).data as NextShift);
+        const shiftRows = (shiftRes.value as any).data;
+        const shiftRow = Array.isArray(shiftRows) ? shiftRows[0] : shiftRows;
+        if (shiftRow) setNextShift(shiftRow as NextShift);
       }
 
       const lbRes = results[2];

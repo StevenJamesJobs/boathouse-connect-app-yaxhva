@@ -18,15 +18,15 @@ import { useAuth } from '@/contexts/AuthContext';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
-import { deriveUsername, findAvailableUsername } from '@/utils/username';
+import { deriveUsername } from '@/utils/username';
 
 type Phase = 'enter_code' | 'create_account';
 
+// Pre-login the client only ever learns the org's display name and whether self-signup is
+// open — never its id or default_password (that leak is what join_signup exists to close).
 interface FoundOrg {
-  id: string;
   name: string;
   allow_self_signup: boolean;
-  default_password: string;
 }
 
 export default function JoinScreen() {
@@ -39,7 +39,7 @@ export default function JoinScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
-  const { login } = useAuth();
+  const { adoptSession } = useAuth();
 
   // Animation values
   const headerOpacity = useRef(new Animated.Value(0)).current;
@@ -89,23 +89,20 @@ export default function JoinScreen() {
     setError('');
 
     try {
-      const { data, error: queryError } = await (supabase as any)
-        .from('organizations')
-        .select('id, name, allow_self_signup, default_password')
-        .ilike('join_code', code)
-        .single();
+      const { data, error: queryError } = await supabase.rpc('lookup_join_code', {
+        p_join_code: code,
+      });
 
-      if (queryError || !data) {
+      const row = Array.isArray(data) ? data[0] : (data as any);
+      if (queryError || !row) {
         setError('Invalid join code. Please check with your manager.');
         setIsLoading(false);
         return;
       }
 
       setOrg({
-        id: (data as any).id,
-        name: (data as any).name,
-        allow_self_signup: (data as any).allow_self_signup,
-        default_password: (data as any).default_password,
+        name: row.org_name,
+        allow_self_signup: row.allow_self_signup,
       });
       setPhase('create_account');
     } catch (e) {
@@ -134,47 +131,42 @@ export default function JoinScreen() {
     try {
       const fullName = `${firstName.trim()} ${lastName.trim()}`;
 
-      // Username = first initial + last name (e.g. "seccles"), with a numeric
-      // suffix if that's already taken.
-      const base = deriveUsername(firstName, lastName);
-      const username = await findAvailableUsername(base, async (candidate) => {
-        // check_username_available returns TRUE when the name is free; "taken" is its negation.
-        const { data: available } = await supabase.rpc('check_username_available', {
-          p_username: candidate,
-        });
-        return !available;
-      });
-
-      // Create user via RPC (self-signup: create_user forces role=employee and force_password_change=true)
-      const { error: createError } = await supabase.rpc('create_user', {
-        p_username: username,
+      // join_signup re-validates the code + self-signup flag, resolves a free username from
+      // this base server-side (numeric suffix on collision), creates the employee with the
+      // org's default password — which never reaches this client — and returns the
+      // authenticated row (login_user shape). Its error messages are user-facing.
+      const { data, error: signupError } = await supabase.rpc('join_signup', {
+        p_join_code: joinCode.trim(),
+        p_username: deriveUsername(firstName, lastName),
         p_name: fullName,
-        p_email: email.trim() || '',
-        p_job_title: '',
-        p_phone_number: '',
-        p_role: 'employee',
-        p_password: org.default_password,
-        p_organization_id: org.id,
+        p_email: email.trim(),
       });
 
-      if (createError) {
-        console.error('[Join] Error creating user:', createError);
-        throw createError;
+      if (signupError) {
+        console.error('[Join] Error creating account:', signupError);
+        setError(signupError.message || 'Something went wrong. Please try again.');
+        return;
       }
 
-      // Auto-login
-      const loginSuccess = await login(username, org.default_password, false);
+      const row = Array.isArray(data) ? data[0] : (data as any);
+      if (!row) {
+        setError('Something went wrong. Please try again.');
+        return;
+      }
 
-      if (loginSuccess) {
+      // The row is already authenticated — adopt it as the session (no credential round-trip).
+      const adopted = await adoptSession(row, false);
+
+      if (adopted) {
         Alert.alert(
           'Account Created',
-          `Your username is "${username}". Use it to sign in next time.\n\nNow set your own password.`,
+          `Your username is "${row.username}". Use it to sign in next time.\n\nNow set your own password.`,
           [{ text: 'Continue', onPress: () => router.replace('/change-password') }],
         );
       } else {
         setError(
-          `Account created with username "${username}", but login failed. ` +
-            'Please go to the login page and sign in.',
+          `Your account was created with username "${row.username}", but automatic sign-in ` +
+            'failed. Ask your manager for the temporary password, then sign in from the login page.',
         );
       }
     } catch (e: any) {
@@ -362,8 +354,7 @@ export default function JoinScreen() {
             color={splashColors.primary}
           />
           <Text style={styles.infoText}>
-            Your temporary password is: {org.default_password}{'\n'}
-            You'll be asked to change it on first login.
+            You'll be signed in automatically and asked to set your own password.
           </Text>
         </View>
 

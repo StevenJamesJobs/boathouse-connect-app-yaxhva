@@ -53,14 +53,12 @@ export default function OpeningChecklistScreen() {
     try {
       setLoading(true);
 
-      // Fetch categories
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('checklist_categories')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('checklist_type', 'opening')
-        .eq('is_active', true)
-        .order('display_order');
+      // Fetch categories (member-gated RPC; org derived server-side)
+      const { data: categoriesData, error: categoriesError } = await supabase.rpc('get_checklist_categories', {
+        p_actor_id: user?.id ?? '',
+        p_bartender: false,
+        p_checklist_type: 'opening',
+      });
 
       if (categoriesError) {
         console.error('Error loading categories:', categoriesError);
@@ -68,12 +66,11 @@ export default function OpeningChecklistScreen() {
       }
 
       // Fetch items
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('checklist_items')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('display_order');
+      const { data: itemsData, error: itemsError } = await supabase.rpc('get_checklist_items', {
+        p_actor_id: user?.id ?? '',
+        p_bartender: false,
+        p_checklist_type: 'opening',
+      });
 
       if (itemsError) {
         console.error('Error loading items:', itemsError);
@@ -82,11 +79,11 @@ export default function OpeningChecklistScreen() {
 
       // Fetch user progress for today
       const today = new Date().toISOString().split('T')[0];
-      const { data: progressData, error: progressError } = await supabase
-        .from('user_checklist_progress')
-        .select('*')
-        .eq('user_id', user?.id)
-        .eq('completed_date', today);
+      const { data: progressData, error: progressError } = await supabase.rpc('get_my_checklist_progress', {
+        p_actor_id: user?.id ?? '',
+        p_bartender: false,
+        p_date: today,
+      });
 
       if (progressError) {
         console.error('Error loading progress:', progressError);
@@ -160,38 +157,18 @@ export default function OpeningChecklistScreen() {
         return cat;
       }));
 
-      // Update database
-      if (newCompleted) {
-        // Insert or update progress
-        const { error } = await supabase
-          .from('user_checklist_progress')
-          .upsert({
-            user_id: user?.id,
-            checklist_item_id: itemId,
-            completed: true,
-            completed_date: today,
-            organization_id: organizationId,
-          }, {
-            onConflict: 'user_id,checklist_item_id,completed_date',
-          });
+      // Update database — one self-gated RPC upserts (check) or deletes (uncheck) own progress.
+      const { error } = await supabase.rpc('set_checklist_progress', {
+        p_actor_id: user?.id ?? '',
+        p_bartender: false,
+        p_item_id: itemId,
+        p_completed: newCompleted,
+        p_date: today,
+      });
 
-        if (error) {
-          console.error('Error updating progress:', error);
-          throw error;
-        }
-      } else {
-        // Delete progress
-        const { error } = await supabase
-          .from('user_checklist_progress')
-          .delete()
-          .eq('user_id', user?.id)
-          .eq('checklist_item_id', itemId)
-          .eq('completed_date', today);
-
-        if (error) {
-          console.error('Error deleting progress:', error);
-          throw error;
-        }
+      if (error) {
+        console.error('Error updating progress:', error);
+        throw error;
       }
 
       console.log('Item toggled successfully');

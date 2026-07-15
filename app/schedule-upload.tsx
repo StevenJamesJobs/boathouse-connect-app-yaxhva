@@ -56,11 +56,11 @@ export default function ScheduleUploadScreen() {
   useEffect(() => {
     if (!processingId) return;
     const interval = setInterval(async () => {
-      const { data } = await supabase
-        .from('schedule_uploads')
-        .select('*')
-        .eq('id', processingId)
-        .single();
+      const { data: pollRows } = await supabase.rpc('get_org_uploads', {
+        p_actor_id: user?.id ?? '',
+        p_upload_id: processingId,
+      });
+      const data: any = Array.isArray(pollRows) ? pollRows[0] : pollRows;
 
       if (data && data.status !== 'processing') {
         setProcessingId(null);
@@ -88,15 +88,13 @@ export default function ScheduleUploadScreen() {
   const loadUploads = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('schedule_uploads')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false })
-        .limit(20);
+      const { data, error } = await supabase.rpc('get_org_uploads', {
+        p_actor_id: user?.id ?? '',
+        p_limit: 20,
+      });
 
       if (error) throw error;
-      setUploads(data || []);
+      setUploads((data || []) as any);
     } catch (error) {
       console.error('Error loading uploads:', error);
     } finally {
@@ -137,28 +135,25 @@ export default function ScheduleUploadScreen() {
     mediaType: string,
     additionalImageUrls: string[] = []
   ) => {
-    const { data: uploadRecord, error: insertError } = await supabase
-      .from('schedule_uploads')
-      .insert({
-        uploaded_by: user?.id,
-        file_url: fileUrl,
-        file_name: displayName,
-        week_start: new Date().toISOString().split('T')[0],
-        week_end: new Date().toISOString().split('T')[0],
-        status: 'processing',
-        organization_id: organizationId,
-      })
-      .select()
-      .single();
+    // Manager-gated RPC (uploaded_by + org derived from the actor); week bounds are
+    // placeholders that parse-schedule corrects, same as the old direct insert.
+    const { data: newUploadId, error: insertError } = await supabase.rpc('create_schedule_upload', {
+      p_actor_id: user?.id ?? '',
+      p_file_url: fileUrl,
+      p_file_name: displayName,
+      p_week_start: new Date().toISOString().split('T')[0],
+      p_week_end: new Date().toISOString().split('T')[0],
+      p_status: 'processing',
+    });
 
     if (insertError) throw insertError;
 
-    setProcessingId(uploadRecord.id);
+    setProcessingId(newUploadId as string);
 
     const { error: fnError } = await supabase.functions.invoke('parse-schedule', {
       body: {
         file_url: fileUrl,
-        upload_id: uploadRecord.id,
+        upload_id: newUploadId,
         media_type: mediaType,
         additional_image_urls: additionalImageUrls,
         organization_id: organizationId,
@@ -324,7 +319,12 @@ export default function ScheduleUploadScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await supabase.from('schedule_uploads').delete().eq('id', upload.id).eq('organization_id', organizationId);
+              // Gated delete; the DB cascade removes this upload's shifts.
+              const { error } = await supabase.rpc('delete_schedule_upload', {
+                p_actor_id: user?.id ?? '',
+                p_upload_id: upload.id,
+              });
+              if (error) throw error;
               loadUploads();
             } catch (error) {
               console.error('Delete error:', error);

@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 
 interface AuthContextType extends AuthState {
   login: (username: string, password: string, rememberMe: boolean) => Promise<boolean>;
+  adoptSession: (row: unknown, rememberMe: boolean) => Promise<boolean>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -250,6 +251,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  // Adopt a server-authenticated users row (login_user / join_signup shape) as the active
+  // session: map it, persist it per rememberMe, publish auth state, and cache org branding.
+  const establishSession = async (row: any, rememberMe: boolean): Promise<User> => {
+    const user = mapRowToUser(row);
+
+    // Store auth state if AsyncStorage is available
+    if (AsyncStorage) {
+      if (rememberMe) {
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+        await AsyncStorage.setItem(REMEMBER_ME_KEY, 'true');
+      } else {
+        await AsyncStorage.removeItem(STORAGE_KEY);
+        await AsyncStorage.setItem(REMEMBER_ME_KEY, 'false');
+      }
+    }
+
+    setAuthState({
+      user,
+      isLoading: false,
+      isAuthenticated: true,
+    });
+
+    // Cache org branding for login screen (hybrid approach)
+    if (AsyncStorage && user.organizationId) {
+      try {
+        const { data: orgRows } = await supabase.rpc('get_org', { p_actor_id: user.id });
+        const orgData: any = Array.isArray(orgRows) ? orgRows[0] : orgRows;
+        if (orgData) {
+          await AsyncStorage.setItem('@mrc_last_org', JSON.stringify({
+            orgId: user.organizationId,
+            orgName: orgData.name,
+            logoUrl: orgData.logo_url,
+          }));
+        }
+      } catch {}
+    }
+
+    return user;
+  };
+
+  // Set the session from a row a signup RPC (join_signup) returned — the row is already
+  // authenticated server-side, so no second credential round-trip is needed.
+  const adoptSession = async (row: unknown, rememberMe: boolean): Promise<boolean> => {
+    try {
+      if (!row || typeof row !== 'object' || !(row as any).id) {
+        console.log('[AuthContext] adoptSession called with an invalid row');
+        return false;
+      }
+      const user = await establishSession(row, rememberMe);
+      console.log('[AuthContext] Session adopted for user:', user.name, 'Role:', user.role);
+      return true;
+    } catch (error) {
+      console.log('[AuthContext] adoptSession error:', error);
+      return false;
+    }
+  };
+
   const login = async (username: string, password: string, rememberMe: boolean): Promise<boolean> => {
     try {
       console.log('[AuthContext] Attempting login with username:', username, 'Platform:', Platform.OS);
@@ -277,39 +335,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return false;
       }
 
-      const user = mapRowToUser(row);
-
-      // Store auth state if AsyncStorage is available
-      if (AsyncStorage) {
-        if (rememberMe) {
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-          await AsyncStorage.setItem(REMEMBER_ME_KEY, 'true');
-        } else {
-          await AsyncStorage.removeItem(STORAGE_KEY);
-          await AsyncStorage.setItem(REMEMBER_ME_KEY, 'false');
-        }
-      }
-
-      setAuthState({
-        user,
-        isLoading: false,
-        isAuthenticated: true,
-      });
-
-      // Cache org branding for login screen (hybrid approach)
-      if (AsyncStorage && user.organizationId) {
-        try {
-          const { data: orgRows } = await supabase.rpc('get_org', { p_actor_id: user.id });
-          const orgData: any = Array.isArray(orgRows) ? orgRows[0] : orgRows;
-          if (orgData) {
-            await AsyncStorage.setItem('@mrc_last_org', JSON.stringify({
-              orgId: user.organizationId,
-              orgName: orgData.name,
-              logoUrl: orgData.logo_url,
-            }));
-          }
-        } catch {}
-      }
+      const user = await establishSession(row, rememberMe);
 
       console.log('[AuthContext] Login successful for user:', user.name, 'Role:', user.role);
       return true;
@@ -338,7 +364,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ ...authState, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ ...authState, login, adoptSession, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

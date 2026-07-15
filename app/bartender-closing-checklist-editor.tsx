@@ -14,6 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -38,6 +39,7 @@ export default function BartenderClosingChecklistEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const colors = useThemeColors();
 
   const styles = StyleSheet.create({
@@ -109,25 +111,24 @@ export default function BartenderClosingChecklistEditorScreen() {
     try {
       setLoading(true);
 
-      const { data: categoriesData, error: categoriesError } = await supabase
-        .from('bartender_checklist_categories')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('checklist_type', 'closing')
-        .eq('is_active', true)
-        .order('display_order');
+      // Fetch categories (member-gated RPC; org derived server-side)
+      const { data: categoriesData, error: categoriesError } = await supabase.rpc('get_checklist_categories', {
+        p_actor_id: user?.id ?? '',
+        p_bartender: true,
+        p_checklist_type: 'closing',
+      });
 
       if (categoriesError) {
         console.error('Error loading categories:', categoriesError);
         throw categoriesError;
       }
 
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('bartender_checklist_items')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('display_order');
+      // Fetch items
+      const { data: itemsData, error: itemsError } = await supabase.rpc('get_checklist_items', {
+        p_actor_id: user?.id ?? '',
+        p_bartender: true,
+        p_checklist_type: 'closing',
+      });
 
       if (itemsError) {
         console.error('Error loading items:', itemsError);
@@ -215,28 +216,18 @@ export default function BartenderClosingChecklistEditorScreen() {
     setSaving(true);
 
     try {
-      if (editingCategory) {
-        const { error } = await supabase
-          .from('bartender_checklist_categories')
-          .update({ name: categoryName.trim() })
-          .eq('id', editingCategory.id);
+      // One manager-gated upsert (p_category_id present = update name, absent = insert with
+      // server-computed display_order).
+      const { error } = await supabase.rpc('upsert_checklist_category', {
+        p_actor_id: user?.id ?? '',
+        p_bartender: true,
+        p_checklist_type: 'closing',
+        p_name: categoryName.trim(),
+        p_category_id: editingCategory?.id ?? undefined,
+      });
 
-        if (error) throw error;
-        console.log('Category updated successfully');
-      } else {
-        const maxOrder = Math.max(...categories.map(c => c.display_order), 0);
-        const { error } = await supabase
-          .from('bartender_checklist_categories')
-          .insert({
-            checklist_type: 'closing',
-            name: categoryName.trim(),
-            display_order: maxOrder + 1,
-            organization_id: organizationId,
-          });
-
-        if (error) throw error;
-        console.log('Category created successfully');
-      }
+      if (error) throw error;
+      console.log('Category saved successfully');
 
       setCategoryModalVisible(false);
       loadChecklist();
@@ -260,10 +251,11 @@ export default function BartenderClosingChecklistEditorScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const { error } = await supabase
-                .from('bartender_checklist_categories')
-                .update({ is_active: false })
-                .eq('id', category.id);
+              const { error } = await supabase.rpc('delete_checklist_category', {
+                p_actor_id: user?.id ?? '',
+                p_bartender: true,
+                p_category_id: category.id,
+              });
 
               if (error) throw error;
               console.log('Category deleted successfully');
@@ -293,33 +285,18 @@ export default function BartenderClosingChecklistEditorScreen() {
     setSaving(true);
 
     try {
-      if (editingItem) {
-        const { error } = await supabase
-          .from('bartender_checklist_items')
-          .update({ 
-            text: itemText.trim(),
-            category_id: selectedCategoryId,
-          })
-          .eq('id', editingItem.id);
+      // One manager-gated upsert (p_item_id present = update text/category, absent = insert with
+      // server-computed display_order).
+      const { error } = await supabase.rpc('upsert_checklist_item', {
+        p_actor_id: user?.id ?? '',
+        p_bartender: true,
+        p_category_id: selectedCategoryId,
+        p_text: itemText.trim(),
+        p_item_id: editingItem?.id ?? undefined,
+      });
 
-        if (error) throw error;
-        console.log('Item updated successfully');
-      } else {
-        const category = categories.find(c => c.id === selectedCategoryId);
-        const maxOrder = category ? Math.max(...category.items.map(i => i.display_order), 0) : 0;
-        
-        const { error } = await supabase
-          .from('bartender_checklist_items')
-          .insert({
-            category_id: selectedCategoryId,
-            text: itemText.trim(),
-            display_order: maxOrder + 1,
-            organization_id: organizationId,
-          });
-
-        if (error) throw error;
-        console.log('Item created successfully');
-      }
+      if (error) throw error;
+      console.log('Item saved successfully');
 
       setItemModalVisible(false);
       loadChecklist();
@@ -343,10 +320,11 @@ export default function BartenderClosingChecklistEditorScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const { error } = await supabase
-                .from('bartender_checklist_items')
-                .update({ is_active: false })
-                .eq('id', item.id);
+              const { error } = await supabase.rpc('delete_checklist_item', {
+                p_actor_id: user?.id ?? '',
+                p_bartender: true,
+                p_item_id: item.id,
+              });
 
               if (error) throw error;
               console.log('Item deleted successfully');

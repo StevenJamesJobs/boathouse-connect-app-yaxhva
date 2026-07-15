@@ -27,6 +27,7 @@ export interface Organization {
   default_password: string;
   owner_id: string | null;
   games_use_sample_data: boolean;
+  staff_can_view_roster: boolean;
 }
 
 interface OrganizationContextType {
@@ -63,6 +64,7 @@ const DEFAULT_ORG: Organization = {
   default_password: 'boathouseconnect',
   owner_id: null,
   games_use_sample_data: true,
+  staff_can_view_roster: true,
 };
 
 const OrganizationContext = createContext<OrganizationContextType>({
@@ -112,6 +114,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         default_password: orgData.default_password || DEFAULT_ORG.default_password,
         owner_id: orgData.owner_id || null,
         games_use_sample_data: orgData.games_use_sample_data ?? true,
+        staff_can_view_roster: orgData.staff_can_view_roster ?? true,
       });
     }
   }, [user?.id]);

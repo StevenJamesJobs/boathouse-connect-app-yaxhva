@@ -105,20 +105,16 @@ export default function LibationRecipesEditorScreen() {
     try {
       setLoading(true);
       console.log('Loading libation recipes from table: libation_recipes');
-      const { data, error } = await supabase
-        .from('libation_recipes')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('category', { ascending: true })
-        .order('display_order', { ascending: true });
+      const { data, error } = await supabase.rpc('get_libation_recipes', { p_actor_id: user?.id ?? '' });
 
       if (error) {
         console.error('Error loading libation recipes:', error);
         throw error;
       }
-      console.log('Loaded libation recipes:', data);
-      setRecipes(data || []);
+      const sorted = (data || []).slice().sort((a: any, b: any) =>
+        (a.category || '').localeCompare(b.category || '') || (a.display_order ?? 0) - (b.display_order ?? 0));
+      console.log('Loaded libation recipes:', sorted);
+      setRecipes(sorted as any);
     } catch (error) {
       console.error('Error loading libation recipes:', error);
       Alert.alert(t('common.error'), t('libation_editor.no_recipes'));
@@ -325,16 +321,9 @@ export default function LibationRecipesEditorScreen() {
           throw error;
         }
         console.log('Libation recipe added successfully');
-        // Fetch newly created recipe to save translations
-        const { data: newRecipes } = await supabase
-          .from('libation_recipes')
-          .select('id')
-          .eq('name', name.trim())
-          .eq('organization_id', organizationId)
-          .order('created_at', { ascending: false })
-          .limit(1);
-        if (newRecipes?.[0] && procedureEs.trim()) {
-          await saveTranslations('libation_recipes', newRecipes[0].id, { procedure_es: procedureEs }, organizationId);
+        // insert_libation_recipe returns the new id — use it directly.
+        if (data && procedureEs.trim()) {
+          await saveTranslations('libation_recipes', data as string, { procedure_es: procedureEs }, organizationId);
         }
         Alert.alert(t('common.success'), t('libation_editor.recipe_added'));
       }

@@ -153,7 +153,7 @@ export default function MemoryGamePlayScreen() {
     setScoreSaved(false);
     setTimeRemaining(difficultyConfig.timeLimitSeconds);
     try {
-      const generatedCards = await generateCards(mode, difficultyConfig.totalPairs, organizationId ?? '', organization.games_use_sample_data);
+      const generatedCards = await generateCards(mode, difficultyConfig.totalPairs, organizationId ?? '', organization.games_use_sample_data, user?.id ?? '');
       setCards(generatedCards);
     } catch (e) {
       console.error('Error generating cards:', e);
@@ -195,18 +195,18 @@ export default function MemoryGamePlayScreen() {
     if (user?.id) {
       try {
         const elapsed = getElapsedSeconds(finalState.startTime);
-        await (supabase.from('game_scores') as any).insert({
-          user_id: user.id,
-          organization_id: organizationId,
-          game_mode: mode,
-          play_mode: playMode,
-          difficulty: difficultyLevel,
-          score: finalState.score,
-          time_seconds: elapsed,
-          pairs_matched: finalState.matchedPairIds.length,
-          total_pairs: difficultyConfig.totalPairs,
-          lives_remaining: playMode === 'lives' ? finalState.lives : 0,
-          completed: finalState.isWin,
+        // Self-submit RPC: the player is the actor, org derived server-side.
+        await supabase.rpc('submit_memory_game_score', {
+          p_actor_id: user.id,
+          p_game_mode: mode,
+          p_play_mode: playMode,
+          p_difficulty: difficultyLevel,
+          p_score: finalState.score,
+          p_time_seconds: elapsed,
+          p_pairs_matched: finalState.matchedPairIds.length,
+          p_total_pairs: difficultyConfig.totalPairs,
+          p_lives_remaining: playMode === 'lives' ? finalState.lives : 0,
+          p_completed: finalState.isWin,
         });
         setScoreSaved(true);
         if (finalState.isWin && finalState.score > 0) {

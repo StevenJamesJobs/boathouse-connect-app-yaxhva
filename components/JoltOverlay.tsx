@@ -180,7 +180,7 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
       tasks.push(
         (async () => {
           const [menu, events, anns, feats] = await Promise.all([
-            supabase.from('menu_items').select('id, name, category').eq('organization_id', organizationId).eq('is_active', true),
+            supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '' }),
             supabase.from('upcoming_events').select('id, title').eq('organization_id', organizationId).eq('is_active', true),
             supabase.from('announcements').select('id, title').eq('organization_id', organizationId).eq('is_active', true),
             supabase.from('special_features').select('id, title').eq('organization_id', organizationId).eq('is_active', true),

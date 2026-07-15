@@ -93,20 +93,17 @@ export default function ManagerProfileScreen() {
     try {
       setLoadingShift(true);
       const today = new Date().toISOString().split('T')[0];
-      const { data, error } = await supabase
-        .from('staff_schedules')
-        .select('*')
-        .eq('user_id', user.id)
-        .gte('shift_date', today)
-        .order('shift_date', { ascending: true })
-        .order('start_time', { ascending: true })
-        .limit(1)
-        .single();
+      const { data, error } = await supabase.rpc('get_my_shifts', {
+        p_actor_id: user.id,
+        p_start_date: today,
+        p_limit: 1,
+      });
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('Error loading next shift:', error);
       }
-      setNextShift(data || null);
+      const row = Array.isArray(data) ? data[0] : data;
+      setNextShift(row || null);
     } catch (error) {
       console.error('Error loading next shift:', error);
       setNextShift(null);

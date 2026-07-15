@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Single source of truth for the owner-editable menu category tree (D4).
 // Replaces the hardcoded CATEGORIES / SUBCATEGORIES / CATEGORY_COLORS /
@@ -51,6 +52,7 @@ export function useMenuCategories(opts?: { includeHidden?: boolean; menuSlot?: 1
   const includeHidden = opts?.includeHidden ?? false;
   const requestedSlot = opts?.menuSlot;
   const { organizationId, organization } = useOrganization();
+  const { user } = useAuth();
   const perMenu = organization?.menu_category_scope === 'per_menu';
   // Shared mode always reads the slot-0 tree; per-menu reads the active slot.
   const effectiveSlot = perMenu ? (requestedSlot ?? 1) : 0;
@@ -68,18 +70,8 @@ export function useMenuCategories(opts?: { includeHidden?: boolean; menuSlot?: 1
     setError(null);
     try {
       const [catRes, subRes] = await Promise.all([
-        (supabase
-          .from('menu_categories' as any)
-          .select('id, display_name, display_name_es, system_key, filter_behavior, color, display_order, is_hidden')
-          .eq('organization_id', organizationId)
-          .eq('menu_slot', effectiveSlot)
-          .order('display_order', { ascending: true }) as any),
-        (supabase
-          .from('menu_subcategories' as any)
-          .select('id, category_id, display_name, display_name_es, system_key, is_cocktail_fed, display_order, is_hidden')
-          .eq('organization_id', organizationId)
-          .eq('menu_slot', effectiveSlot)
-          .order('display_order', { ascending: true }) as any),
+        supabase.rpc('get_menu_categories', { p_actor_id: user?.id ?? '', p_menu_slot: effectiveSlot }),
+        supabase.rpc('get_menu_subcategories', { p_actor_id: user?.id ?? '', p_menu_slot: effectiveSlot }),
       ]);
 
       if (catRes.error) throw catRes.error;

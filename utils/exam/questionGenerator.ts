@@ -205,18 +205,13 @@ interface WineItem {
   member_bottle_price: string | null;
 }
 
-async function fetchMenuItems(organizationId: string): Promise<MenuItem[]> {
+async function fetchMenuItems(actorId: string): Promise<MenuItem[]> {
   // Resolve the org's current Lunch/Dinner names by system_key (renames-safe).
-  const resolver = await fetchMenuCategoryResolver(organizationId);
+  const resolver = await fetchMenuCategoryResolver(actorId);
   const cats = resolver.namesForKeys(['cat.lunch', 'cat.dinner']);
-  let query = supabase
-    .from('menu_items')
-    .select('id, name, name_es, description, price, category, subcategory, is_gluten_free, is_vegetarian, available_for_lunch, available_for_dinner')
-    .eq('is_active', true)
-    .in('category', cats.length ? cats : ['Lunch', 'Dinner']);
-  query = query.eq('organization_id', organizationId);
-
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc('get_menu_items', {
+    p_actor_id: actorId, p_categories: cats.length ? cats : ['Lunch', 'Dinner'],
+  });
   if (error || !data) return [];
   return data as MenuItem[];
 }
@@ -225,76 +220,52 @@ async function fetchMenuItems(organizationId: string): Promise<MenuItem[]> {
 // fetchMenuItems: includes Libations and Wine so bartender/server/host
 // quizzes can all pull imagery. Only returns rows with a non-null
 // thumbnail_url.
-async function fetchMenuItemsWithImages(organizationId: string): Promise<MenuItem[]> {
-  const resolver = await fetchMenuCategoryResolver(organizationId);
+async function fetchMenuItemsWithImages(actorId: string): Promise<MenuItem[]> {
+  const resolver = await fetchMenuCategoryResolver(actorId);
   const cats = resolver.namesForKeys(['cat.lunch', 'cat.dinner', 'cat.libations', 'cat.wine']);
-  let query = (supabase
-    .from('menu_items') as any)
-    .select('id, name, name_es, description, description_es, price, category, subcategory, is_gluten_free, is_vegetarian, available_for_lunch, available_for_dinner, thumbnail_url')
-    .eq('is_active', true)
-    .in('category', cats.length ? cats : ['Lunch', 'Dinner', 'Libations', 'Wine'])
-    .not('thumbnail_url', 'is', null);
-  query = query.eq('organization_id', organizationId);
-
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc('get_menu_items', {
+    p_actor_id: actorId, p_categories: cats.length ? cats : ['Lunch', 'Dinner', 'Libations', 'Wine'],
+  });
   if (error || !data) return [];
   return (data as MenuItem[]).filter(
     (m) => !!m.thumbnail_url && m.thumbnail_url.trim().length > 0
   );
 }
 
-async function fetchCocktails(organizationId: string): Promise<Cocktail[]> {
-  let query = supabase
-    .from('cocktails')
-    .select('id, name, alcohol_type, ingredients')
-    .eq('is_active', true);
-  query = query.eq('organization_id', organizationId);
-
-  const { data, error } = await query;
+async function fetchCocktails(actorId: string): Promise<Cocktail[]> {
+  // Member-gated RPC; org derived from the actor (quiz uses the org's own recipes).
+  const { data, error } = await supabase.rpc('get_cocktails', { p_actor_id: actorId });
   if (error || !data) return [];
   return data as Cocktail[];
 }
 
-async function fetchLibationRecipes(organizationId: string): Promise<LibationRecipe[]> {
-  let query = supabase
-    .from('libation_recipes')
-    .select('id, name, category, glassware, garnish, ingredients')
-    .eq('is_active', true);
-  query = query.eq('organization_id', organizationId);
-
-  const { data, error } = await query;
+async function fetchLibationRecipes(actorId: string): Promise<LibationRecipe[]> {
+  const { data, error } = await supabase.rpc('get_libation_recipes', { p_actor_id: actorId });
   if (error || !data) return [];
   return data as LibationRecipe[];
 }
 
-async function fetchWinePairings(organizationId: string): Promise<WinePairing[]> {
-  let query = (supabase
-    .from('wine_pairings' as any) as any)
-    .select('wine, entree')
-    .eq('is_active', true);
-  query = query.eq('organization_id', organizationId);
+async function fetchWinePairings(actorId: string): Promise<WinePairing[]> {
+  let query: any = supabase.rpc('get_wine_pairings', { p_actor_id: actorId });
 
   const { data, error } = await query;
   if (error || !data) return [];
   return data as WinePairing[];
 }
 
-async function fetchHostChecklistItems(organizationId: string): Promise<ChecklistItem[]> {
-  let catQuery = supabase
-    .from('checklist_categories')
-    .select('id, name, checklist_type')
-    .eq('is_active', true);
-  catQuery = catQuery.eq('organization_id', organizationId);
-  const { data: categories } = await catQuery;
+async function fetchHostChecklistItems(actorId: string): Promise<ChecklistItem[]> {
+  // Member-gated RPCs; org derived from the actor. No p_checklist_type → all types.
+  const { data: categories } = await supabase.rpc('get_checklist_categories', {
+    p_actor_id: actorId,
+    p_bartender: false,
+  });
 
   if (!categories || categories.length === 0) return [];
 
-  let itemQuery = supabase
-    .from('checklist_items')
-    .select('id, text, category_id')
-    .eq('is_active', true);
-  itemQuery = itemQuery.eq('organization_id', organizationId);
-  const { data: items } = await itemQuery;
+  const { data: items } = await supabase.rpc('get_checklist_items', {
+    p_actor_id: actorId,
+    p_bartender: false,
+  });
 
   if (!items) return [];
 
@@ -310,35 +281,29 @@ async function fetchHostChecklistItems(organizationId: string): Promise<Checklis
   }).filter((item: ChecklistItem) => item.category_name !== 'Unknown');
 }
 
-async function fetchWineItems(organizationId: string): Promise<WineItem[]> {
-  const resolver = await fetchMenuCategoryResolver(organizationId);
+async function fetchWineItems(actorId: string): Promise<WineItem[]> {
+  const resolver = await fetchMenuCategoryResolver(actorId);
   const wineCats = resolver.namesForKeys(['cat.wine']);
-  let query = (supabase.from('menu_items') as any)
-    .select('id, name, location, glass_price, bottle_price, member_bottle_price')
-    .eq('is_active', true)
-    .in('category', wineCats.length ? wineCats : ['Wine']);
-  query = query.eq('organization_id', organizationId);
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc('get_menu_items', {
+    p_actor_id: actorId, p_categories: wineCats.length ? wineCats : ['Wine'],
+  });
   if (error || !data) return [];
   return data as WineItem[];
 }
 
-async function fetchBartenderChecklistItems(organizationId: string): Promise<ChecklistItem[]> {
-  let catQuery = supabase
-    .from('bartender_checklist_categories')
-    .select('id, name, checklist_type')
-    .eq('is_active', true);
-  catQuery = catQuery.eq('organization_id', organizationId);
-  const { data: categories } = await catQuery;
+async function fetchBartenderChecklistItems(actorId: string): Promise<ChecklistItem[]> {
+  // Member-gated RPCs; org derived from the actor. No p_checklist_type → all types.
+  const { data: categories } = await supabase.rpc('get_checklist_categories', {
+    p_actor_id: actorId,
+    p_bartender: true,
+  });
 
   if (!categories || categories.length === 0) return [];
 
-  let itemQuery = supabase
-    .from('bartender_checklist_items')
-    .select('id, text, category_id')
-    .eq('is_active', true);
-  itemQuery = itemQuery.eq('organization_id', organizationId);
-  const { data: items } = await itemQuery;
+  const { data: items } = await supabase.rpc('get_checklist_items', {
+    p_actor_id: actorId,
+    p_bartender: true,
+  });
 
   if (!items) return [];
 
@@ -1097,11 +1062,12 @@ export async function generatePhotoQuestion(
   organizationId: string,
   excludeMenuItemIds: string[] = [],
   seed?: string,
+  actorId: string = '',
 ): Promise<GeneratedQuestion | null> {
   if (!organizationId) {
     throw new Error('generatePhotoQuestion requires an organizationId');
   }
-  const pool = await fetchMenuItemsWithImages(organizationId);
+  const pool = await fetchMenuItemsWithImages(actorId);
   const rng = seededRandom(hashString(seed || `photo-${Date.now()}-${Math.random()}`));
   const q = menuPhotoQuestion(pool, rng, new Set(excludeMenuItemIds));
   if (!q) return null;
@@ -1118,6 +1084,7 @@ export async function generateQuizQuestions(
   cycleKey: string,
   questionCount: number = 5,
   organizationId: string,
+  actorId: string = '',
 ): Promise<GeneratedQuestion[]> {
   // Org scoping is mandatory: never generate a quiz from another tenant's data.
   if (!organizationId) {
@@ -1127,8 +1094,8 @@ export async function generateQuizQuestions(
   const rng = seededRandom(hashString(seedStr));
 
   // Fetch all data sources
-  const menuItems = await fetchMenuItems(organizationId);
-  const photoPool = await fetchMenuItemsWithImages(organizationId);
+  const menuItems = await fetchMenuItems(actorId);
+  const photoPool = await fetchMenuItemsWithImages(actorId);
 
   // Build candidate pool based on exam type
   const candidates: QuestionCandidate[] = [];
@@ -1169,10 +1136,10 @@ export async function generateQuizQuestions(
 
   // Libation/cocktail questions — Server and Bartender only
   if (examType === 'server' || examType === 'bartender') {
-    const cocktails = await fetchCocktails(organizationId);
-    const libations = await fetchLibationRecipes(organizationId);
-    const winePairings = await fetchWinePairings(organizationId);
-    const wineItems = await fetchWineItems(organizationId);
+    const cocktails = await fetchCocktails(actorId);
+    const libations = await fetchLibationRecipes(actorId);
+    const winePairings = await fetchWinePairings(actorId);
+    const wineItems = await fetchWineItems(actorId);
 
     menuGenerators.push(
       () => cocktailSpiritQuestion(cocktails, rng),
@@ -1189,10 +1156,10 @@ export async function generateQuizQuestions(
 
   // Checklist questions — Bartender and Host
   if (examType === 'bartender') {
-    const checklistItems = await fetchBartenderChecklistItems(organizationId);
+    const checklistItems = await fetchBartenderChecklistItems(actorId);
     menuGenerators.push(() => checklistQuestion(checklistItems, 'Bartender', rng));
   } else if (examType === 'host') {
-    const checklistItems = await fetchHostChecklistItems(organizationId);
+    const checklistItems = await fetchHostChecklistItems(actorId);
     menuGenerators.push(() => checklistQuestion(checklistItems, 'Host', rng));
   }
 
