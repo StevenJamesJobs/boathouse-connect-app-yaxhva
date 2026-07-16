@@ -11,6 +11,7 @@ import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
+import { useUnreadQuizReward } from '@/hooks/useUnreadQuizReward';
 import { MessageBadge } from '@/components/MessageBadge';
 import { useTranslation } from 'react-i18next';
 
@@ -49,7 +50,8 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
   const { unreadCount } = useUnreadMessages();
   const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
   const { pendingCount: pendingApprovalsCount } = usePendingApprovals();
-  const { hasNew: awardsHasNew } = useUnreadAwards();
+  const { count: awardsCount } = useUnreadAwards();
+  const { count: quizRewardCount } = useUnreadQuizReward();
   const colors = useThemeColors();
   const { mode } = useAppTheme();
   const { t } = useTranslation();
@@ -109,9 +111,9 @@ export default function BottomNavBar({ activeTab }: BottomNavBarProps) {
                       <MessageBadge count={toolsCount} size="small" />
                     </View>
                   )}
-                  {isRewardsTab && awardsHasNew && !isFocused && (
-                    <View style={styles.tabRedDotPosition}>
-                      <View style={styles.tabRedDot} />
+                  {isRewardsTab && (awardsCount + quizRewardCount) > 0 && (
+                    <View style={styles.tabBadgePosition}>
+                      <MessageBadge count={awardsCount + quizRewardCount} size="small" />
                     </View>
                   )}
                 </View>

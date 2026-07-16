@@ -43,6 +43,7 @@ import WelcomeHeader from '@/components/WelcomeHeader';
 import NotificationDropdown from '@/components/NotificationDropdown';
 import ConnectBar, { ConnectBarTab } from '@/components/ConnectBar';
 import { useUnreadContent } from '@/hooks/useUnreadContent';
+import { useUnreadNotifications } from '@/hooks/useUnreadNotifications';
 import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
 import UpcomingShiftsCard from '@/components/UpcomingShiftsCard';
 import { eventFallsOnDate } from '@/utils/dateUtils';
@@ -193,6 +194,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
     markEventsTabVisited,
     markAllEventsViewed,
   } = useUnreadContent();
+  const { count: notificationCount, markViewed: markNotificationsViewed } = useUnreadNotifications();
   const sectionListRef = useRef<FlatList>(null);
   // Per-leaf scroll refs so sibling sub-tab leaves stay vertically in sync (the
   // collapsed Happening-Today / calendar state carries across a sideways swipe).
@@ -1313,7 +1315,11 @@ export default function PortalHome({ role }: PortalHomeProps) {
         <View style={styles.headerPadding}>
           <WelcomeHeader
             onWeatherPress={openWeatherDetail}
-            onNotificationPress={() => setNotificationVisible(true)}
+            onNotificationPress={() => {
+              setNotificationVisible(true);
+              markNotificationsViewed();
+            }}
+            notificationCount={notificationCount}
             newContentCount={newContentCount}
           />
 

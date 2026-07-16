@@ -83,21 +83,9 @@ export function useUnreadAwards() {
         // Manager swiping to Recent doesn't clear shade entries — those are
         // cleared when they actually approve/deny.
       } else {
-        // Employee viewed their Recent Awards — drop redemption_decision rows for them.
-        const { data: shadeRows } = await (supabase
-          .from('custom_notifications') as any)
-          .select('id, data')
-          .order('created_at', { ascending: false })
-          .limit(50);
-        const idsToDelete = ((shadeRows as any[]) || [])
-          .filter((r) =>
-            r.data?.notificationType === 'redemption_decision' &&
-            r.data?.targetUserId === user.id
-          )
-          .map((r) => r.id);
-        if (idsToDelete.length > 0) {
-          await (supabase.from('custom_notifications') as any).delete().in('id', idsToDelete);
-        }
+        // Employee viewed their Recent Awards — drop redemption_decision rows for them
+        // (self-scoped + org-scoped server-side).
+        await supabase.rpc('clear_my_decision_notifications', { p_actor_id: user.id });
       }
     } catch (err) {
       console.error('Error clearing shade entries:', err);

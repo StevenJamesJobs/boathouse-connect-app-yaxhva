@@ -100,19 +100,17 @@ export default function NotificationCenter() {
   const loadDismissed = useCallback(async () => {
     setLoadingDismissed(true);
     try {
-      const { data, error } = await (supabase
-        .from('shade_dismissals') as any)
-        .select('id, notification_type, item_id, dismissed_title, dismissed_at')
-        .eq('organization_id', organizationId)
-        .order('dismissed_at', { ascending: false })
-        .limit(40);
+      const { data, error } = await (supabase.rpc as any)('get_recent_shade_dismissals', {
+        p_actor_id: user?.id,
+        p_limit: 40,
+      });
 
       if (!error && data) setDismissedItems(data as DismissedItem[]);
     } catch (err) {
       console.error('Error loading dismissed items:', err);
     }
     setLoadingDismissed(false);
-  }, [organizationId]);
+  }, [user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -134,10 +132,10 @@ export default function NotificationCenter() {
           onPress: async () => {
             setRestoringId(item.id);
             try {
-              const { error } = await (supabase
-                .from('shade_dismissals') as any)
-                .delete()
-                .eq('id', item.id);
+              const { error } = await (supabase.rpc as any)('restore_shade_item', {
+                p_actor_id: user?.id,
+                p_id: item.id,
+              });
               if (error) throw error;
               setDismissedItems(prev => prev.filter(d => d.id !== item.id));
             } catch (err) {
@@ -228,6 +226,8 @@ export default function NotificationCenter() {
   }
 
   async function doSendNotification() {
+    if (!user?.id) return;
+    const actorId = user.id;
     setSending(true);
 
     try {
@@ -240,12 +240,11 @@ export default function NotificationCenter() {
       // Insert the shade row so the broadcast shows in every staff member's
       // notification shade (+ badge), whether or not a push is also sent.
       try {
-        await (supabase.from('custom_notifications') as any).insert({
-          title,
-          body,
-          sent_by: user?.id,
-          organization_id: organizationId,
-          data: { ...extraData, notificationType: 'custom', notificationSkipped: !sendPush },
+        await supabase.rpc('create_notification', {
+          p_actor_id: actorId,
+          p_title: title,
+          p_body: body,
+          p_data: { ...extraData, notificationType: 'custom', notificationSkipped: !sendPush },
         });
       } catch (err) {
         console.error('Failed to log notification:', err);

@@ -137,10 +137,10 @@ export default function NotificationDropdown({
       setLoading(true);
       const items: NotificationItem[] = [];
 
-      // Load shade dismissals so we can filter out dismissed items
-      const { data: dismissals } = await (supabase
-        .from('shade_dismissals') as any)
-        .select('notification_type, item_id');
+      // Load the org hide-list (member-gated) so we can filter out dismissed items
+      const { data: dismissals } = await (supabase.rpc as any)('get_shade_dismissals', {
+        p_actor_id: user.id,
+      });
       const dismissedSet = new Set(
         (dismissals || []).map((d: any) => `${d.notification_type}:${d.item_id}`)
       );
@@ -242,29 +242,27 @@ export default function NotificationDropdown({
         });
       }
 
-      // Fetch custom notifications
-      const { data: customNotifs } = await (supabase
-        .from('custom_notifications') as any)
-        .select('id, title, body, created_at, data')
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false })
-        .limit(SOURCE_FETCH_LIMIT);
+      // Fetch custom notifications (the role/target visibility matrix below is
+      // now also enforced server-side; the loop's checks remain as belt-and-braces)
+      const { data: customNotifs } = await supabase.rpc('get_my_notifications', {
+        p_actor_id: user.id,
+        p_limit: SOURCE_FETCH_LIMIT,
+      });
 
       // Load this user's quiz dismissals so we can hide the bell entry
       // after they've already tapped it once.
       let dismissedExamIds = new Set<string>();
       if (user?.id) {
-        const { data: dismissals } = await (supabase
-          .from('quiz_notification_dismissals' as any) as any)
-          .select('exam_id')
-          .eq('user_id', user.id);
+        const { data: dismissals } = await (supabase.rpc as any)('get_my_quiz_dismissals', {
+          p_actor_id: user.id,
+        });
         if (dismissals) {
           dismissedExamIds = new Set((dismissals as any[]).map((d) => d.exam_id));
         }
       }
 
       if (customNotifs) {
-        for (const cn of customNotifs) {
+        for (const cn of customNotifs as any[]) {
           // Hide quiz bell entries that this user has already dismissed
           if (
             cn.data?.destination === 'weekly-quizzes' &&
@@ -358,10 +356,10 @@ export default function NotificationDropdown({
       // Weekly quiz deep-link: route to the quizzes screen and record dismissal
       if (data.data?.destination === 'weekly-quizzes') {
         if (data.data?.exam_id && user?.id) {
-          (supabase
-            .from('quiz_notification_dismissals' as any) as any)
-            .insert({ user_id: user.id, exam_id: data.data.exam_id })
-            .then(() => {}, () => {});
+          (supabase.rpc as any)('dismiss_quiz_notification', {
+            p_actor_id: user.id,
+            p_exam_id: data.data.exam_id,
+          }).then(() => {}, () => {});
         }
         // Optimistically hide the entry immediately
         setNotifications((prev) => prev.filter((n) => n.id !== item.id));
@@ -386,7 +384,9 @@ export default function NotificationDropdown({
       if (data.data?.notificationType === 'redemption_decision') {
         setNotifications((prev) => prev.filter((n) => n.id !== item.id));
         // Drop the row so the badge clears
-        (supabase.from('custom_notifications') as any).delete().eq('id', item.id).then(() => {}, () => {});
+        if (user?.id) {
+          supabase.rpc('delete_notification', { p_actor_id: user.id, p_id: item.id }).then(() => {}, () => {});
+        }
         onClose();
         const portalPrefix = (user?.role === 'manager' || user?.role === 'owner') ? '/(portal)/manager' : '/(portal)/employee';
         router.push(`${portalPrefix}/rewards` as any);
@@ -423,18 +423,15 @@ export default function NotificationDropdown({
   const handleDeleteNotification = async (item: NotificationItem) => {
     setDeletingId(item.id);
     try {
-      // Global hide-list: include organization_id (NOT NULL — so the dismiss actually
-      // persists) and snapshot the title for the Recently Dismissed / undo view.
-      const { error } = await (supabase.from('shade_dismissals') as any)
-        .insert({
-          notification_type: item.type,
-          item_id: item.id,
-          dismissed_by: user?.id,
-          organization_id: organizationId,
-          dismissed_title: item.title,
-        });
-      // 23505 = already dismissed (unique on type + item_id) — treat as success.
-      if (error && error.code !== '23505') throw error;
+      // Manager/owner org-wide hide (idempotent server-side); title snapshotted for the
+      // Recently Dismissed / undo view.
+      const { error } = await (supabase.rpc as any)('dismiss_shade_item', {
+        p_actor_id: user?.id,
+        p_notification_type: item.type,
+        p_item_id: item.id,
+        p_title: item.title,
+      });
+      if (error) throw error;
       setNotifications(prev => prev.filter(n => !(n.id === item.id && n.type === item.type)));
     } catch (err) {
       console.error('Error dismissing notification:', err);

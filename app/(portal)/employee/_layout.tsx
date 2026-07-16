@@ -9,6 +9,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
+import { useUnreadQuizReward } from '@/hooks/useUnreadQuizReward';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import PortalTabBar from '@/components/PortalTabBar';
 import JoltOverlay from '@/components/JoltOverlay';
@@ -58,14 +59,15 @@ function EmployeeTabBar(props: any) {
   const { unreadCount } = useUnreadMessages();
   const { unreadCount: unreadQuizCount } = useUnreadQuizzes();
   const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
-  const { hasNew: awardsHasNew } = useUnreadAwards();
+  const { count: awardsCount } = useUnreadAwards();
+  const { count: quizRewardCount } = useUnreadQuizReward();
   const toolsBadgeCount = unreadQuizCount + unreadLeaderboardCount;
 
   return (
     <PortalTabBar
       {...props}
       role="employee"
-      badges={{ messages: unreadCount, tools: toolsBadgeCount, rewardsHasNew: awardsHasNew }}
+      badges={{ messages: unreadCount, tools: toolsBadgeCount, rewards: awardsCount + quizRewardCount }}
     />
   );
 }

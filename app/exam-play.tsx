@@ -35,6 +35,7 @@ import {
 } from '@/utils/exam/examEngine';
 import { getExamTypeName } from '@/utils/exam/questionGenerator';
 import { getEligibleQuizTypes } from '@/app/weekly-quizzes';
+import { refreshAllUnreadQuizReward } from '@/hooks/useUnreadQuizReward';
 import { useTranslation } from 'react-i18next';
 
 type Phase = 'loading' | 'intro' | 'playing' | 'feedback' | 'completed';
@@ -140,11 +141,11 @@ export default function ExamPlayScreen() {
   const loadExam = async () => {
     try {
       // Fetch exam info
-      const { data: examData, error: examError } = await (supabase
-        .from('exams' as any) as any)
-        .select('*')
-        .eq('id', examId)
-        .single();
+      const { data: examRows, error: examError } = await (supabase.rpc as any)('get_exam', {
+        p_actor_id: user?.id,
+        p_exam_id: examId,
+      });
+      const examData = examRows?.[0];
 
       if (examError || !examData) {
         console.error('Failed to load exam:', examError);
@@ -163,12 +164,11 @@ export default function ExamPlayScreen() {
 
       // Check for existing attempt (anti-cheat: detect already completed or already started)
       if (!isPreview && user?.id) {
-        const { data: existingResult } = await (supabase
-          .from('exam_results' as any) as any)
-          .select('id, completed_at, correct_count, started_at')
-          .eq('exam_id', examId)
-          .eq('user_id', user.id)
-          .maybeSingle();
+        const { data: existingResults } = await (supabase.rpc as any)('get_my_exam_result', {
+          p_actor_id: user.id,
+          p_exam_id: examId,
+        });
+        const existingResult = existingResults?.[0];
 
         if (existingResult?.completed_at) {
           // Already completed — redirect back
@@ -182,11 +182,10 @@ export default function ExamPlayScreen() {
       }
 
       // Fetch questions
-      const { data: questionsData, error: questionsError } = await (supabase
-        .from('exam_questions' as any) as any)
-        .select('*')
-        .eq('exam_id', examId)
-        .order('question_order');
+      const { data: questionsData, error: questionsError } = await (supabase.rpc as any)('get_exam_questions', {
+        p_actor_id: user?.id,
+        p_exam_id: examId,
+      });
 
       if (questionsError || !questionsData || questionsData.length === 0) {
         console.error('Failed to load questions:', questionsError);
@@ -370,6 +369,8 @@ export default function ExamPlayScreen() {
 
       // Refresh user to update reward currency balance
       await refreshUser();
+      // Light up the Rewards-tab badge — a quiz reward is now waiting.
+      refreshAllUnreadQuizReward();
     } catch (err) {
       console.error('Submit results error:', err);
     }

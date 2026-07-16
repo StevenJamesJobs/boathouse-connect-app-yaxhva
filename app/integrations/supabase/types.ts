@@ -4364,6 +4364,132 @@ export type Database = {
         Args: { p_organization_id?: string; user_id: string }
         Returns: number
       }
+      get_inbox: {
+        Args: { p_actor_id: string }
+        Returns: {
+          body: string
+          file_name: string
+          file_url: string
+          image_url: string
+          is_read: boolean
+          message_created_at: string
+          message_id: string
+          mr_created_at: string
+          mr_id: string
+          parent_message_id: string
+          recipient_id: string
+          recipient_ids: string[]
+          reply_count: number
+          sender_id: string
+          subject: string
+          thread_has_unread: boolean
+          thread_id: string
+        }[]
+      }
+      get_sent_messages: {
+        Args: { p_actor_id: string }
+        Returns: {
+          body: string
+          created_at: string
+          file_name: string
+          file_url: string
+          id: string
+          image_url: string
+          parent_message_id: string
+          recipient_ids: string[]
+          reply_count: number
+          sender_id: string
+          subject: string
+          thread_id: string
+        }[]
+      }
+      get_message_thread: {
+        Args: { p_actor_id: string; p_message_id: string; p_thread_id: string }
+        Returns: {
+          body: string
+          created_at: string
+          file_name: string
+          file_url: string
+          id: string
+          image_url: string
+          recipient_ids: string[]
+          sender_id: string
+          subject: string
+        }[]
+      }
+      send_message: {
+        Args: {
+          p_actor_id: string
+          p_body: string
+          p_file_name?: string | null
+          p_file_url?: string | null
+          p_image_url?: string | null
+          p_recipient_ids: string[]
+          p_reply_to_message_id?: string | null
+          p_subject: string | null
+        }
+        Returns: string
+      }
+      mark_thread_read: {
+        Args: { p_actor_id: string; p_message_id: string; p_thread_id: string }
+        Returns: undefined
+      }
+      delete_received_thread: {
+        Args: { p_actor_id: string; p_thread_ids: string[] }
+        Returns: undefined
+      }
+      delete_sent_thread: {
+        Args: { p_actor_id: string; p_thread_id: string }
+        Returns: undefined
+      }
+      get_my_notifications: {
+        Args: { p_actor_id: string; p_limit?: number }
+        Returns: {
+          body: string
+          created_at: string
+          data: Json
+          id: string
+          title: string
+        }[]
+      }
+      get_my_notification_preferences: {
+        Args: { p_actor_id: string }
+        Returns: {
+          announcements_enabled: boolean
+          created_at: string
+          custom_notifications_enabled: boolean
+          events_enabled: boolean
+          game_hub_enabled: boolean
+          id: string
+          messages_enabled: boolean
+          organization_id: string
+          quiz_notifications_enabled: boolean
+          rewards_enabled: boolean
+          special_features_enabled: boolean
+          updated_at: string
+          user_id: string
+        }[]
+      }
+      create_notification: {
+        Args: { p_actor_id: string; p_body: string; p_data?: Json; p_title: string }
+        Returns: string
+      }
+      clear_redemption_request_notifications: {
+        Args: { p_actor_id: string; p_request_id: string }
+        Returns: undefined
+      }
+      clear_my_decision_notifications: {
+        Args: { p_actor_id: string }
+        Returns: undefined
+      }
+      delete_notification: {
+        Args: { p_actor_id: string; p_id: string }
+        Returns: undefined
+      }
+      get_unread_notification_count: {
+        Args: { p_actor_id: string; p_since?: string | null }
+        Returns: number
+      }
       get_user_badge_totals: {
         Args: { p_organization_id?: string; p_user_ids: string[] }
         Returns: {

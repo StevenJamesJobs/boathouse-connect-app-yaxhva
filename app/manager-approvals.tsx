@@ -114,24 +114,16 @@ export default function ManagerApprovalsScreen() {
 
       // Clear the pending shade entry across all managers + log the decision row for the requester
       try {
-        const { data: shadeRows } = await (supabase
-          .from('custom_notifications') as any)
-          .select('id, data')
-          .order('created_at', { ascending: false })
-          .limit(100);
-        const idsToDelete = ((shadeRows as any[]) || [])
-          .filter((r) => r.data?.notificationType === 'redemption_requested' && r.data?.requestId === row.id)
-          .map((r) => r.id);
-        if (idsToDelete.length > 0) {
-          await (supabase.from('custom_notifications') as any).delete().in('id', idsToDelete);
-        }
+        await supabase.rpc('clear_redemption_request_notifications', {
+          p_actor_id: user.id,
+          p_request_id: row.id,
+        });
 
-        await (supabase.from('custom_notifications') as any).insert({
-          title: decisionTitle,
-          body: decisionBody,
-          sent_by: user.id,
-          organization_id: organizationId,
-          data: {
+        await supabase.rpc('create_notification', {
+          p_actor_id: user.id,
+          p_title: decisionTitle,
+          p_body: decisionBody,
+          p_data: {
             type: 'custom',
             destination: 'redeem',
             notificationType: 'redemption_decision',

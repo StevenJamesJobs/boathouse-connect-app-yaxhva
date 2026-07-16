@@ -70,106 +70,56 @@ export default function MessagesScreen() {
     const dir = await getOrgDirectory(user.id);
     const dirById = new Map(dir.map((r) => [r.id, r]));
 
-    // Get all messages where user is a recipient, grouped by thread
-    const { data, error } = await supabase
-      .from('message_recipients')
-      .select(`
-        id,
-        is_read,
-        created_at,
-        recipient_id,
-        message:messages (
-          id,
-          sender_id,
-          subject,
-          body,
-          image_url,
-          file_url,
-          file_name,
-          parent_message_id,
-          thread_id,
-          created_at
-        )
-      `)
-      .eq('recipient_id', user.id)
-      .eq('is_deleted', false)
-      .order('created_at', { ascending: false });
+    // All non-deleted recipient rows for this user, with the per-thread
+    // aggregates (recipients, reply count, unread flag) computed server-side.
+    const { data, error } = await supabase.rpc('get_inbox', { p_actor_id: user.id });
 
     if (error) {
       console.error('Error loading inbox:', error);
       throw error;
     }
 
+    // Banner counts raw (pre-filter) rows — the same set the old head-count query counted.
+    setInboxCount((data || []).length);
+
     // Filter out feedback messages and group by thread
     const threadMap = new Map<string, any>();
     
     for (const item of (data || [])) {
-      if (!item.message || item.message.subject?.startsWith('[FEEDBACK]')) {
+      if (item.subject?.startsWith('[FEEDBACK]')) {
         continue;
       }
 
-      const msg = item.message;
-      const threadId = msg.thread_id || msg.id;
+      const threadId = item.thread_id || item.message_id;
 
       if (!threadMap.has(threadId)) {
-        // Load all recipients for this message
-        const { data: recipients } = await supabase
-          .from('message_recipients')
-          .select('recipient_id')
-          .eq('message_id', msg.id);
-
-        const recipientNames = recipients?.map((r: any) => dirById.get(r.recipient_id)?.name).filter(Boolean) || [];
-
-        // Count replies in this thread
-        const { count: replyCount } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('thread_id', threadId)
-          .neq('id', threadId);
-
-        // Check if ANY message in this thread is unread for this user
-        // Step 1: Get all message IDs in this thread
-        const { data: threadMsgs } = await supabase
-          .from('messages')
-          .select('id')
-          .or(`id.eq.${threadId},thread_id.eq.${threadId}`);
-
-        const threadMsgIds = threadMsgs?.map((m: any) => m.id) || [threadId];
-
-        // Step 2: Check message_recipients for unread entries
-        const { data: threadRecipients } = await supabase
-          .from('message_recipients')
-          .select('is_read')
-          .eq('recipient_id', user.id)
-          .in('message_id', threadMsgIds);
-
-        const hasUnreadInThread = threadRecipients?.some((tr: any) => !tr.is_read) || false;
+        const recipientNames = (item.recipient_ids || []).map((id: string) => dirById.get(id)?.name).filter(Boolean);
 
         threadMap.set(threadId, {
-          id: msg.id,
-          sender_id: msg.sender_id,
-          subject: msg.subject,
-          body: msg.body,
-          image_url: msg.image_url || null,
-          file_url: msg.file_url || null,
-          file_name: msg.file_name || null,
-          parent_message_id: msg.parent_message_id,
-          thread_id: msg.thread_id,
-          created_at: msg.created_at,
-          sender_name: dirById.get(msg.sender_id)?.name || 'Unknown',
-          sender_job_title: dirById.get(msg.sender_id)?.job_title || '',
-          sender_profile_picture: dirById.get(msg.sender_id)?.profile_picture_url || null,
-          is_read: !hasUnreadInThread,
+          id: item.message_id,
+          sender_id: item.sender_id,
+          subject: item.subject,
+          body: item.body,
+          image_url: item.image_url || null,
+          file_url: item.file_url || null,
+          file_name: item.file_name || null,
+          parent_message_id: item.parent_message_id,
+          thread_id: item.thread_id,
+          created_at: item.message_created_at,
+          sender_name: dirById.get(item.sender_id)?.name || 'Unknown',
+          sender_job_title: dirById.get(item.sender_id)?.job_title || '',
+          sender_profile_picture: dirById.get(item.sender_id)?.profile_picture_url || null,
+          is_read: !item.thread_has_unread,
           recipient_count: recipientNames.length,
           recipient_id: item.recipient_id,
           recipient_names: recipientNames,
-          reply_count: replyCount || 0,
+          reply_count: item.reply_count || 0,
         });
       } else {
         // Update to latest message time
         const existing = threadMap.get(threadId);
-        if (new Date(msg.created_at) > new Date(existing.created_at)) {
-          existing.created_at = msg.created_at;
+        if (new Date(item.message_created_at) > new Date(existing.created_at)) {
+          existing.created_at = item.message_created_at;
         }
         // Check if this specific message is unread
         if (!item.is_read) {
@@ -192,27 +142,7 @@ export default function MessagesScreen() {
     const dir = await getOrgDirectory(user.id);
     const dirById = new Map(dir.map((r) => [r.id, r]));
 
-    const { data, error } = await supabase
-      .from('messages')
-      .select(`
-        id,
-        sender_id,
-        subject,
-        body,
-        image_url,
-        file_url,
-        file_name,
-        parent_message_id,
-        thread_id,
-        created_at,
-        recipients:message_recipients (
-          id,
-          recipient_id
-        )
-      `)
-      .eq('sender_id', user.id)
-      .eq('deleted_by_sender', false)
-      .order('created_at', { ascending: false });
+    const { data, error } = await supabase.rpc('get_sent_messages', { p_actor_id: user.id });
 
     if (error) {
       console.error('Error loading sent messages:', error);
@@ -228,16 +158,9 @@ export default function MessagesScreen() {
       }
 
       const threadId = msg.thread_id || msg.id;
-      const recipientNames = msg.recipients?.map((r: any) => dirById.get(r.recipient_id)?.name).filter(Boolean) || [];
+      const recipientNames = (msg.recipient_ids || []).map((id: string) => dirById.get(id)?.name).filter(Boolean);
 
       if (!threadMap.has(threadId)) {
-        // Count replies in this thread
-        const { count: replyCount } = await supabase
-          .from('messages')
-          .select('*', { count: 'exact', head: true })
-          .eq('thread_id', threadId)
-          .neq('id', threadId);
-
         threadMap.set(threadId, {
           id: msg.id,
           sender_id: msg.sender_id,
@@ -255,7 +178,7 @@ export default function MessagesScreen() {
           is_read: true,
           recipient_count: recipientNames.length,
           recipient_names: recipientNames,
-          reply_count: replyCount || 0,
+          reply_count: msg.reply_count || 0,
         });
       } else {
         // Update to latest message time
@@ -287,20 +210,6 @@ export default function MessagesScreen() {
     }
   }, [user?.id]);
 
-  const loadInboxCount = useCallback(async () => {
-    if (!user?.id) return;
-
-    const { count, error } = await supabase
-      .from('message_recipients')
-      .select('*', { count: 'exact', head: true })
-      .eq('recipient_id', user.id)
-      .eq('is_deleted', false);
-
-    if (!error && count !== null) {
-      setInboxCount(count);
-    }
-  }, [user?.id]);
-
   const loadMessages = useCallback(async () => {
     if (!user?.id) return;
 
@@ -326,21 +235,18 @@ export default function MessagesScreen() {
       console.log('Messages screen focused, refreshing data...');
       loadMessages();
       loadUnreadCount();
-      loadInboxCount();
-    }, [loadMessages, loadUnreadCount, loadInboxCount])
+    }, [loadMessages, loadUnreadCount])
   );
 
   useEffect(() => {
     loadMessages();
     loadUnreadCount();
-    loadInboxCount();
-  }, [loadMessages, loadUnreadCount, loadInboxCount]);
+  }, [loadMessages, loadUnreadCount]);
 
   const onRefresh = async () => {
     setRefreshing(true);
     await loadMessages();
     await loadUnreadCount();
-    await loadInboxCount();
     setRefreshing(false);
   };
 
@@ -386,21 +292,13 @@ export default function MessagesScreen() {
         if (!message) continue;
         
         const threadId = message.thread_id || message.id;
-        
-        // Get all message IDs in this thread
-        const { data: threadMessages } = await supabase
-          .from('messages')
-          .select('id')
-          .or(`id.eq.${messageId},thread_id.eq.${threadId}`);
 
-        const threadMessageIds = threadMessages?.map(m => m.id) || [messageId];
-        
-        // Mark all messages in thread as read
-        await supabase
-          .from('message_recipients')
-          .update({ is_read: true, read_at: new Date().toISOString() })
-          .eq('recipient_id', user.id)
-          .in('message_id', threadMessageIds);
+        // Mark all messages in thread as read (expanded server-side)
+        await supabase.rpc('mark_thread_read', {
+          p_actor_id: user.id,
+          p_message_id: messageId,
+          p_thread_id: threadId,
+        });
       }
 
       await loadMessages();
@@ -417,7 +315,8 @@ export default function MessagesScreen() {
   };
 
   const handleBatchDelete = async () => {
-    if (selectedMessages.size === 0) return;
+    if (!user?.id || selectedMessages.size === 0) return;
+    const actorId = user.id;
 
     const messageType = 'message';
     const count = selectedMessages.size;
@@ -435,23 +334,28 @@ export default function MessagesScreen() {
               const messageIds = Array.from(selectedMessages);
 
               if (activeTab === 'inbox') {
-                await supabase
-                  .from('message_recipients')
-                  .update({ is_deleted: true, deleted_at: new Date().toISOString() })
-                  .eq('recipient_id', user?.id)
-                  .in('message_id', messageIds);
+                // Delete the whole thread for each selected card (roots = thread_id||id)
+                const threadRoots = messageIds.map((id) => {
+                  const card = inboxMessages.find((m) => m.id === id);
+                  return card?.thread_id || id;
+                });
+                await supabase.rpc('delete_received_thread', {
+                  p_actor_id: actorId,
+                  p_thread_ids: threadRoots,
+                });
               } else {
-                // Soft delete sent messages - mark as deleted by sender
-                await supabase
-                  .from('messages')
-                  .update({ deleted_by_sender: true })
-                  .in('id', messageIds)
-                  .eq('sender_id', user?.id);
+                // Soft delete sent threads - mark as deleted by sender
+                for (const id of messageIds) {
+                  const card = sentMessages.find((m) => m.id === id);
+                  await supabase.rpc('delete_sent_thread', {
+                    p_actor_id: actorId,
+                    p_thread_id: card?.thread_id || id,
+                  });
+                }
               }
 
               await loadMessages();
               await loadUnreadCount();
-              await loadInboxCount();
               // Immediately refresh badge counts on tab bar + WelcomeHeader
               refreshAllUnreadCounts();
               setSelectionMode(false);
@@ -472,21 +376,13 @@ export default function MessagesScreen() {
 
     try {
       const threadId = message.thread_id || message.id;
-      
-      // Get all message IDs in this thread
-      const { data: threadMessages } = await supabase
-        .from('messages')
-        .select('id')
-        .or(`id.eq.${message.id},thread_id.eq.${threadId}`);
 
-      const threadMessageIds = threadMessages?.map(m => m.id) || [message.id];
-      
-      // Mark all messages in thread as read
-      await supabase
-        .from('message_recipients')
-        .update({ is_read: true, read_at: new Date().toISOString() })
-        .eq('recipient_id', user.id)
-        .in('message_id', threadMessageIds);
+      // Mark all messages in thread as read (expanded server-side)
+      await supabase.rpc('mark_thread_read', {
+        p_actor_id: user.id,
+        p_message_id: message.id,
+        p_thread_id: threadId,
+      });
 
       await loadMessages();
       await loadUnreadCount();
@@ -499,6 +395,8 @@ export default function MessagesScreen() {
   };
 
   const handleDeleteMessage = async (message: Message) => {
+    if (!user?.id) return;
+    const actorId = user.id;
     const messageType = 'message';
     const count = 1;
 
@@ -515,33 +413,22 @@ export default function MessagesScreen() {
           onPress: async () => {
             try {
               if (activeTab === 'inbox') {
-                await supabase
-                  .from('message_recipients')
-                  .update({ is_deleted: true, deleted_at: new Date().toISOString() })
-                  .eq('recipient_id', user?.id)
-                  .eq('message_id', message.id);
+                // Whole thread, recipient-scoped, expanded server-side
+                await supabase.rpc('delete_received_thread', {
+                  p_actor_id: actorId,
+                  p_thread_ids: [message.thread_id || message.id],
+                });
               } else {
                 // Soft delete sent messages - mark as deleted by sender
-                // Get thread messages to mark all in thread
-                const threadId = message.thread_id || message.id;
-                const { data: threadMessages } = await supabase
-                  .from('messages')
-                  .select('id')
-                  .eq('sender_id', user?.id)
-                  .or(`id.eq.${threadId},thread_id.eq.${threadId}`);
-
-                const messageIds = threadMessages?.map(m => m.id) || [message.id];
-
-                await supabase
-                  .from('messages')
-                  .update({ deleted_by_sender: true })
-                  .in('id', messageIds)
-                  .eq('sender_id', user?.id);
+                // (whole thread, sender-scoped, expanded server-side)
+                await supabase.rpc('delete_sent_thread', {
+                  p_actor_id: actorId,
+                  p_thread_id: message.thread_id || message.id,
+                });
               }
 
               await loadMessages();
               await loadUnreadCount();
-              await loadInboxCount();
               // Immediately refresh badge counts on tab bar + WelcomeHeader
               refreshAllUnreadCounts();
               Alert.alert(t('common.success'), t('messages.deleted_success', { count, type: messageType }));

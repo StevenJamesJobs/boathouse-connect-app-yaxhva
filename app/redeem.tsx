@@ -287,14 +287,14 @@ export default function EmployeeRedeemScreen() {
       const notifTitle = '💰 Redemption Request';
       const notifBody = `${user.name || 'An employee'} requested ${optionLabel} ($${requestedBucks}).`;
 
-      // Log to managers' notification shade (single broadcast row, filtered by targetRole on read)
+      // Log to managers' notification shade (single broadcast row, filtered by targetRole on
+      // read). The RPC's employee carve-out allows exactly this self-reported request row.
       try {
-        await (supabase.from('custom_notifications') as any).insert({
-          title: notifTitle,
-          body: notifBody,
-          sent_by: user.id,
-          organization_id: organizationId,
-          data: {
+        await supabase.rpc('create_notification', {
+          p_actor_id: user.id,
+          p_title: notifTitle,
+          p_body: notifBody,
+          p_data: {
             type: 'custom',
             destination: 'approvals',
             notificationType: 'redemption_requested',

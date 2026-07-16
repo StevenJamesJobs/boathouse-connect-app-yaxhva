@@ -62,64 +62,35 @@ export default function MessageDetailScreen() {
   const insets = useSafeAreaInsets();
 
   const loadThread = useCallback(async () => {
+    if (!user?.id) return;
+
     try {
       setLoading(true);
 
       // Roster for sender/recipient name/title/avatar hydration (replaces the users(...) embeds).
-      const dir = await getOrgDirectory(user?.id || '');
+      const dir = await getOrgDirectory(user.id);
       const dirById = new Map(dir.map((r) => [r.id, r]));
 
-      // Load the main message first
-      const { data: mainMessage, error: mainError } = await supabase
-        .from('messages')
-        .select(`
-          id,
-          sender_id,
-          subject,
-          body,
-          image_url,
-          file_url,
-          file_name,
-          created_at
-        `)
-        .eq('id', messageId)
-        .single();
-
-      if (mainError) throw mainError;
-
-      // Load all recipients of the original message
-      const { data: recipients, error: recipientsError } = await supabase
-        .from('message_recipients')
-        .select('recipient_id')
-        .eq('message_id', messageId);
-
-      if (recipientsError) throw recipientsError;
-
-      // Store all recipient IDs and names
-      const recipientIds = recipients?.map(r => r.recipient_id) || [];
-      const recipientNames = recipients?.map(r => dirById.get(r.recipient_id)?.name).filter((n): n is string => Boolean(n)) || [];
-      const allIds = [mainMessage.sender_id, ...recipientIds].filter(id => id !== user?.id);
-      setAllRecipientIds(allIds);
-
-      // Load all messages in the thread
-      const { data: threadMessages, error: threadError } = await supabase
-        .from('messages')
-        .select(`
-          id,
-          sender_id,
-          subject,
-          body,
-          image_url,
-          file_url,
-          file_name,
-          created_at
-        `)
-        .or(`id.eq.${messageId},thread_id.eq.${threadId}`)
-        .order('created_at', { ascending: true });
+      // Whole thread in one call (participant-gated + expanded server-side, ascending)
+      const { data: threadMessages, error: threadError } = await supabase.rpc('get_message_thread', {
+        p_actor_id: user.id,
+        p_message_id: messageId,
+        p_thread_id: threadId,
+      });
 
       if (threadError) throw threadError;
 
-      const formattedMessages: MessageThread[] = (threadMessages || [mainMessage]).map((msg: any) => ({
+      const rows = threadMessages || [];
+      const mainMessage = rows.find((msg: any) => msg.id === messageId);
+      if (!mainMessage) throw new Error('Main message not found in thread');
+
+      // Store all recipient IDs and names (recipients of the original message)
+      const recipientIds: string[] = mainMessage.recipient_ids || [];
+      const recipientNames = recipientIds.map(id => dirById.get(id)?.name).filter((n): n is string => Boolean(n));
+      const allIds = [mainMessage.sender_id, ...recipientIds].filter(id => id !== user.id);
+      setAllRecipientIds(allIds);
+
+      const formattedMessages: MessageThread[] = rows.map((msg: any) => ({
         id: msg.id,
         sender_id: msg.sender_id,
         sender_name: dirById.get(msg.sender_id)?.name || 'Unknown',
@@ -131,7 +102,7 @@ export default function MessageDetailScreen() {
         file_url: msg.file_url || null,
         file_name: msg.file_name || null,
         created_at: msg.created_at,
-        is_current_user: msg.sender_id === user?.id,
+        is_current_user: msg.sender_id === user.id,
         recipient_names: msg.id === messageId ? recipientNames : undefined,
       }));
 
@@ -149,30 +120,13 @@ export default function MessageDetailScreen() {
 
     try {
       console.log('Marking entire thread as read for user:', user.id, 'thread:', threadId);
-      
-      // Get all message IDs in this thread
-      const { data: threadMessages, error: threadError } = await supabase
-        .from('messages')
-        .select('id')
-        .or(`id.eq.${messageId},thread_id.eq.${threadId}`);
 
-      if (threadError) {
-        console.error('Error fetching thread messages:', threadError);
-        throw threadError;
-      }
-
-      const messageIds = threadMessages?.map(m => m.id) || [messageId];
-      console.log('Message IDs to mark as read:', messageIds);
-
-      // Mark all messages in the thread as read for this user
-      const { error: updateError } = await supabase
-        .from('message_recipients')
-        .update({ 
-          is_read: true, 
-          read_at: new Date().toISOString() 
-        })
-        .eq('recipient_id', user.id)
-        .in('message_id', messageIds);
+      // Mark all messages in the thread as read for this user (expanded server-side)
+      const { error: updateError } = await supabase.rpc('mark_thread_read', {
+        p_actor_id: user.id,
+        p_message_id: messageId,
+        p_thread_id: threadId,
+      });
 
       if (updateError) {
         console.error('Error marking thread as read:', updateError);
@@ -228,6 +182,8 @@ export default function MessageDetailScreen() {
   };
 
   const handleDelete = () => {
+    if (!user?.id) return;
+    const actorId = user.id;
     // Check if user is the sender of the original message
     const originalMessage = messages.find(m => m.id === messageId || m.id === threadId);
     const isSender = originalMessage?.sender_id === user?.id;
@@ -246,19 +202,17 @@ export default function MessageDetailScreen() {
             try {
               if (isSender) {
                 // Soft delete sent message - mark as deleted by sender
-                const deleteThreadId = threadId || messageId;
-                await supabase
-                  .from('messages')
-                  .update({ deleted_by_sender: true })
-                  .eq('sender_id', user?.id)
-                  .or(`id.eq.${deleteThreadId},thread_id.eq.${deleteThreadId}`);
+                // (whole thread, sender-scoped, expanded server-side)
+                await supabase.rpc('delete_sent_thread', {
+                  p_actor_id: actorId,
+                  p_thread_id: threadId || messageId,
+                });
               } else {
-                // Soft delete from inbox
-                await supabase
-                  .from('message_recipients')
-                  .update({ is_deleted: true, deleted_at: new Date().toISOString() })
-                  .eq('recipient_id', user?.id)
-                  .eq('message_id', messageId);
+                // Soft delete the whole thread from inbox (recipient-scoped)
+                await supabase.rpc('delete_received_thread', {
+                  p_actor_id: actorId,
+                  p_thread_ids: [threadId || messageId],
+                });
               }
 
               Alert.alert(t('common:success', { defaultValue: 'Success' }), t('message_deleted'), [

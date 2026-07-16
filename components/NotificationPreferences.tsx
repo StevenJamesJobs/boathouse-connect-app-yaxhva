@@ -54,27 +54,26 @@ export default function NotificationPreferences({ variant = 'employee' }: Notifi
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('notification_preferences')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
+      const { data, error } = await supabase.rpc('get_my_notification_preferences', {
+        p_actor_id: user.id,
+      });
 
-      if (error && error.code !== 'PGRST116') {
-        // PGRST116 means no rows found, which is okay
+      if (error) {
         console.error('Error loading preferences:', error);
         return;
       }
 
-      if (data) {
+      // No row yet = keep the all-enabled defaults (same as the old PGRST116 path)
+      const row = data?.[0];
+      if (row) {
         setPreferences({
-          messages_enabled: data.messages_enabled,
-          rewards_enabled: data.rewards_enabled,
-          announcements_enabled: data.announcements_enabled,
-          events_enabled: data.events_enabled,
-          special_features_enabled: data.special_features_enabled,
-          custom_notifications_enabled: data.custom_notifications_enabled,
-          game_hub_enabled: data.game_hub_enabled ?? true,
+          messages_enabled: row.messages_enabled,
+          rewards_enabled: row.rewards_enabled,
+          announcements_enabled: row.announcements_enabled,
+          events_enabled: row.events_enabled,
+          special_features_enabled: row.special_features_enabled,
+          custom_notifications_enabled: row.custom_notifications_enabled,
+          game_hub_enabled: row.game_hub_enabled ?? true,
         });
       }
     } catch (error) {

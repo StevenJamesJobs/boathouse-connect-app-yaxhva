@@ -332,6 +332,8 @@ export default function ComposeMessageScreen() {
   };
 
   const handleSend = async () => {
+    if (!user?.id) return;
+    const actorId = user.id;
     if (selectedRecipients.length === 0) {
       Alert.alert(t('common:error', { defaultValue: 'Error' }), t('error_no_recipients'));
       return;
@@ -378,58 +380,20 @@ export default function ComposeMessageScreen() {
         }
       }
 
-      // Determine thread_id and parent_message_id for replies
-      let threadId = null;
-      let parentMessageId = null;
-      
-      if (replyToMessageId) {
-        // This is a reply
-        parentMessageId = replyToMessageId;
-        
-        // Get the thread_id from the original message
-        const { data: originalMessage, error: originalError } = await supabase
-          .from('messages')
-          .select('thread_id, id')
-          .eq('id', replyToMessageId)
-          .single();
-        
-        if (originalError) throw originalError;
-        
-        // If original message has a thread_id, use it; otherwise use the original message id
-        threadId = originalMessage.thread_id || originalMessage.id;
-      }
-
-      // Create the message
-      const { data: messageData, error: messageError } = await supabase
-        .from('messages')
-        .insert({
-          sender_id: user?.id,
-          subject: subject.trim() || null,
-          body: body.trim() || '',
-          image_url: imageUrl,
-          file_url: fileUrl,
-          file_name: fileName,
-          thread_id: threadId,
-          parent_message_id: parentMessageId,
-          organization_id: organizationId,
-        })
-        .select()
-        .single();
+      // Create the message (reply threading is resolved server-side; the
+      // recipient fan-out happens in the same transaction)
+      const { data: newMessageId, error: messageError } = await supabase.rpc('send_message', {
+        p_actor_id: actorId,
+        p_recipient_ids: selectedRecipients.map(recipient => recipient.id),
+        p_subject: subject.trim() || null,
+        p_body: body.trim() || '',
+        p_image_url: imageUrl,
+        p_file_url: fileUrl,
+        p_file_name: fileName,
+        p_reply_to_message_id: replyToMessageId || null,
+      });
 
       if (messageError) throw messageError;
-
-      // Create message recipients
-      const recipients = selectedRecipients.map(recipient => ({
-        message_id: messageData.id,
-        recipient_id: recipient.id,
-        organization_id: organizationId,
-      }));
-
-      const { error: recipientsError } = await supabase
-        .from('message_recipients')
-        .insert(recipients);
-
-      if (recipientsError) throw recipientsError;
 
       // Send push notification to recipients (don't block on failure)
       try {
@@ -441,7 +405,7 @@ export default function ComposeMessageScreen() {
             ? `${user?.name}: ${subject.trim()}${imageUrl ? ' 📷' : ''}${fileUrl ? ' 📎' : ''}`
             : `${user?.name} sent you a ${imageUrl ? 'photo' : fileUrl ? 'file' : 'message'}`,
           data: {
-            messageId: messageData.id,
+            messageId: newMessageId,
             senderId: user?.id,
             senderName: user?.name,
           },
