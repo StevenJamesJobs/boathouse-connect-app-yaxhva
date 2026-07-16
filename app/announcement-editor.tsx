@@ -31,7 +31,7 @@ import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-nativ
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
-import { fetchContentImages, saveContentImages, uploadImageToStorage, deleteContentImages } from '@/utils/contentImages';
+import { fetchContentImages, saveContentImages, uploadImageToStorage } from '@/utils/contentImages';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
 import CollapsibleSection from '@/components/CollapsibleSection';
@@ -156,24 +156,29 @@ export default function AnnouncementEditorScreen() {
   };
 
   const loadAnnouncements = async () => {
+    // Logout race: an empty actor would reach the uuid RPC param as '' (22P02).
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       console.log('Loading announcements from database...');
-      
-      const { data, error } = await supabase
-        .from('announcements')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('display_order', { ascending: true });
+
+      // Manager editor mode: every row, every visibility, inactive included
+      // (the old anon SELECT policy silently hid inactive rows from the editor).
+      const { data, error } = await supabase.rpc('get_announcements', {
+        p_actor_id: user.id,
+        p_include_inactive: true,
+      });
 
       if (error) {
         console.error('Error loading announcements:', error);
         throw error;
       }
-      
+
       console.log('Announcements loaded successfully:', data?.length || 0, 'items');
-      console.log('Announcement data:', JSON.stringify(data, null, 2));
-      setAnnouncements(data || []);
+      setAnnouncements((data || []) as any);
     } catch (error) {
       console.error('Error loading announcements:', error);
       Alert.alert('Error', t('announcement_editor:load_error'));
@@ -376,11 +381,13 @@ export default function AnnouncementEditorScreen() {
         }
         const allAdditionalUrls = [...additionalImageUrls, ...uploadedNewUrls];
         if (allAdditionalUrls.length > 0 || additionalImageUrls.length > 0) {
-          await saveContentImages('announcement', editingAnnouncement.id, allAdditionalUrls);
+          await saveContentImages(user.id, 'announcement', editingAnnouncement.id, allAdditionalUrls);
         }
       } else {
         console.log('Creating new announcement');
-        const { error } = await supabase.rpc('create_announcement', {
+        // The hardened RPC returns the new row's uuid — no more racy
+        // "select newest row" follow-up read.
+        const { data: newAnnouncementId, error } = await supabase.rpc('create_announcement', {
           p_user_id: user.id,
           p_organization_id: organizationId,
           p_title: formData.title,
@@ -423,25 +430,16 @@ export default function AnnouncementEditorScreen() {
         
         Alert.alert('Success', t('announcement_editor:created_success'));
 
-        // Get the newly created item's ID for translations and additional images
-        const { data: newItem } = await supabase
-          .from('announcements')
-          .select('id')
-          .eq('organization_id', organizationId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
         // Save Spanish translations for newly created item
-        if (newItem && (formData.title_es || formData.message_es)) {
-          await saveTranslations('announcements', newItem.id, {
+        if (newAnnouncementId && (formData.title_es || formData.message_es)) {
+          await saveTranslations('announcements', newAnnouncementId, {
             title_es: formData.title_es,
             content_es: formData.message_es,
           }, organizationId);
         }
 
         // Upload and save additional images for newly created item
-        if (newItem && newAdditionalImageUris.length > 0) {
+        if (newAnnouncementId && newAdditionalImageUris.length > 0) {
           const uploadedNewUrls: string[] = [];
           for (const uri of newAdditionalImageUris) {
             const url = await uploadImageToStorage(uri, 'announcement', (u) =>
@@ -450,7 +448,7 @@ export default function AnnouncementEditorScreen() {
             if (url) uploadedNewUrls.push(url);
           }
           if (uploadedNewUrls.length > 0) {
-            await saveContentImages('announcement', newItem.id, uploadedNewUrls);
+            await saveContentImages(user.id, 'announcement', newAnnouncementId, uploadedNewUrls);
           }
         }
       }
@@ -501,8 +499,7 @@ export default function AnnouncementEditorScreen() {
                 }
               }
 
-              // Clean up additional images
-              await deleteContentImages('announcement', announcement.id);
+              // content_images rows are cascaded by delete_announcement server-side.
 
               console.log('Announcement deleted successfully');
               Alert.alert('Success', t('announcement_editor:deleted_success'));
@@ -519,7 +516,7 @@ export default function AnnouncementEditorScreen() {
   };
 
   const handleMoveUp = async (index: number) => {
-    if (index <= 0) return;
+    if (index <= 0 || !user?.id) return;
     const newAnnouncements = [...announcements];
     const currentOrder = newAnnouncements[index].display_order;
     const aboveOrder = newAnnouncements[index - 1].display_order;
@@ -528,10 +525,11 @@ export default function AnnouncementEditorScreen() {
     newAnnouncements[index - 1].display_order = aboveOrder;
     setAnnouncements(newAnnouncements);
     try {
-      await Promise.all([
-        supabase.from('announcements').update({ display_order: aboveOrder }).eq('id', announcements[index].id).eq('organization_id', organizationId),
-        supabase.from('announcements').update({ display_order: currentOrder }).eq('id', announcements[index - 1].id).eq('organization_id', organizationId),
-      ]);
+      // Persist the whole list's new order (reindexed 0..N-1) via the gated RPC.
+      const { error } = await supabase.rpc('reorder_announcements', {
+        p_actor_id: user.id, p_ordered_ids: newAnnouncements.map((a) => a.id),
+      });
+      if (error) throw error;
     } catch (error) {
       console.error('Error moving announcement up:', error);
       await loadAnnouncements();
@@ -539,7 +537,7 @@ export default function AnnouncementEditorScreen() {
   };
 
   const handleMoveDown = async (index: number) => {
-    if (index >= announcements.length - 1) return;
+    if (index >= announcements.length - 1 || !user?.id) return;
     const newAnnouncements = [...announcements];
     const currentOrder = newAnnouncements[index].display_order;
     const belowOrder = newAnnouncements[index + 1].display_order;
@@ -548,10 +546,10 @@ export default function AnnouncementEditorScreen() {
     newAnnouncements[index + 1].display_order = belowOrder;
     setAnnouncements(newAnnouncements);
     try {
-      await Promise.all([
-        supabase.from('announcements').update({ display_order: belowOrder }).eq('id', announcements[index].id).eq('organization_id', organizationId),
-        supabase.from('announcements').update({ display_order: currentOrder }).eq('id', announcements[index + 1].id).eq('organization_id', organizationId),
-      ]);
+      const { error } = await supabase.rpc('reorder_announcements', {
+        p_actor_id: user.id, p_ordered_ids: newAnnouncements.map((a) => a.id),
+      });
+      if (error) throw error;
     } catch (error) {
       console.error('Error moving announcement down:', error);
       await loadAnnouncements();
@@ -559,20 +557,17 @@ export default function AnnouncementEditorScreen() {
   };
 
   const handleDragEnd = async ({ data: reorderedData }: { data: Announcement[] }) => {
+    if (!user?.id) return;
     const updatedData = reorderedData.map((item, index) => ({
       ...item,
       display_order: index,
     }));
     setAnnouncements(updatedData);
     try {
-      const updates = reorderedData.map((item, index) =>
-        supabase
-          .from('announcements')
-          .update({ display_order: index })
-          .eq('id', item.id)
-          .eq('organization_id', organizationId)
-      );
-      await Promise.all(updates);
+      const { error } = await supabase.rpc('reorder_announcements', {
+        p_actor_id: user.id, p_ordered_ids: reorderedData.map((item) => item.id),
+      });
+      if (error) throw error;
       console.log('Drag reorder persisted successfully');
     } catch (error) {
       console.error('Error persisting drag reorder:', error);
@@ -620,7 +615,7 @@ export default function AnnouncementEditorScreen() {
     setNewAdditionalImageUris([]);
 
     // Load existing additional images
-    const existingImages = await fetchContentImages('announcement', announcement.id);
+    const existingImages = await fetchContentImages(user?.id, 'announcement', announcement.id);
     setAdditionalImageUrls(existingImages);
 
     // Load the attached guide file if exists
@@ -661,7 +656,7 @@ export default function AnnouncementEditorScreen() {
   };
 
   const applyPositionChange = async (newPosition: number) => {
-    if (!positionPicker) return;
+    if (!positionPicker || !user?.id) return;
     const oldIndex = positionPicker.currentIndex;
     const newIndex = newPosition - 1;
     if (newIndex === oldIndex) { setPositionPicker(null); return; }
@@ -672,11 +667,10 @@ export default function AnnouncementEditorScreen() {
     setAnnouncements(updated);
     setPositionPicker(null);
     try {
-      await Promise.all(
-        updated.map((item) =>
-          supabase.from('announcements').update({ display_order: item.display_order }).eq('id', item.id).eq('organization_id', organizationId)
-        )
-      );
+      const { error } = await supabase.rpc('reorder_announcements', {
+        p_actor_id: user.id, p_ordered_ids: updated.map((item) => item.id),
+      });
+      if (error) throw error;
     } catch (error) {
       console.error('Error applying position change:', error);
       await loadAnnouncements();

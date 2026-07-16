@@ -3630,7 +3630,7 @@ export type Database = {
           p_user_id: string
           p_visibility?: string
         }
-        Returns: undefined
+        Returns: string
       }
       create_cocktail: {
         Args: {
@@ -3720,7 +3720,7 @@ export type Database = {
           p_title: string
           p_user_id: string
         }
-        Returns: undefined
+        Returns: string
       }
       create_upcoming_event: {
         Args: {
@@ -3770,11 +3770,11 @@ export type Database = {
         Returns: boolean
       }
       delete_expired_special_features: {
-        Args: { p_organization_id?: string }
+        Args: { p_actor_id?: string; p_organization_id?: string }
         Returns: number
       }
       delete_expired_upcoming_events: {
-        Args: { p_organization_id?: string }
+        Args: { p_actor_id?: string; p_organization_id?: string }
         Returns: number
       }
       delete_guide: {
@@ -4182,6 +4182,127 @@ export type Database = {
         Args: { p_actor_id: string; p_ordered_ids: string[] }
         Returns: boolean
       }
+      get_announcements: {
+        Args: {
+          p_actor_id: string
+          p_id?: string
+          p_include_inactive?: boolean
+          p_limit?: number
+        }
+        Returns: {
+          content: string
+          content_es: string
+          created_at: string
+          created_by: string
+          display_order: number
+          guide_file: Json
+          guide_file_id: string
+          id: string
+          is_active: boolean
+          link: string
+          message: string
+          organization_id: string
+          priority: string
+          thumbnail_shape: string
+          thumbnail_url: string
+          title: string
+          title_es: string
+          updated_at: string
+          visibility: string
+        }[]
+      }
+      get_special_features: {
+        Args: {
+          p_actor_id: string
+          p_id?: string
+          p_include_inactive?: boolean
+          p_limit?: number
+        }
+        Returns: {
+          content: string
+          content_es: string
+          created_at: string
+          created_by: string
+          display_order: number
+          end_date_time: string
+          guide_file: Json
+          guide_file_id: string
+          id: string
+          is_active: boolean
+          link: string
+          message: string
+          organization_id: string
+          start_date_time: string
+          thumbnail_shape: string
+          thumbnail_url: string
+          title: string
+          title_es: string
+          updated_at: string
+        }[]
+      }
+      get_upcoming_events: {
+        Args: {
+          p_actor_id: string
+          p_id?: string
+          p_include_inactive?: boolean
+          p_limit?: number
+        }
+        Returns: {
+          category: string
+          content: string
+          content_es: string
+          created_at: string
+          created_by: string
+          display_order: number
+          end_date_time: string
+          guide_file: Json
+          guide_file_id: string
+          id: string
+          is_active: boolean
+          link: string
+          message: string
+          organization_id: string
+          start_date_time: string
+          thumbnail_shape: string
+          thumbnail_url: string
+          title: string
+          title_es: string
+          updated_at: string
+        }[]
+      }
+      get_content_images: {
+        Args: {
+          p_actor_id: string
+          p_content_ids: string[]
+          p_content_type: string
+        }
+        Returns: {
+          content_id: string
+          display_order: number
+          image_url: string
+        }[]
+      }
+      replace_content_images: {
+        Args: {
+          p_actor_id: string
+          p_content_id: string
+          p_content_type: string
+          p_image_urls: string[]
+        }
+        Returns: boolean
+      }
+      reorder_announcements: {
+        Args: { p_actor_id: string; p_ordered_ids: string[] }
+        Returns: boolean
+      }
+      reorder_special_features: {
+        Args: { p_actor_id: string; p_ordered_ids: string[] }
+        Returns: boolean
+      }
+      reorder_upcoming_events: {
+        Args: { p_actor_id: string; p_ordered_ids: string[] }
+        Returns: boolean
+      }
       get_menu_categories: {
         Args: { p_actor_id: string; p_menu_slot?: number; p_source_org?: string }
         Returns: {
@@ -4241,6 +4362,132 @@ export type Database = {
       }
       get_unread_message_count: {
         Args: { p_organization_id?: string; user_id: string }
+        Returns: number
+      }
+      get_inbox: {
+        Args: { p_actor_id: string }
+        Returns: {
+          body: string
+          file_name: string
+          file_url: string
+          image_url: string
+          is_read: boolean
+          message_created_at: string
+          message_id: string
+          mr_created_at: string
+          mr_id: string
+          parent_message_id: string
+          recipient_id: string
+          recipient_ids: string[]
+          reply_count: number
+          sender_id: string
+          subject: string
+          thread_has_unread: boolean
+          thread_id: string
+        }[]
+      }
+      get_sent_messages: {
+        Args: { p_actor_id: string }
+        Returns: {
+          body: string
+          created_at: string
+          file_name: string
+          file_url: string
+          id: string
+          image_url: string
+          parent_message_id: string
+          recipient_ids: string[]
+          reply_count: number
+          sender_id: string
+          subject: string
+          thread_id: string
+        }[]
+      }
+      get_message_thread: {
+        Args: { p_actor_id: string; p_message_id: string; p_thread_id: string }
+        Returns: {
+          body: string
+          created_at: string
+          file_name: string
+          file_url: string
+          id: string
+          image_url: string
+          recipient_ids: string[]
+          sender_id: string
+          subject: string
+        }[]
+      }
+      send_message: {
+        Args: {
+          p_actor_id: string
+          p_body: string
+          p_file_name?: string | null
+          p_file_url?: string | null
+          p_image_url?: string | null
+          p_recipient_ids: string[]
+          p_reply_to_message_id?: string | null
+          p_subject: string | null
+        }
+        Returns: string
+      }
+      mark_thread_read: {
+        Args: { p_actor_id: string; p_message_id: string; p_thread_id: string }
+        Returns: undefined
+      }
+      delete_received_thread: {
+        Args: { p_actor_id: string; p_thread_ids: string[] }
+        Returns: undefined
+      }
+      delete_sent_thread: {
+        Args: { p_actor_id: string; p_thread_id: string }
+        Returns: undefined
+      }
+      get_my_notifications: {
+        Args: { p_actor_id: string; p_limit?: number }
+        Returns: {
+          body: string
+          created_at: string
+          data: Json
+          id: string
+          title: string
+        }[]
+      }
+      get_my_notification_preferences: {
+        Args: { p_actor_id: string }
+        Returns: {
+          announcements_enabled: boolean
+          created_at: string
+          custom_notifications_enabled: boolean
+          events_enabled: boolean
+          game_hub_enabled: boolean
+          id: string
+          messages_enabled: boolean
+          organization_id: string
+          quiz_notifications_enabled: boolean
+          rewards_enabled: boolean
+          special_features_enabled: boolean
+          updated_at: string
+          user_id: string
+        }[]
+      }
+      create_notification: {
+        Args: { p_actor_id: string; p_body: string; p_data?: Json; p_title: string }
+        Returns: string
+      }
+      clear_redemption_request_notifications: {
+        Args: { p_actor_id: string; p_request_id: string }
+        Returns: undefined
+      }
+      clear_my_decision_notifications: {
+        Args: { p_actor_id: string }
+        Returns: undefined
+      }
+      delete_notification: {
+        Args: { p_actor_id: string; p_id: string }
+        Returns: undefined
+      }
+      get_unread_notification_count: {
+        Args: { p_actor_id: string; p_since?: string | null }
         Returns: number
       }
       get_user_badge_totals: {

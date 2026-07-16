@@ -275,10 +275,10 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 router.push('/weekly-quizzes' as any);
                 // Fire-and-forget dismissal of the bell entry for this exam
                 if (data.exam_id && user?.id) {
-                  (supabase
-                    .from('quiz_notification_dismissals' as any) as any)
-                    .insert({ user_id: user.id, exam_id: data.exam_id })
-                    .then(() => {}, () => {});
+                  (supabase.rpc as any)('dismiss_quiz_notification', {
+                    p_actor_id: user.id,
+                    p_exam_id: data.exam_id,
+                  }).then(() => {}, () => {});
                 }
                 break;
               case 'profile':

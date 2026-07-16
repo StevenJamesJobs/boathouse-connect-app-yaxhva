@@ -4,8 +4,8 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { getExamTypeName } from '@/utils/exam/questionGenerator';
+import { refreshAllUnreadQuizReward } from '@/hooks/useUnreadQuizReward';
 
 interface UndismissedResult {
   id: string;
@@ -17,7 +17,6 @@ interface UndismissedResult {
 export default function ExamRewardBlurb() {
   const colors = useThemeColors();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
   const [result, setResult] = useState<UndismissedResult | null>(null);
 
   useEffect(() => {
@@ -29,22 +28,19 @@ export default function ExamRewardBlurb() {
 
     try {
       // Get user's recent exam results
-      const { data: results, error: resultsError } = await (supabase
-        .from('exam_results' as any) as any)
-        .select('id, exam_id, bucks_awarded')
-        .eq('user_id', user.id)
-        .order('completed_at', { ascending: false })
-        .limit(5);
+      const { data: results, error: resultsError } = await (supabase.rpc as any)('get_my_recent_exam_results', {
+        p_actor_id: user.id,
+        p_limit: 5,
+      });
 
       if (resultsError || !results || results.length === 0) return;
 
       // Check which ones are already dismissed
       const resultIds = results.map((r: any) => r.id);
-      const { data: dismissals } = await (supabase
-        .from('exam_reward_dismissals' as any) as any)
-        .select('exam_result_id')
-        .eq('user_id', user.id)
-        .in('exam_result_id', resultIds);
+      const { data: dismissals } = await (supabase.rpc as any)('get_my_exam_reward_dismissals', {
+        p_actor_id: user.id,
+        p_result_ids: resultIds,
+      });
 
       const dismissedIds = new Set((dismissals || []).map((d: any) => d.exam_result_id));
 
@@ -56,12 +52,11 @@ export default function ExamRewardBlurb() {
       }
 
       // Get the exam type
-      const { data: examData } = await (supabase
-        .from('exams' as any) as any)
-        .select('exam_type')
-        .eq('organization_id', organizationId)
-        .eq('id', undismissed.exam_id)
-        .single();
+      const { data: examRows } = await (supabase.rpc as any)('get_exam', {
+        p_actor_id: user.id,
+        p_exam_id: undismissed.exam_id,
+      });
+      const examData = examRows?.[0];
 
       if (examData) {
         setResult({
@@ -80,10 +75,12 @@ export default function ExamRewardBlurb() {
     if (!user?.id || !result) return;
 
     try {
-      await (supabase.from('exam_reward_dismissals' as any) as any).insert({
-        user_id: user.id,
-        exam_result_id: result.id,
+      await (supabase.rpc as any)('dismiss_exam_reward', {
+        p_actor_id: user.id,
+        p_exam_result_id: result.id,
       });
+      // Clear the Rewards-tab badge for this reward.
+      refreshAllUnreadQuizReward();
     } catch (err) {
       console.error('Error dismissing exam reward:', err);
     }

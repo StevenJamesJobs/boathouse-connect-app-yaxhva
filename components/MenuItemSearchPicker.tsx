@@ -69,12 +69,19 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
 
   useEffect(() => {
     if (!visible) return;
+    // Logout race: an empty actor reaches get_menu_items as uuid '' (22P02).
+    // user?.id is in the deps so a reopen after login refetches.
+    if (!user?.id) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     (async () => {
       try {
         const [menuRes, specialsRes] = await Promise.all([
-          supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '' }),
+          supabase.rpc('get_menu_items', { p_actor_id: user.id }),
           (supabase.from('weekly_specials') as any).select('id, name, day_of_week, price').eq('organization_id', organizationId),
         ]);
         if (cancelled) return;
@@ -100,7 +107,7 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [visible]);
+  }, [visible, user?.id]);
 
   const filtered = useMemo<PickedMenuItem[]>(() => {
     const q = query.trim().toLowerCase();

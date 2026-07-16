@@ -1,9 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { AppState, AppStateStatus } from 'react-native';
-import { getEligibleQuizTypes } from '@/app/weekly-quizzes';
 
 // Global event system so any screen can trigger an immediate refresh across
 // all instances of useUnreadQuizzes (tab bar, tools tile, badge syncer).
@@ -21,7 +19,6 @@ export function refreshAllUnreadQuizzes() {
  */
 export function useUnreadQuizzes() {
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(true);
 
@@ -32,51 +29,25 @@ export function useUnreadQuizzes() {
       return;
     }
 
+    // Owners/managers administer quizzes (create/reset/track) but don't take them —
+    // their accounts carry every job title, so eligibility would always badge them.
+    if (user.role === 'manager' || user.role === 'owner') {
+      setUnreadCount(0);
+      setLoading(false);
+      return;
+    }
+
     try {
-      const eligibleTypes = getEligibleQuizTypes(user?.jobTitles || []);
-      if (eligibleTypes.length === 0) {
-        setUnreadCount(0);
-        return;
-      }
-
-      let examsQuery = (supabase
-        .from('exams' as any) as any)
-        .select('id')
-        .in('exam_type', eligibleTypes)
-        .eq('status', 'active');
-      if (organizationId) examsQuery = examsQuery.eq('organization_id', organizationId);
-      const { data: activeExams } = await examsQuery;
-
-      if (!activeExams || activeExams.length === 0) {
-        setUnreadCount(0);
-        return;
-      }
-
-      const examIds = activeExams.map((e: any) => e.id);
-
-      // Find results the user has already submitted for those exams
-      const { data: results } = await (supabase
-        .from('exam_results' as any) as any)
-        .select('exam_id, completed_at')
-        .in('exam_id', examIds)
-        .eq('user_id', user.id);
-
-      // A quiz counts as "read" only once actually completed (completed_at set) — a
-      // started-but-unsubmitted row must NOT clear the badge.
-      const completedExamIds = new Set(
-        (results || [])
-          .filter((r: any) => r.completed_at != null)
-          .map((r: any) => r.exam_id)
-      );
-
-      const unread = examIds.filter((id: string) => !completedExamIds.has(id)).length;
-      setUnreadCount(unread);
+      const { data } = await (supabase.rpc as any)('get_my_unread_quiz_count', {
+        p_actor_id: user.id,
+      });
+      setUnreadCount(typeof data === 'number' ? data : 0);
     } catch (err) {
       console.error('Error loading unread quizzes:', err);
     } finally {
       setLoading(false);
     }
-  }, [user?.id, user?.jobTitles, organizationId]);
+  }, [user?.id, user?.role, user?.jobTitles]);
 
   useEffect(() => {
     loadUnreadCount();

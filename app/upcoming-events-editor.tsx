@@ -31,7 +31,7 @@ import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-nativ
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { fetchContentImages, saveContentImages, uploadImageToStorage, deleteContentImages } from '@/utils/contentImages';
+import { fetchContentImages, saveContentImages, uploadImageToStorage } from '@/utils/contentImages';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -156,41 +156,35 @@ export default function UpcomingEventsEditorScreen() {
   };
 
   const resequenceDisplayOrders = async (currentEvents: UpcomingEvent[]) => {
-    // Assign sequential display_orders (0, 1, 2, ...) based on current sort order
-    const updates: Promise<any>[] = [];
-    currentEvents.forEach((event, index) => {
-      if (event.display_order !== index) {
-        updates.push(
-          supabase
-            .from('upcoming_events')
-            .update({ display_order: index })
-            .eq('id', event.id)
-            .eq('organization_id', organizationId)
-        );
-      }
+    // Assign sequential display_orders (0, 1, 2, ...) based on current sort order —
+    // one gated reorder RPC reindexes the whole list server-side.
+    if (!user?.id || currentEvents.length === 0) return;
+    const { error } = await supabase.rpc('reorder_upcoming_events', {
+      p_actor_id: user.id, p_ordered_ids: currentEvents.map((e) => e.id),
     });
-    if (updates.length > 0) {
-      await Promise.all(updates);
-      console.log(`Resequenced ${updates.length} event display orders`);
+    if (error) {
+      console.error('Error resequencing event display orders:', error);
+    } else {
+      console.log(`Resequenced ${currentEvents.length} event display orders`);
     }
   };
 
   const cleanupExpiredEvents = async () => {
+    if (!user?.id) return;
     try {
-      const { data, error } = await supabase.rpc('delete_expired_upcoming_events', { p_organization_id: organizationId });
+      const { data, error } = await supabase.rpc('delete_expired_upcoming_events', { p_actor_id: user.id });
       if (error) {
         console.error('Error cleaning up expired events:', error);
       } else {
         console.log('Cleaned up expired events:', data);
         // If events were deleted, reload and resequence to close gaps
         if (data && data > 0) {
-          const { data: freshEvents } = await supabase
-            .from('upcoming_events')
-            .select('*')
-            .eq('organization_id', organizationId)
-            .order('display_order', { ascending: true });
+          const { data: freshEvents } = await supabase.rpc('get_upcoming_events', {
+            p_actor_id: user.id,
+            p_include_inactive: true,
+          });
           if (freshEvents) {
-            await resequenceDisplayOrders(freshEvents);
+            await resequenceDisplayOrders(freshEvents as any);
           }
         }
       }
@@ -200,23 +194,28 @@ export default function UpcomingEventsEditorScreen() {
   };
 
   const loadEvents = async () => {
+    // Logout race: an empty actor would reach the uuid RPC param as '' (22P02).
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       console.log('Loading upcoming events from database...');
-      
-      const { data, error } = await supabase
-        .from('upcoming_events')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('display_order', { ascending: true });
+
+      // Manager editor mode: inactive rows included (matches the old select('*')).
+      const { data, error } = await supabase.rpc('get_upcoming_events', {
+        p_actor_id: user.id,
+        p_include_inactive: true,
+      });
 
       if (error) {
         console.error('Error loading upcoming events:', error);
         throw error;
       }
-      
+
       console.log('Upcoming events loaded successfully:', data?.length || 0, 'items');
-      setEvents(data || []);
+      setEvents((data || []) as any);
     } catch (error) {
       console.error('Error loading upcoming events:', error);
       Alert.alert(t('common:error'), t('upcoming_events_editor:load_error'));
@@ -418,11 +417,13 @@ export default function UpcomingEventsEditorScreen() {
         }
         const allAdditionalUrls = [...additionalImageUrls, ...uploadedNewUrls];
         if (allAdditionalUrls.length > 0 || additionalImageUrls.length > 0) {
-          await saveContentImages('upcoming_event', editingEvent.id, allAdditionalUrls);
+          await saveContentImages(user.id, 'upcoming_event', editingEvent.id, allAdditionalUrls);
         }
       } else {
         console.log('Creating new upcoming event');
-        const { error } = await supabase.rpc('create_upcoming_event', {
+        // create_upcoming_event has always returned the new row's uuid — use it
+        // instead of the racy "select newest row" follow-up read.
+        const { data: newEventId, error } = await supabase.rpc('create_upcoming_event', {
           p_user_id: user.id,
           p_organization_id: organizationId,
           p_title: formData.title,
@@ -468,33 +469,26 @@ export default function UpcomingEventsEditorScreen() {
         Alert.alert(t('common:success'), t('upcoming_events_editor:created_success'));
 
         // Save Spanish translations for newly created item
-        if (formData.title_es || formData.message_es) {
-          const { data: newItem } = await supabase
-            .from('upcoming_events')
-            .select('id')
-            .eq('organization_id', organizationId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-          if (newItem) {
-            await saveTranslations('upcoming_events', newItem.id, {
-              title_es: formData.title_es,
-              content_es: formData.message_es,
-            }, organizationId);
+        if (newEventId && (formData.title_es || formData.message_es)) {
+          await saveTranslations('upcoming_events', newEventId, {
+            title_es: formData.title_es,
+            content_es: formData.message_es,
+          }, organizationId);
+        }
 
-            // Upload and save additional images for newly created item
-            if (newAdditionalImageUris.length > 0) {
-              const uploadedNewUrls: string[] = [];
-              for (const uri of newAdditionalImageUris) {
-                const url = await uploadImageToStorage(uri, 'upcoming_event', (u) =>
-                  FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
-                );
-                if (url) uploadedNewUrls.push(url);
-              }
-              if (uploadedNewUrls.length > 0) {
-                await saveContentImages('upcoming_event', newItem.id, uploadedNewUrls);
-              }
-            }
+        // Upload and save additional images for newly created item (no longer
+        // nested under the translations branch — images used to be silently
+        // skipped unless a Spanish title/message was also entered).
+        if (newEventId && newAdditionalImageUris.length > 0) {
+          const uploadedNewUrls: string[] = [];
+          for (const uri of newAdditionalImageUris) {
+            const url = await uploadImageToStorage(uri, 'upcoming_event', (u) =>
+              FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
+            );
+            if (url) uploadedNewUrls.push(url);
+          }
+          if (uploadedNewUrls.length > 0) {
+            await saveContentImages(user.id, 'upcoming_event', newEventId, uploadedNewUrls);
           }
         }
       }
@@ -545,8 +539,7 @@ export default function UpcomingEventsEditorScreen() {
                 }
               }
 
-              // Clean up additional images
-              await deleteContentImages('upcoming_event', event.id);
+              // content_images rows are cascaded by delete_upcoming_event server-side.
 
               console.log('Upcoming event deleted successfully');
 
@@ -568,7 +561,7 @@ export default function UpcomingEventsEditorScreen() {
   };
 
   const handleMoveUp = async (index: number) => {
-    if (index <= 0) return;
+    if (index <= 0 || !user?.id) return;
     const newEvents = [...events];
     const currentOrder = newEvents[index].display_order;
     const aboveOrder = newEvents[index - 1].display_order;
@@ -577,12 +570,12 @@ export default function UpcomingEventsEditorScreen() {
     newEvents[index].display_order = currentOrder;
     newEvents[index - 1].display_order = aboveOrder;
     setEvents(newEvents);
-    // Persist to Supabase
+    // Persist the whole list's new order (reindexed 0..N-1) via the gated RPC
     try {
-      await Promise.all([
-        supabase.from('upcoming_events').update({ display_order: aboveOrder }).eq('id', events[index].id).eq('organization_id', organizationId),
-        supabase.from('upcoming_events').update({ display_order: currentOrder }).eq('id', events[index - 1].id).eq('organization_id', organizationId),
-      ]);
+      const { error } = await supabase.rpc('reorder_upcoming_events', {
+        p_actor_id: user.id, p_ordered_ids: newEvents.map((e) => e.id),
+      });
+      if (error) throw error;
     } catch (error) {
       console.error('Error moving event up:', error);
       await loadEvents(); // Reload on error to restore correct state
@@ -590,7 +583,7 @@ export default function UpcomingEventsEditorScreen() {
   };
 
   const handleMoveDown = async (index: number) => {
-    if (index >= events.length - 1) return;
+    if (index >= events.length - 1 || !user?.id) return;
     const newEvents = [...events];
     const currentOrder = newEvents[index].display_order;
     const belowOrder = newEvents[index + 1].display_order;
@@ -599,12 +592,11 @@ export default function UpcomingEventsEditorScreen() {
     newEvents[index].display_order = currentOrder;
     newEvents[index + 1].display_order = belowOrder;
     setEvents(newEvents);
-    // Persist to Supabase
     try {
-      await Promise.all([
-        supabase.from('upcoming_events').update({ display_order: belowOrder }).eq('id', events[index].id).eq('organization_id', organizationId),
-        supabase.from('upcoming_events').update({ display_order: currentOrder }).eq('id', events[index + 1].id).eq('organization_id', organizationId),
-      ]);
+      const { error } = await supabase.rpc('reorder_upcoming_events', {
+        p_actor_id: user.id, p_ordered_ids: newEvents.map((e) => e.id),
+      });
+      if (error) throw error;
     } catch (error) {
       console.error('Error moving event down:', error);
       await loadEvents(); // Reload on error to restore correct state
@@ -618,16 +610,12 @@ export default function UpcomingEventsEditorScreen() {
       display_order: index,
     }));
     setEvents(updatedData);
-    // Persist new display_orders to Supabase
+    if (!user?.id) return;
     try {
-      const updates = reorderedData.map((event, index) =>
-        supabase
-          .from('upcoming_events')
-          .update({ display_order: index })
-          .eq('id', event.id)
-          .eq('organization_id', organizationId)
-      );
-      await Promise.all(updates);
+      const { error } = await supabase.rpc('reorder_upcoming_events', {
+        p_actor_id: user.id, p_ordered_ids: reorderedData.map((event) => event.id),
+      });
+      if (error) throw error;
       console.log('Drag reorder persisted successfully');
     } catch (error) {
       console.error('Error persisting drag reorder:', error);
@@ -645,10 +633,12 @@ export default function UpcomingEventsEditorScreen() {
     const updated = reordered.map((item, i) => ({ ...item, display_order: i }));
     setEvents(updated);
     setPositionPicker(null);
+    if (!user?.id) return;
     try {
-      await Promise.all(updated.map((item, i) =>
-        supabase.from('upcoming_events').update({ display_order: i }).eq('id', item.id).eq('organization_id', organizationId)
-      ));
+      const { error } = await supabase.rpc('reorder_upcoming_events', {
+        p_actor_id: user.id, p_ordered_ids: updated.map((item) => item.id),
+      });
+      if (error) throw error;
     } catch (error) {
       console.error('Error applying position change:', error);
       await loadEvents();
@@ -728,7 +718,7 @@ export default function UpcomingEventsEditorScreen() {
     setEndDateTime(event.end_date_time ? new Date(event.end_date_time) : null);
     setSelectedImageUri(null);
     setNewAdditionalImageUris([]);
-    const existingImages = await fetchContentImages('upcoming_event', event.id);
+    const existingImages = await fetchContentImages(user?.id, 'upcoming_event', event.id);
     setAdditionalImageUrls(existingImages);
 
     // Load the attached guide file if exists

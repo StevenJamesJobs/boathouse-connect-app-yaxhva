@@ -34,6 +34,7 @@ import { getImageUrl } from '@/utils/imageUrl';
 import { stripFormattingTags } from '@/components/FormattedText';
 import { useUnreadContent } from '@/hooks/useUnreadContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface GuideFile {
   id: string;
@@ -69,6 +70,7 @@ export default function ViewAllUpcomingEventsScreen() {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const [events, setEvents] = useState<UpcomingEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [eventsTab, setEventsTab] = useState<'Event' | 'Entertainment'>('Event');
@@ -102,33 +104,31 @@ export default function ViewAllUpcomingEventsScreen() {
   useEffect(() => {
     loadEvents();
     markEventsTabVisited('Event');
-  }, []);
+  }, [user?.id]);
 
   const loadEvents = async () => {
+    // Logout race: an empty actor would reach the uuid RPC params as '' (22P02).
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
-      try { await supabase.rpc('delete_expired_upcoming_events', { p_organization_id: organizationId }); } catch {}
+      try { await supabase.rpc('delete_expired_upcoming_events', { p_actor_id: user.id }); } catch {}
 
-      const { data, error } = await supabase
-        .from('upcoming_events')
-        .select(`
-          *,
-          guide_file:guides_and_training!upcoming_events_guide_file_id_fkey(
-            id, title, file_url, file_name, file_type
-          )
-        `)
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true })
-        .order('created_at', { ascending: false });
+      // Member-gated RPC: org derived server-side; guide_file jsonb matches the
+      // retired PostgREST embed shape.
+      const { data, error } = await supabase.rpc('get_upcoming_events', {
+        p_actor_id: user.id,
+      });
 
       if (error) throw error;
 
-      setEvents(data || []);
+      setEvents((data || []) as any);
 
       if (data && data.length > 0) {
-        const ids = data.map((e: UpcomingEvent) => e.id);
-        const imagesMap = await fetchContentImagesBatch('upcoming_event', ids);
+        const ids = (data as any[]).map((e: any) => e.id);
+        const imagesMap = await fetchContentImagesBatch(user.id, 'upcoming_event', ids);
         setContentImagesMap(imagesMap);
       }
     } catch (error) {

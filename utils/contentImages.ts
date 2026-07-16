@@ -2,15 +2,6 @@ import { supabase } from '@/app/integrations/supabase/client';
 
 export type ContentType = 'announcement' | 'special_feature' | 'upcoming_event';
 
-interface ContentImage {
-  id: string;
-  content_type: ContentType;
-  content_id: string;
-  image_url: string;
-  display_order: number;
-  created_at: string;
-}
-
 /**
  * Maps table names to content_type values used in the content_images table
  */
@@ -32,28 +23,28 @@ const CONTENT_TYPE_TO_BUCKET: Record<ContentType, string> = {
 /**
  * Fetches additional images for a single content item.
  * Returns an array of image URLs ordered by display_order.
+ * Member-gated RPC — org derived server-side from the actor (the old optional
+ * org filter was passed by nobody, so reads spanned every org).
  */
 export async function fetchContentImages(
+  actorId: string | undefined | null,
   contentType: ContentType,
-  contentId: string,
-  organizationId?: string
+  contentId: string
 ): Promise<string[]> {
+  if (!actorId) return [];
   try {
-    let query = supabase
-      .from('content_images')
-      .select('image_url')
-      .eq('content_type', contentType)
-      .eq('content_id', contentId)
-      .order('display_order', { ascending: true });
-    if (organizationId) query = query.eq('organization_id', organizationId);
-    const { data, error } = await query;
+    const { data, error } = await supabase.rpc('get_content_images', {
+      p_actor_id: actorId,
+      p_content_type: contentType,
+      p_content_ids: [contentId],
+    });
 
     if (error) {
       console.error('Error fetching content images:', error);
       return [];
     }
 
-    return (data || []).map((row) => row.image_url);
+    return ((data as any[]) || []).map((row) => row.image_url);
   } catch (err) {
     console.error('Content images fetch error:', err);
     return [];
@@ -62,32 +53,29 @@ export async function fetchContentImages(
 
 /**
  * Fetches additional images for multiple content items in a single query.
- * Returns a Map of content_id -> image URLs array.
+ * Returns a Map of content_id -> image URLs array (rows arrive display_order ASC).
  */
 export async function fetchContentImagesBatch(
+  actorId: string | undefined | null,
   contentType: ContentType,
-  contentIds: string[],
-  organizationId?: string
+  contentIds: string[]
 ): Promise<Map<string, string[]>> {
   const result = new Map<string, string[]>();
-  if (contentIds.length === 0) return result;
+  if (!actorId || contentIds.length === 0) return result;
 
   try {
-    let query = supabase
-      .from('content_images')
-      .select('content_id, image_url')
-      .eq('content_type', contentType)
-      .in('content_id', contentIds)
-      .order('display_order', { ascending: true });
-    if (organizationId) query = query.eq('organization_id', organizationId);
-    const { data, error } = await query;
+    const { data, error } = await supabase.rpc('get_content_images', {
+      p_actor_id: actorId,
+      p_content_type: contentType,
+      p_content_ids: contentIds,
+    });
 
     if (error) {
       console.error('Error fetching content images batch:', error);
       return result;
     }
 
-    for (const row of data || []) {
+    for (const row of (data as any[]) || []) {
       const existing = result.get(row.content_id) || [];
       existing.push(row.image_url);
       result.set(row.content_id, existing);
@@ -101,52 +89,32 @@ export async function fetchContentImagesBatch(
 }
 
 /**
- * Saves additional images for a content item.
- * Handles uploading new images and syncing the content_images table.
+ * Saves additional images for a content item — atomic full-set replace via the
+ * manager-gated RPC (verifies the parent row is in the actor's org; empty array
+ * clears the set). display_order = array position, org set server-side.
  *
  * @param contentType - The type of content ('announcement', 'special_feature', 'upcoming_event')
  * @param contentId - The UUID of the content item
  * @param imageUrls - The full ordered array of image URLs to save (existing + newly uploaded)
  */
 export async function saveContentImages(
+  actorId: string | undefined | null,
   contentType: ContentType,
   contentId: string,
-  imageUrls: string[],
-  organizationId?: string
+  imageUrls: string[]
 ): Promise<boolean> {
+  if (!actorId) return false;
   try {
-    // Delete all existing images for this content item
-    let deleteQuery = supabase
-      .from('content_images')
-      .delete()
-      .eq('content_type', contentType)
-      .eq('content_id', contentId);
-    if (organizationId) deleteQuery = deleteQuery.eq('organization_id', organizationId);
-    const { error: deleteError } = await deleteQuery;
+    const { error } = await supabase.rpc('replace_content_images', {
+      p_actor_id: actorId,
+      p_content_type: contentType,
+      p_content_id: contentId,
+      p_image_urls: imageUrls,
+    });
 
-    if (deleteError) {
-      console.error('Error deleting old content images:', deleteError);
+    if (error) {
+      console.error('Error saving content images:', error);
       return false;
-    }
-
-    // Insert new images if any
-    if (imageUrls.length > 0) {
-      const rows = imageUrls.map((url, index) => ({
-        content_type: contentType,
-        content_id: contentId,
-        image_url: url,
-        display_order: index,
-        ...(organizationId ? { organization_id: organizationId } : {}),
-      }));
-
-      const { error: insertError } = await supabase
-        .from('content_images')
-        .insert(rows);
-
-      if (insertError) {
-        console.error('Error inserting content images:', insertError);
-        return false;
-      }
     }
 
     console.log(`Saved ${imageUrls.length} additional images for ${contentType} ${contentId}`);
@@ -219,30 +187,9 @@ export async function uploadImageToStorage(
   return uploadImageToBucket(uri, CONTENT_TYPE_TO_BUCKET[contentType], readAsBase64);
 }
 
-/**
- * Deletes all content images for a content item (used when deleting the content itself).
- */
-export async function deleteContentImages(
-  contentType: ContentType,
-  contentId: string,
-  organizationId?: string
-): Promise<void> {
-  try {
-    let query = supabase
-      .from('content_images')
-      .delete()
-      .eq('content_type', contentType)
-      .eq('content_id', contentId);
-    if (organizationId) query = query.eq('organization_id', organizationId);
-    const { error } = await query;
-
-    if (error) {
-      console.error('Error deleting content images:', error);
-    }
-  } catch (err) {
-    console.error('Delete content images error:', err);
-  }
-}
+// deleteContentImages is gone: the delete_announcement / delete_special_feature /
+// delete_upcoming_event RPCs now cascade this content's image rows server-side
+// (the old client call ran AFTER the parent row was deleted, unscoped by org).
 
 /**
  * Helper to get the content type from a table name.

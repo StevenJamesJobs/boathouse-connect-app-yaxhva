@@ -45,10 +45,17 @@ export default function ManagerApprovalsScreen() {
   const [reason, setReason] = useState('');
 
   const refresh = useCallback(async () => {
+    // Logout teardown: user clears before the redirect unmounts this screen —
+    // supabase-js drops an undefined named arg and PostgREST 404s the overload (PGRST202).
+    if (!user?.id) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const { data: reqs } = await supabase.rpc('get_pending_redemptions', {
-        p_actor_id: user?.id,
+        p_actor_id: user.id,
       });
 
       const today = new Date().toISOString().slice(0, 10);
@@ -60,7 +67,7 @@ export default function ManagerApprovalsScreen() {
       const userIds = [...new Set(filtered.map((r) => r.user_id))];
       const userMap = new Map<string, string>();
       if (userIds.length) {
-        const users = (await getOrgDirectory(user?.id)).filter((r) => userIds.includes(r.id));
+        const users = (await getOrgDirectory(user.id)).filter((r) => userIds.includes(r.id));
         (users || []).forEach((u: any) => userMap.set(u.id, u.name));
       }
       setRows(
@@ -107,24 +114,16 @@ export default function ManagerApprovalsScreen() {
 
       // Clear the pending shade entry across all managers + log the decision row for the requester
       try {
-        const { data: shadeRows } = await (supabase
-          .from('custom_notifications') as any)
-          .select('id, data')
-          .order('created_at', { ascending: false })
-          .limit(100);
-        const idsToDelete = ((shadeRows as any[]) || [])
-          .filter((r) => r.data?.notificationType === 'redemption_requested' && r.data?.requestId === row.id)
-          .map((r) => r.id);
-        if (idsToDelete.length > 0) {
-          await (supabase.from('custom_notifications') as any).delete().in('id', idsToDelete);
-        }
+        await supabase.rpc('clear_redemption_request_notifications', {
+          p_actor_id: user.id,
+          p_request_id: row.id,
+        });
 
-        await (supabase.from('custom_notifications') as any).insert({
-          title: decisionTitle,
-          body: decisionBody,
-          sent_by: user.id,
-          organization_id: organizationId,
-          data: {
+        await supabase.rpc('create_notification', {
+          p_actor_id: user.id,
+          p_title: decisionTitle,
+          p_body: decisionBody,
+          p_data: {
             type: 'custom',
             destination: 'redeem',
             notificationType: 'redemption_decision',

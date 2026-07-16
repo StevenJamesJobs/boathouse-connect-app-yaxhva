@@ -67,7 +67,6 @@ interface NotificationDropdownProps {
     link?: string | null;
     guideFile?: GuideFile | null;
   }) => void;
-  visibility?: 'everyone' | 'managers' | 'employees';
   isManager?: boolean;
 }
 
@@ -107,7 +106,6 @@ export default function NotificationDropdown({
   visible,
   onClose,
   onItemPress,
-  visibility = 'everyone',
   isManager = false,
 }: NotificationDropdownProps) {
   const colors = useThemeColors();
@@ -130,31 +128,32 @@ export default function NotificationDropdown({
   }, [visible]);
 
   const loadNotifications = async () => {
+    // Logout race: an empty actor reaches uuid RPC params as '' (22P02).
+    if (!user?.id || !organizationId) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const items: NotificationItem[] = [];
 
-      // Load shade dismissals so we can filter out dismissed items
-      const { data: dismissals } = await (supabase
-        .from('shade_dismissals') as any)
-        .select('notification_type, item_id');
+      // Load the org hide-list (member-gated) so we can filter out dismissed items
+      const { data: dismissals } = await (supabase.rpc as any)('get_shade_dismissals', {
+        p_actor_id: user.id,
+      });
       const dismissedSet = new Set(
         (dismissals || []).map((d: any) => `${d.notification_type}:${d.item_id}`)
       );
 
-      // Fetch announcements
-      const visibilityFilter = visibility === 'managers'
-        ? ['everyone', 'managers']
-        : ['everyone', 'employees'];
-
-      const { data: announcements } = await supabase
-        .from('announcements')
-        .select('*, guide_file:guides_and_training!announcements_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .in('visibility', visibilityFilter)
-        .order('created_at', { ascending: false })
-        .limit(SOURCE_FETCH_LIMIT);
+      // Fetch announcements — role-aware visibility + org scoping enforced
+      // server-side; guide_file jsonb replaces the PostgREST embed. The RPC
+      // orders by display_order (home-tile order), so re-sort by recency and
+      // cap client-side to preserve the shade's old fetch window.
+      const { data: annRows } = await supabase
+        .rpc('get_announcements', { p_actor_id: user.id });
+      const announcements = ((annRows as any[]) || [])
+        .slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+        .slice(0, SOURCE_FETCH_LIMIT);
 
       if (announcements) {
         for (const a of announcements) {
@@ -170,13 +169,11 @@ export default function NotificationDropdown({
       }
 
       // Fetch special features
-      const { data: features } = await supabase
-        .from('special_features')
-        .select('*, guide_file:guides_and_training!special_features_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(SOURCE_FETCH_LIMIT);
+      const { data: sfRows } = await supabase
+        .rpc('get_special_features', { p_actor_id: user.id });
+      const features = ((sfRows as any[]) || [])
+        .slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+        .slice(0, SOURCE_FETCH_LIMIT);
 
       if (features) {
         for (const f of features) {
@@ -192,13 +189,11 @@ export default function NotificationDropdown({
       }
 
       // Fetch upcoming events
-      const { data: events } = await supabase
-        .from('upcoming_events')
-        .select('*, guide_file:guides_and_training!upcoming_events_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(SOURCE_FETCH_LIMIT);
+      const { data: evtRows } = await supabase
+        .rpc('get_upcoming_events', { p_actor_id: user.id });
+      const events = ((evtRows as any[]) || [])
+        .slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+        .slice(0, SOURCE_FETCH_LIMIT);
 
       if (events) {
         for (const e of events) {
@@ -217,11 +212,11 @@ export default function NotificationDropdown({
       // system_key → follows renames) PLUS any item FEATURED via is_weekly_special
       // (overlay). Featured-but-not-categorized items surface by their feature
       // time (updated_at). Merge + dedupe by id.
-      const wsNames = await weeklySpecialsNames(user?.id ?? '');
+      const wsNames = await weeklySpecialsNames(user.id);
       // RPC returns all matching active items; apply the recency sort + cap client-side.
       const [byCatRpc, byFlagRpc] = await Promise.all([
-        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_categories: wsNames }),
-        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_weekly_special: true }),
+        supabase.rpc('get_menu_items', { p_actor_id: user.id, p_categories: wsNames }),
+        supabase.rpc('get_menu_items', { p_actor_id: user.id, p_weekly_special: true }),
       ]);
       const byCatSpecials = {
         data: ((byCatRpc.data as any[]) || [])
@@ -247,29 +242,27 @@ export default function NotificationDropdown({
         });
       }
 
-      // Fetch custom notifications
-      const { data: customNotifs } = await (supabase
-        .from('custom_notifications') as any)
-        .select('id, title, body, created_at, data')
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false })
-        .limit(SOURCE_FETCH_LIMIT);
+      // Fetch custom notifications (the role/target visibility matrix below is
+      // now also enforced server-side; the loop's checks remain as belt-and-braces)
+      const { data: customNotifs } = await supabase.rpc('get_my_notifications', {
+        p_actor_id: user.id,
+        p_limit: SOURCE_FETCH_LIMIT,
+      });
 
       // Load this user's quiz dismissals so we can hide the bell entry
       // after they've already tapped it once.
       let dismissedExamIds = new Set<string>();
       if (user?.id) {
-        const { data: dismissals } = await (supabase
-          .from('quiz_notification_dismissals' as any) as any)
-          .select('exam_id')
-          .eq('user_id', user.id);
+        const { data: dismissals } = await (supabase.rpc as any)('get_my_quiz_dismissals', {
+          p_actor_id: user.id,
+        });
         if (dismissals) {
           dismissedExamIds = new Set((dismissals as any[]).map((d) => d.exam_id));
         }
       }
 
       if (customNotifs) {
-        for (const cn of customNotifs) {
+        for (const cn of customNotifs as any[]) {
           // Hide quiz bell entries that this user has already dismissed
           if (
             cn.data?.destination === 'weekly-quizzes' &&
@@ -324,9 +317,9 @@ export default function NotificationDropdown({
       const eventIds = visibleItems.filter(i => i.type === 'upcoming_event').map(i => i.id);
 
       const [annImgs, featImgs, evtImgs] = await Promise.all([
-        announcementIds.length > 0 ? fetchContentImagesBatch('announcement', announcementIds) : new Map<string, string[]>(),
-        featureIds.length > 0 ? fetchContentImagesBatch('special_feature', featureIds) : new Map<string, string[]>(),
-        eventIds.length > 0 ? fetchContentImagesBatch('upcoming_event', eventIds) : new Map<string, string[]>(),
+        announcementIds.length > 0 ? fetchContentImagesBatch(user.id, 'announcement', announcementIds) : new Map<string, string[]>(),
+        featureIds.length > 0 ? fetchContentImagesBatch(user.id, 'special_feature', featureIds) : new Map<string, string[]>(),
+        eventIds.length > 0 ? fetchContentImagesBatch(user.id, 'upcoming_event', eventIds) : new Map<string, string[]>(),
       ]);
 
       for (const item of visibleItems) {
@@ -363,10 +356,10 @@ export default function NotificationDropdown({
       // Weekly quiz deep-link: route to the quizzes screen and record dismissal
       if (data.data?.destination === 'weekly-quizzes') {
         if (data.data?.exam_id && user?.id) {
-          (supabase
-            .from('quiz_notification_dismissals' as any) as any)
-            .insert({ user_id: user.id, exam_id: data.data.exam_id })
-            .then(() => {}, () => {});
+          (supabase.rpc as any)('dismiss_quiz_notification', {
+            p_actor_id: user.id,
+            p_exam_id: data.data.exam_id,
+          }).then(() => {}, () => {});
         }
         // Optimistically hide the entry immediately
         setNotifications((prev) => prev.filter((n) => n.id !== item.id));
@@ -391,7 +384,9 @@ export default function NotificationDropdown({
       if (data.data?.notificationType === 'redemption_decision') {
         setNotifications((prev) => prev.filter((n) => n.id !== item.id));
         // Drop the row so the badge clears
-        (supabase.from('custom_notifications') as any).delete().eq('id', item.id).then(() => {}, () => {});
+        if (user?.id) {
+          supabase.rpc('delete_notification', { p_actor_id: user.id, p_id: item.id }).then(() => {}, () => {});
+        }
         onClose();
         const portalPrefix = (user?.role === 'manager' || user?.role === 'owner') ? '/(portal)/manager' : '/(portal)/employee';
         router.push(`${portalPrefix}/rewards` as any);
@@ -428,18 +423,15 @@ export default function NotificationDropdown({
   const handleDeleteNotification = async (item: NotificationItem) => {
     setDeletingId(item.id);
     try {
-      // Global hide-list: include organization_id (NOT NULL — so the dismiss actually
-      // persists) and snapshot the title for the Recently Dismissed / undo view.
-      const { error } = await (supabase.from('shade_dismissals') as any)
-        .insert({
-          notification_type: item.type,
-          item_id: item.id,
-          dismissed_by: user?.id,
-          organization_id: organizationId,
-          dismissed_title: item.title,
-        });
-      // 23505 = already dismissed (unique on type + item_id) — treat as success.
-      if (error && error.code !== '23505') throw error;
+      // Manager/owner org-wide hide (idempotent server-side); title snapshotted for the
+      // Recently Dismissed / undo view.
+      const { error } = await (supabase.rpc as any)('dismiss_shade_item', {
+        p_actor_id: user?.id,
+        p_notification_type: item.type,
+        p_item_id: item.id,
+        p_title: item.title,
+      });
+      if (error) throw error;
       setNotifications(prev => prev.filter(n => !(n.id === item.id && n.type === item.type)));
     } catch (err) {
       console.error('Error dismissing notification:', err);

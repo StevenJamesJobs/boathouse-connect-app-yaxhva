@@ -31,7 +31,7 @@ import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/tra
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { fetchContentImages, saveContentImages, uploadImageToStorage, deleteContentImages } from '@/utils/contentImages';
+import { fetchContentImages, saveContentImages, uploadImageToStorage } from '@/utils/contentImages';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -154,8 +154,9 @@ export default function SpecialFeaturesEditorScreen() {
   };
 
   const cleanupExpiredFeatures = async () => {
+    if (!user?.id) return;
     try {
-      const { data, error } = await supabase.rpc('delete_expired_special_features', { p_organization_id: organizationId });
+      const { data, error } = await supabase.rpc('delete_expired_special_features', { p_actor_id: user.id });
       if (error) {
         console.error('Error cleaning up expired features:', error);
       } else {
@@ -167,23 +168,28 @@ export default function SpecialFeaturesEditorScreen() {
   };
 
   const loadFeatures = async () => {
+    // Logout race: an empty actor would reach the uuid RPC param as '' (22P02).
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       console.log('Loading special features from database...');
-      
-      const { data, error } = await supabase
-        .from('special_features')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('display_order', { ascending: true });
+
+      // Manager editor mode: inactive rows included (matches the old select('*')).
+      const { data, error } = await supabase.rpc('get_special_features', {
+        p_actor_id: user.id,
+        p_include_inactive: true,
+      });
 
       if (error) {
         console.error('Error loading special features:', error);
         throw error;
       }
-      
+
       console.log('Special features loaded successfully:', data?.length || 0, 'items');
-      setFeatures(data || []);
+      setFeatures((data || []) as any);
     } catch (error) {
       console.error('Error loading special features:', error);
       Alert.alert(t('common:error'), t('special_features_editor:load_error'));
@@ -384,11 +390,13 @@ export default function SpecialFeaturesEditorScreen() {
         }
         const allAdditionalUrls = [...additionalImageUrls, ...uploadedNewUrls];
         if (allAdditionalUrls.length > 0 || additionalImageUrls.length > 0) {
-          await saveContentImages('special_feature', editingFeature.id, allAdditionalUrls);
+          await saveContentImages(user.id, 'special_feature', editingFeature.id, allAdditionalUrls);
         }
       } else {
         console.log('Creating new special feature');
-        const { error } = await supabase.rpc('create_special_feature', {
+        // The hardened RPC returns the new row's uuid — no more racy
+        // "select newest row" follow-up reads.
+        const { data: newFeatureId, error } = await supabase.rpc('create_special_feature', {
           p_user_id: user.id,
           p_organization_id: organizationId,
           p_title: formData.title,
@@ -432,42 +440,24 @@ export default function SpecialFeaturesEditorScreen() {
         Alert.alert(t('common:success'), t('special_features_editor:created_success'));
 
         // Save Spanish translations for newly created item
-        if (formData.title_es || formData.message_es) {
-          const { data: newItem } = await supabase
-            .from('special_features')
-            .select('id')
-            .eq('organization_id', organizationId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-          if (newItem) {
-            await saveTranslations('special_features', newItem.id, {
-              title_es: formData.title_es,
-              content_es: formData.message_es,
-            }, organizationId);
-          }
+        if (newFeatureId && (formData.title_es || formData.message_es)) {
+          await saveTranslations('special_features', newFeatureId, {
+            title_es: formData.title_es,
+            content_es: formData.message_es,
+          }, organizationId);
         }
 
         // Upload and save additional images for newly created item
-        if (newAdditionalImageUris.length > 0) {
-          const { data: newItem } = await supabase
-            .from('special_features')
-            .select('id')
-            .eq('organization_id', organizationId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-          if (newItem && newAdditionalImageUris.length > 0) {
-            const uploadedNewUrls: string[] = [];
-            for (const uri of newAdditionalImageUris) {
-              const url = await uploadImageToStorage(uri, 'special_feature', (u) =>
-                FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
-              );
-              if (url) uploadedNewUrls.push(url);
-            }
-            if (uploadedNewUrls.length > 0) {
-              await saveContentImages('special_feature', newItem.id, uploadedNewUrls);
-            }
+        if (newFeatureId && newAdditionalImageUris.length > 0) {
+          const uploadedNewUrls: string[] = [];
+          for (const uri of newAdditionalImageUris) {
+            const url = await uploadImageToStorage(uri, 'special_feature', (u) =>
+              FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
+            );
+            if (url) uploadedNewUrls.push(url);
+          }
+          if (uploadedNewUrls.length > 0) {
+            await saveContentImages(user.id, 'special_feature', newFeatureId, uploadedNewUrls);
           }
         }
       }
@@ -518,8 +508,7 @@ export default function SpecialFeaturesEditorScreen() {
                 }
               }
 
-              // Clean up additional images
-              await deleteContentImages('special_feature', feature.id);
+              // content_images rows are cascaded by delete_special_feature server-side.
 
               console.log('Special feature deleted successfully');
               Alert.alert(t('common:success'), t('special_features_editor:deleted_success'));
@@ -536,7 +525,7 @@ export default function SpecialFeaturesEditorScreen() {
   };
 
   const handleMoveUp = async (index: number) => {
-    if (index <= 0) return;
+    if (index <= 0 || !user?.id) return;
     const newFeatures = [...features];
     const currentOrder = newFeatures[index].display_order;
     const aboveOrder = newFeatures[index - 1].display_order;
@@ -545,10 +534,11 @@ export default function SpecialFeaturesEditorScreen() {
     newFeatures[index - 1].display_order = aboveOrder;
     setFeatures(newFeatures);
     try {
-      await Promise.all([
-        supabase.from('special_features').update({ display_order: aboveOrder }).eq('id', features[index].id).eq('organization_id', organizationId),
-        supabase.from('special_features').update({ display_order: currentOrder }).eq('id', features[index - 1].id).eq('organization_id', organizationId),
-      ]);
+      // Persist the whole list's new order (reindexed 0..N-1) via the gated RPC.
+      const { error } = await supabase.rpc('reorder_special_features', {
+        p_actor_id: user.id, p_ordered_ids: newFeatures.map((f) => f.id),
+      });
+      if (error) throw error;
     } catch (error) {
       console.error('Error moving feature up:', error);
       await loadFeatures();
@@ -556,7 +546,7 @@ export default function SpecialFeaturesEditorScreen() {
   };
 
   const handleMoveDown = async (index: number) => {
-    if (index >= features.length - 1) return;
+    if (index >= features.length - 1 || !user?.id) return;
     const newFeatures = [...features];
     const currentOrder = newFeatures[index].display_order;
     const belowOrder = newFeatures[index + 1].display_order;
@@ -565,10 +555,10 @@ export default function SpecialFeaturesEditorScreen() {
     newFeatures[index + 1].display_order = belowOrder;
     setFeatures(newFeatures);
     try {
-      await Promise.all([
-        supabase.from('special_features').update({ display_order: belowOrder }).eq('id', features[index].id).eq('organization_id', organizationId),
-        supabase.from('special_features').update({ display_order: currentOrder }).eq('id', features[index + 1].id).eq('organization_id', organizationId),
-      ]);
+      const { error } = await supabase.rpc('reorder_special_features', {
+        p_actor_id: user.id, p_ordered_ids: newFeatures.map((f) => f.id),
+      });
+      if (error) throw error;
     } catch (error) {
       console.error('Error moving feature down:', error);
       await loadFeatures();
@@ -576,20 +566,17 @@ export default function SpecialFeaturesEditorScreen() {
   };
 
   const handleDragEnd = async ({ data: reorderedData }: { data: SpecialFeature[] }) => {
+    if (!user?.id) return;
     const updatedData = reorderedData.map((item, index) => ({
       ...item,
       display_order: index,
     }));
     setFeatures(updatedData);
     try {
-      const updates = reorderedData.map((item, index) =>
-        supabase
-          .from('special_features')
-          .update({ display_order: index })
-          .eq('id', item.id)
-          .eq('organization_id', organizationId)
-      );
-      await Promise.all(updates);
+      const { error } = await supabase.rpc('reorder_special_features', {
+        p_actor_id: user.id, p_ordered_ids: reorderedData.map((item) => item.id),
+      });
+      if (error) throw error;
       console.log('Drag reorder persisted successfully');
     } catch (error) {
       console.error('Error persisting drag reorder:', error);
@@ -607,10 +594,12 @@ export default function SpecialFeaturesEditorScreen() {
     const updated = reordered.map((item, i) => ({ ...item, display_order: i }));
     setFeatures(updated);
     setPositionPicker(null);
+    if (!user?.id) return;
     try {
-      await Promise.all(updated.map((item, i) =>
-        supabase.from('special_features').update({ display_order: i }).eq('id', item.id).eq('organization_id', organizationId)
-      ));
+      const { error } = await supabase.rpc('reorder_special_features', {
+        p_actor_id: user.id, p_ordered_ids: updated.map((item) => item.id),
+      });
+      if (error) throw error;
     } catch (error) {
       console.error('Error applying position change:', error);
       await loadFeatures();
@@ -688,7 +677,7 @@ export default function SpecialFeaturesEditorScreen() {
     setEndDateTime(feature.end_date_time ? new Date(feature.end_date_time) : null);
     setSelectedImageUri(null);
     setNewAdditionalImageUris([]);
-    const existingImages = await fetchContentImages('special_feature', feature.id);
+    const existingImages = await fetchContentImages(user?.id, 'special_feature', feature.id);
     setAdditionalImageUrls(existingImages);
 
     // Load the attached guide file if exists

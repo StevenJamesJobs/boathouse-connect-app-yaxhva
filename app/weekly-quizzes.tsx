@@ -91,13 +91,11 @@ export default function WeeklyQuizzesScreen() {
         const titleLabel = labelForType(examType);
 
         // Get active exam for this type
-        const { data: examData } = await (supabase.from('exams' as any) as any)
-          .select('id, time_limit_seconds, status, close_at')
-          .eq('organization_id', organizationId)
-          .eq('exam_type', examType)
-          .in('status', ['active', 'paused'])
-          .order('activated_at', { ascending: false })
-          .limit(1);
+        const { data: examData } = await (supabase.rpc as any)('get_exam', {
+          p_actor_id: user?.id,
+          p_exam_type: examType,
+          p_statuses: ['active', 'paused'],
+        });
 
         if (!examData || examData.length === 0) {
           entries.push({ examType, titleLabel, activeExam: null, result: null, questionCount: 0 });
@@ -107,18 +105,18 @@ export default function WeeklyQuizzesScreen() {
         const exam = examData[0] as ActiveExam;
 
         // Get question count
-        const { count } = await (supabase.from('exam_questions' as any) as any)
-          .select('id', { count: 'exact', head: true })
-          .eq('exam_id', exam.id);
+        const { data: count } = await (supabase.rpc as any)('get_exam_question_count', {
+          p_actor_id: user?.id,
+          p_exam_id: exam.id,
+        });
 
         // Check for existing result
         let result: WeeklyQuizCardResult | null = null;
         if (user?.id) {
-          const { data: resultData } = await (supabase.from('exam_results' as any) as any)
-            .select('correct_count, total_questions, bucks_awarded, exam_id, completed_at')
-            .eq('exam_id', exam.id)
-            .eq('user_id', user.id)
-            .limit(1);
+          const { data: resultData } = await (supabase.rpc as any)('get_my_exam_result', {
+            p_actor_id: user.id,
+            p_exam_id: exam.id,
+          });
           // Only a COMPLETED row counts as taken. A started-but-unsubmitted row (e.g. a submit
           // that failed) must still show "Take Quiz" so the user isn't trapped with no way in.
           if (resultData && resultData.length > 0 && resultData[0].completed_at) {

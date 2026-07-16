@@ -85,11 +85,10 @@ export default function ExamResultsScreen() {
   const loadQuestionReview = async () => {
     try {
       // Fetch questions
-      const { data: questionsData } = await (supabase
-        .from('exam_questions' as any) as any)
-        .select('*')
-        .eq('exam_id', examId)
-        .order('question_order');
+      const { data: questionsData } = await (supabase.rpc as any)('get_exam_questions', {
+        p_actor_id: user?.id,
+        p_exam_id: examId,
+      });
 
       if (!questionsData) {
         setLoading(false);
@@ -108,19 +107,17 @@ export default function ExamResultsScreen() {
           }
         }
       } else if (user?.id) {
-        const { data: resultData, error: resultError } = await (supabase
-          .from('exam_results' as any) as any)
-          .select('answers')
-          .eq('exam_id', examId)
-          .eq('user_id', user.id)
-          .maybeSingle();
+        const { data: resultData, error: resultError } = await (supabase.rpc as any)('get_my_exam_result', {
+          p_actor_id: user.id,
+          p_exam_id: examId,
+        });
 
         if (resultError) {
           console.warn('exam-results: failed to load answers', resultError);
-        } else if (resultData?.answers) {
-          userAnswers = typeof resultData.answers === 'string'
-            ? JSON.parse(resultData.answers)
-            : resultData.answers;
+        } else if (resultData?.[0]?.answers) {
+          userAnswers = typeof resultData[0].answers === 'string'
+            ? JSON.parse(resultData[0].answers)
+            : resultData[0].answers;
         }
       }
 

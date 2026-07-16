@@ -67,11 +67,10 @@ export default function ExamAnswerReviewScreen() {
       setLoadError(null);
 
       // Fetch questions
-      const { data: qData, error: qError } = await (supabase
-        .from('exam_questions' as any) as any)
-        .select('*')
-        .eq('exam_id', params.examId)
-        .order('question_order');
+      const { data: qData, error: qError } = await (supabase.rpc as any)('get_exam_questions', {
+        p_actor_id: user?.id,
+        p_exam_id: params.examId,
+      });
 
       if (qError) {
         console.error('exam-answer-review: failed to load questions', qError);
@@ -80,18 +79,19 @@ export default function ExamAnswerReviewScreen() {
       }
 
       // Fetch result
-      const { data: rData, error: rError } = await (supabase
-        .from('exam_results' as any) as any)
-        .select('answers, correct_count, total_questions, bucks_awarded, time_seconds, is_timed_out')
-        .eq('exam_id', params.examId)
-        .eq('user_id', params.userId)
-        .maybeSingle();
+      const { data: rRows, error: rError } = await (supabase.rpc as any)('get_user_exam_result', {
+        p_actor_id: user?.id,
+        p_exam_id: params.examId,
+        p_user_id: params.userId,
+      });
 
       if (rError) {
         console.error('exam-answer-review: failed to load result', rError);
         setLoadError(rError.message || 'Failed to load result.');
         return;
       }
+
+      const rData = rRows?.[0];
 
       // Fetch user via hardened org-directory helper (org-scoped by the actor).
       const directory = await getOrgDirectory(user?.id as string);

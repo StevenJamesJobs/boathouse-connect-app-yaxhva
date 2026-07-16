@@ -137,6 +137,7 @@ export default function ExamEditorScreen() {
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchCurrentExam = useCallback(async () => {
+    if (!user?.id) { setLoading(false); return; }
     setLoading(true);
     try {
       // Auto-close any active exams whose close_at has passed. Fire-and-forget
@@ -147,15 +148,12 @@ export default function ExamEditorScreen() {
         console.warn('close_expired_exams cleanup failed:', cleanupErr);
       }
 
-      // Get the most recent draft or active exam for this type
-      const { data, error } = await (supabase
-        .from('exams' as any) as any)
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('exam_type', examType)
-        .in('status', ['draft', 'active', 'paused'])
-        .order('created_at', { ascending: false })
-        .limit(1);
+      // Get the most recent draft/active/paused exam for this type (org-scoped server-side)
+      const { data, error } = await (supabase.rpc as any)('get_exam', {
+        p_actor_id: user?.id,
+        p_exam_type: examType,
+        p_statuses: ['draft', 'active', 'paused'],
+      });
 
       if (!error && data && data.length > 0) {
         const exam = data[0] as Exam;
@@ -179,7 +177,7 @@ export default function ExamEditorScreen() {
       console.error('Error fetching exam:', err);
     }
     setLoading(false);
-  }, [examType]);
+  }, [examType, user?.id]);
 
   // Tick a countdown re-render once per second while a close_at is active,
   // so the "Closes in …" label updates live.
@@ -203,11 +201,10 @@ export default function ExamEditorScreen() {
   }, [closeAt, currentExam?.status]);
 
   const fetchQuestions = async (examId: string) => {
-    const { data, error } = await (supabase
-      .from('exam_questions' as any) as any)
-      .select('*')
-      .eq('exam_id', examId)
-      .order('question_order');
+    const { data, error } = await (supabase.rpc as any)('get_exam_questions', {
+      p_actor_id: user?.id,
+      p_exam_id: examId,
+    });
 
     if (!error && data) {
       setQuestions(data as ExamQuestion[]);
@@ -240,55 +237,22 @@ export default function ExamEditorScreen() {
     try {
       const cycleKey = getCurrentWeekKey();
 
-      // Create the exam record
-      const { data: examData, error: examError } = await (supabase
-        .from('exams' as any) as any)
-        .insert({
-          exam_type: examType,
-          cycle_key: cycleKey,
-          status: 'draft',
-          time_limit_seconds: 300,
-          created_by: user?.id,
-          organization_id: organizationId,
-        })
-        .select()
-        .single();
+      // Create the exam record (server derives org, gates manager/owner, and does the
+      // unique-cycle_key suffix retry internally — returns the row with its final cycle_key)
+      const { data: examRows, error: examError } = await (supabase.rpc as any)('create_exam', {
+        p_actor_id: user?.id,
+        p_exam_type: examType,
+        p_cycle_key: cycleKey,
+      });
 
-      if (examError) {
-        // If duplicate cycle_key, generate a unique one
-        if (examError.message?.includes('duplicate') || examError.message?.includes('unique')) {
-          const uniqueKey = `${cycleKey}-${Date.now().toString(36)}`;
-          const { data: retryData, error: retryError } = await (supabase
-            .from('exams' as any) as any)
-            .insert({
-              exam_type: examType,
-              cycle_key: uniqueKey,
-              status: 'draft',
-              time_limit_seconds: 300,
-              created_by: user?.id,
-              organization_id: organizationId,
-            })
-            .select()
-            .single();
+      if (examError) throw examError;
+      const exam = (examRows as Exam[])?.[0];
+      if (!exam) throw new Error('No data returned');
 
-          if (retryError) throw retryError;
-          if (!retryData) throw new Error('No data returned');
-
-          const exam = retryData as Exam;
-          await generateAndSaveQuestions(exam.id, uniqueKey);
-          setCurrentExam(exam);
-          setTimeLimit(exam.time_limit_seconds);
-          await fetchQuestions(exam.id);
-        } else {
-          throw examError;
-        }
-      } else if (examData) {
-        const exam = examData as Exam;
-        await generateAndSaveQuestions(exam.id, cycleKey);
-        setCurrentExam(exam);
-        setTimeLimit(exam.time_limit_seconds);
-        await fetchQuestions(exam.id);
-      }
+      await generateAndSaveQuestions(exam.id, exam.cycle_key);
+      setCurrentExam(exam);
+      setTimeLimit(exam.time_limit_seconds);
+      await fetchQuestions(exam.id);
     } catch (err: any) {
       Alert.alert('Error', err?.message || 'Failed to generate quiz');
       console.error('Generate error:', err);
@@ -321,7 +285,12 @@ export default function ExamEditorScreen() {
       question_image_url: q.question_image_url || null,
     }));
 
-    const { error } = await (supabase.from('exam_questions' as any) as any).insert(questionsToInsert);
+    // Server assigns question_order (1-based) + org; extra keys in the objects are ignored.
+    const { error } = await (supabase.rpc as any)('create_exam_questions', {
+      p_actor_id: user?.id,
+      p_exam_id: examId,
+      p_questions: questionsToInsert,
+    });
     if (error) throw error;
   };
 
@@ -329,7 +298,9 @@ export default function ExamEditorScreen() {
   const handleUpdateTimeLimit = async (newSeconds: number) => {
     if (!currentExam) return;
     setTimeLimit(newSeconds);
-    await (supabase.from('exams' as any) as any).update({ time_limit_seconds: newSeconds }).eq('id', currentExam.id).eq('organization_id', organizationId);
+    await (supabase.rpc as any)('update_exam_settings', {
+      p_actor_id: user?.id, p_exam_id: currentExam.id, p_time_limit_seconds: newSeconds,
+    });
   };
 
   // Activate quiz
@@ -348,14 +319,6 @@ export default function ExamEditorScreen() {
           text: 'Activate',
           onPress: async () => {
             try {
-              // Close any previously active exam of this type
-              await (supabase
-                .from('exams' as any) as any)
-                .update({ status: 'closed', closed_at: new Date().toISOString() })
-                .eq('organization_id', organizationId)
-                .eq('exam_type', examType)
-                .eq('status', 'active');
-
               // Default close_at = 7 days from now at 23:59 local if unset
               let effectiveCloseAt = closeAt;
               if (!effectiveCloseAt) {
@@ -366,18 +329,13 @@ export default function ExamEditorScreen() {
                 setCloseAt(d);
               }
 
-              // Activate current exam
-              await (supabase
-                .from('exams' as any) as any)
-                .update({
-                  status: 'active',
-                  activated_at: new Date().toISOString(),
-                  close_at: effectiveCloseAt.toISOString(),
-                  // Reset the notify flag after activation so re-activation
-                  // requires re-arming and we don't double-notify on reopen.
-                  notify_on_activate: false,
-                })
-                .eq('id', currentExam.id).eq('organization_id', organizationId);
+              // Atomic: server closes any other active exam of this type, then activates
+              // this one (activated_at + close_at + notify reset) — one call.
+              await (supabase.rpc as any)('activate_exam', {
+                p_actor_id: user?.id,
+                p_exam_id: currentExam.id,
+                p_close_at: effectiveCloseAt.toISOString(),
+              });
 
               // Fire push if the manager armed the toggle
               if (notifyOnActivate) {
@@ -427,10 +385,9 @@ export default function ExamEditorScreen() {
         {
           text: 'Pause',
           onPress: async () => {
-            await (supabase
-              .from('exams' as any) as any)
-              .update({ status: 'paused' })
-              .eq('id', currentExam.id).eq('organization_id', organizationId);
+            await (supabase.rpc as any)('set_exam_status', {
+              p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'paused',
+            });
             await fetchCurrentExam();
           },
         },
@@ -448,10 +405,9 @@ export default function ExamEditorScreen() {
         {
           text: 'Resume',
           onPress: async () => {
-            await (supabase
-              .from('exams' as any) as any)
-              .update({ status: 'active' })
-              .eq('id', currentExam.id).eq('organization_id', organizationId);
+            await (supabase.rpc as any)('set_exam_status', {
+              p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'active',
+            });
             await fetchCurrentExam();
           },
         },
@@ -464,10 +420,12 @@ export default function ExamEditorScreen() {
     if (!currentExam) return;
     setCloseAt(next);
     try {
-      await (supabase
-        .from('exams' as any) as any)
-        .update({ close_at: next ? next.toISOString() : null })
-        .eq('id', currentExam.id).eq('organization_id', organizationId);
+      await (supabase.rpc as any)('update_exam_settings', {
+        p_actor_id: user?.id,
+        p_exam_id: currentExam.id,
+        p_close_at: next ? next.toISOString() : null,
+        p_clear_close_at: !next,
+      });
     } catch (err) {
       console.error('Update close_at error:', err);
     }
@@ -480,10 +438,9 @@ export default function ExamEditorScreen() {
     setRewardsEnabled(next);
     setCurrentExam({ ...currentExam, rewards_enabled: next });
     try {
-      await (supabase
-        .from('exams' as any) as any)
-        .update({ rewards_enabled: next })
-        .eq('id', currentExam.id).eq('organization_id', organizationId);
+      await (supabase.rpc as any)('update_exam_settings', {
+        p_actor_id: user?.id, p_exam_id: currentExam.id, p_rewards_enabled: next,
+      });
     } catch (err) {
       console.error('Toggle rewards_enabled error:', err);
     }
@@ -495,10 +452,9 @@ export default function ExamEditorScreen() {
     setShowCustomCategoryInput(false);
     setCustomCategoryText('');
     try {
-      await (supabase
-        .from('exam_questions' as any) as any)
-        .update({ category_label: newLabel })
-        .eq('id', q.id).eq('organization_id', organizationId);
+      await (supabase.rpc as any)('update_exam_question', {
+        p_actor_id: user?.id, p_question_id: q.id, p_fields: { category_label: newLabel },
+      });
       setQuestions(prev =>
         prev.map(qq => (qq.id === q.id ? { ...qq, category_label: newLabel } : qq))
       );
@@ -513,10 +469,9 @@ export default function ExamEditorScreen() {
     if (!currentExam || currentExam.status !== 'draft') return;
     setNotifyOnActivate(next);
     try {
-      await (supabase
-        .from('exams' as any) as any)
-        .update({ notify_on_activate: next })
-        .eq('id', currentExam.id).eq('organization_id', organizationId);
+      await (supabase.rpc as any)('update_exam_settings', {
+        p_actor_id: user?.id, p_exam_id: currentExam.id, p_notify_on_activate: next,
+      });
     } catch (err) {
       console.error('Toggle notify_on_activate error:', err);
     }
@@ -535,10 +490,9 @@ export default function ExamEditorScreen() {
           text: 'Close',
           style: 'destructive',
           onPress: async () => {
-            await (supabase
-              .from('exams' as any) as any)
-              .update({ status: 'closed', closed_at: new Date().toISOString() })
-              .eq('id', currentExam.id).eq('organization_id', organizationId);
+            await (supabase.rpc as any)('set_exam_status', {
+              p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'closed',
+            });
 
             setCurrentExam(null);
             setQuestions([]);
@@ -561,10 +515,9 @@ export default function ExamEditorScreen() {
           style: 'destructive',
           onPress: async () => {
             if (currentExam) {
-              await (supabase
-                .from('exams' as any) as any)
-                .update({ status: 'closed', closed_at: new Date().toISOString() })
-                .eq('id', currentExam.id).eq('organization_id', organizationId);
+              await (supabase.rpc as any)('set_exam_status', {
+                p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'closed',
+              });
             }
             setCurrentExam(null);
             setQuestions([]);
@@ -590,22 +543,24 @@ export default function ExamEditorScreen() {
       ? (Number.isNaN(parseInt(trimmedCustomBucks)) ? null : parseInt(trimmedCustomBucks))
       : null;
 
-    const { error } = await (supabase.from('exam_questions' as any) as any).insert({
-      exam_id: currentExam.id,
-      organization_id: organizationId,
-      question_order: nextOrder,
-      question_text: customText.trim(),
-      option_a: customA.trim(),
-      option_b: customB.trim(),
-      option_c: customC.trim(),
-      option_d: customD.trim(),
-      correct_option: customCorrect,
-      is_bonus: isBonus,
-      bonus_bucks_value: bonusValue,
-      bucks_value: customBucks,
-      source_type: isBonus ? 'bonus' : 'custom',
-      source_table: null,
-      question_image_url: customImageUrl,
+    // Server appends after the current max order + derives org.
+    const { error } = await (supabase.rpc as any)('add_exam_question', {
+      p_actor_id: user?.id,
+      p_exam_id: currentExam.id,
+      p_question: {
+        question_text: customText.trim(),
+        option_a: customA.trim(),
+        option_b: customB.trim(),
+        option_c: customC.trim(),
+        option_d: customD.trim(),
+        correct_option: customCorrect,
+        is_bonus: isBonus,
+        bonus_bucks_value: bonusValue,
+        bucks_value: customBucks,
+        source_type: isBonus ? 'bonus' : 'custom',
+        source_table: null,
+        question_image_url: customImageUrl,
+      },
     });
 
     if (error) {
@@ -629,7 +584,9 @@ export default function ExamEditorScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            await (supabase.from('exam_questions' as any) as any).delete().eq('id', question.id).eq('organization_id', organizationId);
+            await (supabase.rpc as any)('delete_exam_question', {
+              p_actor_id: user?.id, p_question_id: question.id,
+            });
             if (currentExam) await fetchQuestions(currentExam.id);
           },
         },
@@ -671,9 +628,10 @@ export default function ExamEditorScreen() {
       }
 
       if (newQuestion) {
-        const { error } = await (supabase
-          .from('exam_questions' as any) as any)
-          .update({
+        const { error } = await (supabase.rpc as any)('update_exam_question', {
+          p_actor_id: user?.id,
+          p_question_id: question.id,
+          p_fields: {
             question_text: newQuestion.question_text,
             option_a: newQuestion.option_a,
             option_b: newQuestion.option_b,
@@ -688,9 +646,8 @@ export default function ExamEditorScreen() {
             option_c_es: newQuestion.option_c_es || null,
             option_d_es: newQuestion.option_d_es || null,
             question_image_url: newQuestion.question_image_url ?? null,
-          })
-          .eq('id', question.id)
-          .eq('organization_id', organizationId);
+          },
+        });
 
         if (error) {
           Alert.alert('Error', error.message);
@@ -709,9 +666,10 @@ export default function ExamEditorScreen() {
   const handleSaveEdit = async () => {
     if (!editingQuestion) return;
 
-    const { error } = await (supabase
-      .from('exam_questions' as any) as any)
-      .update({
+    const { error } = await (supabase.rpc as any)('update_exam_question', {
+      p_actor_id: user?.id,
+      p_question_id: editingQuestion.id,
+      p_fields: {
         question_text: editingQuestion.question_text,
         option_a: editingQuestion.option_a,
         option_b: editingQuestion.option_b,
@@ -721,9 +679,8 @@ export default function ExamEditorScreen() {
         bonus_bucks_value: editingQuestion.bonus_bucks_value,
         bucks_value: editingQuestion.bucks_value,
         question_image_url: editingQuestion.question_image_url ?? null,
-      })
-      .eq('id', editingQuestion.id)
-      .eq('organization_id', organizationId);
+      },
+    });
 
     if (error) {
       Alert.alert('Error', error.message);
@@ -837,7 +794,8 @@ export default function ExamEditorScreen() {
 
   // Reset a specific user's quiz result so they can retake
   const handleResetUserQuiz = (entry: CompletionEntry) => {
-    if (!currentExam) return;
+    if (!user?.id || !currentExam) return;
+    const actorId = user.id;
 
     Alert.alert(
       'Allow Retake',
@@ -877,17 +835,17 @@ export default function ExamEditorScreen() {
                     organization_id: organizationId,
                   },
                 });
-                // Log to Sent History so the manager has a record (single-user push)
-                await (supabase.from('custom_notifications') as any).insert({
-                  title: 'Take 2! 🎯',
-                  body: `Cleared ${entry.name} to retake the quiz.`,
-                  sent_by: user?.id,
-                  organization_id: organizationId,
-                  data: {
-                    notificationType: 'custom',
+                // Log to the shade — visible only to managers/owners and the cleared
+                // user (retake_granted), never the whole org.
+                await supabase.rpc('create_notification', {
+                  p_actor_id: actorId,
+                  p_title: 'Take 2! 🎯',
+                  p_body: `Cleared ${entry.name} to retake the quiz.`,
+                  p_data: {
+                    notificationType: 'retake_granted',
                     destination: 'weekly-quizzes',
                     exam_id: currentExam.id,
-                    target_user_id: entry.user_id,
+                    targetUserId: entry.user_id,
                   },
                 });
               } catch (pushErr) {

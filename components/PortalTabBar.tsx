@@ -11,7 +11,7 @@ export type PortalRole = 'manager' | 'employee' | 'owner';
 export interface PortalTabBarBadges {
   messages: number;
   tools: number;
-  rewardsHasNew?: boolean;
+  rewards?: number;
 }
 
 interface PortalTabBarProps {
@@ -120,9 +120,9 @@ export default function PortalTabBar({ state, descriptors, navigation, role, bad
                       <MessageBadge count={badges.tools} size="small" />
                     </View>
                   )}
-                  {isRewardsTab && badges.rewardsHasNew && !isFocused && (
-                    <View style={styles.tabRedDotPosition}>
-                      <View style={styles.tabRedDot} />
+                  {isRewardsTab && (badges.rewards ?? 0) > 0 && (
+                    <View style={styles.tabBadgePosition}>
+                      <MessageBadge count={badges.rewards ?? 0} size="small" />
                     </View>
                   )}
                 </View>

@@ -17,6 +17,7 @@ import { getExamTypeName } from '@/utils/exam/questionGenerator';
 import type { ExamType } from '@/utils/exam/questionGenerator';
 import { useFocusEffect } from '@react-navigation/native';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ExamSummary {
   id: string;
@@ -41,6 +42,7 @@ export default function QuizHubEditorScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [exams, setExams] = useState<Map<ExamType, ExamSummary | null>>(new Map());
 
@@ -51,23 +53,20 @@ export default function QuizHubEditorScreen() {
     for (const examType of EXAM_TYPES) {
       try {
         // Get the most recent draft or active exam for this type
-        const { data, error } = await (supabase
-          .from('exams' as any) as any)
-          .select('*')
-          .eq('organization_id', organizationId)
-          .eq('exam_type', examType)
-          .in('status', ['draft', 'active', 'paused'])
-          .order('created_at', { ascending: false })
-          .limit(1);
+        const { data, error } = await (supabase.rpc as any)('get_exam', {
+          p_actor_id: user?.id,
+          p_exam_type: examType,
+          p_statuses: ['draft', 'active', 'paused'],
+        });
 
         if (!error && data && data.length > 0) {
           const exam = data[0];
 
           // Get question count
-          const { count: questionCount } = await (supabase
-            .from('exam_questions' as any) as any)
-            .select('*', { count: 'exact', head: true })
-            .eq('exam_id', exam.id);
+          const { data: questionCount } = await (supabase.rpc as any)('get_exam_question_count', {
+            p_actor_id: user?.id,
+            p_exam_id: exam.id,
+          });
 
           // Get completion data if active
           let completedCount = 0;
