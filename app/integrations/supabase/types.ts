@@ -3630,7 +3630,7 @@ export type Database = {
           p_user_id: string
           p_visibility?: string
         }
-        Returns: undefined
+        Returns: string
       }
       create_cocktail: {
         Args: {
@@ -3720,7 +3720,7 @@ export type Database = {
           p_title: string
           p_user_id: string
         }
-        Returns: undefined
+        Returns: string
       }
       create_upcoming_event: {
         Args: {
@@ -3770,11 +3770,11 @@ export type Database = {
         Returns: boolean
       }
       delete_expired_special_features: {
-        Args: { p_organization_id?: string }
+        Args: { p_actor_id?: string; p_organization_id?: string }
         Returns: number
       }
       delete_expired_upcoming_events: {
-        Args: { p_organization_id?: string }
+        Args: { p_actor_id?: string; p_organization_id?: string }
         Returns: number
       }
       delete_guide: {
@@ -4179,6 +4179,127 @@ export type Database = {
         }[]
       }
       reorder_menu_items: {
+        Args: { p_actor_id: string; p_ordered_ids: string[] }
+        Returns: boolean
+      }
+      get_announcements: {
+        Args: {
+          p_actor_id: string
+          p_id?: string
+          p_include_inactive?: boolean
+          p_limit?: number
+        }
+        Returns: {
+          content: string
+          content_es: string
+          created_at: string
+          created_by: string
+          display_order: number
+          guide_file: Json
+          guide_file_id: string
+          id: string
+          is_active: boolean
+          link: string
+          message: string
+          organization_id: string
+          priority: string
+          thumbnail_shape: string
+          thumbnail_url: string
+          title: string
+          title_es: string
+          updated_at: string
+          visibility: string
+        }[]
+      }
+      get_special_features: {
+        Args: {
+          p_actor_id: string
+          p_id?: string
+          p_include_inactive?: boolean
+          p_limit?: number
+        }
+        Returns: {
+          content: string
+          content_es: string
+          created_at: string
+          created_by: string
+          display_order: number
+          end_date_time: string
+          guide_file: Json
+          guide_file_id: string
+          id: string
+          is_active: boolean
+          link: string
+          message: string
+          organization_id: string
+          start_date_time: string
+          thumbnail_shape: string
+          thumbnail_url: string
+          title: string
+          title_es: string
+          updated_at: string
+        }[]
+      }
+      get_upcoming_events: {
+        Args: {
+          p_actor_id: string
+          p_id?: string
+          p_include_inactive?: boolean
+          p_limit?: number
+        }
+        Returns: {
+          category: string
+          content: string
+          content_es: string
+          created_at: string
+          created_by: string
+          display_order: number
+          end_date_time: string
+          guide_file: Json
+          guide_file_id: string
+          id: string
+          is_active: boolean
+          link: string
+          message: string
+          organization_id: string
+          start_date_time: string
+          thumbnail_shape: string
+          thumbnail_url: string
+          title: string
+          title_es: string
+          updated_at: string
+        }[]
+      }
+      get_content_images: {
+        Args: {
+          p_actor_id: string
+          p_content_ids: string[]
+          p_content_type: string
+        }
+        Returns: {
+          content_id: string
+          display_order: number
+          image_url: string
+        }[]
+      }
+      replace_content_images: {
+        Args: {
+          p_actor_id: string
+          p_content_id: string
+          p_content_type: string
+          p_image_urls: string[]
+        }
+        Returns: boolean
+      }
+      reorder_announcements: {
+        Args: { p_actor_id: string; p_ordered_ids: string[] }
+        Returns: boolean
+      }
+      reorder_special_features: {
+        Args: { p_actor_id: string; p_ordered_ids: string[] }
+        Returns: boolean
+      }
+      reorder_upcoming_events: {
         Args: { p_actor_id: string; p_ordered_ids: string[] }
         Returns: boolean
       }

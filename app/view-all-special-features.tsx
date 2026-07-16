@@ -23,6 +23,7 @@ import { fetchContentImagesBatch } from '@/utils/contentImages';
 import { getImageUrl } from '@/utils/imageUrl';
 import FormattedText from '@/components/FormattedText';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface GuideFile {
   id: string;
@@ -58,6 +59,7 @@ export default function ViewAllSpecialFeaturesScreen() {
   const { language } = useLanguage();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const [features, setFeatures] = useState<SpecialFeature[]>([]);
   const [loading, setLoading] = useState(true);
   const [contentImagesMap, setContentImagesMap] = useState<Map<string, string[]>>(new Map());
@@ -78,42 +80,36 @@ export default function ViewAllSpecialFeaturesScreen() {
 
   useEffect(() => {
     loadFeatures();
-  }, []);
+  }, [user?.id]);
 
   const loadFeatures = async () => {
+    // Logout race: an empty actor would reach the uuid RPC param as '' (22P02).
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       console.log('Loading all special features...');
-      
-      const { data, error } = await supabase
-        .from('special_features')
-        .select(`
-          *,
-          guide_file:guides_and_training!special_features_guide_file_id_fkey(
-            id,
-            title,
-            file_url,
-            file_name,
-            file_type
-          )
-        `)
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true })
-        .order('created_at', { ascending: false });
+
+      // Member-gated RPC: org derived server-side; rows carry the same shape as
+      // the old select('*') plus a guide_file jsonb matching the retired embed.
+      const { data, error } = await supabase.rpc('get_special_features', {
+        p_actor_id: user.id,
+      });
 
       if (error) {
         console.error('Error loading special features:', error);
         throw error;
       }
-      
+
       console.log('Special features loaded:', data?.length || 0, 'items');
-      setFeatures(data || []);
+      setFeatures((data || []) as any);
 
       // Batch fetch additional content images
       if (data && data.length > 0) {
-        const ids = data.map((f: SpecialFeature) => f.id);
-        const imagesMap = await fetchContentImagesBatch('special_feature', ids);
+        const ids = (data as any[]).map((f: any) => f.id);
+        const imagesMap = await fetchContentImagesBatch(user.id, 'special_feature', ids);
         setContentImagesMap(imagesMap);
       }
     } catch (error) {

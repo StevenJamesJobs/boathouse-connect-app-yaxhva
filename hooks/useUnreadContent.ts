@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -70,6 +70,13 @@ interface UnreadContentResult {
 export function useUnreadContent(): UnreadContentResult {
   const { organizationId } = useOrganization();
   const { user } = useAuth();
+  // checkUnread below is a []-dep callback held by long-lived subscriptions, the
+  // 60s interval, and the AppState listener — it must read CURRENT auth through a
+  // ref (its closure would otherwise pin the first-render user forever).
+  const userIdRef = useRef<string | null>(user?.id ?? null);
+  useEffect(() => {
+    userIdRef.current = user?.id ?? null;
+  }, [user?.id]);
   const [todayHasNew, setTodayHasNew] = useState(false);
   const [eventsHasNew, setEventsHasNew] = useState(false);
   const [specialsHasNew, setSpecialsHasNew] = useState(false);
@@ -86,6 +93,10 @@ export function useUnreadContent(): UnreadContentResult {
   const [newContentCount, setNewContentCount] = useState(0);
 
   const checkUnread = useCallback(async () => {
+    // Logout teardown: skip the tick entirely — an empty actor would reach
+    // get_menu_items as uuid '' (22P02). Badge state is moot post-logout.
+    const actorId = userIdRef.current;
+    if (!actorId) return;
     try {
       // Load last-viewed timestamps + per-item viewed sets
       const [todayTs, eventsTs, specialsTs, announcementsTs, specialFeaturesTs, eventsContentTs, evtEventTabTs, evtEntTabTs, annViewedRaw, sfViewedRaw, evtViewedRaw] = await Promise.all([
@@ -145,33 +156,22 @@ export function useUnreadContent(): UnreadContentResult {
       const annCutoff = effectiveAnnouncementsTs;
       const sfCutoff = effectiveSpecialFeaturesTs;
       const todayCutoff = todayTs || new Date(0).toISOString();
-      const orgFilter = (q: any) => organizationId ? q.eq('organization_id', organizationId) : q;
-      const [todayAnnRes, todaySfRes, annTabRes, sfTabRes] = await Promise.all([
-        orgFilter((supabase.from('announcements') as any)
-          .select('id')
-          .eq('is_active', true)
-          .gt('created_at', todayCutoff)),
-        orgFilter((supabase.from('special_features') as any)
-          .select('id')
-          .eq('is_active', true)
-          .gt('created_at', todayCutoff)),
-        orgFilter((supabase.from('announcements') as any)
-          .select('id')
-          .eq('is_active', true)
-          .gt('created_at', annCutoff)),
-        orgFilter((supabase.from('special_features') as any)
-          .select('id')
-          .eq('is_active', true)
-          .gt('created_at', sfCutoff)),
+      // One member-gated RPC per table (org + role visibility server-side);
+      // both cutoff windows filter client-side off the same row set (the RPC
+      // has no time-cutoff param). Side effect: badges no longer count posts
+      // this role can't see — the old reads had no visibility filter.
+      const [annRes, sfRes] = await Promise.all([
+        supabase.rpc('get_announcements', { p_actor_id: actorId }),
+        supabase.rpc('get_special_features', { p_actor_id: actorId }),
       ]);
-      const todayAnnUnviewed = ((todayAnnRes.data as { id: string }[] | null) ?? [])
-        .filter((r) => !annViewed.has(r.id)).length;
-      const todaySfUnviewed = ((todaySfRes.data as { id: string }[] | null) ?? [])
-        .filter((r) => !sfViewed.has(r.id)).length;
-      const annTabUnviewed = ((annTabRes.data as { id: string }[] | null) ?? [])
-        .filter((r) => !annViewed.has(r.id)).length;
-      const sfTabUnviewed = ((sfTabRes.data as { id: string }[] | null) ?? [])
-        .filter((r) => !sfViewed.has(r.id)).length;
+      const annRows = ((annRes.data as { id: string; created_at: string | null }[] | null) ?? []);
+      const sfRows = ((sfRes.data as { id: string; created_at: string | null }[] | null) ?? []);
+      const newerThan = (r: { created_at: string | null }, cutoff: string) =>
+        new Date(r.created_at || 0) > new Date(cutoff);
+      const todayAnnUnviewed = annRows.filter((r) => newerThan(r, todayCutoff) && !annViewed.has(r.id)).length;
+      const todaySfUnviewed = sfRows.filter((r) => newerThan(r, todayCutoff) && !sfViewed.has(r.id)).length;
+      const annTabUnviewed = annRows.filter((r) => newerThan(r, annCutoff) && !annViewed.has(r.id)).length;
+      const sfTabUnviewed = sfRows.filter((r) => newerThan(r, sfCutoff) && !sfViewed.has(r.id)).length;
       const todayCount = todayAnnUnviewed + todaySfUnviewed;
       setTodayHasNew(todayCount > 0);
       setAnnouncementsHasNew(annTabUnviewed > 0);
@@ -180,13 +180,9 @@ export function useUnreadContent(): UnreadContentResult {
       // Check "Events" tab: upcoming_events (per-item + per-category tracking)
       const eventsCutoff = eventsTs || new Date(0).toISOString();
       const evtCutoff = effectiveEventsContentTs;
-      let eventsQuery = (supabase.from('upcoming_events') as any)
-        .select('id, category, created_at')
-        .eq('is_active', true)
-        .gt('created_at', evtCutoff);
-      if (organizationId) eventsQuery = eventsQuery.eq('organization_id', organizationId);
-      const eventsRes = await eventsQuery;
-      const eventRows = ((eventsRes.data as { id: string; category: string; created_at: string }[] | null) ?? []);
+      const eventsRes = await supabase.rpc('get_upcoming_events', { p_actor_id: actorId });
+      const eventRows = (((eventsRes.data as any[] | null) ?? []) as { id: string; category: string; created_at: string }[])
+        .filter((r) => new Date(r.created_at || 0) > new Date(evtCutoff));
       const unviewedEvents = eventRows.filter((r) => !evtViewed.has(r.id));
       // Sub-tab badges use the per-tab visit timestamp so swiping to a sub-tab clears its dot
       // independently from item-level NEW pills (which use evtCutoff + viewedEventIds).
@@ -201,7 +197,7 @@ export function useUnreadContent(): UnreadContentResult {
 
       // Check "Specials" tab: menu_items in the org's Weekly Specials category
       // (resolved by system_key so it follows owner renames).
-      const wsNames = await weeklySpecialsNames(user?.id ?? '');
+      const wsNames = await weeklySpecialsNames(actorId);
       const specialsCutoff = specialsTs || new Date(0).toISOString();
       // Two sources of "new specials": items newly CREATED in the Weekly
       // Specials category, and existing items just FEATURED via is_weekly_special
@@ -209,8 +205,8 @@ export function useUnreadContent(): UnreadContentResult {
       // RPC returns active items (with created_at/updated_at); apply the "new since cutoff"
       // filter client-side (the RPC has no time-cutoff param).
       const [byCatRes, byFlagRes] = await Promise.all([
-        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_categories: wsNames }),
-        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_weekly_special: true }),
+        supabase.rpc('get_menu_items', { p_actor_id: actorId, p_categories: wsNames }),
+        supabase.rpc('get_menu_items', { p_actor_id: actorId, p_weekly_special: true }),
       ]);
       const specialIds = new Set<string>([
         ...((byCatRes.data || []) as any[]).filter((r) => (r.created_at || '') > specialsCutoff).map((r) => r.id),

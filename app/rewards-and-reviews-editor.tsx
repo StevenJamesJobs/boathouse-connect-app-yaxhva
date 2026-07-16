@@ -356,9 +356,11 @@ export default function RewardsAndReviewsEditorScreen() {
   }, [user?.id, organizationId]);
 
   const fetchReviews = useCallback(async () => {
+    // Logout race: an empty actor reaches the uuid RPC param as '' (22P02).
+    if (!user?.id) return;
     try {
       const { data, error } = await supabase.rpc('get_org_guest_reviews', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
       });
 
       if (error) throw error;
@@ -366,13 +368,14 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
-  }, [organizationId]);
+  }, [user?.id, organizationId]);
 
   const fetchGoogleReviews = useCallback(async () => {
+    if (!user?.id) return;
     try {
       // Manager editor sees unpublished reviews too (the toggle target).
       const { data, error } = await supabase.rpc('get_org_google_reviews', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_include_unpublished: true,
       });
 
@@ -382,7 +385,7 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (error) {
       console.error('Error fetching Google reviews:', error);
     }
-  }, [organizationId]);
+  }, [user?.id, organizationId]);
 
   // Owner-only: load the remaining manual refreshes for the billing period.
   const fetchRefreshQuota = useCallback(async () => {
@@ -778,6 +781,7 @@ export default function RewardsAndReviewsEditorScreen() {
   };
 
   const handleSaveReview = async () => {
+    if (!user?.id) return;
     try {
       if (!reviewForm.guest_name.trim()) {
         Alert.alert(t('common:error'), t('rewards_reviews_editor:error_guest_name'));
@@ -793,7 +797,7 @@ export default function RewardsAndReviewsEditorScreen() {
 
       // One manager-gated upsert (p_review_id present = update, absent = insert).
       const { error } = await supabase.rpc('upsert_guest_review', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_guest_name: reviewForm.guest_name,
         p_rating: reviewForm.rating,
         p_review_text: reviewForm.review_text,
@@ -848,9 +852,10 @@ export default function RewardsAndReviewsEditorScreen() {
         text: t('common:delete'),
         style: 'destructive',
         onPress: async () => {
+          if (!user?.id) return;
           try {
             const { error } = await supabase.rpc('delete_guest_review', {
-              p_actor_id: user?.id ?? '',
+              p_actor_id: user.id,
               p_review_id: reviewId,
             });
 
@@ -890,10 +895,11 @@ export default function RewardsAndReviewsEditorScreen() {
         {
           text: newPublished ? t('rewards_reviews_editor:show_action') : t('rewards_reviews_editor:hide_action'),
           onPress: async () => {
+            if (!user?.id) return;
             try {
               setLoading(true);
               const { error } = await supabase.rpc('set_google_review_published', {
-                p_actor_id: user?.id ?? '',
+                p_actor_id: user.id,
                 p_review_id: review.id,
                 p_published: newPublished,
               });

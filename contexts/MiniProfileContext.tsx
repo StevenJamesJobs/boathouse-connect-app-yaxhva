@@ -110,6 +110,8 @@ export function MiniProfileProvider({ children }: { children: React.ReactNode })
 
   const load = useCallback(
     async (userId: string) => {
+      // Logout race: an empty actor reaches the uuid RPC params as '' (22P02).
+      if (!user?.id) return;
       const reqId = ++reqRef.current;
       setLoading(true);
       setData(null);
@@ -118,9 +120,9 @@ export function MiniProfileProvider({ children }: { children: React.ReactNode })
       setScore(null);
 
       const results = await Promise.allSettled([
-        supabase.rpc('get_user_card', { p_actor_id: user?.id ?? '', p_user_id: userId }),
+        supabase.rpc('get_user_card', { p_actor_id: user.id, p_user_id: userId }),
         // Same-org gated: a coworker's next shift only, resolved server-side.
-        supabase.rpc('get_user_next_shift', { p_actor_id: user?.id ?? '', p_user_id: userId }),
+        supabase.rpc('get_user_next_shift', { p_actor_id: user.id, p_user_id: userId }),
         organizationId
           ? supabase.rpc('get_master_leaderboard_overall', { p_limit: 200, p_organization_id: organizationId })
           : Promise.resolve({ data: null } as any),

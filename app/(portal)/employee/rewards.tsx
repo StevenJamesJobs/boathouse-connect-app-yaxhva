@@ -228,10 +228,12 @@ export default function EmployeeRewardsScreen() {
   }, [user?.id]);
 
   const fetchReviews = useCallback(async () => {
+    // Logout race: an empty actor reaches the uuid RPC param as '' (22P02).
+    if (!user?.id) return;
     try {
       // Member-gated RPC (active-only, org derived server-side).
       const { data, error } = await supabase.rpc('get_org_guest_reviews', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
       });
 
       if (!error && data) {
@@ -240,13 +242,14 @@ export default function EmployeeRewardsScreen() {
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
-  }, []);
+  }, [user?.id]);
 
   const fetchGoogleReviews = useCallback(async () => {
+    if (!user?.id) return;
     try {
       // Member-gated RPC (published-only for non-managers, org derived server-side).
       const { data, error } = await supabase.rpc('get_org_google_reviews', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
       });
 
       if (!error && data) {
@@ -255,7 +258,7 @@ export default function EmployeeRewardsScreen() {
     } catch (error) {
       console.error('Error fetching Google reviews:', error);
     }
-  }, []);
+  }, [user?.id]);
 
   const allReviews: ReviewItem[] = React.useMemo(() => {
     const manual: ReviewItem[] = reviews.map((r) => ({ ...r, source: 'manual' as const }));

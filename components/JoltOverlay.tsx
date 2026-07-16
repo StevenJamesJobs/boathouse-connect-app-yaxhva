@@ -146,7 +146,8 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
   }, [user, isMgr, t, router]);
 
   const loadIndex = async () => {
-    if (!organizationId || loadedRef.current) return;
+    // !user?.id: logout race — an empty actor reaches get_menu_items as uuid '' (22P02).
+    if (!organizationId || !user?.id || loadedRef.current) return;
     loadedRef.current = true;
     try {
       const homePath = `/(portal)/${role}` as const;
@@ -157,7 +158,7 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
       // inside it); no role gate here.
       tasks.push(
         (async () => {
-          const data = (await getOrgDirectory(user?.id || ''))
+          const data = (await getOrgDirectory(user.id))
             .filter((r) => r.is_active)
             .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           setPeople(
@@ -180,10 +181,12 @@ export default function JoltOverlay({ role }: { role: JoltRole }) {
       tasks.push(
         (async () => {
           const [menu, events, anns, feats] = await Promise.all([
-            supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '' }),
-            supabase.from('upcoming_events').select('id, title').eq('organization_id', organizationId).eq('is_active', true),
-            supabase.from('announcements').select('id, title').eq('organization_id', organizationId).eq('is_active', true),
-            supabase.from('special_features').select('id, title').eq('organization_id', organizationId).eq('is_active', true),
+            supabase.rpc('get_menu_items', { p_actor_id: user.id }),
+            // Member-gated content RPCs (org + role visibility server-side); the
+            // index only needs id/title off the full rows.
+            supabase.rpc('get_upcoming_events', { p_actor_id: user.id }),
+            supabase.rpc('get_announcements', { p_actor_id: user.id }),
+            supabase.rpc('get_special_features', { p_actor_id: user.id }),
           ]);
           const c: JoltResult[] = [];
           (menu.data || []).forEach((m: any) =>

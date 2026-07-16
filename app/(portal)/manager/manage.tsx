@@ -327,7 +327,10 @@ export default function ManagerManageScreen() {
   };
 
   const loadTileData = useCallback(async () => {
-    if (!organizationId) return;
+    // Bail on the logout race too: user clears before the redirect unmounts this
+    // tab, and the manager-gated RPCs below RAISE on an empty/invalid actor.
+    if (!organizationId || !user?.id) return;
+    const actorId = user.id;
     try {
       const today = new Date();
       const todayIso = isoDate(today);
@@ -337,17 +340,19 @@ export default function ManagerManageScreen() {
         d.setDate(today.getDate() + n);
         return d;
       });
-      const wsNames = await weeklySpecialsNames(user?.id ?? '').catch(() => [] as string[]);
+      const wsNames = await weeklySpecialsNames(actorId).catch(() => [] as string[]);
       const settled = await Promise.allSettled([
-        supabase.from('announcements').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('is_active', true).in('visibility', ['everyone', 'managers']),
-        supabase.from('special_features').select('id', { count: 'exact', head: true }).eq('organization_id', organizationId).eq('is_active', true),
-        supabase.from('upcoming_events').select('category, start_date_time, end_date_time').eq('organization_id', organizationId).eq('is_active', true),
-        supabase.rpc('get_org_roster', { p_actor_id: user?.id ?? '', p_date: todayIso }),
-        supabase.rpc('get_org_uploads', { p_actor_id: user?.id ?? '', p_week_start: weekStartIso }).then((r: any) => ({ count: (r.data || []).length })),
-        supabase.rpc('get_org_google_reviews', { p_actor_id: user?.id ?? '' }),
-        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '' }),
-        getOrgDirectory(user?.id).then((rows) => ({ count: rows.filter((r) => r.is_active).length })),
-        getOrgDirectory(user?.id).then((rows) => ({ data: rows.filter((r) => r.is_active).sort((a, b) => (b.mcloones_bucks || 0) - (a.mcloones_bucks || 0)).slice(0, 3) })),
+        // Content RPCs return rows (org + manager visibility server-side); the
+        // tile extraction counts data.length instead of the old head:true count.
+        supabase.rpc('get_announcements', { p_actor_id: actorId }).then((r: any) => ({ count: (r.data || []).length })),
+        supabase.rpc('get_special_features', { p_actor_id: actorId }).then((r: any) => ({ count: (r.data || []).length })),
+        supabase.rpc('get_upcoming_events', { p_actor_id: actorId }),
+        supabase.rpc('get_org_roster', { p_actor_id: actorId, p_date: todayIso }),
+        supabase.rpc('get_org_uploads', { p_actor_id: actorId, p_week_start: weekStartIso }).then((r: any) => ({ count: (r.data || []).length })),
+        supabase.rpc('get_org_google_reviews', { p_actor_id: actorId }),
+        supabase.rpc('get_menu_items', { p_actor_id: actorId }),
+        getOrgDirectory(actorId).then((rows) => ({ count: rows.filter((r) => r.is_active).length })),
+        getOrgDirectory(actorId).then((rows) => ({ data: rows.filter((r) => r.is_active).sort((a, b) => (b.mcloones_bucks || 0) - (a.mcloones_bucks || 0)).slice(0, 3) })),
         supabase.rpc('get_master_leaderboard_overall', { p_limit: 3, p_organization_id: organizationId }),
       ]);
       // Resilient extraction — a single failed query degrades to zeros instead
@@ -405,19 +410,21 @@ export default function ManagerManageScreen() {
   // notification bell). Each source is resilient (allSettled) so one missing
   // table never blanks the feed.
   const loadActivity = useCallback(async () => {
-    if (!organizationId) return;
+    if (!organizationId || !user?.id) return;
+    const actorId = user.id;
     try {
       const since = new Date();
       since.setDate(since.getDate() - 2);
       const settled = await Promise.allSettled([
-        supabase.rpc('get_org_google_reviews', { p_actor_id: user?.id ?? '', p_limit: 3 }),
-        supabase.from('announcements').select('id, title, created_at').eq('organization_id', organizationId).eq('is_active', true).order('created_at', { ascending: false }).limit(3),
-        supabase.from('special_features').select('id, title, created_at').eq('organization_id', organizationId).eq('is_active', true).order('created_at', { ascending: false }).limit(2),
-        supabase.from('upcoming_events').select('id, title, created_at').eq('organization_id', organizationId).eq('is_active', true).order('created_at', { ascending: false }).limit(2),
-        supabase.rpc('get_org_uploads', { p_actor_id: user?.id ?? '', p_limit: 1 }),
-        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '' }),
+        supabase.rpc('get_org_google_reviews', { p_actor_id: actorId, p_limit: 3 }),
+        // Content RPCs order by display_order; the feed wants recency — re-sort + cap client-side.
+        supabase.rpc('get_announcements', { p_actor_id: actorId }).then((r: any) => ({ data: ((r.data || []) as any[]).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 3) })),
+        supabase.rpc('get_special_features', { p_actor_id: actorId }).then((r: any) => ({ data: ((r.data || []) as any[]).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 2) })),
+        supabase.rpc('get_upcoming_events', { p_actor_id: actorId }).then((r: any) => ({ data: ((r.data || []) as any[]).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 2) })),
+        supabase.rpc('get_org_uploads', { p_actor_id: actorId, p_limit: 1 }),
+        supabase.rpc('get_menu_items', { p_actor_id: actorId }),
         supabase.from('guides_and_training').select('id, title, created_at').eq('organization_id', organizationId).order('created_at', { ascending: false }).limit(2),
-        supabase.rpc('get_org_exam_activity', { p_actor_id: user?.id ?? '', p_since: since.toISOString() }),
+        supabase.rpc('get_org_exam_activity', { p_actor_id: actorId, p_since: since.toISOString() }),
       ]);
       const dataOf = (i: number): any[] => (settled[i].status === 'fulfilled' ? (settled[i] as any).value.data || [] : []);
       const items: ActItem[] = [];
@@ -1268,7 +1275,6 @@ export default function ManagerManageScreen() {
         visible={notificationVisible}
         onClose={() => setNotificationVisible(false)}
         onItemPress={openDetailModal}
-        visibility="managers"
         isManager
       />
 

@@ -67,7 +67,6 @@ interface NotificationDropdownProps {
     link?: string | null;
     guideFile?: GuideFile | null;
   }) => void;
-  visibility?: 'everyone' | 'managers' | 'employees';
   isManager?: boolean;
 }
 
@@ -107,7 +106,6 @@ export default function NotificationDropdown({
   visible,
   onClose,
   onItemPress,
-  visibility = 'everyone',
   isManager = false,
 }: NotificationDropdownProps) {
   const colors = useThemeColors();
@@ -130,6 +128,11 @@ export default function NotificationDropdown({
   }, [visible]);
 
   const loadNotifications = async () => {
+    // Logout race: an empty actor reaches uuid RPC params as '' (22P02).
+    if (!user?.id || !organizationId) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       const items: NotificationItem[] = [];
@@ -142,19 +145,15 @@ export default function NotificationDropdown({
         (dismissals || []).map((d: any) => `${d.notification_type}:${d.item_id}`)
       );
 
-      // Fetch announcements
-      const visibilityFilter = visibility === 'managers'
-        ? ['everyone', 'managers']
-        : ['everyone', 'employees'];
-
-      const { data: announcements } = await supabase
-        .from('announcements')
-        .select('*, guide_file:guides_and_training!announcements_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .in('visibility', visibilityFilter)
-        .order('created_at', { ascending: false })
-        .limit(SOURCE_FETCH_LIMIT);
+      // Fetch announcements — role-aware visibility + org scoping enforced
+      // server-side; guide_file jsonb replaces the PostgREST embed. The RPC
+      // orders by display_order (home-tile order), so re-sort by recency and
+      // cap client-side to preserve the shade's old fetch window.
+      const { data: annRows } = await supabase
+        .rpc('get_announcements', { p_actor_id: user.id });
+      const announcements = ((annRows as any[]) || [])
+        .slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+        .slice(0, SOURCE_FETCH_LIMIT);
 
       if (announcements) {
         for (const a of announcements) {
@@ -170,13 +169,11 @@ export default function NotificationDropdown({
       }
 
       // Fetch special features
-      const { data: features } = await supabase
-        .from('special_features')
-        .select('*, guide_file:guides_and_training!special_features_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(SOURCE_FETCH_LIMIT);
+      const { data: sfRows } = await supabase
+        .rpc('get_special_features', { p_actor_id: user.id });
+      const features = ((sfRows as any[]) || [])
+        .slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+        .slice(0, SOURCE_FETCH_LIMIT);
 
       if (features) {
         for (const f of features) {
@@ -192,13 +189,11 @@ export default function NotificationDropdown({
       }
 
       // Fetch upcoming events
-      const { data: events } = await supabase
-        .from('upcoming_events')
-        .select('*, guide_file:guides_and_training!upcoming_events_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('created_at', { ascending: false })
-        .limit(SOURCE_FETCH_LIMIT);
+      const { data: evtRows } = await supabase
+        .rpc('get_upcoming_events', { p_actor_id: user.id });
+      const events = ((evtRows as any[]) || [])
+        .slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
+        .slice(0, SOURCE_FETCH_LIMIT);
 
       if (events) {
         for (const e of events) {
@@ -217,11 +212,11 @@ export default function NotificationDropdown({
       // system_key → follows renames) PLUS any item FEATURED via is_weekly_special
       // (overlay). Featured-but-not-categorized items surface by their feature
       // time (updated_at). Merge + dedupe by id.
-      const wsNames = await weeklySpecialsNames(user?.id ?? '');
+      const wsNames = await weeklySpecialsNames(user.id);
       // RPC returns all matching active items; apply the recency sort + cap client-side.
       const [byCatRpc, byFlagRpc] = await Promise.all([
-        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_categories: wsNames }),
-        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_weekly_special: true }),
+        supabase.rpc('get_menu_items', { p_actor_id: user.id, p_categories: wsNames }),
+        supabase.rpc('get_menu_items', { p_actor_id: user.id, p_weekly_special: true }),
       ]);
       const byCatSpecials = {
         data: ((byCatRpc.data as any[]) || [])
@@ -324,9 +319,9 @@ export default function NotificationDropdown({
       const eventIds = visibleItems.filter(i => i.type === 'upcoming_event').map(i => i.id);
 
       const [annImgs, featImgs, evtImgs] = await Promise.all([
-        announcementIds.length > 0 ? fetchContentImagesBatch('announcement', announcementIds) : new Map<string, string[]>(),
-        featureIds.length > 0 ? fetchContentImagesBatch('special_feature', featureIds) : new Map<string, string[]>(),
-        eventIds.length > 0 ? fetchContentImagesBatch('upcoming_event', eventIds) : new Map<string, string[]>(),
+        announcementIds.length > 0 ? fetchContentImagesBatch(user.id, 'announcement', announcementIds) : new Map<string, string[]>(),
+        featureIds.length > 0 ? fetchContentImagesBatch(user.id, 'special_feature', featureIds) : new Map<string, string[]>(),
+        eventIds.length > 0 ? fetchContentImagesBatch(user.id, 'upcoming_event', eventIds) : new Map<string, string[]>(),
       ]);
 
       for (const item of visibleItems) {

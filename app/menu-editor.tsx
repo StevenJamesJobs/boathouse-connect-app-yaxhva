@@ -1274,7 +1274,12 @@ export default function MenuEditorScreen() {
               offset: SCREEN_WIDTH * index,
               index,
             })}
-            initialScrollIndex={0}
+            // The loading spinner (line ~1157) unmounts this pager on every
+            // loadMenuItems() (move up/down, add/edit/delete, position picker) —
+            // remount on the ACTIVE page, not page 0, so the visible list stays
+            // on the category/subcategory pills the user is parked on. Clamped:
+            // pages can shrink after category edits.
+            initialScrollIndex={Math.max(0, Math.min(currentPageIndex, pages.length - 1))}
             renderItem={({ item: page }) => {
               const pageItems = getItemsForPage(page);
               // Featured Specials is a combined cross-menu overview — read-only

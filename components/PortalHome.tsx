@@ -277,8 +277,10 @@ export default function PortalHome({ role }: PortalHomeProps) {
     // Org context resolves asynchronously on fresh login; bail until we have an
     // org id so we never fire queries filtered on organization_id = null (which
     // return empty and leave the home screen blank). The [organizationId] effect
-    // below re-runs this once the id lands.
-    if (!organizationId) return;
+    // below re-runs this once the id lands. Also bail when the user is already
+    // null (logout race) — an empty actor reaches uuid RPC params as '' (22P02).
+    if (!organizationId || !user?.id) return;
+    const actorId = user.id;
 
     setLoadingSpecials(true);
     setLoadingAnnouncements(true);
@@ -286,62 +288,30 @@ export default function PortalHome({ role }: PortalHomeProps) {
     setLoadingFeatures(true);
 
     try {
-      const wsNames = await weeklySpecialsNames(user?.id ?? '');
+      const wsNames = await weeklySpecialsNames(actorId);
       const [specialsResult, announcementsResult, eventsResult, featuresResult] = await Promise.all([
         // Weekly Specials = items categorized as Weekly Specials PLUS any item
         // flagged is_weekly_special (overlay — the item stays in its home
         // category but is featured here too). Merge + dedupe by id.
         (async () => {
           const [byCategory, flagged] = await Promise.all([
-            supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_categories: wsNames }),
-            supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_weekly_special: true }),
+            supabase.rpc('get_menu_items', { p_actor_id: actorId, p_categories: wsNames }),
+            supabase.rpc('get_menu_items', { p_actor_id: actorId, p_weekly_special: true }),
           ]);
           const byId = new Map<string, any>();
           for (const row of [...(byCategory.data || []), ...(flagged.data || [])]) byId.set(row.id, row);
           const merged = Array.from(byId.values()).sort(compareBySectionThenOrder);
           return { data: merged };
         })(),
-        supabase
-          .from('announcements')
-          .select(`
-            *,
-            guide_file:guides_and_training!announcements_guide_file_id_fkey(
-              id, title, file_url, file_name, file_type
-            )
-          `)
-          .eq('organization_id', organizationId)
-          .eq('is_active', true)
-          .in('visibility', role === 'manager' ? ['everyone', 'managers'] : ['everyone', 'employees'])
-          .order('display_order', { ascending: true })
-          .limit(6),
+        // Member-gated RPCs: org + role-aware visibility enforced server-side; rows
+        // carry the same shape as the old select('*') plus a guide_file jsonb that
+        // matches the retired PostgREST embed.
+        supabase.rpc('get_announcements', { p_actor_id: actorId, p_limit: 6 }),
         (async () => {
-          try { await supabase.rpc('delete_expired_upcoming_events', { p_organization_id: organizationId }); } catch {}
-          return supabase
-            .from('upcoming_events')
-            .select(`
-              *,
-              guide_file:guides_and_training!upcoming_events_guide_file_id_fkey(
-                id, title, file_url, file_name, file_type
-              )
-            `)
-            .eq('organization_id', organizationId)
-            .eq('is_active', true)
-            .order('display_order', { ascending: true })
-            .order('created_at', { ascending: false });
+          try { await supabase.rpc('delete_expired_upcoming_events', { p_actor_id: actorId }); } catch {}
+          return supabase.rpc('get_upcoming_events', { p_actor_id: actorId });
         })(),
-        supabase
-          .from('special_features')
-          .select(`
-            *,
-            guide_file:guides_and_training!special_features_guide_file_id_fkey(
-              id, title, file_url, file_name, file_type
-            )
-          `)
-          .eq('organization_id', organizationId)
-          .eq('is_active', true)
-          .order('display_order', { ascending: true })
-          .order('created_at', { ascending: false })
-          .limit(6),
+        supabase.rpc('get_special_features', { p_actor_id: actorId, p_limit: 6 }),
       ]);
 
       const specials = specialsResult.data || [];
@@ -359,19 +329,19 @@ export default function PortalHome({ role }: PortalHomeProps) {
 
       if (anns.length > 0) {
         imagePromises.push(
-          fetchContentImagesBatch('announcement', anns.map((a: any) => a.id))
+          fetchContentImagesBatch(actorId, 'announcement', anns.map((a: any) => a.id))
             .then(m => m.forEach((urls, id) => newImagesMap.set(id, urls)))
         );
       }
       if (events.length > 0) {
         imagePromises.push(
-          fetchContentImagesBatch('upcoming_event', events.map((e: any) => e.id))
+          fetchContentImagesBatch(actorId, 'upcoming_event', events.map((e: any) => e.id))
             .then(m => m.forEach((urls, id) => newImagesMap.set(id, urls)))
         );
       }
       if (features.length > 0) {
         imagePromises.push(
-          fetchContentImagesBatch('special_feature', features.map((f: any) => f.id))
+          fetchContentImagesBatch(actorId, 'special_feature', features.map((f: any) => f.id))
             .then(m => m.forEach((urls, id) => newImagesMap.set(id, urls)))
         );
       }
@@ -399,16 +369,18 @@ export default function PortalHome({ role }: PortalHomeProps) {
     async function openDeepLinkItem() {
       const { openAnnouncementId, openEventId, openFeatureId } = params;
       if (!openAnnouncementId && !openEventId && !openFeatureId) return;
+      // Org-scoped p_id fetch: a deep-link to another org's content (or one this
+      // role can't see) now resolves to nothing instead of leaking the row.
+      const actorId = user?.id;
+      if (!actorId) return;
 
       try {
         if (openAnnouncementId) {
-          const { data } = await supabase
-            .from('announcements')
-            .select('*, guide_file:guides_and_training!announcements_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
-            .eq('id', openAnnouncementId)
-            .single();
+          const { data: rows } = await supabase
+            .rpc('get_announcements', { p_actor_id: actorId, p_id: String(openAnnouncementId) });
+          const data = (rows?.[0] ?? null) as any;
           if (data) {
-            const imgs = await fetchContentImagesBatch('announcement', [data.id]);
+            const imgs = await fetchContentImagesBatch(actorId, 'announcement', [data.id]);
             const additionalImgs = imgs.get(data.id);
             const allImgs = additionalImgs && additionalImgs.length > 0
               ? [data.thumbnail_url, ...additionalImgs].filter(Boolean) as string[]
@@ -425,13 +397,11 @@ export default function PortalHome({ role }: PortalHomeProps) {
             });
           }
         } else if (openEventId) {
-          const { data } = await supabase
-            .from('upcoming_events')
-            .select('*, guide_file:guides_and_training!upcoming_events_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
-            .eq('id', openEventId)
-            .single();
+          const { data: rows } = await supabase
+            .rpc('get_upcoming_events', { p_actor_id: actorId, p_id: String(openEventId) });
+          const data = (rows?.[0] ?? null) as any;
           if (data) {
-            const imgs = await fetchContentImagesBatch('upcoming_event', [data.id]);
+            const imgs = await fetchContentImagesBatch(actorId, 'upcoming_event', [data.id]);
             const additionalImgs = imgs.get(data.id);
             const allImgs = additionalImgs && additionalImgs.length > 0
               ? [data.thumbnail_url, ...additionalImgs].filter(Boolean) as string[]
@@ -449,13 +419,11 @@ export default function PortalHome({ role }: PortalHomeProps) {
             });
           }
         } else if (openFeatureId) {
-          const { data } = await supabase
-            .from('special_features')
-            .select('*, guide_file:guides_and_training!special_features_guide_file_id_fkey(id, title, file_url, file_name, file_type)')
-            .eq('id', openFeatureId)
-            .single();
+          const { data: rows } = await supabase
+            .rpc('get_special_features', { p_actor_id: actorId, p_id: String(openFeatureId) });
+          const data = (rows?.[0] ?? null) as any;
           if (data) {
-            const imgs = await fetchContentImagesBatch('special_feature', [data.id]);
+            const imgs = await fetchContentImagesBatch(actorId, 'special_feature', [data.id]);
             const additionalImgs = imgs.get(data.id);
             const allImgs = additionalImgs && additionalImgs.length > 0
               ? [data.thumbnail_url, ...additionalImgs].filter(Boolean) as string[]
@@ -479,7 +447,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
     }
 
     openDeepLinkItem();
-  }, [params.openAnnouncementId, params.openEventId, params.openFeatureId]);
+  }, [params.openAnnouncementId, params.openEventId, params.openFeatureId, user?.id]);
 
   const openDetailModal = (item: {
     title: string;
@@ -1389,7 +1357,6 @@ export default function PortalHome({ role }: PortalHomeProps) {
         visible={notificationVisible}
         onClose={() => setNotificationVisible(false)}
         onItemPress={openDetailModal}
-        visibility={isManager ? 'managers' : 'employees'}
         isManager={isManager}
       />
 

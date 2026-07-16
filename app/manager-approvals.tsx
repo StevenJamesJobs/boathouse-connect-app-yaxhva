@@ -45,10 +45,17 @@ export default function ManagerApprovalsScreen() {
   const [reason, setReason] = useState('');
 
   const refresh = useCallback(async () => {
+    // Logout teardown: user clears before the redirect unmounts this screen —
+    // supabase-js drops an undefined named arg and PostgREST 404s the overload (PGRST202).
+    if (!user?.id) {
+      setRows([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const { data: reqs } = await supabase.rpc('get_pending_redemptions', {
-        p_actor_id: user?.id,
+        p_actor_id: user.id,
       });
 
       const today = new Date().toISOString().slice(0, 10);
@@ -60,7 +67,7 @@ export default function ManagerApprovalsScreen() {
       const userIds = [...new Set(filtered.map((r) => r.user_id))];
       const userMap = new Map<string, string>();
       if (userIds.length) {
-        const users = (await getOrgDirectory(user?.id)).filter((r) => userIds.includes(r.id));
+        const users = (await getOrgDirectory(user.id)).filter((r) => userIds.includes(r.id));
         (users || []).forEach((u: any) => userMap.set(u.id, u.name));
       }
       setRows(

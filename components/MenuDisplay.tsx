@@ -297,8 +297,14 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   useEffect(() => {
     if (categoriesLoading) return; // wait for the category tree so injection resolves names
     loadMenuItems();
-    setCurrentPageIndex(bridgeOffset);
-    pagerRef.current?.scrollToIndex({ index: bridgeOffset, animated: false });
+    // PAGES can be shorter than bridgeOffset+1 (logout teardown empties menuCats;
+    // a zero-category org is legit too) — scrollToIndex past the end throws an
+    // out-of-range Invariant caught by the root ErrorBoundary. Clamp to the list.
+    const target = Math.min(bridgeOffset, PAGES.length - 1);
+    if (target >= 0) {
+      setCurrentPageIndex(target);
+      pagerRef.current?.scrollToIndex({ index: target, animated: false });
+    }
   }, [season, menuCats, categoriesLoading]);
 
   // Filter items for a given page
@@ -376,8 +382,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   // search corpus. (For the non-active menu the cocktail subcategory names
   // resolve best-effort against the active tree — fine for search.)
   const buildItemsForSeason = async (seasonKey: Season): Promise<MenuItem[]> => {
+    // Logout teardown: user clears ~100ms before the root redirect unmounts this
+    // tab; an empty actor would reach get_menu_items as uuid '' (22P02).
+    if (!user?.id) return [];
     const { data, error } = await supabase.rpc('get_menu_items', {
-      p_actor_id: user?.id ?? '',
+      p_actor_id: user.id,
       p_season: seasonKey,
     });
 
@@ -608,8 +617,10 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       onSwipeToWelcome();
       // Scroll back to Weekly Specials (index 1) so position is correct if they return
       setTimeout(() => {
-        pagerRef.current?.scrollToIndex({ index: bridgeOffset, animated: false });
-        setCurrentPageIndex(bridgeOffset);
+        if (PAGES.length > bridgeOffset) {
+          pagerRef.current?.scrollToIndex({ index: bridgeOffset, animated: false });
+          setCurrentPageIndex(bridgeOffset);
+        }
       }, 100);
       return;
     }
@@ -1004,7 +1015,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             offset: SCREEN_WIDTH * index,
             index,
           })}
-          initialScrollIndex={bridgeOffset}
+          initialScrollIndex={Math.min(bridgeOffset, Math.max(PAGES.length - 1, 0))}
         />
       )}
 
