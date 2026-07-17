@@ -264,33 +264,17 @@ export default function SetupWizardScreen() {
     setIsLoading(true);
 
     try {
-      // Idempotent: clear any titles left over from a previous (failed) attempt
-      // so tapping Complete Setup again replaces them instead of duplicating.
-      const { error: clearError } = await supabase
-        .from('organization_job_titles')
-        .delete()
-        .eq('organization_id', organizationId);
-
-      if (clearError) {
-        console.error('[SetupWizard] Clear job titles error:', clearError);
-        Alert.alert('Error', 'Failed to save job titles.');
-        setIsLoading(false);
-        return;
-      }
-
-      // Insert job titles with display_order
-      const titleRows = selectedTitles.map((title, idx) => ({
-        organization_id: organizationId,
-        title,
-        display_order: idx,
-      }));
-
-      const { error: titlesError } = await supabase
-        .from('organization_job_titles')
-        .insert(titleRows);
+      // Idempotent: replace any titles left over from a previous (failed) attempt
+      // so tapping Complete Setup again replaces them instead of duplicating. The
+      // RPC deletes leftover titles and inserts the selected ones in order
+      // server-side (blank strings dropped).
+      const { error: titlesError } = await (supabase.rpc as any)('replace_org_job_titles', {
+        p_actor_id: user?.id,
+        p_titles: selectedTitles,
+      });
 
       if (titlesError) {
-        console.error('[SetupWizard] Insert job titles error:', titlesError);
+        console.error('[SetupWizard] Save job titles error:', titlesError);
         Alert.alert('Error', 'Failed to save job titles.');
         setIsLoading(false);
         return;
@@ -299,9 +283,9 @@ export default function SetupWizardScreen() {
       // Seed default job-title → assistant mappings now that titles exist, so
       // employees can see the right assistants out of the box (idempotent;
       // owner can adjust in Org Settings → Jobs & Tools). Non-fatal on error.
-      const { error: seedError } = await supabase.rpc(
-        'seed_default_job_title_assistants',
-        { p_org_id: organizationId }
+      const { error: seedError } = await (supabase.rpc as any)(
+        'seed_default_job_title_assistants_actor',
+        { p_actor_id: user?.id }
       );
       if (seedError) {
         console.error('[SetupWizard] Seed assistant mappings error:', seedError);

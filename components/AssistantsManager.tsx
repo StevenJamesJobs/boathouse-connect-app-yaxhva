@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
 import { supabase } from '@/app/integrations/supabase/client';
 
@@ -39,6 +40,7 @@ interface Props {
 
 export default function AssistantsManager({ colors }: Props) {
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const { activeJobTitles } = useOrgJobTitles();
   const [assistants, setAssistants] = useState<OrgAssistant[]>([]);
   const [mappings, setMappings] = useState<TitleMapping[]>([]);
@@ -46,19 +48,12 @@ export default function AssistantsManager({ colors }: Props) {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchData = async () => {
-    if (!organizationId) return;
+    if (!organizationId || !user?.id) return;
     setIsLoading(true);
 
     const [assistantsRes, mappingsRes] = await Promise.all([
-      (supabase
-        .from('organization_assistants' as any)
-        .select('id, assistant_key, display_name, is_active')
-        .eq('organization_id', organizationId)
-        .order('assistant_key', { ascending: true }) as any),
-      (supabase
-        .from('job_title_assistants' as any)
-        .select('assistant_key, job_title')
-        .eq('organization_id', organizationId) as any),
+      (supabase.rpc as any)('get_org_assistants', { p_actor_id: user?.id }),
+      (supabase.rpc as any)('get_job_title_assistants', { p_actor_id: user?.id }),
     ]);
 
     if (!assistantsRes.error && assistantsRes.data) setAssistants(assistantsRes.data);
@@ -68,14 +63,15 @@ export default function AssistantsManager({ colors }: Props) {
 
   useEffect(() => {
     fetchData();
-  }, [organizationId]);
+  }, [organizationId, user?.id]);
 
   const handleToggle = async (item: OrgAssistant) => {
     try {
-      const { error } = await (supabase
-        .from('organization_assistants' as any)
-        .update({ is_active: !item.is_active })
-        .eq('id', item.id) as any);
+      const { error } = await (supabase.rpc as any)('set_org_assistant_active', {
+        p_actor_id: user?.id,
+        p_id: item.id,
+        p_is_active: !item.is_active,
+      });
 
       if (error) throw error;
       setAssistants(prev =>
@@ -93,26 +89,18 @@ export default function AssistantsManager({ colors }: Props) {
     const hasAccess = titleHasAccess(assistantKey, jobTitle);
 
     try {
+      const { error } = await (supabase.rpc as any)('set_job_title_assistant', {
+        p_actor_id: user?.id,
+        p_assistant_key: assistantKey,
+        p_job_title: jobTitle,
+        p_enabled: !hasAccess,
+      });
+      if (error) throw error;
       if (hasAccess) {
-        const { error } = await (supabase
-          .from('job_title_assistants' as any)
-          .delete()
-          .eq('organization_id', organizationId)
-          .eq('assistant_key', assistantKey)
-          .eq('job_title', jobTitle) as any);
-        if (error) throw error;
         setMappings(prev => prev.filter(m =>
           !(m.assistant_key === assistantKey && m.job_title === jobTitle)
         ));
       } else {
-        const { error } = await (supabase
-          .from('job_title_assistants' as any)
-          .insert({
-            organization_id: organizationId,
-            assistant_key: assistantKey,
-            job_title: jobTitle,
-          }) as any);
-        if (error) throw error;
         setMappings(prev => [...prev, { assistant_key: assistantKey, job_title: jobTitle }]);
       }
     } catch (err: any) {

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useOrganization } from './OrganizationContext';
+import { useAuth } from './AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IS_MCLOONES } from '@/constants/buildVariant';
 import { REVENUECAT_CONFIGURED, ENTITLEMENTS } from '@/config/revenueCat';
@@ -74,13 +75,16 @@ export function SubscriptionProvider({ children }: { children: ReactNode }) {
 
 function SubscriptionProviderInner({ children }: { children: ReactNode }) {
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const [state, setState] = useState<SubscriptionContextType>(DEFAULT_STATE);
   const initializedOrg = useRef<string | null>(null);
 
-  const fetchSubscription = useCallback(async (orgId: string) => {
+  // Actor id is threaded as an explicit arg through the whole load chain (never captured via
+  // closure) — these callbacks have [] deps and would otherwise pin a stale first-render user.
+  const fetchSubscription = useCallback(async (orgId: string, actorId: string) => {
     try {
-      const { data, error } = await (supabase.rpc as any)('get_organization_subscription', {
-        p_organization_id: orgId,
+      const { data, error } = await (supabase.rpc as any)('get_organization_subscription_actor', {
+        p_actor_id: actorId,
       });
 
       if (error) {
@@ -103,27 +107,27 @@ function SubscriptionProviderInner({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const initializeTrial = useCallback(async (orgId: string) => {
+  const initializeTrial = useCallback(async (orgId: string, actorId: string) => {
     try {
-      await (supabase.rpc as any)('initialize_org_trial', {
-        p_organization_id: orgId,
+      await (supabase.rpc as any)('initialize_org_trial_actor', {
+        p_actor_id: actorId,
       });
     } catch (err) {
       console.error('[Subscription] Trial init error:', err);
     }
   }, []);
 
-  const expireTrial = useCallback(async (orgId: string) => {
+  const expireTrial = useCallback(async (orgId: string, actorId: string) => {
     try {
-      await (supabase.rpc as any)('expire_org_trial', {
-        p_organization_id: orgId,
+      await (supabase.rpc as any)('expire_org_trial_actor', {
+        p_actor_id: actorId,
       });
     } catch (err) {
       console.error('[Subscription] Expire error:', err);
     }
   }, []);
 
-  const reconcileWithRevenueCat = useCallback(async (orgId: string, dbTier: SubscriptionTier) => {
+  const reconcileWithRevenueCat = useCallback(async (orgId: string, dbTier: SubscriptionTier, actorId: string) => {
     if (!REVENUECAT_CONFIGURED || Platform.OS === 'web') return dbTier;
 
     try {
@@ -146,6 +150,7 @@ function SubscriptionProviderInner({ children }: { children: ReactNode }) {
         await (supabase.rpc as any)('upsert_organization_subscription', {
           p_organization_id: orgId,
           p_subscription_tier: rcTier,
+          p_actor_id: actorId,
         });
         return rcTier;
       }
@@ -188,14 +193,14 @@ function SubscriptionProviderInner({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const loadSubscription = useCallback(async (orgId: string) => {
+  const loadSubscription = useCallback(async (orgId: string, actorId: string) => {
     setState(prev => ({ ...prev, isLoading: true }));
 
-    let result = await fetchSubscription(orgId);
+    let result = await fetchSubscription(orgId, actorId);
 
     if (!result) {
-      await initializeTrial(orgId);
-      result = await fetchSubscription(orgId);
+      await initializeTrial(orgId, actorId);
+      result = await fetchSubscription(orgId, actorId);
     }
 
     if (!result) {
@@ -207,15 +212,15 @@ function SubscriptionProviderInner({ children }: { children: ReactNode }) {
 
     // Auto-expire trials that have passed their end date
     if (tier === 'trial' && trialEndDate && trialEndDate <= new Date()) {
-      await expireTrial(orgId);
+      await expireTrial(orgId, actorId);
       tier = 'expired';
     }
 
     // Reconcile with RevenueCat (may upgrade tier if purchase detected)
-    tier = await reconcileWithRevenueCat(orgId, tier);
+    tier = await reconcileWithRevenueCat(orgId, tier, actorId);
 
     const computed = computeState(tier, trialEndDate);
-    setState({ ...computed, isLoading: false, refreshSubscription: () => loadSubscription(orgId) });
+    setState({ ...computed, isLoading: false, refreshSubscription: () => loadSubscription(orgId, actorId) });
 
     if (computed.isTrialActive && trialEndDate) {
       scheduleTrialNotifications(trialEndDate);
@@ -223,10 +228,10 @@ function SubscriptionProviderInner({ children }: { children: ReactNode }) {
   }, [fetchSubscription, initializeTrial, expireTrial, reconcileWithRevenueCat]);
 
   const refreshSubscription = useCallback(async () => {
-    if (organizationId) {
-      await loadSubscription(organizationId);
+    if (organizationId && user?.id) {
+      await loadSubscription(organizationId, user.id);
     }
-  }, [organizationId, loadSubscription]);
+  }, [organizationId, user?.id, loadSubscription]);
 
   useEffect(() => {
     if (!organizationId) {
@@ -235,11 +240,15 @@ function SubscriptionProviderInner({ children }: { children: ReactNode }) {
       return;
     }
 
-    if (initializedOrg.current === organizationId) return;
-    initializedOrg.current = organizationId;
+    // Org resolved but actor not yet — wait (keep loading) rather than flashing DEFAULT_STATE.
+    if (!user?.id) return;
 
-    loadSubscription(organizationId);
-  }, [organizationId, loadSubscription]);
+    const key = `${organizationId}:${user.id}`;
+    if (initializedOrg.current === key) return;
+    initializedOrg.current = key;
+
+    loadSubscription(organizationId, user.id);
+  }, [organizationId, user?.id, loadSubscription]);
 
   const contextValue: SubscriptionContextType = {
     ...state,

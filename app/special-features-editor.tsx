@@ -132,14 +132,9 @@ export default function SpecialFeaturesEditorScreen() {
     try {
       console.log('Loading guide files from database...');
       
-      const { data, error } = await supabase
-        .from('guides_and_training')
-        .select('id, title, category, file_name')
-        .eq('organization_id', organizationId)
-        .in('category', GUIDE_CATEGORIES)
-        .eq('is_active', true)
-        .order('category', { ascending: true })
-        .order('title', { ascending: true });
+      const { data, error } = await (supabase.rpc as any)('get_guides', {
+        p_actor_id: user?.id,
+      });
 
       if (error) {
         console.error('Error loading guide files:', error);
