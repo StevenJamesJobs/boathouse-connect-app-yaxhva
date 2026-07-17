@@ -106,4 +106,4 @@ Newest first. Columns: date · variant · version (build#) · commit · built by
 
 | Date | Variant | Version (build) | Commit | Built by | Delivered via | Notes |
 |---|---|---|---|---|---|---|
-| 2026-07-16 | MyResto (public) | 1.0.0 (10) | `504fcb4` | Claude (MacBook) — EAS `production-public`, non-interactive | Transporter (Steve) | First build after the Session-47 security lockdown (org-config + content RPC lockdown, menu-upload-credits mint hole closed, onboarding fix, RevenueCat tier-sync fix). Credentials validated automatically. Sandbox IAP test pending on TestFlight. |
+| 2026-07-16 | MyResto (public) | 1.0.0 (10) | `504fcb4` | Claude (MacBook) — EAS `production-public`, non-interactive | Transporter (Steve) | First build after the Session-47 security lockdown (org-config + content RPC lockdown, menu-upload-credits mint hole closed, onboarding fix, RevenueCat tier-sync fix). Credentials validated automatically. **Sandbox IAP CONFIRMED on TestFlight:** a Premium sandbox purchase on Belmont Tavern flipped its DB `subscription_tier` `expired`→`premium` — the RC tier-sync fix works end-to-end. |
