@@ -45,19 +45,14 @@ export default function HostAssistantScreen() {
   const [sections, setSections] = useState<HostSectionCard[]>([]);
 
   const loadSections = useCallback(async () => {
-    if (!organizationId) return;
+    if (!user?.id) return;
     try {
-      const { data } = await (supabase
-        .from('host_sections' as any)
-        .select('id, title, card_subtitle, card_image_url, icon')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true }) as any);
+      const { data } = await (supabase.rpc as any)('get_host_sections', { p_actor_id: user?.id });
       setSections((data as HostSectionCard[]) || []);
     } catch (e) {
       console.error('Error loading host sections:', e);
     }
-  }, [organizationId]);
+  }, [user?.id]);
 
   useFocusEffect(useCallback(() => { loadSections(); }, [loadSections]));
 

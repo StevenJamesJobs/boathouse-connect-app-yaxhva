@@ -48,6 +48,31 @@ const DEFAULTS = {
   freeshift_cost: 25,
 };
 
+// Module-scope so its identity is stable across renders — defining it inside the screen made every
+// keystroke (setS) remount the TextInput and dismiss the keyboard. Toggle markup is inlined here.
+function CostRow({ label, on, cost, onToggle, onCost, styles, colors, t, currencyName }: {
+  label: string; on: boolean; cost: number; onToggle: () => void; onCost: (v: string) => void;
+  styles: any; colors: any; t: any; currencyName: string;
+}) {
+  return (
+    <GlassCard variant="surface" radius={15} style={styles.optCard}>
+      <View style={styles.optRow}>
+        <Text style={[styles.optLabel, !on && { opacity: 0.5 }]}>{label}</Text>
+        <Pressable style={[styles.tsw, { backgroundColor: on ? '#34C759' : colors.glassBorder }]} onPress={onToggle}>
+          <View style={[styles.tswKnob, { alignSelf: on ? 'flex-end' : 'flex-start' }]} />
+        </Pressable>
+      </View>
+      {on && (
+        <View style={styles.costRow}>
+          <Text style={styles.costLbl}>{t('redeem_settings.cost_label', 'Cost')}</Text>
+          <TextInput style={styles.costInput} value={String(cost)} onChangeText={onCost} keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
+          <Text style={styles.costSuffix}>{currencyName}</Text>
+        </View>
+      )}
+    </GlassCard>
+  );
+}
+
 export default function RedeemSettingsScreen() {
   const { t } = useTranslation();
   const router = useRouter();
@@ -90,13 +115,13 @@ export default function RedeemSettingsScreen() {
   };
 
   const load = useCallback(async () => {
-    if (!organizationId) return;
+    if (!organizationId || !user?.id) return;
     try {
       const [rowRes, optsRes] = await Promise.all([
-        supabase.from('organization_redemption_settings' as any).select('*').eq('organization_id', organizationId).maybeSingle(),
-        supabase.from('redemption_custom_options' as any).select('*').eq('organization_id', organizationId).order('display_order', { ascending: true }),
+        (supabase.rpc as any)('get_redemption_settings', { p_actor_id: user?.id }),
+        (supabase.rpc as any)('get_redemption_custom_options', { p_actor_id: user?.id, p_include_inactive: true }),
       ]);
-      const row: any = rowRes.data;
+      const row: any = rowRes.data?.[0];
       const opts: any[] = (optsRes.data as any) || [];
       if (row) {
         setS({
@@ -117,7 +142,7 @@ export default function RedeemSettingsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [organizationId]);
+  }, [organizationId, user?.id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -202,22 +227,6 @@ export default function RedeemSettingsScreen() {
     </Pressable>
   );
 
-  const CostRow = ({ label, on, cost, onToggle, onCost }: { label: string; on: boolean; cost: number; onToggle: () => void; onCost: (v: string) => void }) => (
-    <GlassCard variant="surface" radius={15} style={styles.optCard}>
-      <View style={styles.optRow}>
-        <Text style={[styles.optLabel, !on && { opacity: 0.5 }]}>{label}</Text>
-        <Toggle on={on} onPress={onToggle} />
-      </View>
-      {on && (
-        <View style={styles.costRow}>
-          <Text style={styles.costLbl}>{t('redeem_settings.cost_label', 'Cost')}</Text>
-          <TextInput style={styles.costInput} value={String(cost)} onChangeText={onCost} keyboardType="numeric" placeholderTextColor={colors.textSecondary} />
-          <Text style={styles.costSuffix}>{currencyName}</Text>
-        </View>
-      )}
-    </GlassCard>
-  );
-
   if (loading) {
     return (
       <View style={[styles.container, { alignItems: 'center', justifyContent: 'center' }]}>
@@ -280,11 +289,14 @@ export default function RedeemSettingsScreen() {
               )}
             </GlassCard>
 
-            <CostRow label={t('rewards_ui:redeem_section_title', 'Choose Your Own Section')} on={s.section_enabled} cost={s.section_cost}
+            <CostRow styles={styles} colors={colors} t={t} currencyName={currencyName}
+              label={t('rewards_ui:redeem_section_title', 'Choose Your Own Section')} on={s.section_enabled} cost={s.section_cost}
               onToggle={() => setS({ ...s, section_enabled: !s.section_enabled })} onCost={(v) => setS({ ...s, section_cost: parseInt(v) || 0 })} />
-            <CostRow label={t('rewards_ui:redeem_sidework_title', 'Choose Your Own Side Work')} on={s.sidework_enabled} cost={s.sidework_cost}
+            <CostRow styles={styles} colors={colors} t={t} currencyName={currencyName}
+              label={t('rewards_ui:redeem_sidework_title', 'Choose Your Own Side Work')} on={s.sidework_enabled} cost={s.sidework_cost}
               onToggle={() => setS({ ...s, sidework_enabled: !s.sidework_enabled })} onCost={(v) => setS({ ...s, sidework_cost: parseInt(v) || 0 })} />
-            <CostRow label={t('rewards_ui:redeem_freeshift_title', 'Side Work Free Shift')} on={s.freeshift_enabled} cost={s.freeshift_cost}
+            <CostRow styles={styles} colors={colors} t={t} currencyName={currencyName}
+              label={t('rewards_ui:redeem_freeshift_title', 'Side Work Free Shift')} on={s.freeshift_enabled} cost={s.freeshift_cost}
               onToggle={() => setS({ ...s, freeshift_enabled: !s.freeshift_enabled })} onCost={(v) => setS({ ...s, freeshift_cost: parseInt(v) || 0 })} />
 
             {/* Custom options */}
@@ -319,7 +331,7 @@ export default function RedeemSettingsScreen() {
       </ScrollView>
 
       <Modal visible={showCustom} transparent animationType="slide" onRequestClose={() => setShowCustom(false)}>
-        <View style={styles.sheetWrap}>
+        <KeyboardAvoidingView style={styles.sheetWrap} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <Pressable style={styles.scrim} onPress={() => setShowCustom(false)} />
           <GlassCard variant="glass" radius={26} intensity={32} style={styles.sheet}>
             <View style={styles.grab} />
@@ -339,7 +351,7 @@ export default function RedeemSettingsScreen() {
               <Text style={styles.saveTxt}>{editingCustom ? t('common:save') : t('redeem_settings.add', 'Add Option')}</Text>
             </Pressable>
           </GlassCard>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </KeyboardAvoidingView>
   );

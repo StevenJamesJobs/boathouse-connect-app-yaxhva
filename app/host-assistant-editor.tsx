@@ -41,14 +41,12 @@ export default function HostAssistantEditorScreen() {
   const [sections, setSections] = useState<SectionRow[]>([]);
 
   const loadSections = useCallback(async () => {
-    if (!organizationId) return;
-    const { data } = await (supabase
-      .from('host_sections' as any)
-      .select('*')
-      .eq('organization_id', organizationId)
-      .order('display_order', { ascending: true }) as any);
+    if (!user?.id) return;
+    const { data } = await (supabase.rpc as any)('get_host_sections', {
+      p_actor_id: user.id, p_include_inactive: true,
+    });
     setSections((data as SectionRow[]) || []);
-  }, [organizationId]);
+  }, [user?.id]);
 
   useFocusEffect(useCallback(() => { loadSections(); }, [loadSections]));
 

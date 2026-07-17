@@ -99,12 +99,10 @@ export default function GuidesAndTrainingEditorScreen() {
       setLoading(true);
       console.log('Loading guides and training items from database...');
       
-      const { data, error } = await supabase
-        .from('guides_and_training')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('category', { ascending: true })
-        .order('display_order', { ascending: true });
+      const { data, error } = await (supabase.rpc as any)('get_guides', {
+        p_actor_id: user?.id,
+        p_include_inactive: true,
+      });
 
       if (error) {
         console.error('Error loading guides:', error);
@@ -347,21 +345,19 @@ export default function GuidesAndTrainingEditorScreen() {
 
       if (editingGuide) {
         console.log('Updating guide:', editingGuide.id);
-        const { error } = await supabase
-          .from('guides_and_training')
-          .update({
-            title: formData.title,
-            description: formData.description || null,
-            category: formData.category,
-            thumbnail_url: thumbnailUrl,
-            file_url: fileUrl,
-            file_type: fileType,
-            file_name: fileName,
-            display_order: formData.display_order,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', editingGuide.id)
-          .eq('organization_id', organizationId);
+        const { error } = await (supabase.rpc as any)('update_guide', {
+          p_user_id: user.id,
+          p_guide_id: editingGuide.id,
+          p_title: formData.title,
+          p_description: formData.description || null,
+          p_category: formData.category,
+          p_thumbnail_url: thumbnailUrl,
+          p_file_url: fileUrl,
+          p_file_type: fileType,
+          p_file_name: fileName,
+          p_display_order: formData.display_order,
+          p_organization_id: organizationId,
+        });
 
         if (error) {
           console.error('Error updating guide:', error);
@@ -378,20 +374,18 @@ export default function GuidesAndTrainingEditorScreen() {
         }
       } else {
         console.log('Creating new guide');
-        const { error } = await supabase
-          .from('guides_and_training')
-          .insert({
-            title: formData.title,
-            description: formData.description || null,
-            category: formData.category,
-            thumbnail_url: thumbnailUrl,
-            file_url: fileUrl,
-            file_type: fileType,
-            file_name: fileName,
-            display_order: formData.display_order,
-            created_by: user.id,
-            organization_id: organizationId,
-          });
+        const { data: newGuideId, error } = await (supabase.rpc as any)('create_guide', {
+          p_user_id: user.id,
+          p_title: formData.title,
+          p_description: formData.description || null,
+          p_category: formData.category,
+          p_thumbnail_url: thumbnailUrl,
+          p_file_url: fileUrl,
+          p_file_type: fileType,
+          p_file_name: fileName,
+          p_display_order: formData.display_order,
+          p_organization_id: organizationId,
+        });
 
         if (error) {
           console.error('Error creating guide:', error);
@@ -400,20 +394,11 @@ export default function GuidesAndTrainingEditorScreen() {
         Alert.alert(t('common.success'), t('guides_training_editor.guide_created'));
 
         // Save Spanish translations for newly created item
-        if (formData.title_es || formData.description_es) {
-          const { data: newItem } = await supabase
-            .from('guides_and_training')
-            .select('id')
-            .eq('organization_id', organizationId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-          if (newItem) {
-            await saveTranslations('guides_and_training', newItem.id, {
-              title_es: formData.title_es,
-              description_es: formData.description_es,
-            }, organizationId);
-          }
+        if ((formData.title_es || formData.description_es) && newGuideId) {
+          await saveTranslations('guides_and_training', newGuideId, {
+            title_es: formData.title_es,
+            description_es: formData.description_es,
+          }, organizationId);
         }
       }
 
@@ -437,12 +422,12 @@ export default function GuidesAndTrainingEditorScreen() {
           onPress: async () => {
             try {
               console.log('Deleting guide:', guide.id);
-              
-              const { error } = await supabase
-                .from('guides_and_training')
-                .delete()
-                .eq('id', guide.id)
-                .eq('organization_id', organizationId);
+
+              const { error } = await (supabase.rpc as any)('delete_guide', {
+                p_user_id: user?.id,
+                p_guide_id: guide.id,
+                p_organization_id: organizationId,
+              });
 
               if (error) {
                 console.error('Error deleting guide:', error);
@@ -486,10 +471,12 @@ export default function GuidesAndTrainingEditorScreen() {
     if (aboveIdx >= 0) newGuides[aboveIdx] = { ...newGuides[aboveIdx], display_order: currentOrder };
     setGuides(newGuides);
     try {
-      await Promise.all([
-        supabase.from('guides_and_training').update({ display_order: aboveOrder }).eq('id', currentItem.id).eq('organization_id', organizationId),
-        supabase.from('guides_and_training').update({ display_order: currentOrder }).eq('id', aboveItem.id).eq('organization_id', organizationId),
-      ]);
+      const reorderedGroup = [...categoryGuides];
+      [reorderedGroup[index - 1], reorderedGroup[index]] = [reorderedGroup[index], reorderedGroup[index - 1]];
+      await (supabase.rpc as any)('reorder_guides', {
+        p_actor_id: user?.id,
+        p_ordered_ids: reorderedGroup.map(g => g.id),
+      });
     } catch (error) {
       console.error('Error moving guide up:', error);
       await loadGuides();
@@ -510,10 +497,12 @@ export default function GuidesAndTrainingEditorScreen() {
     if (belowIdx >= 0) newGuides[belowIdx] = { ...newGuides[belowIdx], display_order: currentOrder };
     setGuides(newGuides);
     try {
-      await Promise.all([
-        supabase.from('guides_and_training').update({ display_order: belowOrder }).eq('id', currentItem.id).eq('organization_id', organizationId),
-        supabase.from('guides_and_training').update({ display_order: currentOrder }).eq('id', belowItem.id).eq('organization_id', organizationId),
-      ]);
+      const reorderedGroup = [...categoryGuides];
+      [reorderedGroup[index], reorderedGroup[index + 1]] = [reorderedGroup[index + 1], reorderedGroup[index]];
+      await (supabase.rpc as any)('reorder_guides', {
+        p_actor_id: user?.id,
+        p_ordered_ids: reorderedGroup.map(g => g.id),
+      });
     } catch (error) {
       console.error('Error moving guide down:', error);
       await loadGuides();
@@ -531,10 +520,10 @@ export default function GuidesAndTrainingEditorScreen() {
     });
     setGuides(newGuides);
     try {
-      const updates = reorderedData.map((item, index) =>
-        supabase.from('guides_and_training').update({ display_order: index }).eq('id', item.id).eq('organization_id', organizationId)
-      );
-      await Promise.all(updates);
+      await (supabase.rpc as any)('reorder_guides', {
+        p_actor_id: user?.id,
+        p_ordered_ids: reorderedData.map(item => item.id),
+      });
       console.log('Drag reorder persisted successfully');
     } catch (error) {
       console.error('Error persisting drag reorder:', error);

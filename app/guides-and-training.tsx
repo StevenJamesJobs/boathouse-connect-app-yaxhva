@@ -88,18 +88,15 @@ export default function GuidesAndTrainingScreen() {
 
   useEffect(() => {
     loadGuides();
-  }, []);
+  }, [user?.id]);
 
   const loadGuides = async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('guides_and_training')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('category', { ascending: true })
-        .order('display_order', { ascending: true });
+      const { data, error } = await (supabase.rpc as any)('get_guides', {
+        p_actor_id: user.id,
+      });
 
       if (error) throw error;
       setGuides(data || []);

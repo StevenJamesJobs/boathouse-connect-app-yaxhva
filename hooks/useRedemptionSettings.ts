@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface RedemptionCustomOption {
   id: string;
@@ -45,18 +46,19 @@ export const REDEMPTION_DEFAULTS: RedemptionSettings = {
  */
 export function useRedemptionSettings() {
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const [settings, setSettings] = useState<RedemptionSettings>(REDEMPTION_DEFAULTS);
   const [customOptions, setCustomOptions] = useState<RedemptionCustomOption[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
-    if (!organizationId) { setLoading(false); return; }
+    if (!organizationId || !user?.id) { setLoading(false); return; }
     try {
       const [rowRes, optsRes] = await Promise.all([
-        supabase.from('organization_redemption_settings' as any).select('*').eq('organization_id', organizationId).maybeSingle(),
-        supabase.from('redemption_custom_options' as any).select('*').eq('organization_id', organizationId).eq('is_active', true).order('display_order', { ascending: true }),
+        (supabase.rpc as any)('get_redemption_settings', { p_actor_id: user?.id }),
+        (supabase.rpc as any)('get_redemption_custom_options', { p_actor_id: user?.id }),
       ]);
-      const row: any = rowRes.data;
+      const row: any = (rowRes.data as any[])?.[0];
       if (row) {
         setSettings({
           redemptions_enabled: row.redemptions_enabled,
@@ -78,7 +80,7 @@ export function useRedemptionSettings() {
     } finally {
       setLoading(false);
     }
-  }, [organizationId]);
+  }, [organizationId, user?.id]);
 
   useEffect(() => { load(); }, [load]);
 

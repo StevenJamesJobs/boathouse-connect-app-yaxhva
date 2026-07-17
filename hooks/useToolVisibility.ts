@@ -23,14 +23,8 @@ export function useToolVisibility() {
       setIsLoading(true);
 
       const [assistantsRes, mappingsRes] = await Promise.all([
-        (supabase
-          .from('organization_assistants' as any)
-          .select('assistant_key, display_name, is_active')
-          .eq('organization_id', organizationId) as any),
-        (supabase
-          .from('job_title_assistants' as any)
-          .select('assistant_key, job_title')
-          .eq('organization_id', organizationId) as any),
+        (supabase.rpc as any)('get_org_assistants', { p_actor_id: user?.id }),
+        (supabase.rpc as any)('get_job_title_assistants', { p_actor_id: user?.id }),
       ]);
 
       const orgAssistants: OrgAssistant[] = assistantsRes.data || [];

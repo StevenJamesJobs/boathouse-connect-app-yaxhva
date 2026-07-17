@@ -83,19 +83,16 @@ export default function HostSectionEditorScreen() {
   const [savingTile, setSavingTile] = useState(false);
 
   const loadTiles = useCallback(async (sid: string) => {
-    const { data } = await (supabase
-      .from('host_section_tiles' as any)
-      .select('*')
-      .eq('section_id', sid)
-      .order('display_order', { ascending: true }) as any);
+    const { data } = await (supabase.rpc as any)('get_host_section_tiles', { p_actor_id: user?.id, p_section_id: sid });
     setTiles((data as Tile[]) || []);
-  }, []);
+  }, [user?.id]);
 
   const load = useCallback(async () => {
     if (isNew || !id) return;
     try {
       setLoading(true);
-      const { data: s } = await (supabase.from('host_sections' as any).select('*').eq('id', id).single() as any);
+      const { data } = await (supabase.rpc as any)('get_host_sections', { p_actor_id: user?.id, p_id: id });
+      const s = data?.[0];
       if (s) {
         setTitle(s.title || '');
         setCardSubtitle(s.card_subtitle || '');
@@ -110,7 +107,7 @@ export default function HostSectionEditorScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, isNew, loadTiles]);
+  }, [id, isNew, loadTiles, user?.id]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -194,18 +191,21 @@ export default function HostSectionEditorScreen() {
         const uploaded = await uploadImageToBucket(tLocalUri, BUCKET, readB64);
         if (uploaded) imgUrl = uploaded;
       }
+      // Prepend https:// when the entered link has no scheme, else it won't open (e.g. "kevahomes.com").
+      const rawLink = tLinkUrl.trim();
+      const linkUrl = rawLink ? (/^https?:\/\//i.test(rawLink) ? rawLink : `https://${rawLink}`) : null;
       if (editingTile) {
         const { error } = await supabase.rpc('update_host_section_tile' as any, {
           p_actor_id: user.id, p_tile_id: editingTile.id, p_title: tTitle.trim() || null,
           p_image_url: imgUrl || null, p_image_shape: tImageShape,
-          p_link_url: tLinkUrl.trim() || null, p_link_description: tLinkDesc.trim() || null,
+          p_link_url: linkUrl, p_link_description: tLinkDesc.trim() || null,
         });
         if (error) throw error;
       } else {
         const { error } = await supabase.rpc('create_host_section_tile' as any, {
           p_actor_id: user.id, p_section_id: sectionId, p_title: tTitle.trim() || null,
           p_image_url: imgUrl || null, p_image_shape: tImageShape,
-          p_link_url: tLinkUrl.trim() || null, p_link_description: tLinkDesc.trim() || null,
+          p_link_url: linkUrl, p_link_description: tLinkDesc.trim() || null,
         });
         if (error) throw error;
       }

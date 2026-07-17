@@ -423,7 +423,7 @@ export default function ManagerManageScreen() {
         supabase.rpc('get_upcoming_events', { p_actor_id: actorId }).then((r: any) => ({ data: ((r.data || []) as any[]).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 2) })),
         supabase.rpc('get_org_uploads', { p_actor_id: actorId, p_limit: 1 }),
         supabase.rpc('get_menu_items', { p_actor_id: actorId }),
-        supabase.from('guides_and_training').select('id, title, created_at').eq('organization_id', organizationId).order('created_at', { ascending: false }).limit(2),
+        (supabase.rpc as any)('get_guides', { p_actor_id: actorId }).then((r: any) => ({ data: ((r.data || []) as any[]).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 2) })),
         supabase.rpc('get_org_exam_activity', { p_actor_id: actorId, p_since: since.toISOString() }),
       ]);
       const dataOf = (i: number): any[] => (settled[i].status === 'fulfilled' ? (settled[i] as any).value.data || [] : []);

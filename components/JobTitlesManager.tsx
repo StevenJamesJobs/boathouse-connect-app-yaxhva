@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useOrgJobTitles, OrgJobTitle } from '@/hooks/useOrgJobTitles';
 import { supabase } from '@/app/integrations/supabase/client';
 
@@ -20,6 +21,7 @@ interface Props {
 
 export default function JobTitlesManager({ colors }: Props) {
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const { jobTitles, isLoading, refetch } = useOrgJobTitles();
   const [newTitle, setNewTitle] = useState('');
   const [adding, setAdding] = useState(false);
@@ -34,18 +36,10 @@ export default function JobTitlesManager({ colors }: Props) {
 
     setAdding(true);
     try {
-      const maxOrder = jobTitles.length > 0
-        ? Math.max(...jobTitles.map(jt => jt.display_order))
-        : 0;
-
-      const { error } = await (supabase
-        .from('organization_job_titles' as any)
-        .insert({
-          organization_id: organizationId,
-          title: trimmed,
-          display_order: maxOrder + 1,
-          is_active: true,
-        }) as any);
+      const { error } = await (supabase.rpc as any)('add_org_job_title', {
+        p_actor_id: user?.id,
+        p_title: trimmed,
+      });
 
       if (error) throw error;
       setNewTitle('');
@@ -59,10 +53,11 @@ export default function JobTitlesManager({ colors }: Props) {
 
   const handleToggleActive = async (item: OrgJobTitle) => {
     try {
-      const { error } = await (supabase
-        .from('organization_job_titles' as any)
-        .update({ is_active: !item.is_active })
-        .eq('id', item.id) as any);
+      const { error } = await (supabase.rpc as any)('set_org_job_title_active', {
+        p_actor_id: user?.id,
+        p_id: item.id,
+        p_is_active: !item.is_active,
+      });
 
       if (error) throw error;
       await refetch();
@@ -73,17 +68,13 @@ export default function JobTitlesManager({ colors }: Props) {
 
   const handleMoveUp = async (index: number) => {
     if (index === 0) return;
-    const current = jobTitles[index];
-    const above = jobTitles[index - 1];
     try {
-      await Promise.all([
-        (supabase.from('organization_job_titles' as any)
-          .update({ display_order: above.display_order })
-          .eq('id', current.id) as any),
-        (supabase.from('organization_job_titles' as any)
-          .update({ display_order: current.display_order })
-          .eq('id', above.id) as any),
-      ]);
+      const reordered = [...jobTitles];
+      [reordered[index - 1], reordered[index]] = [reordered[index], reordered[index - 1]];
+      await (supabase.rpc as any)('reorder_org_job_titles', {
+        p_actor_id: user?.id,
+        p_ordered_ids: reordered.map(j => j.id),
+      });
       await refetch();
     } catch {}
   };
@@ -99,10 +90,10 @@ export default function JobTitlesManager({ colors }: Props) {
           style: 'destructive',
           onPress: async () => {
             try {
-              await (supabase
-                .from('organization_job_titles' as any)
-                .delete()
-                .eq('id', item.id) as any);
+              await (supabase.rpc as any)('delete_org_job_title', {
+                p_actor_id: user?.id,
+                p_id: item.id,
+              });
               await refetch();
             } catch (err: any) {
               Alert.alert('Error', err.message || 'Failed to delete.');

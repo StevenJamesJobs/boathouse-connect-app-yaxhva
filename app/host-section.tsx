@@ -61,23 +61,19 @@ export default function HostSectionScreen() {
   const userName = user?.name || 'there';
 
   const load = useCallback(async () => {
-    if (!id) return;
+    if (!id || !user?.id) return;
     try {
       setLoading(true);
-      const { data: s } = await (supabase.from('host_sections' as any).select('*').eq('id', id).single() as any);
-      const { data: t } = await (supabase
-        .from('host_section_tiles' as any)
-        .select('*')
-        .eq('section_id', id)
-        .order('display_order', { ascending: true }) as any);
-      setSection(s as HostSection);
+      const { data: s } = await (supabase.rpc as any)('get_host_sections', { p_actor_id: user.id, p_id: id });
+      const { data: t } = await (supabase.rpc as any)('get_host_section_tiles', { p_actor_id: user.id, p_section_id: id });
+      setSection((s?.[0]) as HostSection);
       setTiles((t as HostTile[]) || []);
     } catch (e) {
       console.error('Error loading host section:', e);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, user?.id]);
 
   useEffect(() => { load(); }, [load]);
 
