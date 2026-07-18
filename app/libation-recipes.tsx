@@ -70,10 +70,11 @@ export default function LibationRecipesScreen() {
   }, []);
 
   const loadRecipes = async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       console.log('Loading libation recipes from table: libation_recipes');
-      const { data, error } = await supabase.rpc('get_libation_recipes', { p_actor_id: user?.id ?? '' });
+      const { data, error } = await supabase.rpc('get_libation_recipes', { p_actor_id: user.id });
 
       if (error) {
         console.error('Error loading libation recipes:', error);

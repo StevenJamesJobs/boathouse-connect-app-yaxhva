@@ -43,10 +43,10 @@ const TABS: { key: LeaderboardTab; labelKey: string; icon: { ios: string; androi
 ];
 
 const RPC_MAP: Record<LeaderboardTab, string> = {
-  overall: 'get_master_leaderboard_overall',
-  memory: 'get_master_leaderboard_memory',
-  word_search: 'get_master_leaderboard_word_search',
-  picture_this: 'get_master_leaderboard_picture_this',
+  overall: 'get_master_leaderboard_overall_actor',
+  memory: 'get_master_leaderboard_memory_actor',
+  word_search: 'get_master_leaderboard_word_search_actor',
+  picture_this: 'get_master_leaderboard_picture_this_actor',
 };
 
 const RANK_EMOJIS = ['🥇', '🥈', '🥉'];
@@ -64,9 +64,10 @@ export default function MasterLeaderboardScreen() {
   const [loading, setLoading] = useState(true);
 
   const loadData = useCallback(async (tab: LeaderboardTab) => {
+    if (!user?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc(RPC_MAP[tab] as any, { p_limit: 20, p_organization_id: organizationId });
+      const { data, error } = await supabase.rpc(RPC_MAP[tab] as any, { p_limit: 20, p_actor_id: user.id });
       if (!error && data) {
         setEntries(data as MasterLeaderboardEntry[]);
       } else {
@@ -77,7 +78,7 @@ export default function MasterLeaderboardScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     loadData(activeTab);

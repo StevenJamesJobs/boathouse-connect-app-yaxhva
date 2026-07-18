@@ -151,11 +151,12 @@ export default function ManualScheduleScreen() {
   };
 
   const loadShifts = async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       // Manager-gated org schedule for the visible week (org derived server-side).
       const { data, error } = await supabase.rpc('get_org_schedule', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_start_date: currentWeek.startStr,
         p_end_date: currentWeek.endStr,
       });
@@ -295,9 +296,10 @@ export default function ManualScheduleScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            if (!user?.id) return;
             try {
               const { error } = await supabase.rpc('delete_shift', {
-                p_actor_id: user?.id ?? '',
+                p_actor_id: user.id,
                 p_shift_id: shift.id,
               });
               if (error) throw error;

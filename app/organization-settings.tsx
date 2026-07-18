@@ -16,7 +16,6 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -26,6 +25,7 @@ import MenuIconPicker from '@/components/MenuIconPicker';
 import JobTitlesManager from '@/components/JobTitlesManager';
 import AssistantsManager from '@/components/AssistantsManager';
 import { supabase } from '@/app/integrations/supabase/client';
+import { brokerUploadImage } from '@/utils/storageBroker';
 
 type SettingsTab = 'branding' | 'menu' | 'jobs-tools' | 'access';
 
@@ -179,43 +179,18 @@ export default function OrganizationSettingsScreen() {
     if (!organizationId || !user?.id) return;
     setUploadingLogo(true);
     try {
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-
-      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${organizationId}/logo_${Date.now()}.${fileExt}`;
-
-      let contentType = 'image/jpeg';
-      if (fileExt === 'png') contentType = 'image/png';
-      else if (fileExt === 'webp') contentType = 'image/webp';
-
-      const { error: uploadError } = await supabase.storage
-        .from('organization-logos')
-        .upload(fileName, byteArray, { contentType, upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('organization-logos')
-        .getPublicUrl(fileName);
+      const publicUrl = await brokerUploadImage('org_logo', uri, user.id);
+      if (!publicUrl) throw new Error('Failed to upload logo.');
 
       const { data: logoRes, error: logoError } = await supabase.rpc('set_org_logo', {
         p_actor_id: user.id,
-        p_logo_url: urlData.publicUrl,
+        p_logo_url: publicUrl,
       });
       if (logoError) throw logoError;
       const logoResult: any = typeof logoRes === 'string' ? JSON.parse(logoRes) : logoRes;
       if (logoResult && logoResult.success === false) throw new Error(logoResult.error);
 
-      setLogoPreview(urlData.publicUrl);
+      setLogoPreview(publicUrl);
       await refreshOrganization();
       Alert.alert('Done', 'Logo updated successfully.');
     } catch (err: any) {

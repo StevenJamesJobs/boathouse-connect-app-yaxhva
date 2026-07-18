@@ -16,11 +16,11 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { supabase } from '@/app/integrations/supabase/client';
+import { brokerUploadImage } from '@/utils/storageBroker';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
 import RichTextToolbar from '@/components/RichTextToolbar';
@@ -81,10 +81,11 @@ export default function PureeSyrupRecipesEditorScreen() {
   const [procDragH, setProcDragH] = useState(0);
 
   const loadRecipes = useCallback(async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       console.log('Loading puree syrup recipes from table: puree_syrup_recipes');
-      const { data, error } = await supabase.rpc('get_puree_syrup_recipes', { p_actor_id: user?.id ?? '' });
+      const { data, error } = await supabase.rpc('get_puree_syrup_recipes', { p_actor_id: user.id });
 
       if (error) {
         console.error('Error loading puree syrup recipes:', error);
@@ -134,53 +135,13 @@ export default function PureeSyrupRecipesEditorScreen() {
       setUploadingImage(true);
       console.log('Starting image upload for user:', user.id);
 
-      // Read the file as base64
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      // Convert base64 to Uint8Array
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-
-      // Create file name
-      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      
-      console.log('Uploading file to puree-syrup-recipe-images bucket:', fileName);
-
-      // Determine content type
-      let contentType = 'image/jpeg';
-      if (fileExt === 'png') contentType = 'image/png';
-      else if (fileExt === 'gif') contentType = 'image/gif';
-      else if (fileExt === 'webp') contentType = 'image/webp';
-
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('puree-syrup-recipe-images')
-        .upload(fileName, byteArray, {
-          contentType: contentType,
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        throw uploadError;
+      const publicUrl = await brokerUploadImage('puree_syrup_image', uri, user.id);
+      if (!publicUrl) {
+        throw new Error(t('puree_editor:upload_image_error'));
       }
 
-      console.log('Upload successful:', uploadData);
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('puree-syrup-recipe-images')
-        .getPublicUrl(fileName);
-
-      console.log('Public URL:', urlData.publicUrl);
-      setThumbnailUrl(urlData.publicUrl);
+      console.log('Public URL:', publicUrl);
+      setThumbnailUrl(publicUrl);
       Alert.alert(t('common:success'), t('puree_editor:updated_success'));
     } catch (error: any) {
       console.error('Error uploading image:', error);
@@ -258,7 +219,7 @@ export default function PureeSyrupRecipesEditorScreen() {
         }
         console.log('Puree syrup recipe updated successfully');
         if (procedureEs.trim()) {
-          await saveTranslations('puree_syrup_recipes', editingRecipe.id, { procedure_es: procedureEs }, organizationId);
+          await saveTranslations('puree_syrup_recipes', editingRecipe.id, { procedure_es: procedureEs }, user?.id);
         }
         Alert.alert(t('common:success'), t('puree_editor:updated_success'));
       } else {
@@ -282,7 +243,7 @@ export default function PureeSyrupRecipesEditorScreen() {
         console.log('Puree syrup recipe added successfully');
         // insert_puree_syrup_recipe returns the new id — use it directly.
         if (data && procedureEs.trim()) {
-          await saveTranslations('puree_syrup_recipes', data as string, { procedure_es: procedureEs }, organizationId);
+          await saveTranslations('puree_syrup_recipes', data as string, { procedure_es: procedureEs }, user?.id);
         }
         Alert.alert(t('common:success'), t('puree_editor:created_success'));
       }

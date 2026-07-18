@@ -158,7 +158,11 @@ export default function LoginScreen() {
     } catch (error) {
       console.error('[iOS Login] Login error:', error);
       setIsLoading(false);
-      Alert.alert(t('common.error'), t('login.error_generic'));
+      if (error instanceof Error && error.message === 'rate_limited') {
+        Alert.alert(t('login.error_login_failed'), t('login.error_rate_limited'));
+      } else {
+        Alert.alert(t('common.error'), t('login.error_generic'));
+      }
     }
   };
 

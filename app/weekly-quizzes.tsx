@@ -75,11 +75,12 @@ export default function WeeklyQuizzesScreen() {
   );
 
   const fetchQuizzes = useCallback(async () => {
+    if (!user?.id) { setLoading(false); return; }
     setLoading(true);
     try {
       // Fire-and-forget cleanup of expired exams (auto-close)
       try {
-        await supabase.rpc('close_expired_exams', { p_organization_id: organizationId });
+        await supabase.rpc('close_expired_exams_actor' as any, { p_actor_id: user.id });
       } catch {
         // ignore — cleanup is best-effort
       }

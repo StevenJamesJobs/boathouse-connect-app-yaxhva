@@ -15,6 +15,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { brokerUploadBase64 } from '@/utils/storageBroker';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -97,11 +98,11 @@ export default function MenuUploadScreen() {
   }, [user?.id, organizationId]);
 
   const loadUploads = useCallback(async () => {
-    if (!organizationId) return;
+    if (!user?.id || !organizationId) return;
     try {
       setLoading(true);
       const { data, error } = await supabase.rpc('get_menu_uploads', {
-        p_actor_id: user?.id ?? '', p_limit: 15,
+        p_actor_id: user.id, p_limit: 15,
       });
       if (error) throw error;
       setUploads((data || []) as any);
@@ -110,7 +111,7 @@ export default function MenuUploadScreen() {
     } finally {
       setLoading(false);
     }
-  }, [organizationId]);
+  }, [user?.id, organizationId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -123,8 +124,9 @@ export default function MenuUploadScreen() {
   useEffect(() => {
     if (!processingId) return;
     const interval = setInterval(async () => {
+      if (!user?.id) return;
       const { data: pollRows } = await supabase.rpc('get_menu_uploads', {
-        p_actor_id: user?.id ?? '', p_upload_id: processingId,
+        p_actor_id: user.id, p_upload_id: processingId,
       });
       const data: any = Array.isArray(pollRows) ? pollRows[0] : null;
       if (data && data.status !== 'processing') {
@@ -146,14 +148,8 @@ export default function MenuUploadScreen() {
   }, [processingId, router, t, loadUploads, loadQuota, isOnboarding]);
 
   const uploadFileToStorage = async (base64: string, fileName: string, contentType: string): Promise<string> => {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-    const storageName = `${organizationId}/${Date.now()}-${fileName}`;
-    const { error } = await supabase.storage.from('menu-uploads').upload(storageName, bytes, { contentType, upsert: false });
-    if (error) throw error;
-    const { data } = supabase.storage.from('menu-uploads').getPublicUrl(storageName);
-    return data.publicUrl;
+    if (!user?.id) throw new Error('Not signed in');
+    return await brokerUploadBase64('menu_upload_file', base64, fileName, contentType, user.id);
   };
 
   const startParse = async (
@@ -164,8 +160,9 @@ export default function MenuUploadScreen() {
     pageCount: number,
     additionalImageUrls: string[] = []
   ) => {
+    if (!user?.id) return;
     const { data: newId, error: insertError } = await supabase.rpc('create_menu_upload', {
-      p_actor_id: user?.id ?? '',
+      p_actor_id: user.id,
       p_file_url: fileUrl,
       p_file_name: displayName,
       p_source_type: sourceType,

@@ -23,7 +23,6 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
@@ -32,6 +31,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { fetchContentImages, saveContentImages, uploadImageToStorage } from '@/utils/contentImages';
+import { brokerUploadImage, brokerDelete } from '@/utils/storageBroker';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
 import CollapsibleSection from '@/components/CollapsibleSection';
@@ -230,52 +230,22 @@ export default function AnnouncementEditorScreen() {
   };
 
   const uploadImage = async (uri: string): Promise<string | null> => {
+    if (!user?.id) return null;
     try {
       setUploadingImage(true);
       console.log('Starting image upload for announcement');
 
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      const publicUrl = await brokerUploadImage('announcement_image', uri, user.id);
 
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-
-      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${Date.now()}.${ext}`;
-
-      console.log('Uploading image:', fileName);
-
-      let contentType = 'image/jpeg';
-      if (ext === 'png') contentType = 'image/png';
-      else if (ext === 'gif') contentType = 'image/gif';
-      else if (ext === 'webp') contentType = 'image/webp';
-
-      const { data, error } = await supabase.storage
-        .from('announcements')
-        .upload(fileName, byteArray, {
-          contentType: contentType,
-          upsert: false,
-        });
-
-      if (error) {
-        console.error('Error uploading image:', error);
-        throw error;
+      if (!publicUrl) {
+        console.error('Error uploading image');
+        Alert.alert('Error', t('announcement_editor:upload_image_error'));
+        return null;
       }
 
-      console.log('Upload successful:', data);
+      console.log('Public URL:', publicUrl);
 
-      const { data: urlData } = supabase.storage
-        .from('announcements')
-        .getPublicUrl(fileName);
-
-      console.log('Public URL:', urlData.publicUrl);
-
-      return urlData.publicUrl;
+      return publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
       Alert.alert('Error', t('announcement_editor:upload_image_error'));
@@ -366,15 +336,13 @@ export default function AnnouncementEditorScreen() {
           await saveTranslations('announcements', editingAnnouncement.id, {
             title_es: formData.title_es,
             content_es: formData.message_es,
-          }, organizationId);
+          }, user?.id);
         }
 
         // Upload new additional images and save all to content_images
         const uploadedNewUrls: string[] = [];
         for (const uri of newAdditionalImageUris) {
-          const url = await uploadImageToStorage(uri, 'announcement', (u) =>
-            FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
-          );
+          const url = await uploadImageToStorage(uri, 'announcement', user.id);
           if (url) uploadedNewUrls.push(url);
         }
         const allAdditionalUrls = [...additionalImageUrls, ...uploadedNewUrls];
@@ -433,16 +401,14 @@ export default function AnnouncementEditorScreen() {
           await saveTranslations('announcements', newAnnouncementId, {
             title_es: formData.title_es,
             content_es: formData.message_es,
-          }, organizationId);
+          }, user?.id);
         }
 
         // Upload and save additional images for newly created item
         if (newAnnouncementId && newAdditionalImageUris.length > 0) {
           const uploadedNewUrls: string[] = [];
           for (const uri of newAdditionalImageUris) {
-            const url = await uploadImageToStorage(uri, 'announcement', (u) =>
-              FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
-            );
+            const url = await uploadImageToStorage(uri, 'announcement', user.id);
             if (url) uploadedNewUrls.push(url);
           }
           if (uploadedNewUrls.length > 0) {
@@ -489,12 +455,7 @@ export default function AnnouncementEditorScreen() {
               }
 
               if (announcement.thumbnail_url) {
-                const fileName = announcement.thumbnail_url.split('/').pop();
-                if (fileName) {
-                  await supabase.storage
-                    .from('announcements')
-                    .remove([fileName]);
-                }
+                await brokerDelete('announcements', [announcement.thumbnail_url], user.id);
               }
 
               // content_images rows are cascaded by delete_announcement server-side.

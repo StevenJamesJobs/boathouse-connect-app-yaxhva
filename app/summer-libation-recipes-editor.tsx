@@ -17,11 +17,11 @@ import {
   Switch,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { supabase } from '@/app/integrations/supabase/client';
+import { brokerUploadImage } from '@/utils/storageBroker';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -101,9 +101,10 @@ export default function SummerLibationRecipesEditorScreen() {
   const [procDragH, setProcDragH] = useState(0);
 
   const loadRecipes = useCallback(async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
-      const { data, error } = await supabase.rpc('get_summer_libation_recipes', { p_actor_id: user?.id ?? '' });
+      const { data, error } = await supabase.rpc('get_summer_libation_recipes', { p_actor_id: user.id });
 
       if (error) {
         console.error('Error loading summer libation recipes:', error);
@@ -151,42 +152,12 @@ export default function SummerLibationRecipesEditorScreen() {
     try {
       setUploadingImage(true);
 
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-
-      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-
-      let contentType = 'image/jpeg';
-      if (fileExt === 'png') contentType = 'image/png';
-      else if (fileExt === 'gif') contentType = 'image/gif';
-      else if (fileExt === 'webp') contentType = 'image/webp';
-
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('summer-libation-recipe-images')
-        .upload(fileName, byteArray, {
-          contentType: contentType,
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        throw uploadError;
+      const publicUrl = await brokerUploadImage('summer_libation_image', uri, user.id);
+      if (!publicUrl) {
+        throw new Error('Failed to upload image');
       }
 
-      const { data: urlData } = supabase.storage
-        .from('summer-libation-recipe-images')
-        .getPublicUrl(fileName);
-
-      setThumbnailUrl(urlData.publicUrl);
+      setThumbnailUrl(publicUrl);
       Alert.alert(t('common.success'), t('summer_libation_editor.image_uploaded'));
     } catch (error: any) {
       console.error('Error uploading image:', error);
@@ -275,7 +246,7 @@ export default function SummerLibationRecipesEditorScreen() {
           throw error;
         }
         if (procedureEs.trim()) {
-          await saveTranslations('summer_libation_recipes', editingRecipe.id, { procedure_es: procedureEs }, organizationId);
+          await saveTranslations('summer_libation_recipes', editingRecipe.id, { procedure_es: procedureEs }, user?.id);
         }
         Alert.alert(t('common.success'), t('summer_libation_editor.recipe_updated'));
       } else {
@@ -301,7 +272,7 @@ export default function SummerLibationRecipesEditorScreen() {
         }
         // insert_summer_libation_recipe returns the new id — use it directly.
         if (data && procedureEs.trim()) {
-          await saveTranslations('summer_libation_recipes', data as string, { procedure_es: procedureEs }, organizationId);
+          await saveTranslations('summer_libation_recipes', data as string, { procedure_es: procedureEs }, user?.id);
         }
         Alert.alert(t('common.success'), t('summer_libation_editor.recipe_added'));
       }

@@ -107,12 +107,13 @@ export default function BartenderOpeningChecklistEditorScreen() {
   );
 
   const loadChecklist = async () => {
+    if (!user?.id) return;
     console.log('Loading Bartender Opening Checklist for editing');
     try {
       setLoading(true);
 
       const { data: categoriesData, error: categoriesError } = await supabase.rpc('get_checklist_categories', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: true,
         p_checklist_type: 'opening',
       });
@@ -123,7 +124,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
       }
 
       const { data: itemsData, error: itemsError } = await supabase.rpc('get_checklist_items', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: true,
         p_checklist_type: 'opening',
       });
@@ -205,6 +206,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
   };
 
   const handleSaveCategory = async () => {
+    if (!user?.id) return;
     if (!categoryName.trim()) {
       Alert.alert(t('common:error'), t('checklist_editor:error_enter_category_name'));
       return;
@@ -215,7 +217,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
 
     try {
       const { error } = await supabase.rpc('upsert_checklist_category', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: true,
         p_checklist_type: 'opening',
         p_name: categoryName.trim(),
@@ -246,9 +248,10 @@ export default function BartenderOpeningChecklistEditorScreen() {
           text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
+            if (!user?.id) return;
             try {
               const { error } = await supabase.rpc('delete_checklist_category', {
-                p_actor_id: user?.id ?? '',
+                p_actor_id: user.id,
                 p_bartender: true,
                 p_category_id: category.id,
               });
@@ -267,6 +270,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
   };
 
   const handleSaveItem = async () => {
+    if (!user?.id) return;
     if (!itemText.trim()) {
       Alert.alert(t('common:error'), t('checklist_editor:error_enter_item_text'));
       return;
@@ -282,7 +286,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
 
     try {
       const { error } = await supabase.rpc('upsert_checklist_item', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: true,
         p_category_id: selectedCategoryId,
         p_text: itemText.trim(),
@@ -313,9 +317,10 @@ export default function BartenderOpeningChecklistEditorScreen() {
           text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
+            if (!user?.id) return;
             try {
               const { error } = await supabase.rpc('delete_checklist_item', {
-                p_actor_id: user?.id ?? '',
+                p_actor_id: user.id,
                 p_bartender: true,
                 p_item_id: item.id,
               });

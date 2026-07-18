@@ -149,8 +149,8 @@ export default function SetupWizardScreen() {
     // Per-menu mode needs the slot-1/slot-2 category trees materialized from the
     // seeded slot-0 tree. Idempotent, so re-running on a revisit is safe.
     if (scope === 'per_menu') {
-      const { error: matError } = await (supabase.rpc as any)('materialize_org_per_menu_categories', {
-        p_org_id: organizationId,
+      const { error: matError } = await (supabase.rpc as any)('materialize_org_per_menu_categories_actor', {
+        p_actor_id: user.id,
       });
       if (matError) console.error('[SetupWizard] Materialize per-menu categories error:', matError);
     }
@@ -293,9 +293,10 @@ export default function SetupWizardScreen() {
 
       // Seed the Cocktails A-Z starter library (clone from the canonical source
       // org). Idempotent by name; non-fatal — a failure here must not block
-      // onboarding. p_source_org defaults to McLoone's in the RPC.
-      const { error: cocktailSeedError } = await supabase.rpc('seed_org_cocktails', {
-        p_target_org: organizationId,
+      // onboarding. Actor-gated: target = the owner's own org, and a NULL
+      // p_source_org defaults to the sample org inside the RPC.
+      const { error: cocktailSeedError } = await (supabase.rpc as any)('seed_org_cocktails_actor', {
+        p_actor_id: user?.id,
       });
       if (cocktailSeedError) {
         console.error('[SetupWizard] Seed cocktails error:', cocktailSeedError);

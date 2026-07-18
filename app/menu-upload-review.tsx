@@ -86,11 +86,12 @@ export default function MenuUploadReviewScreen() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (!user?.id) return;
       if (!uploadId || !organizationId) return;
       try {
         setLoading(true);
         const { data: uplRows, error } = await supabase.rpc('get_menu_uploads', {
-          p_actor_id: user?.id ?? '', p_upload_id: uploadId,
+          p_actor_id: user.id, p_upload_id: uploadId,
         });
         if (error) throw error;
         if (cancelled) return;
@@ -98,7 +99,7 @@ export default function MenuUploadReviewScreen() {
         setTree(normalizeTree(data?.parsed_result));
         setCocktails(Array.isArray(data?.parsed_result?.flagged_cocktails) ? data.parsed_result.flagged_cocktails : []);
         // existing item names for a duplicate hint
-        const { data: items } = await supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '' });
+        const { data: items } = await supabase.rpc('get_menu_items', { p_actor_id: user.id });
         if (!cancelled && items) setExistingNames(new Set(items.map((i: any) => String(i.name || '').toLowerCase())));
       } catch (e) {
         console.error('load review error', e);
@@ -156,6 +157,7 @@ export default function MenuUploadReviewScreen() {
   });
 
   const doApply = async () => {
+    if (!user?.id) return;
     if (includedCount === 0) {
       Alert.alert(t('menu_upload.nothing_title', 'Nothing Selected'), t('menu_upload.nothing_msg', 'Select at least one item to add.'));
       return;
@@ -165,7 +167,7 @@ export default function MenuUploadReviewScreen() {
       try {
         setApplying(true);
         const { data, error } = await (supabase.rpc as any)('apply_parsed_menu', {
-          p_user_id: user?.id,
+          p_user_id: user.id,
           p_organization_id: organizationId,
           p_upload_id: uploadId,
           p_payload: buildPayload(),

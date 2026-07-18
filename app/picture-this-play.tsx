@@ -135,14 +135,15 @@ export default function PictureThisPlayScreen() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      if (!user?.id) { setLoading(false); return; }
       setLoading(true);
       setPoolError(null);
       try {
         if (category === 'menu_prices') {
-          const { libationNames } = await resolvePriceCategoryNames(organizationId ?? '', organization.games_use_sample_data, user?.id ?? '');
+          const { libationNames } = await resolvePriceCategoryNames(organizationId ?? '', organization.games_use_sample_data, user.id);
           if (!cancelled) libationNamesRef.current = libationNames;
         }
-        const data = await loadPool(category, organizationId ?? '', organization.games_use_sample_data, user?.id ?? '');
+        const data = await loadPool(category, organizationId ?? '', organization.games_use_sample_data, user.id);
         if (cancelled) return;
         if (data.length < 4) {
           setPoolError('Not enough menu items in this category to play. Try a different category.');
@@ -163,7 +164,7 @@ export default function PictureThisPlayScreen() {
     })();
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category]);
+  }, [category, user?.id]);
 
   // Keep finishGame stable across renders via a ref so the timer's setInterval
   // always invokes the latest version (which reads the latest state).

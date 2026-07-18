@@ -394,12 +394,12 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     let items: MenuItem[] = data || [];
 
     if (seasonKey === 'summer') {
-      const { data: slrData } = await (supabase
-        .from('summer_libation_recipes' as any) as any)
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
+      // RPC read (B4 batch 4): member-gated, org derived from the actor,
+      // active-only server-side — replaces the last direct .from() read here.
+      const { data: slrData } = await (supabase.rpc as any)('get_summer_libation_recipes', {
+        p_actor_id: user.id,
+        p_source_org: null,
+      });
 
       if (slrData) {
         const mapped: MenuItem[] = slrData.map((r: any) => ({
@@ -438,12 +438,10 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         (i) => !(i.category === libInjection.libationsCategoryName && i.subcategory != null && libInjection.cocktailSubNames.has(i.subcategory))
       );
 
-      const { data: lrData } = await (supabase
-        .from('libation_recipes' as any) as any)
-        .select('*')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .order('display_order', { ascending: true });
+      const { data: lrData } = await (supabase.rpc as any)('get_libation_recipes', {
+        p_actor_id: user.id,
+        p_source_org: null,
+      });
 
       if (lrData) {
         const mapped: MenuItem[] = lrData.map((r: any) => ({

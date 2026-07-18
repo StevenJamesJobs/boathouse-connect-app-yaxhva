@@ -112,10 +112,11 @@ export default function CocktailsAZScreen() {
   }, [filterCocktails]);
 
   const loadCocktails = async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       // Member-gated RPC (org derived server-side); re-sort A-Z to preserve this screen's order.
-      const { data, error } = await supabase.rpc('get_cocktails', { p_actor_id: user?.id ?? '' });
+      const { data, error } = await supabase.rpc('get_cocktails', { p_actor_id: user.id });
 
       if (error) throw error;
       const sorted = (data || []).slice().sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));

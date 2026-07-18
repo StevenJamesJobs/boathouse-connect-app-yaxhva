@@ -77,7 +77,8 @@ export default function WordSearchPlayScreen() {
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const rawWords = await getWordsForCategory(category, difficulty, organizationId ?? '', organization.games_use_sample_data, user?.id ?? '');
+      if (!user?.id) return;
+      const rawWords = await getWordsForCategory(category, difficulty, organizationId ?? '', organization.games_use_sample_data, user.id);
       if (cancelled) return;
       const generated = generateWordSearchPuzzle(rawWords, difficulty);
       setPuzzle(generated);
@@ -85,7 +86,7 @@ export default function WordSearchPlayScreen() {
     }
     load();
     return () => { cancelled = true; };
-  }, [category, difficulty]);
+  }, [category, difficulty, user?.id]);
 
   // ─── Word found ───────────────────────────────────────────────────────────────
   const handleWordFound = useCallback((wordId: string) => {
@@ -152,13 +153,14 @@ export default function WordSearchPlayScreen() {
 
   // ─── Restart ──────────────────────────────────────────────────────────────────
   const handleRestart = async () => {
+    if (!user?.id) return;
     scoreSavedRef.current = false;
     setPhase('loading');
     setFoundWordIds([]);
     setScore(0);
     setElapsedSeconds(0);
     setSelectedCells([]);
-    const rawWords = await getWordsForCategory(category, difficulty, organizationId ?? '', organization.games_use_sample_data, user?.id ?? '');
+    const rawWords = await getWordsForCategory(category, difficulty, organizationId ?? '', organization.games_use_sample_data, user.id);
     const generated = generateWordSearchPuzzle(rawWords, difficulty);
     setPuzzle(generated);
     setPhase('playing');

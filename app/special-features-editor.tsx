@@ -23,7 +23,6 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
@@ -32,6 +31,7 @@ import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-nativ
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchContentImages, saveContentImages, uploadImageToStorage } from '@/utils/contentImages';
+import { brokerUploadImage, brokerDelete } from '@/utils/storageBroker';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import FormattedText from '@/components/FormattedText';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -236,56 +236,21 @@ export default function SpecialFeaturesEditorScreen() {
   };
 
   const uploadImage = async (uri: string): Promise<string | null> => {
+    if (!user?.id) return null;
     try {
       setUploadingImage(true);
       console.log('Starting image upload for special feature');
 
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      const publicUrl = await brokerUploadImage('special_feature_image', uri, user.id);
 
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-
-      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${Date.now()}.${ext}`;
-
-      console.log('Uploading image:', fileName);
-
-      let contentType = 'image/jpeg';
-      if (ext === 'png') contentType = 'image/png';
-      else if (ext === 'gif') contentType = 'image/gif';
-      else if (ext === 'webp') contentType = 'image/webp';
-
-      const { data, error } = await supabase.storage
-        .from('special-features')
-        .upload(fileName, byteArray, {
-          contentType: contentType,
-          upsert: false,
-        });
-
-      if (error) {
-        console.error('Error uploading image:', error);
-        throw error;
+      if (!publicUrl) {
+        Alert.alert(t('common:error'), t('special_features_editor:upload_image_error'));
+        return null;
       }
 
-      console.log('Upload successful:', data);
+      console.log('Public URL:', publicUrl);
 
-      const { data: urlData } = supabase.storage
-        .from('special-features')
-        .getPublicUrl(fileName);
-
-      console.log('Public URL:', urlData.publicUrl);
-
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      Alert.alert(t('common:error'), t('special_features_editor:upload_image_error'));
-      return null;
+      return publicUrl;
     } finally {
       setUploadingImage(false);
     }
@@ -372,15 +337,13 @@ export default function SpecialFeaturesEditorScreen() {
           await saveTranslations('special_features', editingFeature.id, {
             title_es: formData.title_es,
             content_es: formData.message_es,
-          }, organizationId);
+          }, user?.id);
         }
 
         // Upload new additional images and save all to content_images
         const uploadedNewUrls: string[] = [];
         for (const uri of newAdditionalImageUris) {
-          const url = await uploadImageToStorage(uri, 'special_feature', (u) =>
-            FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
-          );
+          const url = await uploadImageToStorage(uri, 'special_feature', user.id);
           if (url) uploadedNewUrls.push(url);
         }
         const allAdditionalUrls = [...additionalImageUrls, ...uploadedNewUrls];
@@ -439,16 +402,14 @@ export default function SpecialFeaturesEditorScreen() {
           await saveTranslations('special_features', newFeatureId, {
             title_es: formData.title_es,
             content_es: formData.message_es,
-          }, organizationId);
+          }, user?.id);
         }
 
         // Upload and save additional images for newly created item
         if (newFeatureId && newAdditionalImageUris.length > 0) {
           const uploadedNewUrls: string[] = [];
           for (const uri of newAdditionalImageUris) {
-            const url = await uploadImageToStorage(uri, 'special_feature', (u) =>
-              FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
-            );
+            const url = await uploadImageToStorage(uri, 'special_feature', user.id);
             if (url) uploadedNewUrls.push(url);
           }
           if (uploadedNewUrls.length > 0) {
@@ -495,12 +456,7 @@ export default function SpecialFeaturesEditorScreen() {
               }
 
               if (feature.thumbnail_url) {
-                const fileName = feature.thumbnail_url.split('/').pop();
-                if (fileName) {
-                  await supabase.storage
-                    .from('special-features')
-                    .remove([fileName]);
-                }
+                await brokerDelete('special-features', [feature.thumbnail_url], user.id);
               }
 
               // content_images rows are cascaded by delete_special_feature server-side.

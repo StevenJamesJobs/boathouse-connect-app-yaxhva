@@ -36,13 +36,14 @@ export default function MemoryGameLeaderboardScreen() {
   }, [activeMode, activePlayMode]);
 
   const loadLeaderboard = async () => {
+    if (!user?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_game_leaderboard', {
+      const { data, error } = await supabase.rpc('get_game_leaderboard_actor' as any, {
         p_game_mode: activeMode,
         p_limit: 20,
         p_play_mode: activePlayMode,
-        p_organization_id: organizationId,
+        p_actor_id: user.id,
       });
 
       if (!error && data) {

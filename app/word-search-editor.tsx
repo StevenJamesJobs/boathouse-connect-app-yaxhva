@@ -18,6 +18,7 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import {
   WORD_SEARCH_CATEGORIES,
@@ -38,6 +39,7 @@ export default function WordSearchEditorScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { organizationId } = useOrganization();
+  const { user } = useAuth();
   const [resetting, setResetting] = useState<string | null>(null);
 
   const confirmReset = (category: WordSearchCategory | null) => {
@@ -57,12 +59,13 @@ export default function WordSearchEditorScreen() {
   };
 
   const resetScores = async (category: WordSearchCategory | null) => {
+    if (!user?.id) return;
     const key = category ?? 'all';
     setResetting(key);
     try {
-      const { error } = await supabase.rpc('reset_word_search_scores', {
+      const { error } = await (supabase.rpc as any)('reset_word_search_scores_actor', {
+        p_actor_id: user.id,
         p_category: category ?? null,
-        p_organization_id: organizationId,
       });
       if (error) throw error;
       const label = category ? t(CATEGORY_LABEL_KEYS[category]) : t('ws_editor:all_categories_long');

@@ -21,12 +21,8 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
-import { uploadImageToBucket } from '@/utils/contentImages';
+import { brokerUploadImage } from '@/utils/storageBroker';
 import CollapsibleSection from '@/components/CollapsibleSection';
-
-const BUCKET = 'host-section-images';
-const readB64 = (u: string) => FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 });
 
 interface Tile {
   id: string;
@@ -133,7 +129,7 @@ export default function HostSectionEditorScreen() {
       setSaving(true);
       let cardUrl = cardImageUrl;
       if (localCardUri) {
-        const uploaded = await uploadImageToBucket(localCardUri, BUCKET, readB64);
+        const uploaded = await brokerUploadImage('host_section_image', localCardUri, user.id);
         if (uploaded) cardUrl = uploaded;
       }
       if (sectionId) {
@@ -188,7 +184,7 @@ export default function HostSectionEditorScreen() {
       setSavingTile(true);
       let imgUrl = tImageUrl;
       if (tLocalUri) {
-        const uploaded = await uploadImageToBucket(tLocalUri, BUCKET, readB64);
+        const uploaded = await brokerUploadImage('host_section_image', tLocalUri, user.id);
         if (uploaded) imgUrl = uploaded;
       }
       // Prepend https:// when the entered link has no scheme, else it won't open (e.g. "kevahomes.com").

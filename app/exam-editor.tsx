@@ -29,7 +29,7 @@ import { formatTime, formatCountdown, getCountdownUrgency } from '@/utils/exam/e
 import { sendCustomNotification } from '@/utils/notificationHelpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
+import { brokerUploadImage } from '@/utils/storageBroker';
 
 interface Exam {
   id: string;
@@ -143,7 +143,7 @@ export default function ExamEditorScreen() {
       // Auto-close any active exams whose close_at has passed. Fire-and-forget
       // — if it fails we still show the (now slightly stale) data below.
       try {
-        await supabase.rpc('close_expired_exams', { p_organization_id: organizationId });
+        await supabase.rpc('close_expired_exams_actor' as any, { p_actor_id: user.id });
       } catch (cleanupErr) {
         console.warn('close_expired_exams cleanup failed:', cleanupErr);
       }
@@ -212,11 +212,12 @@ export default function ExamEditorScreen() {
   };
 
   const fetchCompletionData = async (examId: string) => {
+    if (!user?.id) return;
     try {
-      const { data, error } = await supabase.rpc('get_exam_completion_status', {
+      const { data, error } = await supabase.rpc('get_exam_completion_status_actor' as any, {
         p_exam_id: examId,
         p_exam_type: examType,
-        p_organization_id: organizationId,
+        p_actor_id: user.id,
       });
 
       if (!error && data) {
@@ -261,7 +262,8 @@ export default function ExamEditorScreen() {
   };
 
   const generateAndSaveQuestions = async (examId: string, cycleKey: string) => {
-    const generatedQuestions = await generateQuizQuestions(examType, cycleKey, questionCount, organizationId ?? '', user?.id ?? '');
+    if (!user?.id) return;
+    const generatedQuestions = await generateQuizQuestions(examType, cycleKey, questionCount, organizationId ?? '', user.id);
 
     const questionsToInsert = generatedQuestions.map((q, index) => ({
       exam_id: examId,
@@ -598,7 +600,7 @@ export default function ExamEditorScreen() {
   const [refreshingQuestionId, setRefreshingQuestionId] = useState<string | null>(null);
 
   const handleRefreshQuestion = async (question: ExamQuestion) => {
-    if (!currentExam) return;
+    if (!currentExam || !user?.id) return;
     setRefreshingQuestionId(question.id);
     try {
       // If the current question has an image, regenerate another photo
@@ -610,7 +612,7 @@ export default function ExamEditorScreen() {
           organizationId ?? '',
           [],
           `${currentExam.cycle_key}-photo-refresh-${question.id}-${Date.now()}`,
-          user?.id ?? '',
+          user.id,
         );
         if (photo && photo.question_text !== question.question_text) {
           newQuestion = photo;
@@ -620,7 +622,7 @@ export default function ExamEditorScreen() {
       if (!newQuestion) {
         // Generate a batch of questions and pick one that's different from the current
         const cycleKey = currentExam.cycle_key + '-refresh-' + Date.now().toString(36);
-        const generated = await generateQuizQuestions(examType, cycleKey, 5, organizationId ?? '', user?.id ?? '');
+        const generated = await generateQuizQuestions(examType, cycleKey, 5, organizationId ?? '', user.id);
 
         // Find one that doesn't duplicate existing questions
         const existingTexts = new Set(questions.map(q => q.question_text));
@@ -709,10 +711,10 @@ export default function ExamEditorScreen() {
   };
 
   // ─── Image picker / upload for picture questions ───────────────────
-  // Reuses the menu-editor pattern: pick via ImagePicker → base64 →
-  // Uint8Array → upload to the 'menu-items' bucket under the
-  // quiz-questions/ subfolder → return the public URL.
+  // Pick via ImagePicker → upload through the storage broker → return
+  // the public URL.
   const pickAndUploadQuizImage = async (): Promise<string | null> => {
+    if (!user?.id) return null;
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
@@ -729,27 +731,9 @@ export default function ExamEditorScreen() {
 
       setUploadingImage(true);
       const uri = result.assets[0].uri;
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
-      const byteArray = new Uint8Array(byteNumbers);
-
-      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `quiz-questions/${Date.now()}.${ext}`;
-      let contentType = 'image/jpeg';
-      if (ext === 'png') contentType = 'image/png';
-      else if (ext === 'webp') contentType = 'image/webp';
-
-      const { error } = await supabase.storage
-        .from('menu-items')
-        .upload(fileName, byteArray, { contentType, upsert: false });
-      if (error) throw error;
-
-      const { data: urlData } = supabase.storage.from('menu-items').getPublicUrl(fileName);
-      return urlData.publicUrl;
+      const publicUrl = await brokerUploadImage('quiz_question_image', uri, user.id);
+      if (!publicUrl) throw new Error('Could not upload image.');
+      return publicUrl;
     } catch (err: any) {
       console.error('Quiz image upload error:', err);
       Alert.alert('Upload Failed', err?.message || 'Could not upload image.');

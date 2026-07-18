@@ -49,13 +49,14 @@ export default function RunningSideWorkChecklistScreen() {
   );
 
   const loadChecklist = async () => {
+    if (!user?.id) return;
     console.log('Loading Running Side Work Checklist for user:', user?.id);
     try {
       setLoading(true);
 
       // Fetch categories (member-gated RPC; org derived server-side)
       const { data: categoriesData, error: categoriesError } = await supabase.rpc('get_checklist_categories', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: false,
         p_checklist_type: 'running_side_work',
       });
@@ -67,7 +68,7 @@ export default function RunningSideWorkChecklistScreen() {
 
       // Fetch items
       const { data: itemsData, error: itemsError } = await supabase.rpc('get_checklist_items', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: false,
         p_checklist_type: 'running_side_work',
       });
@@ -80,7 +81,7 @@ export default function RunningSideWorkChecklistScreen() {
       // Fetch user progress for today
       const today = new Date().toISOString().split('T')[0];
       const { data: progressData, error: progressError } = await supabase.rpc('get_my_checklist_progress', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: false,
         p_date: today,
       });
@@ -136,6 +137,7 @@ export default function RunningSideWorkChecklistScreen() {
   };
 
   const toggleItem = async (categoryId: string, itemId: string, currentCompleted: boolean) => {
+    if (!user?.id) return;
     console.log('Toggling item:', itemId, 'from', currentCompleted, 'to', !currentCompleted);
     
     try {
@@ -156,7 +158,7 @@ export default function RunningSideWorkChecklistScreen() {
 
       // Update database — one self-gated RPC upserts (check) or deletes (uncheck) own progress.
       const { error } = await supabase.rpc('set_checklist_progress', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: false,
         p_item_id: itemId,
         p_completed: newCompleted,

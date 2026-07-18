@@ -207,11 +207,12 @@ export default function GameHubScreen() {
   useFocusEffect(
     useCallback(() => {
       const fetchTopLeaders = async () => {
+        if (!user?.id) { setLoadingLeaders(false); return; }
         setLoadingLeaders(true);
         try {
-          const { data, error } = await supabase.rpc('get_master_leaderboard_overall', {
+          const { data, error } = await supabase.rpc('get_master_leaderboard_overall_actor' as any, {
             p_limit: 3,
-            p_organization_id: organizationId,
+            p_actor_id: user.id,
           });
           if (!error && data) {
             setTopLeaders(data as LeaderboardEntry[]);
@@ -222,7 +223,7 @@ export default function GameHubScreen() {
         setLoadingLeaders(false);
       };
       fetchTopLeaders();
-    }, [])
+    }, [user?.id])
   );
 
   return (

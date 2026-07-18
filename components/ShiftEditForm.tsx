@@ -171,6 +171,7 @@ export default function ShiftEditForm({
   }, [visible, mode, shift, defaultDate, employeeName, userId]);
 
   const handleSave = async () => {
+    if (!authUser?.id) return;
     if (!selectedEmployee.name.trim()) {
       Alert.alert('Select Employee', 'Please choose an employee for this shift.');
       return;
@@ -199,7 +200,7 @@ export default function ShiftEditForm({
       if (mode === 'edit' && shift) {
         // Manager-gated RPC; org membership of both actor and assignee enforced server-side.
         const { error } = await supabase.rpc('update_shift', {
-          p_actor_id: authUser?.id ?? '',
+          p_actor_id: authUser.id,
           p_shift_id: shift.id,
           p_user_id: selectedEmployee.id ?? undefined,
           p_employee_name: selectedEmployee.name,
@@ -221,7 +222,7 @@ export default function ShiftEditForm({
       // ADD mode — add_shift resolves/creates the covering upload row server-side
       // (the old resolveUploadIdForDate) and keeps parsed_shifts_count in sync.
       const { error: insertErr } = await supabase.rpc('add_shift', {
-        p_actor_id: authUser?.id ?? '',
+        p_actor_id: authUser.id,
         p_employee_name: selectedEmployee.name,
         p_shift_date: shiftData.shift_date,
         p_start_time: shiftData.start_time,
@@ -248,6 +249,7 @@ export default function ShiftEditForm({
 
   const handleDelete = () => {
     if (mode !== 'edit' || !shift) return;
+    if (!authUser?.id) return;
     Alert.alert(
       'Delete Shift',
       `Remove ${shift.employee_name}'s shift on ${formatDateHuman(shift.shift_date)}?`,
@@ -261,7 +263,7 @@ export default function ShiftEditForm({
               setSaving(true);
               // Gated delete; parsed_shifts_count is resynced inside the RPC.
               const { error } = await supabase.rpc('delete_shift', {
-                p_actor_id: authUser?.id ?? '',
+                p_actor_id: authUser.id,
                 p_shift_id: shift.id,
               });
               if (error) throw error;

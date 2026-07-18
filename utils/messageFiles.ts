@@ -1,7 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import { supabase } from '@/app/integrations/supabase/client';
+import { brokerUploadFile } from '@/utils/storageBroker';
 
-const BUCKET = 'message-attachments';
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB for files
 
 /**
@@ -21,48 +20,17 @@ export async function validateFileSize(uri: string): Promise<boolean> {
 }
 
 /**
- * Uploads a message file to Supabase Storage and returns the public URL.
- * Returns null on failure.
+ * Uploads a message file via the storage broker and returns the public URL.
+ * Returns null on failure. B4a: manager/owner only (mirrors send_message's
+ * p_file_url gate); the broker builds the org-prefixed files/ path.
  */
-export async function uploadMessageFile(uri: string, originalFileName: string): Promise<string | null> {
-  try {
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-
-    const ext = originalFileName.split('.').pop()?.toLowerCase() || 'pdf';
-    const fileName = `files/${Date.now()}-${Math.random().toString(36).substr(2, 6)}.${ext}`;
-
-    const contentType = getContentType(ext);
-
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(fileName, byteArray, {
-        contentType,
-        upsert: false,
-      });
-
-    if (error) {
-      console.error('Error uploading message file:', error);
-      return null;
-    }
-
-    const { data: urlData } = supabase.storage
-      .from(BUCKET)
-      .getPublicUrl(fileName);
-
-    return urlData.publicUrl;
-  } catch (err) {
-    console.error('Message file upload error:', err);
-    return null;
-  }
+export async function uploadMessageFile(
+  uri: string,
+  originalFileName: string,
+  actorId: string
+): Promise<string | null> {
+  const ext = originalFileName.split('.').pop()?.toLowerCase() || 'pdf';
+  return brokerUploadFile('message_file', uri, originalFileName, getContentType(ext), actorId);
 }
 
 /**

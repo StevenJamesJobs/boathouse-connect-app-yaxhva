@@ -108,12 +108,13 @@ export default function ScheduleReviewScreen() {
   }, [upload_id]);
 
   const loadData = async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
 
       // Load upload info (manager-gated; upload must belong to the actor's org)
       const { data: uploadRows } = await supabase.rpc('get_org_uploads', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_upload_id: upload_id,
       });
       const uploadData = Array.isArray(uploadRows) ? uploadRows[0] : uploadRows;
@@ -125,7 +126,7 @@ export default function ScheduleReviewScreen() {
 
       // Load shifts for this upload
       const { data: shiftData, error: shiftError } = await supabase.rpc('get_upload_shifts', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_upload_id: upload_id,
       });
 
@@ -235,6 +236,7 @@ export default function ScheduleReviewScreen() {
   };
 
   const handleSelectUser = async (userId: string | null) => {
+    if (!user?.id) return;
     try {
       setSaving(true);
       setAssignModalVisible(false);
@@ -242,7 +244,7 @@ export default function ScheduleReviewScreen() {
       // One gated RPC updates every shift for this employee in this upload AND
       // recomputes unmatched_employees server-side from what's actually linked.
       const { error } = await supabase.rpc('assign_upload_shifts', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_upload_id: upload_id,
         p_employee_name: selectedEmployee,
         p_user_id: userId ?? undefined,
@@ -277,10 +279,11 @@ export default function ScheduleReviewScreen() {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            if (!user?.id) return;
             try {
               // Gated delete; parsed_shifts_count is resynced inside the RPC.
               const { error } = await supabase.rpc('delete_shift', {
-                p_actor_id: user?.id ?? '',
+                p_actor_id: user.id,
                 p_shift_id: shift.id,
               });
               if (error) throw error;

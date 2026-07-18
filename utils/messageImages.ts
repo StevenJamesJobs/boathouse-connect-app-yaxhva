@@ -1,7 +1,6 @@
 import * as FileSystem from 'expo-file-system/legacy';
-import { supabase } from '@/app/integrations/supabase/client';
+import { brokerUploadImage } from '@/utils/storageBroker';
 
-const BUCKET = 'message-attachments';
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 /**
@@ -21,49 +20,10 @@ export async function validateImageSize(uri: string): Promise<boolean> {
 }
 
 /**
- * Uploads a message image to Supabase Storage and returns the public URL.
- * Returns null on failure.
+ * Uploads a message image via the storage broker and returns the public URL.
+ * Returns null on failure. B4a: any active member may attach an image
+ * (send_message doesn't role-gate p_image_url); the broker enforces the same.
  */
-export async function uploadMessageImage(uri: string): Promise<string | null> {
-  try {
-    const base64 = await FileSystem.readAsStringAsync(uri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-
-    const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-    const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 6)}.${ext}`;
-
-    let contentType = 'image/jpeg';
-    if (ext === 'png') contentType = 'image/png';
-    else if (ext === 'gif') contentType = 'image/gif';
-    else if (ext === 'webp') contentType = 'image/webp';
-
-    const { error } = await supabase.storage
-      .from(BUCKET)
-      .upload(fileName, byteArray, {
-        contentType,
-        upsert: false,
-      });
-
-    if (error) {
-      console.error('Error uploading message image:', error);
-      return null;
-    }
-
-    const { data: urlData } = supabase.storage
-      .from(BUCKET)
-      .getPublicUrl(fileName);
-
-    return urlData.publicUrl;
-  } catch (err) {
-    console.error('Message image upload error:', err);
-    return null;
-  }
+export async function uploadMessageImage(uri: string, actorId: string): Promise<string | null> {
+  return brokerUploadImage('message_image', uri, actorId);
 }

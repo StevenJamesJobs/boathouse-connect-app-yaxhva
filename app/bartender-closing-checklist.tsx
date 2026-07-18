@@ -49,12 +49,13 @@ export default function BartenderClosingChecklistScreen() {
   );
 
   const loadChecklist = async () => {
+    if (!user?.id) return;
     console.log('Loading Bartender Closing Checklist for user:', user?.id);
     try {
       setLoading(true);
 
       const { data: categoriesData, error: categoriesError } = await supabase.rpc('get_checklist_categories', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: true,
         p_checklist_type: 'closing',
       });
@@ -65,7 +66,7 @@ export default function BartenderClosingChecklistScreen() {
       }
 
       const { data: itemsData, error: itemsError } = await supabase.rpc('get_checklist_items', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: true,
         p_checklist_type: 'closing',
       });
@@ -77,7 +78,7 @@ export default function BartenderClosingChecklistScreen() {
 
       const today = new Date().toISOString().split('T')[0];
       const { data: progressData, error: progressError } = await supabase.rpc('get_my_checklist_progress', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: true,
         p_date: today,
       });
@@ -133,6 +134,7 @@ export default function BartenderClosingChecklistScreen() {
   };
 
   const toggleItem = async (categoryId: string, itemId: string, currentCompleted: boolean) => {
+    if (!user?.id) return;
     console.log('Toggling item:', itemId, 'from', currentCompleted, 'to', !currentCompleted);
     
     try {
@@ -152,7 +154,7 @@ export default function BartenderClosingChecklistScreen() {
       }));
 
       const { error } = await supabase.rpc('set_checklist_progress', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: true,
         p_item_id: itemId,
         p_completed: newCompleted,
