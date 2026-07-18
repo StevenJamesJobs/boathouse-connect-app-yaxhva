@@ -17,7 +17,6 @@ import {
   Switch,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -26,6 +25,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
+import { brokerUploadImage } from '@/utils/storageBroker';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
 import CollapsibleSection from '@/components/CollapsibleSection';
@@ -102,10 +102,11 @@ export default function LibationRecipesEditorScreen() {
   const [procDragH, setProcDragH] = useState(0);
 
   const loadRecipes = useCallback(async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       console.log('Loading libation recipes from table: libation_recipes');
-      const { data, error } = await supabase.rpc('get_libation_recipes', { p_actor_id: user?.id ?? '' });
+      const { data, error } = await supabase.rpc('get_libation_recipes', { p_actor_id: user.id });
 
       if (error) {
         console.error('Error loading libation recipes:', error);
@@ -155,53 +156,14 @@ export default function LibationRecipesEditorScreen() {
       setUploadingImage(true);
       console.log('Starting image upload for user:', user.id);
 
-      // Read the file as base64
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      // Convert base64 to Uint8Array (same as cocktails editor)
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-
-      // Create file name
-      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      
-      console.log('Uploading file to libation-recipe-images bucket:', fileName);
-
-      // Determine content type
-      let contentType = 'image/jpeg';
-      if (fileExt === 'png') contentType = 'image/png';
-      else if (fileExt === 'gif') contentType = 'image/gif';
-      else if (fileExt === 'webp') contentType = 'image/webp';
-
-      // Upload to Supabase Storage (same pattern as cocktails editor)
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('libation-recipe-images')
-        .upload(fileName, byteArray, {
-          contentType: contentType,
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        throw uploadError;
+      // Upload via the storage broker
+      const publicUrl = await brokerUploadImage('libation_image', uri, user.id);
+      if (!publicUrl) {
+        throw new Error('Upload failed');
       }
 
-      console.log('Upload successful:', uploadData);
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('libation-recipe-images')
-        .getPublicUrl(fileName);
-
-      console.log('Public URL:', urlData.publicUrl);
-      setThumbnailUrl(urlData.publicUrl);
+      console.log('Public URL:', publicUrl);
+      setThumbnailUrl(publicUrl);
       Alert.alert(t('common.success'), t('libation_editor.image_uploaded'));
     } catch (error: any) {
       console.error('Error uploading image:', error);
@@ -294,7 +256,7 @@ export default function LibationRecipesEditorScreen() {
         }
         console.log('Libation recipe updated successfully');
         if (procedureEs.trim()) {
-          await saveTranslations('libation_recipes', editingRecipe.id, { procedure_es: procedureEs }, organizationId);
+          await saveTranslations('libation_recipes', editingRecipe.id, { procedure_es: procedureEs }, user?.id);
         }
         Alert.alert(t('common.success'), t('libation_editor.recipe_updated'));
       } else {
@@ -323,7 +285,7 @@ export default function LibationRecipesEditorScreen() {
         console.log('Libation recipe added successfully');
         // insert_libation_recipe returns the new id — use it directly.
         if (data && procedureEs.trim()) {
-          await saveTranslations('libation_recipes', data as string, { procedure_es: procedureEs }, organizationId);
+          await saveTranslations('libation_recipes', data as string, { procedure_es: procedureEs }, user?.id);
         }
         Alert.alert(t('common.success'), t('libation_editor.recipe_added'));
       }

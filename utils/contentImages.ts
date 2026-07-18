@@ -1,4 +1,5 @@
 import { supabase } from '@/app/integrations/supabase/client';
+import { brokerUploadImage, UploadPurpose } from '@/utils/storageBroker';
 
 export type ContentType = 'announcement' | 'special_feature' | 'upcoming_event';
 
@@ -12,12 +13,13 @@ const TABLE_TO_CONTENT_TYPE: Record<string, ContentType> = {
 };
 
 /**
- * Maps content types to their storage bucket names
+ * Maps content types to their storage-broker upload purposes (B4a: direct
+ * bucket writes are revoked; uploads go through the broker edge function).
  */
-const CONTENT_TYPE_TO_BUCKET: Record<ContentType, string> = {
-  announcement: 'announcements',
-  special_feature: 'special-features',
-  upcoming_event: 'upcoming-events',
+const CONTENT_TYPE_TO_PURPOSE: Record<ContentType, UploadPurpose> = {
+  announcement: 'announcement_image',
+  special_feature: 'special_feature_image',
+  upcoming_event: 'upcoming_event_image',
 };
 
 /**
@@ -126,65 +128,17 @@ export async function saveContentImages(
 }
 
 /**
- * Uploads an image to a specific storage bucket and returns the public URL.
- * The lowest-level shared upload helper.
- */
-export async function uploadImageToBucket(
-  uri: string,
-  bucket: string,
-  readAsBase64: (uri: string) => Promise<string>
-): Promise<string | null> {
-  try {
-    const base64 = await readAsBase64(uri);
-
-    const byteCharacters = atob(base64);
-    const byteNumbers = new Array(byteCharacters.length);
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-
-    const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-    const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 6)}.${ext}`;
-
-    let contentTypeHeader = 'image/jpeg';
-    if (ext === 'png') contentTypeHeader = 'image/png';
-    else if (ext === 'gif') contentTypeHeader = 'image/gif';
-    else if (ext === 'webp') contentTypeHeader = 'image/webp';
-
-    const { data, error } = await supabase.storage
-      .from(bucket)
-      .upload(fileName, byteArray, {
-        contentType: contentTypeHeader,
-        upsert: false,
-      });
-
-    if (error) {
-      console.error('Error uploading image to storage:', error);
-      return null;
-    }
-
-    const { data: urlData } = supabase.storage
-      .from(bucket)
-      .getPublicUrl(fileName);
-
-    return urlData.publicUrl;
-  } catch (err) {
-    console.error('Image upload error:', err);
-    return null;
-  }
-}
-
-/**
- * Uploads an image to the bucket mapped from a content type (announcements,
- * special-features, upcoming-events). Thin wrapper over uploadImageToBucket.
+ * Uploads a content image (announcement, special-feature, upcoming-event) via
+ * the storage broker and returns the public URL. B4a: the broker verifies the
+ * actor's role, builds the org-prefixed path, and signs the upload — direct
+ * bucket writes no longer exist.
  */
 export async function uploadImageToStorage(
   uri: string,
   contentType: ContentType,
-  readAsBase64: (uri: string) => Promise<string>
+  actorId: string
 ): Promise<string | null> {
-  return uploadImageToBucket(uri, CONTENT_TYPE_TO_BUCKET[contentType], readAsBase64);
+  return brokerUploadImage(CONTENT_TYPE_TO_PURPOSE[contentType], uri, actorId);
 }
 
 // deleteContentImages is gone: the delete_announcement / delete_special_feature /

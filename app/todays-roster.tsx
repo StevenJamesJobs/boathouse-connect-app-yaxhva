@@ -89,13 +89,14 @@ export default function TodaysRosterScreen() {
   const pagerRef = useRef<FlatList<Date>>(null);
 
   const loadShiftsForDate = useCallback(async (date: Date, force = false) => {
+    if (!user?.id) return;
     const iso = toISODate(date);
     setLoadingByDate((prev) => ({ ...prev, [iso]: true }));
     try {
       // Member-gated org roster (server enforces the owner's staff_can_view_roster
       // setting for employees; managers/owners always pass).
       const { data, error } = await supabase.rpc('get_org_roster', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_date: iso,
       });
       if (error) throw error;

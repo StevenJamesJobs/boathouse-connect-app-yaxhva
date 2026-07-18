@@ -21,7 +21,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
+import { brokerUploadImage } from '@/utils/storageBroker';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { MessageBadge } from '@/components/MessageBadge';
 import { useTranslation } from 'react-i18next';
@@ -181,57 +181,18 @@ export default function ManagerProfileScreen() {
       setUploading(true);
       console.log('Starting image upload for user:', user.id);
 
-      // Read the file as base64
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      // Convert base64 to Uint8Array
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-
-      // Create file name
-      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-
-      console.log('Uploading file:', fileName);
-
-      // Determine content type
-      let contentType = 'image/jpeg';
-      if (fileExt === 'png') contentType = 'image/png';
-      else if (fileExt === 'gif') contentType = 'image/gif';
-      else if (fileExt === 'webp') contentType = 'image/webp';
-
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('profile-pictures')
-        .upload(fileName, byteArray, {
-          contentType: contentType,
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        throw uploadError;
+      // Upload via the storage broker
+      const publicUrl = await brokerUploadImage('profile_picture', uri, user.id);
+      if (!publicUrl) {
+        throw new Error(t('profile.error_upload_picture'));
       }
 
-      console.log('Upload successful:', uploadData);
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('profile-pictures')
-        .getPublicUrl(fileName);
-
-      console.log('Public URL:', urlData.publicUrl);
+      console.log('Public URL:', publicUrl);
 
       // Update user record using the new RPC function
       const { error: updateError } = await supabase.rpc('update_profile_picture', {
         user_id: user.id,
-        picture_url: urlData.publicUrl,
+        picture_url: publicUrl,
         p_organization_id: organizationId,
         p_actor_id: user.id,
       });

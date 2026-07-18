@@ -175,7 +175,7 @@ export default function ManageMenuCategoriesScreen() {
     // Write the Spanish override only when the English create/rename succeeded
     // (empty `es` clears it via saveTranslations → null).
     if (targetId) {
-      await saveTranslations(table, targetId, { display_name_es: es }, organizationId);
+      await saveTranslations(table, targetId, { display_name_es: es }, user?.id);
     }
     await refresh();
   };

@@ -49,10 +49,11 @@ export default function MemoryGameEditorScreen() {
   const [newHint, setNewHint] = useState('');
 
   const fetchPairings = useCallback(async () => {
+    if (!user?.id) return;
     setLoading(true);
     // Manager tool: include inactive pairings so the active/inactive toggle can reactivate them.
     const { data, error } = await supabase.rpc('get_wine_pairings', {
-      p_actor_id: user?.id ?? '',
+      p_actor_id: user.id,
       p_include_inactive: true,
     });
     if (!error && data) {
@@ -66,12 +67,13 @@ export default function MemoryGameEditorScreen() {
   }, [fetchPairings]);
 
   const handleAdd = async () => {
+    if (!user?.id) return;
     if (!newWine.trim() || !newEntree.trim()) {
       Alert.alert(t('common.error'), t('memory_game_editor.fields_required'));
       return;
     }
     const { error } = await supabase.rpc('insert_wine_pairing', {
-      p_user_id: user?.id ?? '',
+      p_user_id: user.id,
       p_wine: newWine.trim(),
       p_entree: newEntree.trim(),
       p_hint: newHint.trim() || undefined,
@@ -88,8 +90,9 @@ export default function MemoryGameEditorScreen() {
   };
 
   const handleUpdate = async (pairing: WinePairing) => {
+    if (!user?.id) return;
     const { error } = await supabase.rpc('update_wine_pairing', {
-      p_user_id: user?.id ?? '',
+      p_user_id: user.id,
       p_pairing_id: pairing.id,
       p_wine: pairing.wine,
       p_entree: pairing.entree,
@@ -113,7 +116,8 @@ export default function MemoryGameEditorScreen() {
           text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
-            await supabase.rpc('delete_wine_pairing', { p_user_id: user?.id ?? '', p_pairing_id: pairing.id });
+            if (!user?.id) return;
+            await supabase.rpc('delete_wine_pairing', { p_user_id: user.id, p_pairing_id: pairing.id });
             fetchPairings();
           },
         },
@@ -122,8 +126,9 @@ export default function MemoryGameEditorScreen() {
   };
 
   const handleToggleActive = async (pairing: WinePairing) => {
+    if (!user?.id) return;
     await supabase.rpc('set_wine_pairing_active', {
-      p_user_id: user?.id ?? '',
+      p_user_id: user.id,
       p_pairing_id: pairing.id,
       p_is_active: !pairing.is_active,
     });
@@ -146,11 +151,12 @@ export default function MemoryGameEditorScreen() {
         text: mode ? t('memory_game.reset_scores_mode') : t('memory_game.reset_scores_all'),
         style: 'destructive',
         onPress: async () => {
+          if (!user?.id) return;
           try {
-            await supabase.rpc('reset_game_scores', {
+            await (supabase.rpc as any)('reset_game_scores_actor', {
+              p_actor_id: user.id,
               p_game_mode: mode || null,
               p_play_mode: playModeFilter || null,
-              p_organization_id: organizationId,
             });
             Alert.alert('', t('memory_game.reset_success'));
           } catch (e) {

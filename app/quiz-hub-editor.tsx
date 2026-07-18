@@ -47,6 +47,7 @@ export default function QuizHubEditorScreen() {
   const [exams, setExams] = useState<Map<ExamType, ExamSummary | null>>(new Map());
 
   const fetchAllExams = async () => {
+    if (!user?.id) { setLoading(false); return; }
     setLoading(true);
     const examMap = new Map<ExamType, ExamSummary | null>();
 
@@ -74,10 +75,10 @@ export default function QuizHubEditorScreen() {
 
           if (exam.status === 'active' || exam.status === 'paused') {
             try {
-              const { data: completionData } = await supabase.rpc('get_exam_completion_status', {
+              const { data: completionData } = await supabase.rpc('get_exam_completion_status_actor' as any, {
                 p_exam_id: exam.id,
                 p_exam_type: examType,
-                p_organization_id: organizationId,
+                p_actor_id: user.id,
               });
 
               if (completionData) {

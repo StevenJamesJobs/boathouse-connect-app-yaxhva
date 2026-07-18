@@ -76,10 +76,28 @@ RULES:
 - Return ALL items from ALL pages — do not skip anything. Return ONLY the JSON object.`;
 }
 
-async function fetchFileAsBase64(url: string): Promise<{ base64: string; byteLength: number }> {
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Failed to fetch file: ${resp.status}`);
-  const arrayBuffer = await resp.arrayBuffer();
+// B4b-ready: prefer a service-role storage download (works whether the bucket
+// is public or private); fall back to the plain public-URL fetch, which dies
+// naturally when the buckets flip private.
+async function fetchFileAsBase64(supabase: any, url: string): Promise<{ base64: string; byteLength: number }> {
+  const PUBLIC_MARKER = '/storage/v1/object/public/';
+  let arrayBuffer: ArrayBuffer | null = null;
+  const idx = url.indexOf(PUBLIC_MARKER);
+  if (idx !== -1) {
+    try {
+      const rest = url.slice(idx + PUBLIC_MARKER.length);
+      const slash = rest.indexOf('/');
+      const bucket = rest.slice(0, slash);
+      const path = decodeURIComponent(rest.slice(slash + 1));
+      const { data, error } = await supabase.storage.from(bucket).download(path);
+      if (!error && data) arrayBuffer = await data.arrayBuffer();
+    } catch (_) { /* fall through to public fetch */ }
+  }
+  if (!arrayBuffer) {
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`Failed to fetch file: ${resp.status}`);
+    arrayBuffer = await resp.arrayBuffer();
+  }
   const bytes = new Uint8Array(arrayBuffer);
   let binary = '';
   const CHUNK = 8192;
@@ -138,11 +156,11 @@ async function processMenuInBackground(
     const existingTree = await buildExistingTree(supabase, organization_id);
 
     // Fetch the menu file(s) -> base64.
-    const primaryFile = await fetchFileAsBase64(file_url);
+    const primaryFile = await fetchFileAsBase64(supabase, file_url);
     console.log(`Primary file fetched (${media_type}), ${primaryFile.byteLength} bytes`);
     const additionalFiles: Array<{ base64: string }> = [];
     for (let i = 0; i < additional_image_urls.length; i++) {
-      additionalFiles.push(await fetchFileAsBase64(additional_image_urls[i]));
+      additionalFiles.push(await fetchFileAsBase64(supabase, additional_image_urls[i]));
     }
 
     // Build content blocks (vision): PDF document or one image block per page.

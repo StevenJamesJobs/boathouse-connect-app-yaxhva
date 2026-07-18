@@ -18,6 +18,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
+import { brokerUploadBase64 } from '@/utils/storageBroker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 
@@ -56,8 +57,9 @@ export default function ScheduleUploadScreen() {
   useEffect(() => {
     if (!processingId) return;
     const interval = setInterval(async () => {
+      if (!user?.id) return;
       const { data: pollRows } = await supabase.rpc('get_org_uploads', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_upload_id: processingId,
       });
       const data: any = Array.isArray(pollRows) ? pollRows[0] : pollRows;
@@ -86,10 +88,11 @@ export default function ScheduleUploadScreen() {
   }, [processingId]);
 
   const loadUploads = async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       const { data, error } = await supabase.rpc('get_org_uploads', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_limit: 20,
       });
 
@@ -102,30 +105,14 @@ export default function ScheduleUploadScreen() {
     }
   };
 
-  // Helper: upload a file (base64) to Supabase storage and return the public URL
+  // Helper: upload a file (base64) via the storage broker and return the public URL
   const uploadFileToStorage = async (
     base64: string,
     fileName: string,
     contentType: string
   ): Promise<string> => {
-    const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-
-    const storageName = `${Date.now()}-${fileName}`;
-    const { error: uploadError } = await supabase.storage
-      .from('schedules')
-      .upload(storageName, bytes, { contentType, upsert: false });
-
-    if (uploadError) throw uploadError;
-
-    const { data: urlData } = supabase.storage
-      .from('schedules')
-      .getPublicUrl(storageName);
-
-    return urlData.publicUrl;
+    if (!user) throw new Error('Not signed in');
+    return await brokerUploadBase64('schedule_upload_file', base64, fileName, contentType, user.id);
   };
 
   // Helper: create upload record + invoke edge function
@@ -135,10 +122,11 @@ export default function ScheduleUploadScreen() {
     mediaType: string,
     additionalImageUrls: string[] = []
   ) => {
+    if (!user?.id) return;
     // Manager-gated RPC (uploaded_by + org derived from the actor); week bounds are
     // placeholders that parse-schedule corrects, same as the old direct insert.
     const { data: newUploadId, error: insertError } = await supabase.rpc('create_schedule_upload', {
-      p_actor_id: user?.id ?? '',
+      p_actor_id: user.id,
       p_file_url: fileUrl,
       p_file_name: displayName,
       p_week_start: new Date().toISOString().split('T')[0],
@@ -157,6 +145,8 @@ export default function ScheduleUploadScreen() {
         media_type: mediaType,
         additional_image_urls: additionalImageUrls,
         organization_id: organizationId,
+        // B4 batch 8: the fn verifies mgr/owner server-side when user_id is present
+        user_id: user.id,
       },
     });
 
@@ -318,10 +308,11 @@ export default function ScheduleUploadScreen() {
           text: t('common.delete', 'Delete'),
           style: 'destructive',
           onPress: async () => {
+            if (!user?.id) return;
             try {
               // Gated delete; the DB cascade removes this upload's shifts.
               const { error } = await supabase.rpc('delete_schedule_upload', {
-                p_actor_id: user?.id ?? '',
+                p_actor_id: user.id,
                 p_upload_id: upload.id,
               });
               if (error) throw error;

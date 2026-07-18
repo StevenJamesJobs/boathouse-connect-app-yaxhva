@@ -23,7 +23,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
+import { brokerUploadImage, brokerDelete } from '@/utils/storageBroker';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
@@ -265,52 +265,20 @@ export default function UpcomingEventsEditorScreen() {
   };
 
   const uploadImage = async (uri: string): Promise<string | null> => {
+    if (!user?.id) return null;
+
     try {
       setUploadingImage(true);
       console.log('Starting image upload for upcoming event');
 
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-
-      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${Date.now()}.${ext}`;
-
-      console.log('Uploading image:', fileName);
-
-      let contentType = 'image/jpeg';
-      if (ext === 'png') contentType = 'image/png';
-      else if (ext === 'gif') contentType = 'image/gif';
-      else if (ext === 'webp') contentType = 'image/webp';
-
-      const { data, error } = await supabase.storage
-        .from('upcoming-events')
-        .upload(fileName, byteArray, {
-          contentType: contentType,
-          upsert: false,
-        });
-
-      if (error) {
-        console.error('Error uploading image:', error);
-        throw error;
+      const publicUrl = await brokerUploadImage('upcoming_event_image', uri, user.id);
+      if (!publicUrl) {
+        throw new Error('Image upload failed');
       }
 
-      console.log('Upload successful:', data);
+      console.log('Public URL:', publicUrl);
 
-      const { data: urlData } = supabase.storage
-        .from('upcoming-events')
-        .getPublicUrl(fileName);
-
-      console.log('Public URL:', urlData.publicUrl);
-
-      return urlData.publicUrl;
+      return publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
       Alert.alert(t('common:error'), t('upcoming_events_editor:upload_image_error'));
@@ -402,15 +370,13 @@ export default function UpcomingEventsEditorScreen() {
           await saveTranslations('upcoming_events', editingEvent.id, {
             title_es: formData.title_es,
             content_es: formData.message_es,
-          }, organizationId);
+          }, user?.id);
         }
 
         // Upload new additional images and save all to content_images
         const uploadedNewUrls: string[] = [];
         for (const uri of newAdditionalImageUris) {
-          const url = await uploadImageToStorage(uri, 'upcoming_event', (u) =>
-            FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
-          );
+          const url = await uploadImageToStorage(uri, 'upcoming_event', user.id);
           if (url) uploadedNewUrls.push(url);
         }
         const allAdditionalUrls = [...additionalImageUrls, ...uploadedNewUrls];
@@ -471,7 +437,7 @@ export default function UpcomingEventsEditorScreen() {
           await saveTranslations('upcoming_events', newEventId, {
             title_es: formData.title_es,
             content_es: formData.message_es,
-          }, organizationId);
+          }, user?.id);
         }
 
         // Upload and save additional images for newly created item (no longer
@@ -480,9 +446,7 @@ export default function UpcomingEventsEditorScreen() {
         if (newEventId && newAdditionalImageUris.length > 0) {
           const uploadedNewUrls: string[] = [];
           for (const uri of newAdditionalImageUris) {
-            const url = await uploadImageToStorage(uri, 'upcoming_event', (u) =>
-              FileSystem.readAsStringAsync(u, { encoding: FileSystem.EncodingType.Base64 })
-            );
+            const url = await uploadImageToStorage(uri, 'upcoming_event', user.id);
             if (url) uploadedNewUrls.push(url);
           }
           if (uploadedNewUrls.length > 0) {
@@ -529,12 +493,7 @@ export default function UpcomingEventsEditorScreen() {
               }
 
               if (event.thumbnail_url) {
-                const fileName = event.thumbnail_url.split('/').pop();
-                if (fileName) {
-                  await supabase.storage
-                    .from('upcoming-events')
-                    .remove([fileName]);
-                }
+                await brokerDelete('upcoming-events', [event.thumbnail_url], user.id);
               }
 
               // content_images rows are cascaded by delete_upcoming_event server-side.

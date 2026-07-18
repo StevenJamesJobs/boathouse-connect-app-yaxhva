@@ -23,7 +23,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
+import { brokerUploadImage, brokerUploadFile, brokerDelete } from '@/utils/storageBroker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
@@ -161,55 +161,19 @@ export default function GuidesAndTrainingEditorScreen() {
   };
 
   const uploadThumbnail = async (uri: string): Promise<string | null> => {
+    if (!user?.id) return null;
     try {
       setUploadingThumbnail(true);
       console.log('Starting thumbnail upload from URI:', uri);
 
-      // Read file as base64
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      console.log('File read as base64, length:', base64.length);
-
-      // Convert base64 to Uint8Array
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-
-      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `thumbnail_${Date.now()}.${ext}`;
-
-      let contentType = 'image/jpeg';
-      if (ext === 'png') contentType = 'image/png';
-      else if (ext === 'gif') contentType = 'image/gif';
-      else if (ext === 'webp') contentType = 'image/webp';
-
-      console.log('Uploading to storage:', fileName, 'Type:', contentType);
-
-      const { data, error } = await supabase.storage
-        .from('guides-and-training')
-        .upload(`thumbnails/${fileName}`, byteArray, {
-          contentType: contentType,
-          upsert: false,
-        });
-
-      if (error) {
-        console.error('Storage upload error:', error);
-        throw error;
+      // Upload via the storage broker
+      const publicUrl = await brokerUploadImage('guide_thumbnail', uri, user.id);
+      if (!publicUrl) {
+        throw new Error('Upload failed');
       }
 
-      console.log('Upload successful, getting public URL...');
-
-      const { data: urlData } = supabase.storage
-        .from('guides-and-training')
-        .getPublicUrl(`thumbnails/${fileName}`);
-
-      console.log('Public URL obtained:', urlData.publicUrl);
-      return urlData.publicUrl;
+      console.log('Public URL obtained:', publicUrl);
+      return publicUrl;
     } catch (error: any) {
       console.error('Error uploading thumbnail:', error);
       Alert.alert('Error', `Failed to upload thumbnail: ${error.message || 'Unknown error'}`);
@@ -220,49 +184,19 @@ export default function GuidesAndTrainingEditorScreen() {
   };
 
   const uploadFile = async (file: { uri: string; name: string; type: string }): Promise<{ url: string; type: string } | null> => {
+    if (!user?.id) return null;
     try {
       setUploadingFile(true);
       console.log('Starting file upload:', file.name, 'from URI:', file.uri);
 
-      // Read file as base64
-      const base64 = await FileSystem.readAsStringAsync(file.uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      console.log('File read as base64, length:', base64.length);
-
-      // Convert base64 to Uint8Array
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-
-      const fileName = `${Date.now()}_${file.name}`;
-
-      console.log('Uploading to storage:', fileName, 'Type:', file.type);
-
-      const { data, error } = await supabase.storage
-        .from('guides-and-training')
-        .upload(`files/${fileName}`, byteArray, {
-          contentType: file.type,
-          upsert: false,
-        });
-
-      if (error) {
-        console.error('Storage upload error:', error);
-        throw error;
+      // Upload via the storage broker
+      const fileUrl = await brokerUploadFile('guide_file', file.uri, file.name, file.type, user.id);
+      if (!fileUrl) {
+        throw new Error('Upload failed');
       }
 
-      console.log('Upload successful, getting public URL...');
-
-      const { data: urlData } = supabase.storage
-        .from('guides-and-training')
-        .getPublicUrl(`files/${fileName}`);
-
-      console.log('Public URL obtained:', urlData.publicUrl);
-      return { url: urlData.publicUrl, type: file.type };
+      console.log('Public URL obtained:', fileUrl);
+      return { url: fileUrl, type: file.type };
     } catch (error: any) {
       console.error('Error uploading file:', error);
       Alert.alert('Error', `Failed to upload file: ${error.message || 'Unknown error'}`);
@@ -370,7 +304,7 @@ export default function GuidesAndTrainingEditorScreen() {
           await saveTranslations('guides_and_training', editingGuide.id, {
             title_es: formData.title_es,
             description_es: formData.description_es,
-          }, organizationId);
+          }, user?.id);
         }
       } else {
         console.log('Creating new guide');
@@ -398,7 +332,7 @@ export default function GuidesAndTrainingEditorScreen() {
           await saveTranslations('guides_and_training', newGuideId, {
             title_es: formData.title_es,
             description_es: formData.description_es,
-          }, organizationId);
+          }, user?.id);
         }
       }
 
@@ -420,6 +354,7 @@ export default function GuidesAndTrainingEditorScreen() {
           text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
+            if (!user?.id) return;
             try {
               console.log('Deleting guide:', guide.id);
 
@@ -434,15 +369,8 @@ export default function GuidesAndTrainingEditorScreen() {
                 throw error;
               }
 
-              // Delete files from storage
-              if (guide.thumbnail_url) {
-                const thumbnailPath = guide.thumbnail_url.split('/').slice(-2).join('/');
-                await supabase.storage.from('guides-and-training').remove([thumbnailPath]);
-              }
-              if (guide.file_url) {
-                const filePath = guide.file_url.split('/').slice(-2).join('/');
-                await supabase.storage.from('guides-and-training').remove([filePath]);
-              }
+              // Delete files from storage via the broker
+              await brokerDelete('guides-and-training', [guide.thumbnail_url, guide.file_url], user.id);
 
               Alert.alert(t('common.success'), t('guides_training_editor.guide_deleted'));
               await loadGuides();

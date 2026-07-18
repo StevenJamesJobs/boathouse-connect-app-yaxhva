@@ -173,32 +173,33 @@ export default function GameHubEditorScreen() {
           text: t('game_hub_editor:reset_everything_btn'),
           style: 'destructive',
           onPress: async () => {
+            if (!user?.id) return;
             setResettingAll(true);
             try {
-              // Use SECURITY DEFINER RPCs (bypasses RLS)
-              const { error: err1 } = await supabase.rpc('reset_game_scores', {
+              // Actor-gated RPCs — org derived server-side from the actor
+              const { error: err1 } = await (supabase.rpc as any)('reset_game_scores_actor', {
+                p_actor_id: user.id,
                 p_game_mode: null,
                 p_play_mode: null,
-                p_organization_id: organizationId,
               });
               if (err1) {
                 console.error('Error resetting game scores:', err1);
                 throw err1;
               }
 
-              const { error: err2 } = await supabase.rpc('reset_word_search_scores', {
+              const { error: err2 } = await (supabase.rpc as any)('reset_word_search_scores_actor', {
+                p_actor_id: user.id,
                 p_category: null,
-                p_organization_id: organizationId,
               });
               if (err2) {
                 console.error('Error resetting word search scores:', err2);
                 throw err2;
               }
 
-              const { error: err3 } = await supabase.rpc('reset_picture_this_scores', {
+              const { error: err3 } = await (supabase.rpc as any)('reset_picture_this_scores_actor', {
+                p_actor_id: user.id,
                 p_category: null,
                 p_difficulty: null,
-                p_organization_id: organizationId,
               });
               if (err3) {
                 console.error('Error resetting picture this scores:', err3);
@@ -235,6 +236,7 @@ export default function GameHubEditorScreen() {
   }, [searchQuery]);
 
   const handleSearchUser = async (queryArg?: string) => {
+    if (!authActorId) return;
     const query = (queryArg ?? searchQuery).trim();
     if (!query) return;
 
@@ -256,7 +258,7 @@ export default function GameHubEditorScreen() {
 
       // One manager-gated aggregate RPC replaces three queries per user.
       const { data: totalsData, error: totalsError } = await supabase.rpc('get_org_game_totals', {
-        p_actor_id: authActorId ?? '',
+        p_actor_id: authActorId,
       });
       if (totalsError) throw totalsError;
       const totalsById = new Map<string, any>((totalsData || []).map((t: any) => [t.user_id, t]));
@@ -299,11 +301,12 @@ export default function GameHubEditorScreen() {
           text: t('game_hub_editor:reset_everything_btn'),
           style: 'destructive',
           onPress: async () => {
+            if (!authActorId) return;
             setResettingUserId(user.user_id);
             try {
               // Manager-gated, same-org enforced; clears all three score tables in one call.
               const { data: resetRes, error: resetError } = await supabase.rpc('reset_user_game_scores', {
-                p_actor_id: authActorId ?? '',
+                p_actor_id: authActorId,
                 p_user_id: user.user_id,
               });
               const resetResult: any = typeof resetRes === 'string' ? JSON.parse(resetRes) : resetRes;

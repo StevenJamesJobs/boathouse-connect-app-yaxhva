@@ -61,7 +61,7 @@ export function useMenuCategories(opts?: { includeHidden?: boolean; menuSlot?: 1
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!organizationId) {
+    if (!organizationId || !user?.id) {
       setCategories([]);
       setLoading(false);
       return;
@@ -70,8 +70,8 @@ export function useMenuCategories(opts?: { includeHidden?: boolean; menuSlot?: 1
     setError(null);
     try {
       const [catRes, subRes] = await Promise.all([
-        supabase.rpc('get_menu_categories', { p_actor_id: user?.id ?? '', p_menu_slot: effectiveSlot }),
-        supabase.rpc('get_menu_subcategories', { p_actor_id: user?.id ?? '', p_menu_slot: effectiveSlot }),
+        supabase.rpc('get_menu_categories', { p_actor_id: user.id, p_menu_slot: effectiveSlot }),
+        supabase.rpc('get_menu_subcategories', { p_actor_id: user.id, p_menu_slot: effectiveSlot }),
       ]);
 
       if (catRes.error) throw catRes.error;
@@ -115,7 +115,7 @@ export function useMenuCategories(opts?: { includeHidden?: boolean; menuSlot?: 1
     } finally {
       setLoading(false);
     }
-  }, [organizationId, includeHidden, effectiveSlot]);
+  }, [organizationId, includeHidden, effectiveSlot, user?.id]);
 
   useEffect(() => {
     load();

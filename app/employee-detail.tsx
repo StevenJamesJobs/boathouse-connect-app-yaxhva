@@ -20,6 +20,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { brokerUploadImage } from '@/utils/storageBroker';
 import * as ImagePicker from 'expo-image-picker';
 import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
 import AmbientGlow from '@/components/AmbientGlow';
@@ -56,11 +57,12 @@ export default function EmployeeDetailScreen() {
   const [newPassword, setNewPassword] = useState('');
 
   const fetchEmployee = useCallback(async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       console.log('Fetching employee with ID:', employeeId);
       const { data, error } = await supabase.rpc('get_employee', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_employee_id: employeeId as string,
       });
 
@@ -213,45 +215,29 @@ export default function EmployeeDetailScreen() {
   };
 
   const uploadImage = async (uri: string) => {
-    if (!employee) return;
+    if (!employee || !user) return;
 
     try {
       setUploading(true);
 
-      // Convert URI to blob
-      const response = await fetch(uri);
-      const blob = await response.blob();
+      // Upload via the storage broker.
+      const publicUrl = await brokerUploadImage('profile_picture', uri, user.id, {
+        targetUserId: employee.id,
+      });
 
-      // Create file name
-      const fileExt = uri.split('.').pop();
-      const fileName = `${employee.id}/${Date.now()}.${fileExt}`;
-
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('profile-pictures')
-        .upload(fileName, blob, {
-          contentType: 'image/jpeg',
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('profile-pictures')
-        .getPublicUrl(fileName);
+      if (!publicUrl) throw new Error('Profile picture upload failed');
 
       // Update user record via the gated RPC (manager sets an employee's photo).
       const { error: updateError } = await supabase.rpc('update_profile_picture', {
         user_id: employee.id,
-        picture_url: urlData.publicUrl,
+        picture_url: publicUrl,
         p_organization_id: organizationId,
         p_actor_id: user?.id,
       });
 
       if (updateError) throw updateError;
 
-      setEmployee({ ...employee, profile_picture_url: urlData.publicUrl });
+      setEmployee({ ...employee, profile_picture_url: publicUrl });
       Alert.alert(t('common:success'), t('picture_updated'));
     } catch (error) {
       console.error('Error uploading image:', error);

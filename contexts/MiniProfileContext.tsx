@@ -123,8 +123,8 @@ export function MiniProfileProvider({ children }: { children: React.ReactNode })
         supabase.rpc('get_user_card', { p_actor_id: user.id, p_user_id: userId }),
         // Same-org gated: a coworker's next shift only, resolved server-side.
         supabase.rpc('get_user_next_shift', { p_actor_id: user.id, p_user_id: userId }),
-        organizationId
-          ? supabase.rpc('get_master_leaderboard_overall', { p_limit: 200, p_organization_id: organizationId })
+        user?.id
+          ? supabase.rpc('get_master_leaderboard_overall_actor' as any, { p_limit: 200, p_actor_id: user.id })
           : Promise.resolve({ data: null } as any),
       ]);
 

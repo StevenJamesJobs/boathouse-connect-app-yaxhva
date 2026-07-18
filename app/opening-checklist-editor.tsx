@@ -299,13 +299,14 @@ export default function OpeningChecklistEditorScreen() {
   );
 
   const loadChecklist = async () => {
+    if (!user?.id) return;
     console.log('Loading Opening Checklist for editing');
     try {
       setLoading(true);
 
       // Fetch categories (member-gated RPC; org derived server-side)
       const { data: categoriesData, error: categoriesError } = await supabase.rpc('get_checklist_categories', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: false,
         p_checklist_type: 'opening',
       });
@@ -317,7 +318,7 @@ export default function OpeningChecklistEditorScreen() {
 
       // Fetch items
       const { data: itemsData, error: itemsError } = await supabase.rpc('get_checklist_items', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: false,
         p_checklist_type: 'opening',
       });
@@ -401,6 +402,7 @@ export default function OpeningChecklistEditorScreen() {
   };
 
   const handleSaveCategory = async () => {
+    if (!user?.id) return;
     if (!categoryName.trim()) {
       Alert.alert(t('common:error'), t('checklist_editor:error_enter_category_name'));
       return;
@@ -413,7 +415,7 @@ export default function OpeningChecklistEditorScreen() {
       // One manager-gated upsert (p_category_id present = update name, absent = insert with
       // server-computed display_order).
       const { error } = await supabase.rpc('upsert_checklist_category', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: false,
         p_checklist_type: 'opening',
         p_name: categoryName.trim(),
@@ -444,9 +446,10 @@ export default function OpeningChecklistEditorScreen() {
           text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
+            if (!user?.id) return;
             try {
               const { error } = await supabase.rpc('delete_checklist_category', {
-                p_actor_id: user?.id ?? '',
+                p_actor_id: user.id,
                 p_bartender: false,
                 p_category_id: category.id,
               });
@@ -465,6 +468,7 @@ export default function OpeningChecklistEditorScreen() {
   };
 
   const handleSaveItem = async () => {
+    if (!user?.id) return;
     if (!itemText.trim()) {
       Alert.alert(t('common:error'), t('checklist_editor:error_enter_item_text'));
       return;
@@ -482,7 +486,7 @@ export default function OpeningChecklistEditorScreen() {
       // One manager-gated upsert (p_item_id present = update text/category, absent = insert with
       // server-computed display_order).
       const { error } = await supabase.rpc('upsert_checklist_item', {
-        p_actor_id: user?.id ?? '',
+        p_actor_id: user.id,
         p_bartender: false,
         p_category_id: selectedCategoryId,
         p_text: itemText.trim(),
@@ -513,9 +517,10 @@ export default function OpeningChecklistEditorScreen() {
           text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
+            if (!user?.id) return;
             try {
               const { error } = await supabase.rpc('delete_checklist_item', {
-                p_actor_id: user?.id ?? '',
+                p_actor_id: user.id,
                 p_bartender: false,
                 p_item_id: item.id,
               });

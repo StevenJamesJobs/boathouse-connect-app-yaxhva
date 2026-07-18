@@ -353,7 +353,7 @@ export default function ManagerManageScreen() {
         supabase.rpc('get_menu_items', { p_actor_id: actorId }),
         getOrgDirectory(actorId).then((rows) => ({ count: rows.filter((r) => r.is_active).length })),
         getOrgDirectory(actorId).then((rows) => ({ data: rows.filter((r) => r.is_active).sort((a, b) => (b.mcloones_bucks || 0) - (a.mcloones_bucks || 0)).slice(0, 3) })),
-        supabase.rpc('get_master_leaderboard_overall', { p_limit: 3, p_organization_id: organizationId }),
+        supabase.rpc('get_master_leaderboard_overall_actor' as any, { p_limit: 3, p_actor_id: actorId }),
       ]);
       // Resilient extraction — a single failed query degrades to zeros instead
       // of blanking the whole cockpit.

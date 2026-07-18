@@ -63,10 +63,11 @@ export default function PureeSyrupRecipesScreen() {
   }, []);
 
   const loadRecipes = async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       console.log('Loading puree syrup recipes from table: puree_syrup_recipes');
-      const { data, error } = await supabase.rpc('get_puree_syrup_recipes', { p_actor_id: user?.id ?? '' });
+      const { data, error } = await supabase.rpc('get_puree_syrup_recipes', { p_actor_id: user.id });
 
       if (error) {
         console.error('Error loading puree syrup recipes:', error);

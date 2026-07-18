@@ -75,13 +75,14 @@ export default function PictureThisLeaderboardScreen() {
     (async () => {
       setLoading(true);
       try {
+        if (!user?.id) { setLoading(false); return; }
         const { data, error } = await supabase.rpc(
-          'get_picture_this_leaderboard_filtered',
+          'get_picture_this_leaderboard_filtered_actor' as any,
           {
             p_category: activeCategory,
             p_play_mode: activePlayMode,
             p_limit: 20,
-            p_organization_id: organizationId,
+            p_actor_id: user.id,
           },
         );
         if (cancelled) return;
@@ -95,7 +96,7 @@ export default function PictureThisLeaderboardScreen() {
       }
     })();
     return () => { cancelled = true; };
-  }, [activePlayMode, activeCategory]);
+  }, [activePlayMode, activeCategory, user?.id]);
 
   const renderEntry = ({ item, index }: { item: Entry; index: number }) => {
     const rank = index + 1;

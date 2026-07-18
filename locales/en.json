@@ -51,6 +51,7 @@
     "error_invalid": "Invalid username or password. Please try again.",
     "error_login_failed": "Login Failed",
     "error_generic": "An error occurred during login. Please try again.",
+    "error_rate_limited": "Too many login attempts. Please wait a few minutes and try again.",
     "forgot_password": "Forgot your password? Contact your manager to have it reset.",
     "join_restaurant": "Join a Restaurant",
     "owner_signup": "I'm a Restaurant Owner",

@@ -67,10 +67,11 @@ export default function EmployeePickerModal({
 
   useEffect(() => {
     if (!visible) return;
+    if (!user?.id) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const roster = await getOrgDirectory(user?.id ?? '');
+      const roster = await getOrgDirectory(user.id);
       if (cancelled) return;
       const data = roster
         .filter((r) => r.is_active)

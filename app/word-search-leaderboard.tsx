@@ -57,12 +57,13 @@ export default function WordSearchLeaderboardScreen() {
   const [loading, setLoading] = useState<Record<string, boolean>>({});
 
   const fetchLeaderboard = useCallback(async (cat: WordSearchCategory) => {
+    if (!user?.id) return;
     if (boards[cat]) return; // already loaded
     setLoading((prev) => ({ ...prev, [cat]: true }));
-    const { data, error } = await supabase.rpc('get_word_search_leaderboard', {
+    const { data, error } = await supabase.rpc('get_word_search_leaderboard_actor' as any, {
       p_category: cat,
       p_limit: 20,
-      p_organization_id: organizationId,
+      p_actor_id: user.id,
     });
     setLoading((prev) => ({ ...prev, [cat]: false }));
     if (!error && data) {
@@ -70,7 +71,7 @@ export default function WordSearchLeaderboardScreen() {
     } else {
       setBoards((prev) => ({ ...prev, [cat]: [] }));
     }
-  }, [boards]);
+  }, [boards, user?.id]);
 
   useEffect(() => {
     fetchLeaderboard('weekly_specials');

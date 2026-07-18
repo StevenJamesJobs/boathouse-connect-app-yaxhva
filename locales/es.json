@@ -51,6 +51,7 @@
     "error_invalid": "Usuario o contraseña incorrectos. Por favor intenta de nuevo.",
     "error_login_failed": "Error al Iniciar Sesión",
     "error_generic": "Ocurrió un error al iniciar sesión. Por favor intenta de nuevo.",
+    "error_rate_limited": "Demasiados intentos de inicio de sesión. Espera unos minutos e intenta de nuevo.",
     "forgot_password": "¿Olvidaste tu contraseña? Contacta a tu gerente para restablecerla.",
     "join_restaurant": "Unirse a un Restaurante",
     "owner_signup": "Soy Dueño de un Restaurante",

@@ -15,7 +15,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
+import { brokerUploadImage } from '@/utils/storageBroker';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -158,10 +158,11 @@ export default function CocktailsAZEditorScreen() {
   }, [filterCocktails]);
 
   const loadCocktails = useCallback(async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       console.log('Loading cocktails from table: cocktails');
-      const { data, error } = await supabase.rpc('get_cocktails', { p_actor_id: user?.id ?? '' });
+      const { data, error } = await supabase.rpc('get_cocktails', { p_actor_id: user.id });
 
       if (error) {
         console.error('Error loading cocktails:', error);
@@ -210,53 +211,13 @@ export default function CocktailsAZEditorScreen() {
       setUploadingImage(true);
       console.log('Starting image upload for user:', user.id);
 
-      // Read the file as base64
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-
-      // Convert base64 to Uint8Array (same as profile image upload)
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-
-      // Create file name
-      const fileExt = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      
-      console.log('Uploading file to cocktail-images bucket:', fileName);
-
-      // Determine content type
-      let contentType = 'image/jpeg';
-      if (fileExt === 'png') contentType = 'image/png';
-      else if (fileExt === 'gif') contentType = 'image/gif';
-      else if (fileExt === 'webp') contentType = 'image/webp';
-
-      // Upload to Supabase Storage (same pattern as profile picture upload)
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('cocktail-images')
-        .upload(fileName, byteArray, {
-          contentType: contentType,
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.error('Upload error:', uploadError);
-        throw uploadError;
+      const publicUrl = await brokerUploadImage('cocktail_image', uri, user.id);
+      if (!publicUrl) {
+        throw new Error('Failed to upload image');
       }
 
-      console.log('Upload successful:', uploadData);
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('cocktail-images')
-        .getPublicUrl(fileName);
-
-      console.log('Public URL:', urlData.publicUrl);
-      setThumbnailUrl(urlData.publicUrl);
+      console.log('Public URL:', publicUrl);
+      setThumbnailUrl(publicUrl);
       Alert.alert(t('common.success'), t('cocktails_editor.image_uploaded'));
     } catch (error: any) {
       console.error('Error uploading image:', error);
@@ -333,7 +294,7 @@ export default function CocktailsAZEditorScreen() {
         }
         console.log('Cocktail updated successfully');
         if (procedureEs.trim()) {
-          await saveTranslations('cocktails', editingCocktail.id, { procedure_es: procedureEs }, organizationId);
+          await saveTranslations('cocktails', editingCocktail.id, { procedure_es: procedureEs }, user?.id);
         }
         Alert.alert(t('common.success'), t('cocktails_editor.cocktail_updated'));
       } else {
@@ -359,7 +320,7 @@ export default function CocktailsAZEditorScreen() {
         console.log('Cocktail added successfully');
         // insert_cocktail returns the new id — use it directly (no follow-up read needed).
         if (data && procedureEs.trim()) {
-          await saveTranslations('cocktails', data as string, { procedure_es: procedureEs }, organizationId);
+          await saveTranslations('cocktails', data as string, { procedure_es: procedureEs }, user?.id);
         }
         Alert.alert(t('common.success'), t('cocktails_editor.cocktail_added'));
       }

@@ -69,9 +69,10 @@ export default function SummerLibationRecipesScreen() {
   }, []);
 
   const loadRecipes = async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
-      const { data, error } = await supabase.rpc('get_summer_libation_recipes', { p_actor_id: user?.id ?? '' });
+      const { data, error } = await supabase.rpc('get_summer_libation_recipes', { p_actor_id: user.id });
 
       if (error) {
         console.error('Error loading summer libation recipes:', error);

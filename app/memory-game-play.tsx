@@ -148,12 +148,13 @@ export default function MemoryGamePlayScreen() {
   }, [playMode, gameState?.startTime, gameState?.isComplete, loading]);
 
   const loadCards = async () => {
+    if (!user?.id) return;
     setLoading(true);
     setShowResults(false);
     setScoreSaved(false);
     setTimeRemaining(difficultyConfig.timeLimitSeconds);
     try {
-      const generatedCards = await generateCards(mode, difficultyConfig.totalPairs, organizationId ?? '', organization.games_use_sample_data, user?.id ?? '');
+      const generatedCards = await generateCards(mode, difficultyConfig.totalPairs, organizationId ?? '', organization.games_use_sample_data, user.id);
       setCards(generatedCards);
     } catch (e) {
       console.error('Error generating cards:', e);

@@ -91,6 +91,7 @@ interface ParseRequest {
   media_type?: string; // 'application/pdf' | 'image/jpeg' | 'image/png'
   additional_image_urls?: string[];
   organization_id?: string;
+  user_id?: string; // B4 batch 8: caller id — verified mgr/owner when present
 }
 
 // Normalize unicode quotes/apostrophes and special chars for comparison
@@ -175,13 +176,30 @@ async function processScheduleInBackground(
       .update({ status: 'processing' })
       .eq('id', upload_id);
 
-    // Helper: fetch a file URL and return base64
+    // Helper: fetch a file URL and return base64. B4b-ready: prefer a
+    // service-role storage download (works for public AND private buckets);
+    // fall back to the plain public-URL fetch.
     async function fetchFileAsBase64(url: string): Promise<{ base64: string; byteLength: number }> {
-      const resp = await fetch(url);
-      if (!resp.ok) {
-        throw new Error(`Failed to fetch file: ${resp.status}`);
+      const PUBLIC_MARKER = '/storage/v1/object/public/';
+      let arrayBuffer: ArrayBuffer | null = null;
+      const idx = url.indexOf(PUBLIC_MARKER);
+      if (idx !== -1) {
+        try {
+          const rest = url.slice(idx + PUBLIC_MARKER.length);
+          const slash = rest.indexOf('/');
+          const bucket = rest.slice(0, slash);
+          const path = decodeURIComponent(rest.slice(slash + 1));
+          const { data, error } = await supabase.storage.from(bucket).download(path);
+          if (!error && data) arrayBuffer = await data.arrayBuffer();
+        } catch (_) { /* fall through to public fetch */ }
       }
-      const arrayBuffer = await resp.arrayBuffer();
+      if (!arrayBuffer) {
+        const resp = await fetch(url);
+        if (!resp.ok) {
+          throw new Error(`Failed to fetch file: ${resp.status}`);
+        }
+        arrayBuffer = await resp.arrayBuffer();
+      }
       const bytes = new Uint8Array(arrayBuffer);
       let base64 = '';
       const CHUNK = 8192;
@@ -500,6 +518,35 @@ serve(async (req) => {
     }
     if (!file_url || !upload_id) {
       throw new Error('Missing required fields: file_url and upload_id');
+    }
+
+    // B4 batch 8: server-side manager/owner verification (custom auth — never
+    // trust the Authorization header). CONDITIONAL for now: pre-B4 clients
+    // don't send user_id, so a missing user_id logs and proceeds; the strict
+    // requirement lands at the adoption-gated teardown. parse-menu already
+    // enforces its owner check unconditionally.
+    if (body.user_id) {
+      const { data: caller, error: callerErr } = await supabase
+        .from('users')
+        .select('role, organization_id')
+        .eq('id', body.user_id)
+        .single();
+      const isManager = caller && (caller.role === 'manager' || caller.role === 'owner');
+      const orgOk = caller && (!organizationId || caller.organization_id === organizationId);
+      if (callerErr || !isManager || !orgOk) {
+        try {
+          await supabase
+            .from('schedule_uploads')
+            .update({ status: 'failed', error_message: 'Not authorized', updated_at: new Date().toISOString() })
+            .eq('id', upload_id);
+        } catch (_) { /* noop */ }
+        return new Response(
+          JSON.stringify({ success: false, error: 'Only managers can upload a schedule.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+        );
+      }
+    } else {
+      console.warn('parse-schedule invoked without user_id (legacy client) — allowed until teardown');
     }
 
     // Kick off the heavy work as a background task so we don't hit the

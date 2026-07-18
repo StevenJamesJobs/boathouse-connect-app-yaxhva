@@ -326,6 +326,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (error) {
         console.log('[AuthContext] login_user error:', error.message);
+        // Server-side throttle (B4 batch 5): surface the lockout distinctly so
+        // the login screens can show a specific message instead of "invalid".
+        if (error.message?.includes('rate_limited')) {
+          throw new Error('rate_limited');
+        }
         return false;
       }
 
@@ -341,6 +346,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return true;
     } catch (error) {
       console.log('[AuthContext] Login exception:', error);
+      if (error instanceof Error && error.message === 'rate_limited') throw error;
       return false;
     }
   };

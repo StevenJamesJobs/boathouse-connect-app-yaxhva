@@ -351,7 +351,7 @@ export default function ComposeMessageScreen() {
       let imageUrl: string | null = null;
       if (selectedImageUri) {
         setUploadingImage(true);
-        imageUrl = await uploadMessageImage(selectedImageUri);
+        imageUrl = await uploadMessageImage(selectedImageUri, actorId);
         setUploadingImage(false);
         if (!imageUrl) {
           Alert.alert(
@@ -368,7 +368,7 @@ export default function ComposeMessageScreen() {
       let fileName: string | null = selectedFileName;
       if (selectedFileUri && selectedFileName) {
         setUploadingFile(true);
-        fileUrl = await uploadMessageFile(selectedFileUri, selectedFileName);
+        fileUrl = await uploadMessageFile(selectedFileUri, selectedFileName, actorId);
         setUploadingFile(false);
         if (!fileUrl) {
           Alert.alert(

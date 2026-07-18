@@ -23,7 +23,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system/legacy';
+import { brokerDelete, brokerUploadImage } from '@/utils/storageBroker';
 import { useTranslation } from 'react-i18next';
 import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
@@ -229,13 +229,14 @@ export default function MenuEditorScreen() {
   );
 
   const loadMenuItems = async () => {
+    if (!user?.id) return;
     try {
       setLoading(true);
       // Active-menu items (season-scoped) feed the swipe pager; the full set
       // (all menus) backs the whole-database search.
       const [scoped, all] = await Promise.all([
-        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '', p_season: season }),
-        supabase.rpc('get_menu_items', { p_actor_id: user?.id ?? '' }),
+        supabase.rpc('get_menu_items', { p_actor_id: user.id, p_season: season }),
+        supabase.rpc('get_menu_items', { p_actor_id: user.id }),
       ]);
 
       if (scoped.error) throw scoped.error;
@@ -378,62 +379,21 @@ export default function MenuEditorScreen() {
   };
 
   const uploadImage = async (uri: string): Promise<string | null> => {
+    if (!user?.id) return null;
     try {
       setUploadingImage(true);
       console.log('Starting image upload for menu item');
 
-      // Read the file as base64 (same method as profile pictures)
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      const publicUrl = await brokerUploadImage('menu_item_image', uri, user.id);
 
-      // Convert base64 to Uint8Array
-      const byteCharacters = atob(base64);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-
-      // Get file extension
-      const ext = uri.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${Date.now()}.${ext}`;
-
-      console.log('Uploading image:', fileName);
-
-      // Determine content type
-      let contentType = 'image/jpeg';
-      if (ext === 'png') contentType = 'image/png';
-      else if (ext === 'gif') contentType = 'image/gif';
-      else if (ext === 'webp') contentType = 'image/webp';
-
-      // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
-        .from('menu-items')
-        .upload(fileName, byteArray, {
-          contentType: contentType,
-          upsert: false,
-        });
-
-      if (error) {
-        console.error('Error uploading image:', error);
-        throw error;
+      if (!publicUrl) {
+        Alert.alert(t('common:error'), t('menu_editor:upload_image_error'));
+        return null;
       }
 
-      console.log('Upload successful:', data);
+      console.log('Public URL:', publicUrl);
 
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('menu-items')
-        .getPublicUrl(fileName);
-
-      console.log('Public URL:', urlData.publicUrl);
-
-      return urlData.publicUrl;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      Alert.alert(t('common:error'), t('menu_editor:upload_image_error'));
-      return null;
+      return publicUrl;
     } finally {
       setUploadingImage(false);
     }
@@ -546,7 +506,7 @@ export default function MenuEditorScreen() {
             name_es: formData.name_es,
             description_es: formData.description_es,
             ...(isWine ? { location_es: formData.location_es } : {}),
-          }, organizationId);
+          }, user?.id);
         }
       } else {
         // New items append to the END of their category/subcategory list;
@@ -602,7 +562,7 @@ export default function MenuEditorScreen() {
               name_es: formData.name_es,
               description_es: formData.description_es,
               ...(isWine ? { location_es: formData.location_es } : {}),
-            }, organizationId);
+            }, user?.id);
           }
         }
       }
@@ -645,12 +605,7 @@ export default function MenuEditorScreen() {
 
               // Delete image if exists
               if (item.thumbnail_url) {
-                const fileName = item.thumbnail_url.split('/').pop();
-                if (fileName) {
-                  await supabase.storage
-                    .from('menu-items')
-                    .remove([fileName]);
-                }
+                await brokerDelete('menu-items', [item.thumbnail_url], user.id);
               }
 
               Alert.alert(t('common:success'), t('menu_editor:deleted_success'));
@@ -666,6 +621,7 @@ export default function MenuEditorScreen() {
   };
 
   const handleMoveUp = async (index: number) => {
+    if (!user?.id) return;
     if (index <= 0) return;
     const items = [...filteredItems];
     const currentItem = items[index];
@@ -687,7 +643,7 @@ export default function MenuEditorScreen() {
       // Persist the whole filtered group's new order (reindexed 0..N-1) via the gated RPC,
       // then reload so the editor reflects the DB's normalized display_order live.
       const { error } = await supabase.rpc('reorder_menu_items', {
-        p_actor_id: user?.id ?? '', p_ordered_ids: items.map((i) => i.id),
+        p_actor_id: user.id, p_ordered_ids: items.map((i) => i.id),
       });
       if (error) throw error;
       loadMenuItems();
@@ -698,6 +654,7 @@ export default function MenuEditorScreen() {
   };
 
   const handleMoveDown = async (index: number) => {
+    if (!user?.id) return;
     if (index >= filteredItems.length - 1) return;
     const items = [...filteredItems];
     const currentItem = items[index];
@@ -715,7 +672,7 @@ export default function MenuEditorScreen() {
     setMenuItems(newMenuItems);
     try {
       const { error } = await supabase.rpc('reorder_menu_items', {
-        p_actor_id: user?.id ?? '', p_ordered_ids: items.map((i) => i.id),
+        p_actor_id: user.id, p_ordered_ids: items.map((i) => i.id),
       });
       if (error) throw error;
       loadMenuItems();
@@ -737,6 +694,7 @@ export default function MenuEditorScreen() {
   // Commit a chosen 1-based position: splice the item into the new slot, then
   // rewrite display_order across the sibling group and reload.
   const applyPositionChange = async (newPos: number) => {
+    if (!user?.id) return;
     if (!positionPicker) return;
     const { item, siblings, currentIndex } = positionPicker;
     const newIndex = newPos - 1;
@@ -747,7 +705,7 @@ export default function MenuEditorScreen() {
     reordered.splice(newIndex, 0, item);
     try {
       const { error } = await supabase.rpc('reorder_menu_items', {
-        p_actor_id: user?.id ?? '', p_ordered_ids: reordered.map((it) => it.id),
+        p_actor_id: user.id, p_ordered_ids: reordered.map((it) => it.id),
       });
       if (error) throw error;
     } catch (error) {
@@ -821,6 +779,7 @@ export default function MenuEditorScreen() {
   };
 
   const handleDragEnd = async ({ data: reorderedData }: { data: MenuItem[] }) => {
+    if (!user?.id) return;
     const updatedFiltered = reorderedData.map((item, index) => ({
       ...item,
       display_order: index,
@@ -835,7 +794,7 @@ export default function MenuEditorScreen() {
     setMenuItems(newMenuItems);
     try {
       const { error } = await supabase.rpc('reorder_menu_items', {
-        p_actor_id: user?.id ?? '', p_ordered_ids: reorderedData.map((item) => item.id),
+        p_actor_id: user.id, p_ordered_ids: reorderedData.map((item) => item.id),
       });
       if (error) throw error;
       console.log('Drag reorder persisted successfully');
