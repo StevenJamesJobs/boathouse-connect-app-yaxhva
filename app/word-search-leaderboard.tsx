@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   FlatList,
   ActivityIndicator,
-  Image,
   Dimensions,
   NativeSyntheticEvent,
   NativeScrollEvent,
@@ -23,6 +22,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import {
@@ -110,7 +110,7 @@ export default function WordSearchLeaderboardScreen() {
           {rank <= 3 ? RANK_EMOJIS[rank - 1] : `${rank}.`}
         </Text>
         {item.profile_picture_url ? (
-          <Image source={{ uri: item.profile_picture_url }} style={styles.avatar} />
+          <StorageImage source={{ uri: item.profile_picture_url }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
             <Text style={[styles.avatarInitial, { color: colors.primary }]}>

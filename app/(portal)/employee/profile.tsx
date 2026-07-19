@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -19,6 +18,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { supabase } from '@/app/integrations/supabase/client';
 import * as ImagePicker from 'expo-image-picker';
 import { brokerUploadImage } from '@/utils/storageBroker';
@@ -293,7 +293,7 @@ export default function EmployeeProfileScreen() {
             {uploading ? (
               <ActivityIndicator size="small" color={colors.primary} style={styles.headerAvatar} />
             ) : user?.profilePictureUrl ? (
-              <Image
+              <StorageImage
                 source={{ uri: user.profilePictureUrl }}
                 style={styles.headerAvatar}
                 key={user.profilePictureUrl}

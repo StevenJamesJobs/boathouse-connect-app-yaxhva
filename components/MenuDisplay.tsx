@@ -12,7 +12,7 @@ import {
   TextInput,
   FlatList,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { StorageExpoImage } from '@/components/StorageImage';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
@@ -654,7 +654,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       activeOpacity={0.7}
     >
       {isBanner && item.thumbnail_url && (
-        <Image
+        <StorageExpoImage
           source={getImageUrl(item.thumbnail_url, item.updated_at)!}
           style={styles.cardImageBanner}
           contentFit="cover"
@@ -662,7 +662,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       )}
       <View style={styles.cardRow}>
         {!isBanner && item.thumbnail_url && (
-          <Image
+          <StorageExpoImage
             source={getImageUrl(item.thumbnail_url, item.updated_at)!}
             style={styles.cardImage}
             contentFit="cover"

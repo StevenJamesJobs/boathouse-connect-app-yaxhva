@@ -1,7 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { useTranslation } from 'react-i18next';
 
 export interface QuestionReviewEntry {
@@ -82,7 +83,7 @@ export default function QuestionReviewList({ questions }: Props) {
           </View>
 
           {q.question_image_url && (
-            <Image
+            <StorageImage
               source={{ uri: q.question_image_url }}
               style={styles.reviewQuestionImage}
               resizeMode="cover"

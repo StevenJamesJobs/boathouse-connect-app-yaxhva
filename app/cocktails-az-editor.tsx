@@ -9,18 +9,19 @@ import {
   TextInput,
   Alert,
   Modal,
-  Image,
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { brokerUploadImage } from '@/utils/storageBroker';
+import { toPublicUrl } from '@/utils/storageResolver';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { useTranslation } from 'react-i18next';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
@@ -458,9 +459,7 @@ export default function CocktailsAZEditorScreen() {
 
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
-    if (url.startsWith('http')) return url;
-    const { data } = supabase.storage.from('cocktail-images').getPublicUrl(url);
-    return data.publicUrl;
+    return toPublicUrl('cocktail-images', url);
   };
 
   return (
@@ -676,7 +675,7 @@ export default function CocktailsAZEditorScreen() {
                     disabled={uploadingImage}
                   >
                     {thumbnailUrl ? (
-                      <Image source={{ uri: getImageUrl(thumbnailUrl) || undefined }} style={styles.thumbImage} resizeMode="cover" />
+                      <StorageImage source={{ uri: getImageUrl(thumbnailUrl) || undefined }} style={styles.thumbImage} resizeMode="cover" />
                     ) : (
                       <View style={styles.thumbPlaceholder}>
                         <IconSymbol ios_icon_name="photo" android_material_icon_name="add-photo-alternate" size={26} color={colors.textSecondary} />

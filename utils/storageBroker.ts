@@ -207,6 +207,62 @@ export async function brokerUploadBase64(
 }
 
 /**
+ * B4b (session 49): signed READS. `brokerSignRead` batch-mints signed read URLs
+ * for stored public-URL identifiers; `brokerStorageMode` reports whether the
+ * buckets have flipped private (derived server-side from live bucket metadata).
+ * Only utils/storageResolver.ts should call these — render sites go through the
+ * resolver/StorageImage, which pass stored URLs through UNCHANGED while the
+ * buckets are public.
+ */
+
+export interface SignedReadResult {
+  input: string;
+  bucket?: string;
+  path?: string;
+  signed_url?: string;
+  expires_at?: string;
+  error?: string;
+}
+
+export async function brokerSignRead(
+  urls: string[],
+  actorId: string,
+  tier: 'image' | 'file' = 'image'
+): Promise<SignedReadResult[] | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('storage-broker', {
+      body: { action: 'sign-read', actor_id: actorId, urls, expiry: tier },
+    });
+    if (error || !data?.success || !Array.isArray(data?.results)) {
+      console.error('storage-broker sign-read failed:', error ?? data?.error);
+      return null;
+    }
+    return data.results as SignedReadResult[];
+  } catch (err) {
+    console.error('storage-broker sign-read error:', err);
+    return null;
+  }
+}
+
+export async function brokerStorageMode(
+  actorId: string
+): Promise<'public' | 'private' | null> {
+  try {
+    const { data, error } = await supabase.functions.invoke('storage-broker', {
+      body: { action: 'storage-mode', actor_id: actorId },
+    });
+    if (error || !data?.success) {
+      console.error('storage-broker storage-mode failed:', error ?? data?.error);
+      return null;
+    }
+    return data.mode === 'private' ? 'private' : 'public';
+  } catch (err) {
+    console.error('storage-broker storage-mode error:', err);
+    return null;
+  }
+}
+
+/**
  * Best-effort delete of stored objects by their public URLs (or bare paths).
  * The broker derives+validates paths server-side (works for legacy flat paths
  * AND new org-prefixed paths). Errors are logged, never thrown — deletes run

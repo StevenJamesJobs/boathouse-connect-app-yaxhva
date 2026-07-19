@@ -8,6 +8,11 @@
 //     need NO storage.objects permissions — proven in the Phase-0 rehearsal),
 //   - deletes happen here with the service role.
 // New object paths are org-prefixed (`${orgId}/…`); legacy objects are flat.
+//
+// B4b (session 49) adds READ groundwork: `sign-read` batch-mints signed read
+// URLs (member-gated, org/sample rules) and `storage-mode` reports public|private
+// derived live from bucket metadata — so flipping buckets private later is a
+// server-side-only event: already-shipped resolver clients switch on their own.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -141,7 +146,77 @@ const DELETE_BUCKETS = new Set([
   'guides-and-training', 'announcements', 'special-features', 'upcoming-events', 'menu-items',
 ]);
 
+// The 15 real buckets sign-read will mint READ URLs for (excludes the inert,
+// empty b4a-proof bucket).
+const READ_BUCKETS = new Set([
+  'announcements', 'cocktail-images', 'guides-and-training', 'host-section-images',
+  'libation-recipe-images', 'menu-items', 'menu-uploads', 'message-attachments',
+  'organization-logos', 'profile-pictures', 'puree-syrup-recipe-images', 'schedules',
+  'special-features', 'summer-libation-recipe-images', 'upcoming-events',
+]);
+
+// Signed-read expiry tiers. `image` keeps in-app renders cache-stable for a full
+// shift; `file` must outlive URLs handed to external viewers (Safari video
+// playback, downloads) that the app cannot transparently re-mint.
+const READ_EXPIRY: Record<string, number> = { image: 43200, file: 86400 };
+
+const ACTIONS = new Set(['sign-upload', 'delete', 'sign-read', 'storage-mode']);
+
+const PUBLIC_MARKER = '/storage/v1/object/public/';
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Bucket-agnostic public-URL → {bucket, path} (same marker approach as
+// parse-menu's fetchFileAsBase64). Tolerates ?v=/?t= suffixes; rejects traversal.
+function parsePublicStorageUrl(input: string): { bucket: string; path: string } | null {
+  const idx = input.indexOf(PUBLIC_MARKER);
+  if (idx === -1) return null;
+  const rest = input.slice(idx + PUBLIC_MARKER.length);
+  const slash = rest.indexOf('/');
+  if (slash <= 0) return null;
+  const bucket = rest.slice(0, slash);
+  let path: string;
+  try {
+    path = decodeURIComponent(rest.slice(slash + 1).split('?')[0]);
+  } catch {
+    return null;
+  }
+  path = path.replace(/^\/+/, '');
+  if (!path || path.includes('..')) return null;
+  return { bucket, path };
+}
+
+// Games' "use sample data" renders the sample org's objects cross-org (shared
+// recipe library). Resolve its id by slug once per isolate — the slug is the
+// single authority (mirrors SQL _recipe_source_org); fail closed on error.
+let _sampleOrgId: string | null | undefined;
+async function getSampleOrgId(supabase: any): Promise<string | null> {
+  if (_sampleOrgId !== undefined) return _sampleOrgId;
+  const { data, error } = await supabase
+    .from('organizations').select('id').eq('slug', 'mcloones-boathouse').maybeSingle();
+  if (error) {
+    console.error('sample-org lookup failed', error.message);
+    return null; // do not cache — retry next request
+  }
+  _sampleOrgId = data?.id ?? null;
+  return _sampleOrgId;
+}
+
+// storage-mode: ANY read bucket with public=false ⇒ 'private'. Derived live so
+// flipping buckets IS the fleet-wide switch (no separate flag to keep in sync);
+// signed URLs already work on public buckets, so early switchers are harmless.
+let _modeCache: { mode: 'public' | 'private'; at: number } | null = null;
+async function getStorageMode(supabase: any): Promise<'public' | 'private'> {
+  if (_modeCache && Date.now() - _modeCache.at < 60_000) return _modeCache.mode;
+  const { data, error } = await supabase.storage.listBuckets();
+  if (error || !data) {
+    console.error('storage-mode listBuckets failed', error?.message);
+    return _modeCache?.mode ?? 'public'; // stale answer over failing the caller
+  }
+  const anyPrivate = data.some((b: any) => READ_BUCKETS.has(b.name) && b.public === false);
+  _modeCache = { mode: anyPrivate ? 'private' : 'public', at: Date.now() };
+  return _modeCache.mode;
+}
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -174,7 +249,7 @@ serve(async (req) => {
     const action = body?.action;
     const actorId = String(body?.actor_id ?? '');
 
-    if (action !== 'sign-upload' && action !== 'delete') {
+    if (!ACTIONS.has(action)) {
       return json({ success: false, error: 'Unknown action' }, 400);
     }
     if (!UUID_RE.test(actorId)) {
@@ -252,6 +327,124 @@ serve(async (req) => {
         token: signed.token,
         signed_url: signed.signedUrl,
         public_url: pub.publicUrl,
+      }, 200);
+    }
+
+    if (action === 'sign-read') {
+      // Batch-mint signed READ URLs. Member-gated: any verified active actor.
+      // While buckets are public the resolver never calls this (pass-through);
+      // it exists so the private flip needs no client update. Per-item errors —
+      // one bad row must not blank a screenful of good images.
+      const tier = String(body?.expiry ?? 'image');
+      const expiresIn = READ_EXPIRY[tier];
+      if (!expiresIn) return json({ success: false, error: 'Bad expiry' }, 400);
+
+      const items = body?.urls;
+      if (!Array.isArray(items) || items.length === 0 || items.length > 60) {
+        return json({ success: false, error: 'Provide 1-60 urls' }, 400);
+      }
+
+      type ReadItem = { input: string; bucket?: string; path?: string; error?: string };
+      const parsed: ReadItem[] = items.map((raw: unknown): ReadItem => {
+        if (typeof raw === 'string') {
+          const hit = parsePublicStorageUrl(raw);
+          return hit ? { input: raw, ...hit } : { input: raw, error: 'invalid_url' };
+        }
+        if (raw && typeof raw === 'object') {
+          const bucket = String((raw as Record<string, unknown>).bucket ?? '');
+          let path = String((raw as Record<string, unknown>).path ?? '');
+          try { path = decodeURIComponent(path); } catch { /* keep as-is */ }
+          path = path.split('?')[0].replace(/^\/+/, '');
+          if (!bucket || !path || path.includes('..')) {
+            return { input: `${bucket}/${path}`, error: 'invalid_url' };
+          }
+          return { input: `${bucket}/${path}`, bucket, path };
+        }
+        return { input: String(raw ?? ''), error: 'invalid_url' };
+      });
+
+      const orgIdLc = String(actor.organization_id).toLowerCase();
+      const sampleOrgId = (await getSampleOrgId(supabase))?.toLowerCase() ?? null;
+      const orgExistsCache = new Map<string, boolean>();
+
+      for (const it of parsed) {
+        if (it.error || !it.bucket || !it.path) continue;
+        if (!READ_BUCKETS.has(it.bucket)) { it.error = 'invalid_url'; continue; }
+        // _orphaned/ is the B4b quarantine namespace — never readable via the broker.
+        if (it.path.startsWith('_orphaned/')) { it.error = 'forbidden'; continue; }
+        const first = it.path.split('/')[0];
+        if (!UUID_RE.test(first)) continue; // legacy flat path — allowed until the B4b move
+        const f = first.toLowerCase();
+        if (f === orgIdLc) continue;
+        if (sampleOrgId && f === sampleOrgId) continue; // shared library / sample-data renders
+        // A uuid prefix that is NOT an org is a legacy user-id path (pre-B4a
+        // recipe/profile objects) — allowed until the move re-files them per org.
+        if (!orgExistsCache.has(f)) {
+          const { data: orgRow } = await supabase
+            .from('organizations').select('id').eq('id', first).maybeSingle();
+          orgExistsCache.set(f, !!orgRow);
+        }
+        if (orgExistsCache.get(f)) it.error = 'forbidden';
+      }
+
+      const byBucket = new Map<string, ReadItem[]>();
+      for (const it of parsed) {
+        if (it.error || !it.bucket || !it.path) continue;
+        const group = byBucket.get(it.bucket) ?? [];
+        group.push(it);
+        byBucket.set(it.bucket, group);
+      }
+      const signedByItem = new Map<ReadItem, string>();
+      for (const [bucket, group] of byBucket) {
+        const { data: signed, error: signErr } = await supabase.storage
+          .from(bucket)
+          .createSignedUrls(group.map((g) => g.path as string), expiresIn);
+        if (signErr || !signed) {
+          console.error('sign-read failed', bucket, signErr?.message);
+          group.forEach((g) => { g.error = 'sign_failed'; });
+          continue;
+        }
+        signed.forEach((row: { error: string | null; signedUrl: string | null }, i: number) => {
+          const it = group[i];
+          if (row.error || !row.signedUrl) {
+            // storage-api wording varies ("Object not found" / "Either the object
+            // does not exist or …") — map both; log the raw text for diagnosis.
+            it.error = /not.?found|does not exist/i.test(String(row.error ?? ''))
+              ? 'not_found' : 'sign_failed';
+            console.log('sign-read item error', bucket, it.path, String(row.error ?? ''));
+          } else {
+            signedByItem.set(it, row.signedUrl);
+          }
+        });
+      }
+
+      console.log('sign-read', {
+        actor: actor.id, n: parsed.length,
+        signed: signedByItem.size, tier,
+      });
+      const expiresAt = new Date(Date.now() + expiresIn * 1000).toISOString();
+      return json({
+        success: true,
+        mode: await getStorageMode(supabase),
+        expires_in: expiresIn,
+        results: parsed.map((it) =>
+          it.error
+            ? { input: it.input, error: it.error }
+            : {
+                input: it.input, bucket: it.bucket, path: it.path,
+                signed_url: signedByItem.get(it), expires_at: expiresAt,
+              }),
+      }, 200);
+    }
+
+    if (action === 'storage-mode') {
+      // public|private from live bucket metadata (see getStorageMode). Actor-
+      // gated for dispatch consistency only — the mode is publicly inferable
+      // (HEAD any public URL), so the gate protects nothing; don't "harden" it.
+      return json({
+        success: true,
+        mode: await getStorageMode(supabase),
+        checked_at: new Date().toISOString(),
       }, 200);
     }
 

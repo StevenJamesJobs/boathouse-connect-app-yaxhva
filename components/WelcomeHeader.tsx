@@ -14,6 +14,8 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
 import { useTranslation } from 'react-i18next';
 import GlassCard from '@/components/GlassCard';
+import { StorageImage } from '@/components/StorageImage';
+import { toPublicUrl } from '@/utils/storageResolver';
 import { fonts } from '@/constants/fonts';
 
 interface WeatherInfo {
@@ -96,7 +98,7 @@ export default function WelcomeHeader({
   const getProfilePictureUrl = (url: string | null | undefined) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
-    return `https://xvbajqukbakcvdrkcioi.supabase.co/storage/v1/object/public/profile-pictures/${url}`;
+    return toPublicUrl('profile-pictures', url);
   };
 
   const profilePictureUrl = getProfilePictureUrl(user?.profilePictureUrl);
@@ -134,7 +136,7 @@ export default function WelcomeHeader({
           style={[styles.av, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
         >
           {profilePictureUrl ? (
-            <Image source={{ uri: profilePictureUrl }} style={styles.avImg} />
+            <StorageImage source={{ uri: profilePictureUrl }} style={styles.avImg} />
           ) : (
             <IconSymbol
               ios_icon_name="person.fill"

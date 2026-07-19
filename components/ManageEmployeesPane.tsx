@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TextInput,
   Modal,
-  Image,
   Alert,
   Share,
   Platform,
@@ -30,8 +29,10 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 import GlassCard from '@/components/GlassCard';
 import MultiSelectField from '@/components/MultiSelectField';
+import { StorageImage } from '@/components/StorageImage';
 import { displayHandle } from '@/utils/displayHandle';
 import { getOrgDirectory } from '@/utils/orgDirectory';
+import { toPublicUrl } from '@/utils/storageResolver';
 import { fonts } from '@/constants/fonts';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
@@ -109,7 +110,7 @@ export default function ManageEmployeesPane({ width, scrollRef, onScroll, header
   const profileUrl = (url?: string | null) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
-    return supabase.storage.from('profile-pictures').getPublicUrl(url).data.publicUrl;
+    return toPublicUrl('profile-pictures', url);
   };
 
   const jobTitlesDisplay = (e: Employee) =>
@@ -276,7 +277,7 @@ export default function ManageEmployeesPane({ width, scrollRef, onScroll, header
                 <View style={styles.cardInfo}>
                   <View style={[styles.avatar, { backgroundColor: colors.thumbPlaceholder }]}>
                     {pic ? (
-                      <Image source={{ uri: pic }} style={styles.avatarImg} />
+                      <StorageImage source={{ uri: pic }} style={styles.avatarImg} />
                     ) : (
                       <IconSymbol ios_icon_name="person.fill" android_material_icon_name="person" size={22} color={colors.textSecondary} />
                     )}

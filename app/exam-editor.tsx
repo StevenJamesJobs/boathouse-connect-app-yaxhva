@@ -10,13 +10,13 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Image,
   Modal,
   Switch,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
@@ -1192,7 +1192,7 @@ export default function ExamEditorScreen() {
                   </View>
                 </View>
                 {q.question_image_url && (
-                  <Image
+                  <StorageImage
                     source={{ uri: q.question_image_url }}
                     style={styles.questionCardImage}
                     resizeMode="cover"
@@ -1350,7 +1350,7 @@ export default function ExamEditorScreen() {
               <View key={entry.user_id} style={[styles.trackerRow, { backgroundColor: colors.card }]}>
                 <View style={styles.trackerAvatar}>
                   {entry.profile_picture_url ? (
-                    <Image source={{ uri: entry.profile_picture_url }} style={styles.trackerAvatarImage} />
+                    <StorageImage source={{ uri: entry.profile_picture_url }} style={styles.trackerAvatarImage} />
                   ) : (
                     <View style={[styles.trackerAvatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
                       <Text style={[styles.trackerAvatarInitial, { color: colors.primary }]}>
@@ -1458,7 +1458,7 @@ export default function ExamEditorScreen() {
                 <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Photo (optional)</Text>
                 {customImageUrl ? (
                   <View style={styles.photoPreviewRow}>
-                    <Image source={{ uri: customImageUrl }} style={styles.photoPreview} resizeMode="cover" />
+                    <StorageImage source={{ uri: customImageUrl }} style={styles.photoPreview} resizeMode="cover" />
                     <View style={styles.photoPreviewButtons}>
                       <TouchableOpacity
                         style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}
@@ -1604,7 +1604,7 @@ export default function ExamEditorScreen() {
                   <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Photo (optional)</Text>
                   {editingQuestion.question_image_url ? (
                     <View style={styles.photoPreviewRow}>
-                      <Image source={{ uri: editingQuestion.question_image_url }} style={styles.photoPreview} resizeMode="cover" />
+                      <StorageImage source={{ uri: editingQuestion.question_image_url }} style={styles.photoPreview} resizeMode="cover" />
                       <View style={styles.photoPreviewButtons}>
                         <TouchableOpacity
                           style={[styles.photoButton, { backgroundColor: colors.primary + '15', borderColor: colors.primary }]}

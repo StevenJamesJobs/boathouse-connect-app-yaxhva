@@ -13,7 +13,6 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
-  Image,
   Animated as RNAnimated,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -22,6 +21,7 @@ import ConfettiCannon from 'react-native-confetti-cannon';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { notifyLeaderboardPassed } from '@/utils/notificationHelpers';
@@ -525,7 +525,7 @@ export default function PictureThisPlayScreen() {
               <ActivityIndicator color={colors.primary} />
             </View>
           )}
-          <Image
+          <StorageImage
             source={{ uri: currentQuestion.imageUrl }}
             style={styles.image}
             resizeMode="cover"
@@ -668,7 +668,7 @@ export default function PictureThisPlayScreen() {
                   const gotItRightFirstTry = entry.wrongAttempts.length === 0;
                   return (
                     <View key={i} style={[styles.reviewItem, { borderBottomColor: colors.border }]}>
-                      <Image source={{ uri: entry.question.imageUrl }} style={styles.reviewThumb} />
+                      <StorageImage source={{ uri: entry.question.imageUrl }} style={styles.reviewThumb} />
                       <View style={styles.reviewBody}>
                         <Text style={[styles.reviewName, { color: colors.text }]} numberOfLines={1}>
                           {entry.question.itemName}

@@ -9,10 +9,10 @@ import {
   BackHandler,
   AppState,
   Alert,
-  Image,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -619,7 +619,7 @@ export default function ExamPlayScreen() {
             currentQuestion.is_bonus && { borderWidth: 2, borderColor: '#F59E0B' },
           ]}>
             {(currentQuestion as any).question_image_url && (
-              <Image
+              <StorageImage
                 source={{ uri: (currentQuestion as any).question_image_url }}
                 style={styles.questionImage}
                 resizeMode="cover"

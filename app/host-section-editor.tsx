@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Image,
   Modal,
   KeyboardAvoidingView,
   Platform,
@@ -23,6 +22,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import * as ImagePicker from 'expo-image-picker';
 import { brokerUploadImage } from '@/utils/storageBroker';
 import CollapsibleSection from '@/components/CollapsibleSection';
+import { StorageImage } from '@/components/StorageImage';
 
 interface Tile {
   id: string;
@@ -322,7 +322,7 @@ export default function HostSectionEditorScreen() {
           <ShapeToggle value={cardImageShape} onChange={setCardImageShape} />
           <TouchableOpacity style={styles.imagePick} onPress={() => pickImage(cardImageShape, setLocalCardUri)}>
             {localCardUri || cardImageUrl ? (
-              <Image source={{ uri: localCardUri || cardImageUrl || '' }} style={cardImageShape === 'square' ? styles.thumbSquare : styles.thumbBanner} resizeMode="cover" />
+              <StorageImage source={{ uri: localCardUri || cardImageUrl || '' }} style={cardImageShape === 'square' ? styles.thumbSquare : styles.thumbBanner} resizeMode="cover" />
             ) : (
               <View style={[styles.imagePlaceholder, cardImageShape === 'square' ? styles.thumbSquare : styles.thumbBanner]}>
                 <IconSymbol ios_icon_name="photo.fill" android_material_icon_name="image" size={28} color={colors.textSecondary} />
@@ -355,7 +355,7 @@ export default function HostSectionEditorScreen() {
                 return (
                   <View key={tile.id} style={styles.tileRow}>
                     {src ? (
-                      <Image source={src} style={styles.tileRowThumb} resizeMode="cover" />
+                      <StorageImage source={src} style={styles.tileRowThumb} resizeMode="cover" />
                     ) : (
                       <View style={[styles.tileRowThumb, styles.imagePlaceholderSmall]}>
                         <IconSymbol ios_icon_name="link" android_material_icon_name="link" size={18} color={colors.primary} />
@@ -399,7 +399,7 @@ export default function HostSectionEditorScreen() {
               <ShapeToggle value={tImageShape} onChange={setTImageShape} />
               <TouchableOpacity style={styles.imagePick} onPress={() => pickImage(tImageShape, (u) => { setTLocalUri(u); setTSystemAsset(null); })}>
                 {tLocalUri || tImageUrl || (tSystemAsset && SYSTEM_ASSETS[tSystemAsset]) ? (
-                  <Image
+                  <StorageImage
                     source={tLocalUri || tImageUrl ? { uri: tLocalUri || tImageUrl || '' } : SYSTEM_ASSETS[tSystemAsset || '']}
                     style={tImageShape === 'square' ? styles.thumbSquare : styles.thumbBanner}
                     resizeMode="cover"

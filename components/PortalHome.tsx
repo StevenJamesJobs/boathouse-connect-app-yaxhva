@@ -18,7 +18,7 @@ import {
   NativeScrollEvent,
   LayoutChangeEvent,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { StorageExpoImage } from '@/components/StorageImage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { isManagerOrOwner } from '@/utils/roles';
@@ -582,7 +582,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
         activeOpacity={0.7}
       >
         {event.thumbnail_shape === 'banner' && event.thumbnail_url && (
-          <Image
+          <StorageExpoImage
             source={getImageUrl(event.thumbnail_url, event.updated_at)!}
             style={styles.bannerCardImage}
             contentFit="cover"
@@ -590,7 +590,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
         )}
         <View style={styles.cardRow}>
           {event.thumbnail_shape !== 'banner' && event.thumbnail_url && (
-            <Image
+            <StorageExpoImage
               source={getImageUrl(event.thumbnail_url, event.updated_at)!}
               style={styles.cardImage}
               contentFit="cover"
@@ -718,7 +718,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
       activeOpacity={0.7}
     >
       {announcement.thumbnail_shape === 'banner' && announcement.thumbnail_url && (
-        <Image
+        <StorageExpoImage
           source={getImageUrl(announcement.thumbnail_url, announcement.updated_at)!}
           style={styles.bannerCardImage}
           contentFit="cover"
@@ -726,7 +726,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
       )}
       <View style={styles.cardRow}>
         {announcement.thumbnail_shape !== 'banner' && announcement.thumbnail_url && (
-          <Image
+          <StorageExpoImage
             source={getImageUrl(announcement.thumbnail_url, announcement.updated_at)!}
             style={styles.cardImage}
             contentFit="cover"
@@ -778,7 +778,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
       activeOpacity={0.7}
     >
       {feature.thumbnail_shape === 'banner' && feature.thumbnail_url && (
-        <Image
+        <StorageExpoImage
           source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
           style={styles.bannerCardImage}
           contentFit="cover"
@@ -786,7 +786,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
       )}
       <View style={styles.cardRow}>
         {feature.thumbnail_shape !== 'banner' && feature.thumbnail_url && (
-          <Image
+          <StorageExpoImage
             source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
             style={styles.cardImage}
             contentFit="cover"
@@ -830,7 +830,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
       activeOpacity={0.7}
     >
       {item.thumbnail_shape === 'banner' && item.thumbnail_url && (
-        <Image
+        <StorageExpoImage
           source={getImageUrl(item.thumbnail_url, item.updated_at)!}
           style={styles.bannerCardImage}
           contentFit="cover"
@@ -838,7 +838,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
       )}
       <View style={styles.cardRow}>
         {item.thumbnail_shape !== 'banner' && item.thumbnail_url && (
-          <Image
+          <StorageExpoImage
             source={getImageUrl(item.thumbnail_url, item.updated_at)!}
             style={styles.cardImage}
             contentFit="cover"

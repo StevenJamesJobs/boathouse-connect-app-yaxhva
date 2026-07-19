@@ -9,7 +9,6 @@ import {
   TextInput,
   Alert,
   Modal,
-  Image,
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
@@ -37,6 +36,7 @@ import FormattedText from '@/components/FormattedText';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import OrderPositionModal from '@/components/OrderPositionModal';
 import SimpleSelectPicker, { SelectField } from '@/components/SimpleSelectPicker';
+import { StorageImage } from '@/components/StorageImage';
 
 interface Announcement {
   id: string;
@@ -675,7 +675,7 @@ export default function AnnouncementEditorScreen() {
 
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
-    return `${url}?t=${Date.now()}`;
+    return url;
   };
 
   const getPriorityColor = (priority: string) => {
@@ -833,7 +833,7 @@ export default function AnnouncementEditorScreen() {
 
                     {announcement.thumbnail_shape === 'square' && announcement.thumbnail_url ? (
                       <View style={styles.squareLayout}>
-                        <Image
+                        <StorageImage
                           key={getImageUrl(announcement.thumbnail_url)}
                           source={{ uri: getImageUrl(announcement.thumbnail_url) }}
                           style={styles.squareImage}
@@ -876,7 +876,7 @@ export default function AnnouncementEditorScreen() {
                     ) : (
                       <>
                         {announcement.thumbnail_url && (
-                          <Image
+                          <StorageImage
                             key={getImageUrl(announcement.thumbnail_url)}
                             source={{ uri: getImageUrl(announcement.thumbnail_url) }}
                             style={styles.bannerImage}
@@ -981,7 +981,7 @@ export default function AnnouncementEditorScreen() {
                     <View style={styles.thumbColumn}>
                       <TouchableOpacity style={styles.thumbSquare} onPress={pickImage}>
                         {selectedImageUri || editingAnnouncement?.thumbnail_url ? (
-                          <Image
+                          <StorageImage
                             source={{ uri: selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '') || '' }}
                             style={styles.thumbImage}
                             key={selectedImageUri || getImageUrl(editingAnnouncement?.thumbnail_url || '')}
@@ -1054,7 +1054,7 @@ export default function AnnouncementEditorScreen() {
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.additionalImagesScroll}>
                       {additionalImageUrls.map((url, idx) => (
                         <View key={`existing-${idx}`} style={styles.additionalImageContainer}>
-                          <Image source={{ uri: getImageUrl(url) || url }} style={styles.additionalImageThumb} />
+                          <StorageImage source={{ uri: getImageUrl(url) || url }} style={styles.additionalImageThumb} />
                           <TouchableOpacity
                             style={styles.removeImageButton}
                             onPress={() => removeAdditionalImage(idx, false)}
@@ -1065,7 +1065,7 @@ export default function AnnouncementEditorScreen() {
                       ))}
                       {newAdditionalImageUris.map((uri, idx) => (
                         <View key={`new-${idx}`} style={styles.additionalImageContainer}>
-                          <Image source={{ uri }} style={styles.additionalImageThumb} />
+                          <StorageImage source={{ uri }} style={styles.additionalImageThumb} />
                           <TouchableOpacity
                             style={styles.removeImageButton}
                             onPress={() => removeAdditionalImage(idx, true)}

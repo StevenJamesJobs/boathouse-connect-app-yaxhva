@@ -11,7 +11,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  Image,
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -19,6 +18,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -127,7 +127,7 @@ export default function MasterLeaderboardScreen() {
 
         {/* Avatar */}
         {item.profile_picture_url ? (
-          <Image source={{ uri: item.profile_picture_url }} style={styles.avatar} />
+          <StorageImage source={{ uri: item.profile_picture_url }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
             <Text style={[styles.avatarInitial, { color: colors.primary }]}>

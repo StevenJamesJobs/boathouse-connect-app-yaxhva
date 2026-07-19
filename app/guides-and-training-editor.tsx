@@ -9,7 +9,6 @@ import {
   TextInput,
   Alert,
   Modal,
-  Image,
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
@@ -17,6 +16,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import HeaderNavButton from '@/components/HeaderNavButton';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -141,7 +141,9 @@ export default function GuidesAndTrainingEditorScreen() {
   const pickFile = async () => {
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'image/*', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        // The broker's guide_file gate accepts ANY type up to 50MB — the picker
+        // list is the only filter, so keep video selectable (session-49 fix).
+        type: ['application/pdf', 'image/*', 'video/*', 'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
         copyToCacheDirectory: true,
       });
 
@@ -504,7 +506,7 @@ export default function GuidesAndTrainingEditorScreen() {
 
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
-    return `${url}?t=${Date.now()}`;
+    return url;
   };
 
   const formatDate = (dateString: string) => {
@@ -624,7 +626,7 @@ export default function GuidesAndTrainingEditorScreen() {
 
                     <View style={styles.guideLayout}>
                       {guide.thumbnail_url && (
-                        <Image
+                        <StorageImage
                           source={{ uri: getImageUrl(guide.thumbnail_url) }}
                           style={styles.guideThumbnail}
                         />
@@ -734,7 +736,7 @@ export default function GuidesAndTrainingEditorScreen() {
                 <Text style={styles.formLabel}>{t('guides_training_editor.thumbnail_label')}</Text>
                 <TouchableOpacity style={styles.imageUploadButton} onPress={pickThumbnail}>
                   {selectedThumbnailUri || editingGuide?.thumbnail_url ? (
-                    <Image
+                    <StorageImage
                       source={{ uri: selectedThumbnailUri || getImageUrl(editingGuide?.thumbnail_url || '') || '' }}
                       style={styles.uploadedImage}
                     />

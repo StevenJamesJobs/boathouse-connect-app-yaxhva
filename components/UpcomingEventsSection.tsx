@@ -6,7 +6,7 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { StorageExpoImage } from '@/components/StorageImage';
 import { useTranslation } from 'react-i18next';
 import { getLocalizedField } from '@/utils/translateContent';
 import WeeklyCalendarStrip from '@/components/WeeklyCalendarStrip';
@@ -159,7 +159,7 @@ export default function UpcomingEventsSection({
     >
       {event.thumbnail_shape === 'square' && event.thumbnail_url ? (
         <View style={styles.eventSquareLayout}>
-          <Image
+          <StorageExpoImage
             source={getImageUrl(event.thumbnail_url, event.updated_at)!}
             style={styles.eventSquareImage}
             contentFit="cover"
@@ -181,7 +181,7 @@ export default function UpcomingEventsSection({
       ) : (
         <>
           {event.thumbnail_url && (
-            <Image
+            <StorageExpoImage
               source={getImageUrl(event.thumbnail_url, event.updated_at)!}
               style={styles.eventBannerImage}
               contentFit="cover"

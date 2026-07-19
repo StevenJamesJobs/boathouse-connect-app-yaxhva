@@ -10,7 +10,6 @@ import {
   ActionSheetIOS,
   Alert,
   Modal,
-  Image,
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
@@ -21,7 +20,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { supabase } from '@/app/integrations/supabase/client';
 import { brokerUploadImage } from '@/utils/storageBroker';
+import { toPublicUrl } from '@/utils/storageResolver';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { useTranslation } from 'react-i18next';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
@@ -431,9 +432,7 @@ export default function PureeSyrupRecipesEditorScreen() {
 
   const getImageUrl = (url: string | null) => {
     if (!url) return PLACEHOLDER_IMAGE;
-    if (url.startsWith('http')) return url;
-    const { data } = supabase.storage.from('puree-syrup-recipe-images').getPublicUrl(url);
-    return data.publicUrl;
+    return toPublicUrl('puree-syrup-recipe-images', url);
   };
 
   // Group recipes by category
@@ -569,7 +568,7 @@ export default function PureeSyrupRecipesEditorScreen() {
                 <View style={styles.thumbAndNameRow}>
                   <TouchableOpacity style={styles.thumbSquare} onPress={pickImage} disabled={uploadingImage}>
                     {thumbnailUrl ? (
-                      <Image source={{ uri: getImageUrl(thumbnailUrl) }} style={styles.thumbImage} resizeMode="cover" />
+                      <StorageImage source={{ uri: getImageUrl(thumbnailUrl) }} style={styles.thumbImage} resizeMode="cover" />
                     ) : (
                       <View style={styles.thumbPlaceholder}>
                         <IconSymbol ios_icon_name="photo" android_material_icon_name="add-photo-alternate" size={26} color="#999999" />

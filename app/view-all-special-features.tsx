@@ -9,7 +9,7 @@ import {
   ActivityIndicator,
   Platform,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { StorageExpoImage } from '@/components/StorageImage';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -205,7 +205,7 @@ export default function ViewAllSpecialFeaturesScreen() {
                 activeOpacity={0.7}
               >
                 {feature.thumbnail_shape === 'banner' && feature.thumbnail_url && (
-                  <Image
+                  <StorageExpoImage
                     source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
                     style={styles.bannerImage}
                     contentFit="cover"
@@ -213,7 +213,7 @@ export default function ViewAllSpecialFeaturesScreen() {
                 )}
                 <View style={styles.squareLayout}>
                 {feature.thumbnail_shape !== 'banner' && feature.thumbnail_url && (
-                  <Image
+                  <StorageExpoImage
                     source={getImageUrl(feature.thumbnail_url, feature.updated_at)!}
                     style={styles.squareImage}
                     contentFit="cover"

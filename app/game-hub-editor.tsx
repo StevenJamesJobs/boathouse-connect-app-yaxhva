@@ -14,13 +14,13 @@ import {
   Alert,
   ActivityIndicator,
   TextInput,
-  Image,
   Switch,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import HeaderNavButton from '@/components/HeaderNavButton';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -416,7 +416,7 @@ export default function GameHubEditorScreen() {
             <View key={user.user_id} style={[styles.userCard, { backgroundColor: colors.card }]}>
               <View style={styles.userTop}>
                 {user.profile_picture_url ? (
-                  <Image source={{ uri: user.profile_picture_url }} style={styles.userAvatar} />
+                  <StorageImage source={{ uri: user.profile_picture_url }} style={styles.userAvatar} />
                 ) : (
                   <View style={[styles.userAvatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
                     <Text style={[styles.userAvatarInitial, { color: colors.primary }]}>

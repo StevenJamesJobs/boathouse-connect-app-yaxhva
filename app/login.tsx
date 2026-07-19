@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Pressable,
   StyleSheet,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -19,6 +18,7 @@ import { useRouter, usePathname, Link } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { IS_MCLOONES } from '@/constants/buildVariant';
 import { useTranslation } from 'react-i18next';
 
@@ -194,8 +194,9 @@ export default function LoginScreen() {
           )}
           {/* Their uploaded logo if they have one, otherwise the MyResto
               plate placeholder (or McLoone's mark on that variant). */}
-          <Image
+          <StorageImage
             source={cachedOrg?.logoUrl ? { uri: cachedOrg.logoUrl } : DEFAULT_LOGO}
+            fallbackSource={DEFAULT_LOGO}
             style={styles.logo}
             resizeMode="contain"
           />
