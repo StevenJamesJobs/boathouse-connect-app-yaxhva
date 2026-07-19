@@ -10,7 +10,6 @@ import {
   ActionSheetIOS,
   Alert,
   Modal,
-  Image,
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
@@ -22,10 +21,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translateTexts, saveTranslations } from '@/utils/translateContent';
 import { brokerUploadImage } from '@/utils/storageBroker';
+import { toPublicUrl } from '@/utils/storageResolver';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
 import CollapsibleSection from '@/components/CollapsibleSection';
@@ -487,9 +488,7 @@ export default function LibationRecipesEditorScreen() {
 
   const getImageUrl = (url: string | null) => {
     if (!url) return PLACEHOLDER_IMAGE;
-    if (url.startsWith('http')) return url;
-    const { data } = supabase.storage.from('libation-recipe-images').getPublicUrl(url);
-    return data.publicUrl;
+    return toPublicUrl('libation-recipe-images', url);
   };
 
   // Group recipes under their bound cocktail-fed subcategory (current names, in
@@ -640,7 +639,7 @@ export default function LibationRecipesEditorScreen() {
                 <View style={styles.thumbAndNameRow}>
                   <TouchableOpacity style={styles.thumbSquare} onPress={pickImage} disabled={uploadingImage}>
                     {thumbnailUrl ? (
-                      <Image source={{ uri: getImageUrl(thumbnailUrl) }} style={styles.thumbImage} resizeMode="cover" />
+                      <StorageImage source={{ uri: getImageUrl(thumbnailUrl) }} style={styles.thumbImage} resizeMode="cover" />
                     ) : (
                       <View style={styles.thumbPlaceholder}>
                         <IconSymbol ios_icon_name="photo" android_material_icon_name="add-photo-alternate" size={26} color="#999999" />

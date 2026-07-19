@@ -10,7 +10,6 @@ import {
   Alert,
   ActionSheetIOS,
   Modal,
-  Image,
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
@@ -37,6 +36,7 @@ import FormattedText from '@/components/FormattedText';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import OrderPositionModal from '@/components/OrderPositionModal';
+import { StorageImage } from '@/components/StorageImage';
 
 interface SpecialFeature {
   id: string;
@@ -676,7 +676,7 @@ export default function SpecialFeaturesEditorScreen() {
 
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
-    return `${url}?t=${Date.now()}`;
+    return url;
   };
 
   const formatDateTime = (dateTime: string | null) => {
@@ -805,7 +805,7 @@ export default function SpecialFeaturesEditorScreen() {
 
                     {feature.thumbnail_shape === 'square' && feature.thumbnail_url ? (
                       <View style={styles.squareLayout}>
-                        <Image
+                        <StorageImage
                           key={getImageUrl(feature.thumbnail_url)}
                           source={{ uri: getImageUrl(feature.thumbnail_url) }}
                           style={styles.squareImage}
@@ -836,7 +836,7 @@ export default function SpecialFeaturesEditorScreen() {
                     ) : (
                       <>
                         {feature.thumbnail_url && (
-                          <Image
+                          <StorageImage
                             key={getImageUrl(feature.thumbnail_url)}
                             source={{ uri: getImageUrl(feature.thumbnail_url) }}
                             style={styles.bannerImage}
@@ -929,7 +929,7 @@ export default function SpecialFeaturesEditorScreen() {
                   <View style={styles.thumbColumn}>
                     <TouchableOpacity style={styles.thumbSquare} onPress={pickImage}>
                       {selectedImageUri || editingFeature?.thumbnail_url ? (
-                        <Image
+                        <StorageImage
                           source={{ uri: selectedImageUri || getImageUrl(editingFeature?.thumbnail_url || '') || '' }}
                           style={styles.thumbImage}
                           key={selectedImageUri || getImageUrl(editingFeature?.thumbnail_url || '')}
@@ -985,7 +985,7 @@ export default function SpecialFeaturesEditorScreen() {
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.additionalImagesScroll}>
                     {additionalImageUrls.map((url, idx) => (
                       <View key={`existing-${idx}`} style={styles.additionalImageContainer}>
-                        <Image source={{ uri: getImageUrl(url) || url }} style={styles.additionalImageThumb} />
+                        <StorageImage source={{ uri: getImageUrl(url) || url }} style={styles.additionalImageThumb} />
                         <TouchableOpacity style={styles.removeImageButton} onPress={() => removeAdditionalImage(idx, false)}>
                           <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
                         </TouchableOpacity>
@@ -993,7 +993,7 @@ export default function SpecialFeaturesEditorScreen() {
                     ))}
                     {newAdditionalImageUris.map((uri, idx) => (
                       <View key={`new-${idx}`} style={styles.additionalImageContainer}>
-                        <Image source={{ uri }} style={styles.additionalImageThumb} />
+                        <StorageImage source={{ uri }} style={styles.additionalImageThumb} />
                         <TouchableOpacity style={styles.removeImageButton} onPress={() => removeAdditionalImage(idx, true)}>
                           <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
                         </TouchableOpacity>

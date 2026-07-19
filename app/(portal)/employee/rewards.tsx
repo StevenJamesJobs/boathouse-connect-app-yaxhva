@@ -12,7 +12,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { StorageExpoImage } from '@/components/StorageImage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { useRouter, useFocusEffect } from 'expo-router';
@@ -570,7 +570,7 @@ export default function EmployeeRewardsScreen() {
                     <>
                       <View style={styles.reviewHeader}>
                         {review.author_image ? (
-                          <Image source={review.author_image} style={styles.authorPhoto} contentFit="cover" />
+                          <StorageExpoImage source={review.author_image} style={styles.authorPhoto} contentFit="cover" />
                         ) : (
                           <View style={[styles.authorPhotoFallback, { backgroundColor: colors.tint + '2E' }]}>
                             <IconSymbol ios_icon_name="person.fill" android_material_icon_name="person" size={16} color={colors.tint} />

@@ -8,7 +8,6 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Modal,
-  Image,
   Platform,
   Animated,
   PanResponder,
@@ -23,6 +22,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import FormattedText from '@/components/FormattedText';
+import { StorageImage } from '@/components/StorageImage';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -126,7 +126,7 @@ export default function SummerLibationRecipesScreen() {
 
   const getImageUrl = (url: string | null) => {
     if (!url) return PLACEHOLDER_IMAGE;
-    return `${url}?t=${Date.now()}`;
+    return url;
   };
 
   const getCategoryLabel = (category: string) => {
@@ -220,7 +220,7 @@ export default function SummerLibationRecipesScreen() {
                       onPress={() => openDetailModal(recipe)}
                       activeOpacity={0.8}
                     >
-                      <Image
+                      <StorageImage
                         source={{ uri: getImageUrl(recipe.thumbnail_url) }}
                         style={styles.tileImage}
                         resizeMode="cover"
@@ -296,7 +296,7 @@ export default function SummerLibationRecipesScreen() {
                     }
                   ]}
                 >
-                  <Image
+                  <StorageImage
                     source={{ uri: getImageUrl(selectedRecipe.thumbnail_url) }}
                     style={styles.heroImage}
                     resizeMode="cover"

@@ -2,7 +2,6 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import {
   View,
   Text,
-  Image,
   StyleSheet,
   Pressable,
   TouchableOpacity,
@@ -15,12 +14,14 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { IconSymbol } from '@/components/IconSymbol';
 import GlassCard from '@/components/GlassCard';
+import { StorageImage } from '@/components/StorageImage';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { isManagerOrOwner } from '@/utils/roles';
 import { displayHandle } from '@/utils/displayHandle';
+import { toPublicUrl } from '@/utils/storageResolver';
 import { fonts } from '@/constants/fonts';
 import type { ThemeColorSet } from '@/styles/commonStyles';
 
@@ -72,7 +73,7 @@ const SCREEN_H = Dimensions.get('window').height;
 const profileUrl = (url: string | null | undefined) => {
   if (!url) return null;
   if (url.startsWith('http')) return url;
-  return `https://xvbajqukbakcvdrkcioi.supabase.co/storage/v1/object/public/profile-pictures/${url}`;
+  return toPublicUrl('profile-pictures', url);
 };
 
 const initialOf = (name?: string | null) => (name || '?').trim().charAt(0).toUpperCase() || '?';
@@ -253,7 +254,7 @@ export function MiniProfileProvider({ children }: { children: React.ReactNode })
                   <View style={styles.idRow}>
                     <View style={[styles.avatar, { backgroundColor: colors.thumbPlaceholder, borderColor: colors.glassBorder }]}>
                       {pic ? (
-                        <Image source={{ uri: pic }} style={styles.avatarImg} />
+                        <StorageImage source={{ uri: pic }} style={styles.avatarImg} />
                       ) : (
                         <Text style={[styles.avatarInitial, { color: colors.primary }]}>{initialOf(data.name)}</Text>
                       )}

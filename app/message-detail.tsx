@@ -10,7 +10,6 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Image,
   Modal,
   Dimensions,
 } from 'react-native';
@@ -23,9 +22,14 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import * as WebBrowser from 'expo-web-browser';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { supabase } from '@/app/integrations/supabase/client';
 import { refreshAllUnreadCounts } from '@/hooks/useUnreadMessages';
 import { getFileIconInfo } from '@/utils/messageFiles';
+import { imageContentTypeForExt } from '@/utils/storageBroker';
+import { StorageImage } from '@/components/StorageImage';
+import { resolveForOpen } from '@/utils/storageResolver';
 
 interface MessageThread {
   id: string;
@@ -153,6 +157,45 @@ export default function MessageDetailScreen() {
       markThreadAsRead();
     }, [loadThread, markThreadAsRead])
   );
+
+  const [savingImage, setSavingImage] = useState(false);
+
+  // Session-49: save a message image from the full-screen viewer — same
+  // download→share-sheet pattern as guides (iOS sheet includes "Save Image").
+  // resolveForOpen keeps this working after the private-bucket flip.
+  const handleSaveImage = async (url: string) => {
+    if (savingImage) return;
+    try {
+      setSavingImage(true);
+      const downloadUrl = await resolveForOpen(url, { tier: 'file' });
+      const base = url.split('?')[0];
+      const rawName = base.substring(base.lastIndexOf('/') + 1);
+      const fileName = rawName || `image_${Date.now()}.jpg`;
+      const downloadsDir = `${FileSystem.cacheDirectory}downloads/`;
+      const dirInfo = await FileSystem.getInfoAsync(downloadsDir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(downloadsDir, { intermediates: true });
+      }
+      const destinationUri = `${downloadsDir}${Date.now()}_${fileName}`;
+      const downloadResult = await FileSystem.downloadAsync(downloadUrl, destinationUri);
+      if (downloadResult.status !== 200) {
+        throw new Error(`Download failed with status ${downloadResult.status}`);
+      }
+      const ext = fileName.includes('.') ? fileName.split('.').pop()!.toLowerCase() : 'jpg';
+      const isAvailable = await Sharing.isAvailableAsync();
+      if (isAvailable) {
+        await Sharing.shareAsync(downloadResult.uri, {
+          mimeType: imageContentTypeForExt(ext),
+          dialogTitle: `Save ${fileName}`,
+        });
+      }
+    } catch (err) {
+      console.error('Error saving image:', err);
+      Alert.alert('Error', 'Could not save the image');
+    } finally {
+      setSavingImage(false);
+    }
+  };
 
   const handleReply = () => {
     const originalMessage = messages[0];
@@ -335,7 +378,7 @@ export default function MessageDetailScreen() {
                 <View style={styles.bubbleAvatarContainer}>
                   {!sameSenderAsPrev ? (
                     message.sender_profile_picture ? (
-                      <Image source={{ uri: message.sender_profile_picture }} style={styles.bubbleAvatar} />
+                      <StorageImage source={{ uri: message.sender_profile_picture }} style={styles.bubbleAvatar} />
                     ) : (
                       <View style={[styles.bubbleAvatarPlaceholder, { backgroundColor: colors.highlight }]}>
                         <Text style={[styles.bubbleAvatarText, { color: colors.text }]}>
@@ -371,7 +414,7 @@ export default function MessageDetailScreen() {
                       onPress={() => setViewingImageUrl(message.image_url)}
                       activeOpacity={0.9}
                     >
-                      <Image
+                      <StorageImage
                         source={{ uri: message.image_url }}
                         style={styles.bubbleImage}
                         resizeMode="cover"
@@ -388,7 +431,7 @@ export default function MessageDetailScreen() {
                         ]}
                         onPress={async () => {
                           try {
-                            await WebBrowser.openBrowserAsync(message.file_url!);
+                            await WebBrowser.openBrowserAsync(await resolveForOpen(message.file_url!, { tier: 'file' }));
                           } catch (err) {
                             console.error('Error opening file:', err);
                             Alert.alert('Error', 'Could not open the file');
@@ -503,8 +546,24 @@ export default function MessageDetailScreen() {
               color="#FFFFFF"
             />
           </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.imageViewerSave}
+            onPress={() => viewingImageUrl && handleSaveImage(viewingImageUrl)}
+            disabled={savingImage}
+          >
+            {savingImage ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <IconSymbol
+                ios_icon_name="arrow.down.circle.fill"
+                android_material_icon_name="download"
+                size={32}
+                color="#FFFFFF"
+              />
+            )}
+          </TouchableOpacity>
           {viewingImageUrl && (
-            <Image
+            <StorageImage
               source={{ uri: viewingImageUrl }}
               style={styles.imageViewerImage}
               resizeMode="contain"
@@ -712,6 +771,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 60,
     right: 20,
+    zIndex: 10,
+    padding: 8,
+  },
+  imageViewerSave: {
+    position: 'absolute',
+    top: 60,
+    left: 20,
     zIndex: 10,
     padding: 8,
   },

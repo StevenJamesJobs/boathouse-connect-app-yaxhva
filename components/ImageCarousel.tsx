@@ -9,7 +9,7 @@ import {
   ViewStyle,
   Text,
 } from 'react-native';
-import { Image } from 'expo-image';
+import { StorageExpoImage } from '@/components/StorageImage';
 
 interface ImageCarouselProps {
   images: string[];
@@ -45,7 +45,7 @@ export default function ImageCarousel({
 
   const renderItem = useCallback(
     ({ item }: { item: string }) => (
-      <Image
+      <StorageExpoImage
         source={item}
         style={imageStyle as any}
         contentFit="cover"
@@ -65,7 +65,7 @@ export default function ImageCarousel({
   if (images.length === 1) {
     return (
       <View style={[styles.container, style]}>
-        <Image
+        <StorageExpoImage
           source={images[0]}
           style={
             thumbnailShape === 'square'

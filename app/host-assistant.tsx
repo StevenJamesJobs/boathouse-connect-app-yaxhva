@@ -6,10 +6,10 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Image,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
@@ -91,7 +91,7 @@ export default function HostAssistantScreen() {
           >
             <View style={styles.sectionCardContent}>
               {section.card_image_url ? (
-                <Image source={{ uri: section.card_image_url }} style={styles.sectionThumb} resizeMode="cover" />
+                <StorageImage source={{ uri: section.card_image_url }} style={styles.sectionThumb} resizeMode="cover" />
               ) : (
                 <IconSymbol
                   ios_icon_name={section.icon || 'square.grid.2x2.fill'}

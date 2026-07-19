@@ -11,7 +11,6 @@ import {
   KeyboardAvoidingView,
   Platform,
   Switch,
-  Image,
   Dimensions,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
@@ -19,6 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import MenuIconPicker from '@/components/MenuIconPicker';
@@ -477,7 +477,7 @@ export default function OrganizationSettingsScreen() {
                   {uploadingLogo ? (
                     <ActivityIndicator size="large" color={colors.primary} />
                   ) : logoPreview ? (
-                    <Image
+                    <StorageImage
                       source={{ uri: logoPreview }}
                       style={styles.logoImage}
                       resizeMode="contain"

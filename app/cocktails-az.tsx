@@ -9,7 +9,6 @@ import {
   TextInput,
   ActivityIndicator,
   Modal,
-  Image,
   Platform,
   Animated,
   PanResponder,
@@ -24,6 +23,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import FormattedText from '@/components/FormattedText';
+import { StorageImage } from '@/components/StorageImage';
 import { GlasswareGlyph } from '@/components/GlasswareIconPicker';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
@@ -167,7 +167,7 @@ export default function CocktailsAZScreen() {
   // Helper function to get image URL with cache busting
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
-    return `${url}?t=${Date.now()}`;
+    return url;
   };
 
   return (
@@ -345,7 +345,7 @@ export default function CocktailsAZScreen() {
               showsVerticalScrollIndicator={true}
             >
               {selectedCocktail?.thumbnail_url && (
-                <Image
+                <StorageImage
                   source={{ uri: getImageUrl(selectedCocktail.thumbnail_url) }}
                   style={styles.modalImage}
                   resizeMode="cover"

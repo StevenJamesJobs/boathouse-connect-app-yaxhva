@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Image,
   Share,
   Pressable,
 } from 'react-native';
@@ -28,8 +27,10 @@ import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
 import MultiSelectField from '@/components/MultiSelectField';
 import AmbientGlow from '@/components/AmbientGlow';
+import { StorageImage } from '@/components/StorageImage';
 import { displayHandle } from '@/utils/displayHandle';
 import { getOrgDirectory } from '@/utils/orgDirectory';
+import { toPublicUrl } from '@/utils/storageResolver';
 import { fonts } from '@/constants/fonts';
 
 interface Employee {
@@ -307,9 +308,7 @@ export default function EmployeeEditorScreen() {
       return url;
     }
     
-    // Otherwise, construct the Supabase storage URL
-    const { data } = supabase.storage.from('profile-pictures').getPublicUrl(url);
-    return data.publicUrl;
+    return toPublicUrl('profile-pictures', url);
   };
 
 
@@ -431,7 +430,7 @@ export default function EmployeeEditorScreen() {
                   <TouchableOpacity style={styles.employeeInfo} onPress={() => openMiniProfile(employee.id)} activeOpacity={0.7}>
                     <View style={styles.employeeAvatar}>
                       {profilePictureUrl ? (
-                        <Image
+                        <StorageImage
                           source={{ uri: profilePictureUrl }}
                           style={styles.profileImage}
                         />

@@ -5,7 +5,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Image,
   Linking,
   Modal,
   ActivityIndicator,
@@ -13,6 +12,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
 
@@ -156,7 +156,7 @@ export default function HostSectionScreen() {
                     activeOpacity={tappable ? 0.7 : 1}
                   >
                     {src ? (
-                      <Image source={src} style={styles.squareThumb} resizeMode="cover" />
+                      <StorageImage source={src} style={styles.squareThumb} resizeMode="cover" />
                     ) : (
                       <View style={[styles.squareThumb, styles.squarePlaceholder, { backgroundColor: colors.primary + '15' }]}>
                         <IconSymbol ios_icon_name="link" android_material_icon_name="link" size={24} color={colors.primary} />
@@ -180,7 +180,7 @@ export default function HostSectionScreen() {
                   activeOpacity={tappable ? 0.85 : 1}
                 >
                   {src ? (
-                    <Image source={src} style={styles.bannerImage} resizeMode="cover" />
+                    <StorageImage source={src} style={styles.bannerImage} resizeMode="cover" />
                   ) : (
                     <View style={[styles.bannerImage, styles.bannerPlaceholder, { backgroundColor: colors.primary + '15' }]}>
                       <IconSymbol ios_icon_name="link" android_material_icon_name="link" size={32} color={colors.primary} />

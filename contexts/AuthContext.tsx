@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { supabase } from '@/app/integrations/supabase/client';
 import { User, AuthState } from '@/types/user';
 import { Platform } from 'react-native';
+import { setResolverActorId } from '@/utils/storageResolver';
 
 interface AuthContextType extends AuthState {
   login: (username: string, password: string, rememberMe: boolean) => Promise<boolean>;
@@ -203,7 +204,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     console.log('[AuthContext] AuthProvider mounted, Platform:', Platform.OS);
-    
+
     // Wrap in try-catch to prevent crashes
     try {
       loadStoredAuth();
@@ -217,6 +218,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     }
   }, [loadStoredAuth]);
+
+  // B4b: the storage resolver reads the actor from module scope (leaf image
+  // components never thread it). Null on logout clears its signed-URL cache.
+  useEffect(() => {
+    setResolverActorId(authState.user?.id ?? null);
+  }, [authState.user?.id]);
 
   const refreshUser = async () => {
     try {

@@ -6,7 +6,6 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   Modal,
   Dimensions,
@@ -20,6 +19,8 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
+import { resolveForOpen } from '@/utils/storageResolver';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
 import * as FileSystem from 'expo-file-system/legacy';
@@ -126,7 +127,7 @@ export default function GuidesAndTrainingScreen() {
 
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
-    return `${url}?t=${Date.now()}`;
+    return url;
   };
 
   const formatDate = (dateString: string) => {
@@ -141,9 +142,10 @@ export default function GuidesAndTrainingScreen() {
   const handleViewFile = async (guide: GuideItem) => {
     try {
       setViewingFile(guide.id);
-      const canOpen = await Linking.canOpenURL(guide.file_url);
+      const opened = await resolveForOpen(guide.file_url, { tier: 'file' });
+      const canOpen = await Linking.canOpenURL(opened);
       if (canOpen) {
-        await Linking.openURL(guide.file_url);
+        await Linking.openURL(opened);
       } else {
         Alert.alert('Error', 'Cannot open this file type');
       }
@@ -159,9 +161,11 @@ export default function GuidesAndTrainingScreen() {
     try {
       setDownloadingFile(guide.id);
 
+      const downloadUrl = await resolveForOpen(guide.file_url, { tier: 'file' });
+
       if (Platform.OS === 'web') {
         const link = document.createElement('a');
-        link.href = guide.file_url;
+        link.href = downloadUrl;
         link.download = guide.file_name;
         link.target = '_blank';
         document.body.appendChild(link);
@@ -190,7 +194,7 @@ export default function GuidesAndTrainingScreen() {
       }
 
       const destinationUri = `${downloadsDir}${uniqueFileName}`;
-      const downloadResult = await FileSystem.downloadAsync(guide.file_url, destinationUri);
+      const downloadResult = await FileSystem.downloadAsync(downloadUrl, destinationUri);
 
       if (downloadResult.status !== 200) {
         throw new Error(`Download failed with status ${downloadResult.status}`);
@@ -289,7 +293,7 @@ export default function GuidesAndTrainingScreen() {
         <View style={styles.guideLayout}>
           {guide.thumbnail_url && (
             <TouchableOpacity onPress={() => openImageModal(guide.thumbnail_url!)}>
-              <Image
+              <StorageImage
                 source={{ uri: getImageUrl(guide.thumbnail_url) }}
                 style={styles.guideThumbnail}
               />
@@ -559,7 +563,7 @@ export default function GuidesAndTrainingScreen() {
               />
             </TouchableOpacity>
             {selectedImage && (
-              <Image
+              <StorageImage
                 source={{ uri: getImageUrl(selectedImage) }}
                 style={styles.fullImage}
                 resizeMode="contain"

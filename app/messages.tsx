@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
-  Image,
   Animated,
   Dimensions,
 } from 'react-native';
@@ -21,6 +20,7 @@ import { getOrgDirectory } from '@/utils/orgDirectory';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { refreshAllUnreadCounts } from '@/hooks/useUnreadMessages';
 
@@ -793,7 +793,7 @@ function MessageCard({
       {/* Profile Picture */}
       <View style={styles.profilePictureContainer}>
         {message.sender_profile_picture ? (
-          <Image
+          <StorageImage
             source={{ uri: message.sender_profile_picture }}
             style={styles.profilePicture}
           />

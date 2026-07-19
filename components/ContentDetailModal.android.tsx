@@ -18,6 +18,7 @@ import * as WebBrowser from 'expo-web-browser';
 import * as Sharing from 'expo-sharing';
 import ImageCarousel from '@/components/ImageCarousel';
 import FormattedText from '@/components/FormattedText';
+import { resolveForOpen } from '@/utils/storageResolver';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 const DISMISS_THRESHOLD = 120;
@@ -173,7 +174,7 @@ export default function ContentDetailModal({
     
     try {
       console.log('Opening file:', guideFile.file_url);
-      await WebBrowser.openBrowserAsync(guideFile.file_url);
+      await WebBrowser.openBrowserAsync(await resolveForOpen(guideFile.file_url, { tier: 'file' }));
     } catch (error) {
       console.error('Error opening file:', error);
       Alert.alert('Error', 'Could not open the file');
@@ -192,7 +193,7 @@ export default function ContentDetailModal({
         return;
       }
 
-      await WebBrowser.openBrowserAsync(guideFile.file_url);
+      await WebBrowser.openBrowserAsync(await resolveForOpen(guideFile.file_url, { tier: 'file' }));
       
       Alert.alert(
         'Download',

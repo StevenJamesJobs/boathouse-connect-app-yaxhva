@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { PanGestureHandler, State } from 'react-native-gesture-handler';
-import { Image } from 'expo-image';
+import { StorageExpoImage } from '@/components/StorageImage';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
@@ -1438,7 +1438,7 @@ export default function RewardsAndReviewsEditorScreen() {
       <GlassCard key={review.id} variant="surface" radius={16} style={styles.rev}>
         <View style={styles.rvHead}>
           {review.author_image ? (
-            <Image source={{ uri: review.author_image }} style={styles.rvAvImg} />
+            <StorageExpoImage source={{ uri: review.author_image }} style={styles.rvAvImg} />
           ) : (
             <View style={styles.rvAv}><IconSymbol ios_icon_name="person.fill" android_material_icon_name="person" size={16} color={colors.tint} /></View>
           )}

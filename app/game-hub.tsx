@@ -11,7 +11,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Image,
   ActivityIndicator,
   Platform,
   Alert,
@@ -26,6 +25,7 @@ import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import { MessageBadge } from '@/components/MessageBadge';
 import { hexToRgba } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { useOrganization } from '../contexts/OrganizationContext';
@@ -330,7 +330,7 @@ export default function GameHubScreen() {
                 >
                   <Text style={styles.rankMedal}>{RANK_MEDALS[index]}</Text>
                   {leader.profile_picture_url ? (
-                    <Image source={{ uri: leader.profile_picture_url }} style={styles.leaderAvatar} />
+                    <StorageImage source={{ uri: leader.profile_picture_url }} style={styles.leaderAvatar} />
                   ) : (
                     <View style={[styles.leaderAvatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
                       <Text style={[styles.leaderInitial, { color: colors.primary }]}>

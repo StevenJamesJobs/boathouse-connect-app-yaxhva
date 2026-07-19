@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-import { Image } from 'expo-image';
+import { StorageExpoImage } from '@/components/StorageImage';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -226,11 +226,11 @@ export default function ViewAllUpcomingEventsScreen() {
       activeOpacity={0.7}
     >
       {event.thumbnail_shape === 'banner' && event.thumbnail_url && (
-        <Image source={getImageUrl(event.thumbnail_url, event.updated_at)!} style={styles.bannerCardImage} contentFit="cover" />
+        <StorageExpoImage source={getImageUrl(event.thumbnail_url, event.updated_at)!} style={styles.bannerCardImage} contentFit="cover" />
       )}
       <View style={styles.cardRow}>
         {event.thumbnail_shape !== 'banner' && event.thumbnail_url && (
-          <Image source={getImageUrl(event.thumbnail_url, event.updated_at)!} style={styles.cardImage} contentFit="cover" />
+          <StorageExpoImage source={getImageUrl(event.thumbnail_url, event.updated_at)!} style={styles.cardImage} contentFit="cover" />
         )}
         <View style={styles.cardContent}>
           <View style={styles.titleRow}>

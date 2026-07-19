@@ -9,7 +9,6 @@ import {
   TextInput,
   Alert,
   Modal,
-  Image,
   ActivityIndicator,
   Platform,
   KeyboardAvoidingView,
@@ -20,6 +19,7 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
@@ -887,8 +887,7 @@ export default function MenuEditorScreen() {
   // Helper function to get image URL with cache busting
   const getImageUrl = (url: string | null) => {
     if (!url) return null;
-    // Add timestamp to force reload and bypass cache
-    return `${url}?t=${Date.now()}`;
+    return url;
   };
 
   // Helper function to format price with $ sign
@@ -1154,7 +1153,7 @@ export default function MenuEditorScreen() {
 
                 {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
                   <View style={styles.squareLayout}>
-                    <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.squareImage} />
+                    <StorageImage key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.squareImage} />
                     <View style={styles.squareContent}>
                       <View style={styles.squareHeader}>
                         <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>
@@ -1185,7 +1184,7 @@ export default function MenuEditorScreen() {
                   </View>
                 ) : (
                   <>
-                    {item.thumbnail_url && <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.menuItemImageBanner} />}
+                    {item.thumbnail_url && <StorageImage key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.menuItemImageBanner} />}
                     <View style={styles.menuItemContent}>
                       <View style={styles.menuItemHeader}>
                         <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>
@@ -1319,7 +1318,7 @@ export default function MenuEditorScreen() {
 
                       {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
                         <View style={styles.squareLayout}>
-                          <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.squareImage} />
+                          <StorageImage key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.squareImage} />
                           <View style={styles.squareContent}>
                             <View style={styles.squareHeader}>
                               <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>
@@ -1345,7 +1344,7 @@ export default function MenuEditorScreen() {
                         </View>
                       ) : (
                         <>
-                          {item.thumbnail_url && <Image key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.menuItemImageBanner} />}
+                          {item.thumbnail_url && <StorageImage key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.menuItemImageBanner} />}
                           <View style={styles.menuItemContent}>
                             <View style={[styles.menuItemHeader, !item.thumbnail_url && !isWS && styles.menuItemHeaderClear]}>
                               {item.thumbnail_url && <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>}
@@ -1428,7 +1427,7 @@ export default function MenuEditorScreen() {
                 <View style={styles.thumbColumn}>
                   <TouchableOpacity style={styles.thumbSquare} onPress={pickImage}>
                     {selectedImageUri || editingItem?.thumbnail_url ? (
-                      <Image
+                      <StorageImage
                         source={{ uri: selectedImageUri || getImageUrl(editingItem?.thumbnail_url || '') || '' }}
                         style={styles.thumbImage}
                         key={selectedImageUri || getImageUrl(editingItem?.thumbnail_url || '')}

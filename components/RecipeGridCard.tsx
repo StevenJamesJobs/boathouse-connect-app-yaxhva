@@ -1,7 +1,8 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ScaleDecorator } from 'react-native-draggable-flatlist';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 
 /**
  * Full-image square thumbnail card for the bartender recipe editors (Phase 2).
@@ -41,7 +42,7 @@ export default function RecipeGridCard({
         disabled={isActive}
         style={[styles.tile, isActive && styles.tileActive]}
       >
-        <Image source={{ uri: imageUrl }} style={styles.tileImage} resizeMode="cover" />
+        <StorageImage source={{ uri: imageUrl }} style={styles.tileImage} resizeMode="cover" />
 
         <View style={styles.tileOverlay}>
           <Text style={styles.tileName} numberOfLines={2}>

@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Image,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -17,6 +16,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -340,7 +340,7 @@ export default function EmployeeDetailScreen() {
             {uploading ? (
               <ActivityIndicator size="large" color={colors.primary} />
             ) : employee.profile_picture_url ? (
-              <Image source={{ uri: employee.profile_picture_url }} style={styles.avatar} />
+              <StorageImage source={{ uri: employee.profile_picture_url }} style={styles.avatar} />
             ) : (
               <IconSymbol
                 ios_icon_name="person.circle.fill"

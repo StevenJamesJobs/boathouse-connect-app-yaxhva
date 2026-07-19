@@ -7,11 +7,11 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
-  Image,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTranslation } from 'react-i18next';
@@ -195,7 +195,7 @@ export default function ExamAnswerReviewScreen() {
         {/* User + score header */}
         <View style={[styles.userCard, { backgroundColor: colors.card }]}>
           {targetUser?.profile_picture_url ? (
-            <Image source={{ uri: targetUser.profile_picture_url }} style={styles.avatar} />
+            <StorageImage source={{ uri: targetUser.profile_picture_url }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatar, { backgroundColor: colors.primary + '20', alignItems: 'center', justifyContent: 'center' }]}>
               <IconSymbol

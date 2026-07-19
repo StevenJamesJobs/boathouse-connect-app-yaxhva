@@ -25,7 +25,7 @@ import { useUnreadContent } from '@/hooks/useUnreadContent';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import GlassCard from '@/components/GlassCard';
 import { fonts } from '@/constants/fonts';
-import { Image } from 'expo-image';
+import { StorageExpoImage } from '@/components/StorageImage';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PAGE_SIZE = 25;
@@ -561,7 +561,7 @@ export default function NotificationDropdown({
                       activeOpacity={0.7}
                     >
                       {item.rawData?.thumbnail_url ? (
-                        <Image source={{ uri: item.rawData.thumbnail_url }} style={styles.iconThumb} contentFit="cover" />
+                        <StorageExpoImage source={{ uri: item.rawData.thumbnail_url }} style={styles.iconThumb} contentFit="cover" />
                       ) : (
                         <View style={[styles.iconCircle, { backgroundColor: config.color + '22', borderColor: config.color + '55', borderWidth: StyleSheet.hairlineWidth }]}>
                           <IconSymbol

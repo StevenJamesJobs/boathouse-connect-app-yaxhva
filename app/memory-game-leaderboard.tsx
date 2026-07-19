@@ -5,11 +5,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  Image,
   ActivityIndicator,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
@@ -108,7 +108,7 @@ export default function MemoryGameLeaderboardScreen() {
 
         {/* Avatar */}
         {item.profile_picture_url ? (
-          <Image source={{ uri: item.profile_picture_url }} style={styles.avatar} />
+          <StorageImage source={{ uri: item.profile_picture_url }} style={styles.avatar} />
         ) : (
           <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary + '30' }]}>
             <Text style={[styles.avatarInitial, { color: colors.primary }]}>
