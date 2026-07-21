@@ -19,6 +19,20 @@ const REMEMBER_ME_KEY = '@mrc_remember_me';
 const OLD_STORAGE_KEY = '@mcloones_auth';
 const OLD_REMEMBER_ME_KEY = '@mcloones_remember_me';
 
+// The password the user just authenticated with, held in volatile module memory
+// (never persisted) so the FORCED change-password flow can pass it as the
+// current password — instead of asserting the org default, which is wrong for
+// anyone who already changed their password. Set on successful login, cleared
+// on logout. Not available after a session-restore (no password was typed) —
+// the forced flow then falls back to the org default, same as before.
+let _lastLoginPassword: string | null = null;
+export function getStashedLoginPassword(): string | null {
+  return _lastLoginPassword;
+}
+export function clearStashedLoginPassword(): void {
+  _lastLoginPassword = null;
+}
+
 // Lazy-load AsyncStorage to avoid SSR issues
 let AsyncStorage: any = null;
 if (typeof window !== 'undefined' || Platform.OS !== 'web') {
@@ -348,6 +362,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       const user = await establishSession(row, rememberMe);
+      // Stash for the forced change-password flow (volatile; cleared on logout).
+      _lastLoginPassword = password;
 
       console.log('[AuthContext] Login successful for user:', user.name, 'Role:', user.role);
       return true;
@@ -361,6 +377,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       console.log('[AuthContext] Logging out...');
+      _lastLoginPassword = null;
       if (AsyncStorage) {
         await AsyncStorage.removeItem(STORAGE_KEY);
         await AsyncStorage.removeItem(REMEMBER_ME_KEY);

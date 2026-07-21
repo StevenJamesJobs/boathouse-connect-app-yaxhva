@@ -13,6 +13,19 @@
 // URLs (member-gated, org/sample rules) and `storage-mode` reports public|private
 // derived live from bucket metadata — so flipping buckets private later is a
 // server-side-only event: already-shipped resolver clients switch on their own.
+//
+// v5 (session 50, TEMPORARY — remove after the ~30-day post-move soak): adds
+// `admin-move-batch`, the org-prefix mover for the teardown window. Guarded by
+// an OWNER actor AND a one-off secret held in the sealed `service_config` table
+// (RLS on, zero grants — service-role only; deleting the row disables the
+// action instantly). Deviation from the runbook's env-var spec, recorded in
+// SESSION_50_PROGRESS.md: MCP cannot set edge secrets and the CLI is
+// unauthenticated; a sealed-table secret is equivalent and MCP-manageable.
+//
+// v6 STRICT (session 50, post-move + post-flip): sign-read allows ONLY own-org
+// + sample-org prefixes (legacy-flat/user-prefix allowances removed — every
+// live object is org-prefixed now); v2 delete requires the actor's own org
+// prefix. admin-move-batch stays until the ~30-day soak closes (rollback tool).
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -160,7 +173,40 @@ const READ_BUCKETS = new Set([
 // playback, downloads) that the app cannot transparently re-mint.
 const READ_EXPIRY: Record<string, number> = { image: 43200, file: 86400 };
 
-const ACTIONS = new Set(['sign-upload', 'delete', 'sign-read', 'storage-mode']);
+const ACTIONS = new Set(['sign-upload', 'delete', 'sign-read', 'storage-mode', 'admin-move-batch']);
+
+// admin-move-batch: the ONLY (table, column) pairs the mover may rewrite —
+// hardcoded allowlist (runbook §Mover), no dynamic SQL beyond exact-match
+// UPDATE ... WHERE col = old_url built from these literals via PostgREST.
+const REWRITE_MAP: Record<string, string[]> = {
+  users: ['profile_picture_url'],
+  organizations: ['logo_url'],
+  menu_items: ['thumbnail_url'],
+  exam_questions: ['question_image_url'],
+  cocktails: ['thumbnail_url'],
+  libation_recipes: ['thumbnail_url'],
+  summer_libation_recipes: ['thumbnail_url'],
+  puree_syrup_recipes: ['thumbnail_url'],
+  announcements: ['thumbnail_url'],
+  special_features: ['thumbnail_url'],
+  upcoming_events: ['thumbnail_url'],
+  content_images: ['image_url'],
+  guides_and_training: ['thumbnail_url', 'file_url'],
+  host_sections: ['card_image_url'],
+  host_section_tiles: ['image_url'],
+  menu_uploads: ['file_url'],
+  schedule_uploads: ['file_url'],
+  messages: ['image_url', 'file_url'],
+};
+
+const MAX_MOVES_PER_BATCH = 50;
+
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length || a.length === 0) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
 
 const PUBLIC_MARKER = '/storage/v1/object/public/';
 
@@ -365,26 +411,22 @@ serve(async (req) => {
 
       const orgIdLc = String(actor.organization_id).toLowerCase();
       const sampleOrgId = (await getSampleOrgId(supabase))?.toLowerCase() ?? null;
-      const orgExistsCache = new Map<string, boolean>();
 
       for (const it of parsed) {
         if (it.error || !it.bucket || !it.path) continue;
         if (!READ_BUCKETS.has(it.bucket)) { it.error = 'invalid_url'; continue; }
-        // _orphaned/ is the B4b quarantine namespace — never readable via the broker.
+        // _orphaned/ is the quarantine namespace — never readable via the broker.
         if (it.path.startsWith('_orphaned/')) { it.error = 'forbidden'; continue; }
+        // STRICT MODE (session 50, post-move): every live object is org-prefixed,
+        // so the ONLY readable paths are the actor's own org and the sample org
+        // (shared recipe library + games' sample-data renders). The pre-move
+        // legacy-flat and legacy-user-prefix allowances are gone.
         const first = it.path.split('/')[0];
-        if (!UUID_RE.test(first)) continue; // legacy flat path — allowed until the B4b move
+        if (!UUID_RE.test(first)) { it.error = 'forbidden'; continue; }
         const f = first.toLowerCase();
         if (f === orgIdLc) continue;
-        if (sampleOrgId && f === sampleOrgId) continue; // shared library / sample-data renders
-        // A uuid prefix that is NOT an org is a legacy user-id path (pre-B4a
-        // recipe/profile objects) — allowed until the move re-files them per org.
-        if (!orgExistsCache.has(f)) {
-          const { data: orgRow } = await supabase
-            .from('organizations').select('id').eq('id', first).maybeSingle();
-          orgExistsCache.set(f, !!orgRow);
-        }
-        if (orgExistsCache.get(f)) it.error = 'forbidden';
+        if (sampleOrgId && f === sampleOrgId) continue;
+        it.error = 'forbidden';
       }
 
       const byBucket = new Map<string, ReadItem[]>();
@@ -448,6 +490,183 @@ serve(async (req) => {
       }, 200);
     }
 
+    if (action === 'admin-move-batch') {
+      // TEMPORARY teardown-window mover (session 50). Moves legacy objects to
+      // org-prefixed paths and rewrites the referencing URL columns, one move
+      // at a time: move-object-FIRST, then exact-match column UPDATE (public
+      // buckets + CDN edge cache cover the seconds in between; runbook §4).
+      // dry_run (the default — executing requires the literal `false`) returns
+      // the manifest without mutating anything.
+      if (!isOwner) return json({ success: false, error: 'Not authorized' }, 403);
+
+      const { data: secretRow } = await supabase
+        .from('service_config').select('value').eq('key', 'admin_move_secret').maybeSingle();
+      const expected = String(secretRow?.value ?? '');
+      if (!expected || !safeEqual(String(body?.admin_secret ?? ''), expected)) {
+        // Missing row = window closed = action disabled.
+        return json({ success: false, error: 'Not authorized' }, 403);
+      }
+
+      const bucket = String(body?.bucket ?? '');
+      if (!READ_BUCKETS.has(bucket)) return json({ success: false, error: 'Unknown bucket' }, 400);
+      const dryRun = body?.dry_run !== false; // anything but explicit false stays non-destructive
+
+      const rawMoves = body?.moves;
+      if (!Array.isArray(rawMoves) || rawMoves.length === 0 || rawMoves.length > MAX_MOVES_PER_BATCH) {
+        return json({ success: false, error: `Provide 1-${MAX_MOVES_PER_BATCH} moves` }, 400);
+      }
+
+      // Validate every move BEFORE touching anything (all-or-nothing on shape).
+      const orgCache = new Map<string, boolean>();
+      const isOrgId = async (id: string): Promise<boolean> => {
+        const k = id.toLowerCase();
+        if (!orgCache.has(k)) {
+          const { data: row } = await supabase
+            .from('organizations').select('id').eq('id', id).maybeSingle();
+          orgCache.set(k, !!row);
+        }
+        return orgCache.get(k)!;
+      };
+
+      type MoveSpec = {
+        from: string; to: string;
+        rewrites: { table: string; column: string }[];
+      };
+      const moves: MoveSpec[] = [];
+      for (const raw of rawMoves) {
+        const from = String((raw as Record<string, unknown>)?.from ?? '').replace(/^\/+/, '');
+        const to = String((raw as Record<string, unknown>)?.to ?? '').replace(/^\/+/, '');
+        if (!from || !to || from.includes('..') || to.includes('..') || from === to) {
+          return json({ success: false, error: `Bad move path: ${from} -> ${to}` }, 400);
+        }
+        // Prefix-only invariant, both directions. FORWARD: `to` is
+        // `<realOrgId>/<from>` or `_orphaned/<from>`, and `from` is not already
+        // org-prefixed (no double-prefixing). REVERSE (the manifest rollback
+        // path — move(to, from)): the exact mirror. Anything else is rejected.
+        const fromFirst = from.split('/')[0];
+        const toFirst = to.split('/')[0];
+        const fromOrg = UUID_RE.test(fromFirst) && await isOrgId(fromFirst);
+        const toOrg = UUID_RE.test(toFirst) && await isOrgId(toFirst);
+        const forward = !fromOrg &&
+          (to === `_orphaned/${from}` || (toOrg && to === `${toFirst}/${from}`));
+        const reverse = !toOrg &&
+          (from === `_orphaned/${to}` || (fromOrg && from === `${fromFirst}/${to}`));
+        if (!forward && !reverse) {
+          return json({ success: false, error: `Move violates prefix-only rule: ${from} -> ${to}` }, 400);
+        }
+
+        const rawRewrites = (raw as Record<string, unknown>)?.rewrites ?? [];
+        if (!Array.isArray(rawRewrites)) return json({ success: false, error: 'Bad rewrites' }, 400);
+        const rewrites: { table: string; column: string }[] = [];
+        for (const rw of rawRewrites) {
+          const table = String((rw as Record<string, unknown>)?.table ?? '');
+          const column = String((rw as Record<string, unknown>)?.column ?? '');
+          if (!REWRITE_MAP[table]?.includes(column)) {
+            return json({ success: false, error: `Rewrite not allowlisted: ${table}.${column}` }, 400);
+          }
+          rewrites.push({ table, column });
+        }
+        moves.push({ from, to, rewrites });
+      }
+
+      const publicBase = `${supabaseUrl}/storage/v1/object/public/${bucket}/`;
+      const results: Record<string, unknown>[] = [];
+      let movedCount = 0, skippedCount = 0, failedCount = 0, rewritesUpdated = 0;
+
+      for (const mv of moves) {
+        // Stored URLs come in exactly two dialects (measured 2026-07-21):
+        // raw path (ts-style names) and encodeURI (space→%20; : & ' kept raw —
+        // storage-js getPublicUrl's historical behavior). Exact-match both; the
+        // prefix (org uuid / _orphaned) is encoding-invariant so the same
+        // surgery applies to each variant. When the name is plain the two
+        // strings coincide and the second UPDATE matches 0 rows — harmless.
+        const oldVariants = [publicBase + mv.from, publicBase + encodeURI(mv.from)];
+        const newVariants = [publicBase + mv.to, publicBase + encodeURI(mv.to)];
+        const dual = oldVariants[0] !== oldVariants[1];
+        const entry: Record<string, unknown> = {
+          from: mv.from, to: mv.to,
+          old_url: oldVariants[0], new_url: newVariants[0],
+          ...(dual ? { old_url_encoded: oldVariants[1], new_url_encoded: newVariants[1] } : {}),
+        };
+
+        if (dryRun) {
+          // Existence + collision probes (signed URLs need no read policies).
+          const { error: srcErr } = await supabase.storage.from(bucket).createSignedUrl(mv.from, 60);
+          const { error: dstErr } = await supabase.storage.from(bucket).createSignedUrl(mv.to, 60);
+          entry.source_exists = !srcErr;
+          entry.target_exists = !dstErr;
+          const expectedCounts: Record<string, unknown>[] = [];
+          for (const rw of mv.rewrites) {
+            let expected = 0; let cntError: string | null = null;
+            for (let v = 0; v < (dual ? 2 : 1); v++) {
+              const { count, error: cntErr } = await supabase
+                .from(rw.table).select(rw.column, { count: 'exact', head: true })
+                .eq(rw.column, oldVariants[v]);
+              if (cntErr) { cntError = cntErr.message; break; }
+              expected += count ?? 0;
+            }
+            expectedCounts.push({
+              table: rw.table, column: rw.column,
+              expected: cntError ? null : expected,
+              ...(cntError ? { error: cntError } : {}),
+            });
+          }
+          entry.rewrites = expectedCounts;
+          results.push(entry);
+          continue;
+        }
+
+        // EXECUTE: move first…
+        const { error: mvErr } = await supabase.storage.from(bucket).move(mv.from, mv.to);
+        if (mvErr) {
+          const msg = String(mvErr.message ?? '');
+          if (/already exists|duplicate/i.test(msg)) {
+            entry.status = 'skipped_exists'; skippedCount++;
+          } else {
+            entry.status = 'move_failed'; entry.error = msg; failedCount++;
+          }
+          results.push(entry);
+          continue; // never rewrite columns for a move that did not happen
+        }
+        movedCount++;
+        // …then exact-match column UPDATEs (both dialects), capturing counts.
+        const done: Record<string, unknown>[] = [];
+        for (const rw of mv.rewrites) {
+          let updated = 0; let updError: string | null = null;
+          for (let v = 0; v < (dual ? 2 : 1); v++) {
+            const { count, error: updErr } = await supabase
+              .from(rw.table)
+              .update({ [rw.column]: newVariants[v] }, { count: 'exact' })
+              .eq(rw.column, oldVariants[v]);
+            if (updErr) { updError = updErr.message; break; }
+            updated += count ?? 0;
+          }
+          if (updError) {
+            done.push({ table: rw.table, column: rw.column, updated: null, error: updError });
+          } else {
+            done.push({ table: rw.table, column: rw.column, updated });
+            rewritesUpdated += updated;
+          }
+        }
+        entry.status = 'moved';
+        entry.rewrites = done;
+        results.push(entry);
+      }
+
+      console.log('admin-move-batch', {
+        actor: actor.id, bucket, dry_run: dryRun, n: moves.length,
+        moved: movedCount, skipped: skippedCount, failed: failedCount,
+      });
+      return json({
+        success: true, dry_run: dryRun, bucket,
+        summary: {
+          total: moves.length, moved: movedCount, skipped_exists: skippedCount,
+          move_failed: failedCount, rewrites_updated: rewritesUpdated,
+        },
+        results,
+      }, 200);
+    }
+
     // action === 'delete'
     const bucket = String(body?.bucket ?? '');
     if (!DELETE_BUCKETS.has(bucket)) return json({ success: false, error: 'Bucket not deletable' }, 400);
@@ -468,11 +687,11 @@ serve(async (req) => {
       }
       p = decodeURIComponent(p).replace(/^\/+/, '');
       if (!p || p.includes('..')) return json({ success: false, error: 'Bad path' }, 400);
-      // New-style paths are org-prefixed: enforce the actor's own org. Legacy
-      // flat paths (pre-B4a) have no org segment and pass — documented residual
-      // until B4b org-prefixes the historical objects.
+      // STRICT MODE (session 50, post-move): deletes must target the actor's
+      // OWN org prefix — the legacy-flat pass is gone (no flat objects remain),
+      // and _orphaned/ + other orgs' prefixes fail this same check.
       const first = p.split('/')[0];
-      if (UUID_RE.test(first) && first.toLowerCase() !== String(actor.organization_id).toLowerCase()) {
+      if (!UUID_RE.test(first) || first.toLowerCase() !== String(actor.organization_id).toLowerCase()) {
         return json({ success: false, error: 'Not authorized' }, 403);
       }
       paths.push(p);

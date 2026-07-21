@@ -76,28 +76,21 @@ RULES:
 - Return ALL items from ALL pages — do not skip anything. Return ONLY the JSON object.`;
 }
 
-// B4b-ready: prefer a service-role storage download (works whether the bucket
-// is public or private); fall back to the plain public-URL fetch, which dies
-// naturally when the buckets flip private.
+// S50 strict (post-flip): service-role storage download is the ONLY path.
+// The public-URL fetch fallback is GONE — buckets are private and stored URLs
+// are opaque identifiers the function parses bucket/path out of.
 async function fetchFileAsBase64(supabase: any, url: string): Promise<{ base64: string; byteLength: number }> {
   const PUBLIC_MARKER = '/storage/v1/object/public/';
-  let arrayBuffer: ArrayBuffer | null = null;
   const idx = url.indexOf(PUBLIC_MARKER);
-  if (idx !== -1) {
-    try {
-      const rest = url.slice(idx + PUBLIC_MARKER.length);
-      const slash = rest.indexOf('/');
-      const bucket = rest.slice(0, slash);
-      const path = decodeURIComponent(rest.slice(slash + 1));
-      const { data, error } = await supabase.storage.from(bucket).download(path);
-      if (!error && data) arrayBuffer = await data.arrayBuffer();
-    } catch (_) { /* fall through to public fetch */ }
-  }
-  if (!arrayBuffer) {
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`Failed to fetch file: ${resp.status}`);
-    arrayBuffer = await resp.arrayBuffer();
-  }
+  if (idx === -1) throw new Error('Not a storage URL');
+  const rest = url.slice(idx + PUBLIC_MARKER.length);
+  const slash = rest.indexOf('/');
+  if (slash <= 0) throw new Error('Bad storage URL');
+  const bucket = rest.slice(0, slash);
+  const path = decodeURIComponent(rest.slice(slash + 1).split('?')[0]);
+  const { data, error } = await supabase.storage.from(bucket).download(path);
+  if (error || !data) throw new Error(`Storage download failed: ${error?.message ?? 'no data'}`);
+  const arrayBuffer: ArrayBuffer = await data.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);
   let binary = '';
   const CHUNK = 8192;
