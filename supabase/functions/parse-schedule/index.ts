@@ -176,30 +176,21 @@ async function processScheduleInBackground(
       .update({ status: 'processing' })
       .eq('id', upload_id);
 
-    // Helper: fetch a file URL and return base64. B4b-ready: prefer a
-    // service-role storage download (works for public AND private buckets);
-    // fall back to the plain public-URL fetch.
+    // Helper: fetch a stored file and return base64. S50 strict (post-flip):
+    // service-role storage download is the ONLY path — the public-URL fetch
+    // fallback is GONE (buckets are private; stored URLs are opaque ids).
     async function fetchFileAsBase64(url: string): Promise<{ base64: string; byteLength: number }> {
       const PUBLIC_MARKER = '/storage/v1/object/public/';
-      let arrayBuffer: ArrayBuffer | null = null;
       const idx = url.indexOf(PUBLIC_MARKER);
-      if (idx !== -1) {
-        try {
-          const rest = url.slice(idx + PUBLIC_MARKER.length);
-          const slash = rest.indexOf('/');
-          const bucket = rest.slice(0, slash);
-          const path = decodeURIComponent(rest.slice(slash + 1));
-          const { data, error } = await supabase.storage.from(bucket).download(path);
-          if (!error && data) arrayBuffer = await data.arrayBuffer();
-        } catch (_) { /* fall through to public fetch */ }
-      }
-      if (!arrayBuffer) {
-        const resp = await fetch(url);
-        if (!resp.ok) {
-          throw new Error(`Failed to fetch file: ${resp.status}`);
-        }
-        arrayBuffer = await resp.arrayBuffer();
-      }
+      if (idx === -1) throw new Error('Not a storage URL');
+      const rest = url.slice(idx + PUBLIC_MARKER.length);
+      const slash = rest.indexOf('/');
+      if (slash <= 0) throw new Error('Bad storage URL');
+      const bucket = rest.slice(0, slash);
+      const path = decodeURIComponent(rest.slice(slash + 1).split('?')[0]);
+      const { data, error } = await supabase.storage.from(bucket).download(path);
+      if (error || !data) throw new Error(`Storage download failed: ${error?.message ?? 'no data'}`);
+      const arrayBuffer: ArrayBuffer = await data.arrayBuffer();
       const bytes = new Uint8Array(arrayBuffer);
       let base64 = '';
       const CHUNK = 8192;
@@ -520,17 +511,18 @@ serve(async (req) => {
       throw new Error('Missing required fields: file_url and upload_id');
     }
 
-    // B4 batch 8: server-side manager/owner verification (custom auth — never
-    // trust the Authorization header). CONDITIONAL for now: pre-B4 clients
-    // don't send user_id, so a missing user_id logs and proceeds; the strict
-    // requirement lands at the adoption-gated teardown. parse-menu already
-    // enforces its owner check unconditionally.
-    if (body.user_id) {
-      const { data: caller, error: callerErr } = await supabase
-        .from('users')
-        .select('role, organization_id')
-        .eq('id', body.user_id)
-        .single();
+    // S50 strict: server-side manager/owner verification is now REQUIRED
+    // (custom auth — never trust the Authorization header). The pre-B4
+    // legacy-client allowance for a missing user_id is GONE; old builds are
+    // dead by design after the teardown window.
+    {
+      const { data: caller, error: callerErr } = body.user_id
+        ? await supabase
+            .from('users')
+            .select('role, organization_id')
+            .eq('id', body.user_id)
+            .single()
+        : { data: null, error: { message: 'missing user_id' } };
       const isManager = caller && (caller.role === 'manager' || caller.role === 'owner');
       const orgOk = caller && (!organizationId || caller.organization_id === organizationId);
       if (callerErr || !isManager || !orgOk) {
@@ -545,8 +537,6 @@ serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
         );
       }
-    } else {
-      console.warn('parse-schedule invoked without user_id (legacy client) — allowed until teardown');
     }
 
     // Kick off the heavy work as a background task so we don't hit the

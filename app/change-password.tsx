@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth, getStashedLoginPassword } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -94,13 +94,18 @@ export default function ChangePasswordScreen() {
     setIsLoading(true);
 
     try {
-      // Update password via RPC
+      // Update password via RPC. The server verifies p_current_password against
+      // the stored hash (do NOT weaken that — it's the B1.1 takeover guard), so
+      // send the password the user ACTUALLY logged in with (stashed at login),
+      // not the org default. Falls back to the org default only when there's no
+      // stash (e.g. a session-restore with no typed password) — same as before,
+      // which works for users still on the default.
       const { error: updateError } = await supabase.rpc('update_password', {
         user_id: user.id,
         new_password: newPassword,
         p_actor_id: user.id,
         p_organization_id: organizationId,
-        p_current_password: organization?.default_password,
+        p_current_password: getStashedLoginPassword() ?? organization?.default_password ?? undefined,
       });
 
       if (updateError) {
