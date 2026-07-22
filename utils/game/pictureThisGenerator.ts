@@ -69,7 +69,7 @@ const PRICE_RANGES = {
 };
 
 // ─── Pool loaders ──────────────────────────────────────────────────────────
-export async function loadPool(category: PictureThisCategory, organizationId: string, useSampleData: boolean, actorId: string = ''): Promise<MenuItem[]> {
+export async function loadPool(category: PictureThisCategory, organizationId: string, useSampleData: boolean, actorId: string = '', wineVisible: boolean = true): Promise<MenuItem[]> {
   const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
 
   // Resolve the source org's CURRENT built-in category names by system_key so
@@ -79,17 +79,21 @@ export async function loadPool(category: PictureThisCategory, organizationId: st
     const n = resolver.namesForKeys([key]);
     return n.length ? n : [fallback];
   };
-  const lunchN = namesOr('cat.lunch', 'Lunch');
-  const dinnerN = namesOr('cat.dinner', 'Dinner');
+  // Menu Dishes spans the org's real food categories (custom upload-built ones
+  // too) plus the Specials/Happy Hour built-ins — the whole menu minus drinks.
+  const foodN = resolver.foodCategoryNames();
   const wsN = namesOr('cat.weekly_specials', 'Weekly Specials');
+  const hhN = resolver.namesForKeys(['cat.happy_hour']);
   const libN = namesOr('cat.libations', 'Libations');
   const wineN = namesOr('cat.wine', 'Wine');
 
   let cats: string[] = [];
-  if (category === 'food') cats = [...lunchN, ...dinnerN, ...wsN];
+  if (category === 'food') cats = [...foodN, ...wsN, ...hhN];
   else if (category === 'libations') cats = libN;
   else if (category === 'wine') cats = wineN;
-  else if (category === 'menu_prices') cats = [...lunchN, ...dinnerN, ...wsN, ...libN, ...wineN];
+  // Menu Prices pulls from everywhere; wine drops out when the org has hidden
+  // its Wine category (wineVisible is the OWN-org visibility, sample-data aside).
+  else if (category === 'menu_prices') cats = [...foodN, ...wsN, ...hhN, ...libN, ...(wineVisible ? wineN : [])];
 
   const { data, error } = await supabase.rpc('get_menu_items', {
     p_actor_id: actorId, p_source_org: sourceOrgId, p_categories: cats.length ? cats : undefined,
@@ -636,11 +640,14 @@ export class QuestionItemPicker {
 }
 
 // ─── Scoring ──────────────────────────────────────────────────────────────
+// 2026-07 boost (×5): the old 10-50/correct paid far below Word Search
+// (75-250/word) and Memory (100-500/match), which buried Picture This on the
+// master leaderboards. Per-correct now lands in the same band.
 export const BASE_POINTS: Record<PictureThisCategory, Record<PictureThisDifficulty, number>> = {
-  food: { easy: 10, medium: 20, hard: 35, only: 0 },
-  libations: { easy: 10, medium: 20, hard: 35, only: 0 },
-  wine: { easy: 0, medium: 25, hard: 40, only: 0 },
-  menu_prices: { easy: 0, medium: 0, hard: 0, only: 50 },
+  food: { easy: 50, medium: 100, hard: 175, only: 0 },
+  libations: { easy: 50, medium: 100, hard: 175, only: 0 },
+  wine: { easy: 0, medium: 125, hard: 200, only: 0 },
+  menu_prices: { easy: 0, medium: 0, hard: 0, only: 250 },
 };
 
 export function pointsPerCorrect(

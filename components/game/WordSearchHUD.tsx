@@ -26,11 +26,8 @@ interface WordSearchHUDProps {
 }
 
 const CATEGORY_LABEL_KEYS: Record<WordSearchCategory, string> = {
-  weekly_specials: 'word_search_hud:cat_weekly_specials',
-  lunch: 'word_search_hud:cat_lunch',
-  dinner: 'word_search_hud:cat_dinner',
-  happy_hour: 'word_search_hud:cat_happy_hour',
-  libations: 'word_search_hud:cat_libations',
+  dishes_ingredients: 'word_search_hud:cat_dishes_ingredients',
+  libations_ingredients: 'word_search_hud:cat_libations_ingredients',
 };
 
 const DIFFICULTY_LABEL_KEYS: Record<WordSearchDifficulty, string> = {

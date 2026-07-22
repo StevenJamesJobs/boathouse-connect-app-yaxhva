@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { GameMode, PlayMode, GAME_MODE_INFO } from '@/types/game';
 import { useAuth } from '@/contexts/AuthContext';
+import { fetchOwnWineVisible } from '@/utils/game/wineVisibility';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 
@@ -28,13 +29,23 @@ export default function MenuMemoryGameScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
   const [modeStats, setModeStats] = useState<Record<GameMode, ModeStats | null>>({
     wine_pairings: null,
     ingredients_dishes: null,
     cocktail_ingredients: null,
   });
   const [selectedMode, setSelectedMode] = useState<GameMode | null>(null);
+  // Wine & Entree Pairings only shows when the org's Wine category is visible.
+  // null = still checking: render NOTHING yet so wine-hidden orgs never see
+  // the card flash-then-vanish (visible orgs get a normal content pop-in).
+  const perMenu = organization?.menu_category_scope === 'per_menu';
+  const [wineVisible, setWineVisible] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchOwnWineVisible(user?.id, perMenu).then((v) => { if (!cancelled) setWineVisible(v); });
+    return () => { cancelled = true; };
+  }, [user?.id, perMenu]);
 
   useEffect(() => {
     if (user?.id) loadStats();
@@ -165,7 +176,7 @@ export default function MenuMemoryGameScreen() {
           {t('memory_game.choose_mode')}
         </Text>
 
-        {renderModeCard('wine_pairings')}
+        {wineVisible === true && renderModeCard('wine_pairings')}
         {renderModeCard('ingredients_dishes')}
         {renderModeCard('cocktail_ingredients')}
 

@@ -26,6 +26,7 @@ import { getImageUrl } from '@/utils/imageUrl';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import SeasonSelector, { type Season } from '@/components/SeasonSelector';
 import { menuIconAndroid } from '@/constants/menuIcons';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
@@ -135,27 +136,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     menuSlot: season === 'winter' ? 1 : 2,
   });
 
-  // Build pages from the loaded category tree: one page per subcategory plus a
-  // virtual 'All' page per category, then prepend the phantom bridge page when
-  // swipe-to-welcome is enabled.
   const hasBridge = !!onSwipeToWelcome;
-  const menuPages = useMemo<PageConfig[]>(() => {
-    const out: PageConfig[] = [];
-    for (const cat of menuCats) {
-      const subs = cat.subcategories;
-      if (subs.length === 0) {
-        out.push({ category: cat.display_name, subcategory: null });
-      } else {
-        for (const sub of subs) out.push({ category: cat.display_name, subcategory: sub.display_name });
-        out.push({ category: cat.display_name, subcategory: ALL_PAGE_KEY });
-      }
-    }
-    return out;
-  }, [menuCats]);
-  const PAGES = useMemo(() => {
-    return hasBridge ? [WELCOME_BRIDGE_PAGE, ...menuPages] : menuPages;
-  }, [hasBridge, menuPages]);
-  const bridgeOffset = hasBridge ? 1 : 0;
 
   const perMenu = organization?.menu_category_scope === 'per_menu';
   // Behavior resolvers — key off system_key / filter_behavior, not display name,
@@ -183,6 +164,135 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     [catOf, perMenu],
   );
 
+  // Single source of truth for the filter-chip predicates (modal options,
+  // active-chip row, and the filtered results all agree).
+  const matchesFilter = useCallback(
+    (item: MenuItem, filter: string): boolean => {
+      switch (filter) {
+        case 'dinner': return item.available_for_dinner;
+        case 'lunch': return item.available_for_lunch;
+        case 'gf': return item.is_gluten_free;
+        case 'gfa': return item.is_gluten_free_available;
+        case 'v': return item.is_vegetarian;
+        case 'va': return item.is_vegetarian_available;
+        case 'wine': return isWineName(item.category);
+        case 'libations': return catOf(item.category)?.system_key === 'cat.libations';
+        case 'happyHour': return catOf(item.category)?.system_key === 'cat.happy_hour';
+        // Match the Featured Specials PAGE: items in the specials category OR
+        // flag-overlaid ones (the old chip missed is_weekly_special items).
+        case 'weeklySpecials':
+          return catOf(item.category)?.filter_behavior === 'weekly_specials' || !!item.is_weekly_special;
+        default: return true;
+      }
+    },
+    [isWineName, catOf],
+  );
+
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  // Cross-menu search corpus (both menus + their injected cocktails), deduped.
+  // Used only when there's a search query so the customer can find an item on
+  // either menu; the badge on each result shows which menu it lives on.
+  const [allItems, setAllItems] = useState<MenuItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Filter items for a given page
+  const getItemsForPage = useCallback((page: PageConfig): MenuItem[] => {
+    // Featured Specials combines flagged items from BOTH menus (allItems) so the
+    // pill shows the same set on Menu 1 and Menu 2; every other page stays scoped
+    // to the active menu (menuItems).
+    const isSpecials = catOf(page.category)?.filter_behavior === 'weekly_specials';
+    let filtered = (isSpecials ? allItems : menuItems).filter(item => categoryMatches(item, page.category));
+
+    // Filter by subcategory if not null and not the virtual "All" page
+    if (page.subcategory && page.subcategory !== ALL_PAGE_KEY) {
+      filtered = filtered.filter(item => item.subcategory === page.subcategory);
+    }
+
+    // Group the combined Specials list by category → subcategory → order so
+    // flagged items from the same section stay together.
+    if (isSpecials) filtered = [...filtered].sort(compareBySectionThenOrder);
+
+    return filtered;
+  }, [menuItems, allItems, categoryMatches, catOf]);
+
+  // Build pages from the loaded category tree — one page per subcategory plus a
+  // virtual 'All' page per category — minus pages that would render empty for
+  // the active menu. Emptiness is computed AFTER cocktail-recipe injection
+  // (counts read menuItems/allItems); while items are loading the unfiltered
+  // build is returned — the pager is unmounted behind the spinner, so nothing
+  // flashes. The bridge page is prepended in PAGES below.
+  const menuPages = useMemo<PageConfig[]>(() => {
+    const buildAll = (): PageConfig[] => {
+      const out: PageConfig[] = [];
+      for (const cat of menuCats) {
+        const subs = cat.subcategories;
+        if (subs.length === 0) {
+          out.push({ category: cat.display_name, subcategory: null });
+        } else {
+          for (const sub of subs) out.push({ category: cat.display_name, subcategory: sub.display_name });
+          out.push({ category: cat.display_name, subcategory: ALL_PAGE_KEY });
+        }
+      }
+      return out;
+    };
+    if (loading) return buildAll();
+    const count = (p: PageConfig) => getItemsForPage(p).length;
+    const out: PageConfig[] = [];
+    for (const cat of menuCats) {
+      const name = cat.display_name;
+      if (cat.subcategories.length === 0) {
+        if (count({ category: name, subcategory: null }) > 0) out.push({ category: name, subcategory: null });
+        continue;
+      }
+      const allPage: PageConfig = { category: name, subcategory: ALL_PAGE_KEY };
+      const allCount = count(allPage);
+      if (allCount === 0) continue; // whole category empty for this menu
+      const survivors = cat.subcategories
+        .map((s): PageConfig => ({ category: name, subcategory: s.display_name }))
+        .filter((p) => count(p) > 0);
+      if (survivors.length === 0) {
+        // Items exist but none match a visible subcategory — collapse to one
+        // page (a null-subcategory page applies no sub filter, same set as 'All').
+        out.push({ category: name, subcategory: null });
+      } else if (survivors.length === 1 && count(survivors[0]) === allCount) {
+        out.push(survivors[0]); // 'All' would duplicate the only surviving sub-page
+      } else {
+        out.push(...survivors, allPage); // 'All' keeps null-/stale-subcategory items reachable
+      }
+    }
+    if (out.length === 0) {
+      // Whole menu empty — keep the first page so the empty state (+ owner
+      // "Set up Menu Now" CTA) renders, and PAGES.length >= bridgeOffset+1
+      // stays true whenever the org has categories (landing-index math).
+      const all = buildAll();
+      if (all.length > 0) out.push(all[0]);
+    }
+    return out;
+  }, [menuCats, loading, getItemsForPage]);
+  const PAGES = useMemo(() => {
+    return hasBridge ? [WELCOME_BRIDGE_PAGE, ...menuPages] : menuPages;
+  }, [hasBridge, menuPages]);
+  const bridgeOffset = hasBridge ? 1 : 0;
+  // Pills mirror the surviving pages (empty categories carry no pill).
+  const visibleCats = useMemo(
+    () => menuCats.filter((c) => menuPages.some((p) => p.category === c.display_name)),
+    [menuCats, menuPages],
+  );
+
+  // A filter chip only shows when it would match at least one item on the
+  // active menu — hidden categories self-zero (catOf can't see them), and
+  // orgs that never set the meal flags drop the Lunch/Dinner chips. Per-menu
+  // scope drops Lunch/Dinner outright (meal overlay doesn't apply there).
+  const availableFilterKeys = useMemo(() => {
+    if (loading) return new Set(FILTER_OPTIONS.map((o) => o.key));
+    return new Set(
+      FILTER_OPTIONS
+        .filter((o) => !(perMenu && (o.key === 'lunch' || o.key === 'dinner')))
+        .filter((o) => menuItems.some((item) => matchesFilter(item, o.key)))
+        .map((o) => o.key),
+    );
+  }, [loading, perMenu, menuItems, matchesFilter]);
+
   // Cocktail-recipe injection: map the fixed recipe vocabulary to the org's
   // CURRENT Libations subcategory names (by system_key) so injected cocktails
   // follow renames; plus the set of cocktail-fed names for the winter dedup.
@@ -199,13 +309,6 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     }
     return { libationsCategoryName, subNameByKey, cocktailSubNames };
   }, [menuCats]);
-
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  // Cross-menu search corpus (both menus + their injected cocktails), deduped.
-  // Used only when there's a search query so the customer can find an item on
-  // either menu; the badge on each result shows which menu it lives on.
-  const [allItems, setAllItems] = useState<MenuItem[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPageIndex, setCurrentPageIndex] = useState(bridgeOffset);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -214,11 +317,16 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const [detailModalVisible, setDetailModalVisible] = useState(false);
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [activeFilters, setActiveFilters] = useState<string[]>([]);
-  // Per-menu hides the Lunch/Dinner chips — drop any stale ones so they can't
-  // linger as active filters with no way to untoggle them.
+  // Drop stale active filters whose chip is no longer offered (per-menu
+  // Lunch/Dinner, hidden categories, zero-match chips) so they can't linger
+  // with no way to untoggle them.
   useEffect(() => {
-    if (perMenu) setActiveFilters((prev) => prev.filter((f) => f !== 'lunch' && f !== 'dinner'));
-  }, [perMenu]);
+    if (loading) return;
+    setActiveFilters((prev) => {
+      const next = prev.filter((f) => availableFilterKeys.has(f));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [loading, availableFilterKeys]);
   const { user } = useAuth();
   const { settings: redemptionSettings } = useRedemptionSettings();
   const router = useRouter();
@@ -233,7 +341,12 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const currentPage = PAGES[currentPageIndex];
   const selectedCategory = currentPage?.category || '';
   const selectedSubcategory = currentPage?.subcategory || null;
-  const selectedCategoryObj = findCategoryByName(menuCats, selectedCategory);
+  // Surviving sub-page names for the selected category ('All' included only
+  // when it survived the empty-page filter; empty => no sub-pill row).
+  const visibleSubNames = useMemo(
+    () => menuPages.filter((p) => p.category === selectedCategory && p.subcategory !== null).map((p) => p.subcategory as string),
+    [menuPages, selectedCategory],
+  );
   // Availability tags + filter chips follow the lunch/dinner (and other built-in) renames.
   const lunchName = labelForCategoryName(menuCats.find((c) => c.filter_behavior === 'lunch')?.display_name || 'Lunch', t, menuCats, language);
   const dinnerName = labelForCategoryName(menuCats.find((c) => c.filter_behavior === 'dinner')?.display_name || 'Dinner', t, menuCats, language);
@@ -307,25 +420,29 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     }
   }, [season, menuCats, categoriesLoading]);
 
-  // Filter items for a given page
-  const getItemsForPage = useCallback((page: PageConfig): MenuItem[] => {
-    // Featured Specials combines flagged items from BOTH menus (allItems) so the
-    // pill shows the same set on Menu 1 and Menu 2; every other page stays scoped
-    // to the active menu (menuItems).
-    const isSpecials = catOf(page.category)?.filter_behavior === 'weekly_specials';
-    let filtered = (isSpecials ? allItems : menuItems).filter(item => categoryMatches(item, page.category));
+  // Refresh items when the tab regains focus — the tab navigator keeps this
+  // screen mounted, so editor changes (e.g. flagging a Featured Special)
+  // otherwise never re-trigger the mount effect. Silent: no spinner, the
+  // pager stays in place while fresh data swaps in.
+  const focusSkipRef = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (focusSkipRef.current) { focusSkipRef.current = false; return; }
+      if (!categoriesLoading && user?.id) loadMenuItems(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [season, menuCats, categoriesLoading, user?.id])
+  );
 
-    // Filter by subcategory if not null and not the virtual "All" page
-    if (page.subcategory && page.subcategory !== ALL_PAGE_KEY) {
-      filtered = filtered.filter(item => item.subcategory === page.subcategory);
+  // PAGES can shrink when the item-aware filter lands (a menu switch can race
+  // the category fetch). Keep the index inside the list; the load effect above
+  // re-targets the landing page when categories settle.
+  useEffect(() => {
+    if (currentPageIndex > PAGES.length - 1) {
+      const clamped = Math.max(0, PAGES.length - 1);
+      setCurrentPageIndex(clamped);
+      pagerRef.current?.scrollToIndex({ index: clamped, animated: false });
     }
-
-    // Group the combined Specials list by category → subcategory → order so
-    // flagged items from the same section stay together.
-    if (isSpecials) filtered = [...filtered].sort(compareBySectionThenOrder);
-
-    return filtered;
-  }, [menuItems, allItems, categoryMatches, catOf]);
+  }, [PAGES.length, currentPageIndex]);
 
   // Get filtered items for search/filter mode
   const getSearchFilteredItems = useCallback(() => {
@@ -353,27 +470,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     }
 
     if (activeFilters.length > 0) {
-      filtered = filtered.filter(item => {
-        return activeFilters.every(filter => {
-          switch (filter) {
-            case 'dinner': return item.available_for_dinner;
-            case 'lunch': return item.available_for_lunch;
-            case 'gf': return item.is_gluten_free;
-            case 'gfa': return item.is_gluten_free_available;
-            case 'v': return item.is_vegetarian;
-            case 'va': return item.is_vegetarian_available;
-            case 'wine': return isWineName(item.category);
-            case 'libations': return catOf(item.category)?.system_key === 'cat.libations';
-            case 'happyHour': return catOf(item.category)?.system_key === 'cat.happy_hour';
-            case 'weeklySpecials': return catOf(item.category)?.filter_behavior === 'weekly_specials';
-            default: return true;
-          }
-        });
-      });
+      filtered = filtered.filter(item => activeFilters.every(filter => matchesFilter(item, filter)));
     }
 
     return filtered;
-  }, [menuItems, allItems, searchQuery, activeFilters, isWineName, catOf]);
+  }, [menuItems, allItems, searchQuery, activeFilters, matchesFilter]);
 
   const isSearchOrFilterMode = searchQuery.trim().length > 0 || activeFilters.length > 0;
 
@@ -473,9 +574,9 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     return items;
   };
 
-  const loadMenuItems = async () => {
+  const loadMenuItems = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const active = await buildItemsForSeason(season);
       setMenuItems(active);
       // Cross-menu search corpus: also pull the OTHER menu (deduped by id) so the
@@ -713,9 +814,12 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             <View style={styles.tagsRow}>
               {specialsContext && (
                 <>
-                  <View style={[styles.tag, { backgroundColor: '#1E88E518' }]}>
-                    <Text style={[styles.tagText, { color: '#1E88E5' }]}>{menuBadgeForSeason(item.season).label}</Text>
-                  </View>
+                  {/* "Both Menus"/menu badges only make sense on 2-menu orgs */}
+                  {organization.menu_count === 2 && (
+                    <View style={[styles.tag, { backgroundColor: '#1E88E518' }]}>
+                      <Text style={[styles.tagText, { color: '#1E88E5' }]}>{menuBadgeForSeason(item.season).label}</Text>
+                    </View>
+                  )}
                   <View style={[styles.tag, { backgroundColor: '#00897B18' }]}>
                     <Text style={[styles.tagText, { color: '#00897B' }]}>{getCategoryLabel(item.category)}</Text>
                   </View>
@@ -888,7 +992,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             >
               {activeFilters.map((filter, index) => (
                 <View key={index} style={[styles.activeFilterChip, { backgroundColor: colors.highlight }]}>
-                  <Text style={[styles.activeFilterChipText, { color: colors.text }]}>{getFilterLabel(filter)}</Text>
+                  <Text style={[styles.activeFilterChipText, { color: colors.text }]}>{filterChipLabel(filter, getFilterLabel(filter))}</Text>
                   <TouchableOpacity onPress={() => removeFilter(filter)}>
                     <IconSymbol
                       ios_icon_name="xmark"
@@ -918,7 +1022,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             style={styles.categoryScroll}
             contentContainerStyle={styles.categoryScrollContent}
           >
-            {menuCats.map((cat) => (
+            {visibleCats.map((cat) => (
               <CategoryPill
                 key={cat.id}
                 size="lg"
@@ -938,7 +1042,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
 
         {/* Subcategory Tabs — only in normal mode and when category has subcategories.
             A virtual 'All' pill is appended (never persisted). */}
-        {!isSearchOrFilterMode && selectedCategoryObj && selectedCategoryObj.subcategories.length > 0 && (
+        {!isSearchOrFilterMode && visibleSubNames.length > 0 && (
           <ScrollView
             ref={subcategoryScrollRef}
             horizontal
@@ -946,7 +1050,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             style={styles.subcategoryScroll}
             contentContainerStyle={styles.subcategoryScrollContent}
           >
-            {[...selectedCategoryObj.subcategories.map((s) => s.display_name), ALL_PAGE_KEY].map((subcategory, index) => (
+            {visibleSubNames.map((subcategory, index) => (
               <CategoryPill
                 key={index}
                 size="sm"
@@ -991,7 +1095,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
               renderMenuCard(
                 item,
                 catOf(item.category)?.color || colors.primary,
-                searchQuery.trim() ? menuBadgeForSeason(item.season) : undefined,
+                searchQuery.trim() && organization.menu_count === 2 ? menuBadgeForSeason(item.season) : undefined,
               )
             )
           )}
@@ -1044,9 +1148,9 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             </View>
 
             <ScrollView style={styles.filterModalScroll} contentContainerStyle={styles.filterModalScrollContent}>
-              {/* Per-menu treats Lunch/Dinner as ordinary categories, so their
-                  meal-overlay filter chips don't apply there. */}
-              {FILTER_OPTIONS.filter((o) => !(perMenu && (o.key === 'lunch' || o.key === 'dinner'))).map((option) => (
+              {/* Only chips that would match something on this menu (hidden
+                  categories and unused meal flags never present dead filters). */}
+              {FILTER_OPTIONS.filter((o) => availableFilterKeys.has(o.key)).map((option) => (
                 <TouchableOpacity
                   key={option.key}
                   style={[

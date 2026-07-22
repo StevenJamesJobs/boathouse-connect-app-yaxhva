@@ -854,11 +854,14 @@ export default function PortalHome({ role }: PortalHomeProps) {
             </Text>
           </View>
           <View style={styles.specialTagsRow}>
-            <View style={[styles.specialMealTag, { backgroundColor: '#1E88E518' }]}>
-              <Text style={[styles.specialTagText, { color: '#1E88E5' }]}>
-                {menuBadgeForSeason((item as any).season, organization, t).label}
-              </Text>
-            </View>
+            {/* "Both Menus"/menu badges only make sense on 2-menu orgs */}
+            {organization.menu_count === 2 && (
+              <View style={[styles.specialMealTag, { backgroundColor: '#1E88E518' }]}>
+                <Text style={[styles.specialTagText, { color: '#1E88E5' }]}>
+                  {menuBadgeForSeason((item as any).season, organization, t).label}
+                </Text>
+              </View>
+            )}
             <View style={[styles.specialMealTag, { backgroundColor: '#00897B18' }]}>
               <Text style={[styles.specialTagText, { color: '#00897B' }]}>
                 {labelForCategoryName(item.category, t)}

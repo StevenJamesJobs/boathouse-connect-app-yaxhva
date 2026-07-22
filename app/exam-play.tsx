@@ -36,6 +36,7 @@ import {
 import { getExamTypeName } from '@/utils/exam/questionGenerator';
 import { getEligibleQuizTypes } from '@/app/weekly-quizzes';
 import { refreshAllUnreadQuizReward } from '@/hooks/useUnreadQuizReward';
+import { enqueuePendingSubmit, getPendingSubmit, removePendingSubmit } from '@/utils/exam/pendingSubmits';
 import { useTranslation } from 'react-i18next';
 
 type Phase = 'loading' | 'intro' | 'playing' | 'feedback' | 'completed';
@@ -175,6 +176,19 @@ export default function ExamPlayScreen() {
           Alert.alert(
             isSpanish ? 'Examen Completado' : 'Quiz Already Completed',
             isSpanish ? 'Ya completaste este examen.' : 'You have already completed this quiz.',
+            [{ text: 'OK', onPress: () => router.back() }]
+          );
+          return;
+        }
+
+        // A queued offline submission also counts as taken — replaying the
+        // quiz with already-revealed answers is the retake loophole this closes.
+        if (await getPendingSubmit(user.id, examId)) {
+          Alert.alert(
+            isSpanish ? 'Examen Completado' : 'Quiz Already Completed',
+            isSpanish
+              ? 'Tus resultados están guardados y se enviarán automáticamente cuando vuelvas a tener conexión.'
+              : 'Your results are saved and will submit automatically when you are back online.',
             [{ text: 'OK', onPress: () => router.back() }]
           );
           return;
@@ -352,27 +366,46 @@ export default function ExamPlayScreen() {
     if (!user?.id || submitting) return;
     setSubmitting(true);
 
+    const results = calculateResults(state, rewardPerCorrect, rewardsEnabled);
+    const submitArgs = {
+      p_exam_id: examId,
+      p_user_id: user.id,
+      p_answers: JSON.stringify(state.answers),
+      p_correct_count: results.correctCount,
+      p_total_questions: results.totalQuestions,
+      p_bucks_awarded: results.totalBucksAwarded,
+      p_time_seconds: results.timeSeconds,
+      p_is_timed_out: state.isTimedOut,
+      p_organization_id: organizationId,
+    };
+
     try {
-      const results = calculateResults(state, rewardPerCorrect, rewardsEnabled);
+      const { error } = await supabase.rpc('submit_exam_and_award_bucks', submitArgs);
+      // supabase-js resolves RPC failures into `error` (no throw) — surface it.
+      if (error) throw error;
 
-      await supabase.rpc('submit_exam_and_award_bucks', {
-        p_exam_id: examId,
-        p_user_id: user.id,
-        p_answers: JSON.stringify(state.answers),
-        p_correct_count: results.correctCount,
-        p_total_questions: results.totalQuestions,
-        p_bucks_awarded: results.totalBucksAwarded,
-        p_time_seconds: results.timeSeconds,
-        p_is_timed_out: state.isTimedOut,
-        p_organization_id: organizationId,
-      });
-
+      // A retry/flush may have queued this attempt earlier — clear it.
+      removePendingSubmit(user.id, examId);
       // Refresh user to update reward currency balance
       await refreshUser();
       // Light up the Rewards-tab badge — a quiz reward is now waiting.
       refreshAllUnreadQuizReward();
     } catch (err) {
       console.error('Submit results error:', err);
+      // Park the exact payload in the offline outbox: the quiz now counts as
+      // TAKEN (weekly-quizzes card + badge) and these first-attempt answers
+      // auto-submit on reconnect — closing the offline retake loophole.
+      await enqueuePendingSubmit(user.id, examId, submitArgs);
+      Alert.alert(
+        isSpanish ? 'Sin conexión' : 'Connection issue',
+        isSpanish
+          ? 'No se pudieron enviar tus resultados ahora. Quedaron guardados en este dispositivo y se enviarán automáticamente cuando vuelvas a tener conexión.'
+          : "Your results couldn't be submitted right now. They're saved on this device and will submit automatically when you're back online.",
+        [
+          { text: isSpanish ? 'Reintentar' : 'Retry', onPress: () => submitResults(state) },
+          { text: 'OK', style: 'cancel' },
+        ],
+      );
     }
     setSubmitting(false);
   };

@@ -27,11 +27,8 @@ import {
 } from '@/types/game';
 
 const CATEGORY_LABEL_KEYS: Record<WordSearchCategory, string> = {
-  weekly_specials: 'word_search:cat_weekly_specials',
-  lunch: 'word_search:cat_lunch',
-  dinner: 'word_search:cat_dinner',
-  happy_hour: 'word_search:cat_happy_hour',
-  libations: 'word_search:cat_libations',
+  dishes_ingredients: 'word_search:cat_dishes_ingredients',
+  libations_ingredients: 'word_search:cat_libations_ingredients',
 };
 
 export default function WordSearchEditorScreen() {

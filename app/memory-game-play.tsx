@@ -105,7 +105,7 @@ export default function MemoryGamePlayScreen() {
         ]}
       >
         <Text style={[styles.previewSubtext, { color: colors.textSecondary }]} numberOfLines={1}>
-          {card.subText}
+          {card.displaySubtext}
         </Text>
         <Text style={[styles.previewText, { color: colors.text }]} numberOfLines={2}>
           {card.displayText}

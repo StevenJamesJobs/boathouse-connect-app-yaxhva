@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { flushPendingSubmits, pendingExamIds } from '@/utils/exam/pendingSubmits';
 import { AppState, AppStateStatus } from 'react-native';
 
 // Global event system so any screen can trigger an immediate refresh across
@@ -38,10 +39,18 @@ export function useUnreadQuizzes() {
     }
 
     try {
+      // Opportunistic outbox flush (this hook already runs on foreground +
+      // 30s poll); anything STILL queued shouldn't badge as unread.
+      await flushPendingSubmits(user.id);
       const { data } = await (supabase.rpc as any)('get_my_unread_quiz_count', {
         p_actor_id: user.id,
       });
-      setUnreadCount(typeof data === 'number' ? data : 0);
+      let count = typeof data === 'number' ? data : 0;
+      if (count > 0) {
+        const pending = await pendingExamIds(user.id);
+        count = Math.max(0, count - pending.size);
+      }
+      setUnreadCount(count);
     } catch (err) {
       console.error('Error loading unread quizzes:', err);
     } finally {

@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { GameMode, PlayMode, GAME_MODE_INFO, LeaderboardEntry } from '@/types/game';
 import { useAuth } from '@/contexts/AuthContext';
+import { fetchOwnWineVisible } from '@/utils/game/wineVisibility';
 import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
@@ -24,10 +25,23 @@ export default function MemoryGameLeaderboardScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
   const { open: openMiniProfile } = useMiniProfile();
   const [activePlayMode, setActivePlayMode] = useState<PlayMode>('lives');
   const [activeMode, setActiveMode] = useState<GameMode>('wine_pairings');
+  // Wine tab only shows when the org's Wine category is visible on the menu.
+  // null = still checking: keep wine surfaces hidden until resolved (no
+  // flash-then-vanish on wine-hidden orgs).
+  const perMenu = organization?.menu_category_scope === 'per_menu';
+  const [wineVisible, setWineVisible] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchOwnWineVisible(user?.id, perMenu).then((v) => { if (!cancelled) setWineVisible(v); });
+    return () => { cancelled = true; };
+  }, [user?.id, perMenu]);
+  useEffect(() => {
+    if (wineVisible === false && activeMode === 'wine_pairings') setActiveMode('ingredients_dishes');
+  }, [wineVisible, activeMode]);
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -64,7 +78,9 @@ export default function MemoryGameLeaderboardScreen() {
     { key: 'timed', label: '⏱ ' + t('memory_game.timed_mode') },
   ];
 
-  const modes: GameMode[] = ['wine_pairings', 'ingredients_dishes', 'cocktail_ingredients'];
+  const modes: GameMode[] = wineVisible === true
+    ? ['wine_pairings', 'ingredients_dishes', 'cocktail_ingredients']
+    : ['ingredients_dishes', 'cocktail_ingredients'];
   const modeLabels: Record<GameMode, string> = {
     wine_pairings: t('memory_game.mode_wine_short'),
     ingredients_dishes: t('memory_game.mode_ingredients_short'),
