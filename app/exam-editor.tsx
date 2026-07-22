@@ -808,6 +808,7 @@ export default function ExamEditorScreen() {
               try {
                 await supabase.functions.invoke('send-push-notification', {
                   body: {
+                    actor_id: user?.id,
                     userIds: [entry.user_id],
                     notificationType: 'custom',
                     title: 'Take 2! 🎯',

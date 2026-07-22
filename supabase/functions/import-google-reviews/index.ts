@@ -454,10 +454,18 @@ serve(async (req) => {
     if (!isAuthorized && body.user_id) {
       const { data: userData } = await adminClient
         .from('users')
-        .select('role')
+        .select('role, organization_id')
         .eq('id', body.user_id)
         .single();
-      if (userData?.role === 'manager' || userData?.role === 'owner') {
+      const isManager = userData?.role === 'manager' || userData?.role === 'owner';
+      // Manual callers may ONLY import for their OWN org — require an explicit
+      // organization_id that matches the caller's, or an anon with a known
+      // manager id could trigger paid Outscraper scrapes for any/every org.
+      const orgMatch =
+        !!userData?.organization_id &&
+        !!body.organization_id &&
+        userData.organization_id === body.organization_id;
+      if (isManager && orgMatch) {
         isAuthorized = true;
         source = 'manual';
       }

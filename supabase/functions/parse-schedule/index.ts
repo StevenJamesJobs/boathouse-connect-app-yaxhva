@@ -507,8 +507,11 @@ serve(async (req) => {
     if (!anthropicApiKey) {
       throw new Error('ANTHROPIC_API_KEY not configured');
     }
-    if (!file_url || !upload_id) {
-      throw new Error('Missing required fields: file_url and upload_id');
+    if (!file_url || !upload_id || !organizationId) {
+      // organization_id is REQUIRED: without it the background job would run
+      // unscoped (all-orgs user enumeration into the AI prompt + null-org shift
+      // inserts). Mirrors parse-menu, which has always required it.
+      throw new Error('Missing required fields: file_url, upload_id and organization_id');
     }
 
     // S50 strict: server-side manager/owner verification is now REQUIRED
@@ -524,7 +527,9 @@ serve(async (req) => {
             .single()
         : { data: null, error: { message: 'missing user_id' } };
       const isManager = caller && (caller.role === 'manager' || caller.role === 'owner');
-      const orgOk = caller && (!organizationId || caller.organization_id === organizationId);
+      // Org match is now UNCONDITIONAL (organization_id is required above) — a
+      // manager/owner may only parse a schedule for their OWN org.
+      const orgOk = caller && !!organizationId && caller.organization_id === organizationId;
       if (callerErr || !isManager || !orgOk) {
         try {
           await supabase

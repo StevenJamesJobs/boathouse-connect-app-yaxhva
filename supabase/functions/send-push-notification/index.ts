@@ -8,14 +8,24 @@ const corsHeaders = {
 };
 
 interface NotificationRequest {
-  userIds?: string[]; // Specific users (if not provided, sends to all)
-  organizationId?: string; // Scope notifications to a specific organization
+  actor_id?: string; // Required: the sending user. Org is DERIVED from this, never trusted from the body.
+  userIds?: string[]; // Specific users (must resolve to the actor's org; cross-org ids are dropped)
+  organizationId?: string; // Ignored for scoping — kept only for back-compat logging (camel/snake both accepted)
+  organization_id?: string;
   notificationType: 'message' | 'reward' | 'announcement' | 'event' | 'special_feature' | 'custom';
   title: string;
   body: string;
   data?: Record<string, any>;
-  jobTitles?: string[]; // Filter recipients by job titles (if not provided, sends to all)
+  jobTitles?: string[]; // Filter recipients by job titles (broadcast — requires manager/owner)
 }
+
+const json = (obj: unknown, status: number) =>
+  new Response(JSON.stringify(obj), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    status,
+  });
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -36,78 +46,75 @@ serve(async (req) => {
       }
     );
 
-    // Create a user-context client to identify the calling user
-    const authHeader = req.headers.get('Authorization');
-    let user: any = null;
-
-    if (authHeader) {
-      const token = authHeader.replace('Bearer ', '');
-      // Try to get user from token - but don't fail if it's the anon key
-      const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser(token);
-      if (!authError && authUser) {
-        user = authUser;
-        console.log('Authenticated user:', user.id);
-      } else {
-        console.log('No user from token, proceeding without user context');
-      }
-    }
-
     // Parse request body
     const requestData: NotificationRequest = await req.json();
-    const { userIds, organizationId, notificationType, title, body, data, jobTitles } = requestData;
+    const { actor_id, userIds, notificationType, title, body, data, jobTitles } = requestData;
 
-    console.log('Processing notification request:', { notificationType, title, userIds, jobTitles, organizationId });
+    // --- Authorization: verify a real actor and DERIVE the org from it ---
+    // This app has no Supabase Auth (the anon key satisfies verify_jwt but proves
+    // nothing), so the actor_id in the body — looked up via the service role — is
+    // the only real caller identity. The client-supplied org is NEVER trusted for
+    // scoping; every recipient query is bound to the actor's own org.
+    if (!actor_id || !UUID_RE.test(actor_id)) {
+      return json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    const { data: actor, error: actorError } = await supabaseClient
+      .from('users')
+      .select('id, role, organization_id, is_active')
+      .eq('id', actor_id)
+      .single();
+    if (actorError || !actor || actor.is_active === false || !actor.organization_id) {
+      return json({ success: false, error: 'Unauthorized' }, 401);
+    }
+    const actorOrg = actor.organization_id as string;
+    const isManager = actor.role === 'manager' || actor.role === 'owner';
+    const hasExplicitUserIds = Array.isArray(userIds) && userIds.length > 0;
 
-    // Get recipient user IDs
+    console.log('Processing notification request:', { notificationType, title, actor_id, actorOrg, count: userIds?.length, jobTitles });
+
+    // Get recipient user IDs — always scoped to the actor's org.
     let recipientIds: string[] = [];
 
-    if (userIds && userIds.length > 0) {
-      // Send to specific users
-      recipientIds = userIds;
-    } else if (jobTitles && jobTitles.length > 0) {
-      // Send to users matching specific job titles
-      let query = supabaseClient
-        .from('users')
-        .select('id, job_titles, job_title')
-        .eq('is_active', true);
-
-      if (organizationId) {
-        query = query.eq('organization_id', organizationId);
-      }
-
-      const { data: matchingUsers, error: usersError } = await query;
-
-      if (usersError) {
-        throw usersError;
-      }
-
-      // Filter users whose job_titles array overlaps with the requested job titles
-      recipientIds = matchingUsers
-        .filter((u: any) => {
-          const userJobTitles: string[] = u.job_titles || (u.job_title ? [u.job_title] : []);
-          return userJobTitles.some((jt: string) => jobTitles.includes(jt));
-        })
-        .map((u: any) => u.id);
-
-      console.log(`Found ${recipientIds.length} users matching job titles: ${jobTitles.join(', ')}`);
-    } else {
-      // Send to all users in the organization (for announcements, events, etc.)
-      let query = supabaseClient
+    if (hasExplicitUserIds) {
+      // Targeted send (messages, rewards, leaderboard-pass): allowed for any active
+      // member, but recipients are filtered to the actor's org — cross-org ids drop out.
+      const { data: sameOrgUsers, error: usersError } = await supabaseClient
         .from('users')
         .select('id')
+        .in('id', userIds)
+        .eq('organization_id', actorOrg)
         .eq('is_active', true);
-
-      if (organizationId) {
-        query = query.eq('organization_id', organizationId);
+      if (usersError) {
+        throw usersError;
+      }
+      recipientIds = (sameOrgUsers || []).map((u: any) => u.id);
+    } else {
+      // Broadcast (whole org, optionally job-title filtered) — announcements, events,
+      // features, custom sends: manager/owner only.
+      if (!isManager) {
+        return json({ success: false, error: 'Forbidden: broadcast requires manager or owner' }, 403);
       }
 
-      const { data: allUsers, error: usersError } = await query;
-
+      const { data: orgUsers, error: usersError } = await supabaseClient
+        .from('users')
+        .select('id, job_titles, job_title')
+        .eq('organization_id', actorOrg)
+        .eq('is_active', true);
       if (usersError) {
         throw usersError;
       }
 
-      recipientIds = allUsers.map((u: any) => u.id);
+      if (jobTitles && jobTitles.length > 0) {
+        recipientIds = (orgUsers || [])
+          .filter((u: any) => {
+            const userJobTitles: string[] = u.job_titles || (u.job_title ? [u.job_title] : []);
+            return userJobTitles.some((jt: string) => jobTitles.includes(jt));
+          })
+          .map((u: any) => u.id);
+        console.log(`Found ${recipientIds.length} users matching job titles: ${jobTitles.join(', ')}`);
+      } else {
+        recipientIds = (orgUsers || []).map((u: any) => u.id);
+      }
     }
 
     console.log(`Sending to ${recipientIds.length} users`);

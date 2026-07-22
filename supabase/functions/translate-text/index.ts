@@ -1,5 +1,6 @@
 // @ts-nocheck
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,6 +8,7 @@ const corsHeaders = {
 };
 
 interface TranslateRequest {
+  actor_id?: string; // Required: verified active user. Guards the paid Google Translate key from anon abuse.
   texts: string[];
   targetLang: string;
   sourceLang?: string;
@@ -17,6 +19,17 @@ interface TranslateResponse {
   translations: string[];
   error?: string;
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// Bound the request so the paid Google Translate spend can't be amplified in one call.
+const MAX_TEXTS = 100;
+const MAX_TOTAL_CHARS = 50_000;
+
+const reject = (status: number, error: string) =>
+  new Response(
+    JSON.stringify({ success: false, translations: [], error } as TranslateResponse),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status }
+  );
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -41,7 +54,7 @@ serve(async (req) => {
       );
     }
 
-    const { texts, targetLang, sourceLang = 'en' } = (await req.json()) as TranslateRequest;
+    const { actor_id, texts, targetLang, sourceLang = 'en' } = (await req.json()) as TranslateRequest;
 
     if (!texts || texts.length === 0 || !targetLang) {
       return new Response(
@@ -55,6 +68,34 @@ serve(async (req) => {
           status: 200,
         }
       );
+    }
+
+    // --- Authorization: verify a real active user (no Supabase Auth exists here, so the
+    // anon key proves nothing) — closes the anonymous drain of the paid Google Translate key. ---
+    if (!actor_id || !UUID_RE.test(actor_id)) {
+      return reject(401, 'Unauthorized');
+    }
+    const adminClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+    const { data: actor, error: actorError } = await adminClient
+      .from('users')
+      .select('id, is_active')
+      .eq('id', actor_id)
+      .single();
+    if (actorError || !actor || actor.is_active === false) {
+      return reject(401, 'Unauthorized');
+    }
+
+    // --- Input caps: bound Google Translate spend per request ---
+    if (texts.length > MAX_TEXTS) {
+      return reject(400, `Too many texts (max ${MAX_TEXTS})`);
+    }
+    const totalChars = texts.reduce((n, t) => n + (typeof t === 'string' ? t.length : 0), 0);
+    if (totalChars > MAX_TOTAL_CHARS) {
+      return reject(400, `Payload too large (max ${MAX_TOTAL_CHARS} characters)`);
     }
 
     // Filter out empty strings and track their positions
