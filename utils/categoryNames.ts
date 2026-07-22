@@ -74,10 +74,16 @@ export interface MenuCategoryResolver {
   namesForKeys: (keys: string[]) => string[];
   /** Distinct names of every cocktail-fed (recipe-backed) subcategory. */
   cocktailFedSubNames: string[];
+  /** The org's FOOD category names: every cat.lunch/cat.dinner name (all slots,
+   *  hidden included — matches namesForKeys) PLUS every visible NULL-system_key
+   *  custom category without a cocktail-fed subcategory. Upload-built menus put
+   *  their items in custom categories, so food pools must span both. Deduped
+   *  case-insensitively, keyed names first. */
+  foodCategoryNames: () => string[];
 }
 
 export async function fetchMenuCategoryResolver(actorId: string, sourceOrg?: string): Promise<MenuCategoryResolver> {
-  const empty: MenuCategoryResolver = { namesForKeys: () => [], cocktailFedSubNames: [] };
+  const empty: MenuCategoryResolver = { namesForKeys: () => [], cocktailFedSubNames: [], foodCategoryNames: () => [] };
   if (!actorId) return empty;
   try {
     const [catRes, subRes] = await Promise.all([
@@ -91,14 +97,31 @@ export async function fetchMenuCategoryResolver(actorId: string, sourceOrg?: str
       if (!arr.includes(c.display_name)) arr.push(c.display_name);
     }
     const cocktailFedSubNames: string[] = [];
+    const cocktailFedCatIds = new Set<string>();
     for (const s of (subRes.data || []) as any[]) {
       if (s.is_cocktail_fed && !cocktailFedSubNames.includes(s.display_name)) {
         cocktailFedSubNames.push(s.display_name);
       }
+      if (s.is_cocktail_fed && s.category_id) cocktailFedCatIds.add(s.category_id);
+    }
+    // Food pool: keyed lunch/dinner names (status quo, hidden included) UNION
+    // visible custom categories that aren't recipe-backed (drink-ish).
+    const foodSeen = new Set<string>();
+    const food: string[] = [];
+    const pushFood = (n: string) => {
+      const k = n.trim().toLowerCase();
+      if (!foodSeen.has(k)) { foodSeen.add(k); food.push(n); }
+    };
+    for (const key of ['cat.lunch', 'cat.dinner']) for (const n of byKey[key] || []) pushFood(n);
+    for (const c of (catRes.data || []) as any[]) {
+      if (c.system_key || c.is_hidden) continue;
+      if (cocktailFedCatIds.has(c.id)) continue;
+      pushFood(c.display_name);
     }
     return {
       namesForKeys: (keys) => keys.flatMap((k) => byKey[k] || []),
       cocktailFedSubNames,
+      foodCategoryNames: () => food,
     };
   } catch (e) {
     console.error('[categoryNames] resolver fetch error:', e);

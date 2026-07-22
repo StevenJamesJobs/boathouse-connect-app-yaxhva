@@ -28,6 +28,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import BottomNavBar from '@/components/BottomNavBar';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { PictureThisCategory, PictureThisPlayMode } from '@/utils/game/pictureThisGenerator';
+import { fetchOwnWineVisible } from '@/utils/game/wineVisibility';
 
 interface Entry {
   user_id: string;
@@ -61,12 +62,26 @@ export default function PictureThisLeaderboardScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
+  const { organizationId, organization } = useOrganization();
   const { t } = useTranslation();
   const { open: openMiniProfile } = useMiniProfile();
 
   const [activePlayMode, setActivePlayMode] = useState<PictureThisPlayMode>('lives');
   const [activeCategory, setActiveCategory] = useState<PictureThisCategory>('food');
+  // Wine tab only shows when the org's Wine category is visible on the menu.
+  // null = still checking: keep the tab hidden until resolved (no
+  // flash-then-vanish on wine-hidden orgs).
+  const perMenu = organization?.menu_category_scope === 'per_menu';
+  const [wineVisible, setWineVisible] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchOwnWineVisible(user?.id, perMenu).then((v) => { if (!cancelled) setWineVisible(v); });
+    return () => { cancelled = true; };
+  }, [user?.id, perMenu]);
+  useEffect(() => {
+    if (wineVisible === false && activeCategory === 'wine') setActiveCategory('food');
+  }, [wineVisible, activeCategory]);
+  const visibleTabs = wineVisible === true ? CATEGORY_TABS : CATEGORY_TABS.filter((c) => c.key !== 'wine');
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -187,7 +202,7 @@ export default function PictureThisLeaderboardScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoryRowContent}
         >
-          {CATEGORY_TABS.map((cat) => {
+          {visibleTabs.map((cat) => {
             const active = cat.key === activeCategory;
             return (
               <TouchableOpacity

@@ -206,11 +206,13 @@ interface WineItem {
 }
 
 async function fetchMenuItems(actorId: string): Promise<MenuItem[]> {
-  // Resolve the org's current Lunch/Dinner names by system_key (renames-safe).
+  // The org's food categories: keyed Lunch/Dinner names PLUS visible custom
+  // categories (upload-built menus live entirely in customs).
   const resolver = await fetchMenuCategoryResolver(actorId);
-  const cats = resolver.namesForKeys(['cat.lunch', 'cat.dinner']);
+  const cats = resolver.foodCategoryNames();
+  if (!cats.length) return [];
   const { data, error } = await supabase.rpc('get_menu_items', {
-    p_actor_id: actorId, p_categories: cats.length ? cats : ['Lunch', 'Dinner'],
+    p_actor_id: actorId, p_categories: cats,
   });
   if (error || !data) return [];
   return data as MenuItem[];
@@ -222,9 +224,10 @@ async function fetchMenuItems(actorId: string): Promise<MenuItem[]> {
 // thumbnail_url.
 async function fetchMenuItemsWithImages(actorId: string): Promise<MenuItem[]> {
   const resolver = await fetchMenuCategoryResolver(actorId);
-  const cats = resolver.namesForKeys(['cat.lunch', 'cat.dinner', 'cat.libations', 'cat.wine']);
+  const cats = [...resolver.foodCategoryNames(), ...resolver.namesForKeys(['cat.libations', 'cat.wine'])];
+  if (!cats.length) return [];
   const { data, error } = await supabase.rpc('get_menu_items', {
-    p_actor_id: actorId, p_categories: cats.length ? cats : ['Lunch', 'Dinner', 'Libations', 'Wine'],
+    p_actor_id: actorId, p_categories: cats,
   });
   if (error || !data) return [];
   return (data as MenuItem[]).filter(

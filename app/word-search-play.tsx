@@ -59,7 +59,7 @@ export default function WordSearchPlayScreen() {
     playMode: WordSearchPlayMode;
   }>();
 
-  const category = params.category ?? 'lunch';
+  const category = params.category ?? 'dishes_ingredients';
   const difficulty = params.difficulty ?? 'easy';
   const playMode = params.playMode ?? 'free';
 

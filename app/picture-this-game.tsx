@@ -4,7 +4,10 @@
  * Pattern source: word-search-game.tsx.
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { fetchOwnWineVisible } from '@/utils/game/wineVisibility';
 import {
   View,
   Text,
@@ -94,6 +97,20 @@ export default function PictureThisGameScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { t } = useTranslation();
+  const { user } = useAuth();
+  const { organization } = useOrganization();
+  const perMenu = organization?.menu_category_scope === 'per_menu';
+
+  // Wine tile only shows when the org's Wine category is visible on the menu.
+  // null = still checking: keep the tile hidden until resolved (no
+  // flash-then-vanish on wine-hidden orgs).
+  const [wineVisible, setWineVisible] = useState<boolean | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchOwnWineVisible(user?.id, perMenu).then((v) => { if (!cancelled) setWineVisible(v); });
+    return () => { cancelled = true; };
+  }, [user?.id, perMenu]);
+  const visibleCategories = wineVisible === true ? CATEGORIES : CATEGORIES.filter((c) => c.key !== 'wine');
 
   const [selectedCategory, setSelectedCategory] = useState<CategoryInfo | null>(null);
   const [pickerStep, setPickerStep] = useState<PickerStep>('difficulty');
@@ -155,7 +172,7 @@ export default function PictureThisGameScreen() {
         </View>
 
         <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('picture_this:choose_category')}</Text>
-        {CATEGORIES.map((cat) => (
+        {visibleCategories.map((cat) => (
           <TouchableOpacity
             key={cat.key}
             style={[styles.categoryCard, { backgroundColor: colors.card }]}

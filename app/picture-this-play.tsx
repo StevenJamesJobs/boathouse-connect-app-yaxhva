@@ -41,6 +41,7 @@ import {
   TIMED_SECONDS,
   milestoneBonus,
 } from '@/utils/game/pictureThisGenerator';
+import { fetchOwnWineVisible } from '@/utils/game/wineVisibility';
 
 const LIVES_QUESTION_CAP = 40;
 const TIMED_METER_TARGET = 50;
@@ -143,7 +144,12 @@ export default function PictureThisPlayScreen() {
           const { libationNames } = await resolvePriceCategoryNames(organizationId ?? '', organization.games_use_sample_data, user.id);
           if (!cancelled) libationNamesRef.current = libationNames;
         }
-        const data = await loadPool(category, organizationId ?? '', organization.games_use_sample_data, user.id);
+        // Own-org wine visibility keeps hidden wine lists out of the
+        // Menu Prices pool (the wine tile itself is gated on the hub screen).
+        const wineVisible = category === 'menu_prices'
+          ? await fetchOwnWineVisible(user.id, organization?.menu_category_scope === 'per_menu')
+          : true;
+        const data = await loadPool(category, organizationId ?? '', organization.games_use_sample_data, user.id, wineVisible);
         if (cancelled) return;
         if (data.length < 4) {
           setPoolError('Not enough menu items in this category to play. Try a different category.');

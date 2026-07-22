@@ -27,6 +27,7 @@ import { SubscriptionProvider, useSubscription } from "@/contexts/SubscriptionCo
 import { MiniProfileProvider } from "@/contexts/MiniProfileContext";
 import { REVENUECAT_ENABLED, REVENUECAT_API_KEY } from "@/config/revenueCat";
 import { fontAssets } from "@/constants/fonts";
+import { flushPendingSubmits } from "@/utils/exam/pendingSubmits";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -141,6 +142,14 @@ function RootLayoutNav() {
       );
     }
   }, [networkState.isConnected, networkState.isInternetReachable]);
+
+  // Reconnect flush: replay any offline-queued quiz submissions (this is the
+  // local-save-and-sync the offline alert above promises).
+  useEffect(() => {
+    if (networkState.isConnected && user?.id) {
+      flushPendingSubmits(user.id);
+    }
+  }, [networkState.isConnected, user?.id]);
 
   // Initialize RevenueCat SDK
   useEffect(() => {

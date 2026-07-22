@@ -30,19 +30,13 @@ import BottomNavBar from '@/components/BottomNavBar';
 type PickerStep = 'difficulty' | 'playmode';
 
 const CATEGORY_LABEL_KEYS: Record<WordSearchCategory, string> = {
-  weekly_specials: 'word_search:cat_weekly_specials',
-  lunch: 'word_search:cat_lunch',
-  dinner: 'word_search:cat_dinner',
-  happy_hour: 'word_search:cat_happy_hour',
-  libations: 'word_search:cat_libations',
+  dishes_ingredients: 'word_search:cat_dishes_ingredients',
+  libations_ingredients: 'word_search:cat_libations_ingredients',
 };
 
 const CATEGORY_DESC_KEYS: Record<WordSearchCategory, string> = {
-  weekly_specials: 'word_search:cat_weekly_specials_desc',
-  lunch: 'word_search:cat_lunch_desc',
-  dinner: 'word_search:cat_dinner_desc',
-  happy_hour: 'word_search:cat_happy_hour_desc',
-  libations: 'word_search:cat_libations_desc',
+  dishes_ingredients: 'word_search:cat_dishes_ingredients_desc',
+  libations_ingredients: 'word_search:cat_libations_ingredients_desc',
 };
 
 const DIFFICULTIES: { value: WordSearchDifficulty; emoji: string; labelKey: string; descKey: string; color: string }[] = [

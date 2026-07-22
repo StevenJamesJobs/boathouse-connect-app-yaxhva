@@ -15,6 +15,7 @@ import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import WeeklyQuizCard, { WeeklyQuizCardResult } from '@/components/WeeklyQuizCard';
+import { flushPendingSubmits, getPendingSubmit, pendingExamIds } from '@/utils/exam/pendingSubmits';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 
@@ -85,6 +86,11 @@ export default function WeeklyQuizzesScreen() {
         // ignore — cleanup is best-effort
       }
 
+      // Replay any offline-queued submissions first, then treat whatever is
+      // still queued as TAKEN below (no fresh attempt while a submit is parked).
+      await flushPendingSubmits(user.id);
+      const pending = await pendingExamIds(user.id);
+
       const eligibleTypes = getEligibleQuizTypes(user?.jobTitles || []);
       const entries: QuizEntry[] = [];
 
@@ -119,9 +125,21 @@ export default function WeeklyQuizzesScreen() {
             p_exam_id: exam.id,
           });
           // Only a COMPLETED row counts as taken. A started-but-unsubmitted row (e.g. a submit
-          // that failed) must still show "Take Quiz" so the user isn't trapped with no way in.
+          // that failed) must still show "Take Quiz" so the user isn't trapped with no way in —
+          // UNLESS the submission is parked in the offline outbox, in which case the quiz is
+          // taken (it auto-submits on reconnect; re-offering it would be the retake cheat).
           if (resultData && resultData.length > 0 && resultData[0].completed_at) {
             result = resultData[0] as WeeklyQuizCardResult;
+          } else if (pending.has(exam.id)) {
+            const queued = await getPendingSubmit(user.id, exam.id);
+            if (queued) {
+              result = {
+                exam_id: exam.id,
+                correct_count: queued.payload.p_correct_count ?? 0,
+                total_questions: queued.payload.p_total_questions ?? 0,
+                bucks_awarded: queued.payload.p_bucks_awarded ?? 0,
+              } as WeeklyQuizCardResult;
+            }
           }
         }
 

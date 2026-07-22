@@ -81,12 +81,11 @@ export interface CocktailPair {
 
 // ─── Word Search Types ────────────────────────────────────────────────────────
 
-export type WordSearchCategory =
-  | 'weekly_specials'
-  | 'lunch'
-  | 'dinner'
-  | 'happy_hour'
-  | 'libations';
+// Consolidated 2026-07: the old weekly_specials/lunch/dinner/happy_hour food
+// categories collapsed into one whole-menu "Dishes & Ingredients" pool, and
+// libations gained the Cocktails A-Z recipes — org menus are custom-category
+// shaped, so per-meal splits no longer map to anything real.
+export type WordSearchCategory = 'dishes_ingredients' | 'libations_ingredients';
 
 export type WordSearchDifficulty = 'easy' | 'medium' | 'hard';
 export type WordSearchPlayMode = 'free' | 'timed';
@@ -149,44 +148,23 @@ export const WORD_SEARCH_CATEGORY_INFO: Record<
   WordSearchCategory,
   { labelKey: string; descKey: string; icon: { ios: string; android: string }; color: string }
 > = {
-  weekly_specials: {
-    labelKey: 'word_search.cat_weekly_specials',
-    descKey: 'word_search.cat_weekly_specials_desc',
-    icon: { ios: 'sparkles', android: 'auto-awesome' },
-    color: '#F59E0B',
-  },
-  lunch: {
-    labelKey: 'word_search.cat_lunch',
-    descKey: 'word_search.cat_lunch_desc',
-    icon: { ios: 'sun.max.fill', android: 'wb-sunny' },
+  dishes_ingredients: {
+    labelKey: 'word_search.cat_dishes_ingredients',
+    descKey: 'word_search.cat_dishes_ingredients_desc',
+    icon: { ios: 'fork.knife', android: 'restaurant' },
     color: '#10B981',
   },
-  dinner: {
-    labelKey: 'word_search.cat_dinner',
-    descKey: 'word_search.cat_dinner_desc',
-    icon: { ios: 'moon.stars.fill', android: 'nights-stay' },
-    color: '#6366F1',
-  },
-  happy_hour: {
-    labelKey: 'word_search.cat_happy_hour',
-    descKey: 'word_search.cat_happy_hour_desc',
-    icon: { ios: 'star.fill', android: 'star' },
-    color: '#EC4899',
-  },
-  libations: {
-    labelKey: 'word_search.cat_libations',
-    descKey: 'word_search.cat_libations_desc',
+  libations_ingredients: {
+    labelKey: 'word_search.cat_libations_ingredients',
+    descKey: 'word_search.cat_libations_ingredients_desc',
     icon: { ios: 'wineglass.fill', android: 'local-bar' },
     color: '#8B5CF6',
   },
 };
 
 export const WORD_SEARCH_CATEGORIES: WordSearchCategory[] = [
-  'weekly_specials',
-  'lunch',
-  'dinner',
-  'happy_hour',
-  'libations',
+  'dishes_ingredients',
+  'libations_ingredients',
 ];
 
 // ─── Memory Game Mode Info ────────────────────────────────────────────────────

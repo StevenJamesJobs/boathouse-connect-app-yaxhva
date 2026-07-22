@@ -2,6 +2,7 @@ import { CardData, GameMode } from '@/types/game';
 import { createCardPair, selectRandom } from './gameEngine';
 import { WINE_PAIRINGS } from './winePairings';
 import { supabase } from '@/app/integrations/supabase/client';
+import { parseCocktailIngredients, pickMainCocktailIngredient } from './cocktailIngredients';
 import { resolveGameSourceOrgId } from './gameSource';
 import { fetchMenuCategoryResolver } from '@/utils/categoryNames';
 
@@ -65,10 +66,13 @@ async function generateWinePairingCards(pairCount: number, organizationId: strin
 // Mode 2: Ingredients to Dishes (from menu_items table)
 async function generateIngredientDishCards(pairCount: number, organizationId: string, useSampleData: boolean, actorId: string = ''): Promise<CardData[]> {
   const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
-  // Resolve the source org's current Dinner/Lunch names by system_key (renames-safe).
+  // The source org's food categories: keyed Dinner/Lunch names PLUS visible
+  // custom categories (upload-built menus live entirely in customs).
   const resolver = await fetchMenuCategoryResolver(actorId, sourceOrgId);
-  const foodCats = resolver.namesForKeys(['cat.dinner', 'cat.lunch']);
-  const categories = foodCats.length ? foodCats : ['Dinner', 'Lunch'];
+  const categories = resolver.foodCategoryNames();
+  if (!categories.length) {
+    return generateWinePairingCards(pairCount, organizationId, useSampleData, actorId);
+  }
   const { data: rawItems, error } = await supabase.rpc('get_menu_items', {
     p_actor_id: actorId, p_source_org: sourceOrgId, p_categories: categories,
   });
@@ -124,7 +128,7 @@ async function generateCocktailCards(pairCount: number, organizationId: string, 
   // Process cocktails (ingredients is newline/comma-separated text)
   if (cocktailsResult.data) {
     cocktailsResult.data.forEach(c => {
-      const mainIngredient = extractCocktailMainIngredient(c.ingredients || '', c.alcohol_type);
+      const mainIngredient = pickMainCocktailIngredient(parseCocktailIngredients(c.ingredients), c.alcohol_type);
       if (mainIngredient) {
         allPairs.push({ ingredient: mainIngredient, cocktail: c.name.trim(), id: c.id });
       }
@@ -144,7 +148,7 @@ async function generateCocktailCards(pairCount: number, organizationId: string, 
   }
 
   if (allPairs.length === 0) {
-    return generateWinePairingCards(pairCount, organizationId, useSampleData);
+    return generateWinePairingCards(pairCount, organizationId, useSampleData, actorId);
   }
 
   const selected = selectRandom(allPairs, pairCount);
@@ -187,30 +191,5 @@ function extractKeyIngredient(description: string): string {
   return distinctive || parts[0];
 }
 
-// Extract the main spirit from a cocktails ingredients text
-// Format: "4 oz. ginger beer \r\n0.25 oz. lime \r\nFloat 2 oz. dark rum"
-function extractCocktailMainIngredient(ingredientsText: string, alcoholType: string): string {
-  // Parse the newline-separated ingredient list
-  const lines = ingredientsText
-    .split(/\r?\n/)
-    .map(l => l.trim())
-    .filter(l => l.length > 0);
-
-  if (lines.length === 0) return alcoholType || '';
-
-  // Try to find the main spirit line (usually has the most volume or is the base)
-  for (const line of lines) {
-    // Remove measurement prefix (e.g., "2 oz.", "1.5 oz.")
-    const cleaned = line
-      .replace(/^[\d.]+\s*oz\.?\s*/i, '')
-      .replace(/^Float\s+[\d.]+\s*oz\.?\s*/i, '')
-      .replace(/^\*optional.*$/i, '')
-      .trim();
-
-    if (cleaned.length > 0 && !cleaned.startsWith('*')) {
-      return cleaned;
-    }
-  }
-
-  return alcoholType || '';
-}
+// (cocktail ingredient parsing lives in ./cocktailIngredients — the TEXT
+// column holds JSON-stringified {amount, ingredient}[] in modern rows.)

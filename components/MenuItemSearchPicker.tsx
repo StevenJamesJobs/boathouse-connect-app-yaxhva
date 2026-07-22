@@ -55,8 +55,6 @@ function parsePriceAmount(priceText: string): number | null {
   return n;
 }
 
-const CATEGORY_PILLS = ['All', 'Weekly Specials', 'Lunch', 'Dinner', 'Libations', 'Wine', 'Happy Hour'];
-
 export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
@@ -66,6 +64,14 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
   const [activeCategory, setActiveCategory] = useState<string>('All');
   const [loading, setLoading] = useState(false);
   const [rows, setRows] = useState<RawRow[]>([]);
+  // Pills come from the org's real categories (the old hardcoded English list
+  // matched nothing for renamed/custom-category menus). The specials pill is
+  // always present — weekly_specials table rows exist independently of menu
+  // categories.
+  const [pillData, setPillData] = useState<{ pills: string[]; wsNames: string[] }>({
+    pills: ['All'],
+    wsNames: ['Weekly Specials'],
+  });
 
   useEffect(() => {
     if (!visible) return;
@@ -80,9 +86,10 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
     setLoading(true);
     (async () => {
       try {
-        const [menuRes, specialsRes] = await Promise.all([
+        const [menuRes, specialsRes, catRes] = await Promise.all([
           supabase.rpc('get_menu_items', { p_actor_id: user.id }),
           (supabase.from('weekly_specials') as any).select('id, name, day_of_week, price').eq('organization_id', organizationId),
+          supabase.rpc('get_menu_categories', { p_actor_id: user.id }),
         ]);
         if (cancelled) return;
         const menuRows: RawRow[] = ((menuRes.data as any[]) || []).map((r) => ({
@@ -100,6 +107,29 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
           price: r.price,
         }));
         setRows([...menuRows, ...specialRows]);
+        // Visible categories that actually hold items, deduped across menu
+        // slots, in (slot, display_order) order; specials resolved by system_key.
+        const itemCats = new Set(menuRows.map((r) => r.category));
+        const catRows = (((catRes.data as any[]) || [])).slice().sort(
+          (a, b) => (a.menu_slot - b.menu_slot) || (a.display_order - b.display_order),
+        );
+        const wsNames = catRows
+          .filter((c) => c.system_key === 'cat.weekly_specials')
+          .map((c) => c.display_name as string);
+        const seen = new Set<string>();
+        const others: string[] = [];
+        for (const c of catRows) {
+          if (c.is_hidden || c.system_key === 'cat.weekly_specials') continue;
+          const name = c.display_name as string;
+          const k = name.trim().toLowerCase();
+          if (seen.has(k) || !itemCats.has(name)) continue;
+          seen.add(k);
+          others.push(name);
+        }
+        setPillData({
+          pills: ['All', wsNames[0] ?? 'Weekly Specials', ...others],
+          wsNames: wsNames.length ? wsNames : ['Weekly Specials'],
+        });
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -129,10 +159,12 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
       })
       .filter((r): r is PickedMenuItem => {
         if (r === null) return false;
-        // Category filter
+        // Category filter — the specials pill (possibly renamed) matches both
+        // weekly_specials table rows ("Weekly Special — <day>") and menu items
+        // categorized under the org's specials category name.
         if (activeCategory !== 'All') {
-          if (activeCategory === 'Weekly Specials') {
-            if (!r.category.startsWith('Weekly Special')) return false;
+          if (pillData.wsNames.includes(activeCategory)) {
+            if (!r.category.startsWith('Weekly Special') && r.category !== activeCategory) return false;
           } else {
             if (r.category !== activeCategory) return false;
           }
@@ -142,7 +174,7 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
         return true;
       })
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [rows, query, activeCategory, redemptionSettings.food_mode]);
+  }, [rows, query, activeCategory, pillData.wsNames, redemptionSettings.food_mode]);
 
   const handleClose = () => {
     setQuery('');
@@ -162,7 +194,7 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
           </View>
 
           <View style={styles.pillRow}>
-            {CATEGORY_PILLS.map((cat) => {
+            {pillData.pills.map((cat) => {
               const active = activeCategory === cat;
               return (
                 <TouchableOpacity

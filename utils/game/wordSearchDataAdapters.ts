@@ -12,6 +12,7 @@ import {
   getDifficultyConfig,
 } from '@/utils/game/wordSearchEngine';
 import { stripFormattingTags } from '@/components/FormattedText';
+import { parseCocktailIngredients } from './cocktailIngredients';
 import { resolveGameSourceOrgId } from './gameSource';
 import { fetchMenuCategoryResolver } from '@/utils/categoryNames';
 
@@ -49,15 +50,17 @@ export async function getWordsForCategory(
   };
 
   switch (category) {
-    case 'weekly_specials':
-      return fetchMenuItemWords(namesOr('cat.weekly_specials', 'Weekly Specials'), config.itemCount, sourceOrgId, actorId);
-    case 'lunch':
-      return fetchMenuItemWords(namesOr('cat.lunch', 'Lunch'), config.itemCount, sourceOrgId, actorId);
-    case 'dinner':
-      return fetchMenuItemWords(namesOr('cat.dinner', 'Dinner'), config.itemCount, sourceOrgId, actorId);
-    case 'happy_hour':
-      return fetchMenuItemWords(namesOr('cat.happy_hour', 'Happy Hour'), config.itemCount, sourceOrgId, actorId);
-    case 'libations':
+    case 'dishes_ingredients': {
+      // Whole-menu food pool: every real food category (customs + keyed
+      // Lunch/Dinner names) plus the Specials/Happy Hour built-ins — the
+      // entire menu except libations, cocktails and wine.
+      const dishCats = [
+        ...resolver.foodCategoryNames(),
+        ...resolver.namesForKeys(['cat.weekly_specials', 'cat.happy_hour']),
+      ];
+      return (await tryFetchMenuItemWords(dishCats, config.itemCount, sourceOrgId, actorId)) ?? getFallbackWords();
+    }
+    case 'libations_ingredients':
       return fetchLibationWords(config.itemCount, sourceOrgId, namesOr('cat.libations', 'Libations'), actorId);
     default:
       return [];
@@ -66,12 +69,14 @@ export async function getWordsForCategory(
 
 // ─── Food Category Fetcher ────────────────────────────────────────────────────
 
-async function fetchMenuItemWords(
+// Returns null (instead of the generic fallback words) when the pool yields too
+// few usable words, so callers can retry with a broader category list first.
+async function tryFetchMenuItemWords(
   categories: string[],
   itemCount: number,
   organizationId: string,
   actorId: string = ''
-): Promise<RawWordItem[]> {
+): Promise<RawWordItem[] | null> {
   try {
     // organizationId is the resolved source org (own or sample); RPC returns all matching
     // active items — filter non-null description client-side.
@@ -81,7 +86,7 @@ async function fetchMenuItemWords(
     const data = ((raw as any[]) || []).filter((m) => m.description != null);
 
     if (error || !data || data.length === 0) {
-      return getFallbackWords();
+      return null;
     }
 
     // Shuffle and pick N items based on difficulty
@@ -98,10 +103,10 @@ async function fetchMenuItemWords(
     }
 
     const deduped = deduplicateWords(allWords);
-    if (deduped.length < 4) return getFallbackWords();
+    if (deduped.length < 4) return null;
     return deduped;
   } catch {
-    return getFallbackWords();
+    return null;
   }
 }
 
@@ -139,6 +144,22 @@ async function fetchLibationWords(
           ? (recipe.ingredients as Array<{ amount: string; ingredient: string }>)
           : [];
         const words = extractLibationWords(ingArray, stripFormattingTags(recipe.name));
+        allWords.push(...words);
+      }
+    }
+
+    // Add Cocktails A-Z names + ingredients. The cocktails.ingredients TEXT
+    // column holds a JSON-stringified {amount, ingredient}[] — parse it and
+    // reuse the same word builder as the libation recipes.
+    const { data: cocktails, error: cocktailError } = await supabase.rpc('get_cocktails', {
+      p_actor_id: actorId, p_source_org: organizationId,
+    });
+    if (!cocktailError && cocktails && cocktails.length > 0) {
+      const picked = shuffleItems(cocktails as any[]).slice(0, itemCount);
+      for (const c of picked) {
+        const parsed = parseCocktailIngredients(c.ingredients);
+        if (parsed.length === 0) continue;
+        const words = extractLibationWords(parsed, stripFormattingTags(c.name));
         allWords.push(...words);
       }
     }
