@@ -318,6 +318,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     try {
       const { data, error } = await supabase.functions.invoke('send-push-notification', {
         body: {
+          actor_id: user.id,
           userIds: params.userIds,
           organizationId,
           notificationType: params.notificationType,

@@ -1,4 +1,5 @@
 import { supabase } from '@/app/integrations/supabase/client';
+import { getCurrentActorId } from '@/utils/currentActor';
 
 /**
  * Translates an array of texts to the target language via the translate-text Edge Function.
@@ -15,6 +16,7 @@ export async function translateTexts(
   try {
     const { data, error } = await supabase.functions.invoke('translate-text', {
       body: {
+        actor_id: getCurrentActorId(),
         texts,
         targetLang,
         sourceLang: 'en',

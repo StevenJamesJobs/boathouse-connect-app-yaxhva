@@ -4,6 +4,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { User, AuthState } from '@/types/user';
 import { Platform } from 'react-native';
 import { setResolverActorId } from '@/utils/storageResolver';
+import { setCurrentActorId } from '@/utils/currentActor';
 
 interface AuthContextType extends AuthState {
   login: (username: string, password: string, rememberMe: boolean) => Promise<boolean>;
@@ -237,6 +238,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // components never thread it). Null on logout clears its signed-URL cache.
   useEffect(() => {
     setResolverActorId(authState.user?.id ?? null);
+    // Same actor feeds edge-function callers (push / translate) that can't thread it.
+    setCurrentActorId(authState.user?.id ?? null);
   }, [authState.user?.id]);
 
   const refreshUser = async () => {

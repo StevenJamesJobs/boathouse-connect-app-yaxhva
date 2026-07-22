@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '@/app/integrations/supabase/client';
+import { getCurrentActorId } from '@/utils/currentActor';
 
 interface SendNotificationParams {
   userIds?: string[];
@@ -22,8 +23,10 @@ interface SendNotificationParams {
  */
 async function sendNotification(params: SendNotificationParams): Promise<void> {
   try {
+    // Server verifies actor_id (active user) and derives the org from it — the
+    // recipient org is never trusted from the client. Null actor => 401 (no push).
     const { data, error } = await supabase.functions.invoke('send-push-notification', {
-      body: params,
+      body: { ...params, actor_id: getCurrentActorId() },
     });
 
     if (error) {
