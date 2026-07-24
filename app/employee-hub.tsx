@@ -9,12 +9,14 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useTranslation } from 'react-i18next';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import BottomNavBar from '@/components/BottomNavBar';
 
 export default function EmployeeHubScreen() {
+  useRequireManagerRoute();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const router = useRouter();

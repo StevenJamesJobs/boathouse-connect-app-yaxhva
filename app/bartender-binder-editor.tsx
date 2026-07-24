@@ -11,8 +11,10 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 
 export default function BartenderBinderEditorScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();

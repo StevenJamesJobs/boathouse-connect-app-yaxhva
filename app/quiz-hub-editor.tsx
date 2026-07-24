@@ -18,6 +18,7 @@ import type { ExamType } from '@/utils/exam/questionGenerator';
 import { useFocusEffect } from '@react-navigation/native';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 
 interface ExamSummary {
   id: string;
@@ -38,6 +39,7 @@ const EXAM_ICONS: Record<ExamType, { ios: string; android: string }> = {
 };
 
 export default function QuizHubEditorScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();

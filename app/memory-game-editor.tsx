@@ -19,6 +19,7 @@ import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { PlayMode } from '@/types/game';
 
 interface WinePairing {
@@ -38,6 +39,7 @@ export default function MemoryGameEditorScreen() {
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
+  useRequireManagerRoute();
   const [activeTab, setActiveTab] = useState<'pairings' | 'scoreboard'>('pairings');
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>('all');
   const [pairings, setPairings] = useState<WinePairing[]>([]);

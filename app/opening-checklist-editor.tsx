@@ -20,6 +20,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 
 interface ChecklistItem {
   id: string;
@@ -36,6 +37,7 @@ interface ChecklistCategory {
 }
 
 export default function OpeningChecklistEditorScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const { t } = useTranslation();
   const { organizationId } = useOrganization();

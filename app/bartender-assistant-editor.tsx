@@ -15,8 +15,10 @@ import BottomNavBar from '@/components/BottomNavBar';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { menuIconAndroid } from '@/constants/menuIcons';
 import HeaderNavButton from '@/components/HeaderNavButton';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 
 export default function BartenderAssistantEditorScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();

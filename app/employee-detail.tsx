@@ -15,6 +15,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -41,6 +42,7 @@ interface Employee {
 }
 
 export default function EmployeeDetailScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const { employeeId } = useLocalSearchParams();
   const { user } = useAuth();

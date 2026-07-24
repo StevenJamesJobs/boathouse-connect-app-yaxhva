@@ -19,6 +19,7 @@ import { useTranslation } from 'react-i18next';
 import { useFocusEffect } from '@react-navigation/native';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -52,6 +53,7 @@ interface DismissedItem {
 }
 
 export default function NotificationCenter() {
+  useRequireManagerRoute();
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();

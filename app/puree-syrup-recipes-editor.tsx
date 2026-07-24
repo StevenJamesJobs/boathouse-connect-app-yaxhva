@@ -18,6 +18,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { supabase } from '@/app/integrations/supabase/client';
 import { brokerUploadImage } from '@/utils/storageBroker';
 import { toPublicUrl } from '@/utils/storageResolver';
@@ -51,6 +52,7 @@ const CATEGORIES = ['Purees', 'Simple Syrups'];
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1587049352846-4a222e784acc?w=400&h=400&fit=crop';
 
 export default function PureeSyrupRecipesEditorScreen() {
+  useRequireManagerRoute();
   const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();

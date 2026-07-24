@@ -19,6 +19,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
 import HeaderNavButton from '@/components/HeaderNavButton';
@@ -78,6 +79,7 @@ const EDITOR_CARDS: EditorCard[] = [
 ];
 
 export default function GameHubEditorScreen() {
+  useRequireManagerRoute();
   const colors = useThemeColors();
   const router = useRouter();
   const { t } = useTranslation();

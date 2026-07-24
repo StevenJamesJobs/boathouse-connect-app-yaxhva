@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import HeaderNavButton from '@/components/HeaderNavButton';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 
 interface SectionRow {
   id: string;
@@ -33,6 +34,7 @@ interface SectionRow {
 }
 
 export default function HostAssistantEditorScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();

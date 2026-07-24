@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { brokerUploadBase64 } from '@/utils/storageBroker';
@@ -52,6 +53,7 @@ function targetMenuOptions(menuCount: number, scope: string, m1: string, m2: str
 }
 
 export default function MenuUploadScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const params = useLocalSearchParams<{ onboarding?: string }>();
   const isOnboarding = params.onboarding === '1';

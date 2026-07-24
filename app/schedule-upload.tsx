@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -36,6 +37,7 @@ interface ScheduleUpload {
 }
 
 export default function ScheduleUploadScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const colors = useThemeColors();
   const { user } = useAuth();

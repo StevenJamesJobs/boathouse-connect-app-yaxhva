@@ -16,6 +16,7 @@ import {
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -37,6 +38,7 @@ const CATEGORIES: CategoryRow[] = [
 ];
 
 export default function PictureThisEditorScreen() {
+  useRequireManagerRoute();
   const colors = useThemeColors();
   const router = useRouter();
   const { t } = useTranslation();

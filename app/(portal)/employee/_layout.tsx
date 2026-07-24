@@ -1,9 +1,10 @@
 
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Redirect, Tabs } from 'expo-router';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { isManagerOrOwner } from '@/utils/roles';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useUnreadMessages } from '@/hooks/useUnreadMessages';
@@ -77,6 +78,7 @@ export default function EmployeeLayout() {
   const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const segments = useSegments();
+  const { user } = useAuth();
   // Welcome = the index tab (last segment is not one of the other tabs).
   const lastSegment = segments[segments.length - 1] as string;
   const onWelcome = !['menus', 'tools', 'rewards', 'profile'].includes(lastSegment);
@@ -84,6 +86,13 @@ export default function EmployeeLayout() {
   // ambient glow at the layout level so it reads behind the status-bar spacer
   // (otherwise the parent's solid background shows as a strip at the very top).
   const onRewards = lastSegment === 'rewards';
+  // B8 inverse of the manager-shell guard: when the (re)validated role is manager/owner,
+  // hop up to the manager portal so a promotion is as visible as a demotion. Nothing
+  // legitimately navigates a manager INTO the employee shell (verified in the B8 recon);
+  // the two guards read the same role, so exactly one portal accepts any user.
+  if (user && isManagerOrOwner(user)) {
+    return <Redirect href="/(portal)/manager" />;
+  }
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Ambient glow on the transparent, edge-to-edge tabs (Welcome + Rewards);

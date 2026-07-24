@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -105,6 +106,7 @@ function formatTime(timeStr: string) {
 }
 
 export default function ManualScheduleScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
