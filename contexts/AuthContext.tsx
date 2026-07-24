@@ -1,8 +1,8 @@
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { supabase } from '@/app/integrations/supabase/client';
 import { User, AuthState } from '@/types/user';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import { setResolverActorId } from '@/utils/storageResolver';
 import { setCurrentActorId } from '@/utils/currentActor';
 
@@ -10,7 +10,7 @@ interface AuthContextType extends AuthState {
   login: (username: string, password: string, rememberMe: boolean) => Promise<boolean>;
   adoptSession: (row: unknown, rememberMe: boolean) => Promise<boolean>;
   logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  refreshUser: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -19,6 +19,15 @@ const STORAGE_KEY = '@mrc_auth';
 const REMEMBER_ME_KEY = '@mrc_remember_me';
 const OLD_STORAGE_KEY = '@mcloones_auth';
 const OLD_REMEMBER_ME_KEY = '@mcloones_remember_me';
+
+// B8 stale-session hardening: when a remembered session had to be published from CACHE
+// (get_me unreachable at restore), its role/job_titles may be stale — server RPC gates
+// still hold, so the leak is UI-only, but it must CONVERGE. Bounded retries run at this
+// cadence after a failed restore refresh; independently, every return to the foreground
+// revalidates the session (throttled below), which also covers a suspended-not-killed
+// app that would otherwise never re-observe a server-side role change.
+const REVALIDATE_BACKOFF_MS = [5000, 30000, 120000];
+const FOREGROUND_REVALIDATE_MIN_MS = 60000;
 
 // The password the user just authenticated with, held in volatile module memory
 // (never persisted) so the FORCED change-password flow can pass it as the
@@ -86,6 +95,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: false,
   });
 
+  // B8 revalidation state (refs so the []-deps effects and timers below never go stale):
+  // current session's user id, whether the session was published from cache without a
+  // successful get_me, the last revalidation attempt time, and any pending retry timer.
+  const userIdRef = useRef<string | null>(null);
+  const sessionStaleRef = useRef(false);
+  const lastRevalidateAtRef = useRef(0);
+  const revalidateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const fetchUserFromDatabase = async (userId: string): Promise<FetchResult> => {
     try {
       console.log('[AuthContext] Fetching user data via get_me for user:', userId);
@@ -111,6 +128,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('[AuthContext] Exception in get_me:', error);
       return { status: 'error' };
     }
+  };
+
+  // Apply a fresh get_me row to state + storage. The storage write is deliberately
+  // non-fatal: a persistence hiccup must never undo a session the server just confirmed.
+  const applyFreshUser = async (freshUser: User) => {
+    try {
+      if (AsyncStorage) {
+        const rememberMe = await AsyncStorage.getItem(REMEMBER_ME_KEY);
+        if (rememberMe === 'true') {
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
+        }
+      }
+    } catch (storageError) {
+      console.log('[AuthContext] Non-fatal: could not persist refreshed user:', storageError);
+    }
+    setAuthState({ user: freshUser, isLoading: false, isAuthenticated: true });
+  };
+
+  // Re-run get_me for the current session and reconcile: fresh row → apply it (stale
+  // flag clears, a demoted role unmounts the manager shell via the live layout guard);
+  // account gone → end the session; transport error → stay as-is (callers retry).
+  const revalidateSession = async (): Promise<'applied' | 'ended' | 'failed' | 'noop'> => {
+    const userId = userIdRef.current;
+    if (!userId) return 'noop';
+    lastRevalidateAtRef.current = Date.now();
+    const result = await fetchUserFromDatabase(userId);
+    if (userIdRef.current !== userId) return 'noop'; // logged out / switched mid-flight
+    if (result.status === 'ok') {
+      sessionStaleRef.current = false;
+      await applyFreshUser(result.user);
+      return 'applied';
+    }
+    if (result.status === 'not_found') {
+      console.log('[AuthContext] Revalidation: account no longer exists — ending session');
+      sessionStaleRef.current = false;
+      await logout();
+      return 'ended';
+    }
+    return 'failed';
+  };
+
+  const scheduleRevalidate = (attempt: number) => {
+    if (attempt >= REVALIDATE_BACKOFF_MS.length) return; // foreground listener takes over
+    if (revalidateTimerRef.current) clearTimeout(revalidateTimerRef.current);
+    revalidateTimerRef.current = setTimeout(async () => {
+      revalidateTimerRef.current = null;
+      const outcome = await revalidateSession();
+      if (outcome === 'failed') scheduleRevalidate(attempt + 1);
+    }, REVALIDATE_BACKOFF_MS[attempt]);
   };
 
   const loadStoredAuth = useCallback(async () => {
@@ -154,8 +220,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (result.status === 'ok') {
               const freshUser = result.user;
-              // Update storage with fresh data
-              await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
+              // Update storage with fresh data (non-fatal: a storage hiccup must not
+              // wipe a session get_me just confirmed — the outer catch clears both keys).
+              try {
+                await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
+              } catch (persistError) {
+                console.log('[AuthContext] Non-fatal: could not persist refreshed user:', persistError);
+              }
 
               // Update cached org branding
               if (freshUser.organizationId) {
@@ -184,11 +255,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               // Keep the cached session rather than logging the user out — this prevents a stale
               // client from being bricked (session erased) during the eventual RLS teardown.
               console.log('[AuthContext] get_me unavailable; keeping cached session');
+              // B8: the cached role may be stale (e.g. a demotion we couldn't observe).
+              // Mark the session stale and converge: bounded backoff retries now, plus
+              // the foreground revalidation listener from then on.
+              sessionStaleRef.current = true;
               setAuthState({
                 user: storedUser as User,
                 isLoading: false,
                 isAuthenticated: true,
               });
+              scheduleRevalidate(0);
               return;
             } else {
               // not_found — the account genuinely no longer exists; clear stored auth.
@@ -237,41 +313,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // B4b: the storage resolver reads the actor from module scope (leaf image
   // components never thread it). Null on logout clears its signed-URL cache.
   useEffect(() => {
+    userIdRef.current = authState.user?.id ?? null;
+    if (!authState.user?.id && revalidateTimerRef.current) {
+      clearTimeout(revalidateTimerRef.current);
+      revalidateTimerRef.current = null;
+    }
     setResolverActorId(authState.user?.id ?? null);
     // Same actor feeds edge-function callers (push / translate) that can't thread it.
     setCurrentActorId(authState.user?.id ?? null);
   }, [authState.user?.id]);
 
-  const refreshUser = async () => {
+  // B8: revalidate on return to foreground — a suspended (not killed) app never re-runs
+  // restore, so without this a server-side role change is unobserved until a cold start.
+  // Throttled to once a minute; runs unconditionally while the session is known-stale.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextState) => {
+      if (nextState !== 'active') return;
+      if (!userIdRef.current) return;
+      const throttled = Date.now() - lastRevalidateAtRef.current < FOREGROUND_REVALIDATE_MIN_MS;
+      if (!sessionStaleRef.current && throttled) return;
+      revalidateSession().then((outcome) => {
+        // Retry on ANY transport failure, not just known-stale sessions: iOS can fail
+        // requests fired in the first instant after foregrounding (network stack still
+        // waking), which would otherwise silently eat this one-shot check.
+        if (outcome === 'failed') scheduleRevalidate(0);
+      });
+    });
+    return () => sub.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const refreshUser = async (): Promise<boolean> => {
     try {
       if (!authState.user?.id) {
         console.log('[AuthContext] No user to refresh');
-        return;
+        return false;
       }
-      
+
       console.log('[AuthContext] Refreshing user data...');
       const result = await fetchUserFromDatabase(authState.user.id);
 
       if (result.status === 'ok') {
-        const freshUser = result.user;
-        // Update storage
-        if (AsyncStorage) {
-          const rememberMe = await AsyncStorage.getItem(REMEMBER_ME_KEY);
-          if (rememberMe === 'true') {
-            await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(freshUser));
-          }
-        }
-
-        setAuthState({
-          user: freshUser,
-          isLoading: false,
-          isAuthenticated: true,
-        });
+        sessionStaleRef.current = false;
+        lastRevalidateAtRef.current = Date.now();
+        await applyFreshUser(result.user);
         console.log('[AuthContext] User data refreshed successfully');
+        return true;
       }
       // On 'error' or 'not_found', leave the current session untouched (don't disrupt an active session).
+      return false;
     } catch (error) {
       console.log('[AuthContext] Error refreshing user:', error);
+      return false;
     }
   };
 

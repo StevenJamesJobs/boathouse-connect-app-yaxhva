@@ -19,6 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { supabase } from '@/app/integrations/supabase/client';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
@@ -63,6 +64,7 @@ interface LibationRecipe {
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=400&h=400&fit=crop';
 
 export default function LibationRecipesEditorScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const { t } = useTranslation();
   const { user } = useAuth();

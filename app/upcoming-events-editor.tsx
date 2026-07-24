@@ -37,6 +37,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import OrderPositionModal from '@/components/OrderPositionModal';
 import { StorageImage } from '@/components/StorageImage';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 
 interface UpcomingEvent {
   id: string;
@@ -67,6 +68,7 @@ interface GuideFile {
 const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
 
 export default function UpcomingEventsEditorScreen() {
+  useRequireManagerRoute();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);

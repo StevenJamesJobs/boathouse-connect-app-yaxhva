@@ -28,6 +28,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import GlassCard from '@/components/GlassCard';
 import AmbientGlow from '@/components/AmbientGlow';
@@ -95,6 +96,7 @@ type ReviewItem =
   | (GoogleReview & { source: 'google' });
 
 export default function RewardsAndReviewsEditorScreen() {
+  useRequireManagerRoute();
   const { t } = useTranslation();
   const { language } = useLanguage();
   const router = useRouter();

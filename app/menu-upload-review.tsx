@@ -18,6 +18,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTranslation } from 'react-i18next';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 
 interface EItem {
   name: string;
@@ -59,6 +60,7 @@ function normalizeTree(parsed: any): ECat[] {
 }
 
 export default function MenuUploadReviewScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const colors = useThemeColors();
   const { user } = useAuth();

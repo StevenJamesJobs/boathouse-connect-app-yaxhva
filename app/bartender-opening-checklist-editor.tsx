@@ -16,6 +16,7 @@ import {
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -36,6 +37,7 @@ interface ChecklistCategory {
 }
 
 export default function BartenderOpeningChecklistEditorScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const { t } = useTranslation();
   const { organizationId } = useOrganization();

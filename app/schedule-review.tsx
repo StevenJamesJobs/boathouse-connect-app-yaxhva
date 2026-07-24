@@ -25,6 +25,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { getOrgDirectory } from '@/utils/orgDirectory';
 import { useTranslation } from 'react-i18next';
 import ShiftEditForm from '@/components/ShiftEditForm';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -61,6 +62,7 @@ interface GroupedShifts {
 }
 
 export default function ScheduleReviewScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();

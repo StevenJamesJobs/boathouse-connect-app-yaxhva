@@ -19,6 +19,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -49,6 +50,7 @@ interface Employee {
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
 export default function EmployeeEditorScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const { t } = useTranslation('employee_editor');
   const colors = useThemeColors();

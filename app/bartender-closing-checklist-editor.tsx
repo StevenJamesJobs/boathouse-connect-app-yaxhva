@@ -20,6 +20,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 
 interface ChecklistItem {
   id: string;
@@ -41,6 +42,7 @@ export default function BartenderClosingChecklistEditorScreen() {
   const { organizationId } = useOrganization();
   const { user } = useAuth();
   const colors = useThemeColors();
+  useRequireManagerRoute();
 
   const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },

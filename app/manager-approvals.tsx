@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +31,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 export default function ManagerApprovalsScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const colors = useThemeColors();
   const { user } = useAuth();

@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,6 +48,7 @@ export default function HostSectionEditorScreen() {
   const { user } = useAuth();
   const { organizationId } = useOrganization();
   const colors = useThemeColors();
+  useRequireManagerRoute();
   const styles = createStyles(colors);
 
   const isNew = !id || id === 'new';

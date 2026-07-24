@@ -25,6 +25,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTranslation } from 'react-i18next';
 import { translateTexts } from '@/utils/translateContent';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 
 interface CustomOption {
   id: string;
@@ -74,6 +75,7 @@ function CostRow({ label, on, cost, onToggle, onCost, styles, colors, t, currenc
 }
 
 export default function RedeemSettingsScreen() {
+  useRequireManagerRoute();
   const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();

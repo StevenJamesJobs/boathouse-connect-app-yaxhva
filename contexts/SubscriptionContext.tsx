@@ -132,26 +132,43 @@ function SubscriptionProviderInner({ children }: { children: ReactNode }) {
 
     try {
       const Purchases = (await import('react-native-purchases')).default;
-      const customerInfo = await Purchases.getCustomerInfo();
 
-      const hasPremiumEntitlement =
-        customerInfo.entitlements.active[ENTITLEMENTS.PREMIUM] !== undefined;
-      const hasBaseEntitlement =
-        customerInfo.entitlements.active[ENTITLEMENTS.BASE] !== undefined;
+      const tierFromInfo = (info: any): SubscriptionTier => {
+        if (info.entitlements.active[ENTITLEMENTS.PREMIUM] !== undefined) return 'premium';
+        if (info.entitlements.active[ENTITLEMENTS.BASE] !== undefined) return 'base';
+        return dbTier;
+      };
 
-      let rcTier: SubscriptionTier = dbTier;
-      if (hasPremiumEntitlement) {
-        rcTier = 'premium';
-      } else if (hasBaseEntitlement) {
-        rcTier = 'base';
+      // Fast path on the SDK's cached customerInfo: no divergence, no write, no network.
+      const cachedTier = tierFromInfo(await Purchases.getCustomerInfo());
+      if (cachedTier === dbTier || (cachedTier !== 'base' && cachedTier !== 'premium')) {
+        return dbTier;
+      }
+
+      // B8: the cached snapshot can be minutes stale (or older when RC's API errors) —
+      // a write from a pre-expiration snapshot would resurrect a paid tier the B7
+      // webhook just downgraded, permanently (no later RC event re-downgrades). Before
+      // ANY write, force a fresh fetch and only write what it confirms; if the fresh
+      // fetch fails, skip the write entirely (the webhook is the source of truth).
+      let rcTier: SubscriptionTier;
+      try {
+        await Purchases.invalidateCustomerInfoCache();
+        rcTier = tierFromInfo(await Purchases.getCustomerInfo());
+      } catch (freshErr) {
+        console.warn('[Subscription] Fresh customerInfo fetch failed; skipping tier write:', freshErr);
+        return dbTier;
       }
 
       if (rcTier !== dbTier && (rcTier === 'base' || rcTier === 'premium')) {
-        await (supabase.rpc as any)('upsert_organization_subscription', {
+        const { error } = await (supabase.rpc as any)('upsert_organization_subscription', {
           p_organization_id: orgId,
           p_subscription_tier: rcTier,
           p_actor_id: actorId,
         });
+        if (error) {
+          console.warn('[Subscription] Tier write failed:', error.message);
+          return dbTier;
+        }
         return rcTier;
       }
 

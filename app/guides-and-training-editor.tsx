@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
 import HeaderNavButton from '@/components/HeaderNavButton';
@@ -51,6 +52,7 @@ interface GuideItem {
 const CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events Flyers'];
 
 export default function GuidesAndTrainingEditorScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const { t } = useTranslation();
   const { user } = useAuth();

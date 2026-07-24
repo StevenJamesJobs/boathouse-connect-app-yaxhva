@@ -10,6 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
@@ -29,6 +30,7 @@ interface GridItem {
 }
 
 export default function AssistantEditorsScreen() {
+  useRequireManagerRoute();
   const colors = useThemeColors();
   const router = useRouter();
   const { t } = useTranslation();

@@ -14,6 +14,7 @@ import {
   Switch,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
@@ -87,6 +88,7 @@ interface CompletionEntry {
 type ActiveSection = 'questions' | 'tracker';
 
 export default function ExamEditorScreen() {
+  useRequireManagerRoute();
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
