@@ -41,7 +41,6 @@ const ICON_MAP: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   'line.3.horizontal': 'restaurant',
   'line.horizontal.3': 'restaurant',
   'list.bullet': 'list',
-  'fork.knife': 'restaurant',
   'fork.knife.circle': 'restaurant-menu',
   
   // Filter
@@ -119,10 +118,7 @@ const ICON_MAP: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   'calculator.fill': 'calculate',
   'dollarsign.circle': 'calculate',
   'dollarsign.circle.fill': 'calculate',
-  
-  // Feedback
-  'feedback': 'feedback',
-  
+
   // Restaurant and food
   'restaurant': 'restaurant',
   'restaurant-menu': 'restaurant-menu',

@@ -42,7 +42,7 @@ export async function fetchOrgCategoryNames(actorId: string, sourceOrg?: string)
       if (!barr.includes(c.display_name)) barr.push(c.display_name);
     }
   } catch (e) {
-    console.error('[categoryNames] fetch error:', e);
+    console.log('[categoryNames] fetch error:', e);
   }
   return { bySystemKey, namesBySystemKey, byBehavior };
 }

@@ -70,9 +70,9 @@ interface UnreadContentResult {
 export function useUnreadContent(): UnreadContentResult {
   const { organizationId } = useOrganization();
   const { user } = useAuth();
-  // checkUnread below is a []-dep callback held by long-lived subscriptions, the
-  // 60s interval, and the AppState listener — it must read CURRENT auth through a
-  // ref (its closure would otherwise pin the first-render user forever).
+  // checkUnread below is a []-dep callback held by the 60s interval and the
+  // AppState listener — it must read CURRENT auth through a ref (its closure
+  // would otherwise pin the first-render user forever).
   const userIdRef = useRef<string | null>(user?.id ?? null);
   useEffect(() => {
     userIdRef.current = user?.id ?? null;
@@ -218,7 +218,7 @@ export function useUnreadContent(): UnreadContentResult {
       // Total count for notification bell badge
       setNewContentCount(todayCount + eventsCount + specialsCount);
     } catch (err) {
-      console.error('Error checking unread content:', err);
+      console.log('Error checking unread content:', err);
     }
   }, []);
 
@@ -318,27 +318,6 @@ export function useUnreadContent(): UnreadContentResult {
     checkUnread();
     listeners.add(checkUnread);
 
-    // Listen for new content via realtime
-    const announcementsChannel = supabase
-      .channel(`unread_announcements_${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, () => checkUnread())
-      .subscribe();
-
-    const specialFeaturesChannel = supabase
-      .channel(`unread_special_features_${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'special_features' }, () => checkUnread())
-      .subscribe();
-
-    const eventsChannel = supabase
-      .channel(`unread_events_${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'upcoming_events' }, () => checkUnread())
-      .subscribe();
-
-    const menuItemsChannel = supabase
-      .channel(`unread_specials_${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'menu_items' }, () => checkUnread())
-      .subscribe();
-
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
       if (next === 'active') checkUnread();
     });
@@ -350,10 +329,6 @@ export function useUnreadContent(): UnreadContentResult {
 
     return () => {
       listeners.delete(checkUnread);
-      supabase.removeChannel(announcementsChannel);
-      supabase.removeChannel(specialFeaturesChannel);
-      supabase.removeChannel(eventsChannel);
-      supabase.removeChannel(menuItemsChannel);
       subscription.remove();
       clearInterval(interval);
     };

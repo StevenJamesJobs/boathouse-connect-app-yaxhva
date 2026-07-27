@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -46,7 +47,7 @@ export default function ManagerApprovalsScreen() {
   const [decisionMode, setDecisionMode] = useState<'approve' | 'deny' | null>(null);
   const [reason, setReason] = useState('');
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     // Logout teardown: user clears before the redirect unmounts this screen —
     // supabase-js drops an undefined named arg and PostgREST 404s the overload (PGRST202).
     if (!user?.id) {
@@ -54,7 +55,7 @@ export default function ManagerApprovalsScreen() {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const { data: reqs } = await supabase.rpc('get_pending_redemptions', {
         p_actor_id: user.id,
@@ -82,14 +83,19 @@ export default function ManagerApprovalsScreen() {
 
   useEffect(() => {
     refresh();
-    const channel = supabase
-      .channel('approvals_queue')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'redemption_requests' }, () => refresh())
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [refresh]);
+
+  // Refetch when the screen regains focus — this route stays mounted below
+  // pushed screens, so requests submitted while away otherwise never re-trigger
+  // the mount effect. Silent: no spinner (loading blanks the whole queue), the
+  // skip ref leaves the initial load to the mount effect.
+  const focusSkipRef = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (focusSkipRef.current) { focusSkipRef.current = false; return; }
+      if (user?.id) refresh(true);
+    }, [refresh, user?.id])
+  );
 
   const decide = async (row: RedemptionRequestRow, mode: 'approve' | 'deny', withReason: string | null) => {
     if (!user?.id) return;

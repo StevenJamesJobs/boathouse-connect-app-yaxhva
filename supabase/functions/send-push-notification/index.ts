@@ -244,6 +244,10 @@ serve(async (req) => {
     // Log notifications to database
     const notificationLogs = filteredTokens.map((item: any) => ({
       user_id: item.user_id,
+      // Recipients are always filtered to the actor's org, so actorOrg is every
+      // log row's org. (v25 omitted this and the legacy BEFORE INSERT trigger
+      // silently stamped McLoone's org on every log — trigger now dropped.)
+      organization_id: actorOrg,
       notification_type: notificationType,
       title: title,
       body: body,
