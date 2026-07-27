@@ -339,7 +339,9 @@ export default function UpcomingEventsEditorScreen() {
         }
       }
 
-      const linkValue = formData.link.trim() || null;
+      // Prepend https:// when the entered link has no scheme, else it won't open (e.g. "kevahomes.com").
+      const rawLink = formData.link.trim();
+      const linkValue = rawLink ? (/^https?:\/\//i.test(rawLink) ? rawLink : `https://${rawLink}`) : null;
       const guideFileId = selectedGuideFile?.id || null;
 
       if (editingEvent) {

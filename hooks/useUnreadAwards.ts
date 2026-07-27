@@ -63,7 +63,7 @@ export function useUnreadAwards() {
       const c = ((rows as any[]) || []).filter((r) => r.decided_at && r.decided_at > cutoff).length;
       setCount(c || 0);
     } catch (err) {
-      console.error('Error checking unread awards:', err);
+      console.log('Error checking unread awards:', err);
     }
   }, [user?.id, isManager, organizationId]);
 
@@ -74,7 +74,7 @@ export function useUnreadAwards() {
     setCount(0);
     // Broadcast to other instances (FloatingTabBar nav, BadgeSyncer for home-screen icon)
     // so they re-read the new cutoff from AsyncStorage immediately instead of waiting
-    // for the next realtime event or app foreground.
+    // for the next app foreground.
     refreshAllUnreadAwards();
 
     // Also clear shade entries tied to this user's decisions / approvals.
@@ -96,24 +96,12 @@ export function useUnreadAwards() {
     check();
     listeners.add(check);
 
-    const txChannel = supabase
-      .channel(`awards_tx_${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'rewards_transactions' }, () => check())
-      .subscribe();
-
-    const reqChannel = supabase
-      .channel(`awards_req_${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'redemption_requests' }, () => check())
-      .subscribe();
-
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
       if (next === 'active') check();
     });
 
     return () => {
       listeners.delete(check);
-      supabase.removeChannel(txChannel);
-      supabase.removeChannel(reqChannel);
       subscription.remove();
     };
   }, [check]);

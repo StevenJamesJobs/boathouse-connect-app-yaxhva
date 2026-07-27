@@ -161,8 +161,10 @@ export default function ContentDetailModal({
     if (!link) return;
     
     try {
-      console.log('Opening link:', link);
-      await WebBrowser.openBrowserAsync(link);
+      // Prepend https:// when the stored link has no scheme, else it won't open (e.g. "kevahomes.com").
+      const openUrl = /^https?:\/\//i.test(link) ? link : `https://${link}`;
+      console.log('Opening link:', openUrl);
+      await WebBrowser.openBrowserAsync(openUrl);
     } catch (error) {
       console.error('Error opening link:', error);
       Alert.alert('Error', 'Could not open the link');

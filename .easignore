@@ -26,7 +26,6 @@ npm-debug.*
 yarn-debug.*
 yarn-error.*
 firebase-debug.log
-chat_history.json
 
 # Docs/notes (not needed for build)
 *.md

@@ -38,11 +38,10 @@ export function useUnreadMessages() {
       });
 
       if (!error && data !== null) {
-        console.log('Unread count:', data);
         setUnreadCount(data);
       }
     } catch (error) {
-      console.error('Error loading unread count:', error);
+      console.log('Error loading unread count:', error);
     } finally {
       setLoading(false);
     }
@@ -53,24 +52,6 @@ export function useUnreadMessages() {
 
     // Register this instance to listen for global refresh events
     listeners.add(loadUnreadCount);
-
-    // Set up real-time subscription for new messages
-    const channel = supabase
-      .channel(`message_updates_${Math.random().toString(36).slice(2)}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'message_recipients',
-          filter: `recipient_id=eq.${user?.id}`,
-        },
-        () => {
-          console.log('Message update detected, refreshing unread count...');
-          loadUnreadCount();
-        }
-      )
-      .subscribe();
 
     // Refresh when app comes to foreground
     const subscription = AppState.addEventListener('change', (nextAppState: AppStateStatus) => {
@@ -88,11 +69,10 @@ export function useUnreadMessages() {
 
     return () => {
       listeners.delete(loadUnreadCount);
-      supabase.removeChannel(channel);
       subscription.remove();
       clearInterval(interval);
     };
-  }, [loadUnreadCount, user?.id]);
+  }, [loadUnreadCount]);
 
   return { unreadCount, loading, refresh: loadUnreadCount };
 }

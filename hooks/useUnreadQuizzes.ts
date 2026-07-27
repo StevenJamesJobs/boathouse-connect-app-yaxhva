@@ -52,7 +52,7 @@ export function useUnreadQuizzes() {
       }
       setUnreadCount(count);
     } catch (err) {
-      console.error('Error loading unread quizzes:', err);
+      console.log('Error loading unread quizzes:', err);
     } finally {
       setLoading(false);
     }
@@ -61,30 +61,6 @@ export function useUnreadQuizzes() {
   useEffect(() => {
     loadUnreadCount();
     listeners.add(loadUnreadCount);
-
-    // Realtime: watch exam status changes and user's exam_results inserts
-    const examsChannel = supabase
-      .channel(`quiz_exams_${Math.random().toString(36).slice(2)}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'exams' },
-        () => loadUnreadCount()
-      )
-      .subscribe();
-
-    const resultsChannel = supabase
-      .channel(`quiz_results_${Math.random().toString(36).slice(2)}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'exam_results',
-          filter: `user_id=eq.${user?.id}`,
-        },
-        () => loadUnreadCount()
-      )
-      .subscribe();
 
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
       if (next === 'active') loadUnreadCount();
@@ -97,12 +73,10 @@ export function useUnreadQuizzes() {
 
     return () => {
       listeners.delete(loadUnreadCount);
-      supabase.removeChannel(examsChannel);
-      supabase.removeChannel(resultsChannel);
       subscription.remove();
       clearInterval(interval);
     };
-  }, [loadUnreadCount, user?.id]);
+  }, [loadUnreadCount]);
 
   return { unreadCount, loading, refresh: loadUnreadCount };
 }

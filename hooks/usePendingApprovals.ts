@@ -38,7 +38,7 @@ export function usePendingApprovals() {
       });
 
       if (error) {
-        console.error('Error loading pending approvals:', error);
+        console.log('Error loading pending approvals:', error);
         return;
       }
 
@@ -56,11 +56,6 @@ export function usePendingApprovals() {
     loadCount();
     listeners.add(loadCount);
 
-    const channel = supabase
-      .channel(`pending_approvals_${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'redemption_requests' }, () => loadCount())
-      .subscribe();
-
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
       if (next === 'active') loadCount();
     });
@@ -71,7 +66,6 @@ export function usePendingApprovals() {
 
     return () => {
       listeners.delete(loadCount);
-      supabase.removeChannel(channel);
       subscription.remove();
       clearInterval(interval);
     };

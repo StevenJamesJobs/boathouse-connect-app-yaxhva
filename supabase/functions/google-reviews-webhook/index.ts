@@ -63,9 +63,14 @@ function extractReviews(payload: any): any[] {
 }
 
 // Translate review/owner text to Spanish and upsert into google_reviews.
-// When orgId is null the BEFORE INSERT trigger trg_default_org_id_google_reviews
-// fills in McLoone's org (legacy default-query path). Returns rows upserted.
+// Fail-closed: throws when no org was resolved. (The legacy path omitted
+// organization_id and let a BEFORE INSERT trigger stamp McLoone's org on the
+// rows; that trigger family is dropped — a null org here is a routing bug,
+// never a valid default.) Returns rows upserted.
 async function ingestReviews(orgId: string | null, reviews: any[], adminClient: any): Promise<number> {
+  if (!orgId) {
+    throw new Error('org_unresolved: refusing to ingest reviews with no organization');
+  }
   const translateApiKey = Deno.env.get('GOOGLE_TRANSLATE_API_KEY');
   const reviewTexts = reviews.map((r: any) => r.review_text || '');
   const ownerAnswers = reviews.map((r: any) => r.owner_answer || '');
@@ -98,7 +103,7 @@ async function ingestReviews(orgId: string | null, reviews: any[], adminClient: 
       owner_answer: r.owner_answer || null,
       owner_answer_es: ownerAnswersEs[i] || null,
       updated_at: new Date().toISOString(),
-      ...(orgId ? { organization_id: orgId } : {}),
+      organization_id: orgId,
     });
   }
 
@@ -200,6 +205,22 @@ serve(async (req) => {
     }
 
     const orgId = orgParam && orgParam !== '-' ? orgParam : (pending?.organization_id ?? null);
+
+    if (!orgId) {
+      // Fail-closed: no resolvable org for this callback (legacy '-' URL and an
+      // org-less pending row). Reviews are never ingested into a default org.
+      // 200 (not 4xx) so Outscraper doesn't retry-storm; the row is terminal.
+      if (pendingId) {
+        await adminClient
+          .from('pending_review_imports')
+          .update({ status: 'failed', last_error: 'org_unresolved (no org on webhook URL or pending row)', updated_at: new Date().toISOString() })
+          .eq('id', pendingId);
+      }
+      return new Response(
+        JSON.stringify({ success: false, error: 'org_unresolved', reviews_upserted: 0 }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+      );
+    }
 
     // --- Get the reviews: inline body first, else GET results_location ---
     let reviews = extractReviews(body);

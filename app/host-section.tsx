@@ -80,9 +80,11 @@ export default function HostSectionScreen() {
   const openLink = async (url: string | null) => {
     if (!url) return;
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) await Linking.openURL(url);
-      else console.error('Cannot open URL:', url);
+      // Prepend https:// for legacy tiles saved before the editor's scheme guard (e.g. "kevahomes.com").
+      const openUrl = /^https?:\/\//i.test(url) ? url : `https://${url}`;
+      const supported = await Linking.canOpenURL(openUrl);
+      if (supported) await Linking.openURL(openUrl);
+      else console.error('Cannot open URL:', openUrl);
     } catch (e) {
       console.error('Error opening URL:', e);
     }

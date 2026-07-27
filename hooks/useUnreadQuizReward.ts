@@ -48,7 +48,7 @@ export function useUnreadQuizReward() {
       const undismissed = list.find((r) => !dismissed.has(r.id));
       setCount(undismissed && undismissed.bucks_awarded > 0 ? 1 : 0);
     } catch (err) {
-      console.error('Error checking quiz reward:', err);
+      console.log('Error checking quiz reward:', err);
     }
   }, [user?.id]);
 

@@ -101,6 +101,27 @@ async function fetchFileAsBase64(supabase: any, url: string): Promise<{ base64: 
   return { base64: btoa(binary), byteLength: arrayBuffer.byteLength };
 }
 
+// The only bucket a menu parse may read from, and the s50 path layout inside it
+// is `${organization_id}/<timestamp>-<name>`.
+const MENU_UPLOADS_BUCKET = 'menu-uploads';
+
+// Parse a stored menu-file URL exactly the way fetchFileAsBase64 does and require
+// the menu-uploads bucket + the caller org's path prefix. Service-role downloads
+// bypass every storage policy, so this check is the org boundary on reads.
+function storageUrlInOrg(url: unknown, organizationId: string): boolean {
+  if (typeof url !== 'string') return false;
+  const PUBLIC_MARKER = '/storage/v1/object/public/';
+  const idx = url.indexOf(PUBLIC_MARKER);
+  if (idx === -1) return false;
+  const rest = url.slice(idx + PUBLIC_MARKER.length);
+  const slash = rest.indexOf('/');
+  if (slash <= 0) return false;
+  const bucket = rest.slice(0, slash);
+  const path = decodeURIComponent(rest.slice(slash + 1).split('?')[0]);
+  if (path.includes('..')) return false;
+  return bucket === MENU_UPLOADS_BUCKET && path.startsWith(`${organizationId}/`);
+}
+
 // Build a human-readable list of the org's existing categories + subcategories so
 // the AI reuses real names instead of inventing near-duplicates.
 async function buildExistingTree(supabase: any, organizationId: string): Promise<string> {
@@ -286,6 +307,7 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   let upload_id = '';
+  let uploadOrgVerified = false; // gates every failure-path write to menu_uploads
   try {
     const body = (await req.json()) as ParseRequest;
     upload_id = body.upload_id || '';
@@ -295,6 +317,23 @@ serve(async (req) => {
       throw new Error('Missing required fields: file_url, upload_id, user_id, organization_id');
     }
 
+    // --- Org-scope validation, part 1: upload_id must be one of the caller
+    // org's own menu_uploads rows BEFORE any status write targets it. (The
+    // service role bypasses RLS — without this, the failure paths below and the
+    // background task's 'processing' stamp could write to another org's row.)
+    const { data: uploadRow } = await supabase
+      .from('menu_uploads')
+      .select('organization_id')
+      .eq('id', upload_id)
+      .maybeSingle();
+    if (!uploadRow || uploadRow.organization_id !== body.organization_id) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Upload not found for your organization.' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+      );
+    }
+    uploadOrgVerified = true;
+
     // Server-side OWNER verification (custom auth — do NOT trust the Authorization
     // header). Only the org owner may run an AI menu upload.
     const { data: caller, error: callerErr } = await supabase
@@ -303,17 +342,32 @@ serve(async (req) => {
       .eq('id', body.user_id)
       .single();
     if (callerErr || !caller || caller.role !== 'owner' || caller.organization_id !== body.organization_id) {
-      // Mark the upload failed so the client stops polling.
-      try {
-        await supabase
-          .from('menu_uploads')
-          .update({ status: 'failed', error_message: 'Not authorized', updated_at: new Date().toISOString() })
-          .eq('id', upload_id);
-      } catch (_) { /* noop */ }
+      // Mark the upload failed so the client stops polling — but only when the
+      // caller is at least a member of the org that owns the verified upload row;
+      // any other caller gets a plain 403 with no writes.
+      if (caller?.organization_id === body.organization_id) {
+        try {
+          await supabase
+            .from('menu_uploads')
+            .update({ status: 'failed', error_message: 'Not authorized', updated_at: new Date().toISOString() })
+            .eq('id', upload_id);
+        } catch (_) { /* noop */ }
+      }
       return new Response(
         JSON.stringify({ success: false, error: 'Only the restaurant owner can upload a menu.' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
       );
+    }
+
+    // --- Org-scope validation, part 2: every storage URL the parse will read
+    // must live in the menu-uploads bucket under the caller org's own prefix.
+    for (const u of [body.file_url, ...(body.additional_image_urls || [])]) {
+      if (!storageUrlInOrg(u, body.organization_id)) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Menu file URL is not a menu upload belonging to your organization.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+        );
+      }
     }
 
     const task = processMenuInBackground(supabase, anthropicApiKey, body);
@@ -331,7 +385,7 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error('Request validation error:', error);
-    if (upload_id) {
+    if (upload_id && uploadOrgVerified) {
       try {
         await supabase
           .from('menu_uploads')

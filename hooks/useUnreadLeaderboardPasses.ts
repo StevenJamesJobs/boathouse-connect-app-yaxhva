@@ -37,12 +37,12 @@ export function useUnreadLeaderboardPasses() {
         p_user_id: user.id,
       });
       if (error) {
-        console.error('Error loading leaderboard pass count:', error);
+        console.log('Error loading leaderboard pass count:', error);
         return;
       }
       setUnreadCount(typeof data === 'number' ? data : 0);
     } catch (err) {
-      console.error('Error in loadUnreadCount (leaderboard pass):', err);
+      console.log('Error in loadUnreadCount (leaderboard pass):', err);
     } finally {
       setLoading(false);
     }
@@ -51,15 +51,6 @@ export function useUnreadLeaderboardPasses() {
   useEffect(() => {
     loadUnreadCount();
     listeners.add(loadUnreadCount);
-
-    const channel = supabase
-      .channel(`leaderboard_pass_${Math.random().toString(36).slice(2)}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'custom_notifications' },
-        () => loadUnreadCount()
-      )
-      .subscribe();
 
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
       if (next === 'active') loadUnreadCount();
@@ -71,7 +62,6 @@ export function useUnreadLeaderboardPasses() {
 
     return () => {
       listeners.delete(loadUnreadCount);
-      supabase.removeChannel(channel);
       subscription.remove();
       clearInterval(interval);
     };

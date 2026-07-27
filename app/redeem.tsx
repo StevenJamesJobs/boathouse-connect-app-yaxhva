@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,7 @@ import {
 const SCREEN_WIDTH = Dimensions.get('window').width;
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
@@ -145,9 +146,9 @@ export default function EmployeeRedeemScreen() {
   );
   const available = balance - reservedBucks;
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (silent = false) => {
     if (!user?.id) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const { data: meRows } = await supabase.rpc('get_me', { p_user_id: user.id });
       const u = (meRows as any)?.[0];
@@ -171,18 +172,19 @@ export default function EmployeeRedeemScreen() {
 
   useEffect(() => {
     refresh();
-    const channel = supabase
-      .channel(`redeem_user_${user?.id || 'none'}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'redemption_requests', filter: `user_id=eq.${user?.id}` },
-        () => refresh()
-      )
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [refresh, user?.id]);
+  }, [refresh]);
+
+  // Refetch when the screen regains focus — this route stays mounted below
+  // pushed screens, so decisions made elsewhere otherwise never re-trigger the
+  // mount effect. Silent: no spinner, fresh data swaps in while the list stays
+  // in place. The skip ref leaves the initial load to the mount effect.
+  const focusSkipRef = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (focusSkipRef.current) { focusSkipRef.current = false; return; }
+      if (user?.id) refresh(true);
+    }, [refresh, user?.id])
+  );
 
   // Pre-fill food redemption when arriving from a Menu detail modal
   const prefilledRef = React.useRef(false);

@@ -429,60 +429,6 @@ export type Database = {
           },
         ]
       }
-      events: {
-        Row: {
-          created_at: string | null
-          created_by: string | null
-          description: string | null
-          end_time: string | null
-          event_date: string
-          id: string
-          organization_id: string
-          start_time: string | null
-          title: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          end_time?: string | null
-          event_date: string
-          id?: string
-          organization_id: string
-          start_time?: string | null
-          title: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          created_by?: string | null
-          description?: string | null
-          end_time?: string | null
-          event_date?: string
-          id?: string
-          organization_id?: string
-          start_time?: string | null
-          title?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "events_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "events_organization_id_fkey"
-            columns: ["organization_id"]
-            isOneToOne: false
-            referencedRelation: "organizations"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       exam_questions: {
         Row: {
           bonus_bucks_value: number | null

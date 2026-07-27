@@ -26,7 +26,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-cron-secret',
 };
 
-const DEFAULT_GOOGLE_MAPS_QUERY = "McLoone's Boathouse, 9 Cherry Lane, West Orange, NJ 07052";
 const DEFAULT_REVIEWS_LIMIT = 10;
 const BACKFILL_REVIEWS_LIMIT = 15;
 
@@ -80,9 +79,14 @@ function extractReviews(payload: any): any[] {
 }
 
 // Translate review/owner text to Spanish and upsert into google_reviews.
-// When orgId is null the BEFORE INSERT trigger trg_default_org_id_google_reviews
-// fills in McLoone's org (legacy default-query path). Returns rows upserted.
+// Fail-closed: throws when no org was resolved. (The legacy path omitted
+// organization_id and let a BEFORE INSERT trigger stamp McLoone's org on the
+// rows; that trigger family is dropped — a null org here is a routing bug,
+// never a valid default.) Returns rows upserted.
 async function ingestReviews(orgId: string | null, reviews: any[], adminClient: any): Promise<number> {
+  if (!orgId) {
+    throw new Error('org_unresolved: refusing to ingest reviews with no organization');
+  }
   const translateApiKey = Deno.env.get('GOOGLE_TRANSLATE_API_KEY');
   const reviewTexts = reviews.map((r: any) => r.review_text || '');
   const ownerAnswers = reviews.map((r: any) => r.owner_answer || '');
@@ -115,7 +119,7 @@ async function ingestReviews(orgId: string | null, reviews: any[], adminClient: 
       owner_answer: r.owner_answer || null,
       owner_answer_es: ownerAnswersEs[i] || null,
       updated_at: new Date().toISOString(),
-      ...(orgId ? { organization_id: orgId } : {}),
+      organization_id: orgId,
     });
   }
 
@@ -160,6 +164,11 @@ async function submitReviewImport(
   source: string,
   webhookSecret: string
 ): Promise<{ pending_id: string; outscraper_request_id: string | null; queued: boolean }> {
+  if (!orgId) {
+    // Fail-closed: every entry mode resolves a concrete org before submitting;
+    // an org-less submit could only produce an unattributable scrape.
+    throw new Error('org_unresolved: refusing to submit an org-less review import');
+  }
   const reviewsLimit = isBackfill ? BACKFILL_REVIEWS_LIMIT : DEFAULT_REVIEWS_LIMIT;
 
   // 1. Pending row FIRST.
@@ -270,6 +279,17 @@ async function reconcilePendingImports(
         .eq('id', row.id);
       if (status === 'failed') failed++;
     };
+
+    if (!row.organization_id) {
+      // Fail-closed: an org-less pending row can never be ingested (ingestReviews
+      // refuses null orgs) — fail it now instead of burning poll attempts.
+      await adminClient
+        .from('pending_review_imports')
+        .update({ status: 'failed', last_error: 'org_unresolved (pending row has no organization)', updated_at: new Date().toISOString() })
+        .eq('id', row.id);
+      failed++;
+      continue;
+    }
 
     if (!row.results_location) {
       await bumpAttempt('no results_location to poll');
@@ -505,22 +525,24 @@ serve(async (req) => {
     }
 
     // --- Single-org mode: manual refresh, or a cron call targeting one org.
-    //     Resolve that org's query; fall back to McLoone's default query. ---
-    let googleMapsQuery = DEFAULT_GOOGLE_MAPS_QUERY;
-
-    if (organizationId) {
-      const { data: orgData } = await adminClient
-        .from('organizations')
-        .select('google_maps_query')
-        .eq('id', organizationId)
-        .single();
-      if (orgData?.google_maps_query) {
-        googleMapsQuery = orgData.google_maps_query;
-      }
+    //     The org's OWN query is required — no default-query fallback (the legacy
+    //     McLoone's fallback would scrape another business's reviews into the
+    //     requesting org when its query was unset). ---
+    const { data: orgData } = await adminClient
+      .from('organizations')
+      .select('google_maps_query')
+      .eq('id', organizationId)
+      .single();
+    const googleMapsQuery = (orgData?.google_maps_query || '').trim();
+    if (!googleMapsQuery) {
+      return new Response(
+        JSON.stringify({ success: false, error: 'no_google_maps_query (configure the Google Maps query in Organization Settings first)' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
     }
 
     const result = await submitReviewImport(
-      organizationId ?? null,
+      organizationId,
       googleMapsQuery,
       adminClient,
       outscrapterKey,

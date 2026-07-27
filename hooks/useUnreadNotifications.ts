@@ -41,12 +41,12 @@ export function useUnreadNotifications() {
         p_since: since || null,
       });
       if (error) {
-        console.error('Error loading notification count:', error);
+        console.log('Error loading notification count:', error);
         return;
       }
       setCount(typeof data === 'number' ? data : 0);
     } catch (err) {
-      console.error('Error in loadCount (notifications):', err);
+      console.log('Error in loadCount (notifications):', err);
     } finally {
       setLoading(false);
     }
@@ -68,15 +68,6 @@ export function useUnreadNotifications() {
     loadCount();
     listeners.add(loadCount);
 
-    const channel = supabase
-      .channel(`custom_notifs_${Math.random().toString(36).slice(2)}`)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'custom_notifications' },
-        () => loadCount()
-      )
-      .subscribe();
-
     const subscription = AppState.addEventListener('change', (next: AppStateStatus) => {
       if (next === 'active') loadCount();
     });
@@ -87,7 +78,6 @@ export function useUnreadNotifications() {
 
     return () => {
       listeners.delete(loadCount);
-      supabase.removeChannel(channel);
       subscription.remove();
       clearInterval(interval);
     };
