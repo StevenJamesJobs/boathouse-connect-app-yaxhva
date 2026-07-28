@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -57,6 +58,7 @@ function parsePriceAmount(priceText: string): number | null {
 
 export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
   const { settings: redemptionSettings } = useRedemptionSettings();
@@ -187,7 +189,7 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
       <View style={styles.overlay}>
         <View style={[styles.sheet, { backgroundColor: colors.background }]}>
           <View style={[styles.header, { borderBottomColor: colors.border }]}>
-            <Text style={[styles.headerText, { color: colors.text }]}>Search Menu</Text>
+            <Text style={[styles.headerText, { color: colors.text }]}>{t('menu_display.search_menu', 'Search Menu')}</Text>
             <TouchableOpacity onPress={handleClose} style={styles.closeBtn}>
               <IconSymbol ios_icon_name="xmark" android_material_icon_name="close" size={22} color={colors.text} />
             </TouchableOpacity>
@@ -224,7 +226,7 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
             <TextInput
               value={query}
               onChangeText={setQuery}
-              placeholder="Search food, beverages, weekly specials"
+              placeholder={t('menu_display.search_menu_ph', 'Search food, beverages, weekly specials')}
               placeholderTextColor={colors.textSecondary}
               style={[styles.searchInput, { color: colors.text }]}
               autoFocus

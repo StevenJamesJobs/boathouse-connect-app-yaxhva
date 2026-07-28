@@ -52,7 +52,8 @@ export default function MyScheduleScreen() {
   const colors = useThemeColors();
   const { user } = useAuth();
   const { organizationId } = useOrganization();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === 'es' ? 'es-ES' : 'en-US';
 
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [loading, setLoading] = useState(true);
@@ -244,7 +245,7 @@ export default function MyScheduleScreen() {
         <View style={{ flex: 1 }}>
           {lastUploadAt && (
             <Text style={[styles.lastUpdatedText, { color: colors.text }]}>
-              {t('my_schedule.last_updated', 'Last Updated')} {new Date(lastUploadAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} {t('my_schedule.at', 'at')} {new Date(lastUploadAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+              {t('my_schedule.last_updated', 'Last Updated')} {new Date(lastUploadAt).toLocaleDateString(dateLocale, { month: 'long', day: 'numeric', year: 'numeric' })} {t('my_schedule.at', 'at')} {new Date(lastUploadAt).toLocaleTimeString(dateLocale, { hour: 'numeric', minute: '2-digit' })}
             </Text>
           )}
           <Text style={[styles.disclaimerText, { color: colors.textSecondary, marginTop: lastUploadAt ? 2 : 0 }]}>

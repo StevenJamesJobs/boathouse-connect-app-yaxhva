@@ -18,6 +18,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslation } from 'react-i18next';
 import { getOrgDirectory } from '@/utils/orgDirectory';
 import ShiftEditForm from '@/components/ShiftEditForm';
 import * as Haptics from 'expo-haptics';
@@ -108,6 +109,7 @@ function formatTime(timeStr: string) {
 export default function ManualScheduleScreen() {
   useRequireManagerRoute();
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
@@ -335,7 +337,7 @@ export default function ManualScheduleScreen() {
             activeOpacity={0.7}
           >
             <IconSymbol ios_icon_name="doc.fill" android_material_icon_name="description" size={16} color={colors.primary} />
-            <Text style={[styles.premiumButtonText, { color: colors.primary }]}>Upload File</Text>
+            <Text style={[styles.premiumButtonText, { color: colors.primary }]}>{t('schedule_upload.upload_file')}</Text>
             {!hasPremium && <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={11} color={colors.primary + '60'} />}
           </TouchableOpacity>
           <TouchableOpacity
@@ -344,7 +346,7 @@ export default function ManualScheduleScreen() {
             activeOpacity={0.7}
           >
             <IconSymbol ios_icon_name="photo.fill" android_material_icon_name="photo-library" size={16} color={colors.primary} />
-            <Text style={[styles.premiumButtonText, { color: colors.primary }]}>Upload Images</Text>
+            <Text style={[styles.premiumButtonText, { color: colors.primary }]}>{t('schedule_upload.upload_images')}</Text>
             {!hasPremium && <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={11} color={colors.primary + '60'} />}
           </TouchableOpacity>
           <TouchableOpacity
@@ -353,7 +355,7 @@ export default function ManualScheduleScreen() {
             activeOpacity={0.7}
           >
             <IconSymbol ios_icon_name="clock.arrow.circlepath" android_material_icon_name="history" size={16} color={colors.primary} />
-            <Text style={[styles.premiumButtonText, { color: colors.primary }]}>History</Text>
+            <Text style={[styles.premiumButtonText, { color: colors.primary }]}>{t('schedule_upload.history_short')}</Text>
             {!hasPremium && <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={11} color={colors.primary + '60'} />}
           </TouchableOpacity>
         </View>

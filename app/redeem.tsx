@@ -255,8 +255,8 @@ export default function EmployeeRedeemScreen() {
     if (!user?.id || (!activeOption && !activeCustom)) return;
     if (requestedBucks > available) {
       Alert.alert(
-        'Not enough bucks',
-        `You need $${requestedBucks} but have $${available} available (after pending requests).`
+        t('rewards_ui:not_enough_title', 'Not enough bucks'),
+        t('rewards_ui:not_enough_msg', { needed: requestedBucks, available, defaultValue: 'You need ${{needed}} but have ${{available}} available (after pending requests).' })
       );
       return;
     }
@@ -348,11 +348,11 @@ export default function EmployeeRedeemScreen() {
 
       <ScrollView contentContainerStyle={styles.scroll}>
         <View style={[styles.balanceCard, { backgroundColor: colors.surface }]}>
-          <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>Available {currencyName}</Text>
+          <Text style={[styles.balanceLabel, { color: colors.textSecondary }]}>{t('rewards_ui:available_currency', { currencyName, defaultValue: 'Available {{currencyName}}' })}</Text>
           <Text style={[styles.balanceAmount, { color: colors.primary }]}>${available}</Text>
           {reservedBucks > 0 && (
             <Text style={[styles.reservedText, { color: colors.textSecondary }]}>
-              (${reservedBucks} held in pending requests)
+              {t('rewards_ui:held_pending', { amount: reservedBucks, defaultValue: '(${{amount}} held in pending requests)' })}
             </Text>
           )}
         </View>
@@ -424,12 +424,12 @@ export default function EmployeeRedeemScreen() {
           </>
         )}
 
-        <Text style={[styles.sectionHeader, { color: colors.text }]}>Pending Requests</Text>
+        <Text style={[styles.sectionHeader, { color: colors.text }]}>{t('rewards_ui:pending_requests', 'Pending Requests')}</Text>
         {loading ? (
           <ActivityIndicator color={colors.primary} style={{ marginVertical: 20 }} />
         ) : pending.length === 0 ? (
           <Text style={[styles.empty, { color: colors.textSecondary }]}>
-            You have no pending redemption requests.
+            {t('rewards_ui:no_pending', 'You have no pending redemption requests.')}
           </Text>
         ) : (
           pending.map((r) => <RedemptionRequestCard key={r.id} row={r} />)
@@ -472,7 +472,7 @@ export default function EmployeeRedeemScreen() {
             </View>
 
             <ScrollView contentContainerStyle={styles.modalBody}>
-              <Text style={[styles.fieldLabel, { color: colors.text }]}>Shift Date</Text>
+              <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('rewards_ui:shift_date', 'Shift Date')}</Text>
               <TouchableOpacity
                 style={[styles.fieldRow, { backgroundColor: colors.surface }]}
                 onPress={() => setShowDatePicker(true)}
@@ -495,7 +495,7 @@ export default function EmployeeRedeemScreen() {
                 </View>
               )}
 
-              <Text style={[styles.fieldLabel, { color: colors.text, marginTop: 16 }]}>Shift</Text>
+              <Text style={[styles.fieldLabel, { color: colors.text, marginTop: 16 }]}>{t('rewards_ui:shift', 'Shift')}</Text>
               <View style={styles.shiftRow}>
                 {(['AM', 'PM'] as ShiftPeriod[]).map((p) => (
                   <TouchableOpacity
@@ -516,19 +516,19 @@ export default function EmployeeRedeemScreen() {
 
               <Text style={[styles.fieldLabel, { color: colors.text, marginTop: 16 }]}>
                 {activeOption === 'section'
-                  ? 'Which section?'
+                  ? t('rewards_ui:which_section', 'Which section?')
                   : activeOption === 'side_work'
-                  ? 'Which side work?'
-                  : 'Notes (optional)'}
+                  ? t('rewards_ui:which_side_work', 'Which side work?')
+                  : t('rewards_ui:notes_optional', 'Notes (optional)')}
               </Text>
               <TextInput
                 style={[styles.textInput, { backgroundColor: colors.surface, color: colors.text }]}
                 placeholder={
                   activeOption === 'section'
-                    ? 'e.g. Patio Section 3'
+                    ? t('rewards_ui:section_ph', 'e.g. Patio Section 3')
                     : activeOption === 'side_work'
-                    ? 'e.g. Bar runner'
-                    : 'Optional notes for the manager'
+                    ? t('rewards_ui:side_work_ph', 'e.g. Bar runner')
+                    : t('rewards_ui:notes_ph', 'Optional notes for the manager')
                 }
                 placeholderTextColor={colors.textSecondary}
                 value={comment}
@@ -543,7 +543,7 @@ export default function EmployeeRedeemScreen() {
                 disabled={!canConfirm}
                 onPress={() => setShowConfirm(true)}
               >
-                <Text style={[styles.confirmText, { color: canConfirm ? colors.fireText : colors.text }]}>Review (${requestedBucks})</Text>
+                <Text style={[styles.confirmText, { color: canConfirm ? colors.fireText : colors.text }]}>{t('rewards_ui:review_btn', { amount: requestedBucks, defaultValue: 'Review (${{amount}})' })}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -554,7 +554,7 @@ export default function EmployeeRedeemScreen() {
       <Modal visible={showConfirm} animationType="fade" transparent onRequestClose={() => setShowConfirm(false)}>
         <View style={styles.confirmOverlay}>
           <GlassCard variant="glass" radius={18} intensity={55} style={styles.confirmCard}>
-            <Text style={[styles.confirmTitle, { color: colors.text }]}>Confirm redemption</Text>
+            <Text style={[styles.confirmTitle, { color: colors.text }]}>{t('rewards_ui:confirm_title', 'Confirm redemption')}</Text>
             {activeCustom ? (
               <Text style={[styles.confirmLine, { color: colors.text }]}>
                 {getLocalizedField(activeCustom, 'label', language)} — ${activeCustom.cost}
@@ -584,7 +584,7 @@ export default function EmployeeRedeemScreen() {
               </>
             )}
             <Text style={[styles.confirmFootnote, { color: colors.textSecondary }]}>
-              A manager will review and approve.
+              {t('rewards_ui:confirm_footnote', 'A manager will review and approve.')}
             </Text>
 
             <View style={styles.confirmActions}>
@@ -593,7 +593,7 @@ export default function EmployeeRedeemScreen() {
                 onPress={() => { setShowConfirm(false); setActiveCustom(null); }}
                 disabled={submitting}
               >
-                <Text style={{ color: colors.text, fontWeight: '700' }}>Back</Text>
+                <Text style={{ color: colors.text, fontWeight: '700' }}>{t('common:back', 'Back')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.confirmBtnSm, { backgroundColor: colors.primary }]}
@@ -603,7 +603,7 @@ export default function EmployeeRedeemScreen() {
                 {submitting ? (
                   <ActivityIndicator color={colors.fireText} />
                 ) : (
-                  <Text style={{ color: colors.fireText, fontWeight: '700' }}>Submit</Text>
+                  <Text style={{ color: colors.fireText, fontWeight: '700' }}>{t('rewards_ui:submit', 'Submit')}</Text>
                 )}
               </TouchableOpacity>
             </View>

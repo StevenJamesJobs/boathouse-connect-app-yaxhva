@@ -733,7 +733,7 @@ function MessageCard({
               size={22}
               color="#FFFFFF"
             />
-            <Text style={styles.swipeActionText}>Read</Text>
+            <Text style={styles.swipeActionText}>{t('messages.swipe_read')}</Text>
           </TouchableOpacity>
         )}
         <TouchableOpacity
@@ -749,7 +749,7 @@ function MessageCard({
             size={22}
             color="#FFFFFF"
           />
-          <Text style={styles.swipeActionText}>Delete</Text>
+          <Text style={styles.swipeActionText}>{t('common.delete')}</Text>
         </TouchableOpacity>
       </Animated.View>
     );
