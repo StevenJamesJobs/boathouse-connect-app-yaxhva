@@ -251,7 +251,7 @@ export default function ExamPlayScreen() {
         const { data, error } = await supabase.rpc('start_exam_attempt', {
           p_exam_id: examId,
           p_user_id: user.id,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
         });
 
         if (error) {
@@ -376,7 +376,7 @@ export default function ExamPlayScreen() {
       p_bucks_awarded: results.totalBucksAwarded,
       p_time_seconds: results.timeSeconds,
       p_is_timed_out: state.isTimedOut,
-      p_organization_id: organizationId,
+      p_organization_id: organizationId ?? undefined,
     };
 
     try {

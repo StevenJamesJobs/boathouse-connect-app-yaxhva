@@ -104,7 +104,7 @@ export default function ChangePasswordScreen() {
         user_id: user.id,
         new_password: newPassword,
         p_actor_id: user.id,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
         p_current_password: getStashedLoginPassword() ?? organization?.default_password ?? undefined,
       });
 

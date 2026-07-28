@@ -3552,8 +3552,8 @@ export type Database = {
       approve_redemption_request: {
         Args: {
           p_manager_id: string
-          p_organization_id?: string
-          p_reason: string
+          p_organization_id?: string | null
+          p_reason: string | null
           p_request_id: string
         }
         Returns: undefined
@@ -3691,7 +3691,7 @@ export type Database = {
           p_email: string
           p_job_title: string
           p_name: string
-          p_organization_id?: string
+          p_organization_id?: string | null
           p_password?: string
           p_phone_number: string
           p_role: string
@@ -3790,8 +3790,8 @@ export type Database = {
       deny_redemption_request: {
         Args: {
           p_manager_id: string
-          p_organization_id?: string
-          p_reason: string
+          p_organization_id?: string | null
+          p_reason: string | null
           p_request_id: string
         }
         Returns: undefined
@@ -4307,7 +4307,7 @@ export type Database = {
         Returns: string
       }
       get_unread_message_count: {
-        Args: { p_organization_id?: string; user_id: string }
+        Args: { p_organization_id?: string | null; user_id: string }
         Returns: number
       }
       get_inbox: {
@@ -4646,15 +4646,15 @@ export type Database = {
       submit_redemption_request: {
         Args: {
           p_bucks_amount: number
-          p_comment: string
-          p_item_name_snapshot: string
-          p_menu_item_id: string
-          p_organization_id?: string
+          p_comment: string | null
+          p_item_name_snapshot: string | null
+          p_menu_item_id: string | null
+          p_organization_id?: string | null
           p_request_type: string
-          p_shift_date: string
-          p_shift_period: string
+          p_shift_date: string | null
+          p_shift_period: string | null
           p_user_id: string
-          p_weekly_special_id: string
+          p_weekly_special_id: string | null
         }
         Returns: string
       }
@@ -5019,7 +5019,7 @@ export type Database = {
         Args: {
           p_actor_id?: string
           p_is_active: boolean
-          p_organization_id?: string
+          p_organization_id?: string | null
           p_user_id: string
         }
         Returns: undefined
@@ -5028,7 +5028,7 @@ export type Database = {
         Args: {
           p_actor_id?: string
           p_job_titles: string[]
-          p_organization_id?: string
+          p_organization_id?: string | null
           p_user_id: string
         }
         Returns: undefined
@@ -5040,7 +5040,7 @@ export type Database = {
           p_events_enabled?: boolean
           p_game_hub_enabled?: boolean
           p_messages_enabled?: boolean
-          p_organization_id?: string
+          p_organization_id?: string | null
           p_rewards_enabled?: boolean
           p_special_features_enabled?: boolean
           p_user_id: string

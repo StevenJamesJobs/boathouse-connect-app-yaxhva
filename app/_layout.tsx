@@ -106,7 +106,7 @@ function RootLayoutNav() {
 
   const { resolvedMode, colors: themeColors } = useAppTheme();
   const networkState = useNetworkState();
-  const segments = useSegments();
+  const segments: string[] = useSegments();
   const router = useRouter();
   const { isAuthenticated, isLoading, user } = useAuth();
   const { organizationId } = useOrganization();

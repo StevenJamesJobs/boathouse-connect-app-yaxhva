@@ -104,7 +104,7 @@ export default function EmployeeProfileScreen() {
     try {
       const { data, error } = await supabase.rpc('get_user_total_game_score', {
         p_user_id: user.id,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
       });
       if (!error && data !== null) {
         setTotalGameScore(Number(data));
@@ -130,7 +130,7 @@ export default function EmployeeProfileScreen() {
         user_id: user.id,
         new_email: email,
         new_phone_number: phoneNumber,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
       });
 
       if (error) {
@@ -199,7 +199,7 @@ export default function EmployeeProfileScreen() {
       const { error: updateError } = await supabase.rpc('update_profile_picture', {
         user_id: user.id,
         picture_url: publicUrl,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
         p_actor_id: user.id,
       });
 
@@ -223,11 +223,12 @@ export default function EmployeeProfileScreen() {
   };
 
   const handleSaveQuickTools = async (toolIds: string[]) => {
+    if (!user?.id) return;
     try {
       await supabase.rpc('update_quick_tools', {
-        user_id: user?.id,
+        user_id: user.id,
         tools: JSON.stringify(toolIds),
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
       });
       await refreshUser();
       setShowToolSelector(false);

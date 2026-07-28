@@ -102,34 +102,6 @@ export default function BartenderAssistantEditorScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Summer Libation Recipes Editor */}
-        <TouchableOpacity
-          style={[styles.card, { backgroundColor: colors.card }]}
-          onPress={() => router.push('/summer-libation-recipes-editor')}
-          activeOpacity={0.7}
-        >
-          <View style={styles.cardContent}>
-            <IconSymbol
-              ios_icon_name={organization?.menu_2_icon || 'sun.max.fill'}
-              android_material_icon_name={menuIconAndroid(organization?.menu_2_icon || 'sun.max.fill')}
-              size={28}
-              color={colors.primary}
-            />
-            <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{`${organization?.menu_2_name || 'Summer'} ${t('bartender_assistant_editor.libation_recipes_editor_suffix')}`}</Text>
-              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                {t('bartender_assistant_editor.summer_libation_recipes_editor_desc', { menu: organization?.menu_2_name || 'Summer' })}
-              </Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </View>
-        </TouchableOpacity>
-
         {/* Winter Libation Recipes Editor */}
         <TouchableOpacity
           style={[styles.card, { backgroundColor: colors.card }]}
@@ -147,6 +119,34 @@ export default function BartenderAssistantEditorScreen() {
               <Text style={[styles.cardTitle, { color: colors.text }]}>{`${organization?.menu_1_name || 'Winter'} ${t('bartender_assistant_editor.libation_recipes_editor_suffix')}`}</Text>
               <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
                 {t('bartender_assistant_editor.winter_libation_recipes_editor_desc', { menu: organization?.menu_1_name || 'Winter' })}
+              </Text>
+            </View>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={colors.textSecondary}
+            />
+          </View>
+        </TouchableOpacity>
+
+        {/* Summer Libation Recipes Editor */}
+        <TouchableOpacity
+          style={[styles.card, { backgroundColor: colors.card }]}
+          onPress={() => router.push('/summer-libation-recipes-editor')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.cardContent}>
+            <IconSymbol
+              ios_icon_name={organization?.menu_2_icon || 'sun.max.fill'}
+              android_material_icon_name={menuIconAndroid(organization?.menu_2_icon || 'sun.max.fill')}
+              size={28}
+              color={colors.primary}
+            />
+            <View style={styles.cardText}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>{`${organization?.menu_2_name || 'Summer'} ${t('bartender_assistant_editor.libation_recipes_editor_suffix')}`}</Text>
+              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
+                {t('bartender_assistant_editor.summer_libation_recipes_editor_desc', { menu: organization?.menu_2_name || 'Summer' })}
               </Text>
             </View>
             <IconSymbol

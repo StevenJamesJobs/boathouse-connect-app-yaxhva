@@ -562,7 +562,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 100,
-    background: 'linear-gradient(to bottom, transparent, rgba(248, 249, 250, 0.9))',
   },
   contentCard: {
     backgroundColor: '#FFFFFF',

@@ -89,7 +89,7 @@ export default function SettingsScreen() {
       const { data: verifyData, error: verifyError } = await supabase.rpc('verify_password', {
         user_id: user.id,
         password: currentPassword,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
       });
       if (verifyError) {
         Alert.alert(t('common.error'), t('profile.error_verify_password'));
@@ -103,7 +103,7 @@ export default function SettingsScreen() {
         user_id: user.id,
         new_password: newPassword,
         p_actor_id: user.id,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
         p_current_password: currentPassword,
       });
       if (updateError) throw updateError;

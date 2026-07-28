@@ -150,7 +150,7 @@ export async function saveTranslations(
       rpcParams[paramName] = value && value.trim() ? value : null;
     }
 
-    const { error } = await supabase.rpc(rpcConfig.rpc, rpcParams);
+    const { error } = await supabase.rpc(rpcConfig.rpc as any, rpcParams);
 
     if (error) {
       console.error(`Failed to save translations for ${table}:`, error);

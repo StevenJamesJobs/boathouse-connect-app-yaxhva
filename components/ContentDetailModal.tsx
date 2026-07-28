@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 24,
     whiteSpace: 'pre-line',
-  },
+  } as any,
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',

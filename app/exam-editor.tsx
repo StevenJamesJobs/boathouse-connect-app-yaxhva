@@ -359,7 +359,7 @@ export default function ExamEditorScreen() {
                       exam_id: currentExam.id,
                       job_titles: targetJobTitles,
                     },
-                    organizationId
+                    organizationId ?? undefined
                   );
                 } catch (pushErr) {
                   // Non-fatal: activation still succeeded.

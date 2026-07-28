@@ -34,7 +34,7 @@ export function useUnreadMessages() {
     try {
       const { data, error } = await supabase.rpc('get_unread_message_count', {
         user_id: user.id,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
       });
 
       if (!error && data !== null) {

@@ -52,8 +52,8 @@ const NotificationContext = createContext<NotificationContextType | undefined>(u
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
   const [expoPushToken, setExpoPushToken] = useState<string | null>(null);
   const [notification, setNotification] = useState<Notifications.Notification | null>(null);
-  const notificationListener = useRef<Notifications.Subscription>();
-  const responseListener = useRef<Notifications.Subscription>();
+  const notificationListener = useRef<Notifications.Subscription | undefined>(undefined);
+  const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
   const { user } = useAuth();
   const { organizationId } = useOrganization();
 
@@ -177,7 +177,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           p_user_id: user.id,
           p_token: token,
           p_device_type: deviceType,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
         });
 
       if (error) {
@@ -213,7 +213,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           break;
 
         case 'reward':
-          router.push(`${portalPrefix}/rewards`);
+          router.push(`${portalPrefix}/rewards` as any);
           break;
 
         case 'announcement':
@@ -251,7 +251,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 router.push('/messages');
                 break;
               case 'rewards':
-                router.push(`${portalPrefix}/rewards`);
+                router.push(`${portalPrefix}/rewards` as any);
                 break;
               case 'announcements':
               case 'events':

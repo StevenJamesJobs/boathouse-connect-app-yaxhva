@@ -206,13 +206,13 @@ export default function PureeSyrupRecipesEditorScreen() {
         console.log('Updating puree syrup recipe:', editingRecipe.id);
         const { data, error } = await supabase.rpc('update_puree_syrup_recipe', {
           p_user_id: user.id,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
           p_recipe_id: editingRecipe.id,
           p_name: name.trim(),
           p_category: category,
           p_ingredients: validIngredients,
-          p_procedure: procedure.trim() || null,
-          p_thumbnail_url: thumbnailUrl,
+          p_procedure: (procedure.trim() || null) as string,
+          p_thumbnail_url: thumbnailUrl as string,
           p_display_order: editingRecipe.display_order,
         });
 
@@ -230,12 +230,12 @@ export default function PureeSyrupRecipesEditorScreen() {
         console.log('Adding new puree syrup recipe');
         const { data, error } = await supabase.rpc('insert_puree_syrup_recipe', {
           p_user_id: user.id,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
           p_name: name.trim(),
           p_category: category,
           p_ingredients: validIngredients,
-          p_procedure: procedure.trim() || null,
-          p_thumbnail_url: thumbnailUrl,
+          p_procedure: (procedure.trim() || null) as string,
+          p_thumbnail_url: thumbnailUrl as string,
           p_display_order: recipes.length,
         });
 
@@ -278,7 +278,7 @@ export default function PureeSyrupRecipesEditorScreen() {
             console.log('Deleting puree syrup recipe:', recipe.id);
             const { error } = await supabase.rpc('delete_puree_syrup_recipe', {
               p_user_id: user.id,
-              p_organization_id: organizationId,
+              p_organization_id: organizationId ?? undefined,
               p_recipe_id: recipe.id,
             });
 
@@ -307,7 +307,7 @@ export default function PureeSyrupRecipesEditorScreen() {
     try {
       const { error } = await supabase.rpc('reorder_puree_syrup_recipes', {
         p_user_id: user.id,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
         p_ordered_ids: ordered.map((r) => r.id),
       });
       if (error) {

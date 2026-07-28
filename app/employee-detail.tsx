@@ -122,7 +122,7 @@ export default function EmployeeDetailScreen() {
         p_job_title: employee.job_titles[0], // Use first job title for backward compatibility
         p_phone_number: employee.phone_number || '',
         p_role: employee.role,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
       });
 
       if (error) {
@@ -136,7 +136,7 @@ export default function EmployeeDetailScreen() {
       const { error: updateError } = await supabase.rpc('update_user_job_titles', {
         p_user_id: employee.id,
         p_job_titles: employee.job_titles,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
         p_actor_id: user?.id,
       });
 
@@ -175,7 +175,7 @@ export default function EmployeeDetailScreen() {
                 user_id: employee.id,
                 new_password: defaultPassword,
                 p_actor_id: user?.id,
-                p_organization_id: organizationId,
+                p_organization_id: organizationId ?? undefined,
               });
               if (error) throw error;
               Alert.alert(
@@ -233,7 +233,7 @@ export default function EmployeeDetailScreen() {
       const { error: updateError } = await supabase.rpc('update_profile_picture', {
         user_id: employee.id,
         picture_url: publicUrl,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
         p_actor_id: user?.id,
       });
 
