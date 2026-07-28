@@ -12,6 +12,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -25,6 +26,7 @@ interface CreatedAccount {
 
 export default function CreateRestaurantScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { login } = useAuth();
   const params = useLocalSearchParams<{
     firstName: string;
@@ -49,13 +51,13 @@ export default function CreateRestaurantScreen() {
 
   const handleCreate = async () => {
     if (!restaurantName.trim()) {
-      Alert.alert('Validation Error', 'Restaurant name is required.');
+      Alert.alert(t('onboarding.validation_error'), t('onboarding.restaurant_name_required'));
       return;
     }
 
     if (!hasOwnerDetails) {
-      Alert.alert('Error', 'Your account details are missing. Please start over.', [
-        { text: 'OK', onPress: () => router.replace('/onboarding/signup') },
+      Alert.alert(t('common.error'), t('onboarding.details_missing'), [
+        { text: t('common.ok'), onPress: () => router.replace('/onboarding/signup') },
       ]);
       return;
     }
@@ -85,7 +87,7 @@ export default function CreateRestaurantScreen() {
 
       if (error) {
         console.error('[CreateRestaurant] signup_owner_with_org error:', error);
-        Alert.alert('Error', error.message || 'Failed to create restaurant.');
+        Alert.alert(t('common.error'), error.message || t('onboarding.create_failed'));
         setIsLoading(false);
         return;
       }
@@ -102,9 +104,9 @@ export default function CreateRestaurantScreen() {
       if (!loginSuccess) {
         console.warn('[CreateRestaurant] Auto-login failed after signup');
         Alert.alert(
-          'Account Created',
-          `Your restaurant is ready. Sign in with username "${result.username}".`,
-          [{ text: 'OK', onPress: () => router.replace('/login') }],
+          t('onboarding.account_created_title'),
+          t('onboarding.created_signin_fallback', { username: result.username }),
+          [{ text: t('common.ok'), onPress: () => router.replace('/login') }],
         );
         setIsLoading(false);
         return;
@@ -118,7 +120,7 @@ export default function CreateRestaurantScreen() {
       });
     } catch (err: any) {
       console.error('[CreateRestaurant] Unexpected error:', err);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      Alert.alert(t('common.error'), t('onboarding.something_went_wrong'));
     } finally {
       setIsLoading(false);
     }
@@ -135,21 +137,21 @@ export default function CreateRestaurantScreen() {
             color="#4CAF50"
           />
         </View>
-        <Text style={styles.successTitle}>You&apos;re all set!</Text>
+        <Text style={styles.successTitle}>{t('onboarding.all_set_title')}</Text>
         <Text style={styles.successSubtitle}>
-          Your restaurant and owner account have been created.
+          {t('onboarding.all_set_subtitle')}
         </Text>
 
         <View style={styles.credCard}>
-          <Text style={styles.credLabel}>Your username</Text>
+          <Text style={styles.credLabel}>{t('onboarding.your_username')}</Text>
           <Text style={styles.credValue}>{created.username}</Text>
-          <Text style={styles.credHint}>Use this to sign in next time.</Text>
+          <Text style={styles.credHint}>{t('onboarding.username_next_hint')}</Text>
         </View>
 
         <View style={styles.credCard}>
-          <Text style={styles.credLabel}>Your team&apos;s join code</Text>
+          <Text style={styles.credLabel}>{t('onboarding.team_join_code')}</Text>
           <Text style={styles.credValue}>{created.joinCode}</Text>
-          <Text style={styles.credHint}>Share it so staff can join your restaurant.</Text>
+          <Text style={styles.credHint}>{t('onboarding.share_join_code_hint')}</Text>
         </View>
 
         <TouchableOpacity
@@ -161,7 +163,7 @@ export default function CreateRestaurantScreen() {
             })
           }
         >
-          <Text style={styles.primaryButtonText}>Continue to Setup</Text>
+          <Text style={styles.primaryButtonText}>{t('onboarding.continue_setup')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -179,16 +181,16 @@ export default function CreateRestaurantScreen() {
       >
         {/* Header */}
         <View style={styles.headerContainer}>
-          <Text style={styles.title}>Create Your Restaurant</Text>
+          <Text style={styles.title}>{t('onboarding.create_restaurant_title')}</Text>
           <Text style={styles.subtitle}>
-            Tell us about your restaurant to get set up.
+            {t('onboarding.create_restaurant_subtitle')}
           </Text>
         </View>
 
         {/* Form */}
         <View style={styles.formContainer}>
           {/* Restaurant Name */}
-          <Text style={styles.label}>Restaurant Name *</Text>
+          <Text style={styles.label}>{t('onboarding.restaurant_name')}</Text>
           <View style={styles.inputContainer}>
             <IconSymbol
               ios_icon_name="building.2.fill"
@@ -199,7 +201,7 @@ export default function CreateRestaurantScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="e.g. Joe's Bistro"
+              placeholder={t('onboarding.restaurant_name_ph')}
               placeholderTextColor={splashColors.textSecondary}
               value={restaurantName}
               onChangeText={setRestaurantName}
@@ -209,7 +211,7 @@ export default function CreateRestaurantScreen() {
           </View>
 
           {/* Address */}
-          <Text style={styles.label}>Address</Text>
+          <Text style={styles.label}>{t('onboarding.address')}</Text>
           <View style={styles.inputContainer}>
             <IconSymbol
               ios_icon_name="mappin.circle.fill"
@@ -220,7 +222,7 @@ export default function CreateRestaurantScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="Street address"
+              placeholder={t('onboarding.street_address_ph')}
               placeholderTextColor={splashColors.textSecondary}
               value={address}
               onChangeText={setAddress}
@@ -232,11 +234,11 @@ export default function CreateRestaurantScreen() {
           {/* City / State / Zip row */}
           <View style={styles.row}>
             <View style={styles.rowFieldLarge}>
-              <Text style={styles.label}>City</Text>
+              <Text style={styles.label}>{t('onboarding.city')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
-                  placeholder="City"
+                  placeholder={t('onboarding.city')}
                   placeholderTextColor={splashColors.textSecondary}
                   value={city}
                   onChangeText={setCity}
@@ -246,7 +248,7 @@ export default function CreateRestaurantScreen() {
               </View>
             </View>
             <View style={styles.rowFieldSmall}>
-              <Text style={styles.label}>State</Text>
+              <Text style={styles.label}>{t('onboarding.state')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
@@ -261,7 +263,7 @@ export default function CreateRestaurantScreen() {
               </View>
             </View>
             <View style={styles.rowFieldSmall}>
-              <Text style={styles.label}>Zip</Text>
+              <Text style={styles.label}>{t('onboarding.zip')}</Text>
               <View style={styles.inputContainer}>
                 <TextInput
                   style={styles.input}
@@ -278,7 +280,7 @@ export default function CreateRestaurantScreen() {
           </View>
 
           {/* Reward Currency */}
-          <Text style={styles.label}>Reward Currency Name</Text>
+          <Text style={styles.label}>{t('onboarding.reward_currency')}</Text>
           <View style={styles.inputContainer}>
             <IconSymbol
               ios_icon_name="star.fill"
@@ -289,7 +291,7 @@ export default function CreateRestaurantScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="e.g. Joe's Bucks"
+              placeholder={t('onboarding.reward_currency_ph')}
               placeholderTextColor={splashColors.textSecondary}
               value={rewardCurrencyName}
               onChangeText={setRewardCurrencyName}
@@ -299,7 +301,7 @@ export default function CreateRestaurantScreen() {
           </View>
 
           {/* Default Employee Password */}
-          <Text style={styles.label}>Default Employee Password</Text>
+          <Text style={styles.label}>{t('onboarding.default_password')}</Text>
           <View style={styles.inputContainer}>
             <IconSymbol
               ios_icon_name="key.fill"
@@ -328,7 +330,7 @@ export default function CreateRestaurantScreen() {
             {isLoading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.primaryButtonText}>Create Restaurant</Text>
+              <Text style={styles.primaryButtonText}>{t('onboarding.create_restaurant_btn')}</Text>
             )}
           </TouchableOpacity>
         </View>

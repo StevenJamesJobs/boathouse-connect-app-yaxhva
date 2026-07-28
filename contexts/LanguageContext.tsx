@@ -17,7 +17,11 @@ const LanguageContext = createContext<LanguageContextType>({
 });
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<SupportedLanguage>('en');
+  // Seed from i18n so the toggle reflects the auto-detected device language
+  // (i18n.ts inits lng from expo-localization before this provider mounts).
+  const [language, setLanguageState] = useState<SupportedLanguage>(
+    i18n.language === 'es' ? 'es' : 'en'
+  );
 
   useEffect(() => {
     // Load saved language preference on startup

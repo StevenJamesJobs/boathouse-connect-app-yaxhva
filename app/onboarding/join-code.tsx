@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -20,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export default function JoinCodeScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const { organization } = useOrganization();
   const { user } = useAuth();
 
@@ -68,7 +70,7 @@ export default function JoinCodeScreen() {
     if (!joinCode) return;
     try {
       await Share.share({
-        message: `Join ${orgName} on MyResto Connect! Use code: ${joinCode}`,
+        message: t('onboarding.share_message', { orgName, joinCode }),
       });
     } catch (err) {
       console.error('[JoinCode] Share error:', err);
@@ -100,14 +102,14 @@ export default function JoinCodeScreen() {
           />
         </View>
 
-        <Text style={styles.title}>You're All Set!</Text>
+        <Text style={styles.title}>{t('onboarding.join_all_set_title')}</Text>
         <Text style={styles.subtitle}>
-          {orgName} is ready to go. Share the join code below with your team.
+          {t('onboarding.join_code_ready', { orgName })}
         </Text>
 
         {/* Join code display */}
         <View style={styles.codeCard}>
-          <Text style={styles.codeLabel}>Your Join Code</Text>
+          <Text style={styles.codeLabel}>{t('onboarding.join_code_title')}</Text>
           <Text style={styles.codeText}>{joinCode || '----'}</Text>
         </View>
 
@@ -121,7 +123,7 @@ export default function JoinCodeScreen() {
               color={splashColors.primary}
             />
             <Text style={styles.actionText}>
-              {copied ? 'Copied!' : 'Copy Code'}
+              {copied ? t('onboarding.copied') : t('onboarding.copy_code')}
             </Text>
           </TouchableOpacity>
 
@@ -132,7 +134,7 @@ export default function JoinCodeScreen() {
               size={20}
               color={splashColors.primary}
             />
-            <Text style={styles.actionText}>Share</Text>
+            <Text style={styles.actionText}>{t('onboarding.share')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -145,8 +147,7 @@ export default function JoinCodeScreen() {
             color={splashColors.primary}
           />
           <Text style={styles.instructionsText}>
-            Share this code with your staff. They'll use it to join your
-            restaurant on MyResto Connect.
+            {t('onboarding.join_code_instructions')}
           </Text>
         </View>
 
@@ -159,17 +160,17 @@ export default function JoinCodeScreen() {
               size={20}
               color={splashColors.primary}
             />
-            <Text style={styles.trialTitle}>Your Free 14-Day Premium Trial</Text>
+            <Text style={styles.trialTitle}>{t('onboarding.trial_title')}</Text>
           </View>
           <Text style={styles.trialBody}>
-            Everything's unlocked — explore every Premium feature free for 14 days:
+            {t('onboarding.trial_body')}
           </Text>
           {[
-            'AI Menu & Schedule Upload',
-            'Automatic Google Reviews import',
-            'Weekly Quizzes with rewards',
-            'Menu Memory & Picture This! games',
-            'Plus the essentials: menus, messaging, schedules, rewards & guides',
+            t('onboarding.trial_feature_1'),
+            t('onboarding.trial_feature_2'),
+            t('onboarding.trial_feature_3'),
+            t('onboarding.trial_feature_4'),
+            t('onboarding.trial_feature_5'),
           ].map((f) => (
             <View key={f} style={styles.trialRow}>
               <IconSymbol
@@ -182,7 +183,7 @@ export default function JoinCodeScreen() {
             </View>
           ))}
           <Text style={styles.trialFooter}>
-            Manage or activate your subscription anytime in Manage → Subscription.
+            {t('onboarding.trial_footer')}
           </Text>
         </View>
       </ScrollView>
@@ -193,7 +194,7 @@ export default function JoinCodeScreen() {
           style={styles.primaryButton}
           onPress={handleGoToDashboard}
         >
-          <Text style={styles.primaryButtonText}>Go to Dashboard</Text>
+          <Text style={styles.primaryButtonText}>{t('onboarding.go_to_dashboard')}</Text>
         </TouchableOpacity>
       </View>
     </View>
