@@ -14,6 +14,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -39,6 +40,7 @@ export default function JoinScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+  const { t } = useTranslation();
   const { adoptSession } = useAuth();
 
   // Animation values
@@ -81,7 +83,7 @@ export default function JoinScreen() {
   const handleLookupCode = async () => {
     const code = joinCode.trim();
     if (!code) {
-      setError('Please enter a join code.');
+      setError(t('join.enter_code_required'));
       return;
     }
 
@@ -95,7 +97,7 @@ export default function JoinScreen() {
 
       const row = Array.isArray(data) ? data[0] : (data as any);
       if (queryError || !row) {
-        setError('Invalid join code. Please check with your manager.');
+        setError(t('join.invalid_code'));
         setIsLoading(false);
         return;
       }
@@ -107,7 +109,7 @@ export default function JoinScreen() {
       setPhase('create_account');
     } catch (e) {
       console.error('[Join] Error looking up code:', e);
-      setError('Something went wrong. Please try again.');
+      setError(t('onboarding.something_went_wrong'));
     } finally {
       setIsLoading(false);
     }
@@ -117,11 +119,11 @@ export default function JoinScreen() {
     if (!org) return;
 
     if (!firstName.trim()) {
-      setError('First name is required.');
+      setError(t('onboarding.first_name_required'));
       return;
     }
     if (!lastName.trim()) {
-      setError('Last name is required.');
+      setError(t('onboarding.last_name_required'));
       return;
     }
 
@@ -144,13 +146,13 @@ export default function JoinScreen() {
 
       if (signupError) {
         console.error('[Join] Error creating account:', signupError);
-        setError(signupError.message || 'Something went wrong. Please try again.');
+        setError(signupError.message || t('onboarding.something_went_wrong'));
         return;
       }
 
       const row = Array.isArray(data) ? data[0] : (data as any);
       if (!row) {
-        setError('Something went wrong. Please try again.');
+        setError(t('onboarding.something_went_wrong'));
         return;
       }
 
@@ -159,19 +161,16 @@ export default function JoinScreen() {
 
       if (adopted) {
         Alert.alert(
-          'Account Created',
-          `Your username is "${row.username}". Use it to sign in next time.\n\nNow set your own password.`,
-          [{ text: 'Continue', onPress: () => router.replace('/change-password') }],
+          t('onboarding.account_created_title'),
+          t('join.account_created_msg', { username: row.username }),
+          [{ text: t('join.continue'), onPress: () => router.replace('/change-password') }],
         );
       } else {
-        setError(
-          `Your account was created with username "${row.username}", but automatic sign-in ` +
-            'failed. Ask your manager for the temporary password, then sign in from the login page.',
-        );
+        setError(t('join.created_signin_failed', { username: row.username }));
       }
     } catch (e: any) {
       console.error('[Join] Error creating account:', e);
-      setError(e?.message || 'Something went wrong. Please try again.');
+      setError(e?.message || t('onboarding.something_went_wrong'));
     } finally {
       setIsLoading(false);
     }
@@ -179,7 +178,7 @@ export default function JoinScreen() {
 
   const renderEnterCode = () => (
     <>
-      <Text style={styles.subtext}>Enter the code your manager gave you</Text>
+      <Text style={styles.subtext}>{t('join.subtitle')}</Text>
 
       <View style={styles.inputContainer}>
         <IconSymbol
@@ -191,7 +190,7 @@ export default function JoinScreen() {
         />
         <TextInput
           style={styles.input}
-          placeholder="e.g. JOES-7X4K"
+          placeholder={t('join.code_ph')}
           placeholderTextColor={splashColors.textSecondary}
           value={joinCode}
           onChangeText={(text) => {
@@ -216,7 +215,7 @@ export default function JoinScreen() {
         {isLoading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.primaryButtonText}>Continue</Text>
+          <Text style={styles.primaryButtonText}>{t('join.continue')}</Text>
         )}
       </TouchableOpacity>
     </>
@@ -246,7 +245,7 @@ export default function JoinScreen() {
               color={splashColors.primary}
             />
             <Text style={styles.infoText}>
-              Self-registration is disabled for this restaurant. Please ask your manager to create your account.
+              {t('join.self_signup_disabled')}
             </Text>
           </View>
 
@@ -258,7 +257,7 @@ export default function JoinScreen() {
               setError('');
             }}
           >
-            <Text style={styles.secondaryButtonText}>Try a Different Code</Text>
+            <Text style={styles.secondaryButtonText}>{t('join.try_different_code')}</Text>
           </TouchableOpacity>
         </>
       );
@@ -273,7 +272,7 @@ export default function JoinScreen() {
             size={20}
             color="#4CAF50"
           />
-          <Text style={styles.orgBadgeText}>Joining {org.name}</Text>
+          <Text style={styles.orgBadgeText}>{t('join.joining', { orgName: org.name })}</Text>
         </View>
 
         <View style={styles.nameRow}>
@@ -287,7 +286,7 @@ export default function JoinScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="First Name *"
+              placeholder={t('join.first_name')}
               placeholderTextColor={splashColors.textSecondary}
               value={firstName}
               onChangeText={(text) => {
@@ -302,7 +301,7 @@ export default function JoinScreen() {
           <View style={[styles.inputContainer, styles.nameField]}>
             <TextInput
               style={styles.input}
-              placeholder="Last Name *"
+              placeholder={t('join.last_name')}
               placeholderTextColor={splashColors.textSecondary}
               value={lastName}
               onChangeText={(text) => {
@@ -318,7 +317,7 @@ export default function JoinScreen() {
 
         {firstName.trim() && lastName.trim() ? (
           <Text style={styles.usernameHintText}>
-            Your username will be{' '}
+            {t('onboarding.username_will_be')}{' '}
             <Text style={styles.usernameHintBold}>
               {deriveUsername(firstName, lastName)}
             </Text>
@@ -335,7 +334,7 @@ export default function JoinScreen() {
           />
           <TextInput
             style={styles.input}
-            placeholder="Email (optional)"
+            placeholder={t('join.email')}
             placeholderTextColor={splashColors.textSecondary}
             value={email}
             onChangeText={setEmail}
@@ -354,7 +353,7 @@ export default function JoinScreen() {
             color={splashColors.primary}
           />
           <Text style={styles.infoText}>
-            You'll be signed in automatically and asked to set your own password.
+            {t('join.auto_signin_note')}
           </Text>
         </View>
 
@@ -368,7 +367,7 @@ export default function JoinScreen() {
           {isLoading ? (
             <ActivityIndicator color="#FFFFFF" />
           ) : (
-            <Text style={styles.primaryButtonText}>Create Account</Text>
+            <Text style={styles.primaryButtonText}>{t('join.create_account')}</Text>
           )}
         </TouchableOpacity>
 
@@ -383,7 +382,7 @@ export default function JoinScreen() {
             setError('');
           }}
         >
-          <Text style={styles.secondaryButtonText}>Back</Text>
+          <Text style={styles.secondaryButtonText}>{t('common.back')}</Text>
         </TouchableOpacity>
       </>
     );
@@ -414,7 +413,7 @@ export default function JoinScreen() {
             size={48}
             color={splashColors.primary}
           />
-          <Text style={styles.header}>Join Your Restaurant</Text>
+          <Text style={styles.header}>{t('join.title')}</Text>
         </Animated.View>
 
         <Animated.View
@@ -433,7 +432,7 @@ export default function JoinScreen() {
           style={styles.backToLoginContainer}
           onPress={() => router.replace('/login')}
         >
-          <Text style={styles.backToLoginText}>Back to Login</Text>
+          <Text style={styles.backToLoginText}>{t('join.back_to_login')}</Text>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

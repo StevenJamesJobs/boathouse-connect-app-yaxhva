@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Modal, ScrollView } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { MENU_ICON_OPTIONS } from '@/constants/menuIcons';
@@ -19,6 +20,7 @@ const COLUMNS = 4;
 // curated MENU_ICON_OPTIONS. Renders rows explicitly (no flexWrap) to avoid
 // the bordered-cell ghost-gap issue noted in feedback_ui_patterns.
 export default function MenuIconPicker({ label, value, onChange, compact }: MenuIconPickerProps) {
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const [open, setOpen] = useState(false);
 
@@ -98,7 +100,7 @@ export default function MenuIconPicker({ label, value, onChange, compact }: Menu
         activeOpacity={0.7}
       >
         <IconSymbol ios_icon_name={value} android_material_icon_name={value} size={22} color={colors.primary} />
-        <Text style={[styles.triggerText, { color: colors.textSecondary }]}>Tap to change</Text>
+        <Text style={[styles.triggerText, { color: colors.textSecondary }]}>{t('common.tap_to_change')}</Text>
         <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color={colors.textSecondary} />
       </TouchableOpacity>
       {pickerModal}

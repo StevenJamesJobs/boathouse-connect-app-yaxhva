@@ -382,6 +382,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.removeItem(STORAGE_KEY);
         await AsyncStorage.setItem(REMEMBER_ME_KEY, 'false');
       }
+      // This device has had a signed-in account — the login screens use this
+      // to hide the first-time join/owner-setup entry points from now on.
+      await AsyncStorage.setItem('@mrc_device_has_account', '1');
     }
 
     setAuthState({

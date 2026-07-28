@@ -9,9 +9,11 @@ import {
   Alert,
   ActivityIndicator,
   Switch,
+  Keyboard,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import MenuIconPicker from '@/components/MenuIconPicker';
@@ -34,6 +36,7 @@ const DEFAULT_JOB_TITLES = [
 
 export default function SetupWizardScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const params = useLocalSearchParams<{ organizationId: string }>();
   const { organizationId: contextOrgId, refreshOrganization } = useOrganization();
   const { user } = useAuth();
@@ -93,7 +96,7 @@ export default function SetupWizardScreen() {
     const trimmed = customTitle.trim();
     if (!trimmed) return;
     if (selectedTitles.includes(trimmed)) {
-      Alert.alert('Duplicate', 'That job title already exists.');
+      Alert.alert(t('onboarding.duplicate_title'), t('onboarding.duplicate_msg'));
       return;
     }
     setSelectedTitles((prev) => [...prev, trimmed]);
@@ -160,7 +163,7 @@ export default function SetupWizardScreen() {
 
   const nextStep = async () => {
     if (step === 1 && selectedTitles.length === 0) {
-      Alert.alert('Select Titles', 'Please select at least one job title.');
+      Alert.alert(t('onboarding.select_titles_title'), t('onboarding.select_titles_msg'));
       return;
     }
     // Leaving the Menu step: persist the menu configuration right now.
@@ -169,7 +172,7 @@ export default function SetupWizardScreen() {
       const ok = await persistMenuConfig();
       setIsLoading(false);
       if (!ok) {
-        Alert.alert('Error', 'Could not save your menu setup. Please try again.');
+        Alert.alert(t('common.error'), t('onboarding.save_menu_failed'));
         return;
       }
     }
@@ -178,11 +181,11 @@ export default function SetupWizardScreen() {
     // the Mon/Thu cron will pick it up).
     if (step === 3 && googleMapsQuery.trim() && !(importResult && importResult.success)) {
       Alert.alert(
-        'Import your reviews?',
-        'Tap "Import My Reviews" to see them now, or skip for now — we\'ll import them automatically.',
+        t('onboarding.import_reviews_q_title'),
+        t('onboarding.import_reviews_q_msg'),
         [
-          { text: 'Import Now', style: 'cancel' },
-          { text: 'Skip for Now', onPress: () => setStep((s) => s + 1) },
+          { text: t('onboarding.import_now'), style: 'cancel' },
+          { text: t('onboarding.skip_for_now'), onPress: () => setStep((s) => s + 1) },
         ],
       );
       return;
@@ -199,7 +202,7 @@ export default function SetupWizardScreen() {
     const ok = await persistMenuConfig();
     setIsLoading(false);
     if (!ok) {
-      Alert.alert('Error', 'Could not save your menu setup. Please try again.');
+      Alert.alert(t('common.error'), t('onboarding.save_menu_failed'));
       return;
     }
     // Flag the uploader as onboarding so it hides the add/replace choice (first
@@ -210,6 +213,8 @@ export default function SetupWizardScreen() {
   // ─── Step 3: Google Reviews import ────────────────────────────────
 
   const handleImportReviews = async () => {
+    // Drop the keyboard so the result blurb and the Back/Next bar are visible.
+    Keyboard.dismiss();
     const query = googleMapsQuery.trim();
     if (!query || !organizationId || !user?.id) return;
 
@@ -257,7 +262,7 @@ export default function SetupWizardScreen() {
 
   const handleComplete = async () => {
     if (!organizationId) {
-      Alert.alert('Error', 'Organization not found. Please go back and try again.');
+      Alert.alert(t('common.error'), t('onboarding.org_not_found'));
       return;
     }
 
@@ -275,7 +280,7 @@ export default function SetupWizardScreen() {
 
       if (titlesError) {
         console.error('[SetupWizard] Save job titles error:', titlesError);
-        Alert.alert('Error', 'Failed to save job titles.');
+        Alert.alert(t('common.error'), t('onboarding.titles_save_failed'));
         setIsLoading(false);
         return;
       }
@@ -330,7 +335,7 @@ export default function SetupWizardScreen() {
       });
     } catch (err: any) {
       console.error('[SetupWizard] Unexpected error:', err);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
+      Alert.alert(t('common.error'), t('onboarding.something_went_wrong'));
     } finally {
       setIsLoading(false);
     }
@@ -381,9 +386,9 @@ export default function SetupWizardScreen() {
 
   const renderStep1 = () => (
     <View>
-      <Text style={styles.stepTitle}>Job Titles</Text>
+      <Text style={styles.stepTitle}>{t('onboarding.step1_title')}</Text>
       <Text style={styles.stepSubtitle}>
-        Select the positions at your restaurant. You can add more later.
+        {t('onboarding.step1_subtitle')}
       </Text>
 
       <View style={styles.titlesGrid}>
@@ -413,7 +418,7 @@ export default function SetupWizardScreen() {
           <View style={[styles.inputContainer, { flex: 1, marginBottom: 0 }]}>
             <TextInput
               style={styles.input}
-              placeholder="Custom title"
+              placeholder={t('onboarding.custom_title_ph')}
               placeholderTextColor={splashColors.textSecondary}
               value={customTitle}
               onChangeText={setCustomTitle}
@@ -456,7 +461,7 @@ export default function SetupWizardScreen() {
             size={20}
             color={splashColors.primary}
           />
-          <Text style={styles.addCustomText}>Add Custom Title</Text>
+          <Text style={styles.addCustomText}>{t('onboarding.add_custom_title')}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -466,14 +471,14 @@ export default function SetupWizardScreen() {
 
   const renderStep2 = () => (
     <View>
-      <Text style={styles.stepTitle}>Menu Configuration</Text>
+      <Text style={styles.stepTitle}>{t('onboarding.step2_title')}</Text>
       <Text style={styles.stepSubtitle}>
-        Configure your restaurant's menu setup.
+        {t('onboarding.step2_subtitle')}
       </Text>
 
       <View style={styles.card}>
         <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Seasonal menus?</Text>
+          <Text style={styles.switchLabel}>{t('onboarding.seasonal_q')}</Text>
           <Switch
             value={hasSeasonalMenus}
             onValueChange={setHasSeasonalMenus}
@@ -483,12 +488,12 @@ export default function SetupWizardScreen() {
         </View>
         <Text style={styles.switchHint}>
           {hasSeasonalMenus
-            ? 'Two menus — great for summer/winter rotations.'
-            : 'One menu — you can always add a second later.'}
+            ? t('onboarding.seasonal_on_hint')
+            : t('onboarding.seasonal_off_hint')}
         </Text>
       </View>
 
-      <Text style={styles.label}>Menu 1 Name</Text>
+      <Text style={styles.label}>{t('onboarding.menu1_label')}</Text>
       <View style={styles.inputContainer}>
         <IconSymbol
           ios_icon_name="fork.knife"
@@ -507,11 +512,11 @@ export default function SetupWizardScreen() {
         />
       </View>
 
-      <MenuIconPicker label={`${menu1Name.trim() || 'Menu 1'} Icon`} value={menu1Icon} onChange={setMenu1Icon} />
+      <MenuIconPicker label={t('onboarding.menu_icon_label', { menuName: menu1Name.trim() || 'Menu 1' })} value={menu1Icon} onChange={setMenu1Icon} />
 
       {hasSeasonalMenus && (
         <>
-          <Text style={styles.label}>Menu 2 Name</Text>
+          <Text style={styles.label}>{t('onboarding.menu2_label')}</Text>
           <View style={styles.inputContainer}>
             <IconSymbol
               ios_icon_name="fork.knife"
@@ -530,19 +535,20 @@ export default function SetupWizardScreen() {
             />
           </View>
 
-          <MenuIconPicker label={`${menu2Name.trim() || 'Menu 2'} Icon`} value={menu2Icon} onChange={setMenu2Icon} />
+          <MenuIconPicker label={t('onboarding.menu_icon_label', { menuName: menu2Name.trim() || 'Menu 2' })} value={menu2Icon} onChange={setMenu2Icon} />
 
-          <Text style={styles.label}>How should categories work?</Text>
+          <Text style={styles.label}>{t('onboarding.categories_q')}</Text>
           <TouchableOpacity
             style={[styles.scopeOption, categoryScope === 'shared' && styles.scopeOptionActive]}
             onPress={() => setCategoryScope('shared')}
             activeOpacity={0.8}
           >
-            <Text style={styles.scopeOptionTitle}>Shared categories {categoryScope === 'shared' ? '✓' : ''}</Text>
+            <Text style={styles.scopeOptionTitle}>{t('onboarding.shared_cats_title')} {categoryScope === 'shared' ? '✓' : ''}</Text>
             <Text style={styles.scopeOptionDesc}>
-              Both menus use the same category list (e.g. one seasonal rotation). An item can appear on
-              {` ${menu1Name.trim() || 'Menu 1'}, ${menu2Name.trim() || 'Menu 2'}, or both`}. Best if your two menus
-              are variations of the same lineup.
+              {t('onboarding.shared_cats_desc', {
+                menu1: menu1Name.trim() || 'Menu 1',
+                menu2: menu2Name.trim() || 'Menu 2',
+              })}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -550,26 +556,23 @@ export default function SetupWizardScreen() {
             onPress={() => setCategoryScope('per_menu')}
             activeOpacity={0.8}
           >
-            <Text style={styles.scopeOptionTitle}>Per-menu categories {categoryScope === 'per_menu' ? '✓' : ''}</Text>
+            <Text style={styles.scopeOptionTitle}>{t('onboarding.per_menu_cats_title')} {categoryScope === 'per_menu' ? '✓' : ''}</Text>
             <Text style={styles.scopeOptionDesc}>
-              Each menu gets its own independent categories you edit separately, and every item belongs to a single
-              menu. Best when your two menus are truly different (e.g. a Breakfast menu and a Dinner menu). You can
-              switch modes anytime in Settings.
+              {t('onboarding.per_menu_cats_desc')}
             </Text>
           </TouchableOpacity>
         </>
       )}
 
-      <MenuIconPicker label="Header Icon (shown next to your restaurant name)" value={headerIcon} onChange={setHeaderIcon} />
+      <MenuIconPicker label={t('onboarding.header_icon_label')} value={headerIcon} onChange={setHeaderIcon} />
 
       {menuUploaded ? (
         <View style={styles.menuDoneNote}>
           <IconSymbol ios_icon_name="checkmark.seal.fill" android_material_icon_name="verified" size={20} color="#34A853" />
           <View style={{ flex: 1 }}>
-            <Text style={styles.menuDoneTitle}>Your first menu is uploaded!</Text>
+            <Text style={styles.menuDoneTitle}>{t('onboarding.menu_done_title')}</Text>
             <Text style={styles.menuDoneText}>
-              Your first menu has been uploaded and created successfully. You can view, edit, and upload
-              another in the Menu and Menu Editor after you complete onboarding!
+              {t('onboarding.menu_done_text')}
             </Text>
           </View>
         </View>
@@ -577,10 +580,9 @@ export default function SetupWizardScreen() {
         <View style={styles.aiMenuNote}>
           <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={20} color={splashColors.primary} />
           <View style={{ flex: 1 }}>
-            <Text style={styles.aiMenuNoteTitle}>Have your menu handy?</Text>
+            <Text style={styles.aiMenuNoteTitle}>{t('onboarding.menu_handy_title')}</Text>
             <Text style={styles.aiMenuNoteText}>
-              You can upload your first menu now or later in the Menu Editor — for FREE. Our AI reads your PDF or
-              photos and builds your categories and items; you review everything before it goes live.
+              {t('onboarding.menu_handy_text')}
             </Text>
             <TouchableOpacity
               style={styles.uploadMenuButton}
@@ -589,7 +591,7 @@ export default function SetupWizardScreen() {
               disabled={isLoading}
             >
               <IconSymbol ios_icon_name="arrow.up.doc.fill" android_material_icon_name="upload-file" size={18} color={splashColors.primary} />
-              <Text style={styles.uploadMenuButtonText}>Upload Menu Now</Text>
+              <Text style={styles.uploadMenuButtonText}>{t('onboarding.upload_menu_now')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -601,13 +603,12 @@ export default function SetupWizardScreen() {
 
   const renderStep3 = () => (
     <View>
-      <Text style={styles.stepTitle}>Google Reviews</Text>
+      <Text style={styles.stepTitle}>{t('onboarding.step3_title')}</Text>
       <Text style={styles.stepSubtitle}>
-        Your 14-day trial includes automatic Google review importing. See your real reviews in the app
-        right away!
+        {t('onboarding.step3_subtitle')}
       </Text>
 
-      <Text style={styles.label}>Find your restaurant on Google Maps</Text>
+      <Text style={styles.label}>{t('onboarding.find_on_gmaps')}</Text>
       <View style={styles.inputContainer}>
         <IconSymbol
           ios_icon_name="mappin.and.ellipse"
@@ -618,7 +619,7 @@ export default function SetupWizardScreen() {
         />
         <TextInput
           style={styles.input}
-          placeholder="e.g. Snow King Resort, 400 E Snow King Ave, Jackson WY"
+          placeholder={t('onboarding.gmaps_ph')}
           placeholderTextColor={splashColors.textSecondary}
           value={googleMapsQuery}
           onChangeText={(text) => {
@@ -629,7 +630,7 @@ export default function SetupWizardScreen() {
         />
       </View>
       <Text style={styles.googleHint}>
-        Enter your restaurant's name and address exactly as it appears on Google Maps.
+        {t('onboarding.gmaps_hint')}
       </Text>
 
       <TouchableOpacity
@@ -644,7 +645,7 @@ export default function SetupWizardScreen() {
         {importingReviews ? (
           <>
             <ActivityIndicator color="#FFFFFF" />
-            <Text style={styles.importButtonText}>Importing reviews…</Text>
+            <Text style={styles.importButtonText}>{t('onboarding.importing_reviews')}</Text>
           </>
         ) : (
           <>
@@ -654,7 +655,7 @@ export default function SetupWizardScreen() {
               size={20}
               color="#FFFFFF"
             />
-            <Text style={styles.importButtonText}>Import My Reviews</Text>
+            <Text style={styles.importButtonText}>{t('onboarding.import_my_reviews')}</Text>
           </>
         )}
       </TouchableOpacity>
@@ -668,8 +669,7 @@ export default function SetupWizardScreen() {
             color="#34A853"
           />
           <Text style={styles.resultCardText}>
-            Your Google reviews are importing now! They'll appear in the Tools page of the app
-            shortly, after you review and complete onboarding on the next page.
+            {t('onboarding.import_success_note')}
           </Text>
         </View>
       )}
@@ -682,7 +682,7 @@ export default function SetupWizardScreen() {
             color="#EA4335"
           />
           <Text style={styles.resultCardText}>
-            We couldn't import right now, but your info is saved — we'll keep trying automatically.
+            {t('onboarding.import_error_note')}
           </Text>
         </View>
       )}
@@ -696,7 +696,7 @@ export default function SetupWizardScreen() {
           onPress={() => setStep((s) => s + 1)}
           activeOpacity={0.7}
         >
-          <Text style={styles.skipLinkText}>Skip for now — you can set this up later in Settings</Text>
+          <Text style={styles.skipLinkText}>{t('onboarding.skip_link')}</Text>
         </TouchableOpacity>
       )}
     </View>
@@ -706,14 +706,14 @@ export default function SetupWizardScreen() {
 
   const renderStep4 = () => (
     <View>
-      <Text style={styles.stepTitle}>Review & Save</Text>
+      <Text style={styles.stepTitle}>{t('onboarding.step4_title')}</Text>
       <Text style={styles.stepSubtitle}>
-        Confirm your setup before finishing.
+        {t('onboarding.step4_subtitle')}
       </Text>
 
       {/* Job Titles Summary */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Job Titles</Text>
+        <Text style={styles.cardTitle}>{t('onboarding.step1_title')}</Text>
         <View style={styles.titlesGrid}>
           {selectedTitles.map((title) => (
             <View key={title} style={[styles.titleChip, styles.titleChipActive]}>
@@ -725,9 +725,9 @@ export default function SetupWizardScreen() {
 
       {/* Menu Summary */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Menus</Text>
+        <Text style={styles.cardTitle}>{t('onboarding.menus_card')}</Text>
         <Text style={styles.cardValue}>
-          {hasSeasonalMenus ? '2 menus' : '1 menu'}
+          {hasSeasonalMenus ? t('onboarding.menus_two') : t('onboarding.menus_one')}
         </Text>
         <Text style={styles.cardDetail}>
           {menu1Name.trim() || 'Menu 1'}
@@ -737,7 +737,7 @@ export default function SetupWizardScreen() {
 
       {/* Google Reviews Summary */}
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Google Reviews</Text>
+        <Text style={styles.cardTitle}>{t('onboarding.step3_title')}</Text>
         {googleMapsQuery.trim() ? (
           <>
             <Text style={styles.cardValue} numberOfLines={2}>
@@ -745,12 +745,12 @@ export default function SetupWizardScreen() {
             </Text>
             <Text style={styles.cardDetail}>
               {importResult && importResult.success
-                ? 'Importing now — will appear shortly'
-                : 'Will import automatically'}
+                ? t('onboarding.importing_shortly')
+                : t('onboarding.will_import_auto')}
             </Text>
           </>
         ) : (
-          <Text style={styles.cardValue}>Skipped — you can set this up later in Settings.</Text>
+          <Text style={styles.cardValue}>{t('onboarding.skipped_note')}</Text>
         )}
       </View>
     </View>
@@ -777,7 +777,7 @@ export default function SetupWizardScreen() {
       <View style={styles.bottomBar}>
         {step > 1 ? (
           <TouchableOpacity style={styles.backButton} onPress={prevStep}>
-            <Text style={styles.backButtonText}>Back</Text>
+            <Text style={styles.backButtonText}>{t('common.back')}</Text>
           </TouchableOpacity>
         ) : (
           <View style={{ flex: 1 }} />
@@ -792,7 +792,7 @@ export default function SetupWizardScreen() {
             {isLoading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.nextButtonText}>Next</Text>
+              <Text style={styles.nextButtonText}>{t('onboarding.next')}</Text>
             )}
           </TouchableOpacity>
         ) : (
@@ -804,7 +804,7 @@ export default function SetupWizardScreen() {
             {isLoading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.nextButtonText}>Complete Setup</Text>
+              <Text style={styles.nextButtonText}>{t('onboarding.complete_setup')}</Text>
             )}
           </TouchableOpacity>
         )}

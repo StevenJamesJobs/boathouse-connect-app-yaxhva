@@ -44,6 +44,21 @@ export default function LoginScreen() {
   const pathname = usePathname();
   const { login, isAuthenticated, user } = useAuth();
 
+  // First-time entry points (join / owner setup) show only until this device
+  // has had a signed-in account — flag set by AuthContext.establishSession.
+  const [showEntryOptions, setShowEntryOptions] = useState(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        const had = await AsyncStorage.getItem('@mrc_device_has_account');
+        if (had !== '1') setShowEntryOptions(true);
+      } catch {
+        setShowEntryOptions(true);
+      }
+    })();
+  }, []);
+
   useEffect(() => {
     async function loadCachedOrg() {
       try {
@@ -315,22 +330,45 @@ export default function LoginScreen() {
             {t('login.forgot_password')}
           </Text>
 
-          {/* Join / Owner Links — multi-tenant entry points only; hidden for the
-              single-tenant McLoone's/Boathouse build. */}
-          {!IS_MCLOONES && (
+          {/* First-time entry points — multi-tenant builds only, and only until
+              this device has had a signed-in account. */}
+          {!IS_MCLOONES && showEntryOptions && (
             <View style={styles.linksContainer}>
-              <Link href="/join" asChild>
-                <Pressable>
-                  <Text style={styles.linkText}>{t('login.join_restaurant')}</Text>
-                </Pressable>
-              </Link>
-              <Text style={styles.linkSeparator}>or</Text>
-              <Link href="/onboarding/signup" asChild>
-                <Pressable>
-                  <Text style={styles.linkText}>{t('login.owner_signup')}</Text>
-                </Pressable>
-              </Link>
+              <View style={styles.entryBlock}>
+                <Text style={styles.entryQuestion}>{t('login.join_code_q')}</Text>
+                <Link href="/join" asChild>
+                  <Pressable style={styles.entryButton}>
+                    <Text style={styles.entryButtonText}>{t('login.join_code_btn')}</Text>
+                  </Pressable>
+                </Link>
+              </View>
+              <View style={styles.entryBlock}>
+                <Text style={styles.entryQuestion}>{t('login.owner_setup_q')}</Text>
+                <Link href="/onboarding/getting-started" asChild>
+                  <Pressable style={styles.entryButton}>
+                    <Text style={styles.entryButtonText}>{t('login.owner_setup_btn')}</Text>
+                  </Pressable>
+                </Link>
+              </View>
             </View>
+          )}
+
+          {/* Dev-only: reveal the first-time entry points again on a device
+              that already has an account (clears the hide flag). Never
+              renders in production builds. */}
+          {__DEV__ && !IS_MCLOONES && !showEntryOptions && (
+            <TouchableOpacity
+              style={styles.devResetLink}
+              onPress={async () => {
+                try {
+                  const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                  await AsyncStorage.removeItem('@mrc_device_has_account');
+                } catch {}
+                setShowEntryOptions(true);
+              }}
+            >
+              <Text style={styles.devResetText}>Show first-time setup options (dev only)</Text>
+            </TouchableOpacity>
           )}
         </Animated.View>
       </ScrollView>
@@ -445,14 +483,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 24,
   },
-  linkText: {
+  entryBlock: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  entryQuestion: {
     fontSize: 14,
+    color: splashColors.textSecondary,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  entryButton: {
+    borderWidth: 1.5,
+    borderColor: splashColors.primary,
+    borderRadius: 22,
+    paddingHorizontal: 22,
+    paddingVertical: 9,
+  },
+  entryButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: splashColors.primary,
     textAlign: 'center',
   },
-  linkSeparator: {
-    fontSize: 13,
+  devResetLink: {
+    marginTop: 24,
+    alignItems: 'center',
+  },
+  devResetText: {
+    fontSize: 12,
     color: splashColors.textSecondary,
-    marginVertical: 6,
+    textDecorationLine: 'underline',
   },
 });

@@ -11,12 +11,14 @@ import {
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { deriveUsername } from '@/utils/username';
 
 export default function SignupScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -27,13 +29,13 @@ export default function SignupScreen() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const validate = (): string | null => {
-    if (!firstName.trim()) return 'First name is required.';
-    if (!lastName.trim()) return 'Last name is required.';
-    if (!email.trim()) return 'Email is required.';
+    if (!firstName.trim()) return t('onboarding.first_name_required');
+    if (!lastName.trim()) return t('onboarding.last_name_required');
+    if (!email.trim()) return t('onboarding.email_required');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
-      return 'Please enter a valid email address.';
-    if (password.length < 6) return 'Password must be at least 6 characters.';
-    if (password !== confirmPassword) return 'Passwords do not match.';
+      return t('onboarding.email_invalid');
+    if (password.length < 6) return t('onboarding.password_min');
+    if (password !== confirmPassword) return t('onboarding.passwords_no_match');
     return null;
   };
 
@@ -44,7 +46,7 @@ export default function SignupScreen() {
   const handleContinue = () => {
     const error = validate();
     if (error) {
-      Alert.alert('Validation Error', error);
+      Alert.alert(t('onboarding.validation_error'), error);
       return;
     }
 
@@ -74,9 +76,9 @@ export default function SignupScreen() {
       >
         {/* Header */}
         <View style={styles.headerContainer}>
-          <Text style={styles.title}>Create Your Account</Text>
+          <Text style={styles.title}>{t('onboarding.signup_title')}</Text>
           <Text style={styles.subtitle}>
-            Set up your owner account to get started with MyResto Connect and your free 14-day trial!
+            {t('onboarding.signup_subtitle')}
           </Text>
         </View>
 
@@ -94,7 +96,7 @@ export default function SignupScreen() {
               />
               <TextInput
                 style={styles.input}
-                placeholder="First Name"
+                placeholder={t('onboarding.first_name')}
                 placeholderTextColor={splashColors.textSecondary}
                 value={firstName}
                 onChangeText={setFirstName}
@@ -104,7 +106,7 @@ export default function SignupScreen() {
             <View style={[styles.inputContainer, styles.nameField]}>
               <TextInput
                 style={styles.input}
-                placeholder="Last Name"
+                placeholder={t('onboarding.last_name')}
                 placeholderTextColor={splashColors.textSecondary}
                 value={lastName}
                 onChangeText={setLastName}
@@ -124,7 +126,7 @@ export default function SignupScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="Email"
+              placeholder={t('onboarding.email')}
               placeholderTextColor={splashColors.textSecondary}
               value={email}
               onChangeText={setEmail}
@@ -143,9 +145,9 @@ export default function SignupScreen() {
                 color={splashColors.primary}
               />
               <Text style={styles.usernameHintText}>
-                Your username will be{' '}
+                {t('onboarding.username_will_be')}{' '}
                 <Text style={styles.usernameHintBold}>{usernamePreview}</Text>
-                {'  '}— use it to sign in.
+                {'  '}{t('onboarding.username_use_hint')}
               </Text>
             </View>
           ) : null}
@@ -161,7 +163,7 @@ export default function SignupScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="Password"
+              placeholder={t('onboarding.password')}
               placeholderTextColor={splashColors.textSecondary}
               value={password}
               onChangeText={setPassword}
@@ -192,7 +194,7 @@ export default function SignupScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="Confirm Password"
+              placeholder={t('onboarding.confirm_password')}
               placeholderTextColor={splashColors.textSecondary}
               value={confirmPassword}
               onChangeText={setConfirmPassword}
@@ -214,7 +216,7 @@ export default function SignupScreen() {
 
           {/* Continue Button */}
           <TouchableOpacity style={styles.primaryButton} onPress={handleContinue}>
-            <Text style={styles.primaryButtonText}>Continue</Text>
+            <Text style={styles.primaryButtonText}>{t('onboarding.continue')}</Text>
           </TouchableOpacity>
         </View>
 
@@ -224,8 +226,8 @@ export default function SignupScreen() {
           onPress={() => router.replace('/login')}
         >
           <Text style={styles.signInText}>
-            Already have an account?{' '}
-            <Text style={styles.signInTextBold}>Sign In</Text>
+            {t('onboarding.already_have_account')}{' '}
+            <Text style={styles.signInTextBold}>{t('login.sign_in')}</Text>
           </Text>
         </TouchableOpacity>
       </ScrollView>
