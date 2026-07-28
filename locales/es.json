@@ -159,7 +159,10 @@
     "hours_ago": "Hace {{count}}h",
     "yesterday": "Ayer",
     "days_ago": "Hace {{count}}d",
-    "recipients": "Para: {{count}} destinatario(s)"
+    "recipients": "Para: {{count}} destinatario(s)",
+    "marked_as_read_success_one": "{{count}} mensaje marcado como leído",
+    "marked_as_read_success_other": "{{count}} mensajes marcados como leídos",
+    "swipe_read": "Leído"
   },
   "compose": {
     "new_message": "Nuevo Mensaje",
@@ -247,7 +250,15 @@
     "type_feature": "Especial Destacado",
     "type_event": "Evento",
     "type_special": "Especial",
-    "type_custom": "Notificación"
+    "type_custom": "Notificación",
+    "title_required": "Título Requerido",
+    "title_required_message": "Por favor ingresa un título de notificación",
+    "message_required": "Mensaje Requerido",
+    "message_required_message": "Por favor ingresa un mensaje de notificación",
+    "error_title": "Error al Enviar",
+    "audience_required": "Audiencia Requerida",
+    "audience_required_message": "Por favor selecciona al menos un puesto de trabajo.",
+    "send_error": "Error al enviar la notificación. Por favor intenta de nuevo."
   },
   "employee_home": {
     "good_morning": "Buenos Días",
@@ -314,7 +325,9 @@
     "clear_all_filters": "Borrar Todos los Filtros",
     "apply_filters": "Aplicar Filtros",
     "owner_setup_hint": "Sube tu primer menú, o créalo y edítalo a mano.",
-    "setup_menu_now": "Configurar menú ahora"
+    "setup_menu_now": "Configurar menú ahora",
+    "search_menu": "Buscar en el Menú",
+    "search_menu_ph": "Buscar comida, bebidas, especiales de la semana"
   },
   "employee_menus": {
     "title": "Menús",
@@ -343,7 +356,9 @@
     "empty_desc": "No hay cuestionarios activos en este momento. ¡Vuelve pronto!",
     "server_title": "Examen Semanal del Servidor",
     "bartender_title": "Examen Semanal del Bartender",
-    "host_title": "Examen Semanal del Anfitrión"
+    "host_title": "Examen Semanal del Anfitrión",
+    "type_quiz_title": "Cuestionario de {{type}}",
+    "manage_blurb": "Administra los cuestionarios semanales para todos los puestos del personal. Toca una tarjeta para crear, editar o activar un cuestionario."
   },
   "employee_rewards": {
     "title": "{{currencyName}}",
@@ -383,7 +398,10 @@
     "special_features": "Características Especiales",
     "weekly_specials": "Especiales de la Semana",
     "view_all": "Ver Todo",
-    "loading": "Cargando..."
+    "loading": "Cargando...",
+    "no_announcements": "No hay anuncios",
+    "no_features": "No hay características especiales",
+    "no_specials": "No hay especiales de la semana"
   },
   "manager_menus": {
     "title": "Menús",
@@ -1577,7 +1595,10 @@
     "show_review_confirm": "¿Mostrar esta reseña de Google a los empleados?",
     "review_hidden": "Reseña ocultada",
     "review_shown": "Reseña mostrada",
-    "review_visibility_error": "Error al actualizar la visibilidad de la reseña"
+    "review_visibility_error": "Error al actualizar la visibilidad de la reseña",
+    "redeem_label": "Canjear",
+    "redeem_settings": "Configuración de Canje",
+    "upgrade": "Mejorar plan"
   },
   "translation_section": {
     "spanish_section_title": "Traducción al Español (Opcional)",
@@ -1655,7 +1676,12 @@
     "shifts": "turnos",
     "unmatched": "sin emparejar",
     "unmatched_employees": "Empleados Sin Emparejar:",
-    "review_edit": "Revisar y Editar Turnos"
+    "review_edit": "Revisar y Editar Turnos",
+    "upload_file": "Subir Archivo",
+    "file_desc": "PDF o Imagen",
+    "upload_images": "Subir Imágenes",
+    "images_desc": "Desde Fotos",
+    "history_short": "Historial"
   },
   "upcoming_shifts": {
     "full_schedule": "Horario Completo",
@@ -1674,7 +1700,10 @@
     "opener": "Apertura",
     "closer": "Cierre",
     "training": "Entrenamiento",
-    "not_scheduled": "Sin horario"
+    "not_scheduled": "Sin horario",
+    "at": "a las",
+    "last_updated": "Última Actualización",
+    "r365_note": "Por favor consulta R365 para ofertas de turno, intercambios, aprobaciones y cambios a tu horario después de la fecha indicada arriba."
   },
   "profile_dashboard": {
     "mcloones_bucks": "{{currencyName}}",
@@ -1985,7 +2014,25 @@
     "manager_reward": "Premiar",
     "manager_deduct": "Deducir",
     "manager_reset": "Reiniciar",
-    "manager_approvals": "Aprobaciones"
+    "manager_approvals": "Aprobaciones",
+    "available_currency": "{{currencyName}} Disponibles",
+    "held_pending": "(${{amount}} retenidos en solicitudes pendientes)",
+    "not_enough_title": "No tienes suficientes bucks",
+    "not_enough_msg": "Necesitas ${{needed}} pero tienes ${{available}} disponibles (después de las solicitudes pendientes).",
+    "pending_requests": "Solicitudes Pendientes",
+    "no_pending": "No tienes solicitudes de canje pendientes.",
+    "shift_date": "Fecha del Turno",
+    "shift": "Turno",
+    "which_section": "¿Qué sección?",
+    "which_side_work": "¿Qué side work?",
+    "notes_optional": "Notas (opcional)",
+    "section_ph": "p. ej. Sección 3 del Patio",
+    "side_work_ph": "p. ej. Bar runner",
+    "notes_ph": "Notas opcionales para el gerente",
+    "review_btn": "Revisar (${{amount}})",
+    "confirm_title": "Confirmar canje",
+    "confirm_footnote": "Un gerente lo revisará y aprobará.",
+    "submit": "Enviar"
   },
   "game_hub_cards": {
     "memory_title": "Juego de Memoria del Menú",
@@ -2139,6 +2186,42 @@
     "delete_failed": "No se pudo eliminar",
     "insufficient_title": "Créditos insuficientes",
     "insufficient_msg": "Esto necesita {{cost}} créditos pero te quedan {{have}} este mes. Los créditos se reinician el próximo mes.",
-    "upload_hint": "Leer un menú tarda entre 40 segundos y 3 minutos según el tamaño del archivo. Por favor, no cierres la aplicación mientras escanea tu archivo o imagen del menú."
+    "upload_hint": "Leer un menú tarda entre 40 segundos y 3 minutos según el tamaño del archivo. Por favor, no cierres la aplicación mientras escanea tu archivo o imagen del menú.",
+    "onboarding_done": "¡Tu primer menú ha sido subido y creado!",
+    "return_to_onboarding": "Volver a la Configuración Inicial"
+  },
+  "redeem_settings": {
+    "title": "Configuración de Canje",
+    "subtitle": "Opciones de canje",
+    "enable_title": "Habilitar Canjes",
+    "enable_sub": "Permite al personal canjear sus bucks. Cuando está apagado, el botón de Canjear se oculta en todas partes.",
+    "builtin_title": "Opciones integradas",
+    "custom_title": "Opciones personalizadas",
+    "add_custom": "Agregar Opción Personalizada",
+    "add": "Agregar Opción",
+    "edit_option": "Editar Opción",
+    "new_option": "Nueva Opción",
+    "option_name": "Nombre de la opción",
+    "option_name_ph": "p. ej. Salir 30 min antes",
+    "option_name_es": "Nombre en español",
+    "option_name_es_ph": "Traducción al español (opcional)",
+    "translate": "Traducir",
+    "translating": "Traduciendo…",
+    "save": "Guardar Configuración",
+    "saved": "Configuración de canje guardada.",
+    "save_error": "No se pudo guardar la configuración.",
+    "label_required": "Ingresa un nombre para la opción.",
+    "delete_option_title": "¿Eliminar opción?",
+    "approval_note": "Todos los canjes necesitan aprobación de un gerente antes de descontar los bucks.",
+    "cost_label": "Costo",
+    "featured_special": "especial destacado",
+    "full_price": "Precio Completo",
+    "half_price": "Mitad de Precio",
+    "food_full_note": "El personal canjea cualquier platillo del menú o {{specialsName}} a su precio completo en {{currencyName}}.",
+    "food_half_note": "El personal canjea cualquier platillo del menú o {{specialsName}} a la MITAD de su precio en {{currencyName}}."
+  },
+  "today_section": {
+    "happening_today": "Eventos de Hoy",
+    "more_today": "más hoy"
   }
 }

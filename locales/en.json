@@ -159,7 +159,10 @@
     "hours_ago": "{{count}}h ago",
     "yesterday": "Yesterday",
     "days_ago": "{{count}}d ago",
-    "recipients": "To: {{count}} recipient(s)"
+    "recipients": "To: {{count}} recipient(s)",
+    "marked_as_read_success_one": "{{count}} message marked as read",
+    "marked_as_read_success_other": "{{count}} messages marked as read",
+    "swipe_read": "Read"
   },
   "compose": {
     "new_message": "New Message",
@@ -247,7 +250,15 @@
     "type_feature": "Special Feature",
     "type_event": "Event",
     "type_special": "Special",
-    "type_custom": "Notification"
+    "type_custom": "Notification",
+    "error_title": "Send Failed",
+    "message_required": "Message Required",
+    "message_required_message": "Please enter a notification message",
+    "title_required": "Title Required",
+    "title_required_message": "Please enter a notification title",
+    "audience_required": "Audience Required",
+    "audience_required_message": "Please select at least one job title.",
+    "send_error": "Failed to send notification. Please try again."
   },
   "employee_home": {
     "good_morning": "Good Morning",
@@ -314,7 +325,9 @@
     "clear_all_filters": "Clear All Filters",
     "apply_filters": "Apply Filters",
     "owner_setup_hint": "Upload your first menu, or create and edit it by hand.",
-    "setup_menu_now": "Set up Menu Now"
+    "setup_menu_now": "Set up Menu Now",
+    "search_menu": "Search Menu",
+    "search_menu_ph": "Search food, beverages, weekly specials"
   },
   "employee_menus": {
     "title": "Menus",
@@ -343,7 +356,9 @@
     "empty_desc": "No active quizzes right now — check back later.",
     "server_title": "Server Weekly Quiz",
     "bartender_title": "Bartender Weekly Quiz",
-    "host_title": "Host Weekly Quiz"
+    "host_title": "Host Weekly Quiz",
+    "type_quiz_title": "{{type}} Quiz",
+    "manage_blurb": "Manage weekly quizzes for all staff roles. Tap a card to create, edit, or activate a quiz."
   },
   "employee_rewards": {
     "title": "{{currencyName}}",
@@ -383,7 +398,10 @@
     "special_features": "Special Features",
     "weekly_specials": "Weekly Specials",
     "view_all": "View All",
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "no_announcements": "No announcements",
+    "no_features": "No special features",
+    "no_specials": "No weekly specials"
   },
   "manager_menus": {
     "title": "Menus",
@@ -1577,7 +1595,10 @@
     "show_review_confirm": "Show this Google review to employees?",
     "review_hidden": "Review hidden",
     "review_shown": "Review shown",
-    "review_visibility_error": "Failed to update review visibility"
+    "review_visibility_error": "Failed to update review visibility",
+    "redeem_label": "Redeem",
+    "redeem_settings": "Redeem Settings",
+    "upgrade": "Upgrade"
   },
   "translation_section": {
     "spanish_section_title": "Spanish Translation (Optional)",
@@ -1655,7 +1676,12 @@
     "shifts": "shifts",
     "unmatched": "unmatched",
     "unmatched_employees": "Unmatched Employees:",
-    "review_edit": "Review & Edit Shifts"
+    "review_edit": "Review & Edit Shifts",
+    "file_desc": "PDF or Image",
+    "images_desc": "From Photos",
+    "upload_file": "Upload File",
+    "upload_images": "Upload Images",
+    "history_short": "History"
   },
   "upcoming_shifts": {
     "full_schedule": "Full Schedule",
@@ -1674,7 +1700,10 @@
     "opener": "Opener",
     "closer": "Closer",
     "training": "Training",
-    "not_scheduled": "Not scheduled"
+    "not_scheduled": "Not scheduled",
+    "at": "at",
+    "last_updated": "Last Updated",
+    "r365_note": "Please see R365 for any Shift Offers, Trades, Approvals and Changes to your schedule after the date above."
   },
   "profile_dashboard": {
     "mcloones_bucks": "{{currencyName}}",
@@ -1985,7 +2014,25 @@
     "manager_reward": "Reward",
     "manager_deduct": "Deduct",
     "manager_reset": "Reset",
-    "manager_approvals": "Approvals"
+    "manager_approvals": "Approvals",
+    "available_currency": "Available {{currencyName}}",
+    "held_pending": "(${{amount}} held in pending requests)",
+    "not_enough_title": "Not enough bucks",
+    "not_enough_msg": "You need ${{needed}} but have ${{available}} available (after pending requests).",
+    "pending_requests": "Pending Requests",
+    "no_pending": "You have no pending redemption requests.",
+    "shift_date": "Shift Date",
+    "shift": "Shift",
+    "which_section": "Which section?",
+    "which_side_work": "Which side work?",
+    "notes_optional": "Notes (optional)",
+    "section_ph": "e.g. Patio Section 3",
+    "side_work_ph": "e.g. Bar runner",
+    "notes_ph": "Optional notes for the manager",
+    "review_btn": "Review (${{amount}})",
+    "confirm_title": "Confirm redemption",
+    "confirm_footnote": "A manager will review and approve.",
+    "submit": "Submit"
   },
   "game_hub_cards": {
     "memory_title": "Menu Memory Game",
@@ -2139,6 +2186,42 @@
     "delete_failed": "Could Not Delete",
     "insufficient_title": "Not Enough Credits",
     "insufficient_msg": "This needs {{cost}} credits but you have {{have}} left this month. Credits reset next month.",
-    "upload_hint": "Reading a menu takes about 40 seconds to 3 minutes depending on the file size. Please don't close the app while it scans your menu file or image."
+    "upload_hint": "Reading a menu takes about 40 seconds to 3 minutes depending on the file size. Please don't close the app while it scans your menu file or image.",
+    "onboarding_done": "Your first menu has been uploaded and created!",
+    "return_to_onboarding": "Return to Onboarding"
+  },
+  "redeem_settings": {
+    "add": "Add Option",
+    "add_custom": "Add Custom Option",
+    "approval_note": "All redemptions need manager approval before bucks are deducted.",
+    "builtin_title": "Built-in options",
+    "cost_label": "Cost",
+    "custom_title": "Custom options",
+    "delete_option_title": "Delete option?",
+    "edit_option": "Edit Option",
+    "enable_sub": "Let staff cash in their bucks. When off, the Redeem button is hidden everywhere.",
+    "enable_title": "Enable Redemptions",
+    "featured_special": "featured special",
+    "food_full_note": "Staff redeem any menu item or {{specialsName}} at its full price in {{currencyName}}.",
+    "food_half_note": "Staff redeem any menu item or {{specialsName}} at HALF its price in {{currencyName}}.",
+    "full_price": "Full Price",
+    "half_price": "Half Price",
+    "label_required": "Enter a name for the option.",
+    "new_option": "New Option",
+    "option_name": "Option name",
+    "option_name_es": "Spanish name",
+    "option_name_es_ph": "Spanish translation (optional)",
+    "option_name_ph": "e.g. Leave 30 min early",
+    "save": "Save Settings",
+    "save_error": "Could not save settings.",
+    "saved": "Redeem settings saved.",
+    "subtitle": "Cash-in options",
+    "title": "Redeem Settings",
+    "translate": "Translate",
+    "translating": "Translating…"
+  },
+  "today_section": {
+    "happening_today": "Happening Today",
+    "more_today": "more today"
   }
 }

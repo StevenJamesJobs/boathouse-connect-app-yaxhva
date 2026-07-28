@@ -41,7 +41,8 @@ const EXAM_ICONS: Record<ExamType, { ios: string; android: string }> = {
 export default function QuizHubEditorScreen() {
   useRequireManagerRoute();
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isSpanish = i18n.language === 'es';
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
@@ -151,7 +152,7 @@ export default function QuizHubEditorScreen() {
           </View>
           <View style={styles.examInfo}>
             <Text style={[styles.examTitle, { color: colors.text }]}>
-              {getExamTypeName(examType)} Quiz
+              {t('weekly_quizzes.type_quiz_title', { type: getExamTypeName(examType, isSpanish) })}
             </Text>
             {exam ? (
               <View style={styles.examMeta}>
@@ -208,7 +209,7 @@ export default function QuizHubEditorScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Weekly Quizzes</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('weekly_quizzes.title')}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -221,7 +222,7 @@ export default function QuizHubEditorScreen() {
             <View style={[styles.infoCard, { backgroundColor: colors.primary + '10' }]}>
               <IconSymbol ios_icon_name="info.circle.fill" android_material_icon_name="info" size={20} color={colors.primary} />
               <Text style={[styles.infoText, { color: colors.text }]}>
-                Manage weekly quizzes for all staff roles. Tap a card to create, edit, or activate a quiz.
+                {t('weekly_quizzes.manage_blurb')}
               </Text>
             </View>
 

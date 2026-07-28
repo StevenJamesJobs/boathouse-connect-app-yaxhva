@@ -204,7 +204,7 @@ export default function NotificationCenter() {
     }
 
     if (audienceMode === 'job_titles' && selectedJobTitles.length === 0) {
-      Alert.alert('Audience Required', 'Please select at least one job title.');
+      Alert.alert(t('notification_center.audience_required'), t('notification_center.audience_required_message'));
       return;
     }
 
@@ -280,7 +280,7 @@ export default function NotificationCenter() {
       console.error('Error context:', JSON.stringify(error?.context));
 
       // Try to get the actual error message from the response
-      let errorMessage = 'Failed to send notification. Please try again.';
+      let errorMessage = t('notification_center.send_error');
 
       if (error?.context) {
         try {

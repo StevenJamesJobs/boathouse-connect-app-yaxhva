@@ -48,11 +48,11 @@ export default function ManagerToolsScreen() {
   const fixedItems: GridItem[] = [
     { id: 'guides-training', label: t('manager_tools.guides_training'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training' },
     { id: 'game-hub', label: t('employee_tools.game_hub'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub' },
-    { id: 'weekly-quizzes', label: 'Weekly Quizzes', iosIcon: 'questionmark.circle.fill', androidIcon: 'quiz', route: '/quiz-hub-editor' },
+    { id: 'weekly-quizzes', label: t('quick_tools.weekly_quizzes'), iosIcon: 'questionmark.circle.fill', androidIcon: 'quiz', route: '/quiz-hub-editor' },
   ];
 
   if (canSee('check_outs')) {
-    fixedItems.push({ id: 'check-outs-calculator', label: 'Check Outs Calculator', iosIcon: 'dollarsign.circle.fill', androidIcon: 'calculate', route: '/check-out-calculator' });
+    fixedItems.push({ id: 'check-outs-calculator', label: t('checkout_calculator.title'), iosIcon: 'dollarsign.circle.fill', androidIcon: 'calculate', route: '/check-out-calculator' });
   }
   fixedItems.push({ id: 'rewards-reviews', label: t('manager_tools.rewards_reviews'), iosIcon: 'gift.fill', androidIcon: 'card-giftcard', route: '/rewards-and-reviews-editor' });
 
