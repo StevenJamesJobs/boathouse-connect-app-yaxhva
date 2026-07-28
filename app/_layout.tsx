@@ -1,6 +1,8 @@
 
 import "react-native-reanimated";
 import "@/i18n";
+import * as Sentry from "@sentry/react-native";
+import { IS_MCLOONES } from "@/constants/buildVariant";
 import React, { useEffect, Component, ErrorInfo, ReactNode } from "react";
 import { useFonts } from "expo-font";
 import { Stack, useRouter, useSegments } from "expo-router";
@@ -36,6 +38,18 @@ export const unstable_settings = {
   initialRouteName: "index",
 };
 
+// Crash/error reporting. DSN is a public client key (safe in the repo).
+// Sourcemap upload for EAS builds is configured separately via
+// SENTRY_ORG/SENTRY_PROJECT/SENTRY_AUTH_TOKEN env (EAS secrets) at build time.
+Sentry.init({
+  dsn: "https://7b06360fc156cb4f0509f5489afb1a1e@o4511814423216129.ingest.us.sentry.io/4511814455853056",
+  environment: __DEV__ ? "development" : "production",
+  tracesSampleRate: 0,
+  sendDefaultPii: false,
+  debug: __DEV__,
+});
+Sentry.setTag("variant", IS_MCLOONES ? "mcloones" : "public");
+
 // Error Boundary Component
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -53,6 +67,7 @@ class ErrorBoundary extends Component<
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('[ErrorBoundary] Error details:', error, errorInfo);
+    Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
   }
 
   render() {
@@ -307,7 +322,7 @@ function RootLayoutNav() {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   console.log('[RootLayout] Root component mounting, Platform:', Platform.OS);
   
   return (
@@ -326,3 +341,5 @@ export default function RootLayout() {
     </ErrorBoundary>
   );
 }
+
+export default Sentry.wrap(RootLayout);

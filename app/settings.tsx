@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import * as Sentry from '@sentry/react-native';
 import {
   View,
   Text,
@@ -185,6 +186,30 @@ export default function SettingsScreen() {
             />
           </View>
         </TouchableOpacity>
+
+        {/* Dev-only: verify Sentry capture end-to-end (never renders in production builds) */}
+        {__DEV__ && (
+          <TouchableOpacity
+            style={[styles.card, { backgroundColor: colors.card }]}
+            onPress={() => {
+              Sentry.captureException(new Error('Sentry smoke test — ignore'));
+              Alert.alert('Sentry', 'Test error sent — check the Sentry dashboard.');
+            }}
+            activeOpacity={0.7}
+          >
+            <View style={styles.cardRow}>
+              <IconSymbol
+                ios_icon_name="ant.fill"
+                android_material_icon_name="bug-report"
+                size={24}
+                color={colors.primary}
+              />
+              <View style={styles.cardContent}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>Test Sentry (dev only)</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* 2. Notification Preferences - Collapsible */}
         <View style={[styles.card, { backgroundColor: colors.card }]}>
