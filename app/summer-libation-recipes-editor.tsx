@@ -229,18 +229,18 @@ export default function SummerLibationRecipesEditorScreen() {
       if (editingRecipe) {
         const { data, error } = await supabase.rpc('update_summer_libation_recipe', {
           p_user_id: user.id,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
           p_recipe_id: editingRecipe.id,
           p_name: name.trim(),
           p_price: price.trim(),
           p_category: legacyCategory,
           p_subcategory_id: subcategoryId,
           p_is_featured: isFeatured,
-          p_glassware: glassware.trim() || null,
-          p_garnish: garnish.trim() || null,
+          p_glassware: (glassware.trim() || null) ?? undefined,
+          p_garnish: (garnish.trim() || null) ?? undefined,
           p_ingredients: validIngredients,
-          p_procedure: procedure.trim() || null,
-          p_thumbnail_url: thumbnailUrl,
+          p_procedure: (procedure.trim() || null) ?? undefined,
+          p_thumbnail_url: thumbnailUrl ?? undefined,
           p_display_order: editingRecipe.display_order,
         });
 
@@ -255,17 +255,17 @@ export default function SummerLibationRecipesEditorScreen() {
       } else {
         const { data, error } = await supabase.rpc('insert_summer_libation_recipe', {
           p_user_id: user.id,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
           p_name: name.trim(),
           p_price: price.trim(),
           p_category: legacyCategory,
           p_subcategory_id: subcategoryId,
           p_is_featured: isFeatured,
-          p_glassware: glassware.trim() || null,
-          p_garnish: garnish.trim() || null,
+          p_glassware: (glassware.trim() || null) ?? undefined,
+          p_garnish: (garnish.trim() || null) ?? undefined,
           p_ingredients: validIngredients,
-          p_procedure: procedure.trim() || null,
-          p_thumbnail_url: thumbnailUrl,
+          p_procedure: (procedure.trim() || null) ?? undefined,
+          p_thumbnail_url: thumbnailUrl ?? undefined,
           p_display_order: recipes.length,
         });
 
@@ -306,7 +306,7 @@ export default function SummerLibationRecipesEditorScreen() {
 
             const { error } = await supabase.rpc('delete_summer_libation_recipe', {
               p_user_id: user.id,
-              p_organization_id: organizationId,
+              p_organization_id: organizationId ?? undefined,
               p_recipe_id: recipe.id,
             });
 
@@ -335,7 +335,7 @@ export default function SummerLibationRecipesEditorScreen() {
     try {
       const { error } = await supabase.rpc('reorder_summer_libation_recipes', {
         p_user_id: user.id,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
         p_ordered_ids: ordered.map((r) => r.id),
       });
       if (error) {

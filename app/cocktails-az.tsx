@@ -608,6 +608,5 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#333333',
     lineHeight: 24,
-    whiteSpace: 'pre-line',
   },
 });

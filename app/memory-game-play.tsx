@@ -216,7 +216,7 @@ export default function MemoryGamePlayScreen() {
             finalState.score,
             t('notifications.game_hub_passed_title', { name: user.name }),
             t('notifications.game_hub_passed_body'),
-            organizationId
+            organizationId ?? undefined
           );
         }
       } catch (e) {

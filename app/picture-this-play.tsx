@@ -385,7 +385,7 @@ export default function PictureThisPlayScreen() {
           finalTotalScore,
           `${user.name} passed you on the leaderboard!`,
           'A new Picture This! score just bumped them above you.',
-          organizationId,
+          organizationId ?? undefined,
         );
       }
     } catch (err) {

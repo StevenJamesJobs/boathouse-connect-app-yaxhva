@@ -238,18 +238,18 @@ export default function LibationRecipesEditorScreen() {
         console.log('Updating libation recipe:', editingRecipe.id);
         const { data, error } = await supabase.rpc('update_libation_recipe', {
           p_user_id: user.id,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
           p_recipe_id: editingRecipe.id,
           p_name: name.trim(),
           p_price: price.trim(),
           p_category: legacyCategory,
           p_subcategory_id: subcategoryId,
           p_is_featured: isFeatured,
-          p_glassware: glassware.trim() || null,
-          p_garnish: garnish.trim() || null,
+          p_glassware: (glassware.trim() || null) as string,
+          p_garnish: (garnish.trim() || null) as string,
           p_ingredients: validIngredients,
-          p_procedure: procedure.trim() || null,
-          p_thumbnail_url: thumbnailUrl,
+          p_procedure: (procedure.trim() || null) as string,
+          p_thumbnail_url: thumbnailUrl as string,
           p_display_order: editingRecipe.display_order,
         });
 
@@ -267,17 +267,17 @@ export default function LibationRecipesEditorScreen() {
         console.log('Adding new libation recipe');
         const { data, error } = await supabase.rpc('insert_libation_recipe', {
           p_user_id: user.id,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
           p_name: name.trim(),
           p_price: price.trim(),
           p_category: legacyCategory,
           p_subcategory_id: subcategoryId,
           p_is_featured: isFeatured,
-          p_glassware: glassware.trim() || null,
-          p_garnish: garnish.trim() || null,
+          p_glassware: (glassware.trim() || null) as string,
+          p_garnish: (garnish.trim() || null) as string,
           p_ingredients: validIngredients,
-          p_procedure: procedure.trim() || null,
-          p_thumbnail_url: thumbnailUrl,
+          p_procedure: (procedure.trim() || null) as string,
+          p_thumbnail_url: thumbnailUrl as string,
           p_display_order: recipes.length,
         });
 
@@ -321,7 +321,7 @@ export default function LibationRecipesEditorScreen() {
             // Use RPC function to delete (same pattern as cocktails editor)
             const { error } = await supabase.rpc('delete_libation_recipe', {
               p_user_id: user.id,
-              p_organization_id: organizationId,
+              p_organization_id: organizationId ?? undefined,
               p_recipe_id: recipe.id,
             });
 
@@ -353,7 +353,7 @@ export default function LibationRecipesEditorScreen() {
     try {
       const { error } = await supabase.rpc('reorder_libation_recipes', {
         p_user_id: user.id,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
         p_ordered_ids: ordered.map((r) => r.id),
       });
       if (error) {

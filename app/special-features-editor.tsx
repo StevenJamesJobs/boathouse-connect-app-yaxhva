@@ -316,17 +316,17 @@ export default function SpecialFeaturesEditorScreen() {
         console.log('Updating special feature:', editingFeature.id);
         const { error } = await supabase.rpc('update_special_feature', {
           p_user_id: user.id,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
           p_feature_id: editingFeature.id,
           p_title: formData.title,
           p_message: formData.message,
-          p_thumbnail_url: thumbnailUrl,
+          p_thumbnail_url: thumbnailUrl ?? undefined,
           p_thumbnail_shape: formData.thumbnail_shape,
-          p_start_date_time: startDateTime?.toISOString() || null,
-          p_end_date_time: endDateTime?.toISOString() || null,
+          p_start_date_time: startDateTime?.toISOString(),
+          p_end_date_time: endDateTime?.toISOString(),
           p_display_order: editingFeature.display_order,
-          p_link: linkValue,
-          p_guide_file_id: guideFileId,
+          p_link: linkValue ?? undefined,
+          p_guide_file_id: guideFileId ?? undefined,
         });
 
         if (error) {
@@ -360,16 +360,16 @@ export default function SpecialFeaturesEditorScreen() {
         // "select newest row" follow-up reads.
         const { data: newFeatureId, error } = await supabase.rpc('create_special_feature', {
           p_user_id: user.id,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
           p_title: formData.title,
           p_message: formData.message,
-          p_thumbnail_url: thumbnailUrl,
+          p_thumbnail_url: thumbnailUrl ?? undefined,
           p_thumbnail_shape: formData.thumbnail_shape,
-          p_start_date_time: startDateTime?.toISOString() || null,
-          p_end_date_time: endDateTime?.toISOString() || null,
+          p_start_date_time: startDateTime?.toISOString(),
+          p_end_date_time: endDateTime?.toISOString(),
           p_display_order: features.length,
-          p_link: linkValue,
-          p_guide_file_id: guideFileId,
+          p_link: linkValue ?? undefined,
+          p_guide_file_id: guideFileId ?? undefined,
         });
 
         if (error) {
@@ -450,7 +450,7 @@ export default function SpecialFeaturesEditorScreen() {
               
               const { error } = await supabase.rpc('delete_special_feature', {
                 p_user_id: user.id,
-                p_organization_id: organizationId,
+                p_organization_id: organizationId ?? undefined,
                 p_feature_id: feature.id,
               });
 

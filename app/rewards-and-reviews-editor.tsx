@@ -680,7 +680,7 @@ export default function RewardsAndReviewsEditorScreen() {
         p_transaction_id: editingTransaction.id,
         p_new_amount: finalAmount,
         p_new_description: editDescription,
-        p_organization_id: organizationId,
+        p_organization_id: organizationId ?? undefined,
       });
 
       if (error) throw error;

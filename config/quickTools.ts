@@ -316,17 +316,19 @@ export const MAX_QUICK_TOOLS = 4;
  * Get available tools for a user based on their role and job titles
  */
 export function getAvailableTools(
-  role: 'employee' | 'manager',
+  role: 'employee' | 'manager' | 'owner',
   jobTitles: string[] = []
 ): QuickToolConfig[] {
+  // Owners use the manager portal and get full manager tool access
+  const effectiveRole = role === 'owner' ? 'manager' : role;
   return QUICK_TOOLS_CATALOG.filter((tool) => {
     // Check role availability
-    if (tool.availableTo !== 'all' && tool.availableTo !== role) {
+    if (tool.availableTo !== 'all' && tool.availableTo !== effectiveRole) {
       return false;
     }
 
     // Managers can access all tools (no job title restriction for managers)
-    if (role === 'manager') {
+    if (effectiveRole === 'manager') {
       return true;
     }
 
@@ -348,12 +350,12 @@ export function getAvailableTools(
  * Get default quick tools for a user based on their role and job titles
  */
 export function getDefaultQuickTools(
-  role: 'employee' | 'manager',
+  role: 'employee' | 'manager' | 'owner',
   jobTitles: string[] = []
 ): string[] {
   const available = getAvailableTools(role, jobTitles);
 
-  if (role === 'manager') {
+  if (role === 'manager' || role === 'owner') {
     // Default manager tools: Employee Hub, Announcement Editor, Schedule Upload, Today's Roster
     const defaults = ['employee-hub', 'announcement-editor', 'schedule-upload', 'todays-roster'];
     return defaults.filter((id) => available.some((t) => t.id === id));

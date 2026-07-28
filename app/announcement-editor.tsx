@@ -315,17 +315,17 @@ export default function AnnouncementEditorScreen() {
         console.log('Updating announcement:', editingAnnouncement.id);
         const { error } = await supabase.rpc('update_announcement', {
           p_user_id: user.id,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
           p_announcement_id: editingAnnouncement.id,
           p_title: formData.title,
           p_message: formData.message,
-          p_thumbnail_url: thumbnailUrl,
+          p_thumbnail_url: thumbnailUrl ?? undefined,
           p_thumbnail_shape: formData.thumbnail_shape,
           p_priority: formData.priority,
           p_visibility: formData.visibility,
           p_display_order: editingAnnouncement.display_order,
-          p_link: linkValue,
-          p_guide_file_id: guideFileId,
+          p_link: linkValue ?? undefined,
+          p_guide_file_id: guideFileId ?? undefined,
         });
 
         if (error) {
@@ -359,16 +359,16 @@ export default function AnnouncementEditorScreen() {
         // "select newest row" follow-up read.
         const { data: newAnnouncementId, error } = await supabase.rpc('create_announcement', {
           p_user_id: user.id,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
           p_title: formData.title,
           p_message: formData.message,
-          p_thumbnail_url: thumbnailUrl,
+          p_thumbnail_url: thumbnailUrl ?? undefined,
           p_thumbnail_shape: formData.thumbnail_shape,
           p_priority: formData.priority,
           p_visibility: formData.visibility,
           p_display_order: announcements.length,
-          p_link: linkValue,
-          p_guide_file_id: guideFileId,
+          p_link: linkValue ?? undefined,
+          p_guide_file_id: guideFileId ?? undefined,
         });
 
         if (error) {
@@ -449,7 +449,7 @@ export default function AnnouncementEditorScreen() {
               
               const { error } = await supabase.rpc('delete_announcement', {
                 p_user_id: user.id,
-                p_organization_id: organizationId,
+                p_organization_id: organizationId ?? undefined,
                 p_announcement_id: announcement.id,
               });
 

@@ -254,7 +254,7 @@ export default function NotificationCenter() {
 
       // Physical push only when the toggle is on; silent = shade + badge only.
       if (sendPush) {
-        await sendCustomNotification(title, body, Object.keys(extraData).length > 0 ? extraData : undefined, organizationId);
+        await sendCustomNotification(title, body, Object.keys(extraData).length > 0 ? extraData : undefined, organizationId ?? undefined);
       }
 
       Alert.alert(

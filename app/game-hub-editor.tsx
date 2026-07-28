@@ -146,7 +146,7 @@ export default function GameHubEditorScreen() {
               const { error } = await supabase.rpc('set_user_test_flag', {
                 p_user_id: user.user_id,
                 p_is_test: willBeTest,
-                p_organization_id: organizationId,
+                p_organization_id: organizationId!,
                 p_actor_id: authActorId,
               });
               if (error) throw error;

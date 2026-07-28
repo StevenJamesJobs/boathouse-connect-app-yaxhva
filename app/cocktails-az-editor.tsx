@@ -279,13 +279,13 @@ export default function CocktailsAZEditorScreen() {
         console.log('Updating cocktail:', editingCocktail.id);
         const { data, error } = await supabase.rpc('update_cocktail', {
           p_user_id: user.id,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
           p_cocktail_id: editingCocktail.id,
           p_name: name.trim(),
           p_alcohol_type: alcoholType,
           p_ingredients: ingredientsJson,
-          p_procedure: procedure.trim() || null,
-          p_thumbnail_url: thumbnailUrl,
+          p_procedure: (procedure.trim() || null) as string,
+          p_thumbnail_url: thumbnailUrl as string,
           p_display_order: editingCocktail.display_order,
           p_glassware: glassware.trim() || null,
           p_garnish: garnish.trim() || null,
@@ -305,12 +305,12 @@ export default function CocktailsAZEditorScreen() {
         console.log('Adding new cocktail');
         const { data, error } = await supabase.rpc('insert_cocktail', {
           p_user_id: user.id,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
           p_name: name.trim(),
           p_alcohol_type: alcoholType,
           p_ingredients: ingredientsJson,
-          p_procedure: procedure.trim() || null,
-          p_thumbnail_url: thumbnailUrl,
+          p_procedure: (procedure.trim() || null) as string,
+          p_thumbnail_url: thumbnailUrl as string,
           p_display_order: cocktails.length,
           p_glassware: glassware.trim() || null,
           p_garnish: garnish.trim() || null,
@@ -356,7 +356,7 @@ export default function CocktailsAZEditorScreen() {
             // Use RPC function to delete (same pattern as profile update)
             const { error } = await supabase.rpc('delete_cocktail', {
               p_user_id: user.id,
-              p_organization_id: organizationId,
+              p_organization_id: organizationId ?? undefined,
               p_cocktail_id: cocktail.id,
             });
 
