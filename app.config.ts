@@ -71,6 +71,7 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    "@sentry/react-native/expo",
     [
       "expo-image-picker",
       {
