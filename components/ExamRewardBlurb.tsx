@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -15,6 +16,8 @@ interface UndismissedResult {
 }
 
 export default function ExamRewardBlurb() {
+  const { t, i18n } = useTranslation();
+  const isSpanish = i18n.language === 'es';
   const colors = useThemeColors();
   const { user } = useAuth();
   const [result, setResult] = useState<UndismissedResult | null>(null);
@@ -97,9 +100,9 @@ export default function ExamRewardBlurb() {
           <IconSymbol ios_icon_name="dollarsign.circle.fill" android_material_icon_name="attach-money" size={20} color="#FFF" />
         </View>
         <View style={styles.textContainer}>
-          <Text style={[styles.title, { color: '#10B981' }]}>Quiz Reward!</Text>
+          <Text style={[styles.title, { color: '#10B981' }]}>{t('weekly_quizzes.reward_blurb_title')}</Text>
           <Text style={[styles.description, { color: colors.text }]}>
-            You earned ${result.bucks_awarded} from your {getExamTypeName(result.exam_type as any)} Weekly Quiz
+            {t('weekly_quizzes.reward_blurb_desc', { amount: result.bucks_awarded, type: getExamTypeName(result.exam_type as any, isSpanish) })}
           </Text>
         </View>
         <TouchableOpacity onPress={handleDismiss} style={styles.dismissButton}>
