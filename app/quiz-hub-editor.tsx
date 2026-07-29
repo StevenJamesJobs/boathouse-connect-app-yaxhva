@@ -38,6 +38,13 @@ const EXAM_ICONS: Record<ExamType, { ios: string; android: string }> = {
   host: { ios: 'person.2.fill', android: 'people' },
 };
 
+const STATUS_LABEL_KEYS: Record<ExamSummary['status'], string> = {
+  draft: 'exam_editor.status_draft',
+  active: 'exam_editor.status_active',
+  paused: 'exam_editor.status_paused',
+  closed: 'exam_editor.status_closed',
+};
+
 export default function QuizHubEditorScreen() {
   useRequireManagerRoute();
   const router = useRouter();
@@ -158,16 +165,16 @@ export default function QuizHubEditorScreen() {
               <View style={styles.examMeta}>
                 <View style={[styles.statusBadge, { backgroundColor: getStatusColor(exam.status) + '20' }]}>
                   <Text style={[styles.statusBadgeText, { color: getStatusColor(exam.status) }]}>
-                    {exam.status.toUpperCase()}
+                    {t(STATUS_LABEL_KEYS[exam.status]).toUpperCase()}
                   </Text>
                 </View>
                 <Text style={[styles.questionCountText, { color: colors.textSecondary }]}>
-                  {exam.questionCount} Q's
+                  {t('weekly_quizzes.question_count_short', { count: exam.questionCount })}
                 </Text>
               </View>
             ) : (
               <Text style={[styles.noQuizText, { color: colors.textSecondary }]}>
-                No active quiz
+                {t('weekly_quizzes.no_active_quiz')}
               </Text>
             )}
           </View>
@@ -194,7 +201,7 @@ export default function QuizHubEditorScreen() {
               />
             </View>
             <Text style={[styles.progressText, { color: colors.textSecondary }]}>
-              {exam.completedCount}/{exam.totalEmployees} completed
+              {t('weekly_quizzes.completed_ratio', { done: exam.completedCount, total: exam.totalEmployees })}
             </Text>
           </View>
         )}

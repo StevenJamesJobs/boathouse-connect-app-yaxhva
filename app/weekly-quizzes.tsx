@@ -199,16 +199,16 @@ export default function WeeklyQuizzesScreen() {
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
           <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={48} color={colors.textSecondary} />
           <Text style={{ fontSize: 20, fontWeight: '700', color: colors.text, marginTop: 16, textAlign: 'center' }}>
-            Premium Feature
+            {t('weekly_quizzes.premium_title')}
           </Text>
           <Text style={{ fontSize: 15, color: colors.textSecondary, marginTop: 8, textAlign: 'center', lineHeight: 22 }}>
-            Weekly Quizzes require the Premium plan. Test your team's knowledge with quizzes tailored to each role.
+            {t('weekly_quizzes.premium_desc')}
           </Text>
           <TouchableOpacity
             style={{ backgroundColor: colors.primary, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12, marginTop: 24 }}
             onPress={() => router.push('/subscription-management' as any)}
           >
-            <Text style={{ color: colors.fireText, fontSize: 16, fontWeight: '700' }}>Upgrade to Premium</Text>
+            <Text style={{ color: colors.fireText, fontSize: 16, fontWeight: '700' }}>{t('weekly_quizzes.premium_upgrade_btn')}</Text>
           </TouchableOpacity>
         </View>
       </View>

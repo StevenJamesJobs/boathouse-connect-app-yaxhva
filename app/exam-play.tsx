@@ -176,7 +176,7 @@ export default function ExamPlayScreen() {
           Alert.alert(
             isSpanish ? 'Examen Completado' : 'Quiz Already Completed',
             isSpanish ? 'Ya completaste este examen.' : 'You have already completed this quiz.',
-            [{ text: 'OK', onPress: () => router.back() }]
+            [{ text: isSpanish ? 'Aceptar' : 'OK', onPress: () => router.back() }]
           );
           return;
         }
@@ -189,7 +189,7 @@ export default function ExamPlayScreen() {
             isSpanish
               ? 'Tus resultados están guardados y se enviarán automáticamente cuando vuelvas a tener conexión.'
               : 'Your results are saved and will submit automatically when you are back online.',
-            [{ text: 'OK', onPress: () => router.back() }]
+            [{ text: isSpanish ? 'Aceptar' : 'OK', onPress: () => router.back() }]
           );
           return;
         }
@@ -269,7 +269,7 @@ export default function ExamPlayScreen() {
           Alert.alert(
             isSpanish ? 'Examen Completado' : 'Quiz Already Completed',
             isSpanish ? 'Ya completaste este examen.' : 'You have already completed this quiz.',
-            [{ text: 'OK', onPress: () => router.back() }]
+            [{ text: isSpanish ? 'Aceptar' : 'OK', onPress: () => router.back() }]
           );
           return;
         }
@@ -403,7 +403,7 @@ export default function ExamPlayScreen() {
           : "Your results couldn't be submitted right now. They're saved on this device and will submit automatically when you're back online.",
         [
           { text: isSpanish ? 'Reintentar' : 'Retry', onPress: () => submitResults(state) },
-          { text: 'OK', style: 'cancel' },
+          { text: isSpanish ? 'Aceptar' : 'OK', style: 'cancel' },
         ],
       );
     }
@@ -640,7 +640,7 @@ export default function ExamPlayScreen() {
             </Text>
             {currentQuestion.is_bonus && (
               <View style={[styles.bonusBadge, { backgroundColor: '#F59E0B' }]}>
-                <Text style={styles.bonusBadgeText}>BONUS +${currentQuestion.bonus_bucks_value}</Text>
+                <Text style={styles.bonusBadgeText}>{isSpanish ? 'BONO' : 'BONUS'} +${currentQuestion.bonus_bucks_value}</Text>
               </View>
             )}
           </View>

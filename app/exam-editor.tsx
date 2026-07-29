@@ -66,13 +66,22 @@ interface ExamQuestion {
   question_image_url?: string | null;
 }
 
-const CATEGORY_OPTIONS: { label: string; sourceTable: string | null }[] = [
-  { label: 'Menu Items', sourceTable: 'menu_items' },
-  { label: 'Wine Pairings', sourceTable: 'wine_pairings' },
-  { label: 'Libation Recipes', sourceTable: 'recipes' },
-  { label: 'Check List Items', sourceTable: 'checklist_items' },
-  { label: 'Menu Category', sourceTable: 'menu_category' },
+// label = the EN-canonical value persisted into exam_questions.category_label
+// (stored data stays English); labelKey translates the DISPLAY only.
+const CATEGORY_OPTIONS: { label: string; labelKey: string; sourceTable: string | null }[] = [
+  { label: 'Menu Items', labelKey: 'exam_editor.cat_menu_items', sourceTable: 'menu_items' },
+  { label: 'Wine Pairings', labelKey: 'exam_editor.cat_wine_pairings', sourceTable: 'wine_pairings' },
+  { label: 'Libation Recipes', labelKey: 'exam_editor.cat_libation_recipes', sourceTable: 'recipes' },
+  { label: 'Check List Items', labelKey: 'exam_editor.cat_checklist_items', sourceTable: 'checklist_items' },
+  { label: 'Menu Category', labelKey: 'exam_editor.cat_menu_category', sourceTable: 'menu_category' },
 ];
+
+const STATUS_LABEL_KEYS: Record<Exam['status'], string> = {
+  draft: 'exam_editor.status_draft',
+  active: 'exam_editor.status_active',
+  paused: 'exam_editor.status_paused',
+  closed: 'exam_editor.status_closed',
+};
 
 interface CompletionEntry {
   user_id: string;
@@ -90,7 +99,8 @@ type ActiveSection = 'questions' | 'tracker';
 export default function ExamEditorScreen() {
   useRequireManagerRoute();
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isSpanish = i18n.language === 'es';
   const colors = useThemeColors();
   const { mode } = useAppTheme();
   const { user } = useAuth();
@@ -250,14 +260,14 @@ export default function ExamEditorScreen() {
 
       if (examError) throw examError;
       const exam = (examRows as Exam[])?.[0];
-      if (!exam) throw new Error('No data returned');
+      if (!exam) throw new Error(t('exam_editor.no_data_returned'));
 
       await generateAndSaveQuestions(exam.id, exam.cycle_key);
       setCurrentExam(exam);
       setTimeLimit(exam.time_limit_seconds);
       await fetchQuestions(exam.id);
     } catch (err: any) {
-      Alert.alert('Error', err?.message || 'Failed to generate quiz');
+      Alert.alert(t('common.error'), err?.message || t('exam_editor.failed_generate'));
       console.error('Generate error:', err);
     }
     setGenerating(false);
@@ -310,17 +320,17 @@ export default function ExamEditorScreen() {
   // Activate quiz
   const handleActivate = () => {
     if (!currentExam || questions.length === 0) {
-      Alert.alert('Error', 'No questions to activate. Generate or add questions first.');
+      Alert.alert(t('common.error'), t('exam_editor.no_questions_activate'));
       return;
     }
 
     Alert.alert(
-      'Activate Quiz',
-      `This will make the ${getExamTypeName(examType)} Weekly Quiz live for all employees. Are you sure?`,
+      t('exam_editor.activate_quiz'),
+      t('exam_editor.activate_msg', { type: getExamTypeName(examType, isSpanish) }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Activate',
+          text: t('exam_editor.activate_btn'),
           onPress: async () => {
             try {
               // Default close_at = 7 days from now at 23:59 local if unset
@@ -369,7 +379,7 @@ export default function ExamEditorScreen() {
 
               setNotifyOnActivate(false);
               await fetchCurrentExam();
-              Alert.alert('Quiz Activated', 'The quiz is now live for employees!');
+              Alert.alert(t('exam_editor.activated_title'), t('exam_editor.activated_msg'));
             } catch (err) {
               console.error('Activate error:', err);
             }
@@ -382,12 +392,12 @@ export default function ExamEditorScreen() {
   const handlePause = () => {
     if (!currentExam) return;
     Alert.alert(
-      'Pause Quiz',
-      'This will pause the quiz. Employees won\'t be able to take it until you resume. In-progress attempts are preserved.',
+      t('exam_editor.pause_quiz'),
+      t('exam_editor.pause_msg'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Pause',
+          text: t('exam_editor.pause_btn'),
           onPress: async () => {
             await (supabase.rpc as any)('set_exam_status', {
               p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'paused',
@@ -402,12 +412,12 @@ export default function ExamEditorScreen() {
   const handleResume = () => {
     if (!currentExam) return;
     Alert.alert(
-      'Resume Quiz',
-      'This will make the quiz live again for employees.',
+      t('exam_editor.resume_quiz'),
+      t('exam_editor.resume_msg'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Resume',
+          text: t('exam_editor.resume_btn'),
           onPress: async () => {
             await (supabase.rpc as any)('set_exam_status', {
               p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'active',
@@ -464,7 +474,7 @@ export default function ExamEditorScreen() {
       );
     } catch (err) {
       console.error('Update category_label error:', err);
-      Alert.alert('Error', 'Failed to update category.');
+      Alert.alert(t('common.error'), t('exam_editor.failed_update_category'));
     }
   };
 
@@ -486,12 +496,12 @@ export default function ExamEditorScreen() {
     if (!currentExam) return;
 
     Alert.alert(
-      'Close Quiz',
-      'This will close the current quiz. Employees who haven\'t taken it will no longer be able to.',
+      t('exam_editor.close_quiz'),
+      t('exam_editor.close_msg'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Close',
+          text: t('common.close'),
           style: 'destructive',
           onPress: async () => {
             await (supabase.rpc as any)('set_exam_status', {
@@ -510,12 +520,12 @@ export default function ExamEditorScreen() {
   // Reset and start new
   const handleResetAndNew = () => {
     Alert.alert(
-      'Reset & New Quiz',
-      'This will close the current quiz and start fresh. Continue?',
+      t('exam_editor.reset_new_quiz'),
+      t('exam_editor.reset_new_msg'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('exam_editor.reset_btn'),
           style: 'destructive',
           onPress: async () => {
             if (currentExam) {
@@ -536,7 +546,7 @@ export default function ExamEditorScreen() {
   const handleAddCustom = async (isBonus: boolean = false) => {
     if (!currentExam) return;
     if (!customText.trim() || !customA.trim() || !customB.trim() || !customC.trim() || !customD.trim()) {
-      Alert.alert('Error', 'Please fill in the question and all four options.');
+      Alert.alert(t('common.error'), t('exam_editor.fill_all_fields'));
       return;
     }
 
@@ -568,7 +578,7 @@ export default function ExamEditorScreen() {
     });
 
     if (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert(t('common.error'), error.message);
     } else {
       resetCustomForm();
       setShowAddCustom(false);
@@ -580,12 +590,12 @@ export default function ExamEditorScreen() {
   // Delete question
   const handleDeleteQuestion = (question: ExamQuestion) => {
     Alert.alert(
-      'Delete Question',
-      'Are you sure you want to delete this question?',
+      t('exam_editor.delete_q_title'),
+      t('exam_editor.delete_q_msg'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
             await (supabase.rpc as any)('delete_exam_question', {
@@ -654,14 +664,14 @@ export default function ExamEditorScreen() {
         });
 
         if (error) {
-          Alert.alert('Error', error.message);
+          Alert.alert(t('common.error'), error.message);
         } else {
           await fetchQuestions(currentExam.id);
         }
       }
     } catch (err) {
       console.error('Refresh question error:', err);
-      Alert.alert('Error', 'Failed to refresh question');
+      Alert.alert(t('common.error'), t('exam_editor.failed_refresh'));
     }
     setRefreshingQuestionId(null);
   };
@@ -687,7 +697,7 @@ export default function ExamEditorScreen() {
     });
 
     if (error) {
-      Alert.alert('Error', error.message);
+      Alert.alert(t('common.error'), error.message);
     } else {
       setEditingQuestion(null);
       if (currentExam) await fetchQuestions(currentExam.id);
@@ -720,7 +730,7 @@ export default function ExamEditorScreen() {
     try {
       const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!perm.granted) {
-        Alert.alert('Permission Required', 'We need photo library access to attach an image.');
+        Alert.alert(t('exam_editor.permission_title'), t('exam_editor.permission_msg'));
         return null;
       }
       const result = await ImagePicker.launchImageLibraryAsync({
@@ -734,11 +744,11 @@ export default function ExamEditorScreen() {
       setUploadingImage(true);
       const uri = result.assets[0].uri;
       const publicUrl = await brokerUploadImage('quiz_question_image', uri, user.id);
-      if (!publicUrl) throw new Error('Could not upload image.');
+      if (!publicUrl) throw new Error(t('exam_editor.upload_failed_msg'));
       return publicUrl;
     } catch (err: any) {
       console.error('Quiz image upload error:', err);
-      Alert.alert('Upload Failed', err?.message || 'Could not upload image.');
+      Alert.alert(t('exam_editor.upload_failed_title'), err?.message || t('exam_editor.upload_failed_msg'));
       return null;
     } finally {
       setUploadingImage(false);
@@ -772,10 +782,23 @@ export default function ExamEditorScreen() {
   };
 
   const getSourceLabel = (q: ExamQuestion) => {
-    if (q.category_label) return q.category_label.toUpperCase();
-    if (q.source_type === 'bonus') return 'BONUS';
-    if (q.source_type === 'custom') return 'CUSTOM';
-    return (q.source_table || 'auto').replace(/_/g, ' ').toUpperCase();
+    if (q.category_label) {
+      // Stored labels are EN-canonical; translate display when it matches a
+      // known option, custom manager-typed labels render as typed.
+      const known = CATEGORY_OPTIONS.find(o => o.label === q.category_label);
+      return (known ? t(known.labelKey) : q.category_label).toUpperCase();
+    }
+    if (q.source_type === 'bonus') return t('exam_editor.source_bonus').toUpperCase();
+    if (q.source_type === 'custom') return t('exam_editor.source_custom').toUpperCase();
+    // Translate the auto-chip only where the option label's EN form matches the
+    // raw slug-derived label — keeps EN chips byte-identical (recipes /
+    // checklist_items keep their historical RECIPES / CHECKLIST ITEMS).
+    const rawLabel = (q.source_table || 'auto').replace(/_/g, ' ').toUpperCase();
+    const bySource = CATEGORY_OPTIONS.find(o => o.sourceTable === q.source_table);
+    if (bySource && bySource.label.toUpperCase() === rawLabel) {
+      return t(bySource.labelKey).toUpperCase();
+    }
+    return rawLabel;
   };
 
   // Reset a specific user's quiz result so they can retake
@@ -784,12 +807,12 @@ export default function ExamEditorScreen() {
     const actorId = user.id;
 
     Alert.alert(
-      'Allow Retake',
-      `This will reset ${entry.name}'s quiz result and allow them to retake the quiz. Any ${currencyName} earned from this quiz will be reversed. Continue?`,
+      t('exam_editor.retake_title'),
+      t('exam_editor.retake_msg', { name: entry.name, currency: currencyName }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Reset',
+          text: t('exam_editor.reset_btn'),
           style: 'destructive',
           onPress: async () => {
             try {
@@ -839,10 +862,10 @@ export default function ExamEditorScreen() {
                 console.error('Retake push failed:', pushErr);
               }
 
-              Alert.alert('Success', `${entry.name} can now retake the quiz.`);
+              Alert.alert(t('common.success'), t('exam_editor.retake_success_msg', { name: entry.name }));
             } catch (err) {
               console.error('Reset user quiz error:', err);
-              Alert.alert('Error', 'Failed to reset quiz result.');
+              Alert.alert(t('common.error'), t('exam_editor.failed_reset_result'));
             }
           },
         },
@@ -860,7 +883,7 @@ export default function ExamEditorScreen() {
           <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
             <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{getExamTypeName(examType)} Quiz Editor</Text>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('exam_editor.title', { type: getExamTypeName(examType, isSpanish) })}</Text>
           <View style={styles.placeholder} />
         </View>
         <View style={styles.loadingContainer}>
@@ -880,7 +903,7 @@ export default function ExamEditorScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{getExamTypeName(examType)} Quiz Editor</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('exam_editor.title', { type: getExamTypeName(examType, isSpanish) })}</Text>
         <View style={styles.placeholder} />
       </View>
 
@@ -893,7 +916,7 @@ export default function ExamEditorScreen() {
               onPress={() => setActiveSection('questions')}
             >
               <Text style={[styles.tabText, { color: colors.textSecondary }, activeSection === 'questions' && { color: colors.text }]}>
-                Questions
+                {t('exam_editor.questions')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -901,7 +924,7 @@ export default function ExamEditorScreen() {
               onPress={() => { setActiveSection('tracker'); if (currentExam) fetchCompletionData(currentExam.id); }}
             >
               <Text style={[styles.tabText, { color: colors.textSecondary }, activeSection === 'tracker' && { color: colors.text }]}>
-                Tracker ({completedCount}/{totalEmployees})
+                {t('exam_editor.tab_tracker', { done: completedCount, total: totalEmployees })}
               </Text>
             </TouchableOpacity>
           </View>
@@ -914,9 +937,9 @@ export default function ExamEditorScreen() {
           <>
             <View style={[styles.emptyCard, { backgroundColor: colors.card }]}>
               <IconSymbol ios_icon_name="doc.questionmark.fill" android_material_icon_name="quiz" size={48} color={colors.primary} />
-              <Text style={[styles.emptyTitle, { color: colors.text }]}>No Active Quiz</Text>
+              <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('exam_editor.no_active_title')}</Text>
               <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
-                Generate a new weekly quiz to get started. Questions will be auto-created from menu data, recipes, and more.
+                {t('exam_editor.no_active_desc')}
               </Text>
             </View>
 
@@ -924,7 +947,7 @@ export default function ExamEditorScreen() {
             <View style={[styles.questionCountCard, { backgroundColor: colors.card }]}>
               <View style={styles.timeLimitHeader}>
                 <IconSymbol ios_icon_name="number.circle.fill" android_material_icon_name="format-list-numbered" size={22} color={colors.primary} />
-                <Text style={[styles.timeLimitTitle, { color: colors.text }]}>Number of Questions</Text>
+                <Text style={[styles.timeLimitTitle, { color: colors.text }]}>{t('exam_editor.number_of_questions')}</Text>
               </View>
               <Text style={[styles.timeLimitDisplay, { color: colors.primary }]}>{questionCount}</Text>
               <View style={styles.timeLimitButtons}>
@@ -947,7 +970,7 @@ export default function ExamEditorScreen() {
                 ))}
               </View>
               <View style={styles.customCountRow}>
-                <Text style={[styles.customCountLabel, { color: colors.textSecondary }]}>Custom:</Text>
+                <Text style={[styles.customCountLabel, { color: colors.textSecondary }]}>{t('exam_editor.custom_label')}</Text>
                 <TextInput
                   style={[styles.customCountInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
                   keyboardType="number-pad"
@@ -974,7 +997,7 @@ export default function ExamEditorScreen() {
               ) : (
                 <>
                   <IconSymbol ios_icon_name="wand.and.stars" android_material_icon_name="auto-awesome" size={22} color={colors.fireText} />
-                  <Text style={[styles.generateButtonText, { color: colors.fireText }]}>Generate {questionCount} Questions</Text>
+                  <Text style={[styles.generateButtonText, { color: colors.fireText }]}>{t('exam_editor.generate_btn', { count: questionCount })}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -987,15 +1010,15 @@ export default function ExamEditorScreen() {
             {/* Status Card */}
             <View style={[styles.statusCard, { backgroundColor: colors.card }]}>
               <View style={styles.statusRow}>
-                <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Status</Text>
+                <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>{t('exam_editor.status_label')}</Text>
                 <View style={[styles.statusBadge, { backgroundColor: getStatusColor(currentExam.status) + '20' }]}>
                   <Text style={[styles.statusBadgeText, { color: getStatusColor(currentExam.status) }]}>
-                    {currentExam.status.toUpperCase()}
+                    {t(STATUS_LABEL_KEYS[currentExam.status]).toUpperCase()}
                   </Text>
                 </View>
               </View>
               <View style={styles.statusRow}>
-                <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Questions</Text>
+                <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>{t('exam_editor.questions')}</Text>
                 <Text style={[styles.statusValue, { color: colors.text }]}>{questions.length}</Text>
               </View>
 
@@ -1006,7 +1029,7 @@ export default function ExamEditorScreen() {
                   onPress={() => setShowCloseDatePicker(true)}
                   activeOpacity={0.6}
                 >
-                  <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Closes At</Text>
+                  <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>{t('exam_editor.closes_at')}</Text>
                   <View style={styles.closeAtRight}>
                     {closeAt ? (
                       (() => {
@@ -1020,7 +1043,7 @@ export default function ExamEditorScreen() {
                         return (
                           <>
                             <Text style={[styles.statusValue, { color }]}>
-                              {formatCountdown(msRemaining)}
+                              {formatCountdown(msRemaining, isSpanish)}
                             </Text>
                             <Text style={[styles.closeAtDate, { color: colors.textSecondary }]}>
                               {closeAt.toLocaleString(undefined, {
@@ -1034,7 +1057,7 @@ export default function ExamEditorScreen() {
                         );
                       })()
                     ) : (
-                      <Text style={[styles.statusValue, { color: colors.primary }]}>Set date/time</Text>
+                      <Text style={[styles.statusValue, { color: colors.primary }]}>{t('exam_editor.set_datetime')}</Text>
                     )}
                   </View>
                 </TouchableOpacity>
@@ -1045,7 +1068,7 @@ export default function ExamEditorScreen() {
                     style={[styles.closeAtClearBtn, { borderColor: colors.border }]}
                     onPress={() => handleUpdateCloseAt(null)}
                   >
-                    <Text style={[styles.closeAtClearText, { color: colors.textSecondary }]}>Clear</Text>
+                    <Text style={[styles.closeAtClearText, { color: colors.textSecondary }]}>{t('common.clear')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -1054,9 +1077,9 @@ export default function ExamEditorScreen() {
               {currentExam.status === 'draft' && (
                 <View style={styles.statusRow}>
                   <View style={styles.notifyLabelCol}>
-                    <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Notify Staff</Text>
+                    <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>{t('exam_editor.notify_staff')}</Text>
                     <Text style={[styles.notifyDesc, { color: colors.textSecondary }]}>
-                      Send a push notification when activated
+                      {t('exam_editor.notify_staff_desc')}
                     </Text>
                   </View>
                   <Switch
@@ -1072,9 +1095,9 @@ export default function ExamEditorScreen() {
               {currentExam.status === 'draft' && (
                 <View style={styles.statusRow}>
                   <View style={styles.notifyLabelCol}>
-                    <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>Award {currencyName}</Text>
+                    <Text style={[styles.statusLabel, { color: colors.textSecondary }]}>{t('exam_editor.award_currency', { currency: currencyName })}</Text>
                     <Text style={[styles.notifyDesc, { color: colors.textSecondary }]}>
-                      Off for training-only quizzes (e.g. New Menu)
+                      {t('exam_editor.award_currency_desc')}
                     </Text>
                   </View>
                   <Switch
@@ -1091,10 +1114,10 @@ export default function ExamEditorScreen() {
             <View style={[styles.timeLimitCard, { backgroundColor: colors.card }]}>
               <View style={styles.timeLimitHeader}>
                 <IconSymbol ios_icon_name="timer" android_material_icon_name="timer" size={22} color={colors.primary} />
-                <Text style={[styles.timeLimitTitle, { color: colors.text }]}>Time Limit</Text>
+                <Text style={[styles.timeLimitTitle, { color: colors.text }]}>{t('exam_editor.time_limit')}</Text>
               </View>
               <Text style={[styles.timeLimitDisplay, { color: colors.primary }]}>
-                {timeLimit === 0 ? 'No Limit' : formatTime(timeLimit)}
+                {timeLimit === 0 ? t('exam_editor.no_limit') : formatTime(timeLimit)}
               </Text>
               <View style={styles.timeLimitButtons}>
                 {[60, 105, 120, 180, 240, 300, 360, 420, 480, 0].map(secs => (
@@ -1119,7 +1142,7 @@ export default function ExamEditorScreen() {
             </View>
 
             {/* Questions List */}
-            <Text style={[styles.sectionTitle, { color: colors.text }]}>Questions</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('exam_editor.questions')}</Text>
             {questions.map((q, index) => (
               <View
                 key={q.id}
@@ -1131,7 +1154,7 @@ export default function ExamEditorScreen() {
               >
                 <View style={styles.questionHeader}>
                   <View style={styles.questionNumberContainer}>
-                    <Text style={[styles.questionNumber, { color: colors.primary }]}>Q{q.question_order}</Text>
+                    <Text style={[styles.questionNumber, { color: colors.primary }]}>{t('exam_editor.q_number', { n: q.question_order })}</Text>
                     <TouchableOpacity
                       style={[styles.sourceChip, { backgroundColor: q.is_bonus ? '#F59E0B20' : colors.primary + '15' }]}
                       onPress={() => {
@@ -1246,7 +1269,7 @@ export default function ExamEditorScreen() {
                   onPress={() => { resetCustomForm(); setShowAddCustom(true); }}
                 >
                   <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={20} color={colors.primary} />
-                  <Text style={[styles.addQuestionText, { color: colors.primary }]}>Add Custom Question</Text>
+                  <Text style={[styles.addQuestionText, { color: colors.primary }]}>{t('exam_editor.add_custom_question')}</Text>
                 </TouchableOpacity>
 
                 {!questions.some(q => q.is_bonus) && (
@@ -1255,7 +1278,7 @@ export default function ExamEditorScreen() {
                     onPress={() => { resetCustomForm(); setShowAddBonus(true); }}
                   >
                     <IconSymbol ios_icon_name="star.circle.fill" android_material_icon_name="stars" size={20} color="#F59E0B" />
-                    <Text style={[styles.addQuestionText, { color: '#F59E0B' }]}>Add Bonus Question</Text>
+                    <Text style={[styles.addQuestionText, { color: '#F59E0B' }]}>{t('exam_editor.add_bonus_question')}</Text>
                   </TouchableOpacity>
                 )}
               </>
@@ -1270,7 +1293,7 @@ export default function ExamEditorScreen() {
                     onPress={handlePreview}
                   >
                     <IconSymbol ios_icon_name="eye.fill" android_material_icon_name="preview" size={20} color={colors.primary} />
-                    <Text style={[styles.previewButtonText, { color: colors.primary }]}>Preview Quiz</Text>
+                    <Text style={[styles.previewButtonText, { color: colors.primary }]}>{t('exam_editor.preview_quiz')}</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -1278,7 +1301,7 @@ export default function ExamEditorScreen() {
                     onPress={handleActivate}
                   >
                     <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={22} color="#FFF" />
-                    <Text style={styles.activateButtonText}>Activate Quiz</Text>
+                    <Text style={styles.activateButtonText}>{t('exam_editor.activate_quiz')}</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -1290,14 +1313,14 @@ export default function ExamEditorScreen() {
                     onPress={handlePause}
                   >
                     <IconSymbol ios_icon_name="pause.circle.fill" android_material_icon_name="pause-circle-filled" size={22} color="#FFF" />
-                    <Text style={styles.pauseButtonText}>Pause Quiz</Text>
+                    <Text style={styles.pauseButtonText}>{t('exam_editor.pause_quiz')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.closeButton, { borderColor: '#EF4444' }]}
                     onPress={handleClose}
                   >
                     <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={20} color="#EF4444" />
-                    <Text style={[styles.closeButtonText, { color: '#EF4444' }]}>Close Quiz</Text>
+                    <Text style={[styles.closeButtonText, { color: '#EF4444' }]}>{t('exam_editor.close_quiz')}</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -1309,14 +1332,14 @@ export default function ExamEditorScreen() {
                     onPress={handleResume}
                   >
                     <IconSymbol ios_icon_name="play.circle.fill" android_material_icon_name="play-circle-filled" size={22} color="#FFF" />
-                    <Text style={styles.activateButtonText}>Resume Quiz</Text>
+                    <Text style={styles.activateButtonText}>{t('exam_editor.resume_quiz')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.closeButton, { borderColor: '#EF4444' }]}
                     onPress={handleClose}
                   >
                     <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={20} color="#EF4444" />
-                    <Text style={[styles.closeButtonText, { color: '#EF4444' }]}>Close Quiz</Text>
+                    <Text style={[styles.closeButtonText, { color: '#EF4444' }]}>{t('exam_editor.close_quiz')}</Text>
                   </TouchableOpacity>
                 </>
               )}
@@ -1326,7 +1349,7 @@ export default function ExamEditorScreen() {
                 onPress={handleResetAndNew}
               >
                 <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="refresh" size={18} color={colors.textSecondary} />
-                <Text style={[styles.resetButtonText, { color: colors.textSecondary }]}>Reset & New Quiz</Text>
+                <Text style={[styles.resetButtonText, { color: colors.textSecondary }]}>{t('exam_editor.reset_new_quiz')}</Text>
               </TouchableOpacity>
             </View>
           </>
@@ -1337,7 +1360,7 @@ export default function ExamEditorScreen() {
           <>
             <View style={[styles.trackerSummary, { backgroundColor: colors.card }]}>
               <Text style={[styles.trackerSummaryText, { color: colors.text }]}>
-                {completedCount} of {totalEmployees} completed
+                {t('exam_editor.completed_ratio', { done: completedCount, total: totalEmployees })}
               </Text>
               <View style={[styles.progressBar, { backgroundColor: colors.border }]}>
                 <View
@@ -1385,19 +1408,19 @@ export default function ExamEditorScreen() {
                       }
                     >
                       <IconSymbol ios_icon_name="doc.text.magnifyingglass" android_material_icon_name="pageview" size={12} color={colors.primary} />
-                      <Text style={[styles.retakeButtonText, { color: colors.primary }]}>View</Text>
+                      <Text style={[styles.retakeButtonText, { color: colors.primary }]}>{t('common.view')}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.retakeButton, { borderColor: colors.primary }]}
                       onPress={() => handleResetUserQuiz(entry)}
                     >
                       <IconSymbol ios_icon_name="arrow.counterclockwise" android_material_icon_name="refresh" size={12} color={colors.primary} />
-                      <Text style={[styles.retakeButtonText, { color: colors.primary }]}>Retake</Text>
+                      <Text style={[styles.retakeButtonText, { color: colors.primary }]}>{t('exam_editor.retake_btn')}</Text>
                     </TouchableOpacity>
                   </View>
                 ) : (
                   <View style={[styles.notTakenBadge, { backgroundColor: '#EF444420' }]}>
-                    <Text style={styles.notTakenText}>Not Taken</Text>
+                    <Text style={styles.notTakenText}>{t('exam_editor.not_taken')}</Text>
                   </View>
                 )}
               </View>
@@ -1405,7 +1428,7 @@ export default function ExamEditorScreen() {
 
             {completionData.length === 0 && (
               <Text style={[styles.emptyTrackerText, { color: colors.textSecondary }]}>
-                No employees found for this quiz type.
+                {t('exam_editor.no_employees')}
               </Text>
             )}
           </>
@@ -1419,7 +1442,7 @@ export default function ExamEditorScreen() {
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: colors.text }]}>
-                  {showAddBonus ? 'Add Bonus Question' : 'Add Custom Question'}
+                  {showAddBonus ? t('exam_editor.add_bonus_question') : t('exam_editor.add_custom_question')}
                 </Text>
                 <TouchableOpacity onPress={() => { setShowAddCustom(false); setShowAddBonus(false); }}>
                   <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={28} color={colors.textSecondary} />
@@ -1429,7 +1452,7 @@ export default function ExamEditorScreen() {
               <ScrollView style={styles.modalScroll} contentContainerStyle={{ paddingBottom: 320 }} keyboardShouldPersistTaps="handled">
                 {showAddBonus ? (
                   <View style={styles.bonusValueRow}>
-                    <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Bonus Bucks Value</Text>
+                    <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.bonus_bucks_value')}</Text>
                     <TextInput
                       style={[styles.bonusInput, { backgroundColor: colors.background, color: '#F59E0B', borderColor: '#F59E0B' }]}
                       value={bonusBucksValue}
@@ -1442,9 +1465,9 @@ export default function ExamEditorScreen() {
                 ) : (
                   <View style={styles.bonusValueRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Mcloone's Bucks Value</Text>
+                      <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.currency_value', { currency: currencyName })}</Text>
                       <Text style={[styles.notifyDesc, { color: colors.textSecondary, marginTop: 2 }]}>
-                        Leave blank for the default per-quiz amount
+                        {t('exam_editor.leave_blank_default')}
                       </Text>
                     </View>
                     <TextInput
@@ -1452,13 +1475,13 @@ export default function ExamEditorScreen() {
                       value={customBucksValue}
                       onChangeText={setCustomBucksValue}
                       keyboardType="numeric"
-                      placeholder="Default"
+                      placeholder={t('exam_editor.default_ph')}
                       placeholderTextColor={colors.textSecondary}
                     />
                   </View>
                 )}
 
-                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Photo (optional)</Text>
+                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.photo_optional')}</Text>
                 {customImageUrl ? (
                   <View style={styles.photoPreviewRow}>
                     <StorageImage source={{ uri: customImageUrl }} style={styles.photoPreview} resizeMode="cover" />
@@ -1469,7 +1492,7 @@ export default function ExamEditorScreen() {
                         disabled={uploadingImage}
                       >
                         <Text style={[styles.photoButtonText, { color: colors.primary }]}>
-                          {uploadingImage ? 'Uploading…' : 'Change Photo'}
+                          {uploadingImage ? t('exam_editor.uploading') : t('exam_editor.change_photo')}
                         </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
@@ -1477,7 +1500,7 @@ export default function ExamEditorScreen() {
                         onPress={() => setCustomImageUrl(null)}
                         disabled={uploadingImage}
                       >
-                        <Text style={[styles.photoButtonText, { color: '#EF4444' }]}>Remove</Text>
+                        <Text style={[styles.photoButtonText, { color: '#EF4444' }]}>{t('exam_editor.remove')}</Text>
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -1489,17 +1512,17 @@ export default function ExamEditorScreen() {
                   >
                     <IconSymbol ios_icon_name="photo.fill" android_material_icon_name="photo" size={16} color={colors.primary} />
                     <Text style={[styles.photoButtonText, { color: colors.primary, marginLeft: 6 }]}>
-                      {uploadingImage ? 'Uploading…' : 'Add Photo'}
+                      {uploadingImage ? t('exam_editor.uploading') : t('exam_editor.add_photo')}
                     </Text>
                   </TouchableOpacity>
                 )}
 
-                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Question</Text>
+                <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.question_label')}</Text>
                 <TextInput
                   style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                   value={customText}
                   onChangeText={setCustomText}
-                  placeholder="Enter your question..."
+                  placeholder={t('exam_editor.enter_question_ph')}
                   placeholderTextColor={colors.textSecondary}
                   multiline
                 />
@@ -1510,7 +1533,7 @@ export default function ExamEditorScreen() {
                   return (
                     <View key={letter}>
                       <View style={styles.optionLabelRow}>
-                        <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Option {letter}</Text>
+                        <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.option_letter', { letter })}</Text>
                         <TouchableOpacity
                           style={[
                             styles.correctToggle,
@@ -1520,7 +1543,7 @@ export default function ExamEditorScreen() {
                           onPress={() => setCustomCorrect(letter)}
                         >
                           <Text style={[styles.correctToggleText, { color: customCorrect === letter ? '#FFF' : colors.textSecondary }]}>
-                            {customCorrect === letter ? 'Correct' : 'Set Correct'}
+                            {customCorrect === letter ? t('exam_editor.correct') : t('exam_editor.set_correct')}
                           </Text>
                         </TouchableOpacity>
                       </View>
@@ -1528,7 +1551,7 @@ export default function ExamEditorScreen() {
                         style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                         value={value}
                         onChangeText={setter}
-                        placeholder={`Option ${letter}...`}
+                        placeholder={t('exam_editor.option_letter_ph', { letter })}
                         placeholderTextColor={colors.textSecondary}
                       />
                     </View>
@@ -1540,7 +1563,7 @@ export default function ExamEditorScreen() {
                   onPress={() => handleAddCustom(showAddBonus)}
                 >
                   <Text style={[styles.modalSaveText, !showAddBonus && { color: colors.fireText }]}>
-                    {showAddBonus ? 'Add Bonus Question' : 'Add Question'}
+                    {showAddBonus ? t('exam_editor.add_bonus_question') : t('exam_editor.add_question_btn')}
                   </Text>
                 </TouchableOpacity>
               </ScrollView>
@@ -1555,7 +1578,7 @@ export default function ExamEditorScreen() {
           <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 40 : 0} style={styles.modalContainer}>
             <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
               <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>Edit Question</Text>
+                <Text style={[styles.modalTitle, { color: colors.text }]}>{t('exam_editor.edit_question')}</Text>
                 <TouchableOpacity onPress={() => setEditingQuestion(null)}>
                   <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={28} color={colors.textSecondary} />
                 </TouchableOpacity>
@@ -1565,7 +1588,7 @@ export default function ExamEditorScreen() {
                 <ScrollView style={styles.modalScroll} contentContainerStyle={{ paddingBottom: 320 }} keyboardShouldPersistTaps="handled">
                   {editingQuestion.is_bonus ? (
                     <View style={styles.bonusValueRow}>
-                      <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Bonus Bucks Value</Text>
+                      <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.bonus_bucks_value')}</Text>
                       <TextInput
                         style={[styles.bonusInput, { backgroundColor: colors.background, color: '#F59E0B', borderColor: '#F59E0B' }]}
                         value={String(editingQuestion.bonus_bucks_value || 5)}
@@ -1576,9 +1599,9 @@ export default function ExamEditorScreen() {
                   ) : (
                     <View style={styles.bonusValueRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Mcloone's Bucks Value</Text>
+                        <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.currency_value', { currency: currencyName })}</Text>
                         <Text style={[styles.notifyDesc, { color: colors.textSecondary, marginTop: 2 }]}>
-                          Leave blank for the default per-quiz amount
+                          {t('exam_editor.leave_blank_default')}
                         </Text>
                       </View>
                       <TextInput
@@ -1598,13 +1621,13 @@ export default function ExamEditorScreen() {
                           }
                         }}
                         keyboardType="numeric"
-                        placeholder="Default"
+                        placeholder={t('exam_editor.default_ph')}
                         placeholderTextColor={colors.textSecondary}
                       />
                     </View>
                   )}
 
-                  <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Photo (optional)</Text>
+                  <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.photo_optional')}</Text>
                   {editingQuestion.question_image_url ? (
                     <View style={styles.photoPreviewRow}>
                       <StorageImage source={{ uri: editingQuestion.question_image_url }} style={styles.photoPreview} resizeMode="cover" />
@@ -1615,7 +1638,7 @@ export default function ExamEditorScreen() {
                           disabled={uploadingImage}
                         >
                           <Text style={[styles.photoButtonText, { color: colors.primary }]}>
-                            {uploadingImage ? 'Uploading…' : 'Change Photo'}
+                            {uploadingImage ? t('exam_editor.uploading') : t('exam_editor.change_photo')}
                           </Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -1623,7 +1646,7 @@ export default function ExamEditorScreen() {
                           onPress={handleRemovePhotoFromEditingQuestion}
                           disabled={uploadingImage}
                         >
-                          <Text style={[styles.photoButtonText, { color: '#EF4444' }]}>Remove</Text>
+                          <Text style={[styles.photoButtonText, { color: '#EF4444' }]}>{t('exam_editor.remove')}</Text>
                         </TouchableOpacity>
                       </View>
                     </View>
@@ -1635,12 +1658,12 @@ export default function ExamEditorScreen() {
                     >
                       <IconSymbol ios_icon_name="photo.fill" android_material_icon_name="photo" size={16} color={colors.primary} />
                       <Text style={[styles.photoButtonText, { color: colors.primary, marginLeft: 6 }]}>
-                        {uploadingImage ? 'Uploading…' : 'Add Photo'}
+                        {uploadingImage ? t('exam_editor.uploading') : t('exam_editor.add_photo')}
                       </Text>
                     </TouchableOpacity>
                   )}
 
-                  <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Question</Text>
+                  <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.question_label')}</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
                     value={editingQuestion.question_text}
@@ -1653,7 +1676,7 @@ export default function ExamEditorScreen() {
                     return (
                       <View key={letter}>
                         <View style={styles.optionLabelRow}>
-                          <Text style={[styles.formLabel, { color: colors.textSecondary }]}>Option {letter}</Text>
+                          <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.option_letter', { letter })}</Text>
                           <TouchableOpacity
                             style={[
                               styles.correctToggle,
@@ -1663,7 +1686,7 @@ export default function ExamEditorScreen() {
                             onPress={() => setEditingQuestion({ ...editingQuestion, correct_option: letter })}
                           >
                             <Text style={[styles.correctToggleText, { color: editingQuestion.correct_option === letter ? '#FFF' : colors.textSecondary }]}>
-                              {editingQuestion.correct_option === letter ? 'Correct' : 'Set Correct'}
+                              {editingQuestion.correct_option === letter ? t('exam_editor.correct') : t('exam_editor.set_correct')}
                             </Text>
                           </TouchableOpacity>
                         </View>
@@ -1680,7 +1703,7 @@ export default function ExamEditorScreen() {
                     style={[styles.modalSaveButton, { backgroundColor: colors.primary }]}
                     onPress={handleSaveEdit}
                   >
-                    <Text style={[styles.modalSaveText, { color: colors.fireText }]}>Save Changes</Text>
+                    <Text style={[styles.modalSaveText, { color: colors.fireText }]}>{t('exam_editor.save_changes')}</Text>
                   </TouchableOpacity>
                 </ScrollView>
               )}
@@ -1719,7 +1742,7 @@ export default function ExamEditorScreen() {
             onStartShouldSetResponder={() => true}
           >
             <Text style={[styles.modalTitle, { color: colors.text, marginBottom: 12 }]}>
-              Question Category
+              {t('exam_editor.question_category')}
             </Text>
             {!showCustomCategoryInput ? (
               <>
@@ -1745,7 +1768,7 @@ export default function ExamEditorScreen() {
                       }}
                     >
                       <Text style={{ color: colors.text, fontSize: 15, fontWeight: '500' }}>
-                        {opt.label}
+                        {t(opt.labelKey)}
                       </Text>
                       {isCurrent && (
                         <IconSymbol
@@ -1767,7 +1790,7 @@ export default function ExamEditorScreen() {
                   }}
                 >
                   <Text style={{ color: colors.primary, fontSize: 15, fontWeight: '600' }}>
-                    Custom…
+                    {t('common.custom_option')}
                   </Text>
                   <IconSymbol
                     ios_icon_name="chevron.right"
@@ -1780,7 +1803,7 @@ export default function ExamEditorScreen() {
             ) : (
               <View>
                 <Text style={[styles.formLabel, { color: colors.textSecondary }]}>
-                  Custom category
+                  {t('exam_editor.custom_category')}
                 </Text>
                 <TextInput
                   style={[
@@ -1789,7 +1812,7 @@ export default function ExamEditorScreen() {
                   ]}
                   value={customCategoryText}
                   onChangeText={setCustomCategoryText}
-                  placeholder="e.g. Cocktail Specs"
+                  placeholder={t('exam_editor.custom_category_ph')}
                   placeholderTextColor={colors.textSecondary}
                   autoFocus
                 />
@@ -1801,7 +1824,7 @@ export default function ExamEditorScreen() {
                       setCustomCategoryText('');
                     }}
                   >
-                    <Text style={[styles.modalSaveText, { color: colors.text }]}>Back</Text>
+                    <Text style={[styles.modalSaveText, { color: colors.text }]}>{t('common.back')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.modalSaveButton, { flex: 1, backgroundColor: colors.primary }]}
@@ -1812,7 +1835,7 @@ export default function ExamEditorScreen() {
                       handleUpdateCategoryLabel(q, trimmed || null);
                     }}
                   >
-                    <Text style={[styles.modalSaveText, { color: colors.fireText }]}>Save</Text>
+                    <Text style={[styles.modalSaveText, { color: colors.fireText }]}>{t('common.save')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -1829,7 +1852,7 @@ export default function ExamEditorScreen() {
             <View style={[styles.datePickerContainer, { backgroundColor: colors.card }]}>
               <View style={styles.datePickerHeader}>
                 <TouchableOpacity onPress={() => { setShowCloseDatePicker(false); setShowCloseTimePicker(true); }}>
-                  <Text style={[styles.datePickerDone, { color: colors.primary }]}>Next: Time</Text>
+                  <Text style={[styles.datePickerDone, { color: colors.primary }]}>{t('exam_editor.picker_next_time')}</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -1867,7 +1890,7 @@ export default function ExamEditorScreen() {
             <View style={[styles.datePickerContainer, { backgroundColor: colors.card }]}>
               <View style={styles.datePickerHeader}>
                 <TouchableOpacity onPress={() => setShowCloseTimePicker(false)}>
-                  <Text style={[styles.datePickerDone, { color: colors.primary }]}>Done</Text>
+                  <Text style={[styles.datePickerDone, { color: colors.primary }]}>{t('exam_editor.picker_done')}</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
