@@ -12,6 +12,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useTranslation } from 'react-i18next';
 import { useToolVisibility } from '@/hooks/useToolVisibility';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
@@ -31,12 +32,14 @@ interface GridItem {
   iosIcon: string;
   androidIcon: string;
   route: string;
+  isPremium?: boolean; // dim + lock badge on base; the destination screen enforces the gate
 }
 
 export default function ManagerToolsScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { user } = useAuth();
+  const { hasPremium } = useSubscription();
   const { t } = useTranslation();
   const { pendingCount } = usePendingApprovals();
   const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
@@ -48,7 +51,7 @@ export default function ManagerToolsScreen() {
   const fixedItems: GridItem[] = [
     { id: 'guides-training', label: t('manager_tools.guides_training'), iosIcon: 'book.fill', androidIcon: 'menu-book', route: '/guides-and-training' },
     { id: 'game-hub', label: t('employee_tools.game_hub'), iosIcon: 'gamecontroller.fill', androidIcon: 'sports-esports', route: '/game-hub' },
-    { id: 'weekly-quizzes', label: t('quick_tools.weekly_quizzes'), iosIcon: 'questionmark.circle.fill', androidIcon: 'quiz', route: '/quiz-hub-editor' },
+    { id: 'weekly-quizzes', label: t('quick_tools.weekly_quizzes'), iosIcon: 'questionmark.circle.fill', androidIcon: 'quiz', route: '/quiz-hub-editor', isPremium: true },
   ];
 
   if (canSee('check_outs')) {
@@ -73,10 +76,11 @@ export default function ManagerToolsScreen() {
   const renderGridItem = (item: GridItem) => {
     const showApprovalsBadge = item.id === 'rewards-reviews' && pendingCount > 0;
     const showGameHubBadge = item.id === 'game-hub' && unreadLeaderboardCount > 0;
+    const isLocked = item.isPremium && !hasPremium;
     return (
       <TouchableOpacity
         key={item.id}
-        style={[styles.gridItem, { backgroundColor: colors.card, width: ITEM_WIDTH }]}
+        style={[styles.gridItem, { backgroundColor: colors.card, width: ITEM_WIDTH }, isLocked && { opacity: 0.7 }]}
         onPress={() => router.push(item.route as any)}
         activeOpacity={0.7}
       >
@@ -95,6 +99,11 @@ export default function ManagerToolsScreen() {
           {showGameHubBadge && (
             <View style={styles.tileBadge}>
               <MessageBadge count={unreadLeaderboardCount} size="small" />
+            </View>
+          )}
+          {isLocked && (
+            <View style={styles.tileBadge}>
+              <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={14} color={colors.textSecondary} />
             </View>
           )}
         </View>

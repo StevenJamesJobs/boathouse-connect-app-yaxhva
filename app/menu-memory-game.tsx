@@ -14,6 +14,9 @@ import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { GameMode, PlayMode, GAME_MODE_INFO } from '@/types/game';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { isManagerOrOwner } from '@/utils/roles';
+import PremiumGate from '@/components/PremiumGate';
 import { fetchOwnWineVisible } from '@/utils/game/wineVisibility';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -29,6 +32,7 @@ export default function MenuMemoryGameScreen() {
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
+  const { hasPremium } = useSubscription();
   const { organizationId, organization } = useOrganization();
   const [modeStats, setModeStats] = useState<Record<GameMode, ModeStats | null>>({
     wine_pairings: null,
@@ -141,6 +145,42 @@ export default function MenuMemoryGameScreen() {
       </TouchableOpacity>
     );
   };
+
+  if (!hasPremium) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <IconSymbol
+              ios_icon_name="chevron.left"
+              android_material_icon_name="arrow-back"
+              size={24}
+              color={colors.text}
+            />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            {t('memory_game.hub_title')}
+          </Text>
+          <View style={styles.placeholder} />
+        </View>
+        {isManagerOrOwner(user) ? (
+          <PremiumGate
+            desc={t('game_hub_ui.premium_intro')}
+            bullets={[t('game_hub_ui.premium_b1'), t('game_hub_ui.premium_b2')]}
+            footer={t('game_hub_ui.premium_footer')}
+          />
+        ) : (
+          // Employees can't purchase — no upsell, just a friendly nudge.
+          <PremiumGate
+            title={t('common.feature_locked_title')}
+            desc={t('common.feature_locked_desc')}
+            footer={t('game_hub_ui.locked_joke')}
+            showButton={false}
+          />
+        )}
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

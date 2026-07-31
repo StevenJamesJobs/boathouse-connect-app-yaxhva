@@ -11,9 +11,10 @@ Claude Code auto-loads this file. **These rules are load-bearing — follow them
   lockfile is delicate and must not be disturbed: `ln -s <main-checkout>/node_modules <worktree>/node_modules`.
 - **Dev server runs FROM THE WORKTREE:** `unset APP_VARIANT && APP_VARIANT=public npx expo start -c --go`
   (`public` = the MyResto variant; `mcloones` = Boathouse).
-- **Gates on every change:** `npx tsc --noEmit` with **0 net-new errors in touched files** (main has a
-  large pre-existing baseline of benign `organizationId: string|null` errors — measure the diff, not the
-  total), and keep **en/es i18n at parity** — never add a `t()` key to only one locale.
+- **Gates on every change:** `npx tsc --noEmit` must be a **TRUE 0** (the old pre-existing baseline was
+  eliminated by the s57 type pass, PR #66 — any tsc error is net-new by definition), and keep **en/es
+  i18n at parity** — never add a `t()` key to only one locale (run the key check in BOTH directions:
+  source refs exist in both locales AND newly added keys are referenced in source).
 - **Supabase project `xvbajqukbakcvdrkcioi` via the Supabase MCP.** Migrations and edge functions deploy
   **through the MCP** (`apply_migration` / edge-fn deploy), **not** from the repo. Keep a repo copy of each
   migration under `supabase/migrations/` for the record, but the live deploy is via MCP. Keep SQL

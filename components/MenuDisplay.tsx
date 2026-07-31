@@ -495,6 +495,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     let items: MenuItem[] = data || [];
 
     if (seasonKey === 'summer') {
+      // Mirror the winter dedup: hide manually-entered Libations cocktail menu
+      // items so they can't double-render next to the injected summer recipes.
+      items = items.filter(
+        (i) => !(i.category === libInjection.libationsCategoryName && i.subcategory != null && libInjection.cocktailSubNames.has(i.subcategory))
+      );
       // RPC read (B4 batch 4): member-gated, org derived from the actor,
       // active-only server-side — replaces the last direct .from() read here.
       const { data: slrData } = await (supabase.rpc as any)('get_summer_libation_recipes', {

@@ -73,7 +73,7 @@ export default function QuestionReviewList({ questions }: Props) {
               </View>
               {q.is_bonus && (
                 <View style={[styles.bonusChip, { backgroundColor: '#F59E0B20' }]}>
-                  <Text style={styles.bonusChipText}>BONUS</Text>
+                  <Text style={styles.bonusChipText}>{isSpanish ? 'BONO' : 'BONUS'}</Text>
                 </View>
               )}
             </View>

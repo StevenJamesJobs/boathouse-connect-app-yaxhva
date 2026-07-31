@@ -65,7 +65,7 @@ export default function WeeklyQuizCard({
         <Text style={[styles.examEmptyTitle, { color: colors.text }]}>{titleLabel}</Text>
         <Text style={[styles.examEmptyDesc, { color: colors.textSecondary }]}>
           {isSpanish
-            ? '¡No hay un examen activo en este momento. Vuelve pronto!'
+            ? 'No hay un cuestionario activo en este momento. ¡Vuelve pronto!'
             : "There's no active quiz right now. Check back soon!"}
         </Text>
       </View>
@@ -84,13 +84,13 @@ export default function WeeklyQuizCard({
             color="#F59E0B"
           />
           <Text style={[styles.examActiveBadgeText, { color: '#F59E0B' }]}>
-            {isSpanish ? 'Examen en Pausa' : 'Quiz Paused'}
+            {isSpanish ? 'Cuestionario en Pausa' : 'Quiz Paused'}
           </Text>
         </View>
         <Text style={[styles.examEmptyTitle, { color: colors.text }]}>{titleLabel}</Text>
         <Text style={[styles.examEmptyDesc, { color: colors.textSecondary }]}>
           {isSpanish
-            ? 'Este examen está en pausa actualmente. ¡Vuelve pronto!'
+            ? 'Este cuestionario está en pausa actualmente. ¡Vuelve pronto!'
             : 'This quiz is currently paused. Check back soon!'}
         </Text>
       </View>
@@ -162,7 +162,7 @@ export default function WeeklyQuizCard({
         <View style={[styles.examActiveBadge, { backgroundColor: '#10B98120' }]}>
           <View style={[styles.examActiveDot, { backgroundColor: '#10B981' }]} />
           <Text style={styles.examActiveBadgeText}>
-            {isSpanish ? 'Examen Activo' : 'Active Quiz'}
+            {isSpanish ? 'Cuestionario Activo' : 'Active Quiz'}
           </Text>
         </View>
         {closeAtDate && (
@@ -220,7 +220,7 @@ export default function WeeklyQuizCard({
         onPress={() => onTakeQuiz(activeExam.id)}
       >
         <Text style={[styles.takeQuizButtonText, { color: colors.fireText }]}>
-          {isSpanish ? 'Tomar Examen' : 'Take Quiz'}
+          {isSpanish ? 'Tomar Cuestionario' : 'Take Quiz'}
         </Text>
         <IconSymbol
           ios_icon_name="arrow.right"
@@ -232,7 +232,7 @@ export default function WeeklyQuizCard({
       {eligibleQuizCount > 1 && (
         <Text style={[styles.splitNote, { color: colors.textSecondary }]}>
           {isSpanish
-            ? `Tu recompensa por pregunta se divide entre tus ${eligibleQuizCount} exámenes — el máximo semanal sigue siendo el mismo.`
+            ? `Tu recompensa por pregunta se divide entre tus ${eligibleQuizCount} cuestionarios — el máximo semanal sigue siendo el mismo.`
             : `Your reward per question is split across your ${eligibleQuizCount} quizzes — total weekly max stays the same.`}
         </Text>
       )}

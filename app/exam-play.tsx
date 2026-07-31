@@ -174,8 +174,8 @@ export default function ExamPlayScreen() {
         if (existingResult?.completed_at) {
           // Already completed — redirect back
           Alert.alert(
-            isSpanish ? 'Examen Completado' : 'Quiz Already Completed',
-            isSpanish ? 'Ya completaste este examen.' : 'You have already completed this quiz.',
+            isSpanish ? 'Cuestionario Completado' : 'Quiz Already Completed',
+            isSpanish ? 'Ya completaste este cuestionario.' : 'You have already completed this quiz.',
             [{ text: isSpanish ? 'Aceptar' : 'OK', onPress: () => router.back() }]
           );
           return;
@@ -185,7 +185,7 @@ export default function ExamPlayScreen() {
         // quiz with already-revealed answers is the retake loophole this closes.
         if (await getPendingSubmit(user.id, examId)) {
           Alert.alert(
-            isSpanish ? 'Examen Completado' : 'Quiz Already Completed',
+            isSpanish ? 'Cuestionario Completado' : 'Quiz Already Completed',
             isSpanish
               ? 'Tus resultados están guardados y se enviarán automáticamente cuando vuelvas a tener conexión.'
               : 'Your results are saved and will submit automatically when you are back online.',
@@ -258,7 +258,7 @@ export default function ExamPlayScreen() {
           console.error('start_exam_attempt error:', error);
           Alert.alert(
             isSpanish ? 'Error' : 'Error',
-            isSpanish ? 'No se pudo iniciar el examen. Inténtalo de nuevo.' : 'Could not start the quiz. Please try again.'
+            isSpanish ? 'No se pudo iniciar el cuestionario. Inténtalo de nuevo.' : 'Could not start the quiz. Please try again.'
           );
           return;
         }
@@ -267,8 +267,8 @@ export default function ExamPlayScreen() {
 
         if (attempt?.is_completed) {
           Alert.alert(
-            isSpanish ? 'Examen Completado' : 'Quiz Already Completed',
-            isSpanish ? 'Ya completaste este examen.' : 'You have already completed this quiz.',
+            isSpanish ? 'Cuestionario Completado' : 'Quiz Already Completed',
+            isSpanish ? 'Ya completaste este cuestionario.' : 'You have already completed this quiz.',
             [{ text: isSpanish ? 'Aceptar' : 'OK', onPress: () => router.back() }]
           );
           return;
@@ -302,7 +302,7 @@ export default function ExamPlayScreen() {
         console.error('start_exam_attempt exception:', err);
         Alert.alert(
           isSpanish ? 'Error' : 'Error',
-          isSpanish ? 'No se pudo iniciar el examen. Inténtalo de nuevo.' : 'Could not start the quiz. Please try again.'
+          isSpanish ? 'No se pudo iniciar el cuestionario. Inténtalo de nuevo.' : 'Could not start the quiz. Please try again.'
         );
         return;
       }
@@ -452,7 +452,7 @@ export default function ExamPlayScreen() {
           <View style={[styles.introCard, { backgroundColor: colors.card }]}>
             <IconSymbol ios_icon_name="doc.text.fill" android_material_icon_name="quiz" size={56} color={colors.primary} />
             <Text style={[styles.introTitle, { color: colors.text }]}>
-              {isSpanish ? `Examen Semanal del ${getExamTypeName(examType as any, true)}` : `${getExamTypeName(examType as any)} Weekly Quiz`}
+              {isSpanish ? `Cuestionario Semanal del ${getExamTypeName(examType as any, true)}` : `${getExamTypeName(examType as any)} Weekly Quiz`}
             </Text>
             <Text style={[styles.introSubtitle, { color: colors.textSecondary }]}>
               {examState.questions.length} {isSpanish ? 'Preguntas' : 'Questions'}
@@ -498,7 +498,7 @@ export default function ExamPlayScreen() {
             {eligibleQuizCount > 1 && (
               <Text style={[styles.introSplitNote, { color: colors.textSecondary }]}>
                 {isSpanish
-                  ? `Tu recompensa por pregunta se divide entre tus ${eligibleQuizCount} exámenes — el máximo semanal sigue siendo el mismo.`
+                  ? `Tu recompensa por pregunta se divide entre tus ${eligibleQuizCount} cuestionarios — el máximo semanal sigue siendo el mismo.`
                   : `Your reward per question is split across your ${eligibleQuizCount} quizzes — total weekly max stays the same.`}
               </Text>
             )}
@@ -530,7 +530,7 @@ export default function ExamPlayScreen() {
             style={[styles.startButton, { backgroundColor: colors.primary }]}
             onPress={handleStart}
           >
-            <Text style={[styles.startButtonText, { color: colors.fireText }]}>{isSpanish ? 'Comenzar Examen' : 'Start Quiz'}</Text>
+            <Text style={[styles.startButtonText, { color: colors.fireText }]}>{isSpanish ? 'Comenzar Cuestionario' : 'Start Quiz'}</Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={() => router.back()} style={styles.cancelLink}>
@@ -555,7 +555,7 @@ export default function ExamPlayScreen() {
           )}
 
           <View style={[styles.completedCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.completedTitle, { color: colors.text }]}>{isSpanish ? '¡Examen Completo!' : 'Quiz Complete!'}</Text>
+            <Text style={[styles.completedTitle, { color: colors.text }]}>{isSpanish ? '¡Cuestionario Completo!' : 'Quiz Complete!'}</Text>
 
             <View style={[styles.scoreCircle, { borderColor: colors.primary }]}>
               <Text style={[styles.scoreNumber, { color: colors.primary }]}>

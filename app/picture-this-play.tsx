@@ -152,7 +152,7 @@ export default function PictureThisPlayScreen() {
         const data = await loadPool(category, organizationId ?? '', organization.games_use_sample_data, user.id, wineVisible);
         if (cancelled) return;
         if (data.length < 4) {
-          setPoolError('Not enough menu items in this category to play. Try a different category.');
+          setPoolError(t('picture_this:not_enough_items'));
           setLoading(false);
           return;
         }
@@ -163,7 +163,7 @@ export default function PictureThisPlayScreen() {
       } catch (err) {
         console.error('[PictureThis] pool load error:', err);
         if (!cancelled) {
-          setPoolError('Could not load menu items. Check your connection.');
+          setPoolError(t('picture_this:load_failed'));
           setLoading(false);
         }
       }

@@ -191,6 +191,8 @@ const ICON_MAP: Record<string, keyof typeof MaterialIcons.glyphMap> = {
   'wineglass.fill': 'wine-bar',
   'cup.and.saucer.fill': 'local-cafe',
   'cup.and.straw.fill': 'local-bar',
+  'mug': 'sports-bar',
+  'mug.fill': 'sports-bar',
   'fish.fill': 'set-meal',
   'takeoutbag.and.cup.and.straw.fill': 'takeout-dining',
   'popcorn.fill': 'fastfood',

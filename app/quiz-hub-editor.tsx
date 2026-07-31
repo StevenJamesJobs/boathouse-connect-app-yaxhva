@@ -19,6 +19,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import PremiumGate from '@/components/PremiumGate';
 
 interface ExamSummary {
   id: string;
@@ -53,6 +55,7 @@ export default function QuizHubEditorScreen() {
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
+  const { hasPremium } = useSubscription();
   const [loading, setLoading] = useState(true);
   const [exams, setExams] = useState<Map<ExamType, ExamSummary | null>>(new Map());
 
@@ -208,6 +211,25 @@ export default function QuizHubEditorScreen() {
       </TouchableOpacity>
     );
   };
+
+  if (!hasPremium) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('weekly_quizzes.title')}</Text>
+          <View style={styles.placeholder} />
+        </View>
+        <PremiumGate
+          desc={t('weekly_quizzes.premium_desc')}
+          bullets={[t('weekly_quizzes.premium_b1'), t('weekly_quizzes.premium_b2'), t('weekly_quizzes.premium_b3')]}
+          footer={t('weekly_quizzes.premium_footer')}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

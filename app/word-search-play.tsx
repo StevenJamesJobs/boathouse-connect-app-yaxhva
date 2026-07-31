@@ -192,27 +192,27 @@ export default function WordSearchPlayScreen() {
           <View style={[styles.resultCard, { backgroundColor: colors.card }]}>
             <Text style={styles.resultEmoji}>{isWin ? '🎉' : '⏰'}</Text>
             <Text style={[styles.resultTitle, { color: colors.text }]}>
-              {isWin ? 'Puzzle Complete!' : "Time's Up!"}
+              {isWin ? t('word_search:puzzle_complete') : t('word_search:times_up')}
             </Text>
             <Text style={[styles.resultSub, { color: colors.textSecondary }]}>
               {isWin
-                ? 'Great work finding all the ingredients!'
-                : `You found ${foundWordIds.length} of ${puzzle.words.length} words`}
+                ? t('word_search:great_work')
+                : t('word_search:you_found_count', { found: foundWordIds.length, total: puzzle.words.length })}
             </Text>
 
             {/* Score breakdown */}
             <View style={[styles.scoreBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <ScoreRow label="Words Found" value={`${foundWordIds.length} × ${pointsPerWord}`} color={colors.primary} />
+              <ScoreRow label={t('word_search:words_found')} value={`${foundWordIds.length} × ${pointsPerWord}`} color={colors.primary} />
               {playMode === 'timed' && isWin && (
-                <ScoreRow label="Time Bonus" value={`+${timeBonus}`} color="#10B981" />
+                <ScoreRow label={t('word_search:time_bonus')} value={`+${timeBonus}`} color="#10B981" />
               )}
               <View style={[styles.scoreDivider, { backgroundColor: colors.border }]} />
-              <ScoreRow label="Total Score" value={String(finalScore)} color={colors.primary} bold />
+              <ScoreRow label={t('word_search:total_score')} value={String(finalScore)} color={colors.primary} bold />
             </View>
 
             {/* Word review grouped by dish/cocktail */}
             <View style={[styles.reviewBox, { borderColor: colors.border }]}>
-              <Text style={[styles.reviewTitle, { color: colors.text }]}>Word Review</Text>
+              <Text style={[styles.reviewTitle, { color: colors.text }]}>{t('word_search:word_review')}</Text>
               <ScrollView style={styles.reviewScroll} showsVerticalScrollIndicator={false}>
                 {Array.from(grouped.entries()).map(([itemName, words]) => (
                   <View key={itemName}>
@@ -247,7 +247,7 @@ export default function WordSearchPlayScreen() {
               style={[styles.actionBtn, { backgroundColor: colors.primary }]}
               onPress={handleRestart}
             >
-              <Text style={[styles.actionBtnText, { color: colors.fireText }]}>Play Again</Text>
+              <Text style={[styles.actionBtnText, { color: colors.fireText }]}>{t('word_search:play_again')}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.secondaryBtn, { borderColor: colors.border }]}
@@ -256,7 +256,7 @@ export default function WordSearchPlayScreen() {
                 router.replace('/word-search-game');
               }}
             >
-              <Text style={[styles.secondaryBtnText, { color: colors.textSecondary }]}>Back to Categories</Text>
+              <Text style={[styles.secondaryBtnText, { color: colors.textSecondary }]}>{t('word_search:back_to_categories')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -269,7 +269,7 @@ export default function WordSearchPlayScreen() {
     return (
       <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Building your puzzle...</Text>
+        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('word_search:building_puzzle')}</Text>
       </View>
     );
   }

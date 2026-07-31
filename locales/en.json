@@ -16,6 +16,8 @@
     "not_found": "Could not load this profile."
   },
   "common": {
+    "feature_locked_title": "Feature Locked",
+    "feature_locked_desc": "This feature has not been unlocked yet.",
     "to_editor": "To Editor",
     "to_user": "To User",
     "custom_option": "Custom…",
@@ -353,6 +355,11 @@
     "game_hub": "Game Hub"
   },
   "weekly_quizzes": {
+    "premium_b1": "Automatic generation of quizzes big and small for your staff.",
+    "premium_b2": "Questions come from your own menu dishes & ingredients, checklists, libation and wine recipes, prices, and dietary restrictions.",
+    "premium_b3": "Add your own custom questions, with reward values your staff earn for correct answers!",
+    "premium_footer": "Weekly Quizzes is just one feature you gain access to. Tap below to find out more about our Premium Plan.",
+    "locked_joke": "Tell your manager you want to test your skills!",
     "title": "Weekly Quizzes",
     "subtitle": "Your assigned quizzes this week",
     "empty_title": "No Quiz Available",
@@ -363,9 +370,10 @@
     "type_quiz_title": "{{type}} Quiz",
     "manage_blurb": "Manage weekly quizzes for all staff roles. Tap a card to create, edit, or activate a quiz.",
     "premium_title": "Premium Feature",
-    "premium_desc": "Weekly Quizzes require the Premium plan. Test your team's knowledge with quizzes tailored to each role.",
+    "premium_desc": "Building quizzes for your staff requires the Premium Plan, which gives you access to:",
     "premium_upgrade_btn": "Upgrade to Premium",
     "question_count_short": "{{count}} Q's",
+    "question_count_short_one": "{{count}} Q",
     "no_active_quiz": "No active quiz",
     "completed_ratio": "{{done}}/{{total}} completed",
     "reward_blurb_title": "Quiz Reward!",
@@ -1442,7 +1450,8 @@
     "delete_error": "Failed to delete menu item",
     "pick_image_error": "Failed to pick image",
     "upload_image_error": "Failed to upload image",
-    "summer_libation_banner": "Summer cocktails are managed via the Summer Libation Recipes Editor.",
+    "summer_libation_banner": "{{menu}} cocktails are managed via the {{menu}} Libation Recipes Editor.",
+    "libation_banner_single": "Cocktails are managed via the Libation Recipes Editor.",
     "season_label": "Menu Choice",
     "shape_label": "Image Shape",
     "season_winter": "Winter",
@@ -1458,7 +1467,7 @@
     "ai_button": "AI",
     "ai_upload_button": "AI Menu Upload",
     "upload_menu_button": "Upload Menu",
-    "winter_libation_banner": "Menu 1 cocktails are managed via the Menu 1 Libation Recipes Editor."
+    "winter_libation_banner": "{{menu}} cocktails are managed via the {{menu}} Libation Recipes Editor."
   },
   "season_selector": {
     "winter": "Winter Menu",
@@ -1483,6 +1492,12 @@
     "theme_ocean": "Ocean"
   },
   "rewards_reviews_editor": {
+    "gr_premium_screen_title": "Google Reviews",
+    "gr_premium_desc": "Automatic Google Reviews require the Premium Plan, which gives you access to:",
+    "gr_premium_b1": "Add your Google Maps location and we'll automatically grab your latest reviews!",
+    "gr_premium_b2": "Automatic refreshes twice a week — Monday after the busy weekend, and Thursday to catch up mid-week!",
+    "gr_premium_b3": "10 manual refreshes a month for when you just can't wait to see what's new.",
+    "gr_premium_footer": "Automatic Google Reviews is just one feature you gain access to. Tap below to find out more about our Premium Plan.",
     "title": "Rewards & Reviews Editor",
     "tab_rewards": "Rewards",
     "tab_reviews": "Reviews",
@@ -1588,10 +1603,9 @@
     "no_transactions_found": "No transactions found",
     "refresh_short": "Refresh",
     "n_left": "{{count}} left",
+    "n_left_one": "{{count}} left",
     "deduct_modal_title": "Deduct Bucks",
     "current_balance": "Current",
-    "premium_feature_title": "Premium Feature",
-    "premium_feature_msg": "Automatic Google Reviews import requires the Premium plan ($15/mo).",
     "refresh_confirm_title": "Refresh Google Reviews?",
     "refresh_confirm_message": "Reviews refresh automatically every Monday & Thursday morning and don't count toward your limit. You have {{count}} manual refreshes left this subscription period.",
     "refresh_now": "Refresh Now",
@@ -1608,8 +1622,7 @@
     "review_shown": "Review shown",
     "review_visibility_error": "Failed to update review visibility",
     "redeem_label": "Redeem",
-    "redeem_settings": "Redeem Settings",
-    "upgrade": "Upgrade"
+    "redeem_settings": "Redeem Settings"
   },
   "translation_section": {
     "spanish_section_title": "Spanish Translation (Optional)",
@@ -1667,6 +1680,13 @@
     "forecast_sun_times": "Sunrise at {{sunrise}}, sunset at {{sunset}}."
   },
   "schedule_upload": {
+    "premium_b1": "Upload files or images of the staff schedules you've exported or created — PDFs, photos, Word and Excel documents.",
+    "premium_b2": "Our AI automatically scans them and adds the shifts to your staff's roster and profiles.",
+    "premium_b3": "Review and edit every imported schedule afterwards.",
+    "premium_b4": "Employees not yet in your organization — or name mismatches — are saved so you can assign them afterwards.",
+    "premium_b5": "Manual entry is a thing of the past!",
+    "premium_footer": "AI Schedule Uploads is just one feature you gain access to by upgrading. Tap below to find out more about our Premium Plan.",
+    "premium_desc": "AI Schedule Uploads require the Premium Plan, which gives you access to:",
     "title": "Staff Schedules",
     "uploading": "Uploading...",
     "processing_message": "AI is reading your schedule PDF... This may take 15-30 seconds.",
@@ -1729,6 +1749,7 @@
     "my_quick_tools": "My Quick Tools"
   },
   "quick_tools": {
+    "picture_this": "Picture This!",
     "select_tools": "Select Quick Tools",
     "selected_count": "{{count}} of {{max}} selected",
     "max_reached": "Maximum reached",
@@ -1769,6 +1790,9 @@
     "quiz_hub_editor": "Quizzes Editor"
   },
   "word_search": {
+    "you_found_count": "You found {{found}} of {{total}} words",
+    "time_bonus": "Time Bonus",
+    "total_score": "Total Score",
     "hub_title": "Word Search Games",
     "intro_title": "Find the Ingredients!",
     "intro_desc": "Discover ingredient words hidden in the letter grid. Learn what's in every dish while you search!",
@@ -1980,6 +2004,11 @@
     "generic_error": "Something went wrong. Try again."
   },
   "game_hub_ui": {
+    "premium_intro": "Upgrading to the Premium Plan unlocks both games:",
+    "premium_b1": "Menu Memory Game — match tiles of your dishes and recipes with their ingredients.",
+    "premium_b2": "Picture This! — pick the correct ingredients for a menu item's picture, from Easy to Hard, in Free Play and Lives modes.",
+    "premium_footer": "The games are just one feature you gain access to. Tap below to find out more about our Premium Plan.",
+    "locked_joke": "Let your manager know you need more games!",
     "title": "Game Hub",
     "subtitle": "Test your knowledge of the menu with fun, interactive games.",
     "leaderboard_title": "Leaderboard",
@@ -2063,6 +2092,8 @@
     "mode_free": "🔓 Free"
   },
   "onboarding": {
+    "default_menu_1": "Menu 1",
+    "default_menu_2": "Menu 2",
     "email": "Email",
     "password": "Password",
     "address": "Address",
@@ -2431,7 +2462,7 @@
     "retake_btn": "Retake",
     "not_taken": "Not Taken",
     "no_employees": "No employees found for this quiz type.",
-    "bonus_bucks_value": "Bonus Bucks Value",
+    "bonus_bucks_value": "Bonus {{currency}} Value",
     "leave_blank_default": "Leave blank for the default per-quiz amount",
     "default_ph": "Default",
     "photo_optional": "Photo (optional)",
@@ -2454,5 +2485,39 @@
     "picker_next_time": "Next: Time",
     "picker_done": "Done",
     "currency_value": "{{currency}} Value"
+  },
+  "manual_schedule": {
+    "shifts_count": "{{count}} shifts",
+    "shifts_count_one": "{{count}} shift",
+    "scheduled_count": "{{count}} scheduled",
+    "scheduled_count_one": "{{count}} scheduled",
+    "employees_count": "{{count}} employees",
+    "employees_count_one": "{{count}} employee"
+  },
+  "menu_icons": {
+    "snowflake": "Snowflake",
+    "sun": "Sun",
+    "leaf": "Leaf",
+    "sparkles": "Sparkles",
+    "night": "Night",
+    "flame": "Flame",
+    "dining": "Dining",
+    "wine": "Wine",
+    "coffee": "Coffee",
+    "drinks": "Drinks",
+    "seafood": "Seafood",
+    "takeout": "Takeout",
+    "snacks": "Snacks",
+    "cake": "Cake",
+    "produce": "Produce",
+    "star": "Star",
+    "heart": "Heart",
+    "gift": "Gift",
+    "drop": "Drop",
+    "bolt": "Bolt",
+    "trophy": "Trophy",
+    "sailboat": "Sailboat",
+    "globe": "Globe",
+    "building": "Building"
   }
 }
