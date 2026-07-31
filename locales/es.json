@@ -16,6 +16,8 @@
     "not_found": "No se pudo cargar este perfil."
   },
   "common": {
+    "feature_locked_title": "Función Bloqueada",
+    "feature_locked_desc": "Esta función aún no ha sido desbloqueada.",
     "to_editor": "Al Editor",
     "to_user": "Al Usuario",
     "custom_option": "Personalizado…",
@@ -353,19 +355,25 @@
     "game_hub": "Centro de Juegos"
   },
   "weekly_quizzes": {
+    "premium_b1": "Generación automática de cuestionarios grandes y pequeños para tu personal.",
+    "premium_b2": "Las preguntas se crean a partir de tus propios platos e ingredientes del menú, listas de tareas, recetas de bebidas y vinos, precios y restricciones dietéticas.",
+    "premium_b3": "¡Agrega tus propias preguntas personalizadas, con valores de recompensa que tu personal gana al responder correctamente!",
+    "premium_footer": "Los Cuestionarios Semanales son solo una de las funciones que obtienes. Toca abajo para conocer más sobre nuestro plan Premium.",
+    "locked_joke": "¡Dile a tu gerente que quieres poner a prueba tus habilidades!",
     "title": "Cuestionarios Semanales",
     "subtitle": "Tus cuestionarios asignados para esta semana",
-    "empty_title": "No Hay Examen Disponible",
+    "empty_title": "No Hay Cuestionario Disponible",
     "empty_desc": "No hay cuestionarios activos en este momento. ¡Vuelve pronto!",
-    "server_title": "Examen Semanal del Servidor",
-    "bartender_title": "Examen Semanal del Bartender",
-    "host_title": "Examen Semanal del Anfitrión",
+    "server_title": "Cuestionario Semanal del Servidor",
+    "bartender_title": "Cuestionario Semanal del Bartender",
+    "host_title": "Cuestionario Semanal del Anfitrión",
     "type_quiz_title": "Cuestionario de {{type}}",
     "manage_blurb": "Administra los cuestionarios semanales para todos los puestos del personal. Toca una tarjeta para crear, editar o activar un cuestionario.",
     "premium_title": "Función Premium",
-    "premium_desc": "Los Cuestionarios Semanales requieren el plan Premium. Pon a prueba los conocimientos de tu equipo con cuestionarios adaptados a cada puesto.",
+    "premium_desc": "Crear cuestionarios para tu personal requiere el plan Premium, que te da acceso a:",
     "premium_upgrade_btn": "Mejora a Premium",
     "question_count_short": "{{count}} preguntas",
+    "question_count_short_one": "{{count}} pregunta",
     "no_active_quiz": "Sin cuestionario activo",
     "completed_ratio": "{{done}}/{{total}} completados",
     "reward_blurb_title": "¡Recompensa del Cuestionario!",
@@ -501,7 +509,7 @@
     "act_schedule_t": "Horario subido — semana del {{week}}",
     "act_menu_t": "{{name}} añadido al menú",
     "act_guide_t": "Nuevo archivo \"{{title}}\" subido",
-    "act_quiz_t": "{{count}} empleados completaron un examen de capacitación",
+    "act_quiz_t": "{{count}} empleados completaron un cuestionario de capacitación",
     "group_news_feed": "Noticias",
     "group_team_training": "Equipo y capacitación",
     "group_management": "Administración · Propietario",
@@ -1442,7 +1450,8 @@
     "delete_error": "Error al eliminar el artículo del menú",
     "pick_image_error": "Error al seleccionar imagen",
     "upload_image_error": "Error al subir imagen",
-    "summer_libation_banner": "Los cócteles de verano se gestionan en el Editor de Recetas de Verano.",
+    "summer_libation_banner": "Los cócteles de {{menu}} se gestionan en el Editor de Recetas de Libaciones de {{menu}}.",
+    "libation_banner_single": "Los cócteles se gestionan en el Editor de Recetas de Libaciones.",
     "season_label": "Elección de Menú",
     "shape_label": "Forma de Imagen",
     "season_winter": "Invierno",
@@ -1458,7 +1467,7 @@
     "ai_button": "IA",
     "ai_upload_button": "Subir menú con IA",
     "upload_menu_button": "Subir menú",
-    "winter_libation_banner": "Los cócteles del Menú 1 se gestionan en el Editor de Recetas de Libaciones del Menú 1."
+    "winter_libation_banner": "Los cócteles de {{menu}} se gestionan en el Editor de Recetas de Libaciones de {{menu}}."
   },
   "season_selector": {
     "winter": "Menú de Invierno",
@@ -1483,6 +1492,12 @@
     "theme_ocean": "Océano"
   },
   "rewards_reviews_editor": {
+    "gr_premium_screen_title": "Reseñas de Google",
+    "gr_premium_desc": "Las Reseñas Automáticas de Google requieren el plan Premium, que te da acceso a:",
+    "gr_premium_b1": "¡Agrega tu ubicación de Google Maps y obtendremos tus reseñas más recientes automáticamente!",
+    "gr_premium_b2": "Actualizaciones automáticas dos veces por semana — el lunes después del fin de semana ocupado, y el jueves para ponerte al día a mitad de semana.",
+    "gr_premium_b3": "10 actualizaciones manuales al mes para cuando no puedas esperar a ver qué hay de nuevo.",
+    "gr_premium_footer": "Las Reseñas Automáticas de Google son solo una de las funciones que obtienes. Toca abajo para conocer más sobre nuestro plan Premium.",
     "title": "Editor de Recompensas y Reseñas",
     "tab_rewards": "Recompensas",
     "tab_reviews": "Reseñas",
@@ -1588,10 +1603,9 @@
     "no_transactions_found": "No se encontraron transacciones",
     "refresh_short": "Actualizar",
     "n_left": "{{count}} restantes",
+    "n_left_one": "{{count}} restante",
     "deduct_modal_title": "Deducir Bucks",
     "current_balance": "Actual",
-    "premium_feature_title": "Función Premium",
-    "premium_feature_msg": "La importación automática de reseñas de Google requiere el plan Premium ($15/mes).",
     "refresh_confirm_title": "¿Actualizar reseñas de Google?",
     "refresh_confirm_message": "Las reseñas se actualizan automáticamente cada lunes y jueves por la mañana y no cuentan para tu límite. Te quedan {{count}} actualizaciones manuales en este período de suscripción.",
     "refresh_now": "Actualizar Ahora",
@@ -1608,8 +1622,7 @@
     "review_shown": "Reseña mostrada",
     "review_visibility_error": "Error al actualizar la visibilidad de la reseña",
     "redeem_label": "Canjear",
-    "redeem_settings": "Configuración de Canje",
-    "upgrade": "Mejorar plan"
+    "redeem_settings": "Configuración de Canje"
   },
   "translation_section": {
     "spanish_section_title": "Traducción al Español (Opcional)",
@@ -1667,6 +1680,13 @@
     "forecast_sun_times": "Amanecer a las {{sunrise}}, atardecer a las {{sunset}}."
   },
   "schedule_upload": {
+    "premium_b1": "Sube archivos o imágenes de los horarios de tu personal que hayas exportado o creado — PDF, fotos, documentos de Word y Excel.",
+    "premium_b2": "Nuestra IA los escanea automáticamente y agrega los turnos al roster y a los perfiles de tu personal.",
+    "premium_b3": "Revisa y edita cada horario importado después.",
+    "premium_b4": "Los empleados que aún no están en tu organización — o con nombres que no coinciden — se guardan para que los asignes después.",
+    "premium_b5": "¡La entrada manual es cosa del pasado!",
+    "premium_footer": "Subir horarios con IA es solo una de las funciones que obtienes al mejorar. Toca abajo para conocer más sobre nuestro plan Premium.",
+    "premium_desc": "Subir horarios con IA requiere el plan Premium, que te da acceso a:",
     "title": "Horarios del Personal",
     "uploading": "Subiendo...",
     "processing_message": "La IA está leyendo tu PDF de horarios... Esto puede tardar 15-30 segundos.",
@@ -1729,6 +1749,7 @@
     "my_quick_tools": "Mis Herramientas Rápidas"
   },
   "quick_tools": {
+    "picture_this": "¡Adivina la Imagen!",
     "select_tools": "Seleccionar Herramientas",
     "selected_count": "{{count}} de {{max}} seleccionados",
     "max_reached": "Máximo alcanzado",
@@ -1769,6 +1790,9 @@
     "quiz_hub_editor": "Editor de Cuestionarios"
   },
   "word_search": {
+    "you_found_count": "Encontraste {{found}} de {{total}} palabras",
+    "time_bonus": "Bono de Tiempo",
+    "total_score": "Puntuación Total",
     "hub_title": "Sopa de Letras",
     "intro_title": "¡Encuentra los Ingredientes!",
     "intro_desc": "Descubre palabras de ingredientes escondidas en la cuadrícula. ¡Aprende qué hay en cada plato mientras buscas!",
@@ -1980,6 +2004,11 @@
     "generic_error": "Algo salió mal. Inténtalo de nuevo."
   },
   "game_hub_ui": {
+    "premium_intro": "Mejorar al plan Premium desbloquea ambos juegos:",
+    "premium_b1": "Juego de Memoria del Menú — asocia fichas de tus platos y recetas con sus ingredientes.",
+    "premium_b2": "¡Adivina la Imagen! — elige los ingredientes correctos para la foto de un plato, de Fácil a Difícil, en modos Libre y con Vidas.",
+    "premium_footer": "Los juegos son solo una de las funciones que obtienes. Toca abajo para conocer más sobre nuestro plan Premium.",
+    "locked_joke": "¡Dile a tu gerente que necesitas más juegos!",
     "title": "Centro de Juegos",
     "subtitle": "Pon a prueba tu conocimiento del menú con juegos divertidos e interactivos.",
     "leaderboard_title": "Clasificación",
@@ -2063,6 +2092,8 @@
     "mode_free": "🔓 Libre"
   },
   "onboarding": {
+    "default_menu_1": "Menú 1",
+    "default_menu_2": "Menú 2",
     "email": "Correo Electrónico",
     "password": "Contraseña",
     "address": "Dirección",
@@ -2431,7 +2462,7 @@
     "retake_btn": "Reintentar",
     "not_taken": "Sin Realizar",
     "no_employees": "No se encontraron empleados para este tipo de cuestionario.",
-    "bonus_bucks_value": "Valor en Bucks del Bono",
+    "bonus_bucks_value": "Valor en {{currency}} del Bono",
     "leave_blank_default": "Déjalo en blanco para usar el monto predeterminado del cuestionario",
     "default_ph": "Predeterminado",
     "photo_optional": "Foto (opcional)",
@@ -2454,5 +2485,39 @@
     "picker_next_time": "Siguiente: Hora",
     "picker_done": "Listo",
     "currency_value": "Valor en {{currency}}"
+  },
+  "manual_schedule": {
+    "shifts_count": "{{count}} turnos",
+    "shifts_count_one": "{{count}} turno",
+    "scheduled_count": "{{count}} programados",
+    "scheduled_count_one": "{{count}} programado",
+    "employees_count": "{{count}} empleados",
+    "employees_count_one": "{{count}} empleado"
+  },
+  "menu_icons": {
+    "snowflake": "Copo de Nieve",
+    "sun": "Sol",
+    "leaf": "Hoja",
+    "sparkles": "Destellos",
+    "night": "Noche",
+    "flame": "Llama",
+    "dining": "Comidas",
+    "wine": "Vino",
+    "coffee": "Café",
+    "drinks": "Bebidas",
+    "seafood": "Mariscos",
+    "takeout": "Para Llevar",
+    "snacks": "Aperitivos",
+    "cake": "Pastel",
+    "produce": "Productos Frescos",
+    "star": "Estrella",
+    "heart": "Corazón",
+    "gift": "Regalo",
+    "drop": "Gota",
+    "bolt": "Rayo",
+    "trophy": "Trofeo",
+    "sailboat": "Velero",
+    "globe": "Mundo",
+    "building": "Edificio"
   }
 }

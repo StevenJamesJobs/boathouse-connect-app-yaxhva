@@ -22,6 +22,8 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import PremiumGate from '@/components/PremiumGate';
 import { getOrgDirectory } from '@/utils/orgDirectory';
 import { useTranslation } from 'react-i18next';
 import ShiftEditForm from '@/components/ShiftEditForm';
@@ -68,6 +70,7 @@ export default function ScheduleReviewScreen() {
   const { t } = useTranslation();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
+  const { hasPremium } = useSubscription();
   const { upload_id } = useLocalSearchParams<{ upload_id: string }>();
   const scrollViewRef = useRef<ScrollView>(null);
 
@@ -344,6 +347,31 @@ export default function ScheduleReviewScreen() {
       setSelectedLetter(letter);
     }
   };
+
+  if (!hasPremium) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.primary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Review Schedule</Text>
+          <View style={styles.headerRight} />
+        </View>
+        <PremiumGate
+          desc={t('schedule_upload.premium_desc')}
+          bullets={[
+            t('schedule_upload.premium_b1'),
+            t('schedule_upload.premium_b2'),
+            t('schedule_upload.premium_b3'),
+            t('schedule_upload.premium_b4'),
+            t('schedule_upload.premium_b5'),
+          ]}
+          footer={t('schedule_upload.premium_footer')}
+        />
+      </View>
+    );
+  }
 
   if (loading) {
     return (

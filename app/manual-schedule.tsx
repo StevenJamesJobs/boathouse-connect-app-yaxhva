@@ -77,9 +77,17 @@ function getWeekBounds(date: Date): { start: Date; end: Date; startStr: string; 
   };
 }
 
-function formatWeekLabel(startStr: string, endStr: string): string {
+function formatWeekLabel(startStr: string, endStr: string, isES: boolean): string {
   const s = new Date(startStr + 'T00:00:00');
   const e = new Date(endStr + 'T00:00:00');
+  if (isES) {
+    // Spanish mirror-range, month-last: "19 - 25 de julio" / "26 de julio - 1 de agosto".
+    // EN keeps its ordinal format below, untouched.
+    const sMonthEs = s.toLocaleDateString('es-ES', { month: 'long' });
+    const eMonthEs = e.toLocaleDateString('es-ES', { month: 'long' });
+    if (sMonthEs === eMonthEs) return `${s.getDate()} - ${e.getDate()} de ${eMonthEs}`;
+    return `${s.getDate()} de ${sMonthEs} - ${e.getDate()} de ${eMonthEs}`;
+  }
   const sMonth = s.toLocaleDateString('en-US', { month: 'long' });
   const eMonth = e.toLocaleDateString('en-US', { month: 'long' });
   const sDay = s.getDate();
@@ -109,7 +117,8 @@ function formatTime(timeStr: string) {
 export default function ManualScheduleScreen() {
   useRequireManagerRoute();
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const isES = i18n.language === 'es';
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
@@ -194,19 +203,10 @@ export default function ManualScheduleScreen() {
   }, []);
 
   const handlePremiumFeature = () => {
-    if (hasPremium) {
-      // AI Schedule Upload is live — open the uploader (PDF/image → AI parse).
-      router.push('/schedule-upload' as any);
-    } else {
-      Alert.alert(
-        'Premium Feature',
-        'AI Schedule Upload requires the Premium plan ($15/mo). Upgrade to unlock this and other premium features.',
-        [
-          { text: 'Not Now', style: 'cancel' },
-          { text: 'Upgrade', onPress: () => router.push('/subscription-management' as any) },
-        ]
-      );
-    }
+    // Both tiers land on /schedule-upload: premium gets the working uploader,
+    // base gets its sales-copy lock screen (a better pitch than an alert).
+    // The buttons' lock badges below still telegraph the gate.
+    router.push('/schedule-upload' as any);
   };
 
   const employeeRows = useMemo(() => {
@@ -374,14 +374,14 @@ export default function ManualScheduleScreen() {
 
         <View style={styles.weekLabelContainer}>
           <Text style={[styles.weekLabel, { color: colors.text }]}>
-            {formatWeekLabel(currentWeek.startStr, currentWeek.endStr)}
+            {formatWeekLabel(currentWeek.startStr, currentWeek.endStr, isES)}
           </Text>
           <View style={styles.weekStats}>
-            <Text style={[styles.weekStatText, { color: colors.primary }]}>{totalShifts} shifts</Text>
+            <Text style={[styles.weekStatText, { color: colors.primary }]}>{t('manual_schedule.shifts_count', { count: totalShifts })}</Text>
             <Text style={[styles.weekStatDot, { color: colors.textSecondary }]}> · </Text>
-            <Text style={[styles.weekStatText, { color: '#4CAF50' }]}>{employeesWithShifts} scheduled</Text>
+            <Text style={[styles.weekStatText, { color: '#4CAF50' }]}>{t('manual_schedule.scheduled_count', { count: employeesWithShifts })}</Text>
             <Text style={[styles.weekStatDot, { color: colors.textSecondary }]}> · </Text>
-            <Text style={[styles.weekStatText, { color: colors.textSecondary }]}>{users.length} employees</Text>
+            <Text style={[styles.weekStatText, { color: colors.textSecondary }]}>{t('manual_schedule.employees_count', { count: users.length })}</Text>
           </View>
         </View>
 

@@ -58,7 +58,7 @@ export default function MenuIconPicker({ label, value, onChange, compact }: Menu
                         activeOpacity={0.7}
                       >
                         <IconSymbol ios_icon_name={opt.sf} android_material_icon_name={opt.sf} size={26} color={colors.primary} />
-                        <Text style={[styles.cellLabel, { color: colors.textSecondary }]} numberOfLines={1}>{opt.label}</Text>
+                        <Text style={[styles.cellLabel, { color: colors.textSecondary }]} numberOfLines={1}>{t(opt.labelKey)}</Text>
                       </TouchableOpacity>
                     );
                   })}

@@ -20,6 +20,8 @@ import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import PremiumGate from '@/components/PremiumGate';
 import { useOrganization } from '../contexts/OrganizationContext';
 import { PictureThisCategory } from '@/utils/game/pictureThisGenerator';
 
@@ -44,6 +46,7 @@ export default function PictureThisEditorScreen() {
   const { t } = useTranslation();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
+  const { hasPremium } = useSubscription();
   const [resetting, setResetting] = useState<string | null>(null);
 
   const confirmReset = (category: PictureThisCategory | null) => {
@@ -82,6 +85,25 @@ export default function PictureThisEditorScreen() {
       setResetting(null);
     }
   };
+
+  if (!hasPremium) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('pt_editor:title')}</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <PremiumGate
+          desc={t('game_hub_ui:premium_intro')}
+          bullets={[t('game_hub_ui:premium_b1'), t('game_hub_ui:premium_b2')]}
+          footer={t('game_hub_ui:premium_footer')}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

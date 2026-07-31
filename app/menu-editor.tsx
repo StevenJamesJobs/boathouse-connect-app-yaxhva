@@ -1107,7 +1107,16 @@ export default function MenuEditorScreen() {
         >
           <IconSymbol ios_icon_name="info.circle.fill" android_material_icon_name="info" size={20} color={colors.primary} />
           <Text style={styles.libationBannerText}>
-            {t(season === 'summer' ? 'menu_editor:summer_libation_banner' : 'menu_editor:winter_libation_banner')}
+            {organization?.menu_count === 1
+              ? t('menu_editor:libation_banner_single')
+              : t(
+                  season === 'summer' ? 'menu_editor:summer_libation_banner' : 'menu_editor:winter_libation_banner',
+                  {
+                    menu: season === 'summer'
+                      ? (organization?.menu_2_name || t('onboarding.default_menu_2'))
+                      : (organization?.menu_1_name || t('onboarding.default_menu_1')),
+                  }
+                )}
           </Text>
           <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={18} color={colors.primary} />
         </TouchableOpacity>
@@ -1246,6 +1255,12 @@ export default function MenuEditorScreen() {
               // ordering here (drag + Move/Order disabled), with menu + category chips.
               const isWS = findCategoryByName(menuCats, page.category)?.filter_behavior === 'weekly_specials';
               if (pageItems.length === 0) {
+                // Cocktail-fed subs are managed in the recipes editors — the
+                // banner above is the page's action; hide the add/upload CTAs.
+                const pageSub = findCategoryByName(menuCats, page.category)?.subcategories.find(
+                  (s) => s.display_name === page.subcategory
+                );
+                const isCocktailFed = !!pageSub?.is_cocktail_fed;
                 return (
                   <View style={{ width: SCREEN_WIDTH }}>
                     <View style={styles.emptyContainer}>
@@ -1256,8 +1271,22 @@ export default function MenuEditorScreen() {
                         color={colors.textSecondary}
                       />
                       <Text style={styles.emptyText}>{t('menu_editor:empty_title')}</Text>
-                      <Text style={styles.emptySubtext}>{t('menu_editor:empty_subtext')}</Text>
-                      {user?.role === 'owner' && (
+                      {!isCocktailFed && (
+                        <Text style={styles.emptySubtext}>{t('menu_editor:empty_subtext')}</Text>
+                      )}
+                      {!isCocktailFed && (
+                        <TouchableOpacity
+                          style={styles.uploadMenuButton}
+                          onPress={openAddModal}
+                          activeOpacity={0.85}
+                        >
+                          <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={18} color={colors.fireText} />
+                          <Text style={styles.uploadMenuButtonText}>{t('menu_editor:add_button')}</Text>
+                        </TouchableOpacity>
+                      )}
+                      {/* AI upload only offered on a fully empty menu — 1-item
+                          adds belong in the Add modal, not the credit funnel. */}
+                      {!isCocktailFed && user?.role === 'owner' && menuItems.length === 0 && (
                         <TouchableOpacity
                           style={styles.uploadMenuButton}
                           onPress={() => router.push('/menu-upload' as any)}
@@ -1773,7 +1802,9 @@ export default function MenuEditorScreen() {
                   showsHorizontalScrollIndicator={false}
                   style={styles.optionsScroll}
                 >
-                  {formMenuCats.map((cat) => (
+                  {/* Hidden categories stay out of the picker; a legacy item's
+                      current (now-hidden) category remains selectable. */}
+                  {formMenuCats.filter((c) => !c.is_hidden || c.display_name === formData.category).map((cat) => (
                     <CategoryPill
                       key={cat.id}
                       size="sm"
@@ -1788,7 +1819,10 @@ export default function MenuEditorScreen() {
               {/* Subcategory — also from the selected menu's tree. */}
               {(() => {
                 const formCat = findCategoryByName(formMenuCats, formData.category);
-                if (!formCat || formCat.subcategories.length === 0) return null;
+                const formVisibleSubs = formCat
+                  ? formCat.subcategories.filter((s) => !s.is_hidden || s.display_name === formData.subcategory)
+                  : [];
+                if (!formCat || formVisibleSubs.length === 0) return null;
                 return (
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel}>{t('menu_editor:subcategory_label')}</Text>
@@ -1797,7 +1831,7 @@ export default function MenuEditorScreen() {
                     showsHorizontalScrollIndicator={false}
                     style={styles.optionsScroll}
                   >
-                    {formCat.subcategories.map((sub) => (
+                    {formVisibleSubs.map((sub) => (
                       <CategoryPill
                         key={sub.id}
                         size="sm"

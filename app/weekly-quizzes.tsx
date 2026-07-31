@@ -18,6 +18,8 @@ import WeeklyQuizCard, { WeeklyQuizCardResult } from '@/components/WeeklyQuizCar
 import { flushPendingSubmits, getPendingSubmit, pendingExamIds } from '@/utils/exam/pendingSubmits';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { isManagerOrOwner } from '@/utils/roles';
+import PremiumGate from '@/components/PremiumGate';
 
 type ExamType = 'server' | 'bartender' | 'host';
 
@@ -196,21 +198,21 @@ export default function WeeklyQuizzesScreen() {
           </Text>
           <View style={styles.placeholder} />
         </View>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 32 }}>
-          <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={48} color={colors.textSecondary} />
-          <Text style={{ fontSize: 20, fontWeight: '700', color: colors.text, marginTop: 16, textAlign: 'center' }}>
-            {t('weekly_quizzes.premium_title')}
-          </Text>
-          <Text style={{ fontSize: 15, color: colors.textSecondary, marginTop: 8, textAlign: 'center', lineHeight: 22 }}>
-            {t('weekly_quizzes.premium_desc')}
-          </Text>
-          <TouchableOpacity
-            style={{ backgroundColor: colors.primary, paddingVertical: 14, paddingHorizontal: 28, borderRadius: 12, marginTop: 24 }}
-            onPress={() => router.push('/subscription-management' as any)}
-          >
-            <Text style={{ color: colors.fireText, fontSize: 16, fontWeight: '700' }}>{t('weekly_quizzes.premium_upgrade_btn')}</Text>
-          </TouchableOpacity>
-        </View>
+        {isManagerOrOwner(user) ? (
+          <PremiumGate
+            desc={t('weekly_quizzes.premium_desc')}
+            bullets={[t('weekly_quizzes.premium_b1'), t('weekly_quizzes.premium_b2'), t('weekly_quizzes.premium_b3')]}
+            footer={t('weekly_quizzes.premium_footer')}
+          />
+        ) : (
+          // Employees can't purchase — no upsell, just a friendly nudge.
+          <PremiumGate
+            title={t('common.feature_locked_title')}
+            desc={t('common.feature_locked_desc')}
+            footer={t('weekly_quizzes.locked_joke')}
+            showButton={false}
+          />
+        )}
       </View>
     );
   }

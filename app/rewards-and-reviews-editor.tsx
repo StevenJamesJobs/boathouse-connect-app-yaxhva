@@ -965,14 +965,9 @@ export default function RewardsAndReviewsEditorScreen() {
 
   const handleRefreshGoogleReviews = () => {
     if (!hasPremium) {
-      Alert.alert(
-        t('rewards_reviews_editor:premium_feature_title'),
-        t('rewards_reviews_editor:premium_feature_msg'),
-        [
-          { text: t('common:not_now'), style: 'cancel' },
-          { text: t('rewards_reviews_editor:upgrade'), onPress: () => router.push('/subscription-management' as any) },
-        ]
-      );
+      // Base tier gets the Google Reviews sales-copy lock screen — a better
+      // pitch than an alert.
+      router.push('/google-reviews-premium' as any);
       return;
     }
     if (!isOwner) return; // owners only — the button is hidden for managers
@@ -1407,7 +1402,9 @@ export default function RewardsAndReviewsEditorScreen() {
               <>
                 <IconSymbol ios_icon_name="arrow.clockwise" android_material_icon_name="refresh" size={16} color={colors.blueText} />
                 <Text style={[styles.rvbTxt, { color: colors.blueText }]}>{t('rewards_reviews_editor:refresh_short', 'Refresh')}</Text>
-                {refreshRemaining !== null && (
+                {!hasPremium ? (
+                  <IconSymbol ios_icon_name="lock.fill" android_material_icon_name="lock" size={14} color={colors.blueText} />
+                ) : refreshRemaining !== null && (
                   <View style={styles.refLim}><Text style={styles.refLimTxt}>{t('rewards_reviews_editor:n_left', { count: refreshRemaining, defaultValue: `${refreshRemaining} left` })}</Text></View>
                 )}
               </>

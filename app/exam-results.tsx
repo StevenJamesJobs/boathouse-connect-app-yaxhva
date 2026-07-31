@@ -170,7 +170,7 @@ export default function ExamResultsScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* Header */}
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{isSpanish ? 'Resultados del Examen' : 'Quiz Results'}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>{isSpanish ? 'Resultados del Cuestionario' : 'Quiz Results'}</Text>
 
         {isPreview && (
           <View style={[styles.previewBanner, { backgroundColor: '#F59E0B' }]}>
@@ -210,7 +210,7 @@ export default function ExamResultsScreen() {
                   <Text style={[styles.statValue, { color: bonusCorrect ? '#F59E0B' : '#EF4444' }]}>
                     {bonusCorrect ? `+$${bonusBucksValue}` : '$0'}
                   </Text>
-                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{isSpanish ? 'Bonificación' : 'Bonus'}</Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{isSpanish ? 'Bono' : 'Bonus'}</Text>
                 </View>
               </>
             )}
@@ -314,8 +314,6 @@ const styles = StyleSheet.create({
   reviewHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   resultBadge: { flexDirection: 'row', alignItems: 'center', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, gap: 4 },
   resultBadgeText: { fontSize: 12, fontWeight: '700' },
-  bonusChip: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 2 },
-  bonusChipText: { color: '#F59E0B', fontSize: 10, fontWeight: '800' },
   reviewQuestionNum: { fontSize: 13, fontWeight: '600' },
   reviewQuestionText: { fontSize: 15, fontWeight: '600', marginBottom: 10, lineHeight: 21 },
   reviewQuestionImage: {

@@ -239,7 +239,7 @@ export default function ExamAnswerReviewScreen() {
         ) : (
           <View style={[styles.emptyCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {isSpanish ? 'Este usuario no ha completado el examen.' : 'This user has not completed the quiz.'}
+              {isSpanish ? 'Este usuario no ha completado el cuestionario.' : 'This user has not completed the quiz.'}
             </Text>
           </View>
         )}

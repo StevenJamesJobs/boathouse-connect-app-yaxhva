@@ -53,6 +53,16 @@ interface LeaderboardEntry {
 }
 
 const GAME_CARDS: GameCard[] = [
+  // Free game first — base users get a playable game up top; the two premium
+  // cards sit right below with their locks visible.
+  {
+    titleKey: 'game_hub_cards:word_search_title',
+    descKey: 'game_hub_cards:word_search_desc',
+    iosIcon: 'textformat.abc',
+    androidIcon: 'spellcheck',
+    route: '/word-search-game',
+    color: '#10B981',
+  },
   {
     titleKey: 'game_hub_cards:memory_title',
     descKey: 'game_hub_cards:memory_desc',
@@ -61,14 +71,6 @@ const GAME_CARDS: GameCard[] = [
     route: '/menu-memory-game',
     color: '#6366F1',
     isPremium: true,
-  },
-  {
-    titleKey: 'game_hub_cards:word_search_title',
-    descKey: 'game_hub_cards:word_search_desc',
-    iosIcon: 'textformat.abc',
-    androidIcon: 'spellcheck',
-    route: '/word-search-game',
-    color: '#10B981',
   },
   {
     titleKey: 'game_hub_cards:picture_this_title',
@@ -258,17 +260,17 @@ export default function GameHubScreen() {
               key={card.route}
               style={[styles.card, { backgroundColor: colors.card }, isLocked && { opacity: 0.7 }]}
               onPress={() => {
-                if (isLocked) {
+                if (isLocked && !isManagerOrOwner(user)) {
+                  // Employees can't purchase — no upsell, just a friendly nudge.
                   Alert.alert(
-                    'Premium Feature',
-                    `${t(card.titleKey)} requires the Premium plan ($15/mo).`,
-                    [
-                      { text: 'Not Now', style: 'cancel' },
-                      { text: 'Upgrade', onPress: () => router.push('/subscription-management' as any) },
-                    ]
+                    t('common:feature_locked_title'),
+                    `${t('common:feature_locked_desc')}\n\n${t('game_hub_ui:locked_joke')}`,
+                    [{ text: t('common:ok') }]
                   );
                   return;
                 }
+                // Locked + manager/owner falls through: the game screen itself
+                // shows the sales-copy gate — a better pitch than an alert.
                 router.push(card.route as any);
               }}
               activeOpacity={0.75}

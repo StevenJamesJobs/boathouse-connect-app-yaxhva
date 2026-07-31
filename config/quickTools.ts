@@ -49,6 +49,15 @@ export const QUICK_TOOLS_CATALOG: QuickToolConfig[] = [
     availableTo: 'all',
   },
   {
+    id: 'picture-this',
+    labelKey: 'quick_tools.picture_this',
+    iosIcon: 'photo.fill',
+    androidIcon: 'photo-camera',
+    route: '/picture-this-game',
+    category: 'general',
+    availableTo: 'all',
+  },
+  {
     id: 'word-search',
     labelKey: 'quick_tools.word_search',
     iosIcon: 'textformat.abc',

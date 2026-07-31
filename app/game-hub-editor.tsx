@@ -26,6 +26,7 @@ import HeaderNavButton from '@/components/HeaderNavButton';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { getOrgDirectory } from '@/utils/orgDirectory';
 
 interface EditorCard {
@@ -35,6 +36,7 @@ interface EditorCard {
   androidIcon: string;
   route: string;
   color: string;
+  isPremium?: boolean;
 }
 
 interface UserScoreResult {
@@ -52,14 +54,7 @@ interface UserScoreResult {
 }
 
 const EDITOR_CARDS: EditorCard[] = [
-  {
-    titleKey: 'game_hub_editor:memory_editor_title',
-    descKey: 'game_hub_editor:memory_editor_desc',
-    iosIcon: 'gamecontroller.fill',
-    androidIcon: 'sports-esports',
-    route: '/memory-game-editor',
-    color: '#6366F1',
-  },
+  // Free game's editor first — mirrors the employee hub order.
   {
     titleKey: 'game_hub_editor:ws_editor_title',
     descKey: 'game_hub_editor:ws_editor_desc',
@@ -69,12 +64,22 @@ const EDITOR_CARDS: EditorCard[] = [
     color: '#10B981',
   },
   {
+    titleKey: 'game_hub_editor:memory_editor_title',
+    descKey: 'game_hub_editor:memory_editor_desc',
+    iosIcon: 'gamecontroller.fill',
+    androidIcon: 'sports-esports',
+    route: '/memory-game-editor',
+    color: '#6366F1',
+    isPremium: true,
+  },
+  {
     titleKey: 'game_hub_editor:pt_editor_title',
     descKey: 'game_hub_editor:pt_editor_desc',
     iosIcon: 'photo.fill',
     androidIcon: 'photo-camera',
     route: '/picture-this-editor',
     color: '#EC4899',
+    isPremium: true,
   },
 ];
 
@@ -85,6 +90,7 @@ export default function GameHubEditorScreen() {
   const { t } = useTranslation();
   const { organizationId, organization, refreshOrganization } = useOrganization();
   const { user } = useAuth();
+  const { hasPremium } = useSubscription();
   const authActorId = user?.id; // stable actor id — the search-result render loops shadow `user`
   const [resettingAll, setResettingAll] = useState(false);
 
@@ -507,33 +513,49 @@ export default function GameHubEditorScreen() {
 
         {/* Game Editors */}
         <Text style={[styles.sectionTitle, { color: colors.text, marginTop: 8 }]}>{t('game_hub_editor:game_editors_section')}</Text>
-        {EDITOR_CARDS.map((card) => (
-          <TouchableOpacity
-            key={card.route}
-            style={[styles.card, { backgroundColor: colors.card }]}
-            onPress={() => router.push(card.route as any)}
-            activeOpacity={0.75}
-          >
-            <View style={[styles.iconContainer, { backgroundColor: card.color + '18' }]}>
-              <IconSymbol
-                ios_icon_name={card.iosIcon as any}
-                android_material_icon_name={card.androidIcon as any}
-                size={30}
-                color={card.color}
-              />
-            </View>
-            <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{t(card.titleKey)}</Text>
-              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{t(card.descKey)}</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={18}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-        ))}
+        {EDITOR_CARDS.map((card) => {
+          const isLocked = card.isPremium && !hasPremium;
+          return (
+            <TouchableOpacity
+              key={card.route}
+              style={[styles.card, { backgroundColor: colors.card }, isLocked && { opacity: 0.7 }]}
+              onPress={() => {
+                // Locked cards still navigate: the editor screen itself shows
+                // the sales-copy gate — a better pitch than an alert.
+                router.push(card.route as any);
+              }}
+              activeOpacity={0.75}
+            >
+              <View style={[styles.iconContainer, { backgroundColor: card.color + '18' }]}>
+                <IconSymbol
+                  ios_icon_name={card.iosIcon as any}
+                  android_material_icon_name={card.androidIcon as any}
+                  size={30}
+                  color={card.color}
+                />
+              </View>
+              <View style={styles.cardText}>
+                <Text style={[styles.cardTitle, { color: colors.text }]}>{t(card.titleKey)}</Text>
+                <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{t(card.descKey)}</Text>
+              </View>
+              {isLocked ? (
+                <IconSymbol
+                  ios_icon_name="lock.fill"
+                  android_material_icon_name="lock"
+                  size={16}
+                  color={colors.textSecondary}
+                />
+              ) : (
+                <IconSymbol
+                  ios_icon_name="chevron.right"
+                  android_material_icon_name="chevron-right"
+                  size={18}
+                  color={colors.textSecondary}
+                />
+              )}
+            </TouchableOpacity>
+          );
+        })}
 
         {/* Reset All Scores */}
         <View style={[styles.resetSection, { borderTopColor: colors.border }]}>

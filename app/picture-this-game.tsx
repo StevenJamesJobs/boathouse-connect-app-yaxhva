@@ -6,6 +6,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { isManagerOrOwner } from '@/utils/roles';
+import PremiumGate from '@/components/PremiumGate';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { fetchOwnWineVisible } from '@/utils/game/wineVisibility';
 import {
@@ -98,6 +101,7 @@ export default function PictureThisGameScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const { user } = useAuth();
+  const { hasPremium } = useSubscription();
   const { organization } = useOrganization();
   const perMenu = organization?.menu_category_scope === 'per_menu';
 
@@ -149,6 +153,35 @@ export default function PictureThisGameScreen() {
     }
     return t(DIFFICULTY_INFO[difficulty].descKey);
   };
+
+  if (!hasPremium) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.primary} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('picture_this:hub_title')}</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        {isManagerOrOwner(user) ? (
+          <PremiumGate
+            desc={t('game_hub_ui:premium_intro')}
+            bullets={[t('game_hub_ui:premium_b1'), t('game_hub_ui:premium_b2')]}
+            footer={t('game_hub_ui:premium_footer')}
+          />
+        ) : (
+          // Employees can't purchase — no upsell, just a friendly nudge.
+          <PremiumGate
+            title={t('common:feature_locked_title')}
+            desc={t('common:feature_locked_desc')}
+            footer={t('game_hub_ui:locked_joke')}
+            showButton={false}
+          />
+        )}
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

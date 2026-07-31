@@ -20,6 +20,8 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import PremiumGate from '@/components/PremiumGate';
 import { PlayMode } from '@/types/game';
 
 interface WinePairing {
@@ -39,6 +41,7 @@ export default function MemoryGameEditorScreen() {
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
+  const { hasPremium } = useSubscription();
   useRequireManagerRoute();
   const [activeTab, setActiveTab] = useState<'pairings' | 'scoreboard'>('pairings');
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>('all');
@@ -377,6 +380,25 @@ export default function MemoryGameEditorScreen() {
       </TouchableOpacity>
     </>
   );
+
+  if (!hasPremium) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('memory_game_editor.title')}</Text>
+          <View style={styles.placeholder} />
+        </View>
+        <PremiumGate
+          desc={t('game_hub_ui.premium_intro')}
+          bullets={[t('game_hub_ui.premium_b1'), t('game_hub_ui.premium_b2')]}
+          footer={t('game_hub_ui.premium_footer')}
+        />
+      </View>
+    );
+  }
 
   return (
     <KeyboardAvoidingView

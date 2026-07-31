@@ -15,6 +15,8 @@ import {
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import PremiumGate from '@/components/PremiumGate';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
@@ -105,6 +107,7 @@ export default function ExamEditorScreen() {
   const { mode } = useAppTheme();
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
+  const { hasPremium } = useSubscription();
   const currencyName = organization.reward_currency_name;
   const params = useLocalSearchParams<{ type: string }>();
   const examType = (params.type || 'server') as ExamType;
@@ -790,15 +793,12 @@ export default function ExamEditorScreen() {
     }
     if (q.source_type === 'bonus') return t('exam_editor.source_bonus').toUpperCase();
     if (q.source_type === 'custom') return t('exam_editor.source_custom').toUpperCase();
-    // Translate the auto-chip only where the option label's EN form matches the
-    // raw slug-derived label — keeps EN chips byte-identical (recipes /
-    // checklist_items keep their historical RECIPES / CHECKLIST ITEMS).
-    const rawLabel = (q.source_table || 'auto').replace(/_/g, ' ').toUpperCase();
+    // Auto-chips read like the category picker: any known source_table shows its
+    // picker label (recipes → LIBATION RECIPES, checklist_items → CHECK LIST ITEMS);
+    // unknown tables and null fall back to the raw slug.
     const bySource = CATEGORY_OPTIONS.find(o => o.sourceTable === q.source_table);
-    if (bySource && bySource.label.toUpperCase() === rawLabel) {
-      return t(bySource.labelKey).toUpperCase();
-    }
-    return rawLabel;
+    if (bySource) return t(bySource.labelKey).toUpperCase();
+    return (q.source_table || 'auto').replace(/_/g, ' ').toUpperCase();
   };
 
   // Reset a specific user's quiz result so they can retake
@@ -875,6 +875,25 @@ export default function ExamEditorScreen() {
 
   const completedCount = completionData.filter(e => e.has_completed).length;
   const totalEmployees = completionData.length;
+
+  if (!hasPremium) {
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('exam_editor.title', { type: getExamTypeName(examType, isSpanish) })}</Text>
+          <View style={styles.placeholder} />
+        </View>
+        <PremiumGate
+          desc={t('weekly_quizzes.premium_desc')}
+          bullets={[t('weekly_quizzes.premium_b1'), t('weekly_quizzes.premium_b2'), t('weekly_quizzes.premium_b3')]}
+          footer={t('weekly_quizzes.premium_footer')}
+        />
+      </View>
+    );
+  }
 
   if (loading) {
     return (
@@ -1452,7 +1471,7 @@ export default function ExamEditorScreen() {
               <ScrollView style={styles.modalScroll} contentContainerStyle={{ paddingBottom: 320 }} keyboardShouldPersistTaps="handled">
                 {showAddBonus ? (
                   <View style={styles.bonusValueRow}>
-                    <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.bonus_bucks_value')}</Text>
+                    <View style={{ flex: 1 }}><Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.bonus_bucks_value', { currency: currencyName })}</Text></View>
                     <TextInput
                       style={[styles.bonusInput, { backgroundColor: colors.background, color: '#F59E0B', borderColor: '#F59E0B' }]}
                       value={bonusBucksValue}
@@ -1588,7 +1607,7 @@ export default function ExamEditorScreen() {
                 <ScrollView style={styles.modalScroll} contentContainerStyle={{ paddingBottom: 320 }} keyboardShouldPersistTaps="handled">
                   {editingQuestion.is_bonus ? (
                     <View style={styles.bonusValueRow}>
-                      <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.bonus_bucks_value')}</Text>
+                      <View style={{ flex: 1 }}><Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.bonus_bucks_value', { currency: currencyName })}</Text></View>
                       <TextInput
                         style={[styles.bonusInput, { backgroundColor: colors.background, color: '#F59E0B', borderColor: '#F59E0B' }]}
                         value={String(editingQuestion.bonus_bucks_value || 5)}

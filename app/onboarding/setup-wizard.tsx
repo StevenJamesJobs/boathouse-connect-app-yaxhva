@@ -52,8 +52,8 @@ export default function SetupWizardScreen() {
 
   // Step 2 state — menus
   const [hasSeasonalMenus, setHasSeasonalMenus] = useState(true);
-  const [menu1Name, setMenu1Name] = useState('Menu 1');
-  const [menu2Name, setMenu2Name] = useState('Menu 2');
+  const [menu1Name, setMenu1Name] = useState(t('onboarding.default_menu_1'));
+  const [menu2Name, setMenu2Name] = useState(t('onboarding.default_menu_2'));
   const [menu1Icon, setMenu1Icon] = useState('snowflake');
   const [menu2Icon, setMenu2Icon] = useState('sun.max.fill');
   const [headerIcon, setHeaderIcon] = useState('fork.knife');
@@ -124,10 +124,10 @@ export default function SetupWizardScreen() {
       p_organization_id: organizationId,
       p_user_id: user.id,
       p_menu_count: menuCount,
-      p_menu_1_name: menu1Name.trim() || 'Menu 1',
+      p_menu_1_name: menu1Name.trim() || t('onboarding.default_menu_1'),
       // menu_2_name is NOT NULL; menu_count governs display, so keep a valid
       // placeholder even with one menu.
-      p_menu_2_name: menu2Name.trim() || 'Menu 2',
+      p_menu_2_name: menu2Name.trim() || t('onboarding.default_menu_2'),
       p_menu_1_icon: menu1Icon,
       p_menu_2_icon: menu2Icon,
       p_header_icon: headerIcon,
@@ -504,7 +504,7 @@ export default function SetupWizardScreen() {
         />
         <TextInput
           style={styles.input}
-          placeholder="Menu 1"
+          placeholder={t('onboarding.default_menu_1')}
           placeholderTextColor={splashColors.textSecondary}
           value={menu1Name}
           onChangeText={setMenu1Name}
@@ -512,7 +512,7 @@ export default function SetupWizardScreen() {
         />
       </View>
 
-      <MenuIconPicker label={t('onboarding.menu_icon_label', { menuName: menu1Name.trim() || 'Menu 1' })} value={menu1Icon} onChange={setMenu1Icon} />
+      <MenuIconPicker label={t('onboarding.menu_icon_label', { menuName: menu1Name.trim() || t('onboarding.default_menu_1') })} value={menu1Icon} onChange={setMenu1Icon} />
 
       {hasSeasonalMenus && (
         <>
@@ -527,7 +527,7 @@ export default function SetupWizardScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="Menu 2"
+              placeholder={t('onboarding.default_menu_2')}
               placeholderTextColor={splashColors.textSecondary}
               value={menu2Name}
               onChangeText={setMenu2Name}
@@ -535,7 +535,7 @@ export default function SetupWizardScreen() {
             />
           </View>
 
-          <MenuIconPicker label={t('onboarding.menu_icon_label', { menuName: menu2Name.trim() || 'Menu 2' })} value={menu2Icon} onChange={setMenu2Icon} />
+          <MenuIconPicker label={t('onboarding.menu_icon_label', { menuName: menu2Name.trim() || t('onboarding.default_menu_2') })} value={menu2Icon} onChange={setMenu2Icon} />
 
           <Text style={styles.label}>{t('onboarding.categories_q')}</Text>
           <TouchableOpacity
@@ -546,8 +546,8 @@ export default function SetupWizardScreen() {
             <Text style={styles.scopeOptionTitle}>{t('onboarding.shared_cats_title')} {categoryScope === 'shared' ? '✓' : ''}</Text>
             <Text style={styles.scopeOptionDesc}>
               {t('onboarding.shared_cats_desc', {
-                menu1: menu1Name.trim() || 'Menu 1',
-                menu2: menu2Name.trim() || 'Menu 2',
+                menu1: menu1Name.trim() || t('onboarding.default_menu_1'),
+                menu2: menu2Name.trim() || t('onboarding.default_menu_2'),
               })}
             </Text>
           </TouchableOpacity>
@@ -730,8 +730,8 @@ export default function SetupWizardScreen() {
           {hasSeasonalMenus ? t('onboarding.menus_two') : t('onboarding.menus_one')}
         </Text>
         <Text style={styles.cardDetail}>
-          {menu1Name.trim() || 'Menu 1'}
-          {hasSeasonalMenus ? ` / ${menu2Name.trim() || 'Menu 2'}` : ''}
+          {menu1Name.trim() || t('onboarding.default_menu_1')}
+          {hasSeasonalMenus ? ` / ${menu2Name.trim() || t('onboarding.default_menu_2')}` : ''}
         </Text>
       </View>
 

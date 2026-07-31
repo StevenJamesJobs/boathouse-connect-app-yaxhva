@@ -572,7 +572,9 @@ export default function ManagerManageScreen() {
   // auto-refresh reminder before consuming a credit. Managers never see this.
   const handleRefreshReviews = useCallback(async () => {
     if (!hasPremium) {
-      router.push('/subscription-management');
+      // Base tier gets the Google Reviews sales-copy lock screen — a better
+      // pitch than an alert.
+      router.push('/google-reviews-premium' as any);
       return;
     }
     if (!isOwner) return;

@@ -148,10 +148,18 @@ export default function MyScheduleScreen() {
     const end = new Date(weekStart);
     end.setDate(end.getDate() + 6);
     const sameMonth = weekStart.getMonth() === end.getMonth();
-    const startFmt = weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    if (dateLocale === 'es-ES') {
+      // Spanish reads month-last: "19 – 25 jul" / "26 jul – 1 ago"
+      const startFmt = sameMonth
+        ? String(weekStart.getDate())
+        : weekStart.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' });
+      const endFmt = end.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' });
+      return `${startFmt} – ${endFmt}`;
+    }
+    const startFmt = weekStart.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' });
     const endFmt = sameMonth
-      ? end.toLocaleDateString('en-US', { day: 'numeric' })
-      : end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      ? end.toLocaleDateString(dateLocale, { day: 'numeric' })
+      : end.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' });
     return `${startFmt} – ${endFmt}`;
   };
 
@@ -180,6 +188,7 @@ export default function MyScheduleScreen() {
                 isToday={isTodayDay}
                 colors={colors}
                 t={t}
+                dateLocale={dateLocale}
                 formatTime={formatTime}
                 getShiftDuration={getShiftDuration}
               />
@@ -288,12 +297,13 @@ interface DayRowProps {
   isToday: boolean;
   colors: any;
   t: any;
+  dateLocale: string;
   formatTime: (s: string) => string;
   getShiftDuration: (s: string, e: string) => string;
 }
 
-function DayRow({ day, shifts, isToday, colors, t, formatTime, getShiftDuration }: DayRowProps) {
-  const dayName = day.toLocaleDateString('en-US', { weekday: 'short' });
+function DayRow({ day, shifts, isToday, colors, t, dateLocale, formatTime, getShiftDuration }: DayRowProps) {
+  const dayName = day.toLocaleDateString(dateLocale, { weekday: 'short' });
   const dayNumber = day.getDate();
   const hasShifts = shifts.length > 0;
 
