@@ -56,7 +56,7 @@ export function useRedemptionSettings() {
     try {
       const [rowRes, optsRes] = await Promise.all([
         (supabase.rpc as any)('get_redemption_settings', { p_actor_id: user?.id }),
-        (supabase.rpc as any)('get_redemption_custom_options', { p_actor_id: user?.id }),
+        supabase.rpc('get_redemption_custom_options', { p_actor_id: user.id }),
       ]);
       const row: any = (rowRes.data as any[])?.[0];
       if (row) {

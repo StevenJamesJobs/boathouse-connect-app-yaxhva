@@ -142,8 +142,7 @@ export default function WordSearchPlayScreen() {
           notifyLeaderboardPassed(
             user.id,
             finalScore,
-            t('notifications.game_hub_passed_title', { name: user.name }),
-            t('notifications.game_hub_passed_body'),
+            user.name,
             organizationId ?? undefined
           );
         }

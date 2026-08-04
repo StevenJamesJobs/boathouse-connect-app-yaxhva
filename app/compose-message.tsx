@@ -23,6 +23,8 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useNotification } from '@/contexts/NotificationContext';
+import { bothLanguages } from '@/utils/notificationHelpers';
+import i18n from '@/i18n';
 import { uploadMessageImage, validateImageSize } from '@/utils/messageImages';
 import { uploadMessageFile, validateFileSize, getFileIconInfo } from '@/utils/messageFiles';
 import { getOrgDirectory } from '@/utils/orgDirectory';
@@ -397,13 +399,23 @@ export default function ComposeMessageScreen() {
 
       // Send push notification to recipients (don't block on failure)
       try {
+        // Subject bodies are sender-typed (language-neutral) — same for
+        // everyone; the no-subject scaffold is prose, so both copies ride.
+        const msgTitle = bothLanguages('notifications.new_message_title');
+        const subj = subject.trim();
+        const attachSuffix = `${imageUrl ? ' 📷' : ''}${fileUrl ? ' 📎' : ''}`;
+        const noSubjKey = imageUrl
+          ? 'notifications.sent_you_photo'
+          : fileUrl ? 'notifications.sent_you_file' : 'notifications.sent_you_message';
         await sendNotification({
           userIds: selectedRecipients.map(r => r.id),
           notificationType: 'message',
-          title: '📨 New Message',
-          body: subject.trim()
-            ? `${user?.name}: ${subject.trim()}${imageUrl ? ' 📷' : ''}${fileUrl ? ' 📎' : ''}`
-            : `${user?.name} sent you a ${imageUrl ? 'photo' : fileUrl ? 'file' : 'message'}`,
+          title: msgTitle.en,
+          body: subj
+            ? `${user?.name}: ${subj}${attachSuffix}`
+            : i18n.t(noSubjKey, { lng: 'en', name: user?.name }),
+          title_es: msgTitle.es,
+          body_es: subj ? undefined : i18n.t(noSubjKey, { lng: 'es', name: user?.name }),
           data: {
             messageId: newMessageId,
             senderId: user?.id,

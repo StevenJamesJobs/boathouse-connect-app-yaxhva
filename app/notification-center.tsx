@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -21,6 +21,8 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
+import { useTranslationSection } from '@/components/TranslationSection';
+import i18n from '@/i18n';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -30,6 +32,9 @@ import GlassCard from '@/components/GlassCard';
 import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
 import { fonts } from '@/constants/fonts';
 
+// VALUES double as push-targeting filters matched against users.job_titles —
+// they must stay English-canonical. Display goes through JOB_TITLE_LABEL_KEYS
+// (value/label split, s62); an unmapped value falls back to the raw string.
 const JOB_TITLE_OPTIONS = [
   'Banquet Captain',
   'Banquets',
@@ -43,6 +48,20 @@ const JOB_TITLE_OPTIONS = [
   'Runner',
   'Server',
 ];
+
+const JOB_TITLE_LABEL_KEYS: Record<string, string> = {
+  'Banquet Captain': 'job_titles.banquet_captain',
+  'Banquets': 'job_titles.banquets',
+  'Bartender': 'job_titles.bartender',
+  'Busser': 'job_titles.busser',
+  'Chef': 'job_titles.chef',
+  'Host': 'job_titles.host',
+  'Kitchen': 'job_titles.kitchen',
+  'Lead Server': 'job_titles.lead_server',
+  'Manager': 'job_titles.manager',
+  'Runner': 'job_titles.runner',
+  'Server': 'job_titles.server',
+};
 
 interface DismissedItem {
   id: string;
@@ -76,6 +95,8 @@ export default function NotificationCenter() {
 
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [titleEs, setTitleEs] = useState('');
+  const [bodyEs, setBodyEs] = useState('');
   const [destination, setDestination] = useState('');
   const [showDestinationPicker, setShowDestinationPicker] = useState(false);
   const [sending, setSending] = useState(false);
@@ -98,6 +119,47 @@ export default function NotificationCenter() {
 
   const maxTitleLength = 50;
   const maxBodyLength = 200;
+
+  // Hybrid bilingual authoring (s61 shared section): the primary inputs bind
+  // the composer's device language; the section holds the other-language
+  // preview + translate button + pencil. resolveOnSave() runs the staleness
+  // rules right before send. sessionKey bumps on every successful send so the
+  // next compose starts a fresh session.
+  const isSpanishAuthor = i18n.language === 'es';
+  const sendSessionRef = useRef(0);
+  const translation = useTranslationSection({
+    fields: [
+      {
+        key: 'title',
+        labelKey: 'translation_section:field_title',
+        enValue: title,
+        esValue: titleEs,
+        setEnValue: setTitle,
+        setEsValue: setTitleEs,
+      },
+      {
+        key: 'body',
+        labelKey: 'translation_section:field_description',
+        enValue: body,
+        esValue: bodyEs,
+        setEnValue: setBody,
+        setEsValue: setBodyEs,
+        multiline: true,
+      },
+    ],
+    sessionKey: `compose:${sendSessionRef.current}`,
+    // Screen host (not a modal): the draft PERSISTS across tab flips, so
+    // active stays true — flipping it would bump the session epoch, which
+    // both silently cancels a confirmed in-flight send and re-runs
+    // auto-fill against a half-edited draft. The session lifecycle is
+    // keyed to sessionKey alone (bumped after each successful send).
+    active: true,
+  });
+
+  const jobTitleLabel = (v: string) => {
+    const key = JOB_TITLE_LABEL_KEYS[v];
+    return key ? t(key) : v;
+  };
 
   const loadDismissed = useCallback(async () => {
     setLoadingDismissed(true);
@@ -172,10 +234,10 @@ export default function NotificationCenter() {
   };
 
   const getAudienceLabel = () => {
-    if (audienceMode === 'all') return 'All Staff';
-    if (selectedJobTitles.length === 0) return 'Select job titles...';
-    if (selectedJobTitles.length <= 2) return selectedJobTitles.join(', ');
-    return `${selectedJobTitles.length} job titles selected`;
+    if (audienceMode === 'all') return t('notification_center.all_staff');
+    if (selectedJobTitles.length === 0) return t('notification_center.select_job_titles');
+    if (selectedJobTitles.length <= 2) return selectedJobTitles.map(jobTitleLabel).join(', ');
+    return t('notification_center.n_job_titles_selected', { count: selectedJobTitles.length });
   };
 
   const getTimeAgo = (dateString: string) => {
@@ -185,20 +247,24 @@ export default function NotificationCenter() {
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffDays = Math.floor(diffHours / 24);
 
-    if (diffHours < 1) return 'Just now';
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays === 1) return '1d ago';
-    return `${diffDays}d ago`;
+    if (diffHours < 1) return t('notifications.just_now');
+    if (diffHours < 24) return t('notification_center.hours_ago', { count: diffHours });
+    if (diffDays === 1) return t('notification_center.one_day_ago');
+    return t('notification_center.days_ago', { count: diffDays });
   };
 
   async function handleSendNotification() {
-    // Validation
-    if (!title.trim()) {
+    // Validation runs on the AUTHOR-language side (bind-flip): whichever
+    // language the composer is typing in must be filled; the other side is
+    // resolved (auto-translate / pencil) at send time.
+    const authorTitle = (isSpanishAuthor ? titleEs : title).trim();
+    const authorBody = (isSpanishAuthor ? bodyEs : body).trim();
+    if (!authorTitle) {
       Alert.alert(t('notification_center.title_required'), t('notification_center.title_required_message'));
       return;
     }
 
-    if (!body.trim()) {
+    if (!authorBody) {
       Alert.alert(t('notification_center.message_required'), t('notification_center.message_required_message'));
       return;
     }
@@ -209,13 +275,13 @@ export default function NotificationCenter() {
     }
 
     const audienceText = audienceMode === 'all'
-      ? 'All Staff'
-      : selectedJobTitles.join(', ');
+      ? t('notification_center.all_staff')
+      : selectedJobTitles.map(jobTitleLabel).join(', ');
 
     // Confirm sending
     Alert.alert(
       t('notification_center.send_confirm_title'),
-      `${t('notification_center.send_confirm_body')}\n\n${t('notification_center.title_label')}: "${title}"\n${t('notification_center.message_label')}: "${body}"\nTo: ${audienceText}${destination ? `\n${t('notification_center.opens_to')}: ${DESTINATION_OPTIONS.find(d => d.value === destination)?.label}` : ''}`,
+      `${t('notification_center.send_confirm_body')}\n\n${t('notification_center.title_label')}: "${authorTitle}"\n${t('notification_center.message_label')}: "${authorBody}"\n${t('notification_center.to_label')} ${audienceText}${destination ? `\n${t('notification_center.opens_to')}: ${DESTINATION_OPTIONS.find(d => d.value === destination)?.label}` : ''}`,
       [
         { text: t('common.cancel'), style: 'cancel' },
         {
@@ -233,6 +299,19 @@ export default function NotificationCenter() {
     setSending(true);
 
     try {
+      // Fill/refresh the other language per the s61 staleness rules (may ask
+      // once). Null = abort (translate toward the author's other side failed,
+      // or a double-tap) — keep the typed content and let the manager retry.
+      const resolved = await translation.resolveOnSave();
+      if (!resolved) {
+        setSending(false);
+        return;
+      }
+      const titleFinal = resolved.title.en.trim();
+      const bodyFinal = resolved.body.en.trim();
+      const titleEsFinal = resolved.title.es.trim();
+      const bodyEsFinal = resolved.body.es.trim();
+
       const extraData: Record<string, any> = {};
       if (destination) extraData.destination = destination;
       if (audienceMode === 'job_titles' && selectedJobTitles.length > 0) {
@@ -241,12 +320,21 @@ export default function NotificationCenter() {
 
       // Insert the shade row so the broadcast shows in every staff member's
       // notification shade (+ badge), whether or not a push is also sent.
+      // Spanish copy rides data.title_es/body_es for the dropdown's
+      // viewer-language pick (zero-migration: create_notification passes
+      // p_data through verbatim).
       try {
         await supabase.rpc('create_notification', {
           p_actor_id: actorId,
-          p_title: title,
-          p_body: body,
-          p_data: { ...extraData, notificationType: 'custom', notificationSkipped: !sendPush },
+          p_title: titleFinal,
+          p_body: bodyFinal,
+          p_data: {
+            ...extraData,
+            notificationType: 'custom',
+            notificationSkipped: !sendPush,
+            title_es: titleEsFinal || undefined,
+            body_es: bodyEsFinal || undefined,
+          },
         });
       } catch (err) {
         console.error('Failed to log notification:', err);
@@ -254,7 +342,14 @@ export default function NotificationCenter() {
 
       // Physical push only when the toggle is on; silent = shade + badge only.
       if (sendPush) {
-        await sendCustomNotification(title, body, Object.keys(extraData).length > 0 ? extraData : undefined, organizationId ?? undefined);
+        await sendCustomNotification(
+          titleFinal,
+          bodyFinal,
+          Object.keys(extraData).length > 0 ? extraData : undefined,
+          organizationId ?? undefined,
+          titleEsFinal || undefined,
+          bodyEsFinal || undefined
+        );
       }
 
       Alert.alert(
@@ -266,6 +361,9 @@ export default function NotificationCenter() {
             onPress: () => {
               setTitle('');
               setBody('');
+              setTitleEs('');
+              setBodyEs('');
+              sendSessionRef.current += 1;
               setDestination('');
               setAudienceMode('all');
               setSelectedJobTitles([]);
@@ -376,7 +474,7 @@ export default function NotificationCenter() {
               </View>
 
               <Text style={styles.cardTitle}>
-                Send Notification
+                {t('notification_center.card_title')}
               </Text>
 
               <Text style={styles.cardDescription}>
@@ -386,7 +484,7 @@ export default function NotificationCenter() {
               {/* Audience Selector */}
               <View style={styles.inputContainer}>
                 <View style={styles.inputHeader}>
-                  <Text style={styles.inputLabel}>Send To</Text>
+                  <Text style={styles.inputLabel}>{t('notification_center.send_to')}</Text>
                 </View>
                 <TouchableOpacity
                   style={styles.destinationSelector}
@@ -420,17 +518,17 @@ export default function NotificationCenter() {
                     {t('notification_center.title_label')}
                   </Text>
                   <Text style={styles.characterCount}>
-                    {title.length}/{maxTitleLength}
+                    {(isSpanishAuthor ? titleEs : title).length}/{maxTitleLength}
                   </Text>
                 </View>
                 <TextInput
                   style={styles.titleInput}
                   placeholder={t('notification_center.title_placeholder')}
                   placeholderTextColor={colors.textSecondary}
-                  value={title}
+                  value={isSpanishAuthor ? titleEs : title}
                   onChangeText={(text) => {
                     if (text.length <= maxTitleLength) {
-                      setTitle(text);
+                      (isSpanishAuthor ? setTitleEs : setTitle)(text);
                     }
                   }}
                   maxLength={maxTitleLength}
@@ -444,7 +542,7 @@ export default function NotificationCenter() {
                     {t('notification_center.message_label')}
                   </Text>
                   <Text style={styles.characterCount}>
-                    {body.length}/{maxBodyLength}
+                    {(isSpanishAuthor ? bodyEs : body).length}/{maxBodyLength}
                   </Text>
                 </View>
                 <View>
@@ -452,10 +550,10 @@ export default function NotificationCenter() {
                     style={[styles.bodyInput, { minHeight: Math.max(100, bodyDragH) }]}
                     placeholder={t('notification_center.message_placeholder')}
                     placeholderTextColor={colors.textSecondary}
-                    value={body}
+                    value={isSpanishAuthor ? bodyEs : body}
                     onChangeText={(text) => {
                       if (text.length <= maxBodyLength) {
-                        setBody(text);
+                        (isSpanishAuthor ? setBodyEs : setBody)(text);
                       }
                     }}
                     maxLength={maxBodyLength}
@@ -472,6 +570,9 @@ export default function NotificationCenter() {
                 </View>
               </View>
 
+              {/* Bilingual authoring: other-language preview + translate + pencil */}
+              {translation.element}
+
               {/* Destination Picker */}
               <View style={styles.inputContainer}>
                 <View style={styles.inputHeader}>
@@ -479,7 +580,7 @@ export default function NotificationCenter() {
                     {t('notification_center.opens_to')}
                   </Text>
                   <Text style={styles.characterCount}>
-                    Optional
+                    {t('notification_center.optional')}
                   </Text>
                 </View>
                 <TouchableOpacity
@@ -565,7 +666,7 @@ export default function NotificationCenter() {
                   onPress={() => setShowAudiencePicker(false)}
                 >
                   <View style={styles.pickerContainer}>
-                    <Text style={styles.pickerTitle}>Send To</Text>
+                    <Text style={styles.pickerTitle}>{t('notification_center.send_to')}</Text>
                     {/* All Staff option */}
                     <TouchableOpacity
                       style={[styles.pickerOption, audienceMode === 'all' && styles.pickerOptionSelected]}
@@ -586,7 +687,7 @@ export default function NotificationCenter() {
                           styles.pickerOptionText,
                           audienceMode === 'all' && styles.pickerOptionTextSelected,
                         ]}>
-                          All Staff
+                          {t('notification_center.all_staff')}
                         </Text>
                       </View>
                       {audienceMode === 'all' && (
@@ -596,7 +697,7 @@ export default function NotificationCenter() {
 
                     {/* Divider */}
                     <View style={[styles.audienceDivider, { backgroundColor: colors.border }]} />
-                    <Text style={[styles.audienceSectionLabel, { color: colors.textSecondary }]}>By Job Title</Text>
+                    <Text style={[styles.audienceSectionLabel, { color: colors.textSecondary }]}>{t('notification_center.by_job_title')}</Text>
 
                     {/* Job title checkboxes */}
                     {JOB_TITLE_OPTIONS.map((jt) => {
@@ -614,7 +715,7 @@ export default function NotificationCenter() {
                             styles.pickerOptionText,
                             isSelected && styles.pickerOptionTextSelected,
                           ]}>
-                            {jt}
+                            {jobTitleLabel(jt)}
                           </Text>
                           {isSelected && (
                             <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={18} color={colors.primary} />
@@ -628,32 +729,32 @@ export default function NotificationCenter() {
                       style={[styles.audienceDoneBtn, { backgroundColor: colors.primary }]}
                       onPress={() => setShowAudiencePicker(false)}
                     >
-                      <Text style={styles.audienceDoneBtnText}>Done</Text>
+                      <Text style={styles.audienceDoneBtnText}>{t('notification_center.done')}</Text>
                     </TouchableOpacity>
                   </View>
                 </TouchableOpacity>
               </Modal>
 
               {/* Preview */}
-              {(title || body) && (
+              {((isSpanishAuthor ? titleEs : title) || (isSpanishAuthor ? bodyEs : body)) && (
                 <View style={styles.previewContainer}>
                   <Text style={styles.previewLabel}>
                     {t('notification_center.preview')}
                   </Text>
                   <View style={styles.previewCard}>
-                    {title && (
+                    {(isSpanishAuthor ? titleEs : title) && (
                       <Text style={styles.previewTitle}>
-                        {title}
+                        {isSpanishAuthor ? titleEs : title}
                       </Text>
                     )}
-                    {body && (
+                    {(isSpanishAuthor ? bodyEs : body) && (
                       <Text style={styles.previewBody}>
-                        {body}
+                        {isSpanishAuthor ? bodyEs : body}
                       </Text>
                     )}
                     {audienceMode === 'job_titles' && selectedJobTitles.length > 0 && (
                       <Text style={[styles.previewAudience, { color: colors.textSecondary }]}>
-                        To: {selectedJobTitles.join(', ')}
+                        {t('notification_center.to_label')} {selectedJobTitles.map(jobTitleLabel).join(', ')}
                       </Text>
                     )}
                   </View>
@@ -682,10 +783,10 @@ export default function NotificationCenter() {
               <TouchableOpacity
                 style={[
                   styles.sendButton,
-                  (!title.trim() || !body.trim() || sending || (audienceMode === 'job_titles' && selectedJobTitles.length === 0)) && styles.sendButtonDisabled,
+                  (!(isSpanishAuthor ? titleEs : title).trim() || !(isSpanishAuthor ? bodyEs : body).trim() || sending || (audienceMode === 'job_titles' && selectedJobTitles.length === 0)) && styles.sendButtonDisabled,
                 ]}
                 onPress={handleSendNotification}
-                disabled={!title.trim() || !body.trim() || sending || (audienceMode === 'job_titles' && selectedJobTitles.length === 0)}
+                disabled={!(isSpanishAuthor ? titleEs : title).trim() || !(isSpanishAuthor ? bodyEs : body).trim() || sending || (audienceMode === 'job_titles' && selectedJobTitles.length === 0)}
               >
                 {sending ? (
                   <ActivityIndicator color={colors.fireText} />
@@ -698,7 +799,7 @@ export default function NotificationCenter() {
                       color={colors.fireText}
                     />
                     <Text style={styles.sendButtonText}>
-                      {audienceMode === 'all' ? t('notification_center.send_button') : `Send to ${selectedJobTitles.length} Group${selectedJobTitles.length !== 1 ? 's' : ''}`}
+                      {audienceMode === 'all' ? t('notification_center.send_button') : t('notification_center.send_to_groups', { count: selectedJobTitles.length })}
                     </Text>
                   </>
                 )}

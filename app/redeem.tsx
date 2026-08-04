@@ -21,6 +21,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
+import { bothLanguages } from '@/utils/notificationHelpers';
+import i18n from '@/i18n';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -285,17 +287,27 @@ export default function EmployeeRedeemScreen() {
       }
 
       const optionMatch = OPTIONS.find((o) => o.type === activeOption);
-      const optionLabel = activeCustom ? activeCustom.label : optionMatch ? t(optionMatch.titleKey) : 'Redemption';
-      const notifTitle = '💰 Redemption Request';
-      const notifBody = `${user.name || 'An employee'} requested ${optionLabel} ($${requestedBucks}).`;
+      // Both language copies (s62): built-in option labels come from i18n per
+      // language; custom options use their stored label_es when present.
+      const optionLabelEn = activeCustom
+        ? activeCustom.label
+        : optionMatch ? i18n.t(optionMatch.titleKey, { lng: 'en' }) : i18n.t('notifications.redemption_fallback_option', { lng: 'en' });
+      const optionLabelEs = activeCustom
+        ? (activeCustom.label_es || activeCustom.label)
+        : optionMatch ? i18n.t(optionMatch.titleKey, { lng: 'es' }) : i18n.t('notifications.redemption_fallback_option', { lng: 'es' });
+      const nameEn = user.name || i18n.t('notifications.an_employee', { lng: 'en' });
+      const nameEs = user.name || i18n.t('notifications.an_employee', { lng: 'es' });
+      const notifTitle = bothLanguages('notifications.redemption_request_title');
+      const notifBodyEn = i18n.t('notifications.redemption_request_body', { lng: 'en', name: nameEn, option: optionLabelEn, amount: requestedBucks });
+      const notifBodyEs = i18n.t('notifications.redemption_request_body', { lng: 'es', name: nameEs, option: optionLabelEs, amount: requestedBucks });
 
       // Log to managers' notification shade (single broadcast row, filtered by targetRole on
       // read). The RPC's employee carve-out allows exactly this self-reported request row.
       try {
         await supabase.rpc('create_notification', {
           p_actor_id: user.id,
-          p_title: notifTitle,
-          p_body: notifBody,
+          p_title: notifTitle.en,
+          p_body: notifBodyEn,
           p_data: {
             type: 'custom',
             destination: 'approvals',
@@ -303,6 +315,8 @@ export default function EmployeeRedeemScreen() {
             requestId,
             targetRole: 'manager',
             requesterId: user.id,
+            title_es: notifTitle.es,
+            body_es: notifBodyEs,
           },
         });
       } catch (err) {
@@ -318,8 +332,10 @@ export default function EmployeeRedeemScreen() {
           await sendNotification({
             userIds: managerIds,
             notificationType: 'custom',
-            title: notifTitle,
-            body: notifBody,
+            title: notifTitle.en,
+            body: notifBodyEn,
+            title_es: notifTitle.es,
+            body_es: notifBodyEs,
             data: { type: 'custom', destination: 'approvals' },
           });
         }

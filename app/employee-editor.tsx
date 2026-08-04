@@ -33,6 +33,7 @@ import { displayHandle } from '@/utils/displayHandle';
 import { getOrgDirectory } from '@/utils/orgDirectory';
 import { toPublicUrl } from '@/utils/storageResolver';
 import { fonts } from '@/constants/fonts';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface Employee {
   id: string;
@@ -204,7 +205,7 @@ export default function EmployeeEditorScreen() {
       fetchEmployees();
     } catch (error: any) {
       console.error('Error adding employee:', error);
-      Alert.alert(t('common:error'), error.message || t('error_fetch'));
+      Alert.alert(t('common:error'), translateServerError(error, t('error_fetch')));
     }
   };
 

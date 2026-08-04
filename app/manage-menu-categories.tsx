@@ -143,7 +143,6 @@ export default function ManageMenuCategoriesScreen() {
     const value = resolved.display_name.en.trim();
     const es = resolved.display_name.es;
     const m = nameModal;
-    setNameModal(null);
 
     let res: any = null;
     let targetId: string | null = null;
@@ -186,6 +185,12 @@ export default function ManageMenuCategoriesScreen() {
       table = 'menu_subcategories';
       targetId = res ? m.id : null;
     }
+
+    // callRpc alerted on failure (or silently no-ops while another call is
+    // busy) — keep the modal open so the typed name isn't lost; the manager
+    // can retry or cancel.
+    if (!res) return;
+    setNameModal(null);
 
     // Write the Spanish override only when the English create/rename succeeded
     // (empty `es` clears it via saveTranslations → null).

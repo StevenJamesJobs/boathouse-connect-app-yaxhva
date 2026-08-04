@@ -1,8 +1,10 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import i18n from '@/i18n';
+import { supabase } from '@/app/integrations/supabase/client';
+import { getCurrentActorId } from '@/utils/currentActor';
 
-const LANGUAGE_STORAGE_KEY = '@app_language';
+export const LANGUAGE_STORAGE_KEY = '@app_language';
 
 export type SupportedLanguage = 'en' | 'es';
 
@@ -37,6 +39,18 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     setLanguageState(lang);
     i18n.changeLanguage(lang);
     await AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, lang);
+    // s62: mirror the choice to users.preferred_language so push senders can
+    // localize per recipient. LanguageProvider mounts OUTSIDE AuthProvider, so
+    // the actor comes from module scope; logged out (null) skips — the
+    // AuthContext session effect syncs at next login. Fire-and-forget.
+    const actorId = getCurrentActorId();
+    if (actorId) {
+      supabase
+        .rpc('set_my_preferred_language', { p_user_id: actorId, p_language: lang })
+        .then(({ error }) => {
+          if (error) console.warn('[LanguageContext] preferred_language sync failed:', error.message);
+        });
+    }
   };
 
   return (

@@ -30,7 +30,8 @@ import { generateQuizQuestions, generatePhotoQuestion, getCurrentWeekKey, getExa
 import type { ExamType } from '@/utils/exam/questionGenerator';
 import { useTranslationSection } from '@/components/TranslationSection';
 import { formatTime, formatCountdown, getCountdownUrgency } from '@/utils/exam/examEngine';
-import { sendCustomNotification } from '@/utils/notificationHelpers';
+import { sendCustomNotification, bothLanguages } from '@/utils/notificationHelpers';
+import i18n from '@/i18n';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { brokerUploadImage } from '@/utils/storageBroker';
@@ -339,8 +340,8 @@ export default function ExamEditorScreen() {
     }));
 
     // Server assigns question_order (1-based) + org; extra keys in the objects are ignored.
-    const { error } = await (supabase.rpc as any)('create_exam_questions', {
-      p_actor_id: user?.id,
+    const { error } = await supabase.rpc('create_exam_questions', {
+      p_actor_id: user.id,
       p_exam_id: examId,
       p_questions: questionsToInsert,
     });
@@ -399,16 +400,22 @@ export default function ExamEditorScreen() {
                     host: ['Host'],
                   };
                   const targetJobTitles = jobTitlesByType[examType] || [];
-                  const examTypeLabel = getExamTypeName(examType);
+                  const quizTitle = bothLanguages('notifications.quiz_live_title');
+                  // Body interpolates the language-specific quiz-type name, so
+                  // the two copies are built individually.
+                  const quizBodyEn = i18n.t('notifications.quiz_live_body', { lng: 'en', type: getExamTypeName(examType) });
+                  const quizBodyEs = i18n.t('notifications.quiz_live_body', { lng: 'es', type: getExamTypeName(examType, true) });
                   await sendCustomNotification(
-                    'New Weekly Quiz Available',
-                    `Your ${examTypeLabel} quiz is live — tap to take it.`,
+                    quizTitle.en,
+                    quizBodyEn,
                     {
                       destination: 'weekly-quizzes',
                       exam_id: currentExam.id,
                       job_titles: targetJobTitles,
                     },
-                    organizationId ?? undefined
+                    organizationId ?? undefined,
+                    quizTitle.es,
+                    quizBodyEs
                   );
                 } catch (pushErr) {
                   // Non-fatal: activation still succeeded.
@@ -504,9 +511,10 @@ export default function ExamEditorScreen() {
     setCategoryPickerForQuestion(null);
     setShowCustomCategoryInput(false);
     setCustomCategoryText('');
+    if (!user?.id) return;
     try {
-      await (supabase.rpc as any)('update_exam_question', {
-        p_actor_id: user?.id, p_question_id: q.id, p_fields: { category_label: newLabel },
+      await supabase.rpc('update_exam_question', {
+        p_actor_id: user.id, p_question_id: q.id, p_fields: { category_label: newLabel },
       });
       setQuestions(prev =>
         prev.map(qq => (qq.id === q.id ? { ...qq, category_label: newLabel } : qq))
@@ -583,7 +591,7 @@ export default function ExamEditorScreen() {
 
   // Add custom question
   const handleAddCustom = async (isBonus: boolean = false) => {
-    if (!currentExam) return;
+    if (!currentExam || !user?.id) return;
     const authorText = isSpanish ? customTextEs : customText;
     const authorA = isSpanish ? customAEs : customA;
     const authorB = isSpanish ? customBEs : customB;
@@ -606,8 +614,8 @@ export default function ExamEditorScreen() {
       : null;
 
     // Server appends after the current max order + derives org.
-    const { error } = await (supabase.rpc as any)('add_exam_question', {
-      p_actor_id: user?.id,
+    const { error } = await supabase.rpc('add_exam_question', {
+      p_actor_id: user.id,
       p_exam_id: currentExam.id,
       p_question: {
         question_text: resolved.question.en.trim(),
@@ -695,8 +703,8 @@ export default function ExamEditorScreen() {
       }
 
       if (newQuestion) {
-        const { error } = await (supabase.rpc as any)('update_exam_question', {
-          p_actor_id: user?.id,
+        const { error } = await supabase.rpc('update_exam_question', {
+          p_actor_id: user.id,
           p_question_id: question.id,
           p_fields: {
             question_text: newQuestion.question_text,
@@ -731,7 +739,7 @@ export default function ExamEditorScreen() {
 
   // Save edited question
   const handleSaveEdit = async () => {
-    if (!editingQuestion) return;
+    if (!editingQuestion || !user?.id) return;
 
     // Fill/refresh the other language per the s61 staleness rules (may ask
     // once). Sending the _es keys explicitly (value or null) also fixes the
@@ -739,15 +747,15 @@ export default function ExamEditorScreen() {
     const resolved = await editTranslation.resolveOnSave();
     if (!resolved) return;
 
-    const { error } = await (supabase.rpc as any)('update_exam_question', {
-      p_actor_id: user?.id,
+    const { error } = await supabase.rpc('update_exam_question', {
+      p_actor_id: user.id,
       p_question_id: editingQuestion.id,
       p_fields: {
-        question_text: resolved.question.en,
-        option_a: resolved.option_a.en,
-        option_b: resolved.option_b.en,
-        option_c: resolved.option_c.en,
-        option_d: resolved.option_d.en,
+        question_text: resolved.question.en.trim(),
+        option_a: resolved.option_a.en.trim(),
+        option_b: resolved.option_b.en.trim(),
+        option_c: resolved.option_c.en.trim(),
+        option_d: resolved.option_d.en.trim(),
         correct_option: editingQuestion.correct_option,
         bonus_bucks_value: editingQuestion.bonus_bucks_value,
         bucks_value: editingQuestion.bucks_value,
@@ -897,13 +905,18 @@ export default function ExamEditorScreen() {
               // Push the user a "you've been cleared" notification — uses the
               // existing send-push-notification edge function with userIds filter.
               try {
+                const take2Title = bothLanguages('notifications.take2_title');
+                const take2Body = bothLanguages('notifications.take2_body');
+                const shadeBody = bothLanguages('notifications.take2_shade_body', { name: entry.name });
                 await supabase.functions.invoke('send-push-notification', {
                   body: {
                     actor_id: user?.id,
                     userIds: [entry.user_id],
                     notificationType: 'custom',
-                    title: 'Take 2! 🎯',
-                    body: 'You have been cleared to retake your quiz.',
+                    title: take2Title.en,
+                    body: take2Body.en,
+                    title_es: take2Title.es,
+                    body_es: take2Body.es,
                     data: {
                       destination: 'weekly-quizzes',
                       exam_id: currentExam.id,
@@ -912,12 +925,15 @@ export default function ExamEditorScreen() {
                   },
                 });
                 // Log to the shade — visible only to managers/owners and the cleared
-                // user (retake_granted), never the whole org.
+                // user (retake_granted), never the whole org. Spanish copy rides
+                // data.title_es/body_es for the dropdown's viewer-language pick.
                 await supabase.rpc('create_notification', {
                   p_actor_id: actorId,
-                  p_title: 'Take 2! 🎯',
-                  p_body: `Cleared ${entry.name} to retake the quiz.`,
+                  p_title: take2Title.en,
+                  p_body: shadeBody.en,
                   p_data: {
+                    title_es: take2Title.es,
+                    body_es: shadeBody.es,
                     notificationType: 'retake_granted',
                     destination: 'weekly-quizzes',
                     exam_id: currentExam.id,

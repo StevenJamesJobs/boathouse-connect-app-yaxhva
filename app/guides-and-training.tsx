@@ -95,7 +95,7 @@ export default function GuidesAndTrainingScreen() {
     if (!user?.id) return;
     try {
       setLoading(true);
-      const { data, error } = await (supabase.rpc as any)('get_guides', {
+      const { data, error } = await supabase.rpc('get_guides', {
         p_actor_id: user.id,
       });
 

@@ -22,6 +22,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
+import { bothLanguages } from '@/utils/notificationHelpers';
 import * as ImagePicker from 'expo-image-picker';
 import { useFocusEffect } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -163,8 +164,9 @@ export default function SpecialFeaturesEditorScreen() {
     try {
       console.log('Loading guide files from database...');
       
-      const { data, error } = await (supabase.rpc as any)('get_guides', {
-        p_actor_id: user?.id,
+      if (!user?.id) return;
+      const { data, error } = await supabase.rpc('get_guides', {
+        p_actor_id: user.id,
       });
 
       if (error) {
@@ -396,10 +398,14 @@ export default function SpecialFeaturesEditorScreen() {
         // Send the actual push only when toggle is on
         if (shouldSendNotification) {
           try {
+            const pushTitle = bothLanguages('notifications.new_special_feature_title');
             await sendNotification({
               notificationType: 'special_feature',
-              title: '⭐ New Special Feature',
+              title: pushTitle.en,
               body: resolved.title.en,
+              title_es: pushTitle.es,
+              // The authored Spanish title when it exists; empty falls back to EN.
+              body_es: resolved.title.es || undefined,
               data: {
                 featureId: null,
                 startDateTime: startDateTime?.toISOString() || null,

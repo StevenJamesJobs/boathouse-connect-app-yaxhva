@@ -17,6 +17,7 @@ import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface CreatedAccount {
   orgId: string;
@@ -87,7 +88,7 @@ export default function CreateRestaurantScreen() {
 
       if (error) {
         console.error('[CreateRestaurant] signup_owner_with_org error:', error);
-        Alert.alert(t('common.error'), error.message || t('onboarding.create_failed'));
+        Alert.alert(t('common.error'), translateServerError(error, t('onboarding.create_failed')));
         setIsLoading(false);
         return;
       }

@@ -2037,6 +2037,47 @@ export type Database = {
           },
         ]
       }
+      redemption_custom_options: {
+        Row: {
+          cost: number
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          label: string
+          label_es: string | null
+          organization_id: string
+        }
+        Insert: {
+          cost: number
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          label: string
+          label_es?: string | null
+          organization_id: string
+        }
+        Update: {
+          cost?: number
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          label?: string
+          label_es?: string | null
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "redemption_custom_options_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       redemption_requests: {
         Row: {
           bucks_amount: number
@@ -2796,6 +2837,7 @@ export type Database = {
           organization_id: string
           password_hash: string
           phone_number: string | null
+          preferred_language: string | null
           profile_picture_url: string | null
           quick_tools: Json | null
           role: string
@@ -2818,6 +2860,7 @@ export type Database = {
           organization_id: string
           password_hash?: string
           phone_number?: string | null
+          preferred_language?: string | null
           profile_picture_url?: string | null
           quick_tools?: Json | null
           role: string
@@ -2840,6 +2883,7 @@ export type Database = {
           organization_id?: string
           password_hash?: string
           phone_number?: string | null
+          preferred_language?: string | null
           profile_picture_url?: string | null
           quick_tools?: Json | null
           role?: string
@@ -3013,6 +3057,70 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_exam_question: {
+        Args: { p_actor_id: string; p_exam_id: string; p_question: Json }
+        Returns: string
+      }
+      create_exam_questions: {
+        Args: { p_actor_id: string; p_exam_id: string; p_questions: Json }
+        Returns: undefined
+      }
+      update_exam_question: {
+        Args: { p_actor_id: string; p_fields: Json; p_question_id: string }
+        Returns: undefined
+      }
+      set_my_preferred_language: {
+        Args: { p_language: string; p_user_id: string }
+        Returns: undefined
+      }
+      get_guides: {
+        Args: { p_actor_id: string; p_include_inactive?: boolean }
+        Returns: {
+          category: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          description_es: string | null
+          display_order: number
+          file_name: string
+          file_type: string
+          file_url: string
+          id: string
+          is_active: boolean
+          organization_id: string
+          thumbnail_url: string | null
+          title: string
+          title_es: string | null
+          updated_at: string
+        }[]
+      }
+      get_redemption_custom_options: {
+        Args: { p_actor_id: string; p_include_inactive?: boolean }
+        Returns: {
+          cost: number
+          display_order: number
+          id: string
+          is_active: boolean
+          label: string
+          label_es: string | null
+        }[]
+      }
+      upsert_redemption_custom_option: {
+        Args: {
+          p_cost: number
+          p_id: string | null
+          p_is_active: boolean
+          p_label: string
+          p_label_es?: string | null
+          p_organization_id: string
+          p_user_id: string
+        }
+        Returns: { id?: string; ok: boolean; reason?: string }
+      }
+      delete_redemption_custom_option: {
+        Args: { p_id: string; p_organization_id: string; p_user_id: string }
+        Returns: { ok: boolean; reason?: string }
+      }
       reset_all_bucks: {
         Args: { p_actor_id?: string }
         Returns: undefined
@@ -3914,7 +4022,14 @@ export type Database = {
       }
       get_unread_leaderboard_pass_count: { Args: { p_user_id: string }; Returns: number }
       add_leaderboard_pass_notifications: {
-        Args: { p_actor_id: string; p_body: string; p_recipient_ids: string[]; p_title: string }
+        Args: {
+          p_actor_id: string
+          p_body: string
+          p_body_es?: string | null
+          p_recipient_ids: string[]
+          p_title: string
+          p_title_es?: string | null
+        }
         Returns: number
       }
       get_checklist_categories: {
@@ -4681,6 +4796,76 @@ export type Database = {
           p_id: string
           p_organization_id?: string
           p_title_es?: string
+        }
+        Returns: undefined
+      }
+      update_announcement_translations_actor: {
+        Args: {
+          p_actor_id: string
+          p_content_es?: string | null
+          p_id: string
+          p_title_es?: string | null
+        }
+        Returns: undefined
+      }
+      update_cocktail_translations_actor: {
+        Args: { p_actor_id: string; p_id: string; p_procedure_es?: string | null }
+        Returns: undefined
+      }
+      update_guide_translations_actor: {
+        Args: {
+          p_actor_id: string
+          p_description_es?: string | null
+          p_id: string
+          p_title_es?: string | null
+        }
+        Returns: undefined
+      }
+      update_libation_recipe_translations_actor: {
+        Args: { p_actor_id: string; p_id: string; p_procedure_es?: string | null }
+        Returns: undefined
+      }
+      update_menu_category_translations_actor: {
+        Args: { p_actor_id: string; p_display_name_es?: string | null; p_id: string }
+        Returns: undefined
+      }
+      update_menu_item_translations_actor: {
+        Args: {
+          p_actor_id: string
+          p_description_es?: string | null
+          p_id: string
+          p_location_es?: string | null
+          p_name_es?: string | null
+        }
+        Returns: undefined
+      }
+      update_menu_subcategory_translations_actor: {
+        Args: { p_actor_id: string; p_display_name_es?: string | null; p_id: string }
+        Returns: undefined
+      }
+      update_puree_syrup_recipe_translations_actor: {
+        Args: { p_actor_id: string; p_id: string; p_procedure_es?: string | null }
+        Returns: undefined
+      }
+      update_special_feature_translations_actor: {
+        Args: {
+          p_actor_id: string
+          p_content_es?: string | null
+          p_id: string
+          p_title_es?: string | null
+        }
+        Returns: undefined
+      }
+      update_summer_libation_recipe_translations_actor: {
+        Args: { p_actor_id: string; p_id: string; p_procedure_es?: string | null }
+        Returns: undefined
+      }
+      update_upcoming_event_translations_actor: {
+        Args: {
+          p_actor_id: string
+          p_content_es?: string | null
+          p_id: string
+          p_title_es?: string | null
         }
         Returns: undefined
       }

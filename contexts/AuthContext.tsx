@@ -5,6 +5,8 @@ import { User, AuthState } from '@/types/user';
 import { AppState, Platform } from 'react-native';
 import { setResolverActorId } from '@/utils/storageResolver';
 import { setCurrentActorId } from '@/utils/currentActor';
+import i18n from '@/i18n';
+import { LANGUAGE_STORAGE_KEY } from '@/contexts/LanguageContext';
 
 interface AuthContextType extends AuthState {
   login: (username: string, password: string, rememberMe: boolean) => Promise<boolean>;
@@ -321,6 +323,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setResolverActorId(authState.user?.id ?? null);
     // Same actor feeds edge-function callers (push / translate) that can't thread it.
     setCurrentActorId(authState.user?.id ?? null);
+    // s62: sync the UI language to users.preferred_language once per session
+    // establishment (login / join-adopt / cold restore). Read the persisted
+    // override directly — at cold start i18n.language may still be the device
+    // default while LanguageContext's async read is in flight. Fire-and-forget;
+    // the server no-ops when the value is unchanged.
+    const uid = authState.user?.id;
+    if (uid && AsyncStorage) {
+      AsyncStorage.getItem(LANGUAGE_STORAGE_KEY)
+        .then((saved: string | null) => {
+          const lang = saved === 'es' || saved === 'en' ? saved : i18n.language === 'es' ? 'es' : 'en';
+          return supabase.rpc('set_my_preferred_language', { p_user_id: uid, p_language: lang });
+        })
+        .then((res: { error: { message: string } | null } | undefined) => {
+          if (res?.error) console.warn('[AuthContext] preferred_language sync failed:', res.error.message);
+        })
+        .catch(() => {});
+    }
   }, [authState.user?.id]);
 
   // B8: revalidate on return to foreground — a suspended (not killed) app never re-runs

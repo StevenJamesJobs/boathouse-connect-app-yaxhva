@@ -21,6 +21,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
+import { bothLanguages } from '@/utils/notificationHelpers';
 import * as ImagePicker from 'expo-image-picker';
 import { brokerUploadImage, brokerDelete } from '@/utils/storageBroker';
 import { useFocusEffect } from '@react-navigation/native';
@@ -168,8 +169,9 @@ export default function UpcomingEventsEditorScreen() {
       // get_guides returns the org's active guides (SETOF rows) for the actor.
       // Category narrowing + grouping stays client-side (groupedGuideFiles /
       // GUIDE_CATEGORIES), same as before the RPC swap.
-      const { data, error } = await (supabase.rpc as any)('get_guides', {
-        p_actor_id: user?.id,
+      if (!user?.id) return;
+      const { data, error } = await supabase.rpc('get_guides', {
+        p_actor_id: user.id,
       });
 
       if (error) {
@@ -430,10 +432,14 @@ export default function UpcomingEventsEditorScreen() {
         // Send the actual push only when toggle is on
         if (shouldSendNotification) {
           try {
+            const pushTitle = bothLanguages('notifications.new_event_title');
             await sendNotification({
               notificationType: 'event',
-              title: '📅 New Event',
+              title: pushTitle.en,
               body: resolved.title.en,
+              title_es: pushTitle.es,
+              // The authored Spanish title when it exists; empty falls back to EN.
+              body_es: resolved.title.es || undefined,
               data: {
                 eventId: null,
                 category: formData.category,
