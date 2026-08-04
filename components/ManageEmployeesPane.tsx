@@ -34,6 +34,7 @@ import { displayHandle } from '@/utils/displayHandle';
 import { getOrgDirectory } from '@/utils/orgDirectory';
 import { toPublicUrl } from '@/utils/storageResolver';
 import { fonts } from '@/constants/fonts';
+import { translateServerError } from '@/utils/serverErrors';
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
 
@@ -153,7 +154,7 @@ export default function ManageEmployeesPane({ width, scrollRef, onScroll, header
       fetchEmployees();
     } catch (e: any) {
       setSubmitting(false);
-      Alert.alert(t('common.error', 'Error'), e?.message || t('employee_editor.error_fetch', 'Something went wrong'));
+      Alert.alert(t('common.error', 'Error'), translateServerError(e, t('employee_editor.error_fetch', 'Something went wrong')));
     }
   };
 

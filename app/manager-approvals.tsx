@@ -20,15 +20,26 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotification } from '@/contexts/NotificationContext';
 import { RedemptionRequestCard, RedemptionRequestRow } from '@/components/RedemptionRequestCard';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { bothLanguages } from '@/utils/notificationHelpers';
+import i18n from '@/i18n';
 import { getOrgDirectory } from '@/utils/orgDirectory';
 import AmbientGlow from '@/components/AmbientGlow';
 import { fonts } from '@/constants/fonts';
 
-const TYPE_LABELS: Record<string, string> = {
-  food_beverage: 'Food & Beverages',
-  section: 'Choose Your Own Section',
-  side_work: 'Choose Your Own Side Work',
-  side_work_free: 'Side Work Free Shift',
+// Same keys the redeem screen's option cards use — EN values byte-identical
+// to the old hardcoded labels; ES comes along for free (s62).
+const TYPE_LABEL_KEYS: Record<string, string> = {
+  food_beverage: 'rewards_ui:redeem_food_title',
+  section: 'rewards_ui:redeem_section_title',
+  side_work: 'rewards_ui:redeem_sidework_title',
+  side_work_free: 'rewards_ui:redeem_freeshift_title',
+};
+
+const typeLabel = (requestType: string, lng?: string): string => {
+  const key = TYPE_LABEL_KEYS[requestType];
+  return key
+    ? i18n.t(key, lng ? { lng } : undefined)
+    : i18n.t('notifications.redemption_fallback_option', lng ? { lng } : undefined);
 };
 
 export default function ManagerApprovalsScreen() {
@@ -113,12 +124,19 @@ export default function ManagerApprovalsScreen() {
         return;
       }
 
-      const optionLabel = TYPE_LABELS[row.request_type] || 'Redemption';
-      const decisionTitle = mode === 'approve' ? '✅ Redemption Approved' : '❌ Redemption Denied';
-      const decisionBody =
+      // Both language copies (s62) — the employee sees the decision in THEIR
+      // language; the manager-typed reason stays verbatim in both.
+      const decisionTitle = bothLanguages(
+        mode === 'approve' ? 'notifications.redemption_approved_title' : 'notifications.redemption_denied_title'
+      );
+      const bodyKey =
         mode === 'approve'
-          ? `Your ${optionLabel} ($${row.bucks_amount}) was approved.`
-          : `Your ${optionLabel} ($${row.bucks_amount}) was denied${withReason ? `: ${withReason}` : ''}.`;
+          ? 'notifications.redemption_approved_body'
+          : withReason
+            ? 'notifications.redemption_denied_body_reason'
+            : 'notifications.redemption_denied_body';
+      const decisionBodyEn = i18n.t(bodyKey, { lng: 'en', option: typeLabel(row.request_type, 'en'), amount: row.bucks_amount, reason: withReason });
+      const decisionBodyEs = i18n.t(bodyKey, { lng: 'es', option: typeLabel(row.request_type, 'es'), amount: row.bucks_amount, reason: withReason });
 
       // Clear the pending shade entry across all managers + log the decision row for the requester
       try {
@@ -129,8 +147,8 @@ export default function ManagerApprovalsScreen() {
 
         await supabase.rpc('create_notification', {
           p_actor_id: user.id,
-          p_title: decisionTitle,
-          p_body: decisionBody,
+          p_title: decisionTitle.en,
+          p_body: decisionBodyEn,
           p_data: {
             type: 'custom',
             destination: 'redeem',
@@ -138,6 +156,8 @@ export default function ManagerApprovalsScreen() {
             targetUserId: row.user_id,
             requestId: row.id,
             status: mode,
+            title_es: decisionTitle.es,
+            body_es: decisionBodyEs,
           },
         });
       } catch (err) {
@@ -149,8 +169,10 @@ export default function ManagerApprovalsScreen() {
         await sendNotification({
           userIds: [row.user_id],
           notificationType: 'custom',
-          title: decisionTitle,
-          body: decisionBody,
+          title: decisionTitle.en,
+          body: decisionBodyEn,
+          title_es: decisionTitle.es,
+          body_es: decisionBodyEs,
           data: { type: 'custom', destination: 'redeem' },
         });
       } catch (err) {
@@ -220,7 +242,7 @@ export default function ManagerApprovalsScreen() {
         <View style={styles.overlay}>
           <View style={[styles.detailCard, { backgroundColor: colors.card }]}>
             <Text style={[styles.detailTitle, { color: colors.text }]}>
-              {detailRow ? TYPE_LABELS[detailRow.request_type] : ''}
+              {detailRow ? typeLabel(detailRow.request_type) : ''}
             </Text>
             {detailRow && (
               <>

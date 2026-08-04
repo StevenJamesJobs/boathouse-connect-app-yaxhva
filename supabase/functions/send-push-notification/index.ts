@@ -13,8 +13,10 @@ interface NotificationRequest {
   organizationId?: string; // Ignored for scoping — kept only for back-compat logging (camel/snake both accepted)
   organization_id?: string;
   notificationType: 'message' | 'reward' | 'announcement' | 'event' | 'special_feature' | 'custom';
-  title: string;
+  title: string; // English base copy — always required, the fallback for every recipient
   body: string;
+  title_es?: string; // Optional Spanish copy (s62): recipients whose users.preferred_language = 'es'
+  body_es?: string; //  get these; anyone else (en/NULL/unknown) gets the English base. Per-field fallback.
   data?: Record<string, any>;
   jobTitles?: string[]; // Filter recipients by job titles (broadcast — requires manager/owner)
 }
@@ -48,7 +50,7 @@ serve(async (req) => {
 
     // Parse request body
     const requestData: NotificationRequest = await req.json();
-    const { actor_id, userIds, notificationType, title, body, data, jobTitles } = requestData;
+    const { actor_id, userIds, notificationType, title, body, title_es, body_es, data, jobTitles } = requestData;
 
     // --- Authorization: verify a real actor and DERIVE the org from it ---
     // This app has no Supabase Auth (the anon key satisfies verify_jwt but proves
@@ -70,17 +72,20 @@ serve(async (req) => {
     const isManager = actor.role === 'manager' || actor.role === 'owner';
     const hasExplicitUserIds = Array.isArray(userIds) && userIds.length > 0;
 
-    console.log('Processing notification request:', { notificationType, title, actor_id, actorOrg, count: userIds?.length, jobTitles });
+    console.log('Processing notification request:', { notificationType, title, actor_id, actorOrg, count: userIds?.length, jobTitles, hasEs: !!(title_es || body_es) });
 
-    // Get recipient user IDs — always scoped to the actor's org.
+    // Get recipient user IDs — always scoped to the actor's org. Recipient
+    // language rides the same queries (s62): preferred_language 'es' picks the
+    // Spanish copy when one was provided; 'en'/NULL stays on the English base.
     let recipientIds: string[] = [];
+    const langById: Record<string, string> = {};
 
     if (hasExplicitUserIds) {
       // Targeted send (messages, rewards, leaderboard-pass): allowed for any active
       // member, but recipients are filtered to the actor's org — cross-org ids drop out.
       const { data: sameOrgUsers, error: usersError } = await supabaseClient
         .from('users')
-        .select('id')
+        .select('id, preferred_language')
         .in('id', userIds)
         .eq('organization_id', actorOrg)
         .eq('is_active', true);
@@ -88,6 +93,7 @@ serve(async (req) => {
         throw usersError;
       }
       recipientIds = (sameOrgUsers || []).map((u: any) => u.id);
+      for (const u of sameOrgUsers || []) langById[u.id] = u.preferred_language || 'en';
     } else {
       // Broadcast (whole org, optionally job-title filtered) — announcements, events,
       // features, custom sends: manager/owner only.
@@ -97,12 +103,13 @@ serve(async (req) => {
 
       const { data: orgUsers, error: usersError } = await supabaseClient
         .from('users')
-        .select('id, job_titles, job_title')
+        .select('id, job_titles, job_title, preferred_language')
         .eq('organization_id', actorOrg)
         .eq('is_active', true);
       if (usersError) {
         throw usersError;
       }
+      for (const u of orgUsers || []) langById[u.id] = u.preferred_language || 'en';
 
       if (jobTitles && jobTitles.length > 0) {
         recipientIds = (orgUsers || [])
@@ -208,6 +215,20 @@ serve(async (req) => {
       console.error('Exception fetching badge totals:', e);
     }
 
+    // Per-recipient copy pick (s62). Expo's push API takes an array of
+    // independent message objects, so mixed-language sends ride ONE request —
+    // no per-language batching needed. Per-FIELD fallback: a missing title_es
+    // falls back to the English title even when body_es exists (and vice
+    // versa), so a partial Spanish copy can never blank a field.
+    const copyFor = (userId: string) => {
+      const wantsEs = langById[userId] === 'es';
+      return {
+        title: wantsEs && title_es ? title_es : title,
+        body: wantsEs && body_es ? body_es : body,
+        language: wantsEs && (title_es || body_es) ? 'es' : 'en',
+      };
+    };
+
     // Prepare messages for Expo Push API
     const messages = filteredTokens.map((item: any) => {
       // Server-computed total reflects the DB right now. For quiz activation
@@ -217,43 +238,54 @@ serve(async (req) => {
       // only if the RPC failed, so the user still sees a badge bump.
       const computedTotal = badgeTotals[item.user_id];
       const badgeValue = typeof computedTotal === 'number' ? computedTotal : 1;
+      const copy = copyFor(item.user_id);
       return {
         to: item.token,
         sound: 'default',
-        title: title,
-        body: body,
+        title: copy.title,
+        body: copy.body,
         data: data || {},
         badge: badgeValue,
       };
     });
 
-    // Send notifications to Expo Push API
+    // Send notifications to Expo Push API. Expo caps a request at 100
+    // messages — today's largest fan-out is ~74 tokens, but chunk defensively
+    // so a larger org can't silently fail the whole send.
     const expoPushEndpoint = 'https://exp.host/--/api/v2/push/send';
-    const pushResponse = await fetch(expoPushEndpoint, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(messages),
-    });
-
-    const pushResult = await pushResponse.json();
+    const pushResults: any[] = [];
+    for (let i = 0; i < messages.length; i += 100) {
+      const chunk = messages.slice(i, i + 100);
+      const pushResponse = await fetch(expoPushEndpoint, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(chunk),
+      });
+      pushResults.push(await pushResponse.json());
+    }
+    const pushResult = pushResults.length === 1 ? pushResults[0] : pushResults;
     console.log('Expo push result:', pushResult);
 
-    // Log notifications to database
-    const notificationLogs = filteredTokens.map((item: any) => ({
-      user_id: item.user_id,
-      // Recipients are always filtered to the actor's org, so actorOrg is every
-      // log row's org. (v25 omitted this and the legacy BEFORE INSERT trigger
-      // silently stamped McLoone's org on every log — trigger now dropped.)
-      organization_id: actorOrg,
-      notification_type: notificationType,
-      title: title,
-      body: body,
-      data: data || {},
-      status: 'sent',
-    }));
+    // Log notifications to database — title/body record the copy each
+    // recipient actually got; data carries the delivery language tag.
+    const notificationLogs = filteredTokens.map((item: any) => {
+      const copy = copyFor(item.user_id);
+      return {
+        user_id: item.user_id,
+        // Recipients are always filtered to the actor's org, so actorOrg is every
+        // log row's org. (v25 omitted this and the legacy BEFORE INSERT trigger
+        // silently stamped McLoone's org on every log — trigger now dropped.)
+        organization_id: actorOrg,
+        notification_type: notificationType,
+        title: copy.title,
+        body: copy.body,
+        data: { ...(data || {}), delivered_language: copy.language },
+        status: 'sent',
+      };
+    });
 
     const { error: logError } = await supabaseClient
       .from('notification_logs')

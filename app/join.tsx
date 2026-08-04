@@ -20,6 +20,7 @@ import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { deriveUsername } from '@/utils/username';
+import { translateServerError } from '@/utils/serverErrors';
 
 type Phase = 'enter_code' | 'create_account';
 
@@ -146,7 +147,7 @@ export default function JoinScreen() {
 
       if (signupError) {
         console.error('[Join] Error creating account:', signupError);
-        setError(signupError.message || t('onboarding.something_went_wrong'));
+        setError(translateServerError(signupError, t('onboarding.something_went_wrong')));
         return;
       }
 
@@ -170,7 +171,7 @@ export default function JoinScreen() {
       }
     } catch (e: any) {
       console.error('[Join] Error creating account:', e);
-      setError(e?.message || t('onboarding.something_went_wrong'));
+      setError(translateServerError(e, t('onboarding.something_went_wrong')));
     } finally {
       setIsLoading(false);
     }

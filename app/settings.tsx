@@ -25,6 +25,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { BlurView } from 'expo-blur';
 import NotificationPreferences from '@/components/NotificationPreferences';
 import { supabase } from '@/app/integrations/supabase/client';
+import { translateServerError } from '@/utils/serverErrors';
 
 export default function SettingsScreen() {
   const { t } = useTranslation();
@@ -117,7 +118,7 @@ export default function SettingsScreen() {
       setShowNewPassword(false);
       setShowConfirmPassword(false);
     } catch (error: any) {
-      Alert.alert(t('common.error'), error.message || t('profile.error_change_password'));
+      Alert.alert(t('common.error'), translateServerError(error, t('profile.error_change_password')));
     }
   };
 

@@ -294,11 +294,14 @@ export default function NotificationDropdown({
           if (linkedType === 'leaderboard_pass') {
             if (cn.data?.targetUserId !== user?.id) continue;
           }
+          // s62: composer/system senders store the Spanish copy in
+          // data.title_es/body_es — pick the viewer's language, EN base as
+          // fallback (rows sent before s62 simply have no _es keys).
           items.push({
             id: cn.id,
             type: 'custom_notification',
-            title: cn.title,
-            subtitle: cn.body,
+            title: (language === 'es' && cn.data?.title_es) ? String(cn.data.title_es) : cn.title,
+            subtitle: (language === 'es' && cn.data?.body_es) ? String(cn.data.body_es) : cn.body,
             createdAt: cn.created_at,
             rawData: cn,
           });
@@ -393,8 +396,8 @@ export default function NotificationDropdown({
         return;
       }
       onItemPress({
-        title: data.title,
-        content: data.body,
+        title: (language === 'es' && data.data?.title_es) ? String(data.data.title_es) : data.title,
+        content: (language === 'es' && data.data?.body_es) ? String(data.data.body_es) : data.body,
       });
     } else {
       // Mark per-item NEW state cleared when the user opens the detail modal from the shade.

@@ -41,6 +41,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { useNotification } from '@/contexts/NotificationContext';
+import { bothLanguages } from '@/utils/notificationHelpers';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
@@ -528,11 +529,15 @@ export default function RewardsAndReviewsEditorScreen() {
       // Send push notification (only for rewards, not deductions)
       if (isReward) {
         try {
+          // Org-branded currency (fixes the hardcoded McLoone's copy) + both
+          // language copies; the amount/description body is language-neutral.
+          const rewardTitle = bothLanguages('notifications.reward_title', { currency: currencyName });
           await sendNotification({
             userIds: [selectedEmployee.id],
             notificationType: 'reward',
-            title: '🎉 You Earned McLoone\'s Bucks!',
+            title: rewardTitle.en,
             body: `+${rewardAmount} - ${rewardDescription}`,
+            title_es: rewardTitle.es,
             data: {
               amount: finalAmount,
               description: rewardDescription,

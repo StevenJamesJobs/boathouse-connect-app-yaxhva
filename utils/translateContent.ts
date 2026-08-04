@@ -21,6 +21,10 @@ export async function translateTextsDetailed(
   const hasContent = texts.some((t) => t && t.trim().length > 0);
   if (!hasContent) return { ok: true, translations: texts.map(() => '') };
 
+  // Abort a hung edge call after 12s so a dead network can't hold a
+  // translation section's busy state for the rest of the session.
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), 12000);
   try {
     const { data, error } = await supabase.functions.invoke('translate-text', {
       body: {
@@ -29,6 +33,7 @@ export async function translateTextsDetailed(
         targetLang,
         sourceLang,
       },
+      signal: abort.signal,
     });
 
     if (error) {
@@ -45,6 +50,8 @@ export async function translateTextsDetailed(
   } catch (err) {
     console.error('Translation request failed:', err);
     return { ok: false, translations: texts };
+  } finally {
+    clearTimeout(timer);
   }
 }
 

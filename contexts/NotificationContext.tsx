@@ -44,6 +44,10 @@ interface SendNotificationParams {
   notificationType: 'message' | 'reward' | 'announcement' | 'event' | 'special_feature' | 'custom';
   title: string;
   body: string;
+  // s62: optional Spanish copy — the edge function delivers it to recipients
+  // whose users.preferred_language is 'es'; everyone else gets the base copy.
+  title_es?: string;
+  body_es?: string;
   data?: Record<string, any>;
 }
 
@@ -324,6 +328,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
           notificationType: params.notificationType,
           title: params.title,
           body: params.body,
+          title_es: params.title_es,
+          body_es: params.body_es,
           data: params.data,
         },
       });

@@ -127,7 +127,7 @@ export default function RedeemSettingsScreen() {
     try {
       const [rowRes, optsRes] = await Promise.all([
         (supabase.rpc as any)('get_redemption_settings', { p_actor_id: user?.id }),
-        (supabase.rpc as any)('get_redemption_custom_options', { p_actor_id: user?.id, p_include_inactive: true }),
+        supabase.rpc('get_redemption_custom_options', { p_actor_id: user.id, p_include_inactive: true }),
       ]);
       const row: any = rowRes.data?.[0];
       const opts: any[] = (optsRes.data as any) || [];
@@ -190,9 +190,10 @@ export default function RedeemSettingsScreen() {
     // Fill/refresh the other language per the s61 staleness rules (may ask once).
     const resolved = await translation.resolveOnSave();
     if (!resolved) return;
+    if (!user?.id || !organizationId) return;
     try {
-      const { data, error } = await (supabase as any).rpc('upsert_redemption_custom_option', {
-        p_user_id: user?.id,
+      const { data, error } = await supabase.rpc('upsert_redemption_custom_option', {
+        p_user_id: user.id,
         p_organization_id: organizationId,
         p_id: editingCustom?.id ?? null,
         p_label: resolved.label.en.trim(),
@@ -210,9 +211,10 @@ export default function RedeemSettingsScreen() {
   };
 
   const toggleCustomActive = async (o: CustomOption) => {
+    if (!user?.id || !organizationId) return;
     try {
-      await (supabase as any).rpc('upsert_redemption_custom_option', {
-        p_user_id: user?.id, p_organization_id: organizationId,
+      await supabase.rpc('upsert_redemption_custom_option', {
+        p_user_id: user.id, p_organization_id: organizationId,
         p_id: o.id, p_label: o.label, p_cost: o.cost, p_is_active: !o.is_active,
         // The RPC's UPDATE branch writes label_es unconditionally — omitting
         // this param would wipe the stored Spanish label on every toggle.
@@ -228,7 +230,8 @@ export default function RedeemSettingsScreen() {
       {
         text: t('common:delete'), style: 'destructive', onPress: async () => {
           try {
-            await (supabase as any).rpc('delete_redemption_custom_option', { p_user_id: user?.id, p_organization_id: organizationId, p_id: o.id });
+            if (!user?.id || !organizationId) return;
+            await supabase.rpc('delete_redemption_custom_option', { p_user_id: user.id, p_organization_id: organizationId, p_id: o.id });
             load();
           } catch (e) { console.warn('delete custom', e); }
         },

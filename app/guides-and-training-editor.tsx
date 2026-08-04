@@ -129,8 +129,9 @@ export default function GuidesAndTrainingEditorScreen() {
       setLoading(true);
       console.log('Loading guides and training items from database...');
       
-      const { data, error } = await (supabase.rpc as any)('get_guides', {
-        p_actor_id: user?.id,
+      if (!user?.id) return;
+      const { data, error } = await supabase.rpc('get_guides', {
+        p_actor_id: user.id,
         p_include_inactive: true,
       });
 

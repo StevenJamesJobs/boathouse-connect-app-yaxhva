@@ -1,12 +1,13 @@
 /**
  * Notification Helper Functions
- * 
+ *
  * These functions provide easy-to-use wrappers for sending different types
  * of notifications throughout the app.
  */
 
 import { supabase } from '@/app/integrations/supabase/client';
 import { getCurrentActorId } from '@/utils/currentActor';
+import i18n from '@/i18n';
 
 interface SendNotificationParams {
   userIds?: string[];
@@ -14,8 +15,25 @@ interface SendNotificationParams {
   notificationType: 'message' | 'reward' | 'announcement' | 'event' | 'special_feature' | 'custom';
   title: string;
   body: string;
+  // s62: optional Spanish copy — the edge function picks per recipient from
+  // users.preferred_language; anyone unknown/en gets the English base.
+  title_es?: string;
+  body_es?: string;
   data?: Record<string, any>;
   jobTitles?: string[];
+}
+
+/**
+ * Build the same i18n key in both supported languages (interpolation included).
+ * Push senders pass the pair through so the edge function can deliver each
+ * recipient's copy from users.preferred_language (s62). Both locales are
+ * bundled inline, so the fixed-lng lookups are synchronous.
+ */
+export function bothLanguages(key: string, vars?: Record<string, any>): { en: string; es: string } {
+  return {
+    en: i18n.t(key, { ...vars, lng: 'en' }),
+    es: i18n.t(key, { ...vars, lng: 'es' }),
+  };
 }
 
 /**
@@ -42,135 +60,20 @@ async function sendNotification(params: SendNotificationParams): Promise<void> {
 }
 
 /**
- * Send a notification when a new message is received
- */
-export async function sendMessageNotification(
-  recipientIds: string[],
-  senderName: string,
-  messagePreview: string,
-  messageId: string,
-  threadId?: string,
-  organizationId?: string
-): Promise<void> {
-  await sendNotification({
-    userIds: recipientIds,
-    organizationId,
-    notificationType: 'message',
-    title: `New message from ${senderName}`,
-    body: messagePreview.substring(0, 100), // Limit preview length
-    data: {
-      messageId,
-      threadId,
-      type: 'message',
-    },
-  });
-}
-
-/**
- * Send a notification when reward currency is awarded.
- * @param currencyName  Display name for the org's reward currency (e.g. "McLoone's Bucks").
- */
-export async function sendRewardNotification(
-  userId: string,
-  amount: number,
-  description?: string,
-  organizationId?: string,
-  currencyName: string = 'Bucks'
-): Promise<void> {
-  await sendNotification({
-    userIds: [userId],
-    organizationId,
-    notificationType: 'reward',
-    title: `\u{1F389} ${currencyName} Earned!`,
-    body: `You earned $${amount} ${currencyName}!${description ? ` ${description}` : ''}`,
-    data: {
-      amount,
-      type: 'reward',
-    },
-  });
-}
-
-/**
- * Send a notification when a new announcement is published
- */
-export async function sendAnnouncementNotification(
-  title: string,
-  announcementId: string,
-  preview?: string,
-  organizationId?: string
-): Promise<void> {
-  await sendNotification({
-    organizationId,
-    notificationType: 'announcement',
-    title: '📢 New Announcement',
-    body: preview || title,
-    data: {
-      announcementId,
-      type: 'announcement',
-    },
-  });
-}
-
-/**
- * Send a notification when a new event is published
- */
-export async function sendEventNotification(
-  eventTitle: string,
-  eventId: string,
-  eventDate?: string,
-  organizationId?: string
-): Promise<void> {
-  const body = eventDate 
-    ? `${eventTitle} - ${eventDate}`
-    : eventTitle;
-
-  await sendNotification({
-    organizationId,
-    notificationType: 'event',
-    title: '📅 New Event Added',
-    body: body,
-    data: {
-      eventId,
-      type: 'event',
-    },
-  });
-}
-
-/**
- * Send a notification when a new special feature is published
- */
-export async function sendSpecialFeatureNotification(
-  featureTitle: string,
-  featureId: string,
-  description?: string,
-  organizationId?: string
-): Promise<void> {
-  await sendNotification({
-    organizationId,
-    notificationType: 'special_feature',
-    title: '✨ New Special Feature',
-    body: description || featureTitle,
-    data: {
-      featureId,
-      type: 'special_feature',
-    },
-  });
-}
-
-/**
  * Notify users who got passed on the master Game Hub leaderboard.
  * Calls get_passed_users_on_leaderboard RPC (which already filters
  * recipients by their game_hub_enabled preference) and fires a push
  * to the resulting list. No-op when no one was passed.
  *
- * Caller passes localized title/body — recipient locale isn't known here.
- * Fire-and-forget; errors are swallowed so the post-game UI isn't blocked.
+ * Both language copies are built HERE (s62): each passed user gets the push
+ * and the shade row in their own language, regardless of the player's UI
+ * language. Fire-and-forget; errors are swallowed so the post-game UI isn't
+ * blocked.
  */
 export async function notifyLeaderboardPassed(
   playerUserId: string,
   scoreJustEarned: number,
-  title: string,
-  body: string,
+  playerName: string,
   organizationId?: string
 ): Promise<void> {
   if (!playerUserId || scoreJustEarned <= 0) return;
@@ -187,16 +90,22 @@ export async function notifyLeaderboardPassed(
     const passed = (data ?? []) as Array<{ user_id: string; name: string }>;
     if (passed.length === 0) return;
 
+    const title = bothLanguages('notifications.game_hub_passed_title', { name: playerName });
+    const body = bothLanguages('notifications.game_hub_passed_body');
+
     // Write per-recipient shade rows (server-side) so each passed user sees the entry in
     // their personal notification dropdown. The DEFINER RPC derives organization_id from the
     // actor, sets sent_by, and stamps data.targetUserId per recipient — it works for an
     // employee player (the direct insert used to fail the manager-only INSERT policy) and
-    // supplies the NOT NULL organization_id the old insert omitted.
+    // supplies the NOT NULL organization_id the old insert omitted. The Spanish copy rides
+    // data.title_es/body_es for the dropdown's viewer-language pick.
     const { error: insertError } = await supabase.rpc('add_leaderboard_pass_notifications', {
       p_actor_id: playerUserId,
       p_recipient_ids: passed.map((p) => p.user_id),
-      p_title: title,
-      p_body: body,
+      p_title: title.en,
+      p_body: body.en,
+      p_title_es: title.es,
+      p_body_es: body.es,
     });
     if (insertError) {
       console.error('[notifyLeaderboardPassed] shade insert error:', insertError);
@@ -207,8 +116,10 @@ export async function notifyLeaderboardPassed(
       userIds: passed.map((p) => p.user_id),
       organizationId,
       notificationType: 'custom',
-      title,
-      body,
+      title: title.en,
+      body: body.en,
+      title_es: title.es,
+      body_es: body.es,
       data: {
         type: 'custom',
         notificationType: 'leaderboard_pass',
@@ -228,7 +139,9 @@ export async function sendCustomNotification(
   title: string,
   body: string,
   data?: Record<string, any>,
-  organizationId?: string
+  organizationId?: string,
+  titleEs?: string,
+  bodyEs?: string
 ): Promise<void> {
   // Extract job_titles from data to pass as top-level param for edge function filtering
   const jobTitles = data?.job_titles as string[] | undefined;
@@ -238,6 +151,8 @@ export async function sendCustomNotification(
     notificationType: 'custom',
     title: title,
     body: body,
+    title_es: titleEs,
+    body_es: bodyEs,
     data: {
       ...data,
       type: 'custom',

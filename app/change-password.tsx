@@ -19,6 +19,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import { translateServerError } from '@/utils/serverErrors';
 
 export default function ChangePasswordScreen() {
   const [newPassword, setNewPassword] = useState('');
@@ -136,7 +137,9 @@ export default function ChangePasswordScreen() {
       }
     } catch (e: any) {
       console.error('[ChangePassword] Error:', e);
-      setError(e?.message || 'Something went wrong. Please try again.');
+      // No fallback arg: the helper's own default is localized (this screen
+      // is otherwise hardcoded EN — its full ES pass is backlog).
+      setError(translateServerError(e));
     } finally {
       setIsLoading(false);
     }
