@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMenuCategories, MenuCategory, MenuSubcategory } from '@/hooks/useMenuCategories';
 import { categoryLabel, subcategoryLabel } from '@/utils/menuCategoryLabels';
-import { translateTexts, saveTranslations } from '@/utils/translateContent';
+import { saveTranslations } from '@/utils/translateContent';
+import { useTranslationSection } from '@/components/TranslationSection';
 import CategoryColorPicker from '@/components/CategoryColorPicker';
 
 type NameMode = 'add-cat' | 'rename-cat' | 'add-sub' | 'rename-sub';
@@ -40,7 +41,7 @@ const BEHAVIOR_CAPTION_KEY: Record<string, string> = {
 
 export default function ManageMenuCategoriesScreen() {
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useAuth();
@@ -59,8 +60,30 @@ export default function ManageMenuCategoriesScreen() {
   const [nameModal, setNameModal] = useState<{ mode: NameMode; id: string | null; title: string } | null>(null);
   const [nameInput, setNameInput] = useState('');
   const [nameInputEs, setNameInputEs] = useState('');
-  const [translating, setTranslating] = useState(false);
   const [busy, setBusy] = useState(false);
+
+  // Hybrid bilingual authoring (s61): the primary name input binds the device
+  // language; the shared section shows the other-language preview + translate
+  // button + pencil edit. resolveOnSave() runs the staleness rules.
+  const isSpanishAuthor = i18n.language === 'es';
+  const addSessionRef = useRef(0);
+  const translation = useTranslationSection({
+    fields: [
+      {
+        key: 'display_name',
+        labelKey: 'translation_section:field_name',
+        enValue: nameInput,
+        esValue: nameInputEs,
+        setEnValue: setNameInput,
+        setEsValue: setNameInputEs,
+      },
+    ],
+    sessionKey:
+      nameModal && (nameModal.mode === 'rename-cat' || nameModal.mode === 'rename-sub')
+        ? `edit:${nameModal.id}`
+        : `new:${addSessionRef.current}`,
+    active: nameModal !== null,
+  });
 
   const selectedCategory = cats.find((c) => c.id === selectedCategoryId) || null;
 
@@ -103,30 +126,22 @@ export default function ManageMenuCategoriesScreen() {
 
   // --- Name modal ----------------------------------------------------------
   const openNameModal = (mode: NameMode, id: string | null, initial: string, title: string, initialEs = '') => {
+    if (mode === 'add-cat' || mode === 'add-sub') addSessionRef.current += 1;
     setNameModal({ mode, id, title });
     setNameInput(initial);
     setNameInputEs(initialEs);
   };
 
-  // Auto-translate the English name into the Spanish field (reuses the menu-item
-  // name_es pattern: translate-text Edge Function via translateTexts).
-  const handleTranslateName = async () => {
-    const src = nameInput.trim();
-    if (!src) return;
-    setTranslating(true);
-    try {
-      const [es] = await translateTexts([src]);
-      setNameInputEs(es || '');
-    } finally {
-      setTranslating(false);
-    }
-  };
-
   const submitName = async () => {
     if (!nameModal) return;
-    const value = nameInput.trim();
-    if (!value) return;
-    const es = nameInputEs.trim();
+    const authorName = (isSpanishAuthor ? nameInputEs : nameInput).trim();
+    if (!authorName) return;
+
+    // Fill/refresh the other language per the s61 staleness rules (may ask once).
+    const resolved = await translation.resolveOnSave();
+    if (!resolved) return;
+    const value = resolved.display_name.en.trim();
+    const es = resolved.display_name.es;
     const m = nameModal;
     setNameModal(null);
 
@@ -556,41 +571,20 @@ export default function ManageMenuCategoriesScreen() {
             <Text style={styles.modalTitle}>{nameModal?.title}</Text>
             <TextInput
               style={styles.modalInput}
-              value={nameInput}
-              onChangeText={setNameInput}
+              value={isSpanishAuthor ? nameInputEs : nameInput}
+              onChangeText={isSpanishAuthor ? setNameInputEs : setNameInput}
               placeholder={t('manage_categories:name_placeholder')}
               placeholderTextColor={colors.textSecondary}
               autoFocus
               returnKeyType="next"
             />
-            <View style={styles.esHeaderRow}>
-              <Text style={styles.esFieldLabel}>{t('manage_categories:spanish_name_label')}</Text>
-              <TouchableOpacity
-                style={[styles.translateBtn, (!nameInput.trim() || translating) && styles.translateBtnDisabled]}
-                onPress={handleTranslateName}
-                disabled={!nameInput.trim() || translating}
-              >
-                {translating ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
-                ) : (
-                  <Text style={styles.translateBtnText}>{t('manage_categories:translate_button')}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-            <TextInput
-              style={[styles.modalInput, styles.esInput]}
-              value={nameInputEs}
-              onChangeText={setNameInputEs}
-              placeholder={t('manage_categories:spanish_name_placeholder')}
-              placeholderTextColor={colors.textSecondary}
-              returnKeyType="done"
-              onSubmitEditing={submitName}
-            />
+            {/* Bilingual authoring (s61 hybrid) */}
+            {translation.element}
             <View style={styles.modalActions}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setNameModal(null)}>
                 <Text style={styles.modalCancelText}>{t('manage_categories:cancel')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalSave, !nameInput.trim() && { opacity: 0.5 }]} onPress={submitName} disabled={!nameInput.trim()}>
+              <TouchableOpacity style={[styles.modalSave, !(isSpanishAuthor ? nameInputEs : nameInput).trim() && { opacity: 0.5 }]} onPress={submitName} disabled={!(isSpanishAuthor ? nameInputEs : nameInput).trim()}>
                 <Text style={styles.modalSaveText}>{t('manage_categories:save')}</Text>
               </TouchableOpacity>
             </View>
@@ -695,23 +689,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       color: colors.text,
       backgroundColor: colors.background,
     },
-    esHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 14, marginBottom: 6 },
-    esFieldLabel: { fontSize: 13, fontWeight: '600', color: colors.textSecondary },
-    translateBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.primary,
-      minWidth: 96,
-      minHeight: 30,
-    },
-    translateBtnDisabled: { opacity: 0.5 },
-    translateBtnText: { fontSize: 13, fontWeight: '600', color: colors.primary },
-    esInput: { marginTop: 0 },
     modalActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12, marginTop: 18 },
     modalCancel: { paddingHorizontal: 18, paddingVertical: 10 },
     modalCancelText: { fontSize: 15, color: colors.textSecondary, fontWeight: '600' },

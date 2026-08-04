@@ -383,8 +383,8 @@ export default function PictureThisPlayScreen() {
         notifyLeaderboardPassed(
           user.id,
           finalTotalScore,
-          `${user.name} passed you on the leaderboard!`,
-          'A new Picture This! score just bumped them above you.',
+          t('notifications.game_hub_passed_title', { name: user.name }),
+          t('notifications.game_hub_passed_body'),
           organizationId ?? undefined,
         );
       }

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -30,7 +30,8 @@ import { useTranslation } from 'react-i18next';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
+import { saveTranslations, getLocalizedField } from '@/utils/translateContent';
+import { useTranslationSection } from '@/components/TranslationSection';
 
 interface GuideItem {
   id: string;
@@ -54,7 +55,7 @@ const CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'Events 
 export default function GuidesAndTrainingEditorScreen() {
   useRequireManagerRoute();
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const { organizationId } = useOrganization();
   const colors = useThemeColors();
@@ -75,8 +76,6 @@ export default function GuidesAndTrainingEditorScreen() {
     description_es: '',
   });
   const [uploadingFile, setUploadingFile] = useState(false);
-  const [showSpanish, setShowSpanish] = useState(false);
-  const [translating, setTranslating] = useState(false);
   const [uploadingThumbnail, setUploadingThumbnail] = useState(false);
   const [selectedThumbnailUri, setSelectedThumbnailUri] = useState<string | null>(null);
   const [selectedFile, setSelectedFile] = useState<{
@@ -84,6 +83,35 @@ export default function GuidesAndTrainingEditorScreen() {
     name: string;
     type: string;
   } | null>(null);
+
+  // Hybrid bilingual authoring (s61): the primary inputs bind the device
+  // language; the shared section shows the other-language preview + translate
+  // button + pencil edit. resolveOnSave() runs the staleness rules.
+  const isSpanishAuthor = i18n.language === 'es';
+  const addSessionRef = useRef(0);
+  const translation = useTranslationSection({
+    fields: [
+      {
+        key: 'title',
+        labelKey: 'translation_section:field_title',
+        enValue: formData.title,
+        esValue: formData.title_es,
+        setEnValue: (v) => setFormData(prev => ({ ...prev, title: v })),
+        setEsValue: (v) => setFormData(prev => ({ ...prev, title_es: v })),
+      },
+      {
+        key: 'description',
+        labelKey: 'translation_section:field_description',
+        enValue: formData.description,
+        esValue: formData.description_es,
+        setEnValue: (v) => setFormData(prev => ({ ...prev, description: v })),
+        setEsValue: (v) => setFormData(prev => ({ ...prev, description_es: v })),
+        multiline: true,
+      },
+    ],
+    sessionKey: editingGuide ? `edit:${editingGuide.id}` : `new:${addSessionRef.current}`,
+    active: showAddModal,
+  });
 
   useEffect(() => {
     loadGuides();
@@ -210,30 +238,9 @@ export default function GuidesAndTrainingEditorScreen() {
     }
   };
 
-  const handleAutoTranslate = async () => {
-    if (!formData.title && !formData.description) {
-      Alert.alert(t('common.error'), t('translation_section.no_content_to_translate'));
-      return;
-    }
-    setTranslating(true);
-    try {
-      const results = await translateTexts([formData.title, formData.description]);
-      setFormData(prev => ({
-        ...prev,
-        title_es: results[0] || '',
-        description_es: results[1] || '',
-      }));
-      setShowSpanish(true);
-    } catch (err) {
-      console.error('Auto-translate error:', err);
-      Alert.alert(t('common.error'), t('translation_section.translate_failed'));
-    } finally {
-      setTranslating(false);
-    }
-  };
-
   const handleSave = async () => {
-    if (!formData.title) {
+    const authorTitle = isSpanishAuthor ? formData.title_es : formData.title;
+    if (!authorTitle) {
       Alert.alert(t('common.error'), t('guides_training_editor.error_no_title'));
       return;
     }
@@ -247,6 +254,10 @@ export default function GuidesAndTrainingEditorScreen() {
       Alert.alert(t('common.error'), t('guides_training_editor.error_not_authenticated'));
       return;
     }
+
+    // Fill/refresh the other language per the s61 staleness rules (may ask once).
+    const resolved = await translation.resolveOnSave();
+    if (!resolved) return;
 
     try {
       let thumbnailUrl = editingGuide?.thumbnail_url || null;
@@ -286,8 +297,8 @@ export default function GuidesAndTrainingEditorScreen() {
         const { error } = await (supabase.rpc as any)('update_guide', {
           p_user_id: user.id,
           p_guide_id: editingGuide.id,
-          p_title: formData.title,
-          p_description: formData.description || null,
+          p_title: resolved.title.en,
+          p_description: resolved.description.en || null,
           p_category: formData.category,
           p_thumbnail_url: thumbnailUrl,
           p_file_url: fileUrl,
@@ -303,19 +314,17 @@ export default function GuidesAndTrainingEditorScreen() {
         }
         Alert.alert(t('common.success'), t('guides_training_editor.guide_updated'));
 
-        // Save Spanish translations
-        if (formData.title_es || formData.description_es) {
-          await saveTranslations('guides_and_training', editingGuide.id, {
-            title_es: formData.title_es,
-            description_es: formData.description_es,
-          }, user?.id);
-        }
+        // Save Spanish translations (server null semantics vary — most content tables COALESCE-keep when blank)
+        await saveTranslations('guides_and_training', editingGuide.id, {
+          title_es: resolved.title.es,
+          description_es: resolved.description.es,
+        }, user?.id);
       } else {
         console.log('Creating new guide');
         const { data: newGuideId, error } = await (supabase.rpc as any)('create_guide', {
           p_user_id: user.id,
-          p_title: formData.title,
-          p_description: formData.description || null,
+          p_title: resolved.title.en,
+          p_description: resolved.description.en || null,
           p_category: formData.category,
           p_thumbnail_url: thumbnailUrl,
           p_file_url: fileUrl,
@@ -332,10 +341,10 @@ export default function GuidesAndTrainingEditorScreen() {
         Alert.alert(t('common.success'), t('guides_training_editor.guide_created'));
 
         // Save Spanish translations for newly created item
-        if ((formData.title_es || formData.description_es) && newGuideId) {
+        if (newGuideId) {
           await saveTranslations('guides_and_training', newGuideId, {
-            title_es: formData.title_es,
-            description_es: formData.description_es,
+            title_es: resolved.title.es,
+            description_es: resolved.description.es,
           }, user?.id);
         }
       }
@@ -475,7 +484,7 @@ export default function GuidesAndTrainingEditorScreen() {
     });
     setSelectedThumbnailUri(null);
     setSelectedFile(null);
-    setShowSpanish(false);
+    addSessionRef.current += 1;
     setShowAddModal(true);
   };
 
@@ -489,7 +498,6 @@ export default function GuidesAndTrainingEditorScreen() {
       title_es: guide.title_es || '',
       description_es: guide.description_es || '',
     });
-    setShowSpanish(!!(guide.title_es || guide.description_es));
     setSelectedThumbnailUri(null);
     setSelectedFile(null);
     setShowAddModal(true);
@@ -779,8 +787,8 @@ export default function GuidesAndTrainingEditorScreen() {
                   style={styles.input}
                   placeholder={t('guides_training_editor.title_placeholder')}
                   placeholderTextColor="#999999"
-                  value={formData.title}
-                  onChangeText={(text) => setFormData({ ...formData, title: text })}
+                  value={isSpanishAuthor ? formData.title_es : formData.title}
+                  onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, title_es: text } : { ...prev, title: text })}
                 />
               </View>
 
@@ -791,65 +799,16 @@ export default function GuidesAndTrainingEditorScreen() {
                   style={[styles.input, styles.textArea]}
                   placeholder={t('guides_training_editor.description_placeholder')}
                   placeholderTextColor="#999999"
-                  value={formData.description}
-                  onChangeText={(text) => setFormData({ ...formData, description: text })}
+                  value={isSpanishAuthor ? formData.description_es : formData.description}
+                  onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, description_es: text } : { ...prev, description: text })}
                   multiline
                   numberOfLines={4}
                 />
               </View>
 
-              {/* Spanish Translation Section */}
+              {/* Bilingual authoring (s61 hybrid) */}
               <View style={styles.formGroup}>
-                <TouchableOpacity
-                  style={styles.spanishSectionHeader}
-                  onPress={() => setShowSpanish(!showSpanish)}
-                >
-                  <Text style={styles.formLabel}>{t('translation_section.spanish_section_title')}</Text>
-                  <IconSymbol
-                    ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
-                    android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
-                    size={20}
-                    color="#666666"
-                  />
-                </TouchableOpacity>
-
-                {showSpanish && (
-                  <View style={styles.spanishFields}>
-                    <TouchableOpacity
-                      style={styles.autoTranslateButton}
-                      onPress={handleAutoTranslate}
-                      disabled={translating}
-                    >
-                      {translating ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <Text style={styles.autoTranslateButtonText}>
-                          {t('translation_section.auto_translate')}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-
-                    <Text style={styles.spanishFieldLabel}>{t('translation_section.title_es_label')}</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder={t('translation_section.title_es_placeholder')}
-                      placeholderTextColor="#999999"
-                      value={formData.title_es}
-                      onChangeText={(text) => setFormData({ ...formData, title_es: text })}
-                    />
-
-                    <Text style={[styles.spanishFieldLabel, { marginTop: 12 }]}>{t('translation_section.description_es_label')}</Text>
-                    <TextInput
-                      style={[styles.input, styles.textArea]}
-                      placeholder={t('translation_section.description_es_placeholder')}
-                      placeholderTextColor="#999999"
-                      value={formData.description_es}
-                      onChangeText={(text) => setFormData({ ...formData, description_es: text })}
-                      multiline
-                      numberOfLines={4}
-                    />
-                  </View>
-                )}
+                {translation.element}
               </View>
 
               {/* Category */}
@@ -1276,47 +1235,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#666666',
-  },
-  spanishSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    backgroundColor: '#FFF8E1',
-    borderRadius: 12,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#FFE082',
-  },
-  spanishFields: {
-    backgroundColor: '#FFFDE7',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#FFF59D',
-  },
-  autoTranslateButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#4CAF50',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    marginBottom: 16,
-    gap: 8,
-  },
-  autoTranslateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  spanishFieldLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#5D4037',
-    marginBottom: 6,
   },
 });

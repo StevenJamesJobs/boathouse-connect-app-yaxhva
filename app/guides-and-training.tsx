@@ -580,7 +580,7 @@ export default function GuidesAndTrainingScreen() {
           visible={detailModalVisible}
           onClose={closeDetailModal}
           title={getLocalizedField(selectedGuide, 'title', language)}
-          content={getLocalizedField(selectedGuide, 'description', language) || 'No description available'}
+          content={getLocalizedField(selectedGuide, 'description', language) || t('guides_training.no_description')}
           thumbnailUrl={selectedGuide.thumbnail_url}
           guideFile={{
             id: selectedGuide.id,

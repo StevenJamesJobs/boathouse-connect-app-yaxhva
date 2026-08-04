@@ -28,7 +28,8 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { useTranslation } from 'react-i18next';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
+import { saveTranslations, getLocalizedField } from '@/utils/translateContent';
+import { useTranslationSection } from '@/components/TranslationSection';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { fetchContentImages, saveContentImages, uploadImageToStorage } from '@/utils/contentImages';
 import RichTextToolbar from '@/components/RichTextToolbar';
@@ -69,7 +70,7 @@ const GUIDE_CATEGORIES = ['Employee HandBooks', 'Full Menus', 'Cheat Sheets', 'E
 
 export default function UpcomingEventsEditorScreen() {
   useRequireManagerRoute();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
@@ -107,9 +108,37 @@ export default function UpcomingEventsEditorScreen() {
   // Additional images state
   const [additionalImageUrls, setAdditionalImageUrls] = useState<string[]>([]);
   const [newAdditionalImageUris, setNewAdditionalImageUris] = useState<string[]>([]);
-  const [showSpanish, setShowSpanish] = useState(false);
-  const [translating, setTranslating] = useState(false);
   const [shouldSendNotification, setShouldSendNotification] = useState(true);
+
+  // Hybrid bilingual authoring (s61): the primary inputs bind the device
+  // language; the shared section shows the other-language preview + translate
+  // button + pencil edit. resolveOnSave() runs the staleness rules.
+  const isSpanishAuthor = i18n.language === 'es';
+  const addSessionRef = useRef(0);
+  const translation = useTranslationSection({
+    fields: [
+      {
+        key: 'title',
+        labelKey: 'translation_section:field_title',
+        enValue: formData.title,
+        esValue: formData.title_es,
+        setEnValue: (v) => setFormData(prev => ({ ...prev, title: v })),
+        setEsValue: (v) => setFormData(prev => ({ ...prev, title_es: v })),
+      },
+      {
+        key: 'message',
+        labelKey: 'translation_section:field_description',
+        enValue: formData.message,
+        esValue: formData.message_es,
+        setEnValue: (v) => setFormData(prev => ({ ...prev, message: v })),
+        setEsValue: (v) => setFormData(prev => ({ ...prev, message_es: v })),
+        multiline: true,
+      },
+    ],
+    sessionKey: editingEvent ? `edit:${editingEvent.id}` : `new:${addSessionRef.current}`,
+    active: showAddModal,
+  });
+
   const contentInputRef = useRef<TextInput>(null);
   const [contentSelection, setContentSelection] = useState({ start: 0, end: 0 });
   const [positionPicker, setPositionPicker] = useState<{
@@ -290,30 +319,10 @@ export default function UpcomingEventsEditorScreen() {
     }
   };
 
-  const handleAutoTranslate = async () => {
-    if (!formData.title && !formData.message) {
-      Alert.alert(t('common:error'), t('translation_section:no_content_to_translate'));
-      return;
-    }
-    setTranslating(true);
-    try {
-      const results = await translateTexts([formData.title, formData.message]);
-      setFormData(prev => ({
-        ...prev,
-        title_es: results[0] || '',
-        message_es: results[1] || '',
-      }));
-      setShowSpanish(true);
-    } catch (err) {
-      console.error('Auto-translate error:', err);
-      Alert.alert(t('common:error'), t('translation_section:translate_failed'));
-    } finally {
-      setTranslating(false);
-    }
-  };
-
   const handleSave = async () => {
-    if (!formData.title || !formData.message) {
+    const authorTitle = isSpanishAuthor ? formData.title_es : formData.title;
+    const authorMessage = isSpanishAuthor ? formData.message_es : formData.message;
+    if (!authorTitle || !authorMessage) {
       Alert.alert(t('common:error'), t('upcoming_events_editor:error_fill_fields'));
       return;
     }
@@ -327,6 +336,10 @@ export default function UpcomingEventsEditorScreen() {
       Alert.alert(t('upcoming_events_editor:limit_reached_title'), t('upcoming_events_editor:limit_reached_msg'));
       return;
     }
+
+    // Fill/refresh the other language per the s61 staleness rules (may ask once).
+    const resolved = await translation.resolveOnSave();
+    if (!resolved) return;
 
     try {
       let thumbnailUrl = editingEvent?.thumbnail_url || null;
@@ -350,8 +363,8 @@ export default function UpcomingEventsEditorScreen() {
           p_user_id: user.id,
           p_organization_id: organizationId ?? undefined,
           p_event_id: editingEvent.id,
-          p_title: formData.title,
-          p_message: formData.message,
+          p_title: resolved.title.en,
+          p_message: resolved.message.en,
           p_thumbnail_url: thumbnailUrl ?? undefined,
           p_thumbnail_shape: formData.thumbnail_shape,
           p_start_date_time: startDateTime?.toISOString(),
@@ -369,13 +382,11 @@ export default function UpcomingEventsEditorScreen() {
         console.log('Upcoming event updated successfully');
         Alert.alert(t('common:success'), t('upcoming_events_editor:updated_success'));
 
-        // Save Spanish translations
-        if (formData.title_es || formData.message_es) {
-          await saveTranslations('upcoming_events', editingEvent.id, {
-            title_es: formData.title_es,
-            content_es: formData.message_es,
-          }, user?.id);
-        }
+        // Save Spanish translations (server null semantics vary — most content tables COALESCE-keep when blank)
+        await saveTranslations('upcoming_events', editingEvent.id, {
+          title_es: resolved.title.es,
+          content_es: resolved.message.es,
+        }, user?.id);
 
         // Upload new additional images and save all to content_images
         const uploadedNewUrls: string[] = [];
@@ -394,8 +405,8 @@ export default function UpcomingEventsEditorScreen() {
         const { data: newEventId, error } = await supabase.rpc('create_upcoming_event', {
           p_user_id: user.id,
           p_organization_id: organizationId ?? undefined,
-          p_title: formData.title,
-          p_message: formData.message,
+          p_title: resolved.title.en,
+          p_message: resolved.message.en,
           p_thumbnail_url: thumbnailUrl ?? undefined,
           p_thumbnail_shape: formData.thumbnail_shape,
           p_start_date_time: startDateTime?.toISOString(),
@@ -422,7 +433,7 @@ export default function UpcomingEventsEditorScreen() {
             await sendNotification({
               notificationType: 'event',
               title: '📅 New Event',
-              body: formData.title,
+              body: resolved.title.en,
               data: {
                 eventId: null,
                 category: formData.category,
@@ -437,10 +448,10 @@ export default function UpcomingEventsEditorScreen() {
         Alert.alert(t('common:success'), t('upcoming_events_editor:created_success'));
 
         // Save Spanish translations for newly created item
-        if (newEventId && (formData.title_es || formData.message_es)) {
+        if (newEventId) {
           await saveTranslations('upcoming_events', newEventId, {
-            title_es: formData.title_es,
-            content_es: formData.message_es,
+            title_es: resolved.title.es,
+            content_es: resolved.message.es,
           }, user?.id);
         }
 
@@ -658,8 +669,8 @@ export default function UpcomingEventsEditorScreen() {
     setSelectedGuideFile(null);
     setFileSearchQuery('');
     setShowFileSection(false);
-    setShowSpanish(false);
     setShouldSendNotification(true);
+    addSessionRef.current += 1;
     setShowAddModal(true);
   };
 
@@ -674,7 +685,6 @@ export default function UpcomingEventsEditorScreen() {
       title_es: event.title_es || '',
       message_es: event.content_es || '',
     });
-    setShowSpanish(false);
     setStartDateTime(event.start_date_time ? new Date(event.start_date_time) : null);
     setEndDateTime(event.end_date_time ? new Date(event.end_date_time) : null);
     setSelectedImageUri(null);
@@ -1021,8 +1031,8 @@ export default function UpcomingEventsEditorScreen() {
                       style={styles.input}
                       placeholder={t('upcoming_events_editor:event_title_placeholder')}
                       placeholderTextColor="#999999"
-                      value={formData.title}
-                      onChangeText={(text) => setFormData({ ...formData, title: text })}
+                      value={isSpanishAuthor ? formData.title_es : formData.title}
+                      onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, title_es: text } : { ...prev, title: text })}
                     />
                   </View>
                 </View>
@@ -1246,8 +1256,8 @@ export default function UpcomingEventsEditorScreen() {
                 <View style={styles.formGroup}>
                   <Text style={styles.formLabel}>{t('upcoming_events_editor:description_label')}</Text>
                   <RichTextToolbar
-                    text={formData.message}
-                    onChangeText={(text) => setFormData(prev => ({ ...prev, message: text }))}
+                    text={isSpanishAuthor ? formData.message_es : formData.message}
+                    onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, message_es: text } : { ...prev, message: text })}
                     selection={contentSelection}
                     onSelectionChange={setContentSelection}
                     textInputRef={contentInputRef}
@@ -1258,58 +1268,17 @@ export default function UpcomingEventsEditorScreen() {
                     style={[styles.input, styles.textArea]}
                     placeholder={t('upcoming_events_editor:description_placeholder')}
                     placeholderTextColor="#999999"
-                    value={formData.message}
-                    onChangeText={(text) => setFormData({ ...formData, message: text })}
+                    value={isSpanishAuthor ? formData.message_es : formData.message}
+                    onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, message_es: text } : { ...prev, message: text })}
                     multiline
                     numberOfLines={4}
                     onSelectionChange={(e) => setContentSelection(e.nativeEvent.selection)}
                   />
                 </View>
 
-                {/* Spanish Translation */}
+                {/* Bilingual authoring (s61 hybrid) */}
                 <View style={styles.formGroup}>
-                  <TouchableOpacity
-                    style={styles.spanishSectionHeader}
-                    onPress={() => setShowSpanish(!showSpanish)}
-                  >
-                    <Text style={styles.formLabel}>{t('translation_section:spanish_section_title')}</Text>
-                    <IconSymbol
-                      ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
-                      android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
-                      size={20}
-                      color="#666666"
-                    />
-                  </TouchableOpacity>
-                  {showSpanish && (
-                    <View style={styles.spanishFields}>
-                      <TouchableOpacity style={styles.autoTranslateButton} onPress={handleAutoTranslate} disabled={translating}>
-                        {translating ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <Text style={styles.autoTranslateButtonText}>{t('translation_section:auto_translate')}</Text>
-                        )}
-                      </TouchableOpacity>
-                      <Text style={styles.spanishFieldLabel}>{t('translation_section:title_es_label')}</Text>
-                      <TextInput
-                        style={styles.input}
-                        placeholder={t('translation_section:title_es_placeholder')}
-                        placeholderTextColor="#999999"
-                        value={formData.title_es}
-                        onChangeText={(text) => setFormData({ ...formData, title_es: text })}
-                      />
-                      <Text style={[styles.spanishFieldLabel, { marginTop: 12 }]}>{t('translation_section:message_es_label')}</Text>
-                      <TextInput
-                        style={[styles.input, styles.textArea]}
-                        placeholder={t('translation_section:message_es_placeholder')}
-                        placeholderTextColor="#999999"
-                        value={formData.message_es}
-                        onChangeText={(text) => setFormData({ ...formData, message_es: text })}
-                        multiline
-                        numberOfLines={4}
-                      />
-                      <Text style={styles.formHint}>{t('translation_section:hint')}</Text>
-                    </View>
-                  )}
+                  {translation.element}
                 </View>
               </CollapsibleSection>
 
@@ -1781,39 +1750,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     paddingHorizontal: 16,
     marginBottom: 8,
     marginTop: 12,
-  },
-  spanishSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  spanishFields: {
-    marginTop: 8,
-    backgroundColor: '#F0F8FF',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#D0E8FF',
-  },
-  autoTranslateButton: {
-    backgroundColor: '#3498DB',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  autoTranslateButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  spanishFieldLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#666666',
-    marginBottom: 4,
   },
   modalContainer: {
     flex: 1,

@@ -1,17 +1,25 @@
 import { supabase } from '@/app/integrations/supabase/client';
 import { getCurrentActorId } from '@/utils/currentActor';
 
+export interface TranslateResult {
+  ok: boolean;
+  translations: string[];
+}
+
 /**
- * Translates an array of texts to the target language via the translate-text Edge Function.
- * Returns original texts on failure (graceful degradation).
+ * Failure-aware translate: `ok: false` means the service call failed and
+ * `translations` echoes the originals. Callers that must never write
+ * same-language text into the other locale's columns should check `ok`
+ * instead of consuming the echo.
  */
-export async function translateTexts(
+export async function translateTextsDetailed(
   texts: string[],
-  targetLang: string = 'es'
-): Promise<string[]> {
+  targetLang: string = 'es',
+  sourceLang: string = 'en'
+): Promise<TranslateResult> {
   // Filter out empty strings, track their positions
   const hasContent = texts.some((t) => t && t.trim().length > 0);
-  if (!hasContent) return texts.map(() => '');
+  if (!hasContent) return { ok: true, translations: texts.map(() => '') };
 
   try {
     const { data, error } = await supabase.functions.invoke('translate-text', {
@@ -19,25 +27,38 @@ export async function translateTexts(
         actor_id: getCurrentActorId(),
         texts,
         targetLang,
-        sourceLang: 'en',
+        sourceLang,
       },
     });
 
     if (error) {
       console.error('Translation Edge Function error:', error);
-      return texts; // Return originals as fallback
+      return { ok: false, translations: texts };
     }
 
     if (!data?.success) {
       console.error('Translation failed:', data?.error);
-      return texts; // Return originals as fallback
+      return { ok: false, translations: texts };
     }
 
-    return data.translations;
+    return { ok: true, translations: data.translations };
   } catch (err) {
     console.error('Translation request failed:', err);
-    return texts; // Return originals as fallback
+    return { ok: false, translations: texts };
   }
+}
+
+/**
+ * Translates an array of texts via the translate-text Edge Function.
+ * Returns original texts on failure (graceful degradation).
+ */
+export async function translateTexts(
+  texts: string[],
+  targetLang: string = 'es',
+  sourceLang: string = 'en'
+): Promise<string[]> {
+  const result = await translateTextsDetailed(texts, targetLang, sourceLang);
+  return result.translations;
 }
 
 /**

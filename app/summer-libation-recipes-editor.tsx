@@ -27,7 +27,8 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
 import { useTranslation } from 'react-i18next';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { translateTexts, saveTranslations } from '@/utils/translateContent';
+import { saveTranslations } from '@/utils/translateContent';
+import { useTranslationSection } from '@/components/TranslationSection';
 import RichTextToolbar from '@/components/RichTextToolbar';
 import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
 import CollapsibleSection from '@/components/CollapsibleSection';
@@ -66,7 +67,7 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1514362545857-3bc16
 export default function SummerLibationRecipesEditorScreen() {
   useRequireManagerRoute();
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
   const colors = useThemeColors();
   const { language } = useLanguage();
@@ -96,12 +97,31 @@ export default function SummerLibationRecipesEditorScreen() {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [procedureEs, setProcedureEs] = useState('');
-  const [showSpanish, setShowSpanish] = useState(false);
-  const [translating, setTranslating] = useState(false);
   // Dropdown pickers + auto-grow procedure height
   const [subPickerOpen, setSubPickerOpen] = useState(false);
   const [procH, setProcH] = useState(120);
   const [procDragH, setProcDragH] = useState(0);
+
+  // Hybrid bilingual authoring (s61): the primary inputs bind the device
+  // language; the shared section shows the other-language preview + translate
+  // button + pencil edit. resolveOnSave() runs the staleness rules.
+  const isSpanishAuthor = i18n.language === 'es';
+  const addSessionRef = useRef(0);
+  const translation = useTranslationSection({
+    fields: [
+      {
+        key: 'procedure',
+        labelKey: 'translation_section:field_procedure',
+        enValue: procedure,
+        esValue: procedureEs,
+        setEnValue: setProcedure,
+        setEsValue: setProcedureEs,
+        multiline: true,
+      },
+    ],
+    sessionKey: editingRecipe ? `edit:${editingRecipe.id}` : `new:${addSessionRef.current}`,
+    active: showModal,
+  });
 
   const loadRecipes = useCallback(async () => {
     if (!user?.id) return;
@@ -170,24 +190,6 @@ export default function SummerLibationRecipesEditorScreen() {
     }
   };
 
-  const handleAutoTranslate = async () => {
-    if (!procedure.trim()) {
-      Alert.alert(t('common.error'), 'No procedure text to translate');
-      return;
-    }
-    setTranslating(true);
-    try {
-      const results = await translateTexts([procedure]);
-      setProcedureEs(results[0] || '');
-      setShowSpanish(true);
-    } catch (err) {
-      console.error('Auto-translate error:', err);
-      Alert.alert(t('common.error'), 'Translation failed');
-    } finally {
-      setTranslating(false);
-    }
-  };
-
   const handleSave = async () => {
     try {
       if (!name.trim()) {
@@ -220,6 +222,9 @@ export default function SummerLibationRecipesEditorScreen() {
       }
 
       setLoading(true);
+      // Fill/refresh the other language per the s61 staleness rules (may ask once).
+      const resolved = await translation.resolveOnSave();
+      if (!resolved) { setLoading(false); return; }
 
       // Resolve the chosen cocktail-fed subcategory; keep writing a stable legacy
       // `category` string (built-in vocab or custom name) for fallback resolution.
@@ -239,7 +244,7 @@ export default function SummerLibationRecipesEditorScreen() {
           p_glassware: (glassware.trim() || null) ?? undefined,
           p_garnish: (garnish.trim() || null) ?? undefined,
           p_ingredients: validIngredients,
-          p_procedure: (procedure.trim() || null) ?? undefined,
+          p_procedure: (resolved.procedure.en.trim() || null) ?? undefined,
           p_thumbnail_url: thumbnailUrl ?? undefined,
           p_display_order: editingRecipe.display_order,
         });
@@ -248,9 +253,7 @@ export default function SummerLibationRecipesEditorScreen() {
           console.error('Error updating summer libation recipe:', error);
           throw error;
         }
-        if (procedureEs.trim()) {
-          await saveTranslations('summer_libation_recipes', editingRecipe.id, { procedure_es: procedureEs }, user?.id);
-        }
+        await saveTranslations('summer_libation_recipes', editingRecipe.id, { procedure_es: resolved.procedure.es }, user?.id);
         Alert.alert(t('common.success'), t('summer_libation_editor.recipe_updated'));
       } else {
         const { data, error } = await supabase.rpc('insert_summer_libation_recipe', {
@@ -264,7 +267,7 @@ export default function SummerLibationRecipesEditorScreen() {
           p_glassware: (glassware.trim() || null) ?? undefined,
           p_garnish: (garnish.trim() || null) ?? undefined,
           p_ingredients: validIngredients,
-          p_procedure: (procedure.trim() || null) ?? undefined,
+          p_procedure: (resolved.procedure.en.trim() || null) ?? undefined,
           p_thumbnail_url: thumbnailUrl ?? undefined,
           p_display_order: recipes.length,
         });
@@ -274,8 +277,8 @@ export default function SummerLibationRecipesEditorScreen() {
           throw error;
         }
         // insert_summer_libation_recipe returns the new id — use it directly.
-        if (data && procedureEs.trim()) {
-          await saveTranslations('summer_libation_recipes', data as string, { procedure_es: procedureEs }, user?.id);
+        if (data) {
+          await saveTranslations('summer_libation_recipes', data as string, { procedure_es: resolved.procedure.es }, user?.id);
         }
         Alert.alert(t('common.success'), t('summer_libation_editor.recipe_added'));
       }
@@ -406,6 +409,7 @@ export default function SummerLibationRecipesEditorScreen() {
 
   const openAddModal = () => {
     resetForm();
+    addSessionRef.current += 1;
     setShowModal(true);
   };
 
@@ -444,7 +448,6 @@ export default function SummerLibationRecipesEditorScreen() {
     setIngredients([{ amount: '', ingredient: '' }]);
     setProcedure('');
     setProcedureEs('');
-    setShowSpanish(false);
     setProcDragH(0);
     setThumbnailUrl(null);
   };
@@ -757,8 +760,8 @@ export default function SummerLibationRecipesEditorScreen() {
                 <View style={styles.formField}>
                   <Text style={styles.formLabel}>{t('summer_libation_editor.procedure_label')}</Text>
                   <RichTextToolbar
-                    text={procedure}
-                    onChangeText={setProcedure}
+                    text={isSpanishAuthor ? procedureEs : procedure}
+                    onChangeText={isSpanishAuthor ? setProcedureEs : setProcedure}
                     selection={procedureSelection}
                     onSelectionChange={setProcedureSelection}
                     textInputRef={procedureInputRef}
@@ -768,8 +771,8 @@ export default function SummerLibationRecipesEditorScreen() {
                     <TextInput
                       ref={procedureInputRef}
                       style={[styles.formInput, styles.textArea, { minHeight: Math.max(120, procDragH), paddingBottom: 22 }]}
-                      value={procedure}
-                      onChangeText={setProcedure}
+                      value={isSpanishAuthor ? procedureEs : procedure}
+                      onChangeText={isSpanishAuthor ? setProcedureEs : setProcedure}
                       placeholder={t('summer_libation_editor.procedure_placeholder')}
                       placeholderTextColor="#9E9E9E"
                       multiline
@@ -781,38 +784,9 @@ export default function SummerLibationRecipesEditorScreen() {
                   </View>
                 </View>
 
-                {/* Spanish Procedure Translation (menu-editor blue style) */}
+                {/* Bilingual authoring (s61 hybrid) */}
                 <View style={styles.formField}>
-                  <TouchableOpacity style={styles.spanishSectionHeader} onPress={() => setShowSpanish(!showSpanish)}>
-                    <Text style={styles.formLabel}>{t('translation_section:spanish_section_title')}</Text>
-                    <IconSymbol
-                      ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
-                      android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
-                      size={20}
-                      color="#666666"
-                    />
-                  </TouchableOpacity>
-                  {showSpanish && (
-                    <View style={styles.spanishFields}>
-                      <TouchableOpacity style={styles.autoTranslateButton} onPress={handleAutoTranslate} disabled={translating}>
-                        {translating ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <Text style={styles.autoTranslateButtonText}>{t('translation_section:auto_translate')}</Text>
-                        )}
-                      </TouchableOpacity>
-                      <Text style={styles.spanishFieldLabel}>{t('summer_libation_editor.procedure_es_label')}</Text>
-                      <TextInput
-                        style={[styles.formInput, styles.textArea]}
-                        value={procedureEs}
-                        onChangeText={setProcedureEs}
-                        placeholder="Procedimiento en español"
-                        placeholderTextColor="#9E9E9E"
-                        multiline
-                        numberOfLines={4}
-                      />
-                    </View>
-                  )}
+                  {translation.element}
                 </View>
 
               </CollapsibleSection>
@@ -1112,40 +1086,6 @@ const styles = StyleSheet.create({
   },
   extraBottomPadding: {
     height: 30,
-  },
-  // Spanish block — menu-editor blue style (replaces the old orange).
-  spanishSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  spanishFields: {
-    marginTop: 8,
-    backgroundColor: '#F0F8FF',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#D0E8FF',
-  },
-  autoTranslateButton: {
-    backgroundColor: '#3498DB',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  autoTranslateButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  spanishFieldLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#666666',
-    marginBottom: 4,
   },
   // Tap-to-attach 80×80 thumbnail + name row, and the subcategory/price two-col row.
   thumbAndNameRow: {
