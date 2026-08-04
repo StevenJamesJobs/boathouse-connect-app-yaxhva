@@ -261,7 +261,7 @@ export default function SetupWizardScreen() {
   // ─── Step 3: Save ─────────────────────────────────────────────────
 
   const handleComplete = async () => {
-    if (!organizationId) {
+    if (!organizationId || !user?.id) {
       Alert.alert(t('common.error'), t('onboarding.org_not_found'));
       return;
     }
@@ -273,8 +273,8 @@ export default function SetupWizardScreen() {
       // so tapping Complete Setup again replaces them instead of duplicating. The
       // RPC deletes leftover titles and inserts the selected ones in order
       // server-side (blank strings dropped).
-      const { error: titlesError } = await (supabase.rpc as any)('replace_org_job_titles', {
-        p_actor_id: user?.id,
+      const { error: titlesError } = await supabase.rpc('replace_org_job_titles', {
+        p_actor_id: user.id,
         p_titles: selectedTitles,
       });
 
@@ -288,9 +288,9 @@ export default function SetupWizardScreen() {
       // Seed default job-title → assistant mappings now that titles exist, so
       // employees can see the right assistants out of the box (idempotent;
       // owner can adjust in Org Settings → Jobs & Tools). Non-fatal on error.
-      const { error: seedError } = await (supabase.rpc as any)(
+      const { error: seedError } = await supabase.rpc(
         'seed_default_job_title_assistants_actor',
-        { p_actor_id: user?.id }
+        { p_actor_id: user.id }
       );
       if (seedError) {
         console.error('[SetupWizard] Seed assistant mappings error:', seedError);

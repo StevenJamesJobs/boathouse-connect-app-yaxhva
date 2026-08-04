@@ -40,6 +40,7 @@ import { useMenuCategories } from '@/hooks/useMenuCategories';
 import { categoryLabel, subcategoryLabel, findCategoryByName, labelForCategoryName } from '@/utils/menuCategoryLabels';
 import { compareBySectionThenOrder } from '@/utils/menuBadges';
 import { menuIconAndroid } from '@/constants/menuIcons';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface MenuItem {
   id: string;
@@ -600,7 +601,7 @@ export default function MenuEditorScreen() {
       loadMenuItems();
     } catch (error: any) {
       console.error('Error saving menu item:', error);
-      Alert.alert(t('common:error'), error.message || t('menu_editor:save_error'));
+      Alert.alert(t('common:error'), translateServerError(error, t('menu_editor:save_error')));
     }
   };
 
@@ -641,7 +642,7 @@ export default function MenuEditorScreen() {
               loadMenuItems();
             } catch (error: any) {
               console.error('Error deleting menu item:', error);
-              Alert.alert(t('common:error'), error.message || t('menu_editor:delete_error'));
+              Alert.alert(t('common:error'), translateServerError(error, t('menu_editor:delete_error')));
             }
           },
         },

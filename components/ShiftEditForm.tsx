@@ -19,6 +19,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { JOB_TITLES } from '@/constants/jobTitles';
 import EmployeePickerModal from '@/components/EmployeePickerModal';
+import { translateServerError } from '@/utils/serverErrors';
 
 export interface ShiftLike {
   id: string;
@@ -241,7 +242,7 @@ export default function ShiftEditForm({
       onSaved();
     } catch (error: any) {
       console.error('Error saving shift:', error);
-      Alert.alert('Error', error.message || 'Failed to save shift.');
+      Alert.alert('Error', translateServerError(error, 'Failed to save shift.'));
     } finally {
       setSaving(false);
     }
@@ -272,7 +273,7 @@ export default function ShiftEditForm({
               onSaved();
             } catch (error: any) {
               console.error('Error deleting shift:', error);
-              Alert.alert('Error', error.message || 'Failed to delete shift.');
+              Alert.alert('Error', translateServerError(error, 'Failed to delete shift.'));
             } finally {
               setSaving(false);
             }

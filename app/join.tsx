@@ -24,6 +24,14 @@ import { translateServerError } from '@/utils/serverErrors';
 
 type Phase = 'enter_code' | 'create_account';
 
+// Join-screen override: these two join_signup errors have richer join.* copy
+// ("check with your manager" guidance) than the generic server_errors.* pair
+// every other surface uses. Site-local on purpose — the shared map stays 1:1.
+const JOIN_COPY_OVERRIDES: Record<string, string> = {
+  'Invalid join code': 'join.invalid_code',
+  'Self-registration is disabled for this organization': 'join.self_signup_disabled',
+};
+
 // Pre-login the client only ever learns the org's display name and whether self-signup is
 // open — never its id or default_password (that leak is what join_signup exists to close).
 interface FoundOrg {
@@ -116,6 +124,13 @@ export default function JoinScreen() {
     }
   };
 
+  // Prefer this screen's richer copy for the two errors that have it;
+  // everything else goes through the shared server-error map.
+  const joinServerError = (err: { message?: string | null } | null | undefined) => {
+    const overrideKey = JOIN_COPY_OVERRIDES[(err?.message || '').trim()];
+    return overrideKey ? t(overrideKey) : translateServerError(err, t('onboarding.something_went_wrong'));
+  };
+
   const handleCreateAccount = async () => {
     if (!org) return;
 
@@ -147,7 +162,7 @@ export default function JoinScreen() {
 
       if (signupError) {
         console.error('[Join] Error creating account:', signupError);
-        setError(translateServerError(signupError, t('onboarding.something_went_wrong')));
+        setError(joinServerError(signupError));
         return;
       }
 
@@ -171,7 +186,7 @@ export default function JoinScreen() {
       }
     } catch (e: any) {
       console.error('[Join] Error creating account:', e);
-      setError(translateServerError(e, t('onboarding.something_went_wrong')));
+      setError(joinServerError(e));
     } finally {
       setIsLoading(false);
     }

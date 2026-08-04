@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTranslation } from 'react-i18next';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface EItem {
   name: string;
@@ -189,7 +190,7 @@ export default function MenuUploadReviewScreen() {
         );
       } catch (e: any) {
         console.error('apply error', e);
-        Alert.alert(t('menu_upload.apply_failed', 'Could Not Add Menu'), e.message || 'Error');
+        Alert.alert(t('menu_upload.apply_failed', 'Could Not Add Menu'), translateServerError(e, 'Error'));
       } finally {
         setApplying(false);
       }

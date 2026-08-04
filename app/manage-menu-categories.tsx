@@ -25,6 +25,7 @@ import { categoryLabel, subcategoryLabel } from '@/utils/menuCategoryLabels';
 import { saveTranslations } from '@/utils/translateContent';
 import { useTranslationSection } from '@/components/TranslationSection';
 import CategoryColorPicker from '@/components/CategoryColorPicker';
+import { translateServerError } from '@/utils/serverErrors';
 
 type NameMode = 'add-cat' | 'rename-cat' | 'add-sub' | 'rename-sub';
 
@@ -107,17 +108,17 @@ export default function ManageMenuCategoriesScreen() {
     try {
       const { data, error } = await (supabase.rpc as any)(fn, args);
       if (error) {
-        Alert.alert(t('common:error'), error.message);
+        Alert.alert(t('common:error'), translateServerError(error));
         return null;
       }
       if (data && data.success === false) {
-        Alert.alert(t('common:error'), data.error || 'Action failed');
+        Alert.alert(t('common:error'), translateServerError({ message: data.error }, 'Action failed'));
         return null;
       }
       if (doRefresh) await refresh();
       return data ?? {};
     } catch (e: any) {
-      Alert.alert(t('common:error'), e?.message || 'Action failed');
+      Alert.alert(t('common:error'), translateServerError(e, 'Action failed'));
       return null;
     } finally {
       setBusy(false);

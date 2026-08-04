@@ -40,6 +40,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import OrderPositionModal from '@/components/OrderPositionModal';
 import { StorageImage } from '@/components/StorageImage';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface SpecialFeature {
   id: string;
@@ -406,8 +407,11 @@ export default function SpecialFeaturesEditorScreen() {
               title_es: pushTitle.es,
               // The authored Spanish title when it exists; empty falls back to EN.
               body_es: resolved.title.es || undefined,
+              // type + the created row's uuid make the banner tap deep-link
+              // (NotificationContext routes to PortalHome's openFeatureId).
               data: {
-                featureId: null,
+                type: 'special_feature',
+                featureId: newFeatureId,
                 startDateTime: startDateTime?.toISOString() || null,
               },
             });
@@ -443,7 +447,7 @@ export default function SpecialFeaturesEditorScreen() {
       await loadFeatures();
     } catch (error: any) {
       console.error('Error saving special feature:', error);
-      Alert.alert(t('common:error'), error.message || t('special_features_editor:save_error'));
+      Alert.alert(t('common:error'), translateServerError(error, t('special_features_editor:save_error')));
     }
   };
 
@@ -488,7 +492,7 @@ export default function SpecialFeaturesEditorScreen() {
               await loadFeatures();
             } catch (error: any) {
               console.error('Error deleting special feature:', error);
-              Alert.alert(t('common:error'), error.message || t('special_features_editor:delete_error'));
+              Alert.alert(t('common:error'), translateServerError(error, t('special_features_editor:delete_error')));
             }
           },
         },

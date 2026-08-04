@@ -22,6 +22,8 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
 import { useTranslationSection } from '@/components/TranslationSection';
+import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
+import { NotificationDraft, newDraftId, listDrafts, saveDraft, deleteDraft } from '@/utils/notificationDrafts';
 import i18n from '@/i18n';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -35,6 +37,9 @@ import { fonts } from '@/constants/fonts';
 // VALUES double as push-targeting filters matched against users.job_titles —
 // they must stay English-canonical. Display goes through JOB_TITLE_LABEL_KEYS
 // (value/label split, s62); an unmapped value falls back to the raw string.
+// The picker itself lists the ORG'S titles (useOrgJobTitles) so org-added
+// custom titles are targetable; this static list is only the fallback while
+// that list loads (or for an org with no titles configured).
 const JOB_TITLE_OPTIONS = [
   'Banquet Captain',
   'Banquets',
@@ -71,6 +76,15 @@ interface DismissedItem {
   dismissed_at: string;
 }
 
+interface SentItem {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string | null;
+  data: Record<string, any> | null;
+  sender_name: string | null;
+}
+
 export default function NotificationCenter() {
   useRequireManagerRoute();
   const router = useRouter();
@@ -80,6 +94,18 @@ export default function NotificationCenter() {
   const { user } = useAuth();
   const { organizationId } = useOrganization();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  // Org-configured job titles (same source as the employee editor), so
+  // org-added custom titles can be targeted. Values are the raw org title
+  // strings — they match users.job_titles verbatim, which is exactly what the
+  // edge function's jobTitles filter compares against. While the list loads
+  // the picker offers nothing (not the static fallback) so a selection can
+  // never be stranded on a title the loaded list doesn't have.
+  const { activeJobTitles, isLoading: jobTitlesLoading } = useOrgJobTitles();
+  const pickerJobTitles = jobTitlesLoading
+    ? []
+    : activeJobTitles.length > 0
+      ? activeJobTitles
+      : JOB_TITLE_OPTIONS;
 
   const DESTINATION_OPTIONS = [
     { value: '', label: t('notification_center.opens_to_none') },
@@ -111,11 +137,23 @@ export default function NotificationCenter() {
   const [selectedJobTitles, setSelectedJobTitles] = useState<string[]>([]);
   const [showAudiencePicker, setShowAudiencePicker] = useState(false);
 
-  // Recently Dismissed (replaces the retired Sent History)
-  const [activeTab, setActiveTab] = useState<'compose' | 'dismissed'>('compose');
+  // History tab (s63c, Steve's design): two sub-views — Dismissed (the
+  // restorable shade hide-list) and Recently Sent (read-only proof-of-send
+  // record of composer sends, incl. per-row audience).
+  const [activeTab, setActiveTab] = useState<'compose' | 'drafts' | 'history'>('compose');
+  const [historyTab, setHistoryTab] = useState<'dismissed' | 'sent'>('dismissed');
   const [dismissedItems, setDismissedItems] = useState<DismissedItem[]>([]);
   const [loadingDismissed, setLoadingDismissed] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [sentItems, setSentItems] = useState<SentItem[]>([]);
+  const [loadingSent, setLoadingSent] = useState(false);
+
+  // Drafts (s63b, Steve's design): device-local per-user AsyncStorage.
+  // draftIdRef tracks a loaded draft so sending it consumes it and
+  // re-saving updates it in place.
+  const [drafts, setDrafts] = useState<NotificationDraft[]>([]);
+  const [loadingDrafts, setLoadingDrafts] = useState(false);
+  const draftIdRef = useRef<string | null>(null);
 
   const maxTitleLength = 50;
   const maxBodyLength = 200;
@@ -127,6 +165,11 @@ export default function NotificationCenter() {
   // next compose starts a fresh session.
   const isSpanishAuthor = i18n.language === 'es';
   const sendSessionRef = useRef(0);
+  // Re-entry latch: a double-tap of Send can queue TWO confirm alerts before
+  // the `sending` state flips (and the queued onPress closures capture the
+  // stale false). The ref is stable across renders, so the second confirm's
+  // doSend bails instead of double-posting.
+  const sendingRef = useRef(false);
   const translation = useTranslationSection({
     fields: [
       {
@@ -162,26 +205,52 @@ export default function NotificationCenter() {
   };
 
   const loadDismissed = useCallback(async () => {
+    if (!user?.id) return;
     setLoadingDismissed(true);
     try {
-      const { data, error } = await (supabase.rpc as any)('get_recent_shade_dismissals', {
-        p_actor_id: user?.id,
+      const { data, error } = await supabase.rpc('get_recent_shade_dismissals', {
+        p_actor_id: user.id,
         p_limit: 40,
       });
 
-      if (!error && data) setDismissedItems(data as DismissedItem[]);
+      if (!error && data) setDismissedItems(data);
     } catch (err) {
       console.error('Error loading dismissed items:', err);
     }
     setLoadingDismissed(false);
   }, [user?.id]);
 
+  const loadDraftList = useCallback(async () => {
+    if (!user?.id) return;
+    setLoadingDrafts(true);
+    setDrafts(await listDrafts(user.id));
+    setLoadingDrafts(false);
+  }, [user?.id]);
+
+  const loadSent = useCallback(async () => {
+    if (!user?.id) return;
+    setLoadingSent(true);
+    try {
+      const { data, error } = await supabase.rpc('get_recent_sent_notifications', {
+        p_actor_id: user.id,
+        p_limit: 40,
+      });
+      if (!error && data) setSentItems(data as SentItem[]);
+    } catch (err) {
+      console.error('Error loading sent notifications:', err);
+    }
+    setLoadingSent(false);
+  }, [user?.id]);
+
   useFocusEffect(
     useCallback(() => {
-      if (activeTab === 'dismissed') {
-        loadDismissed();
+      if (activeTab === 'history') {
+        if (historyTab === 'sent') loadSent();
+        else loadDismissed();
+      } else if (activeTab === 'drafts') {
+        loadDraftList();
       }
-    }, [activeTab, loadDismissed])
+    }, [activeTab, historyTab, loadDismissed, loadDraftList, loadSent])
   );
 
   const handleRestore = (item: DismissedItem) => {
@@ -194,10 +263,11 @@ export default function NotificationCenter() {
           text: t('notification_center.restore', 'Restore'),
           style: 'default',
           onPress: async () => {
+            if (!user?.id) return;
             setRestoringId(item.id);
             try {
-              const { error } = await (supabase.rpc as any)('restore_shade_item', {
-                p_actor_id: user?.id,
+              const { error } = await supabase.rpc('restore_shade_item', {
+                p_actor_id: user.id,
                 p_id: item.id,
               });
               if (error) throw error;
@@ -253,7 +323,111 @@ export default function NotificationCenter() {
     return t('notification_center.days_ago', { count: diffDays });
   };
 
+  const resetComposeForm = () => {
+    setTitle('');
+    setBody('');
+    setTitleEs('');
+    setBodyEs('');
+    sendSessionRef.current += 1;
+    draftIdRef.current = null;
+    setDestination('');
+    setAudienceMode('all');
+    setSelectedJobTitles([]);
+    setSendPush(true);
+    setBodyDragH(0);
+  };
+
+  // Save the CURRENT form as a device-local draft (upserts when a loaded
+  // draft is being edited). Button handler only — the No-Signal alert saves
+  // its own send-time snapshot instead of live form state.
+  async function saveCurrentAsDraft() {
+    if (!user?.id) return;
+    const ok = await saveDraft(user.id, {
+      id: draftIdRef.current ?? newDraftId(),
+      savedAt: Date.now(),
+      title,
+      body,
+      titleEs,
+      bodyEs,
+      destination,
+      audienceMode,
+      selectedJobTitles,
+      sendPush,
+    });
+    if (ok) {
+      resetComposeForm();
+      Alert.alert(
+        t('notification_center.draft_saved_title'),
+        t('notification_center.draft_saved_body'),
+        [{ text: t('common.ok') }]
+      );
+    } else {
+      Alert.alert(t('common.error'), t('notification_center.draft_save_error'));
+    }
+  }
+
+  const loadDraftIntoForm = (draft: NotificationDraft) => {
+    setTitle(draft.title);
+    setBody(draft.body);
+    setTitleEs(draft.titleEs);
+    setBodyEs(draft.bodyEs);
+    setDestination(draft.destination);
+    setAudienceMode(draft.audienceMode);
+    setSelectedJobTitles(draft.selectedJobTitles);
+    setSendPush(draft.sendPush);
+    setBodyDragH(0);
+    // New translation session so the section re-baselines against the
+    // loaded values (pre-existing semantics), not the previous compose.
+    sendSessionRef.current += 1;
+    draftIdRef.current = draft.id;
+    setActiveTab('compose');
+  };
+
+  // "New Draft" must actually start FRESH — clearing the form and the
+  // loaded-draft ref — or a later Save as Draft would silently overwrite the
+  // previously loaded draft. Confirm first when the composer holds content
+  // (the loaded draft itself stays in storage either way).
+  const handleNewDraft = () => {
+    const startFresh = () => {
+      resetComposeForm();
+      setActiveTab('compose');
+    };
+    if (!(title.trim() || body.trim() || titleEs.trim() || bodyEs.trim())) {
+      startFresh();
+      return;
+    }
+    Alert.alert(
+      t('notification_center.new_draft_confirm_title'),
+      t('notification_center.new_draft_confirm_body'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('notification_center.new_draft'), onPress: startFresh },
+      ]
+    );
+  };
+
+  const handleDeleteDraft = (draft: NotificationDraft) => {
+    Alert.alert(
+      t('notification_center.delete_draft_title'),
+      t('notification_center.delete_draft_body'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('common.delete'),
+          style: 'destructive',
+          onPress: async () => {
+            if (!user?.id) return;
+            await deleteDraft(user.id, draft.id);
+            if (draftIdRef.current === draft.id) draftIdRef.current = null;
+            loadDraftList();
+          },
+        },
+      ]
+    );
+  };
+
   async function handleSendNotification() {
+    if (sending || sendingRef.current) return;
     // Validation runs on the AUTHOR-language side (bind-flip): whichever
     // language the composer is typing in must be filled; the other side is
     // resolved (auto-translate / pencil) at send time.
@@ -295,6 +469,8 @@ export default function NotificationCenter() {
 
   async function doSendNotification() {
     if (!user?.id) return;
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     const actorId = user.id;
     setSending(true);
 
@@ -312,6 +488,24 @@ export default function NotificationCenter() {
       const titleEsFinal = resolved.title.es.trim();
       const bodyEsFinal = resolved.body.es.trim();
 
+      // Snapshot this send's identity + content NOW. The outcome alerts run
+      // at tap time — by then the manager may have loaded another draft or
+      // kept typing (the slow-network window this flow exists for), so the
+      // callbacks must act on what was actually sent, never live form state.
+      const sentDraftId = draftIdRef.current;
+      const sendSnapshot: NotificationDraft = {
+        id: sentDraftId ?? newDraftId(),
+        savedAt: 0, // stamped when actually saved
+        title: titleFinal,
+        body: bodyFinal,
+        titleEs: titleEsFinal,
+        bodyEs: bodyEsFinal,
+        destination,
+        audienceMode,
+        selectedJobTitles,
+        sendPush,
+      };
+
       const extraData: Record<string, any> = {};
       if (destination) extraData.destination = destination;
       if (audienceMode === 'job_titles' && selectedJobTitles.length > 0) {
@@ -323,8 +517,13 @@ export default function NotificationCenter() {
       // Spanish copy rides data.title_es/body_es for the dropdown's
       // viewer-language pick (zero-migration: create_notification passes
       // p_data through verbatim).
+      let shadePosted = false;
       try {
-        await supabase.rpc('create_notification', {
+        // supabase-js resolves RPC failures into { error }, it doesn't throw —
+        // capture it so a failed shade insert is visible in logs and the
+        // outcome branch below can tell "nothing was posted" from
+        // "only the push failed".
+        const { error: shadeError } = await supabase.rpc('create_notification', {
           p_actor_id: actorId,
           p_title: titleFinal,
           p_body: bodyFinal,
@@ -336,13 +535,18 @@ export default function NotificationCenter() {
             body_es: bodyEsFinal || undefined,
           },
         });
+        if (shadeError) console.error('Failed to log notification:', shadeError);
+        else shadePosted = true;
       } catch (err) {
         console.error('Failed to log notification:', err);
       }
 
       // Physical push only when the toggle is on; silent = shade + badge only.
+      // sendCustomNotification never throws — it reports transport failure via
+      // its boolean.
+      let pushOk = true;
       if (sendPush) {
-        await sendCustomNotification(
+        pushOk = await sendCustomNotification(
           titleFinal,
           bodyFinal,
           Object.keys(extraData).length > 0 ? extraData : undefined,
@@ -352,61 +556,81 @@ export default function NotificationCenter() {
         );
       }
 
-      Alert.alert(
-        t('notification_center.sent_title'),
-        t('notification_center.sent_body'),
-        [
-          {
-            text: t('common.ok'),
-            onPress: () => {
-              setTitle('');
-              setBody('');
-              setTitleEs('');
-              setBodyEs('');
-              sendSessionRef.current += 1;
-              setDestination('');
-              setAudienceMode('all');
-              setSelectedJobTitles([]);
-              setSendPush(true);
-              setBodyDragH(0);
+      if (!shadePosted && (!sendPush || !pushOk)) {
+        // Nothing reached anyone (typically: no connection). The form is
+        // kept — Close lets the manager retry once signal returns; Save as
+        // Draft stores the attempted send locally (device storage works
+        // offline, and the snapshot includes any auto-translation that
+        // resolveOnSave produced).
+        Alert.alert(
+          t('notification_center.no_signal_title'),
+          t('notification_center.no_signal_body'),
+          [
+            { text: t('common.close'), style: 'cancel' },
+            {
+              text: t('notification_center.save_draft'),
+              onPress: async () => {
+                if (!user?.id) return;
+                const ok = await saveDraft(user.id, { ...sendSnapshot, savedAt: Date.now() });
+                if (!ok) {
+                  Alert.alert(t('common.error'), t('notification_center.draft_save_error'));
+                  return;
+                }
+                // Clear the form only if it still shows this send's content —
+                // a draft loaded mid-send is left alone.
+                if (draftIdRef.current === sentDraftId) resetComposeForm();
+                Alert.alert(
+                  t('notification_center.draft_saved_title'),
+                  t('notification_center.draft_saved_body'),
+                  [{ text: t('common.ok') }]
+                );
+              },
             },
-          },
-        ]
-      );
-    } catch (error: any) {
-      console.error('Error sending notification:', error);
-      console.error('Error context:', JSON.stringify(error?.context));
-
-      // Try to get the actual error message from the response
-      let errorMessage = t('notification_center.send_error');
-
-      if (error?.context) {
-        try {
-          // Clone the response before reading it
-          const response = error.context;
-          if (typeof response.text === 'function') {
-            const textResponse = await response.text();
-            console.error('Error response text:', textResponse);
-            try {
-              const errorData = JSON.parse(textResponse);
-              errorMessage = errorData.error || errorData.message || errorMessage;
-              console.error('Parsed error data:', errorData);
-            } catch (e) {
-              console.error('Could not parse error as JSON');
-              errorMessage = textResponse || errorMessage;
-            }
-          }
-        } catch (e) {
-          console.error('Could not read error response:', e);
-        }
+          ]
+        );
+        return;
       }
 
+      if (!shadePosted) {
+        // Push delivered but the inbox post failed (rare: RPC timeout or a
+        // server-side rejection with the edge call succeeding). Keep the form
+        // and the loaded draft so the manager can post again — with the push
+        // toggle off — without retyping or double-alerting.
+        Alert.alert(
+          t('notification_center.shade_partial_title'),
+          t('notification_center.shade_partial_body'),
+          [{ text: t('common.ok') }]
+        );
+        return;
+      }
+
+      // Shade posted — consume the SENT draft (by its captured id). Reset
+      // only if the form still shows this send's content; the push_partial
+      // alert is informational only: the shade row reached staff inboxes and
+      // a resend would duplicate it, so there is deliberately no retry.
+      const finishSend = () => {
+        if (sentDraftId && user?.id) {
+          deleteDraft(user.id, sentDraftId);
+        }
+        if (draftIdRef.current === sentDraftId) resetComposeForm();
+      };
+      const partial = sendPush && !pushOk;
+      Alert.alert(
+        partial ? t('notification_center.push_partial_title') : t('notification_center.sent_title'),
+        partial ? t('notification_center.push_partial_body') : t('notification_center.sent_body'),
+        [{ text: t('common.ok'), onPress: finishSend }]
+      );
+    } catch (error: any) {
+      // Only resolveOnSave / truly unexpected throws land here — the push
+      // call reports via its boolean and the shade insert logs its own error.
+      console.error('Error sending notification:', error);
       Alert.alert(
         t('notification_center.error_title'),
-        errorMessage,
+        t('notification_center.send_error'),
         [{ text: t('common.ok') }]
       );
     } finally {
+      sendingRef.current = false;
       setSending(false);
     }
   }
@@ -434,12 +658,14 @@ export default function NotificationCenter() {
             <Text style={styles.headerSub}>
               {activeTab === 'compose'
                 ? t('notification_center.tab_compose', 'Compose')
-                : t('notification_center.tab_dismissed', 'Recently Dismissed')}
+                : activeTab === 'drafts'
+                  ? t('notification_center.tab_drafts')
+                  : t('notification_center.tab_history')}
             </Text>
           </View>
         </View>
 
-        {/* Glass segmented tabs: Compose / Recently Dismissed */}
+        {/* Glass segmented tabs: Compose / Drafts / History */}
         <View style={styles.tabBar}>
           <Pressable
             style={[styles.tab, activeTab === 'compose' && styles.tabOn]}
@@ -451,12 +677,25 @@ export default function NotificationCenter() {
             </Text>
           </Pressable>
           <Pressable
-            style={[styles.tab, activeTab === 'dismissed' && styles.tabOn]}
-            onPress={() => { setActiveTab('dismissed'); loadDismissed(); }}
+            style={[styles.tab, activeTab === 'drafts' && styles.tabOn]}
+            onPress={() => { setActiveTab('drafts'); loadDraftList(); }}
           >
-            <IconSymbol ios_icon_name="clock.arrow.circlepath" android_material_icon_name="history" size={14} color={activeTab === 'dismissed' ? colors.text : colors.textSecondary} />
-            <Text style={[styles.tabText, activeTab === 'dismissed' && { color: colors.text }]}>
-              {t('notification_center.tab_dismissed', 'Recently Dismissed')}
+            <IconSymbol ios_icon_name="doc.text" android_material_icon_name="drafts" size={14} color={activeTab === 'drafts' ? colors.text : colors.textSecondary} />
+            <Text style={[styles.tabText, activeTab === 'drafts' && { color: colors.text }]}>
+              {t('notification_center.tab_drafts')}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.tab, activeTab === 'history' && styles.tabOn]}
+            onPress={() => {
+              setActiveTab('history');
+              if (historyTab === 'sent') loadSent();
+              else loadDismissed();
+            }}
+          >
+            <IconSymbol ios_icon_name="clock.arrow.circlepath" android_material_icon_name="history" size={14} color={activeTab === 'history' ? colors.text : colors.textSecondary} />
+            <Text style={[styles.tabText, activeTab === 'history' && { color: colors.text }]}>
+              {t('notification_center.tab_history')}
             </Text>
           </Pressable>
         </View>
@@ -700,7 +939,7 @@ export default function NotificationCenter() {
                     <Text style={[styles.audienceSectionLabel, { color: colors.textSecondary }]}>{t('notification_center.by_job_title')}</Text>
 
                     {/* Job title checkboxes */}
-                    {JOB_TITLE_OPTIONS.map((jt) => {
+                    {pickerJobTitles.map((jt) => {
                       const isSelected = selectedJobTitles.includes(jt);
                       return (
                         <TouchableOpacity
@@ -805,6 +1044,28 @@ export default function NotificationCenter() {
                 )}
               </TouchableOpacity>
 
+              {/* Save as Draft (secondary) — device-local, works offline.
+                  Enabled when ANY field holds text (either language), so a
+                  draft loaded after a device-language switch stays savable. */}
+              <TouchableOpacity
+                style={[
+                  styles.saveDraftButton,
+                  (!(title.trim() || body.trim() || titleEs.trim() || bodyEs.trim()) || sending) && { opacity: 0.4 },
+                ]}
+                onPress={saveCurrentAsDraft}
+                disabled={!(title.trim() || body.trim() || titleEs.trim() || bodyEs.trim()) || sending}
+              >
+                <IconSymbol
+                  ios_icon_name="tray.and.arrow.down"
+                  android_material_icon_name="save"
+                  size={16}
+                  color={colors.textSecondary}
+                />
+                <Text style={[styles.saveDraftButtonText, { color: colors.textSecondary }]}>
+                  {t('notification_center.save_draft')}
+                </Text>
+              </TouchableOpacity>
+
               {/* Info */}
               <View style={styles.infoContainer}>
                 <IconSymbol
@@ -819,10 +1080,169 @@ export default function NotificationCenter() {
               </View>
             </GlassCard>
           </ScrollView>
-        ) : (
-          /* Recently Dismissed Tab */
+        ) : activeTab === 'drafts' ? (
+          /* Drafts Tab */
           <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
             <GlassCard variant="surface" radius={16} style={styles.card}>
+              <View style={styles.iconContainer}>
+                <IconSymbol
+                  ios_icon_name="doc.text"
+                  android_material_icon_name="drafts"
+                  size={44}
+                  color={colors.primary}
+                />
+              </View>
+              <Text style={styles.cardTitle}>{t('notification_center.tab_drafts')}</Text>
+              <Text style={styles.cardDescription}>
+                {t('notification_center.drafts_desc')}
+              </Text>
+
+              {loadingDrafts ? (
+                <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} />
+              ) : drafts.length === 0 ? (
+                <View style={styles.historyEmpty}>
+                  <Text style={[styles.historyEmptyText, { color: colors.textSecondary }]}>
+                    {t('notification_center.drafts_empty')}
+                  </Text>
+                </View>
+              ) : (
+                drafts.map((draft) => {
+                  const draftTitle = (isSpanishAuthor ? draft.titleEs : draft.title) || draft.title || draft.titleEs;
+                  const draftBody = (isSpanishAuthor ? draft.bodyEs : draft.body) || draft.body || draft.bodyEs;
+                  return (
+                    <TouchableOpacity
+                      key={draft.id}
+                      style={[styles.historyItem, { borderColor: colors.surfaceBorder }]}
+                      onPress={() => loadDraftIntoForm(draft)}
+                    >
+                      <View style={styles.historyItemContent}>
+                        <Text style={[styles.historyItemTitle, { color: colors.text }]} numberOfLines={1}>
+                          {draftTitle || t('notification_center.draft_untitled')}
+                        </Text>
+                        {!!draftBody && (
+                          <Text style={[styles.draftBodyPreview, { color: colors.textSecondary }]} numberOfLines={2}>
+                            {draftBody}
+                          </Text>
+                        )}
+                        <Text style={[styles.historyItemTime, { color: colors.textSecondary }]}>
+                          {getTimeAgo(new Date(draft.savedAt).toISOString())}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.draftDeleteBtn}
+                        onPress={() => handleDeleteDraft(draft)}
+                        hitSlop={8}
+                      >
+                        <IconSymbol ios_icon_name="trash" android_material_icon_name="delete" size={18} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  );
+                })
+              )}
+
+              {/* New draft = compose a fresh notification */}
+              <TouchableOpacity
+                style={[styles.newDraftBtn, { backgroundColor: colors.primary }]}
+                onPress={handleNewDraft}
+              >
+                <IconSymbol ios_icon_name="square.and.pencil" android_material_icon_name="edit" size={16} color={colors.fireText} />
+                <Text style={[styles.newDraftBtnText, { color: colors.fireText }]}>
+                  {t('notification_center.new_draft')}
+                </Text>
+              </TouchableOpacity>
+            </GlassCard>
+          </ScrollView>
+        ) : (
+          /* History Tab: Dismissed (restorable) / Recently Sent (read-only) */
+          <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
+            <GlassCard variant="surface" radius={16} style={styles.card}>
+              {/* Sub-tabs */}
+              <View style={styles.subTabBar}>
+                <Pressable
+                  style={[styles.subTab, historyTab === 'dismissed' && styles.subTabOn]}
+                  onPress={() => { setHistoryTab('dismissed'); loadDismissed(); }}
+                >
+                  <Text style={[styles.subTabText, historyTab === 'dismissed' && { color: colors.text }]}>
+                    {t('notification_center.tab_dismissed_short')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[styles.subTab, historyTab === 'sent' && styles.subTabOn]}
+                  onPress={() => { setHistoryTab('sent'); loadSent(); }}
+                >
+                  <Text style={[styles.subTabText, historyTab === 'sent' && { color: colors.text }]}>
+                    {t('notification_center.sent_tab')}
+                  </Text>
+                </Pressable>
+              </View>
+
+              {historyTab === 'sent' ? (
+                <>
+                  <View style={styles.iconContainer}>
+                    <IconSymbol
+                      ios_icon_name="paperplane.circle"
+                      android_material_icon_name="send"
+                      size={44}
+                      color={colors.primary}
+                    />
+                  </View>
+                  <Text style={styles.cardTitle}>{t('notification_center.sent_title_header')}</Text>
+                  <Text style={styles.cardDescription}>
+                    {t('notification_center.sent_desc')}
+                  </Text>
+
+                  {loadingSent ? (
+                    <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} />
+                  ) : sentItems.length === 0 ? (
+                    <View style={styles.historyEmpty}>
+                      <Text style={[styles.historyEmptyText, { color: colors.textSecondary }]}>
+                        {t('notification_center.sent_empty')}
+                      </Text>
+                    </View>
+                  ) : (
+                    sentItems.map((item) => {
+                      // Viewer-language pick, same rule as the shade dropdown.
+                      const viewTitle = (isSpanishAuthor && item.data?.title_es) || item.title;
+                      const viewBody = (isSpanishAuthor && item.data?.body_es) || item.body;
+                      const targeted: string[] = Array.isArray(item.data?.job_titles) ? item.data.job_titles : [];
+                      const audience = targeted.length > 0
+                        ? targeted.map(jobTitleLabel).join(', ')
+                        : t('notification_center.all_staff');
+                      // House locale-arg convention (my-schedule/manage precedent).
+                      const dateLocale = i18n.language === 'es' ? 'es-ES' : 'en-US';
+                      const sentAt = item.created_at
+                        ? `${new Date(item.created_at).toLocaleDateString(dateLocale)} ${new Date(item.created_at).toLocaleTimeString(dateLocale, { hour: '2-digit', minute: '2-digit' })}`
+                        : '';
+                      return (
+                        <View key={item.id} style={[styles.historyItem, { borderColor: colors.surfaceBorder }]}>
+                          <View style={styles.historyItemContent}>
+                            <View style={styles.historyItemTitleRow}>
+                              <Text style={[styles.historyItemTitle, { color: colors.text }]} numberOfLines={1}>
+                                {viewTitle}
+                              </Text>
+                              {item.data?.notificationSkipped === true && (
+                                <View style={[styles.historyTypeBadge, { backgroundColor: colors.primary + '20' }]}>
+                                  <Text style={[styles.historyTypeBadgeText, { color: colors.primary }]}>
+                                    {t('notification_center.sent_silent')}
+                                  </Text>
+                                </View>
+                              )}
+                            </View>
+                            <Text style={[styles.draftBodyPreview, { color: colors.textSecondary }]} numberOfLines={2}>
+                              {viewBody}
+                            </Text>
+                            <Text style={[styles.historyItemTime, { color: colors.textSecondary }]} numberOfLines={1}>
+                              {t('notification_center.to_label')} {audience}
+                              {item.sender_name ? ` · ${item.sender_name}` : ''}{sentAt ? ` · ${sentAt}` : ''}
+                            </Text>
+                          </View>
+                        </View>
+                      );
+                    })
+                  )}
+                </>
+              ) : (
+                <>
               <View style={styles.iconContainer}>
                 <IconSymbol
                   ios_icon_name="clock.arrow.circlepath"
@@ -879,6 +1299,8 @@ export default function NotificationCenter() {
                   </View>
                 ))
               )}
+                </>
+              )}
             </GlassCard>
           </ScrollView>
         )}
@@ -925,6 +1347,33 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     borderColor: colors.surfaceBorder,
   },
   tabText: {
+    fontSize: 12,
+    fontFamily: fonts.display.semibold,
+    color: colors.textSecondary,
+  },
+  subTabBar: {
+    flexDirection: 'row',
+    gap: 4,
+    backgroundColor: colors.glass,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
+    borderRadius: 11,
+    padding: 3,
+    marginBottom: 16,
+  },
+  subTab: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  subTabOn: {
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.surfaceBorder,
+  },
+  subTabText: {
     fontSize: 12,
     fontFamily: fonts.display.semibold,
     color: colors.textSecondary,
@@ -1064,6 +1513,48 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     color: colors.fireText,
     fontSize: 16,
     fontWeight: '600',
+  },
+  saveDraftButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.glassBorder,
+    backgroundColor: colors.glass,
+  },
+  saveDraftButtonText: {
+    fontSize: 14,
+    fontFamily: fonts.display.semibold,
+  },
+  draftBodyPreview: {
+    fontSize: 13,
+    fontFamily: fonts.body.regular,
+    lineHeight: 17,
+    marginTop: 2,
+  },
+  draftDeleteBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  newDraftBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 16,
+  },
+  newDraftBtnText: {
+    fontSize: 14,
+    fontFamily: fonts.display.semibold,
   },
   destinationSelector: {
     flexDirection: 'row',

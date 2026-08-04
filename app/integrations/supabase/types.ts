@@ -3121,6 +3121,36 @@ export type Database = {
         Args: { p_id: string; p_organization_id: string; p_user_id: string }
         Returns: { ok: boolean; reason?: string }
       }
+      get_redemption_settings: {
+        Args: { p_actor_id: string }
+        Returns: {
+          food_enabled: boolean
+          food_mode: string
+          freeshift_cost: number
+          freeshift_enabled: boolean
+          redemptions_enabled: boolean
+          section_cost: number
+          section_enabled: boolean
+          sidework_cost: number
+          sidework_enabled: boolean
+        }[]
+      }
+      update_redemption_settings: {
+        Args: {
+          p_food_enabled: boolean
+          p_food_mode: string
+          p_freeshift_cost: number
+          p_freeshift_enabled: boolean
+          p_organization_id: string
+          p_redemptions_enabled: boolean
+          p_section_cost: number
+          p_section_enabled: boolean
+          p_sidework_cost: number
+          p_sidework_enabled: boolean
+          p_user_id: string
+        }
+        Returns: { ok: boolean; reason?: string }
+      }
       reset_all_bucks: {
         Args: { p_actor_id?: string }
         Returns: undefined
@@ -4550,6 +4580,119 @@ export type Database = {
       get_unread_notification_count: {
         Args: { p_actor_id: string; p_since?: string | null }
         Returns: number
+      }
+      get_shade_dismissals: {
+        Args: { p_actor_id: string }
+        Returns: {
+          item_id: string
+          notification_type: string
+        }[]
+      }
+      dismiss_shade_item: {
+        Args: {
+          p_actor_id: string
+          p_item_id: string
+          p_notification_type: string
+          p_title?: string | null
+        }
+        Returns: undefined
+      }
+      get_recent_sent_notifications: {
+        Args: { p_actor_id: string; p_limit?: number }
+        Returns: {
+          body: string
+          created_at: string | null
+          data: Json
+          id: string
+          sender_name: string | null
+          title: string
+        }[]
+      }
+      get_recent_shade_dismissals: {
+        Args: { p_actor_id: string; p_limit?: number }
+        Returns: {
+          dismissed_at: string
+          dismissed_title: string | null
+          id: string
+          item_id: string
+          notification_type: string
+        }[]
+      }
+      restore_shade_item: {
+        Args: { p_actor_id: string; p_id: string }
+        Returns: undefined
+      }
+      get_my_quiz_dismissals: {
+        Args: { p_actor_id: string }
+        Returns: {
+          exam_id: string
+        }[]
+      }
+      dismiss_quiz_notification: {
+        Args: { p_actor_id: string; p_exam_id: string }
+        Returns: undefined
+      }
+      get_org_job_titles: {
+        Args: { p_actor_id: string }
+        Returns: {
+          display_order: number
+          id: string
+          is_active: boolean
+          title: string
+        }[]
+      }
+      add_org_job_title: {
+        Args: { p_actor_id: string; p_title: string }
+        Returns: string
+      }
+      set_org_job_title_active: {
+        Args: { p_actor_id: string; p_id: string; p_is_active: boolean }
+        Returns: undefined
+      }
+      reorder_org_job_titles: {
+        Args: { p_actor_id: string; p_ordered_ids: string[] }
+        Returns: undefined
+      }
+      delete_org_job_title: {
+        Args: { p_actor_id: string; p_id: string }
+        Returns: undefined
+      }
+      replace_org_job_titles: {
+        Args: { p_actor_id: string; p_titles: string[] }
+        Returns: undefined
+      }
+      get_org_assistants: {
+        Args: { p_actor_id: string }
+        Returns: {
+          assistant_key: string
+          display_name: string | null
+          id: string
+          is_active: boolean
+        }[]
+      }
+      get_job_title_assistants: {
+        Args: { p_actor_id: string }
+        Returns: {
+          assistant_key: string
+          job_title: string
+        }[]
+      }
+      set_job_title_assistant: {
+        Args: {
+          p_actor_id: string
+          p_assistant_key: string
+          p_enabled: boolean
+          p_job_title: string
+        }
+        Returns: undefined
+      }
+      set_org_assistant_active: {
+        Args: { p_actor_id: string; p_id: string; p_is_active: boolean }
+        Returns: undefined
+      }
+      seed_default_job_title_assistants_actor: {
+        Args: { p_actor_id: string }
+        Returns: undefined
       }
       get_user_badge_totals: {
         Args: { p_organization_id?: string; p_user_ids: string[] }

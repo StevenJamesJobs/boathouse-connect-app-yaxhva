@@ -32,6 +32,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { isManagerOrOwner } from '@/utils/roles';
 import HeaderNavButton from '@/components/HeaderNavButton';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface GuideItem {
   id: string;
@@ -226,7 +227,7 @@ export default function GuidesAndTrainingScreen() {
       } else if (error.message?.includes('permission')) {
         errorMessage = 'Permission denied. Please check app permissions.';
       } else if (error.message) {
-        errorMessage = error.message;
+        errorMessage = translateServerError(error);
       }
       Alert.alert('Download Error', errorMessage);
     } finally {

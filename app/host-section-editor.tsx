@@ -24,6 +24,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { brokerUploadImage } from '@/utils/storageBroker';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import { StorageImage } from '@/components/StorageImage';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface Tile {
   id: string;
@@ -158,7 +159,7 @@ export default function HostSectionEditorScreen() {
         Alert.alert('Created', 'Section created — you can now add tiles below.');
       }
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to save section.');
+      Alert.alert('Error', translateServerError(e, 'Failed to save section.'));
     } finally {
       setSaving(false);
     }
@@ -210,7 +211,7 @@ export default function HostSectionEditorScreen() {
       setTileModalVisible(false);
       await loadTiles(sectionId);
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to save tile.');
+      Alert.alert('Error', translateServerError(e, 'Failed to save tile.'));
     } finally {
       setSavingTile(false);
     }

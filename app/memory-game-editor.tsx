@@ -23,6 +23,7 @@ import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import PremiumGate from '@/components/PremiumGate';
 import { PlayMode } from '@/types/game';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface WinePairing {
   id: string;
@@ -84,7 +85,7 @@ export default function MemoryGameEditorScreen() {
       p_hint: newHint.trim() || undefined,
     });
     if (error) {
-      Alert.alert(t('common.error'), error.message);
+      Alert.alert(t('common.error'), translateServerError(error));
     } else {
       setNewWine('');
       setNewEntree('');
@@ -104,7 +105,7 @@ export default function MemoryGameEditorScreen() {
       p_hint: pairing.hint ?? undefined,
     });
     if (error) {
-      Alert.alert(t('common.error'), error.message);
+      Alert.alert(t('common.error'), translateServerError(error));
     } else {
       setEditingId(null);
       fetchPairings();

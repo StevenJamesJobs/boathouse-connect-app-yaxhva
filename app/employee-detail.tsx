@@ -27,6 +27,7 @@ import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
 import AmbientGlow from '@/components/AmbientGlow';
 import MultiSelectField from '@/components/MultiSelectField';
 import { fonts } from '@/constants/fonts';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface Employee {
   id: string;
@@ -152,7 +153,7 @@ export default function EmployeeDetailScreen() {
       await fetchEmployee();
     } catch (error: any) {
       console.error('Error updating employee:', error);
-      Alert.alert(t('common:error'), error.message || t('error_load'));
+      Alert.alert(t('common:error'), translateServerError(error, t('error_load')));
     } finally {
       setSaving(false);
     }
@@ -274,7 +275,7 @@ export default function EmployeeDetailScreen() {
               router.back();
             } catch (error: any) {
               console.error('Error deleting employee:', error);
-              Alert.alert(t('common:error'), error.message || t('error_delete'));
+              Alert.alert(t('common:error'), translateServerError(error, t('error_delete')));
             }
           },
         },

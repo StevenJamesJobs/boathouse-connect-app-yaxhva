@@ -35,6 +35,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import RecipeGridCard from '@/components/RecipeGridCard';
 import OrderPositionModal from '@/components/OrderPositionModal';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface PureeSyrupRecipe {
   id: string;
@@ -168,7 +169,7 @@ export default function PureeSyrupRecipesEditorScreen() {
       Alert.alert(t('common:success'), t('puree_editor:updated_success'));
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert(t('common:error'), error.message || t('puree_editor:upload_image_error'));
+      Alert.alert(t('common:error'), translateServerError(error, t('puree_editor:upload_image_error')));
     } finally {
       setUploadingImage(false);
     }
@@ -259,7 +260,7 @@ export default function PureeSyrupRecipesEditorScreen() {
       loadRecipes();
     } catch (error: any) {
       console.error('Error saving puree syrup recipe:', error);
-      Alert.alert(t('common:error'), error.message || t('puree_editor:save_error'));
+      Alert.alert(t('common:error'), translateServerError(error, t('puree_editor:save_error')));
     } finally {
       setLoading(false);
     }
@@ -293,7 +294,7 @@ export default function PureeSyrupRecipesEditorScreen() {
             loadRecipes();
           } catch (error: any) {
             console.error('Error deleting puree syrup recipe:', error);
-            Alert.alert(t('common:error'), error.message || t('puree_editor:delete_error'));
+            Alert.alert(t('common:error'), translateServerError(error, t('puree_editor:delete_error')));
           }
         },
       },

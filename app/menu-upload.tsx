@@ -25,6 +25,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface MenuUpload {
   id: string;
@@ -141,7 +142,7 @@ export default function MenuUploadScreen() {
         } else if (data.status === 'failed') {
           Alert.alert(
             t('menu_upload.failed_title', 'Could Not Read Menu'),
-            data.error_message || t('menu_upload.failed_generic', 'Something went wrong reading that menu. Please try again.')
+            translateServerError({ message: data.error_message }, t('menu_upload.failed_generic', 'Something went wrong reading that menu. Please try again.'))
           );
         }
       }
@@ -234,7 +235,7 @@ export default function MenuUploadScreen() {
       await startParse(fileUrl, file.name || 'Menu', mediaType, isImg ? 'image' : 'pdf', 1);
     } catch (e: any) {
       console.error('PDF upload error:', e);
-      Alert.alert(t('menu_upload.upload_failed', 'Upload Failed'), e.message || t('menu_upload.failed_generic', 'An error occurred.'));
+      Alert.alert(t('menu_upload.upload_failed', 'Upload Failed'), translateServerError(e, t('menu_upload.failed_generic', 'An error occurred.')));
     } finally {
       setUploading(false);
     }
@@ -273,7 +274,7 @@ export default function MenuUploadScreen() {
       await startParse(urls[0], displayName, primaryType, 'image', images.length, urls.slice(1));
     } catch (e: any) {
       console.error('Photo upload error:', e);
-      Alert.alert(t('menu_upload.upload_failed', 'Upload Failed'), e.message || t('menu_upload.failed_generic', 'An error occurred.'));
+      Alert.alert(t('menu_upload.upload_failed', 'Upload Failed'), translateServerError(e, t('menu_upload.failed_generic', 'An error occurred.')));
     } finally {
       setUploading(false);
     }
@@ -304,7 +305,7 @@ export default function MenuUploadScreen() {
       );
     } catch (e: any) {
       console.error('delete_menu error:', e);
-      Alert.alert(t('menu_upload.delete_failed', 'Could Not Delete'), e.message || 'Error');
+      Alert.alert(t('menu_upload.delete_failed', 'Could Not Delete'), translateServerError(e, 'Error'));
     } finally {
       setDeleting(false);
     }

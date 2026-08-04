@@ -40,6 +40,7 @@ import CollapsibleSection from '@/components/CollapsibleSection';
 import OrderPositionModal from '@/components/OrderPositionModal';
 import { StorageImage } from '@/components/StorageImage';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface UpcomingEvent {
   id: string;
@@ -440,8 +441,11 @@ export default function UpcomingEventsEditorScreen() {
               title_es: pushTitle.es,
               // The authored Spanish title when it exists; empty falls back to EN.
               body_es: resolved.title.es || undefined,
+              // type + the created row's uuid make the banner tap deep-link
+              // (NotificationContext routes to PortalHome's openEventId).
               data: {
-                eventId: null,
+                type: 'event',
+                eventId: newEventId,
                 category: formData.category,
                 startDateTime: startDateTime?.toISOString() || null,
               },
@@ -480,7 +484,7 @@ export default function UpcomingEventsEditorScreen() {
       await loadEvents();
     } catch (error: any) {
       console.error('Error saving upcoming event:', error);
-      Alert.alert(t('common:error'), error.message || t('upcoming_events_editor:save_error'));
+      Alert.alert(t('common:error'), translateServerError(error, t('upcoming_events_editor:save_error')));
     }
   };
 
@@ -530,7 +534,7 @@ export default function UpcomingEventsEditorScreen() {
               await loadEvents();
             } catch (error: any) {
               console.error('Error deleting upcoming event:', error);
-              Alert.alert(t('common:error'), error.message || t('upcoming_events_editor:delete_error'));
+              Alert.alert(t('common:error'), translateServerError(error, t('upcoming_events_editor:delete_error')));
             }
           },
         },

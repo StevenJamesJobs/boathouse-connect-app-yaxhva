@@ -1,17 +1,23 @@
 /**
- * Server-error → i18n map, Phase 1 (s62).
+ * Server-error → i18n map. Phase 1 (s62): the auth/onboarding RPCs
+ * (join_signup, signup_owner_with_org, update_password, create_user).
+ * Phase 2 (s63): the shared guard/validation/race strings of the RPCs the
+ * editor screens call (~83 rewired error.message sites).
  *
- * The auth/onboarding RPCs (join_signup, signup_owner_with_org, update_password,
- * create_user) RAISE static English strings that some screens show verbatim.
- * Every RAISE in those functions is a static literal (verified against
- * pg_proc.prosrc), so an exact-match map is sufficient; the only dynamic
- * messages are raw Postgres 23505 duplicate-key errors from the manager
- * create_user path, matched by regex.
+ * Every mapped RAISE (and json 'error'-field value from the manage_menu_*
+ * family) is a static literal verified against pg_proc.prosrc, so an
+ * exact-match map is sufficient. The dynamic messages are: raw Postgres
+ * 23505 duplicate-key errors (regex) and two interpolated redemption
+ * RAISEs (regex, one with value capture).
+ *
+ * DELIBERATELY UNMAPPED: the ~45 per-action permission strings ("Only
+ * managers can update cocktails", …) — they are role/nav-gated to
+ * near-zero reachability and pass through RAW exactly as before; the
+ * long-term fix is stable server error codes, for which these slugs are
+ * forward-compatible.
  *
  * Unmapped messages pass through RAW (debuggable) — callers supply their
- * existing generic fallback for the empty-message case. Phase 2 widens this
- * to the ~45 editor-screen error.message sites; the long-term fix is stable
- * server error codes, for which these slugs are forward-compatible.
+ * existing generic fallback for the empty-message case.
  */
 import i18n from '@/i18n';
 
@@ -42,6 +48,53 @@ const EXACT_MAP: Record<string, string> = {
   "Only an owner can reset an owner's password": 'server_errors.reset_password_owner_only',
   // _throttle_check token (login/join rate limiting)
   'rate_limited': 'server_errors.rate_limited',
+
+  // ——— Phase 2 (s63): editor-RPC shared guards ———
+  'Not authorized': 'server_errors.not_authorized',
+  // Token-style variant thrown from json-returning RPCs' reason fields
+  // (e.g. update_redemption_settings, set_my_preferred_language).
+  'not_authorized': 'server_errors.not_authorized',
+  'Invalid actor': 'server_errors.invalid_actor',
+  'Organization mismatch': 'server_errors.org_mismatch',
+  'Org mismatch': 'server_errors.org_mismatch',
+  'Actor has no organization': 'server_errors.actor_no_org',
+  'User not found': 'server_errors.user_not_found',
+  // Not-found races (another manager deleted the row)
+  'Exam not found': 'server_errors.exam_not_found',
+  'Upload not found': 'server_errors.upload_not_found',
+  'Shift not found': 'server_errors.shift_not_found',
+  'Review not found': 'server_errors.review_not_found',
+  'Section not found': 'server_errors.section_not_found',
+  'Tile not found': 'server_errors.tile_not_found',
+  'Wine pairing not found': 'server_errors.wine_pairing_not_found',
+  'Redemption request not found': 'server_errors.redemption_not_found',
+  'Transaction not found': 'server_errors.transaction_not_found',
+  'Category not found': 'server_errors.category_not_found',
+  'Subcategory not found': 'server_errors.subcategory_not_found',
+  // Validation
+  'Title required': 'server_errors.title_required',
+  'Title and body are required': 'server_errors.title_body_required',
+  'Employee name is required': 'server_errors.employee_name_required',
+  'A description is required': 'server_errors.description_required',
+  'Amount must be non-zero': 'server_errors.amount_non_zero',
+  'Wine and entree are required': 'server_errors.wine_entree_required',
+  'Guest name and review text are required': 'server_errors.guest_review_required',
+  'Rating must be between 1 and 5': 'server_errors.rating_range',
+  'Invalid bucks amount': 'server_errors.invalid_bucks_amount',
+  // manage_menu_* json 'error' values (surfaced via callRpc data.error)
+  'Category name is required': 'server_errors.category_name_required',
+  'Subcategory name is required': 'server_errors.subcategory_name_required',
+  'A category with that name already exists': 'server_errors.category_name_taken',
+  'A subcategory with that name already exists': 'server_errors.subcategory_name_taken',
+  'Built-in categories cannot be deleted; hide them instead': 'server_errors.builtin_category_undeletable',
+  'Built-in subcategories cannot be deleted; hide them instead': 'server_errors.builtin_subcategory_undeletable',
+  'Only Libations subcategories can be recipe-backed': 'server_errors.libations_only_recipe_backed',
+  'Template subcategories are always recipe-linked and cannot be unlinked': 'server_errors.template_subcategory_locked',
+  // Owner protections
+  'The primary owner account cannot be deleted': 'server_errors.primary_owner_undeletable',
+  "The primary owner's role cannot be changed": 'server_errors.primary_owner_role_locked',
+  // Redemption decision race
+  'Employee balance insufficient at approval time': 'server_errors.balance_insufficient_at_approval',
 };
 
 export function translateServerError(
@@ -56,6 +109,13 @@ export function translateServerError(
     // duplicate violates only the _lower_ one.
     if (/duplicate key value.*users_username(_lower)?_key/.test(msg)) return i18n.t('server_errors.username_taken');
     if (/duplicate key value.*users_email_key/.test(msg)) return i18n.t('server_errors.email_in_use');
+    // The two interpolated redemption RAISEs (s63; the only dynamic RAISE
+    // templates among the mapped RPCs).
+    if (/^Redemption request is not pending/.test(msg)) return i18n.t('server_errors.redemption_not_pending');
+    const balance = msg.match(/^Insufficient balance\. Available: (.+), Required: (.+)$/);
+    if (balance) {
+      return i18n.t('server_errors.insufficient_balance', { available: balance[1], required: balance[2] });
+    }
     return msg;
   }
   return fallback || i18n.t('onboarding.something_went_wrong');

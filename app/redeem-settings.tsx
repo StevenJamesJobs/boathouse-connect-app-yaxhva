@@ -26,6 +26,7 @@ import { useTranslation } from 'react-i18next';
 import { useTranslationSection } from '@/components/TranslationSection';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface CustomOption {
   id: string;
@@ -126,16 +127,17 @@ export default function RedeemSettingsScreen() {
     if (!organizationId || !user?.id) return;
     try {
       const [rowRes, optsRes] = await Promise.all([
-        (supabase.rpc as any)('get_redemption_settings', { p_actor_id: user?.id }),
+        supabase.rpc('get_redemption_settings', { p_actor_id: user.id }),
         supabase.rpc('get_redemption_custom_options', { p_actor_id: user.id, p_include_inactive: true }),
       ]);
-      const row: any = rowRes.data?.[0];
-      const opts: any[] = (optsRes.data as any) || [];
+      const row = rowRes.data?.[0];
       if (row) {
         setS({
           redemptions_enabled: row.redemptions_enabled,
           food_enabled: row.food_enabled,
-          food_mode: row.food_mode,
+          // update_redemption_settings only ever writes 'full'|'half'; the
+          // ternary narrows the catalog's text type without a cast.
+          food_mode: row.food_mode === 'half' ? 'half' : 'full',
           section_enabled: row.section_enabled,
           section_cost: row.section_cost,
           sidework_enabled: row.sidework_enabled,
@@ -144,7 +146,7 @@ export default function RedeemSettingsScreen() {
           freeshift_cost: row.freeshift_cost,
         });
       }
-      setCustoms(opts as CustomOption[]);
+      setCustoms(optsRes.data || []);
     } catch (e) {
       console.error('load redemption settings', e);
     } finally {
@@ -155,10 +157,11 @@ export default function RedeemSettingsScreen() {
   useEffect(() => { load(); }, [load]);
 
   const save = async () => {
+    if (!user?.id || !organizationId) return;
     setSaving(true);
     try {
-      const { data, error } = await (supabase as any).rpc('update_redemption_settings', {
-        p_user_id: user?.id,
+      const { data, error } = await supabase.rpc('update_redemption_settings', {
+        p_user_id: user.id,
         p_organization_id: organizationId,
         p_redemptions_enabled: s.redemptions_enabled,
         p_food_enabled: s.food_enabled,
@@ -175,7 +178,7 @@ export default function RedeemSettingsScreen() {
       Alert.alert(t('common:success'), t('redeem_settings.saved', 'Redeem settings saved.'));
       router.back();
     } catch (e: any) {
-      Alert.alert(t('common:error'), e.message || t('redeem_settings.save_error', 'Could not save settings.'));
+      Alert.alert(t('common:error'), translateServerError(e, t('redeem_settings.save_error', 'Could not save settings.')));
     } finally {
       setSaving(false);
     }
@@ -206,7 +209,7 @@ export default function RedeemSettingsScreen() {
       setShowCustom(false);
       load();
     } catch (e: any) {
-      Alert.alert(t('common:error'), e.message || 'Could not save option.');
+      Alert.alert(t('common:error'), translateServerError(e, 'Could not save option.'));
     }
   };
 

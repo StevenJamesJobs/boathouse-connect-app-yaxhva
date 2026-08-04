@@ -55,15 +55,17 @@ export function useRedemptionSettings() {
     if (!organizationId || !user?.id) { setLoading(false); return; }
     try {
       const [rowRes, optsRes] = await Promise.all([
-        (supabase.rpc as any)('get_redemption_settings', { p_actor_id: user?.id }),
+        supabase.rpc('get_redemption_settings', { p_actor_id: user.id }),
         supabase.rpc('get_redemption_custom_options', { p_actor_id: user.id }),
       ]);
-      const row: any = (rowRes.data as any[])?.[0];
+      const row = rowRes.data?.[0];
       if (row) {
         setSettings({
           redemptions_enabled: row.redemptions_enabled,
           food_enabled: row.food_enabled,
-          food_mode: row.food_mode,
+          // update_redemption_settings only ever writes 'full'|'half'; the
+          // ternary narrows the catalog's text type without a cast.
+          food_mode: row.food_mode === 'half' ? 'half' : 'full',
           section_enabled: row.section_enabled,
           section_cost: row.section_cost,
           sidework_enabled: row.sidework_enabled,
@@ -74,7 +76,7 @@ export function useRedemptionSettings() {
       } else {
         setSettings(REDEMPTION_DEFAULTS);
       }
-      setCustomOptions(((optsRes.data as any) || []) as RedemptionCustomOption[]);
+      setCustomOptions(optsRes.data || []);
     } catch (e) {
       console.warn('useRedemptionSettings load error', e);
     } finally {

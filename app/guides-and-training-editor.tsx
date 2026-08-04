@@ -32,6 +32,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { saveTranslations, getLocalizedField } from '@/utils/translateContent';
 import { useTranslationSection } from '@/components/TranslationSection';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface GuideItem {
   id: string;
@@ -209,7 +210,7 @@ export default function GuidesAndTrainingEditorScreen() {
       return publicUrl;
     } catch (error: any) {
       console.error('Error uploading thumbnail:', error);
-      Alert.alert('Error', `Failed to upload thumbnail: ${error.message || 'Unknown error'}`);
+      Alert.alert('Error', `Failed to upload thumbnail: ${translateServerError(error, 'Unknown error')}`);
       return null;
     } finally {
       setUploadingThumbnail(false);
@@ -232,7 +233,7 @@ export default function GuidesAndTrainingEditorScreen() {
       return { url: fileUrl, type: file.type };
     } catch (error: any) {
       console.error('Error uploading file:', error);
-      Alert.alert('Error', `Failed to upload file: ${error.message || 'Unknown error'}`);
+      Alert.alert('Error', `Failed to upload file: ${translateServerError(error, 'Unknown error')}`);
       return null;
     } finally {
       setUploadingFile(false);
@@ -354,7 +355,7 @@ export default function GuidesAndTrainingEditorScreen() {
       await loadGuides();
     } catch (error: any) {
       console.error('Error saving guide:', error);
-      Alert.alert('Error', error.message || 'Failed to save guide');
+      Alert.alert('Error', translateServerError(error, 'Failed to save guide'));
     }
   };
 
@@ -390,7 +391,7 @@ export default function GuidesAndTrainingEditorScreen() {
               await loadGuides();
             } catch (error: any) {
               console.error('Error deleting guide:', error);
-              Alert.alert('Error', error.message || 'Failed to delete guide');
+              Alert.alert('Error', translateServerError(error, 'Failed to delete guide'));
             }
           },
         },

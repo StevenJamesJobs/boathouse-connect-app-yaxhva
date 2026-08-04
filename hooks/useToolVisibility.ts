@@ -18,13 +18,14 @@ export function useToolVisibility() {
 
   useEffect(() => {
     if (!organizationId || !user?.id) return;
+    const actorId = user.id;
 
     async function fetch() {
       setIsLoading(true);
 
       const [assistantsRes, mappingsRes] = await Promise.all([
-        (supabase.rpc as any)('get_org_assistants', { p_actor_id: user?.id }),
-        (supabase.rpc as any)('get_job_title_assistants', { p_actor_id: user?.id }),
+        supabase.rpc('get_org_assistants', { p_actor_id: actorId }),
+        supabase.rpc('get_job_title_assistants', { p_actor_id: actorId }),
       ]);
 
       const orgAssistants: OrgAssistant[] = assistantsRes.data || [];

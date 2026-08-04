@@ -138,11 +138,11 @@ export default function NotificationDropdown({
       const items: NotificationItem[] = [];
 
       // Load the org hide-list (member-gated) so we can filter out dismissed items
-      const { data: dismissals } = await (supabase.rpc as any)('get_shade_dismissals', {
+      const { data: dismissals } = await supabase.rpc('get_shade_dismissals', {
         p_actor_id: user.id,
       });
       const dismissedSet = new Set(
-        (dismissals || []).map((d: any) => `${d.notification_type}:${d.item_id}`)
+        (dismissals || []).map((d) => `${d.notification_type}:${d.item_id}`)
       );
 
       // Fetch announcements — role-aware visibility + org scoping enforced
@@ -253,11 +253,11 @@ export default function NotificationDropdown({
       // after they've already tapped it once.
       let dismissedExamIds = new Set<string>();
       if (user?.id) {
-        const { data: dismissals } = await (supabase.rpc as any)('get_my_quiz_dismissals', {
+        const { data: dismissals } = await supabase.rpc('get_my_quiz_dismissals', {
           p_actor_id: user.id,
         });
         if (dismissals) {
-          dismissedExamIds = new Set((dismissals as any[]).map((d) => d.exam_id));
+          dismissedExamIds = new Set(dismissals.map((d) => d.exam_id));
         }
       }
 
@@ -359,7 +359,7 @@ export default function NotificationDropdown({
       // Weekly quiz deep-link: route to the quizzes screen and record dismissal
       if (data.data?.destination === 'weekly-quizzes') {
         if (data.data?.exam_id && user?.id) {
-          (supabase.rpc as any)('dismiss_quiz_notification', {
+          supabase.rpc('dismiss_quiz_notification', {
             p_actor_id: user.id,
             p_exam_id: data.data.exam_id,
           }).then(() => {}, () => {});
@@ -424,12 +424,13 @@ export default function NotificationDropdown({
   };
 
   const handleDeleteNotification = async (item: NotificationItem) => {
+    if (!user?.id) return;
     setDeletingId(item.id);
     try {
       // Manager/owner org-wide hide (idempotent server-side); title snapshotted for the
       // Recently Dismissed / undo view.
-      const { error } = await (supabase.rpc as any)('dismiss_shade_item', {
-        p_actor_id: user?.id,
+      const { error } = await supabase.rpc('dismiss_shade_item', {
+        p_actor_id: user.id,
         p_notification_type: item.type,
         p_item_id: item.id,
         p_title: item.title,

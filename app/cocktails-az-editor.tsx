@@ -34,6 +34,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { saveTranslations } from '@/utils/translateContent';
 import { useTranslationSection } from '@/components/TranslationSection';
 import { IS_MCLOONES } from '@/constants/buildVariant';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface Cocktail {
   id: string;
@@ -244,7 +245,7 @@ export default function CocktailsAZEditorScreen() {
       Alert.alert(t('common.success'), t('cocktails_editor.image_uploaded'));
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', error.message || 'Failed to upload image');
+      Alert.alert('Error', translateServerError(error, 'Failed to upload image'));
     } finally {
       setUploadingImage(false);
     }
@@ -336,7 +337,7 @@ export default function CocktailsAZEditorScreen() {
       loadCocktails();
     } catch (error: any) {
       console.error('Error saving cocktail:', error);
-      Alert.alert('Error', error.message || 'Failed to save cocktail');
+      Alert.alert('Error', translateServerError(error, 'Failed to save cocktail'));
     } finally {
       setLoading(false);
     }
@@ -371,7 +372,7 @@ export default function CocktailsAZEditorScreen() {
             loadCocktails();
           } catch (error: any) {
             console.error('Error deleting cocktail:', error);
-            Alert.alert('Error', error.message || 'Failed to delete cocktail');
+            Alert.alert('Error', translateServerError(error, 'Failed to delete cocktail'));
           }
         },
       },
