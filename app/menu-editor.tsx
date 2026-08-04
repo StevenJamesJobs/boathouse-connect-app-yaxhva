@@ -26,7 +26,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import * as ImagePicker from 'expo-image-picker';
 import { brokerDelete, brokerUploadImage } from '@/utils/storageBroker';
 import { useTranslation } from 'react-i18next';
-import { translateTexts, saveTranslations, getLocalizedField } from '@/utils/translateContent';
+import { saveTranslations, getLocalizedField } from '@/utils/translateContent';
+import { useTranslationSection } from '@/components/TranslationSection';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -84,7 +85,7 @@ interface PageConfig {
 
 export default function MenuEditorScreen() {
   useRequireManagerRoute();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
@@ -198,10 +199,70 @@ export default function MenuEditorScreen() {
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const [showSpanish, setShowSpanish] = useState(false);
-  const [translating, setTranslating] = useState(false);
   const descriptionInputRef = useRef<TextInput>(null);
   const [descriptionSelection, setDescriptionSelection] = useState({ start: 0, end: 0 });
+
+  // Hybrid bilingual authoring (s61): the primary inputs bind the device
+  // language; the shared section shows the other-language preview + translate
+  // button + pencil edit. resolveOnSave() runs the staleness rules.
+  // Location is preview/pencil-only (noMachine) — it was never machine-translated.
+  // Wine-only flavor/USP fields join the set when the item's category is a wine.
+  const isSpanishAuthor = i18n.language === 'es';
+  const addSessionRef = useRef(0);
+  const translation = useTranslationSection({
+    fields: [
+      {
+        key: 'name',
+        labelKey: 'translation_section:field_name',
+        enValue: formData.name,
+        esValue: formData.name_es,
+        setEnValue: (v) => setFormData(prev => ({ ...prev, name: v })),
+        setEsValue: (v) => setFormData(prev => ({ ...prev, name_es: v })),
+      },
+      {
+        key: 'description',
+        labelKey: 'translation_section:field_description',
+        enValue: formData.description,
+        esValue: formData.description_es,
+        setEnValue: (v) => setFormData(prev => ({ ...prev, description: v })),
+        setEsValue: (v) => setFormData(prev => ({ ...prev, description_es: v })),
+        multiline: true,
+      },
+      ...(isWineName(formData.category)
+        ? [
+            {
+              key: 'location',
+              labelKey: 'translation_section:field_location',
+              enValue: formData.location,
+              esValue: formData.location_es,
+              setEnValue: (v: string) => setFormData(prev => ({ ...prev, location: v })),
+              setEsValue: (v: string) => setFormData(prev => ({ ...prev, location_es: v })),
+              noMachine: true,
+            },
+            {
+              key: 'flavor_profile',
+              labelKey: 'translation_section:field_flavor_profile',
+              enValue: formData.flavor_profile,
+              esValue: formData.flavor_profile_es,
+              setEnValue: (v: string) => setFormData(prev => ({ ...prev, flavor_profile: v })),
+              setEsValue: (v: string) => setFormData(prev => ({ ...prev, flavor_profile_es: v })),
+              multiline: true,
+            },
+            {
+              key: 'unique_selling_points',
+              labelKey: 'translation_section:field_selling_points',
+              enValue: formData.unique_selling_points,
+              esValue: formData.unique_selling_points_es,
+              setEnValue: (v: string) => setFormData(prev => ({ ...prev, unique_selling_points: v })),
+              setEsValue: (v: string) => setFormData(prev => ({ ...prev, unique_selling_points_es: v })),
+              multiline: true,
+            },
+          ]
+        : []),
+    ],
+    sessionKey: editingItem ? `edit:${editingItem.id}` : `new:${addSessionRef.current}`,
+    active: showAddModal,
+  });
 
   // The add/edit form's category/subcategory pills must reflect the menu the
   // item is being assigned to (formData.item_season) — NOT whichever menu the
@@ -401,47 +462,13 @@ export default function MenuEditorScreen() {
     }
   };
 
-  const handleAutoTranslate = async () => {
-    const isWine = isWineName(formData.category);
-    const hasAny = formData.name || formData.description ||
-      (isWine && (formData.flavor_profile || formData.unique_selling_points));
-    if (!hasAny) {
-      Alert.alert(t('common:error'), t('translation_section:no_content_to_translate'));
-      return;
-    }
-    setTranslating(true);
-    try {
-      const inputs = [
-        formData.name,
-        formData.description,
-        isWine ? formData.flavor_profile : '',
-        isWine ? formData.unique_selling_points : '',
-      ];
-      const results = await translateTexts(inputs);
-      setFormData(prev => ({
-        ...prev,
-        name_es: results[0] || '',
-        description_es: results[1] || '',
-        ...(isWine ? {
-          flavor_profile_es: results[2] || '',
-          unique_selling_points_es: results[3] || '',
-        } : {}),
-      }));
-      setShowSpanish(true);
-    } catch (err) {
-      console.error('Auto-translate error:', err);
-      Alert.alert(t('common:error'), t('translation_section:translate_failed'));
-    } finally {
-      setTranslating(false);
-    }
-  };
-
   const handleSave = async () => {
     const isWine = isWineName(formData.category);
+    const authorName = isSpanishAuthor ? formData.name_es : formData.name;
     // Wines validate on glass OR bottle price (members may not order all tiers);
     // non-wines still require the legacy single price.
     const winePriceMissing = isWine && !formData.glass_price && !formData.bottle_price;
-    if (!formData.name || (!isWine && !formData.price) || winePriceMissing) {
+    if (!authorName || (!isWine && !formData.price) || winePriceMissing) {
       Alert.alert(t('common:error'), t('menu_editor:error_fill_fields'));
       return;
     }
@@ -450,6 +477,10 @@ export default function MenuEditorScreen() {
       Alert.alert(t('common:error'), t('menu_editor:error_not_authenticated'));
       return;
     }
+
+    // Fill/refresh the other language per the s61 staleness rules (may ask once).
+    const resolved = await translation.resolveOnSave();
+    if (!resolved) return;
 
     try {
       let thumbnailUrl = editingItem?.thumbnail_url || null;
@@ -469,8 +500,8 @@ export default function MenuEditorScreen() {
           p_user_id: user.id,
           p_organization_id: organizationId ?? undefined,
           p_menu_item_id: editingItem.id,
-          p_name: formData.name,
-          p_description: (formData.description || null) as string,
+          p_name: resolved.name.en,
+          p_description: (resolved.description.en || null) as string,
           p_price: formData.price,
           p_category: formData.category,
           p_subcategory: (formData.subcategory || null) as string,
@@ -483,14 +514,14 @@ export default function MenuEditorScreen() {
           p_thumbnail_url: thumbnailUrl as string,
           p_thumbnail_shape: formData.thumbnail_shape,
           p_display_order: formData.display_order,
-          p_location: isWine ? (formData.location || undefined) : undefined,
+          p_location: isWine ? (resolved.location?.en || undefined) : undefined,
           p_glass_price: isWine ? (formData.glass_price || undefined) : undefined,
           p_bottle_price: isWine ? (formData.bottle_price || undefined) : undefined,
           p_member_bottle_price: isWine ? (formData.member_bottle_price || undefined) : undefined,
-          p_flavor_profile: isWine ? (formData.flavor_profile || undefined) : undefined,
-          p_flavor_profile_es: isWine ? (formData.flavor_profile_es || undefined) : undefined,
-          p_unique_selling_points: isWine ? (formData.unique_selling_points || undefined) : undefined,
-          p_unique_selling_points_es: isWine ? (formData.unique_selling_points_es || undefined) : undefined,
+          p_flavor_profile: isWine ? (resolved.flavor_profile?.en || undefined) : undefined,
+          p_flavor_profile_es: isWine ? (resolved.flavor_profile?.es || undefined) : undefined,
+          p_unique_selling_points: isWine ? (resolved.unique_selling_points?.en || undefined) : undefined,
+          p_unique_selling_points_es: isWine ? (resolved.unique_selling_points?.es || undefined) : undefined,
           p_season: formData.item_season,
           p_is_weekly_special: formData.is_weekly_special,
         });
@@ -502,14 +533,12 @@ export default function MenuEditorScreen() {
         console.log('Menu item updated successfully');
         Alert.alert(t('common:success'), t('menu_editor:updated_success'));
 
-        // Save Spanish translations
-        if (formData.name_es || formData.description_es || formData.location_es) {
-          await saveTranslations('menu_items', editingItem.id, {
-            name_es: formData.name_es,
-            description_es: formData.description_es,
-            ...(isWine ? { location_es: formData.location_es } : {}),
-          }, user?.id);
-        }
+        // Save Spanish translations (server null semantics vary — most content tables COALESCE-keep when blank)
+        await saveTranslations('menu_items', editingItem.id, {
+          name_es: resolved.name.es,
+          description_es: resolved.description.es,
+          location_es: resolved.location?.es ?? '',
+        }, user?.id);
       } else {
         // New items append to the END of their category/subcategory list;
         // ordering is then adjusted via drag or the Order Position picker.
@@ -524,8 +553,8 @@ export default function MenuEditorScreen() {
         const { data, error } = await supabase.rpc('create_menu_item', {
           p_user_id: user.id,
           p_organization_id: organizationId ?? undefined,
-          p_name: formData.name,
-          p_description: (formData.description || null) as string,
+          p_name: resolved.name.en,
+          p_description: (resolved.description.en || null) as string,
           p_price: formData.price,
           p_category: formData.category,
           p_subcategory: (formData.subcategory || null) as string,
@@ -538,14 +567,14 @@ export default function MenuEditorScreen() {
           p_thumbnail_url: thumbnailUrl as string,
           p_thumbnail_shape: formData.thumbnail_shape,
           p_display_order: nextOrder,
-          p_location: isWine ? (formData.location || undefined) : undefined,
+          p_location: isWine ? (resolved.location?.en || undefined) : undefined,
           p_glass_price: isWine ? (formData.glass_price || undefined) : undefined,
           p_bottle_price: isWine ? (formData.bottle_price || undefined) : undefined,
           p_member_bottle_price: isWine ? (formData.member_bottle_price || undefined) : undefined,
-          p_flavor_profile: isWine ? (formData.flavor_profile || undefined) : undefined,
-          p_flavor_profile_es: isWine ? (formData.flavor_profile_es || undefined) : undefined,
-          p_unique_selling_points: isWine ? (formData.unique_selling_points || undefined) : undefined,
-          p_unique_selling_points_es: isWine ? (formData.unique_selling_points_es || undefined) : undefined,
+          p_flavor_profile: isWine ? (resolved.flavor_profile?.en || undefined) : undefined,
+          p_flavor_profile_es: isWine ? (resolved.flavor_profile?.es || undefined) : undefined,
+          p_unique_selling_points: isWine ? (resolved.unique_selling_points?.en || undefined) : undefined,
+          p_unique_selling_points_es: isWine ? (resolved.unique_selling_points?.es || undefined) : undefined,
           p_season: formData.item_season,
           p_is_weekly_special: formData.is_weekly_special,
         });
@@ -558,14 +587,12 @@ export default function MenuEditorScreen() {
         Alert.alert(t('common:success'), t('menu_editor:created_success'));
 
         // Save Spanish translations for newly created item (create_menu_item returns its id).
-        if (formData.name_es || formData.description_es || formData.location_es) {
-          if (data) {
-            await saveTranslations('menu_items', data as string, {
-              name_es: formData.name_es,
-              description_es: formData.description_es,
-              ...(isWine ? { location_es: formData.location_es } : {}),
-            }, user?.id);
-          }
+        if (data) {
+          await saveTranslations('menu_items', data as string, {
+            name_es: resolved.name.es,
+            description_es: resolved.description.es,
+            location_es: resolved.location?.es ?? '',
+          }, user?.id);
         }
       }
 
@@ -837,7 +864,7 @@ export default function MenuEditorScreen() {
       item_season: season === 'summer' ? 'summer' : season === 'winter' ? 'winter' : 'both',
     });
     setSelectedImageUri(null);
-    setShowSpanish(false);
+    addSessionRef.current += 1;
     setShowAddModal(true);
   };
 
@@ -871,7 +898,6 @@ export default function MenuEditorScreen() {
       unique_selling_points_es: item.unique_selling_points_es || '',
       item_season: ((item as any).season as 'winter' | 'summer' | 'both') || 'both',
     });
-    setShowSpanish(false);
     setSelectedImageUri(null);
     setShowAddModal(true);
   };
@@ -1482,8 +1508,8 @@ export default function MenuEditorScreen() {
                     style={styles.input}
                     placeholder={t('menu_editor:name_placeholder')}
                     placeholderTextColor="#999999"
-                    value={formData.name}
-                    onChangeText={(text) => setFormData({ ...formData, name: text })}
+                    value={isSpanishAuthor ? formData.name_es : formData.name}
+                    onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, name_es: text } : { ...prev, name: text })}
                   />
                 </View>
               </View>
@@ -1536,8 +1562,8 @@ export default function MenuEditorScreen() {
               <View style={styles.formGroup}>
                 <Text style={styles.formLabel}>{t('menu_editor:description_label')}</Text>
                 <RichTextToolbar
-                  text={formData.description}
-                  onChangeText={(text) => setFormData(prev => ({ ...prev, description: text }))}
+                  text={isSpanishAuthor ? formData.description_es : formData.description}
+                  onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, description_es: text } : { ...prev, description: text })}
                   selection={descriptionSelection}
                   onSelectionChange={setDescriptionSelection}
                   textInputRef={descriptionInputRef}
@@ -1548,68 +1574,12 @@ export default function MenuEditorScreen() {
                   style={[styles.input, styles.textArea]}
                   placeholder={t('menu_editor:description_placeholder')}
                   placeholderTextColor="#999999"
-                  value={formData.description}
-                  onChangeText={(text) => setFormData({ ...formData, description: text })}
+                  value={isSpanishAuthor ? formData.description_es : formData.description}
+                  onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, description_es: text } : { ...prev, description: text })}
                   multiline
                   numberOfLines={4}
                   onSelectionChange={(e) => setDescriptionSelection(e.nativeEvent.selection)}
                 />
-              </View>
-
-              {/* Spanish Translation Section */}
-              <View style={styles.formGroup}>
-                <TouchableOpacity
-                  style={styles.spanishSectionHeader}
-                  onPress={() => setShowSpanish(!showSpanish)}
-                >
-                  <Text style={styles.formLabel}>{t('translation_section:spanish_section_title')}</Text>
-                  <IconSymbol
-                    ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
-                    android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
-                    size={20}
-                    color="#666666"
-                  />
-                </TouchableOpacity>
-
-                {showSpanish && (
-                  <View style={styles.spanishFields}>
-                    <TouchableOpacity
-                      style={styles.autoTranslateButton}
-                      onPress={handleAutoTranslate}
-                      disabled={translating}
-                    >
-                      {translating ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <Text style={styles.autoTranslateButtonText}>
-                          {t('translation_section:auto_translate')}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-
-                    <Text style={styles.spanishFieldLabel}>{t('translation_section:name_es_label')}</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder={t('translation_section:name_es_placeholder')}
-                      placeholderTextColor="#999999"
-                      value={formData.name_es}
-                      onChangeText={(text) => setFormData({ ...formData, name_es: text })}
-                    />
-
-                    <Text style={[styles.spanishFieldLabel, { marginTop: 12 }]}>{t('translation_section:description_es_label')}</Text>
-                    <TextInput
-                      style={[styles.input, styles.textArea]}
-                      placeholder={t('translation_section:description_es_placeholder')}
-                      placeholderTextColor="#999999"
-                      value={formData.description_es}
-                      onChangeText={(text) => setFormData({ ...formData, description_es: text })}
-                      multiline
-                      numberOfLines={4}
-                    />
-
-                    <Text style={styles.formHint}>{t('translation_section:hint')}</Text>
-                  </View>
-                )}
               </View>
 
               {/* Wine-specific fields: location + 3 prices.
@@ -1622,18 +1592,9 @@ export default function MenuEditorScreen() {
                       style={styles.input}
                       placeholder="e.g. Napa Valley, California"
                       placeholderTextColor="#999999"
-                      value={formData.location}
-                      onChangeText={(text) => setFormData({ ...formData, location: text })}
+                      value={isSpanishAuthor ? formData.location_es : formData.location}
+                      onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, location_es: text } : { ...prev, location: text })}
                     />
-                    {showSpanish && (
-                      <TextInput
-                        style={[styles.input, { marginTop: 8 }]}
-                        placeholder="Ubicación (Spanish)"
-                        placeholderTextColor="#999999"
-                        value={formData.location_es}
-                        onChangeText={(text) => setFormData({ ...formData, location_es: text })}
-                      />
-                    )}
                   </View>
                   <View style={styles.priceOrderRow}>
                     <View style={styles.priceOrderCol}>
@@ -1685,22 +1646,11 @@ export default function MenuEditorScreen() {
                       style={[styles.input, styles.textArea]}
                       placeholder="e.g. Crisp green apple, citrus, mineral finish"
                       placeholderTextColor="#999999"
-                      value={formData.flavor_profile}
-                      onChangeText={(text) => setFormData({ ...formData, flavor_profile: text })}
+                      value={isSpanishAuthor ? formData.flavor_profile_es : formData.flavor_profile}
+                      onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, flavor_profile_es: text } : { ...prev, flavor_profile: text })}
                       multiline
                       numberOfLines={3}
                     />
-                    {showSpanish && (
-                      <TextInput
-                        style={[styles.input, styles.textArea, { marginTop: 8 }]}
-                        placeholder="Sabor / Sensorial Clave (Spanish)"
-                        placeholderTextColor="#999999"
-                        value={formData.flavor_profile_es}
-                        onChangeText={(text) => setFormData({ ...formData, flavor_profile_es: text })}
-                        multiline
-                        numberOfLines={3}
-                      />
-                    )}
                   </View>
                   <View style={styles.formGroup}>
                     <Text style={styles.formLabel}>Unique Selling Points</Text>
@@ -1708,25 +1658,21 @@ export default function MenuEditorScreen() {
                       style={[styles.input, styles.textArea]}
                       placeholder="e.g. Family-owned estate, biodynamic, limited 200 cases"
                       placeholderTextColor="#999999"
-                      value={formData.unique_selling_points}
-                      onChangeText={(text) => setFormData({ ...formData, unique_selling_points: text })}
+                      value={isSpanishAuthor ? formData.unique_selling_points_es : formData.unique_selling_points}
+                      onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, unique_selling_points_es: text } : { ...prev, unique_selling_points: text })}
                       multiline
                       numberOfLines={3}
                     />
-                    {showSpanish && (
-                      <TextInput
-                        style={[styles.input, styles.textArea, { marginTop: 8 }]}
-                        placeholder="Puntos de Venta Únicos (Spanish)"
-                        placeholderTextColor="#999999"
-                        value={formData.unique_selling_points_es}
-                        onChangeText={(text) => setFormData({ ...formData, unique_selling_points_es: text })}
-                        multiline
-                        numberOfLines={3}
-                      />
-                    )}
                   </View>
                 </>
               )}
+
+              {/* Bilingual authoring (s61 hybrid) — placed after ALL authored
+                  text fields (incl. wine flavor/USP) per Steve's s61 walk
+                  feedback, so the preview sits where the eye lands last. */}
+              <View style={styles.formGroup}>
+                {translation.element}
+              </View>
 
               {/* close SECTION: Item basics */}
               </View>
@@ -2648,45 +2594,6 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.c
     fontWeight: '600',
     color: '#1A1A1A',
     marginBottom: 8,
-  },
-  formHint: {
-    fontSize: 12,
-    color: '#666666',
-    marginTop: 6,
-    fontStyle: 'italic',
-  },
-  spanishSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  spanishFields: {
-    marginTop: 8,
-    backgroundColor: '#F0F8FF',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#D0E8FF',
-  },
-  autoTranslateButton: {
-    backgroundColor: '#3498DB',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  autoTranslateButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  spanishFieldLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#666666',
-    marginBottom: 4,
   },
   input: {
     backgroundColor: '#F5F5F5',

@@ -28,6 +28,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { generateQuizQuestions, generatePhotoQuestion, getCurrentWeekKey, getExamTypeName } from '@/utils/exam/questionGenerator';
 import type { ExamType } from '@/utils/exam/questionGenerator';
+import { useTranslationSection } from '@/components/TranslationSection';
 import { formatTime, formatCountdown, getCountdownUrgency } from '@/utils/exam/examEngine';
 import { sendCustomNotification } from '@/utils/notificationHelpers';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -66,6 +67,11 @@ interface ExamQuestion {
   source_type: 'auto' | 'custom' | 'bonus';
   source_table: string | null;
   question_image_url?: string | null;
+  question_text_es?: string | null;
+  option_a_es?: string | null;
+  option_b_es?: string | null;
+  option_c_es?: string | null;
+  option_d_es?: string | null;
 }
 
 // label = the EN-canonical value persisted into exam_questions.category_label
@@ -131,6 +137,11 @@ export default function ExamEditorScreen() {
   const [customC, setCustomC] = useState('');
   const [customD, setCustomD] = useState('');
   const [customCorrect, setCustomCorrect] = useState<'A' | 'B' | 'C' | 'D'>('A');
+  const [customTextEs, setCustomTextEs] = useState('');
+  const [customAEs, setCustomAEs] = useState('');
+  const [customBEs, setCustomBEs] = useState('');
+  const [customCEs, setCustomCEs] = useState('');
+  const [customDEs, setCustomDEs] = useState('');
   const [bonusBucksValue, setBonusBucksValue] = useState('5');
   const [customImageUrl, setCustomImageUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -149,6 +160,31 @@ export default function ExamEditorScreen() {
   const [showCloseTimePicker, setShowCloseTimePicker] = useState(false);
   // Countdown tick state — forces re-render every second while a close_at is set
   const [countdownTick, setCountdownTick] = useState(0);
+
+  // Hybrid bilingual authoring (s61): custom/bonus + edit modals bind the
+  // device language; the shared section previews and resolves the other side.
+  const addTranslation = useTranslationSection({
+    fields: [
+      { key: 'question', labelKey: 'translation_section:field_question', enValue: customText, esValue: customTextEs, setEnValue: setCustomText, setEsValue: setCustomTextEs, multiline: true },
+      { key: 'option_a', labelKey: 'translation_section:field_option_a', enValue: customA, esValue: customAEs, setEnValue: setCustomA, setEsValue: setCustomAEs },
+      { key: 'option_b', labelKey: 'translation_section:field_option_b', enValue: customB, esValue: customBEs, setEnValue: setCustomB, setEsValue: setCustomBEs },
+      { key: 'option_c', labelKey: 'translation_section:field_option_c', enValue: customC, esValue: customCEs, setEnValue: setCustomC, setEsValue: setCustomCEs },
+      { key: 'option_d', labelKey: 'translation_section:field_option_d', enValue: customD, esValue: customDEs, setEnValue: setCustomD, setEsValue: setCustomDEs },
+    ],
+    sessionKey: 'custom-add',
+    active: showAddCustom || showAddBonus,
+  });
+  const editTranslation = useTranslationSection({
+    fields: [
+      { key: 'question', labelKey: 'translation_section:field_question', enValue: editingQuestion?.question_text ?? '', esValue: editingQuestion?.question_text_es ?? '', setEnValue: (v) => setEditingQuestion(prev => prev ? { ...prev, question_text: v } : prev), setEsValue: (v) => setEditingQuestion(prev => prev ? { ...prev, question_text_es: v } : prev), multiline: true },
+      { key: 'option_a', labelKey: 'translation_section:field_option_a', enValue: editingQuestion?.option_a ?? '', esValue: editingQuestion?.option_a_es ?? '', setEnValue: (v) => setEditingQuestion(prev => prev ? { ...prev, option_a: v } : prev), setEsValue: (v) => setEditingQuestion(prev => prev ? { ...prev, option_a_es: v } : prev) },
+      { key: 'option_b', labelKey: 'translation_section:field_option_b', enValue: editingQuestion?.option_b ?? '', esValue: editingQuestion?.option_b_es ?? '', setEnValue: (v) => setEditingQuestion(prev => prev ? { ...prev, option_b: v } : prev), setEsValue: (v) => setEditingQuestion(prev => prev ? { ...prev, option_b_es: v } : prev) },
+      { key: 'option_c', labelKey: 'translation_section:field_option_c', enValue: editingQuestion?.option_c ?? '', esValue: editingQuestion?.option_c_es ?? '', setEnValue: (v) => setEditingQuestion(prev => prev ? { ...prev, option_c: v } : prev), setEsValue: (v) => setEditingQuestion(prev => prev ? { ...prev, option_c_es: v } : prev) },
+      { key: 'option_d', labelKey: 'translation_section:field_option_d', enValue: editingQuestion?.option_d ?? '', esValue: editingQuestion?.option_d_es ?? '', setEnValue: (v) => setEditingQuestion(prev => prev ? { ...prev, option_d: v } : prev), setEsValue: (v) => setEditingQuestion(prev => prev ? { ...prev, option_d_es: v } : prev) },
+    ],
+    sessionKey: editingQuestion ? `edit:${editingQuestion.id}` : 'none',
+    active: !!editingQuestion,
+  });
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchCurrentExam = useCallback(async () => {
@@ -548,10 +584,19 @@ export default function ExamEditorScreen() {
   // Add custom question
   const handleAddCustom = async (isBonus: boolean = false) => {
     if (!currentExam) return;
-    if (!customText.trim() || !customA.trim() || !customB.trim() || !customC.trim() || !customD.trim()) {
+    const authorText = isSpanish ? customTextEs : customText;
+    const authorA = isSpanish ? customAEs : customA;
+    const authorB = isSpanish ? customBEs : customB;
+    const authorC = isSpanish ? customCEs : customC;
+    const authorD = isSpanish ? customDEs : customD;
+    if (!authorText.trim() || !authorA.trim() || !authorB.trim() || !authorC.trim() || !authorD.trim()) {
       Alert.alert(t('common.error'), t('exam_editor.fill_all_fields'));
       return;
     }
+
+    // Fill/refresh the other language per the s61 staleness rules (may ask once).
+    const resolved = await addTranslation.resolveOnSave();
+    if (!resolved) return;
 
     const nextOrder = questions.length > 0 ? Math.max(...questions.map(q => q.question_order)) + 1 : 1;
     const bonusValue = isBonus ? parseInt(bonusBucksValue) || 5 : null;
@@ -565,11 +610,11 @@ export default function ExamEditorScreen() {
       p_actor_id: user?.id,
       p_exam_id: currentExam.id,
       p_question: {
-        question_text: customText.trim(),
-        option_a: customA.trim(),
-        option_b: customB.trim(),
-        option_c: customC.trim(),
-        option_d: customD.trim(),
+        question_text: resolved.question.en.trim(),
+        option_a: resolved.option_a.en.trim(),
+        option_b: resolved.option_b.en.trim(),
+        option_c: resolved.option_c.en.trim(),
+        option_d: resolved.option_d.en.trim(),
         correct_option: customCorrect,
         is_bonus: isBonus,
         bonus_bucks_value: bonusValue,
@@ -577,6 +622,11 @@ export default function ExamEditorScreen() {
         source_type: isBonus ? 'bonus' : 'custom',
         source_table: null,
         question_image_url: customImageUrl,
+        question_text_es: resolved.question.es.trim() || null,
+        option_a_es: resolved.option_a.es.trim() || null,
+        option_b_es: resolved.option_b.es.trim() || null,
+        option_c_es: resolved.option_c.es.trim() || null,
+        option_d_es: resolved.option_d.es.trim() || null,
       },
     });
 
@@ -683,19 +733,30 @@ export default function ExamEditorScreen() {
   const handleSaveEdit = async () => {
     if (!editingQuestion) return;
 
+    // Fill/refresh the other language per the s61 staleness rules (may ask
+    // once). Sending the _es keys explicitly (value or null) also fixes the
+    // stale-Spanish defect: an EN edit no longer leaves old ES text live.
+    const resolved = await editTranslation.resolveOnSave();
+    if (!resolved) return;
+
     const { error } = await (supabase.rpc as any)('update_exam_question', {
       p_actor_id: user?.id,
       p_question_id: editingQuestion.id,
       p_fields: {
-        question_text: editingQuestion.question_text,
-        option_a: editingQuestion.option_a,
-        option_b: editingQuestion.option_b,
-        option_c: editingQuestion.option_c,
-        option_d: editingQuestion.option_d,
+        question_text: resolved.question.en,
+        option_a: resolved.option_a.en,
+        option_b: resolved.option_b.en,
+        option_c: resolved.option_c.en,
+        option_d: resolved.option_d.en,
         correct_option: editingQuestion.correct_option,
         bonus_bucks_value: editingQuestion.bonus_bucks_value,
         bucks_value: editingQuestion.bucks_value,
         question_image_url: editingQuestion.question_image_url ?? null,
+        question_text_es: resolved.question.es.trim() || null,
+        option_a_es: resolved.option_a.es.trim() || null,
+        option_b_es: resolved.option_b.es.trim() || null,
+        option_c_es: resolved.option_c.es.trim() || null,
+        option_d_es: resolved.option_d.es.trim() || null,
       },
     });
 
@@ -715,6 +776,11 @@ export default function ExamEditorScreen() {
 
   const resetCustomForm = () => {
     setCustomText('');
+    setCustomTextEs('');
+    setCustomAEs('');
+    setCustomBEs('');
+    setCustomCEs('');
+    setCustomDEs('');
     setCustomA('');
     setCustomB('');
     setCustomC('');
@@ -1243,10 +1309,11 @@ export default function ExamEditorScreen() {
                     resizeMode="cover"
                   />
                 )}
-                <Text style={[styles.questionText, { color: colors.text }]}>{q.question_text}</Text>
+                <Text style={[styles.questionText, { color: colors.text }]}>{isSpanish && q.question_text_es ? q.question_text_es : q.question_text}</Text>
                 <View style={styles.optionsList}>
                   {(['A', 'B', 'C', 'D'] as const).map(letter => {
-                    const optionText = q[`option_${letter.toLowerCase()}` as keyof ExamQuestion] as string;
+                    const optionEs = q[`option_${letter.toLowerCase()}_es` as keyof ExamQuestion] as string | null | undefined;
+                    const optionText = isSpanish && optionEs ? optionEs : (q[`option_${letter.toLowerCase()}` as keyof ExamQuestion] as string);
                     const isCorrect = q.correct_option === letter;
                     return (
                       <View
@@ -1539,16 +1606,20 @@ export default function ExamEditorScreen() {
                 <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.question_label')}</Text>
                 <TextInput
                   style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-                  value={customText}
-                  onChangeText={setCustomText}
+                  value={isSpanish ? customTextEs : customText}
+                  onChangeText={isSpanish ? setCustomTextEs : setCustomText}
                   placeholder={t('exam_editor.enter_question_ph')}
                   placeholderTextColor={colors.textSecondary}
                   multiline
                 />
 
                 {(['A', 'B', 'C', 'D'] as const).map(letter => {
-                  const value = letter === 'A' ? customA : letter === 'B' ? customB : letter === 'C' ? customC : customD;
-                  const setter = letter === 'A' ? setCustomA : letter === 'B' ? setCustomB : letter === 'C' ? setCustomC : setCustomD;
+                  const value = isSpanish
+                    ? (letter === 'A' ? customAEs : letter === 'B' ? customBEs : letter === 'C' ? customCEs : customDEs)
+                    : (letter === 'A' ? customA : letter === 'B' ? customB : letter === 'C' ? customC : customD);
+                  const setter = isSpanish
+                    ? (letter === 'A' ? setCustomAEs : letter === 'B' ? setCustomBEs : letter === 'C' ? setCustomCEs : setCustomDEs)
+                    : (letter === 'A' ? setCustomA : letter === 'B' ? setCustomB : letter === 'C' ? setCustomC : setCustomD);
                   return (
                     <View key={letter}>
                       <View style={styles.optionLabelRow}>
@@ -1576,6 +1647,8 @@ export default function ExamEditorScreen() {
                     </View>
                   );
                 })}
+
+                {addTranslation.element}
 
                 <TouchableOpacity
                   style={[styles.modalSaveButton, { backgroundColor: showAddBonus ? '#F59E0B' : colors.primary }]}
@@ -1685,13 +1758,13 @@ export default function ExamEditorScreen() {
                   <Text style={[styles.formLabel, { color: colors.textSecondary }]}>{t('exam_editor.question_label')}</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-                    value={editingQuestion.question_text}
-                    onChangeText={(v) => setEditingQuestion({ ...editingQuestion, question_text: v })}
+                    value={isSpanish ? (editingQuestion.question_text_es ?? '') : editingQuestion.question_text}
+                    onChangeText={(v) => setEditingQuestion(prev => prev ? { ...prev, [isSpanish ? 'question_text_es' : 'question_text']: v } : prev)}
                     multiline
                   />
 
                   {(['A', 'B', 'C', 'D'] as const).map(letter => {
-                    const key = `option_${letter.toLowerCase()}` as keyof ExamQuestion;
+                    const key = (isSpanish ? `option_${letter.toLowerCase()}_es` : `option_${letter.toLowerCase()}`) as keyof ExamQuestion;
                     return (
                       <View key={letter}>
                         <View style={styles.optionLabelRow}>
@@ -1711,12 +1784,14 @@ export default function ExamEditorScreen() {
                         </View>
                         <TextInput
                           style={[styles.input, { backgroundColor: colors.background, color: colors.text, borderColor: colors.border }]}
-                          value={editingQuestion[key] as string}
-                          onChangeText={(v) => setEditingQuestion({ ...editingQuestion, [key]: v })}
+                          value={(editingQuestion[key] as string | null | undefined) ?? ''}
+                          onChangeText={(v) => setEditingQuestion(prev => prev ? { ...prev, [key]: v } : prev)}
                         />
                       </View>
                     );
                   })}
+
+                  {editTranslation.element}
 
                   <TouchableOpacity
                     style={[styles.modalSaveButton, { backgroundColor: colors.primary }]}

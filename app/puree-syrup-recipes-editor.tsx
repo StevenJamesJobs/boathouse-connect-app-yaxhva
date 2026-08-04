@@ -29,7 +29,8 @@ import RichTextToolbar from '@/components/RichTextToolbar';
 import ProcedureResizeHandle from '@/components/ProcedureResizeHandle';
 import CollapsibleSection from '@/components/CollapsibleSection';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { translateTexts, saveTranslations } from '@/utils/translateContent';
+import { saveTranslations } from '@/utils/translateContent';
+import { useTranslationSection } from '@/components/TranslationSection';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import RecipeGridCard from '@/components/RecipeGridCard';
@@ -53,7 +54,7 @@ const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1587049352846-4a222
 
 export default function PureeSyrupRecipesEditorScreen() {
   useRequireManagerRoute();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
   const colors = useThemeColors();
@@ -78,10 +79,29 @@ export default function PureeSyrupRecipesEditorScreen() {
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [procedureEs, setProcedureEs] = useState('');
-  const [showSpanish, setShowSpanish] = useState(false);
-  const [translating, setTranslating] = useState(false);
   const [procH, setProcH] = useState(120);
   const [procDragH, setProcDragH] = useState(0);
+
+  // Hybrid bilingual authoring (s61): the primary inputs bind the device
+  // language; the shared section shows the other-language preview + translate
+  // button + pencil edit. resolveOnSave() runs the staleness rules.
+  const isSpanishAuthor = i18n.language === 'es';
+  const addSessionRef = useRef(0);
+  const translation = useTranslationSection({
+    fields: [
+      {
+        key: 'procedure',
+        labelKey: 'translation_section:field_procedure',
+        enValue: procedure,
+        esValue: procedureEs,
+        setEnValue: setProcedure,
+        setEsValue: setProcedureEs,
+        multiline: true,
+      },
+    ],
+    sessionKey: editingRecipe ? `edit:${editingRecipe.id}` : `new:${addSessionRef.current}`,
+    active: showModal,
+  });
 
   const loadRecipes = useCallback(async () => {
     if (!user?.id) return;
@@ -154,24 +174,6 @@ export default function PureeSyrupRecipesEditorScreen() {
     }
   };
 
-  const handleAutoTranslate = async () => {
-    if (!procedure.trim()) {
-      Alert.alert(t('common:error'), 'No procedure text to translate');
-      return;
-    }
-    setTranslating(true);
-    try {
-      const results = await translateTexts([procedure]);
-      setProcedureEs(results[0] || '');
-      setShowSpanish(true);
-    } catch (err) {
-      console.error('Auto-translate error:', err);
-      Alert.alert(t('common:error'), 'Translation failed');
-    } finally {
-      setTranslating(false);
-    }
-  };
-
   const handleSave = async () => {
     try {
       if (!name.trim()) {
@@ -200,6 +202,9 @@ export default function PureeSyrupRecipesEditorScreen() {
       }
 
       setLoading(true);
+      // Fill/refresh the other language per the s61 staleness rules (may ask once).
+      const resolved = await translation.resolveOnSave();
+      if (!resolved) { setLoading(false); return; }
 
       if (editingRecipe) {
         // Update existing recipe using RPC function
@@ -211,7 +216,7 @@ export default function PureeSyrupRecipesEditorScreen() {
           p_name: name.trim(),
           p_category: category,
           p_ingredients: validIngredients,
-          p_procedure: (procedure.trim() || null) as string,
+          p_procedure: (resolved.procedure.en.trim() || null) as string,
           p_thumbnail_url: thumbnailUrl as string,
           p_display_order: editingRecipe.display_order,
         });
@@ -221,9 +226,7 @@ export default function PureeSyrupRecipesEditorScreen() {
           throw error;
         }
         console.log('Puree syrup recipe updated successfully');
-        if (procedureEs.trim()) {
-          await saveTranslations('puree_syrup_recipes', editingRecipe.id, { procedure_es: procedureEs }, user?.id);
-        }
+        await saveTranslations('puree_syrup_recipes', editingRecipe.id, { procedure_es: resolved.procedure.es }, user?.id);
         Alert.alert(t('common:success'), t('puree_editor:updated_success'));
       } else {
         // Insert new recipe using RPC function
@@ -234,7 +237,7 @@ export default function PureeSyrupRecipesEditorScreen() {
           p_name: name.trim(),
           p_category: category,
           p_ingredients: validIngredients,
-          p_procedure: (procedure.trim() || null) as string,
+          p_procedure: (resolved.procedure.en.trim() || null) as string,
           p_thumbnail_url: thumbnailUrl as string,
           p_display_order: recipes.length,
         });
@@ -245,8 +248,8 @@ export default function PureeSyrupRecipesEditorScreen() {
         }
         console.log('Puree syrup recipe added successfully');
         // insert_puree_syrup_recipe returns the new id — use it directly.
-        if (data && procedureEs.trim()) {
-          await saveTranslations('puree_syrup_recipes', data as string, { procedure_es: procedureEs }, user?.id);
+        if (data) {
+          await saveTranslations('puree_syrup_recipes', data as string, { procedure_es: resolved.procedure.es }, user?.id);
         }
         Alert.alert(t('common:success'), t('puree_editor:created_success'));
       }
@@ -378,6 +381,7 @@ export default function PureeSyrupRecipesEditorScreen() {
 
   const openAddModal = () => {
     resetForm();
+    addSessionRef.current += 1;
     setShowModal(true);
   };
 
@@ -408,7 +412,6 @@ export default function PureeSyrupRecipesEditorScreen() {
     setIngredients([{ amount: '', ingredient: '' }]);
     setProcedure('');
     setProcedureEs('');
-    setShowSpanish(false);
     setProcDragH(0);
     setThumbnailUrl(null);
   };
@@ -667,8 +670,8 @@ export default function PureeSyrupRecipesEditorScreen() {
                 <View style={styles.formField}>
                   <Text style={styles.formLabel}>{t('puree_editor:procedure_label')}</Text>
                   <RichTextToolbar
-                    text={procedure}
-                    onChangeText={setProcedure}
+                    text={isSpanishAuthor ? procedureEs : procedure}
+                    onChangeText={isSpanishAuthor ? setProcedureEs : setProcedure}
                     selection={procedureSelection}
                     onSelectionChange={setProcedureSelection}
                     textInputRef={procedureInputRef}
@@ -678,8 +681,8 @@ export default function PureeSyrupRecipesEditorScreen() {
                     <TextInput
                       ref={procedureInputRef}
                       style={[styles.formInput, styles.textArea, { minHeight: Math.max(120, procDragH), paddingBottom: 22 }]}
-                      value={procedure}
-                      onChangeText={setProcedure}
+                      value={isSpanishAuthor ? procedureEs : procedure}
+                      onChangeText={isSpanishAuthor ? setProcedureEs : setProcedure}
                       placeholder={t('puree_editor:procedure_placeholder')}
                       placeholderTextColor={colors.textSecondary}
                       multiline
@@ -691,38 +694,9 @@ export default function PureeSyrupRecipesEditorScreen() {
                   </View>
                 </View>
 
-                {/* Spanish Procedure Translation (menu-editor blue style) */}
+                {/* Bilingual authoring (s61 hybrid) */}
                 <View style={styles.formField}>
-                  <TouchableOpacity style={styles.spanishSectionHeader} onPress={() => setShowSpanish(!showSpanish)}>
-                    <Text style={styles.formLabel}>{t('translation_section:spanish_section_title')}</Text>
-                    <IconSymbol
-                      ios_icon_name={showSpanish ? 'chevron.up' : 'chevron.down'}
-                      android_material_icon_name={showSpanish ? 'expand-less' : 'expand-more'}
-                      size={20}
-                      color="#666666"
-                    />
-                  </TouchableOpacity>
-                  {showSpanish && (
-                    <View style={styles.spanishFields}>
-                      <TouchableOpacity style={styles.autoTranslateButton} onPress={handleAutoTranslate} disabled={translating}>
-                        {translating ? (
-                          <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                          <Text style={styles.autoTranslateButtonText}>{t('translation_section:auto_translate')}</Text>
-                        )}
-                      </TouchableOpacity>
-                      <Text style={styles.spanishFieldLabel}>{t('puree_editor:procedure_es_label')}</Text>
-                      <TextInput
-                        style={[styles.formInput, styles.textArea]}
-                        value={procedureEs}
-                        onChangeText={setProcedureEs}
-                        placeholder="Procedimiento en español"
-                        placeholderTextColor={colors.textSecondary}
-                        multiline
-                        numberOfLines={4}
-                      />
-                    </View>
-                  )}
+                  {translation.element}
                 </View>
 
               </CollapsibleSection>
@@ -992,40 +966,6 @@ const styles = StyleSheet.create({
   },
   extraBottomPadding: {
     height: 30,
-  },
-  // Spanish block — menu-editor blue style (replaces the old orange).
-  spanishSectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 4,
-  },
-  spanishFields: {
-    marginTop: 8,
-    backgroundColor: '#F0F8FF',
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#D0E8FF',
-  },
-  autoTranslateButton: {
-    backgroundColor: '#3498DB',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  autoTranslateButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  spanishFieldLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#666666',
-    marginBottom: 4,
   },
   // Tap-to-attach 80×80 thumbnail + name row.
   thumbAndNameRow: {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -23,7 +23,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTranslation } from 'react-i18next';
-import { translateTexts } from '@/utils/translateContent';
+import { useTranslationSection } from '@/components/TranslationSection';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 
@@ -76,7 +76,7 @@ function CostRow({ label, on, cost, onToggle, onCost, styles, colors, t, currenc
 
 export default function RedeemSettingsScreen() {
   useRequireManagerRoute();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
   const insets = useSafeAreaInsets();
@@ -101,20 +101,26 @@ export default function RedeemSettingsScreen() {
   const [customLabel, setCustomLabel] = useState('');
   const [customLabelEs, setCustomLabelEs] = useState('');
   const [customCost, setCustomCost] = useState('');
-  const [translating, setTranslating] = useState(false);
 
-  const autoTranslateCustom = async () => {
-    if (!customLabel.trim()) return;
-    setTranslating(true);
-    try {
-      const [es] = await translateTexts([customLabel.trim()]);
-      if (es) setCustomLabelEs(es);
-    } catch (e) {
-      console.warn('translate custom option', e);
-    } finally {
-      setTranslating(false);
-    }
-  };
+  // Hybrid bilingual authoring (s61): the primary input binds the device
+  // language; the shared section shows the other-language preview + translate
+  // button + pencil edit. resolveOnSave() runs the staleness rules.
+  const isSpanishAuthor = i18n.language === 'es';
+  const addSessionRef = useRef(0);
+  const translation = useTranslationSection({
+    fields: [
+      {
+        key: 'label',
+        labelKey: 'translation_section:field_label',
+        enValue: customLabel,
+        esValue: customLabelEs,
+        setEnValue: setCustomLabel,
+        setEsValue: setCustomLabelEs,
+      },
+    ],
+    sessionKey: editingCustom ? `edit:${editingCustom.id}` : `new:${addSessionRef.current}`,
+    active: showCustom,
+  });
 
   const load = useCallback(async () => {
     if (!organizationId || !user?.id) return;
@@ -175,20 +181,24 @@ export default function RedeemSettingsScreen() {
     }
   };
 
-  const openAddCustom = () => { setEditingCustom(null); setCustomLabel(''); setCustomLabelEs(''); setCustomCost(''); setShowCustom(true); };
+  const openAddCustom = () => { setEditingCustom(null); setCustomLabel(''); setCustomLabelEs(''); setCustomCost(''); addSessionRef.current += 1; setShowCustom(true); };
   const openEditCustom = (o: CustomOption) => { setEditingCustom(o); setCustomLabel(o.label); setCustomLabelEs(o.label_es || ''); setCustomCost(String(o.cost)); setShowCustom(true); };
 
   const saveCustom = async () => {
-    if (!customLabel.trim()) { Alert.alert(t('common:error'), t('redeem_settings.label_required', 'Enter a name for the option.')); return; }
+    const authorLabel = isSpanishAuthor ? customLabelEs : customLabel;
+    if (!authorLabel.trim()) { Alert.alert(t('common:error'), t('redeem_settings.label_required', 'Enter a name for the option.')); return; }
+    // Fill/refresh the other language per the s61 staleness rules (may ask once).
+    const resolved = await translation.resolveOnSave();
+    if (!resolved) return;
     try {
       const { data, error } = await (supabase as any).rpc('upsert_redemption_custom_option', {
         p_user_id: user?.id,
         p_organization_id: organizationId,
         p_id: editingCustom?.id ?? null,
-        p_label: customLabel.trim(),
+        p_label: resolved.label.en.trim(),
         p_cost: parseInt(customCost) || 0,
         p_is_active: editingCustom?.is_active ?? true,
-        p_label_es: customLabelEs.trim() || null,
+        p_label_es: resolved.label.es.trim() || null,
       });
       if (error) throw error;
       if (!data?.ok) throw new Error(data?.reason || 'save failed');
@@ -204,6 +214,9 @@ export default function RedeemSettingsScreen() {
       await (supabase as any).rpc('upsert_redemption_custom_option', {
         p_user_id: user?.id, p_organization_id: organizationId,
         p_id: o.id, p_label: o.label, p_cost: o.cost, p_is_active: !o.is_active,
+        // The RPC's UPDATE branch writes label_es unconditionally — omitting
+        // this param would wipe the stored Spanish label on every toggle.
+        p_label_es: o.label_es ?? null,
       });
       load();
     } catch (e) { console.warn('toggle custom', e); }
@@ -339,14 +352,8 @@ export default function RedeemSettingsScreen() {
             <View style={styles.grab} />
             <Text style={styles.mtitle}>{editingCustom ? t('redeem_settings.edit_option', 'Edit Option') : t('redeem_settings.new_option', 'New Option')}</Text>
             <Text style={styles.flbl}>{t('redeem_settings.option_name', 'Option name')}</Text>
-            <TextInput style={styles.finput} value={customLabel} onChangeText={setCustomLabel} placeholder={t('redeem_settings.option_name_ph', 'e.g. Leave 30 min early')} placeholderTextColor={colors.textSecondary} />
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 7, marginHorizontal: 2 }}>
-              <Text style={{ fontFamily: fonts.mono.semibold, fontSize: 9.5, letterSpacing: 0.8, textTransform: 'uppercase', color: colors.textSecondary }}>{t('redeem_settings.option_name_es', 'Spanish name')}</Text>
-              <Pressable onPress={autoTranslateCustom} disabled={!customLabel.trim() || translating} style={{ opacity: !customLabel.trim() || translating ? 0.5 : 1 }} hitSlop={8}>
-                <Text style={{ fontFamily: fonts.display.semibold, fontSize: 12, color: colors.tint }}>{translating ? t('redeem_settings.translating', 'Translating…') : t('redeem_settings.translate', 'Translate')}</Text>
-              </Pressable>
-            </View>
-            <TextInput style={styles.finput} value={customLabelEs} onChangeText={setCustomLabelEs} placeholder={t('redeem_settings.option_name_es_ph', 'Spanish translation (optional)')} placeholderTextColor={colors.textSecondary} />
+            <TextInput style={styles.finput} value={isSpanishAuthor ? customLabelEs : customLabel} onChangeText={isSpanishAuthor ? setCustomLabelEs : setCustomLabel} placeholder={t('redeem_settings.option_name_ph', 'e.g. Leave 30 min early')} placeholderTextColor={colors.textSecondary} />
+            {translation.element}
             <Text style={styles.flbl}>{t('redeem_settings.cost_label', 'Cost')} ({currencyName})</Text>
             <TextInput style={styles.finput} value={customCost} onChangeText={setCustomCost} keyboardType="numeric" placeholder="0" placeholderTextColor={colors.textSecondary} />
             <Pressable style={styles.saveBtn} onPress={saveCustom}>
