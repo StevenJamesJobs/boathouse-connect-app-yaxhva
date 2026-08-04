@@ -49,6 +49,7 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 import { usePendingApprovals } from '@/hooks/usePendingApprovals';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { MessageBadge } from '@/components/MessageBadge';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface Employee {
   id: string;
@@ -557,7 +558,7 @@ export default function RewardsAndReviewsEditorScreen() {
       fetchRewardsData();
     } catch (error: any) {
       console.error('Error adding reward:', error);
-      Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:reward_error'));
+      Alert.alert(t('common:error'), translateServerError(error, t('rewards_reviews_editor:reward_error')));
     } finally {
       setLoading(false);
     }
@@ -597,7 +598,7 @@ export default function RewardsAndReviewsEditorScreen() {
               fetchRewardsData();
             } catch (error: any) {
               console.error('Error resetting user bucks:', error);
-              Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:reset_error'));
+              Alert.alert(t('common:error'), translateServerError(error, t('rewards_reviews_editor:reset_error')));
             } finally {
               setLoading(false);
             }
@@ -636,7 +637,7 @@ export default function RewardsAndReviewsEditorScreen() {
               fetchRewardsData();
             } catch (error: any) {
               console.error('Error resetting all users bucks:', error);
-              Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:reset_all_error'));
+              Alert.alert(t('common:error'), translateServerError(error, t('rewards_reviews_editor:reset_all_error')));
             } finally {
               setLoading(false);
             }
@@ -697,7 +698,7 @@ export default function RewardsAndReviewsEditorScreen() {
       fetchRewardsData();
     } catch (error: any) {
       console.error('Error updating transaction:', error);
-      Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:transaction_update_error'));
+      Alert.alert(t('common:error'), translateServerError(error, t('rewards_reviews_editor:transaction_update_error')));
     } finally {
       setLoading(false);
     }
@@ -729,7 +730,7 @@ export default function RewardsAndReviewsEditorScreen() {
               fetchRewardsData();
             } catch (error: any) {
               console.error('Error deleting transaction:', error);
-              Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:transaction_delete_error'));
+              Alert.alert(t('common:error'), translateServerError(error, t('rewards_reviews_editor:transaction_delete_error')));
             } finally {
               setLoading(false);
             }
@@ -768,7 +769,7 @@ export default function RewardsAndReviewsEditorScreen() {
               fetchRewardsData();
             } catch (error: any) {
               console.error(`Error ${actionText}ing transaction:`, error);
-              Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:transaction_visibility_error'));
+              Alert.alert(t('common:error'), translateServerError(error, t('rewards_reviews_editor:transaction_visibility_error')));
             } finally {
               setLoading(false);
             }
@@ -823,7 +824,7 @@ export default function RewardsAndReviewsEditorScreen() {
       fetchReviews();
     } catch (error: any) {
       console.error('Error saving review:', error);
-      Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:review_save_error'));
+      Alert.alert(t('common:error'), translateServerError(error, t('rewards_reviews_editor:review_save_error')));
     } finally {
       setLoading(false);
     }
@@ -871,7 +872,7 @@ export default function RewardsAndReviewsEditorScreen() {
             fetchReviews();
           } catch (error: any) {
             console.error('Error deleting review:', error);
-            Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:review_delete_error'));
+            Alert.alert(t('common:error'), translateServerError(error, t('rewards_reviews_editor:review_delete_error')));
           }
         },
       },
@@ -915,7 +916,7 @@ export default function RewardsAndReviewsEditorScreen() {
               fetchGoogleReviews();
             } catch (error: any) {
               console.error('Error toggling Google review visibility:', error);
-              Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:review_visibility_error'));
+              Alert.alert(t('common:error'), translateServerError(error, t('rewards_reviews_editor:review_visibility_error')));
             } finally {
               setLoading(false);
             }
@@ -962,7 +963,7 @@ export default function RewardsAndReviewsEditorScreen() {
       setTimeout(() => fetchGoogleReviews(), 4000);
     } catch (error: any) {
       console.error('Error refreshing Google reviews:', error);
-      Alert.alert(t('common:error'), error.message || t('rewards_reviews_editor:refresh_error'));
+      Alert.alert(t('common:error'), translateServerError(error, t('rewards_reviews_editor:refresh_error')));
     } finally {
       setRefreshingGoogle(false);
     }

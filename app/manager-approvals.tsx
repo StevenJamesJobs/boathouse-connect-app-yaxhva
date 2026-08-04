@@ -25,6 +25,7 @@ import i18n from '@/i18n';
 import { getOrgDirectory } from '@/utils/orgDirectory';
 import AmbientGlow from '@/components/AmbientGlow';
 import { fonts } from '@/constants/fonts';
+import { translateServerError } from '@/utils/serverErrors';
 
 // Same keys the redeem screen's option cards use — EN values byte-identical
 // to the old hardcoded labels; ES comes along for free (s62).
@@ -120,7 +121,7 @@ export default function ManagerApprovalsScreen() {
         p_organization_id: organizationId,
       });
       if (error) {
-        Alert.alert(`Could not ${mode}`, error.message);
+        Alert.alert(`Could not ${mode}`, translateServerError(error));
         return;
       }
 

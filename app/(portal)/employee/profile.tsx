@@ -27,6 +27,7 @@ import { MessageBadge } from '@/components/MessageBadge';
 import { useTranslation } from 'react-i18next';
 import { QUICK_TOOLS_CATALOG, getAvailableTools, getDefaultQuickTools } from '@/config/quickTools';
 import QuickToolsSelector from '@/components/QuickToolsSelector';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface NextShift {
   shift_date: string;
@@ -216,7 +217,7 @@ export default function EmployeeProfileScreen() {
       Alert.alert(t('common.success'), t('profile.profile_picture_updated'));
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert(t('common.error'), error.message || t('profile.error_upload_picture'));
+      Alert.alert(t('common.error'), translateServerError(error, t('profile.error_upload_picture')));
     } finally {
       setUploading(false);
     }

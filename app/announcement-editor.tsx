@@ -40,6 +40,7 @@ import CollapsibleSection from '@/components/CollapsibleSection';
 import OrderPositionModal from '@/components/OrderPositionModal';
 import SimpleSelectPicker, { SelectField } from '@/components/SimpleSelectPicker';
 import { StorageImage } from '@/components/StorageImage';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface Announcement {
   id: string;
@@ -404,8 +405,11 @@ export default function AnnouncementEditorScreen() {
               title_es: pushTitle.es,
               // The authored Spanish title when it exists; empty falls back to EN.
               body_es: resolved.title.es || undefined,
+              // type + the created row's uuid make the banner tap deep-link
+              // (NotificationContext routes to PortalHome's openAnnouncementId).
               data: {
-                announcementId: null,
+                type: 'announcement',
+                announcementId: newAnnouncementId,
                 priority: formData.priority,
               },
             });
@@ -441,7 +445,7 @@ export default function AnnouncementEditorScreen() {
       await loadAnnouncements();
     } catch (error: any) {
       console.error('Error saving announcement:', error);
-      Alert.alert('Error', error.message || t('announcement_editor:save_error'));
+      Alert.alert('Error', translateServerError(error, t('announcement_editor:save_error')));
     }
   };
 
@@ -486,7 +490,7 @@ export default function AnnouncementEditorScreen() {
               await loadAnnouncements();
             } catch (error: any) {
               console.error('Error deleting announcement:', error);
-              Alert.alert('Error', error.message || t('announcement_editor:delete_error'));
+              Alert.alert('Error', translateServerError(error, t('announcement_editor:delete_error')));
             }
           },
         },

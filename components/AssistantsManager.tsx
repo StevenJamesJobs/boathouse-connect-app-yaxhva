@@ -13,6 +13,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
 import { supabase } from '@/app/integrations/supabase/client';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface OrgAssistant {
   id: string;
@@ -52,8 +53,8 @@ export default function AssistantsManager({ colors }: Props) {
     setIsLoading(true);
 
     const [assistantsRes, mappingsRes] = await Promise.all([
-      (supabase.rpc as any)('get_org_assistants', { p_actor_id: user?.id }),
-      (supabase.rpc as any)('get_job_title_assistants', { p_actor_id: user?.id }),
+      supabase.rpc('get_org_assistants', { p_actor_id: user.id }),
+      supabase.rpc('get_job_title_assistants', { p_actor_id: user.id }),
     ]);
 
     if (!assistantsRes.error && assistantsRes.data) setAssistants(assistantsRes.data);
@@ -66,9 +67,10 @@ export default function AssistantsManager({ colors }: Props) {
   }, [organizationId, user?.id]);
 
   const handleToggle = async (item: OrgAssistant) => {
+    if (!user?.id) return;
     try {
-      const { error } = await (supabase.rpc as any)('set_org_assistant_active', {
-        p_actor_id: user?.id,
+      const { error } = await supabase.rpc('set_org_assistant_active', {
+        p_actor_id: user.id,
         p_id: item.id,
         p_is_active: !item.is_active,
       });
@@ -78,7 +80,7 @@ export default function AssistantsManager({ colors }: Props) {
         prev.map(a => a.id === item.id ? { ...a, is_active: !a.is_active } : a)
       );
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update.');
+      Alert.alert('Error', translateServerError(err, 'Failed to update.'));
     }
   };
 
@@ -87,10 +89,11 @@ export default function AssistantsManager({ colors }: Props) {
 
   const handleToggleTitle = async (assistantKey: string, jobTitle: string) => {
     const hasAccess = titleHasAccess(assistantKey, jobTitle);
+    if (!user?.id) return;
 
     try {
-      const { error } = await (supabase.rpc as any)('set_job_title_assistant', {
-        p_actor_id: user?.id,
+      const { error } = await supabase.rpc('set_job_title_assistant', {
+        p_actor_id: user.id,
         p_assistant_key: assistantKey,
         p_job_title: jobTitle,
         p_enabled: !hasAccess,
@@ -104,7 +107,7 @@ export default function AssistantsManager({ colors }: Props) {
         setMappings(prev => [...prev, { assistant_key: assistantKey, job_title: jobTitle }]);
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update access.');
+      Alert.alert('Error', translateServerError(err, 'Failed to update access.'));
     }
   };
 

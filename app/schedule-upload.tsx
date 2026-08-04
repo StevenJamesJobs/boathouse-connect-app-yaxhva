@@ -24,6 +24,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { brokerUploadBase64 } from '@/utils/storageBroker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface ScheduleUpload {
   id: string;
@@ -84,7 +85,7 @@ export default function ScheduleUploadScreen() {
         } else if (data.status === 'failed') {
           Alert.alert(
             t('schedule_upload.error_title', 'Processing Failed'),
-            data.error_message || t('schedule_upload.error_generic', 'An error occurred while processing the schedule.')
+            translateServerError({ message: data.error_message }, t('schedule_upload.error_generic', 'An error occurred while processing the schedule.'))
           );
         }
       }
@@ -201,7 +202,7 @@ export default function ScheduleUploadScreen() {
       console.error('Upload error:', error);
       Alert.alert(
         t('schedule_upload.error_title', 'Upload Failed'),
-        error.message || t('schedule_upload.error_generic', 'An error occurred.')
+        translateServerError(error, t('schedule_upload.error_generic', 'An error occurred.'))
       );
     } finally {
       setUploading(false);
@@ -261,7 +262,7 @@ export default function ScheduleUploadScreen() {
       console.error('Image upload error:', error);
       Alert.alert(
         t('schedule_upload.error_title', 'Upload Failed'),
-        error.message || t('schedule_upload.error_generic', 'An error occurred.')
+        translateServerError(error, t('schedule_upload.error_generic', 'An error occurred.'))
       );
     } finally {
       setUploading(false);
@@ -572,7 +573,7 @@ export default function ScheduleUploadScreen() {
               {upload.status === 'failed' && upload.error_message && (
                 <View style={[styles.errorSection, { borderTopColor: colors.border }]}>
                   <Text style={[styles.errorText, { color: '#F44336' }]}>
-                    {upload.error_message}
+                    {translateServerError({ message: upload.error_message })}
                   </Text>
                 </View>
               )}

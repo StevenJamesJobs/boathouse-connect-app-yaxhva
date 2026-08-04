@@ -35,6 +35,7 @@ import i18n from '@/i18n';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import { brokerUploadImage } from '@/utils/storageBroker';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface Exam {
   id: string;
@@ -307,7 +308,7 @@ export default function ExamEditorScreen() {
       setTimeLimit(exam.time_limit_seconds);
       await fetchQuestions(exam.id);
     } catch (err: any) {
-      Alert.alert(t('common.error'), err?.message || t('exam_editor.failed_generate'));
+      Alert.alert(t('common.error'), translateServerError(err, t('exam_editor.failed_generate')));
       console.error('Generate error:', err);
     }
     setGenerating(false);
@@ -639,7 +640,7 @@ export default function ExamEditorScreen() {
     });
 
     if (error) {
-      Alert.alert(t('common.error'), error.message);
+      Alert.alert(t('common.error'), translateServerError(error));
     } else {
       resetCustomForm();
       setShowAddCustom(false);
@@ -725,7 +726,7 @@ export default function ExamEditorScreen() {
         });
 
         if (error) {
-          Alert.alert(t('common.error'), error.message);
+          Alert.alert(t('common.error'), translateServerError(error));
         } else {
           await fetchQuestions(currentExam.id);
         }
@@ -769,7 +770,7 @@ export default function ExamEditorScreen() {
     });
 
     if (error) {
-      Alert.alert(t('common.error'), error.message);
+      Alert.alert(t('common.error'), translateServerError(error));
     } else {
       setEditingQuestion(null);
       if (currentExam) await fetchQuestions(currentExam.id);
@@ -825,7 +826,7 @@ export default function ExamEditorScreen() {
       return publicUrl;
     } catch (err: any) {
       console.error('Quiz image upload error:', err);
-      Alert.alert(t('exam_editor.upload_failed_title'), err?.message || t('exam_editor.upload_failed_msg'));
+      Alert.alert(t('exam_editor.upload_failed_title'), translateServerError(err, t('exam_editor.upload_failed_msg')));
       return null;
     } finally {
       setUploadingImage(false);

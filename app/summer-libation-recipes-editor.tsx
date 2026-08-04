@@ -44,6 +44,7 @@ import {
 import DraggableFlatList, { RenderItemParams } from 'react-native-draggable-flatlist';
 import RecipeGridCard from '@/components/RecipeGridCard';
 import OrderPositionModal from '@/components/OrderPositionModal';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface LibationRecipe {
   id: string;
@@ -184,7 +185,7 @@ export default function SummerLibationRecipesEditorScreen() {
       Alert.alert(t('common.success'), t('summer_libation_editor.image_uploaded'));
     } catch (error: any) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', error.message || 'Failed to upload image');
+      Alert.alert('Error', translateServerError(error, 'Failed to upload image'));
     } finally {
       setUploadingImage(false);
     }
@@ -288,7 +289,7 @@ export default function SummerLibationRecipesEditorScreen() {
       loadRecipes();
     } catch (error: any) {
       console.error('Error saving summer libation recipe:', error);
-      Alert.alert('Error', error.message || 'Failed to save recipe');
+      Alert.alert('Error', translateServerError(error, 'Failed to save recipe'));
     } finally {
       setLoading(false);
     }
@@ -321,7 +322,7 @@ export default function SummerLibationRecipesEditorScreen() {
             loadRecipes();
           } catch (error: any) {
             console.error('Error deleting summer libation recipe:', error);
-            Alert.alert('Error', error.message || 'Failed to delete recipe');
+            Alert.alert('Error', translateServerError(error, 'Failed to delete recipe'));
           }
         },
       },

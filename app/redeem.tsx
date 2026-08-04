@@ -37,6 +37,7 @@ import AmbientGlow from '@/components/AmbientGlow';
 import BottomNavBar from '@/components/BottomNavBar';
 import GlassCard from '@/components/GlassCard';
 import { fonts } from '@/constants/fonts';
+import { translateServerError } from '@/utils/serverErrors';
 
 const SECTION_COST = 10;
 const SIDE_WORK_COST = 5;
@@ -282,7 +283,7 @@ export default function EmployeeRedeemScreen() {
       });
 
       if (error) {
-        Alert.alert('Could not submit request', error.message);
+        Alert.alert('Could not submit request', translateServerError(error));
         return;
       }
 

@@ -22,7 +22,7 @@ export function useOrgJobTitles() {
       return;
     }
     setIsLoading(true);
-    const { data, error } = await (supabase.rpc as any)('get_org_job_titles', {
+    const { data, error } = await supabase.rpc('get_org_job_titles', {
       p_actor_id: user.id,
     });
 

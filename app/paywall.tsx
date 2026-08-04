@@ -16,6 +16,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { REVENUECAT_CONFIGURED, PRODUCTS } from '@/config/revenueCat';
+import { translateServerError } from '@/utils/serverErrors';
 
 const BASE_FEATURES = [
   { label: 'Manual Schedule Builder', included: true },
@@ -81,7 +82,7 @@ export default function PaywallScreen() {
       ]);
     } catch (err: any) {
       if (!err.userCancelled) {
-        Alert.alert('Purchase Error', err.message || 'Something went wrong.');
+        Alert.alert('Purchase Error', translateServerError(err, 'Something went wrong.'));
       }
     } finally {
       setPurchasing(false);
@@ -111,7 +112,7 @@ export default function PaywallScreen() {
         Alert.alert('No Active Subscription', 'No previous subscription was found for this account.');
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Could not restore purchases.');
+      Alert.alert('Error', translateServerError(err, 'Could not restore purchases.'));
     } finally {
       setPurchasing(false);
     }

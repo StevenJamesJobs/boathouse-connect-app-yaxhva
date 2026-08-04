@@ -28,6 +28,7 @@ import { getOrgDirectory } from '@/utils/orgDirectory';
 import { useTranslation } from 'react-i18next';
 import ShiftEditForm from '@/components/ShiftEditForm';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { translateServerError } from '@/utils/serverErrors';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -268,7 +269,7 @@ export default function ScheduleReviewScreen() {
       );
     } catch (error: any) {
       console.error('Error assigning user:', error);
-      Alert.alert('Error', error.message || 'Failed to update assignment.');
+      Alert.alert('Error', translateServerError(error, 'Failed to update assignment.'));
     } finally {
       setSaving(false);
     }

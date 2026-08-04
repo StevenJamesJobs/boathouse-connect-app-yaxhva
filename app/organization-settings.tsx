@@ -26,6 +26,7 @@ import JobTitlesManager from '@/components/JobTitlesManager';
 import AssistantsManager from '@/components/AssistantsManager';
 import { supabase } from '@/app/integrations/supabase/client';
 import { brokerUploadImage } from '@/utils/storageBroker';
+import { translateServerError } from '@/utils/serverErrors';
 
 type SettingsTab = 'branding' | 'menu' | 'jobs-tools' | 'access';
 
@@ -120,13 +121,13 @@ export default function OrganizationSettingsScreen() {
           p_scope: next,
         });
         if (error || (data && data.success === false)) {
-          Alert.alert('Error', (data && data.error) || error?.message || 'Failed to change menu mode');
+          Alert.alert('Error', (data && data.error) || translateServerError(error, 'Failed to change menu mode'));
           return;
         }
         setMenuScope(next);
         await refreshOrganization();
       } catch (e: any) {
-        Alert.alert('Error', e?.message || 'Failed to change menu mode');
+        Alert.alert('Error', translateServerError(e, 'Failed to change menu mode'));
       } finally {
         setScopeSaving(false);
       }
@@ -194,7 +195,7 @@ export default function OrganizationSettingsScreen() {
       await refreshOrganization();
       Alert.alert('Done', 'Logo updated successfully.');
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to upload logo.');
+      Alert.alert('Error', translateServerError(err, 'Failed to upload logo.'));
     } finally {
       setUploadingLogo(false);
     }
@@ -219,7 +220,7 @@ export default function OrganizationSettingsScreen() {
             setLogoPreview(null);
             await refreshOrganization();
           } catch (err: any) {
-            Alert.alert('Error', err.message || 'Failed to remove logo.');
+            Alert.alert('Error', translateServerError(err, 'Failed to remove logo.'));
           }
         },
       },
@@ -279,7 +280,7 @@ export default function OrganizationSettingsScreen() {
 
       const result = typeof data === 'string' ? JSON.parse(data) : data;
       if (!result.success) {
-        Alert.alert('Error', result.error || 'Failed to save settings.');
+        Alert.alert('Error', translateServerError({ message: result.error }, 'Failed to save settings.'));
         return;
       }
 
@@ -299,7 +300,7 @@ export default function OrganizationSettingsScreen() {
         Alert.alert('Saved', 'Organization settings updated successfully.');
       }
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to save settings.');
+      Alert.alert('Error', translateServerError(err, 'Failed to save settings.'));
     } finally {
       setSaving(false);
     }
@@ -332,7 +333,7 @@ export default function OrganizationSettingsScreen() {
         .catch((e: any) => console.error('[OrgSettings] background review import failed:', e));
     } catch (e: any) {
       setSavingGmaps(false);
-      Alert.alert('Error', e?.message || 'Failed to save location.');
+      Alert.alert('Error', translateServerError(e, 'Failed to save location.'));
     }
   };
 
@@ -359,14 +360,14 @@ export default function OrganizationSettingsScreen() {
 
       const result = typeof data === 'string' ? JSON.parse(data) : data;
       if (!result.success) {
-        Alert.alert('Error', result.error || 'Failed to regenerate code.');
+        Alert.alert('Error', translateServerError({ message: result.error }, 'Failed to regenerate code.'));
         return;
       }
 
       await refreshOrganization();
       Alert.alert('Done', `New join code: ${result.join_code}`);
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to regenerate join code.');
+      Alert.alert('Error', translateServerError(err, 'Failed to regenerate join code.'));
     } finally {
       setRegeneratingCode(false);
     }

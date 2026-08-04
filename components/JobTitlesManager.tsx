@@ -14,6 +14,7 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrgJobTitles, OrgJobTitle } from '@/hooks/useOrgJobTitles';
 import { supabase } from '@/app/integrations/supabase/client';
+import { translateServerError } from '@/utils/serverErrors';
 
 interface Props {
   colors: any;
@@ -34,10 +35,11 @@ export default function JobTitlesManager({ colors }: Props) {
       return;
     }
 
+    if (!user?.id) return;
     setAdding(true);
     try {
-      const { error } = await (supabase.rpc as any)('add_org_job_title', {
-        p_actor_id: user?.id,
+      const { error } = await supabase.rpc('add_org_job_title', {
+        p_actor_id: user.id,
         p_title: trimmed,
       });
 
@@ -45,16 +47,17 @@ export default function JobTitlesManager({ colors }: Props) {
       setNewTitle('');
       await refetch();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to add title.');
+      Alert.alert('Error', translateServerError(err, 'Failed to add title.'));
     } finally {
       setAdding(false);
     }
   };
 
   const handleToggleActive = async (item: OrgJobTitle) => {
+    if (!user?.id) return;
     try {
-      const { error } = await (supabase.rpc as any)('set_org_job_title_active', {
-        p_actor_id: user?.id,
+      const { error } = await supabase.rpc('set_org_job_title_active', {
+        p_actor_id: user.id,
         p_id: item.id,
         p_is_active: !item.is_active,
       });
@@ -62,17 +65,17 @@ export default function JobTitlesManager({ colors }: Props) {
       if (error) throw error;
       await refetch();
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Failed to update.');
+      Alert.alert('Error', translateServerError(err, 'Failed to update.'));
     }
   };
 
   const handleMoveUp = async (index: number) => {
-    if (index === 0) return;
+    if (index === 0 || !user?.id) return;
     try {
       const reordered = [...jobTitles];
       [reordered[index - 1], reordered[index]] = [reordered[index], reordered[index - 1]];
-      await (supabase.rpc as any)('reorder_org_job_titles', {
-        p_actor_id: user?.id,
+      await supabase.rpc('reorder_org_job_titles', {
+        p_actor_id: user.id,
         p_ordered_ids: reordered.map(j => j.id),
       });
       await refetch();
@@ -89,14 +92,15 @@ export default function JobTitlesManager({ colors }: Props) {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
+            if (!user?.id) return;
             try {
-              await (supabase.rpc as any)('delete_org_job_title', {
-                p_actor_id: user?.id,
+              await supabase.rpc('delete_org_job_title', {
+                p_actor_id: user.id,
                 p_id: item.id,
               });
               await refetch();
             } catch (err: any) {
-              Alert.alert('Error', err.message || 'Failed to delete.');
+              Alert.alert('Error', translateServerError(err, 'Failed to delete.'));
             }
           },
         },

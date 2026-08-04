@@ -17,6 +17,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSubscription, SubscriptionTier } from '@/contexts/SubscriptionContext';
 import { REVENUECAT_CONFIGURED, PRODUCTS, ENTITLEMENTS } from '@/config/revenueCat';
+import { translateServerError } from '@/utils/serverErrors';
 
 const BASE_FEATURES = [
   'Manual Schedule Builder',
@@ -122,7 +123,7 @@ export default function SubscriptionManagementScreen() {
       if (err.userCancelled) {
         // User cancelled — no alert needed
       } else {
-        Alert.alert('Purchase Error', err.message || 'Something went wrong. Please try again.');
+        Alert.alert('Purchase Error', translateServerError(err, 'Something went wrong. Please try again.'));
       }
     } finally {
       setPurchasing(false);
@@ -142,7 +143,7 @@ export default function SubscriptionManagementScreen() {
       await refreshSubscription();
       Alert.alert('Restored', 'Your purchases have been restored.');
     } catch (err: any) {
-      Alert.alert('Error', err.message || 'Could not restore purchases.');
+      Alert.alert('Error', translateServerError(err, 'Could not restore purchases.'));
     } finally {
       setPurchasing(false);
     }

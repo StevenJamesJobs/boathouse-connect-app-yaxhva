@@ -146,7 +146,16 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
       }
       
       console.log('[NotificationContext] ✅ Permission granted, getting push token...');
-      
+
+      // Android Expo Go lost remote push in SDK 53 — getExpoPushTokenAsync only
+      // logs a loud console.error there. Skip the token fetch in that dev env
+      // (the permission flow above still covers local notifications; real
+      // builds and iOS Expo Go are unaffected).
+      if (Platform.OS === 'android' && Constants.appOwnership === 'expo') {
+        console.log('[NotificationContext] Skipping push token fetch — Android Expo Go has no remote push (SDK 53+)');
+        return;
+      }
+
       try {
         const projectId = EAS_PROJECT_ID; // variant-aware (see top of file)
         token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
@@ -279,7 +288,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 router.push('/weekly-quizzes' as any);
                 // Fire-and-forget dismissal of the bell entry for this exam
                 if (data.exam_id && user?.id) {
-                  (supabase.rpc as any)('dismiss_quiz_notification', {
+                  supabase.rpc('dismiss_quiz_notification', {
                     p_actor_id: user.id,
                     p_exam_id: data.exam_id,
                   }).then(() => {}, () => {});

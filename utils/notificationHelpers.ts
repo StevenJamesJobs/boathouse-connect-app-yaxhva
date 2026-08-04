@@ -37,9 +37,13 @@ export function bothLanguages(key: string, vars?: Record<string, any>): { en: st
 }
 
 /**
- * Core function to send notifications via Edge Function
+ * Core function to send notifications via Edge Function.
+ *
+ * Never throws — system senders (games/redemption/quiz/…) stay fire-and-forget.
+ * Returns whether the push HTTP call succeeded so interactive senders (the
+ * composer) can tell the manager when the phone alert may not have gone out.
  */
-async function sendNotification(params: SendNotificationParams): Promise<void> {
+async function sendNotification(params: SendNotificationParams): Promise<boolean> {
   try {
     // Server verifies actor_id (active user) and derives the org from it — the
     // recipient org is never trusted from the client. Null actor => 401 (no push).
@@ -53,9 +57,11 @@ async function sendNotification(params: SendNotificationParams): Promise<void> {
     }
 
     console.log('Notification sent successfully:', data);
+    return true;
   } catch (error) {
     console.error('Error in sendNotification:', error);
     // Don't throw - fail silently so app continues working
+    return false;
   }
 }
 
@@ -134,6 +140,8 @@ export async function notifyLeaderboardPassed(
 /**
  * Send a custom notification (manager only)
  * Supports optional job_titles filtering for targeted notifications
+ *
+ * Returns whether the push HTTP call succeeded (never throws).
  */
 export async function sendCustomNotification(
   title: string,
@@ -142,11 +150,11 @@ export async function sendCustomNotification(
   organizationId?: string,
   titleEs?: string,
   bodyEs?: string
-): Promise<void> {
+): Promise<boolean> {
   // Extract job_titles from data to pass as top-level param for edge function filtering
   const jobTitles = data?.job_titles as string[] | undefined;
 
-  await sendNotification({
+  return sendNotification({
     organizationId,
     notificationType: 'custom',
     title: title,
