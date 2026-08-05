@@ -17,6 +17,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { isManagerOrOwner } from '@/utils/roles';
 import PremiumGate from '@/components/PremiumGate';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
 import { fetchOwnWineVisible } from '@/utils/game/wineVisibility';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -149,20 +151,8 @@ export default function MenuMemoryGameScreen() {
   if (!hasPremium) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol
-              ios_icon_name="chevron.left"
-              android_material_icon_name="arrow-back"
-              size={24}
-              color={colors.text}
-            />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {t('memory_game.hub_title')}
-          </Text>
-          <View style={styles.placeholder} />
-        </View>
+        <AmbientGlow />
+        <ScreenHeader title={t('memory_game.hub_title')} />
         {isManagerOrOwner(user) ? (
           <PremiumGate
             desc={t('game_hub_ui.premium_intro')}
@@ -184,21 +174,9 @@ export default function MenuMemoryGameScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AmbientGlow />
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {t('memory_game.hub_title')}
-        </Text>
-        <View style={styles.placeholder} />
-      </View>
+      <ScreenHeader title={t('memory_game.hub_title')} />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         {/* Intro Card */}
@@ -322,28 +300,6 @@ export default function MenuMemoryGameScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    padding: 4,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    flex: 1,
-    textAlign: 'center',
-  },
-  placeholder: {
-    width: 40,
   },
   scrollView: {
     flex: 1,

@@ -11,6 +11,7 @@ import {
   Linking,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useAuth } from '@/contexts/AuthContext';
@@ -56,6 +57,7 @@ const TIER_COLORS: Record<SubscriptionTier, string> = {
 
 export default function SubscriptionManagementScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
   const { organization } = useOrganization();
@@ -70,20 +72,6 @@ export default function SubscriptionManagementScreen() {
   } = useSubscription();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [purchasing, setPurchasing] = useState(false);
-
-  // Owner-only gate
-  if (user?.role !== 'owner') {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>
-          Only the restaurant owner can manage subscriptions.
-        </Text>
-        <TouchableOpacity style={styles.primaryButton} onPress={() => router.back()}>
-          <Text style={styles.primaryButtonText}>Go Back</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
 
   const handlePurchase = useCallback(async (productId: string) => {
     if (!REVENUECAT_CONFIGURED) {
@@ -160,6 +148,20 @@ export default function SubscriptionManagementScreen() {
       Alert.alert('Error', 'Could not open subscription settings.');
     }
   }, []);
+
+  // Owner-only gate — must sit BELOW every hook so both roles run the same count.
+  if (user?.role !== 'owner') {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>
+          {t('subscription:owner_only')}
+        </Text>
+        <TouchableOpacity style={styles.primaryButton} onPress={() => router.back()}>
+          <Text style={styles.primaryButtonText}>{t('subscription:go_back')}</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
   const tierColor = TIER_COLORS[tier];
   const trialEndFormatted = trialEndDate

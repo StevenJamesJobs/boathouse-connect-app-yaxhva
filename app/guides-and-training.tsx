@@ -377,7 +377,13 @@ export default function GuidesAndTrainingScreen() {
 
   // Render a page for the horizontal pager
   const renderPage = ({ item: category }: { item: string }) => {
-    const categoryGuides = filterGuides(guides.filter(g => g.category === category));
+    // Tie-break must match the editor's comparator (guides-and-training-editor.tsx)
+    // or a display_order collision renders in a different order for staff.
+    const categoryGuides = filterGuides(guides.filter(g => g.category === category)
+      .sort((a, b) =>
+        (a.display_order ?? 0) - (b.display_order ?? 0) ||
+        (a.created_at || '').localeCompare(b.created_at || '') ||
+        a.id.localeCompare(b.id)));
 
     return (
       <View style={{ width: SCREEN_WIDTH }}>

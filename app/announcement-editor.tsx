@@ -212,7 +212,7 @@ export default function AnnouncementEditorScreen() {
       setAnnouncements(data || []);
     } catch (error) {
       console.error('Error loading announcements:', error);
-      Alert.alert('Error', t('announcement_editor:load_error'));
+      Alert.alert(t('common:error'), t('announcement_editor:load_error'));
     } finally {
       setLoading(false);
     }
@@ -232,7 +232,7 @@ export default function AnnouncementEditorScreen() {
       }
     } catch (error) {
       console.error('Error picking image:', error);
-      Alert.alert('Error', t('announcement_editor:pick_image_error'));
+      Alert.alert(t('common:error'), t('announcement_editor:pick_image_error'));
     }
   };
 
@@ -250,7 +250,7 @@ export default function AnnouncementEditorScreen() {
       }
     } catch (error) {
       console.error('Error picking additional image:', error);
-      Alert.alert('Error', t('announcement_editor:pick_image_error'));
+      Alert.alert(t('common:error'), t('announcement_editor:pick_image_error'));
     }
   };
 
@@ -272,7 +272,7 @@ export default function AnnouncementEditorScreen() {
 
       if (!publicUrl) {
         console.error('Error uploading image');
-        Alert.alert('Error', t('announcement_editor:upload_image_error'));
+        Alert.alert(t('common:error'), t('announcement_editor:upload_image_error'));
         return null;
       }
 
@@ -281,7 +281,7 @@ export default function AnnouncementEditorScreen() {
       return publicUrl;
     } catch (error) {
       console.error('Error uploading image:', error);
-      Alert.alert('Error', t('announcement_editor:upload_image_error'));
+      Alert.alert(t('common:error'), t('announcement_editor:upload_image_error'));
       return null;
     } finally {
       setUploadingImage(false);
@@ -292,12 +292,12 @@ export default function AnnouncementEditorScreen() {
     const authorTitle = isSpanishAuthor ? formData.title_es : formData.title;
     const authorMessage = isSpanishAuthor ? formData.message_es : formData.message;
     if (!authorTitle || !authorMessage) {
-      Alert.alert('Error', t('announcement_editor:error_fill_fields'));
+      Alert.alert(t('common:error'), t('announcement_editor:error_fill_fields'));
       return;
     }
 
     if (!user?.id) {
-      Alert.alert('Error', t('announcement_editor:error_not_authenticated'));
+      Alert.alert(t('common:error'), t('announcement_editor:error_not_authenticated'));
       return;
     }
 
@@ -348,7 +348,7 @@ export default function AnnouncementEditorScreen() {
           throw error;
         }
         console.log('Announcement updated successfully');
-        Alert.alert('Success', t('announcement_editor:updated_success'));
+        Alert.alert(t('common:success'), t('announcement_editor:updated_success'));
 
         // Save Spanish translations (server null semantics vary — most content tables COALESCE-keep when blank)
         await saveTranslations('announcements', editingAnnouncement.id, {
@@ -418,7 +418,7 @@ export default function AnnouncementEditorScreen() {
           }
         }
         
-        Alert.alert('Success', t('announcement_editor:created_success'));
+        Alert.alert(t('common:success'), t('announcement_editor:created_success'));
 
         // Save Spanish translations for newly created item
         if (newAnnouncementId) {
@@ -445,7 +445,7 @@ export default function AnnouncementEditorScreen() {
       await loadAnnouncements();
     } catch (error: any) {
       console.error('Error saving announcement:', error);
-      Alert.alert('Error', translateServerError(error, t('announcement_editor:save_error')));
+      Alert.alert(t('common:error'), translateServerError(error, t('announcement_editor:save_error')));
     }
   };
 
@@ -461,7 +461,7 @@ export default function AnnouncementEditorScreen() {
           onPress: async () => {
             try {
               if (!user?.id) {
-                Alert.alert('Error', t('announcement_editor:error_not_authenticated'));
+                Alert.alert(t('common:error'), t('announcement_editor:error_not_authenticated'));
                 return;
               }
 
@@ -485,12 +485,12 @@ export default function AnnouncementEditorScreen() {
               // content_images rows are cascaded by delete_announcement server-side.
 
               console.log('Announcement deleted successfully');
-              Alert.alert('Success', t('announcement_editor:deleted_success'));
+              Alert.alert(t('common:success'), t('announcement_editor:deleted_success'));
               
               await loadAnnouncements();
             } catch (error: any) {
               console.error('Error deleting announcement:', error);
-              Alert.alert('Error', translateServerError(error, t('announcement_editor:delete_error')));
+              Alert.alert(t('common:error'), translateServerError(error, t('announcement_editor:delete_error')));
             }
           },
         },
@@ -717,15 +717,30 @@ export default function AnnouncementEditorScreen() {
   const getPriorityLabel = (priority: string) => {
     switch (priority) {
       case 'new':
-        return 'New';
+        return t('common:priority_new');
       case 'important':
-        return 'Important';
+        return t('common:priority_important');
       case 'update':
-        return 'Update';
+        return t('common:priority_update');
       case 'none':
-        return 'None';
+        return t('common:priority_none');
       default:
         return priority.charAt(0).toUpperCase() + priority.slice(1);
+    }
+  };
+
+  const getVisibilityLabel = (visibility: string) => {
+    switch (visibility) {
+      case 'everyone':
+        return t('announcement_editor:visibility_everyone');
+      case 'employees':
+        return t('announcement_editor:visibility_employees');
+      case 'managers':
+        return t('announcement_editor:visibility_managers');
+      case 'none':
+        return t('announcement_editor:visibility_none');
+      default:
+        return visibility.charAt(0).toUpperCase() + visibility.slice(1);
     }
   };
 
@@ -891,7 +906,7 @@ export default function AnnouncementEditorScreen() {
                                 size={16}
                                 color={colors.textSecondary}
                               />
-                              <Text style={styles.metaText}>{announcement.visibility}</Text>
+                              <Text style={styles.metaText}>{getVisibilityLabel(announcement.visibility)}</Text>
                             </View>
                           </View>
                         </View>
@@ -935,7 +950,7 @@ export default function AnnouncementEditorScreen() {
                                 size={16}
                                 color={colors.textSecondary}
                               />
-                              <Text style={styles.metaText}>{announcement.visibility}</Text>
+                              <Text style={styles.metaText}>{getVisibilityLabel(announcement.visibility)}</Text>
                             </View>
                           </View>
                         </View>
@@ -1072,8 +1087,8 @@ export default function AnnouncementEditorScreen() {
 
                   {/* Additional Images */}
                   <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Additional Images</Text>
-                    <Text style={styles.formHint}>Add more images for a swipeable carousel in the detail view</Text>
+                    <Text style={styles.formLabel}>{t('common:additional_images')}</Text>
+                    <Text style={styles.formHint}>{t('common:additional_images_hint')}</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.additionalImagesScroll}>
                       {additionalImageUrls.map((url, idx) => (
                         <View key={`existing-${idx}`} style={styles.additionalImageContainer}>
@@ -1096,13 +1111,13 @@ export default function AnnouncementEditorScreen() {
                             <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={22} color="#E74C3C" />
                           </TouchableOpacity>
                           <View style={styles.newImageBadge}>
-                            <Text style={styles.newImageBadgeText}>NEW</Text>
+                            <Text style={styles.newImageBadgeText}>{t('common:image_new_badge')}</Text>
                           </View>
                         </View>
                       ))}
                       <TouchableOpacity style={styles.addImageButton} onPress={pickAdditionalImage}>
                         <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={32} color="#D4A843" />
-                        <Text style={styles.addImageText}>Add</Text>
+                        <Text style={styles.addImageText}>{t('common:add')}</Text>
                       </TouchableOpacity>
                     </ScrollView>
                   </View>
@@ -1176,7 +1191,7 @@ export default function AnnouncementEditorScreen() {
                   </View>
 
                   <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Attach File from Guides & Training (Optional)</Text>
+                    <Text style={styles.formLabel}>{t('announcement_editor:attach_file_label')}</Text>
 
                     {selectedGuideFile ? (
                       <View style={styles.selectedFileContainer}>
@@ -1213,7 +1228,7 @@ export default function AnnouncementEditorScreen() {
                           color={colors.primary}
                         />
                         <Text style={styles.filePickerButtonText}>
-                          {showFileSection ? 'Hide File Selection' : 'Show File Selection'}
+                          {showFileSection ? t('announcement_editor:hide_file_selection') : t('announcement_editor:show_file_selection')}
                         </Text>
                       </TouchableOpacity>
                     )}
@@ -1229,7 +1244,7 @@ export default function AnnouncementEditorScreen() {
                           />
                           <TextInput
                             style={styles.searchInput}
-                            placeholder="Search files by name, category..."
+                            placeholder={t('announcement_editor:search_files_placeholder')}
                             placeholderTextColor="#999999"
                             value={fileSearchQuery}
                             onChangeText={setFileSearchQuery}
@@ -1290,9 +1305,9 @@ export default function AnnouncementEditorScreen() {
                                 size={48}
                                 color="#999999"
                               />
-                              <Text style={styles.emptyFileListText}>No files found</Text>
+                              <Text style={styles.emptyFileListText}>{t('announcement_editor:no_files_found')}</Text>
                               <Text style={styles.emptyFileListSubtext}>
-                                Try adjusting your search or check if files are uploaded in Guides & Training
+                                {t('announcement_editor:no_files_subtext')}
                               </Text>
                             </View>
                           )}
@@ -1301,27 +1316,27 @@ export default function AnnouncementEditorScreen() {
                     )}
 
                     <Text style={styles.formHint}>
-                      Attach a file from Guides & Training to display View and Download buttons
+                      {t('announcement_editor:attach_file_hint')}
                     </Text>
                   </View>
 
                   {/* Badge Type + Visible To — side-by-side dropdowns */}
                   <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Badge Type & Visibility</Text>
+                    <Text style={styles.formLabel}>{t('announcement_editor:badge_visibility_label')}</Text>
                     <View style={styles.dropdownRow}>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.formHint}>Badge</Text>
+                        <Text style={styles.formHint}>{t('announcement_editor:badge_label')}</Text>
                         <SelectField
                           value={getPriorityLabel(formData.priority)}
-                          placeholder="Badge Type"
+                          placeholder={t('announcement_editor:badge_type_label')}
                           onPress={() => setShowBadgePicker(true)}
                         />
                       </View>
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.formHint}>Visible To</Text>
+                        <Text style={styles.formHint}>{t('announcement_editor:visible_to_label')}</Text>
                         <SelectField
-                          value={formData.visibility.charAt(0).toUpperCase() + formData.visibility.slice(1)}
-                          placeholder="Visibility"
+                          value={getVisibilityLabel(formData.visibility)}
+                          placeholder={t('announcement_editor:visible_to_label')}
                           onPress={() => setShowVisibilityPicker(true)}
                         />
                       </View>
@@ -1333,10 +1348,10 @@ export default function AnnouncementEditorScreen() {
                 <View style={styles.notificationToggleContainer}>
                   <View style={styles.notificationToggleTextContainer}>
                     <Text style={styles.notificationToggleLabel}>
-                      Send notification to staff?
+                      {t('announcement_editor:send_notification_label')}
                     </Text>
                     <Text style={styles.notificationToggleHint}>
-                      Select whether to send a push notification when this announcement is published.
+                      {t('announcement_editor:send_notification_hint')}
                     </Text>
                   </View>
                   <Switch
@@ -1353,7 +1368,7 @@ export default function AnnouncementEditorScreen() {
                   style={styles.cancelButton}
                   onPress={closeModal}
                 >
-                  <Text style={styles.cancelButtonText}>Cancel</Text>
+                  <Text style={styles.cancelButtonText}>{t('announcement_editor:cancel_button')}</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1365,7 +1380,7 @@ export default function AnnouncementEditorScreen() {
                     <ActivityIndicator color={colors.fireText} />
                   ) : (
                     <Text style={styles.saveButtonText}>
-                      {editingAnnouncement ? 'Update Announcement' : 'Add Announcement'}
+                      {editingAnnouncement ? t('announcement_editor:save_button') : t('announcement_editor:add_save_button')}
                     </Text>
                   )}
                 </TouchableOpacity>
@@ -1374,7 +1389,7 @@ export default function AnnouncementEditorScreen() {
 
             <SimpleSelectPicker
               visible={showBadgePicker}
-              title="Badge Type"
+              title={t('announcement_editor:badge_type_label')}
               options={PRIORITY_LEVELS.map(p => getPriorityLabel(p))}
               value={getPriorityLabel(formData.priority)}
               onSelect={(label) => {
@@ -1386,11 +1401,12 @@ export default function AnnouncementEditorScreen() {
 
             <SimpleSelectPicker
               visible={showVisibilityPicker}
-              title="Visible To"
-              options={VISIBILITY_OPTIONS.map(v => v.charAt(0).toUpperCase() + v.slice(1))}
-              value={formData.visibility.charAt(0).toUpperCase() + formData.visibility.slice(1)}
+              title={t('announcement_editor:visible_to_label')}
+              options={VISIBILITY_OPTIONS.map(v => getVisibilityLabel(v))}
+              value={getVisibilityLabel(formData.visibility)}
               onSelect={(label) => {
-                setFormData(prev => ({ ...prev, visibility: label.toLowerCase() }));
+                const match = VISIBILITY_OPTIONS.find(v => getVisibilityLabel(v) === label);
+                if (match) setFormData(prev => ({ ...prev, visibility: match }));
               }}
               onClose={() => setShowVisibilityPicker(false)}
             />

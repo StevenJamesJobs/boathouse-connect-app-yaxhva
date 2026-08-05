@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Switch,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -27,12 +28,15 @@ interface TitleMapping {
   job_title: string;
 }
 
-const ASSISTANT_INFO: Record<string, { label: string; description: string }> = {
-  server: { label: 'Server Assistant', description: 'Server opening/closing checklists, sidework guides' },
-  bartender: { label: 'Bartender Assistant', description: 'Bar checklists, cocktail recipes, binder' },
-  host: { label: 'Host Assistant', description: 'Seating charts, reservation guides' },
-  kitchen: { label: 'Kitchen Assistant', description: 'Kitchen prep lists, station guides' },
-  check_outs: { label: 'Check Outs Calculator', description: 'End-of-shift checkout calculator' },
+// t() cannot run at module scope, so this table holds KEYS and the render site
+// resolves them. The labels reuse the employee_tools names the staff-facing
+// Tools screen already uses, so one assistant has one name app-wide.
+const ASSISTANT_INFO: Record<string, { labelKey: string; descKey: string }> = {
+  server: { labelKey: 'employee_tools:server_assistant', descKey: 'org_settings.assistant_server_desc' },
+  bartender: { labelKey: 'employee_tools:bartender_assistant', descKey: 'org_settings.assistant_bartender_desc' },
+  host: { labelKey: 'employee_tools:host_assistant', descKey: 'org_settings.assistant_host_desc' },
+  kitchen: { labelKey: 'employee_tools:kitchen_assistant', descKey: 'org_settings.assistant_kitchen_desc' },
+  check_outs: { labelKey: 'employee_tools:check_out_calculator', descKey: 'org_settings.assistant_check_outs_desc' },
 };
 
 interface Props {
@@ -40,6 +44,7 @@ interface Props {
 }
 
 export default function AssistantsManager({ colors }: Props) {
+  const { t } = useTranslation();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
   const { activeJobTitles } = useOrgJobTitles();
@@ -80,7 +85,7 @@ export default function AssistantsManager({ colors }: Props) {
         prev.map(a => a.id === item.id ? { ...a, is_active: !a.is_active } : a)
       );
     } catch (err: any) {
-      Alert.alert('Error', translateServerError(err, 'Failed to update.'));
+      Alert.alert(t('common:error'), translateServerError(err, t('org_settings.update_failed', 'Failed to update.')));
     }
   };
 
@@ -107,7 +112,7 @@ export default function AssistantsManager({ colors }: Props) {
         setMappings(prev => [...prev, { assistant_key: assistantKey, job_title: jobTitle }]);
       }
     } catch (err: any) {
-      Alert.alert('Error', translateServerError(err, 'Failed to update access.'));
+      Alert.alert(t('common:error'), translateServerError(err, t('org_settings.update_access_failed', 'Failed to update access.')));
     }
   };
 
@@ -116,7 +121,7 @@ export default function AssistantsManager({ colors }: Props) {
   if (isLoading) {
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Tools & Assistants</Text>
+        <Text style={styles.sectionTitle}>{t('org_settings.tools_assistants', 'Tools & Assistants')}</Text>
         <ActivityIndicator color={colors.primary} />
       </View>
     );
@@ -124,15 +129,16 @@ export default function AssistantsManager({ colors }: Props) {
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Tools & Assistants</Text>
+      <Text style={styles.sectionTitle}>{t('org_settings.tools_assistants', 'Tools & Assistants')}</Text>
       <Text style={styles.hint}>
-        Toggle tools on/off, then tap a tool to configure which job titles can access it.
+        {t('org_settings.tools_assistants_hint', 'Toggle tools on/off, then tap a tool to configure which job titles can access it.')}
       </Text>
 
       {assistants.map(item => {
-        const info = ASSISTANT_INFO[item.assistant_key] || {
-          label: item.display_name || item.assistant_key,
-          description: '',
+        const meta = ASSISTANT_INFO[item.assistant_key];
+        const info = {
+          label: meta ? t(meta.labelKey) : (item.display_name || item.assistant_key),
+          description: meta ? t(meta.descKey) : '',
         };
         const isExpanded = expandedKey === item.assistant_key;
         const assignedCount = mappings.filter(m => m.assistant_key === item.assistant_key).length;
@@ -163,7 +169,7 @@ export default function AssistantsManager({ colors }: Props) {
                 </Text>
                 <Text style={styles.assistantDesc}>
                   {info.description}
-                  {assignedCount > 0 ? ` · ${assignedCount} title${assignedCount !== 1 ? 's' : ''}` : ''}
+                  {assignedCount > 0 ? ' · ' + t('org_settings.title_count', { count: assignedCount }) : ''}
                 </Text>
               </View>
               <Switch
@@ -176,7 +182,7 @@ export default function AssistantsManager({ colors }: Props) {
 
             {isExpanded && (
               <View style={styles.titlesList}>
-                <Text style={styles.titlesHeader}>Who can access this tool?</Text>
+                <Text style={styles.titlesHeader}>{t('org_settings.who_can_access', 'Who can access this tool?')}</Text>
                 {activeJobTitles.map(title => {
                   const checked = titleHasAccess(item.assistant_key, title);
                   return (
@@ -205,7 +211,7 @@ export default function AssistantsManager({ colors }: Props) {
                   );
                 })}
                 {activeJobTitles.length === 0 && (
-                  <Text style={styles.emptyText}>No active job titles. Add some above first.</Text>
+                  <Text style={styles.emptyText}>{t('org_settings.no_active_titles', 'No active job titles. Add some above first.')}</Text>
                 )}
               </View>
             )}
@@ -214,7 +220,7 @@ export default function AssistantsManager({ colors }: Props) {
       })}
 
       {assistants.length === 0 && (
-        <Text style={styles.emptyText}>No assistants configured for this organization.</Text>
+        <Text style={styles.emptyText}>{t('org_settings.no_assistants', 'No assistants configured for this organization.')}</Text>
       )}
     </View>
   );

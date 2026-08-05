@@ -9,6 +9,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { isManagerOrOwner } from '@/utils/roles';
 import PremiumGate from '@/components/PremiumGate';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { fetchOwnWineVisible } from '@/utils/game/wineVisibility';
 import {
@@ -157,13 +159,8 @@ export default function PictureThisGameScreen() {
   if (!hasPremium) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.primary} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('picture_this:hub_title')}</Text>
-          <View style={{ width: 40 }} />
-        </View>
+        <AmbientGlow />
+        <ScreenHeader title={t('picture_this:hub_title')} />
         {isManagerOrOwner(user) ? (
           <PremiumGate
             desc={t('game_hub_ui:premium_intro')}
@@ -185,13 +182,8 @@ export default function PictureThisGameScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('picture_this:hub_title')}</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <AmbientGlow />
+      <ScreenHeader title={t('picture_this:hub_title')} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={[styles.introCard, { backgroundColor: '#EC489915', borderColor: '#EC489940' }]}>
@@ -304,17 +296,6 @@ export default function PictureThisGameScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-  },
-  backBtn: { width: 40 },
-  headerTitle: { fontSize: 20, fontWeight: '700' },
   content: { padding: 16, paddingBottom: 120 },
   introCard: {
     borderRadius: 12,

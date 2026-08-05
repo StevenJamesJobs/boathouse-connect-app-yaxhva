@@ -20,6 +20,8 @@ import PremiumGate from '@/components/PremiumGate';
 import { useAppTheme } from '@/contexts/ThemeContext';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
@@ -967,13 +969,8 @@ export default function ExamEditorScreen() {
   if (!hasPremium) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('exam_editor.title', { type: getExamTypeName(examType, isSpanish) })}</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <AmbientGlow />
+        <ScreenHeader title={t('exam_editor.title', { type: getExamTypeName(examType, isSpanish) })} />
         <PremiumGate
           desc={t('weekly_quizzes.premium_desc')}
           bullets={[t('weekly_quizzes.premium_b1'), t('weekly_quizzes.premium_b2'), t('weekly_quizzes.premium_b3')]}
@@ -986,13 +983,8 @@ export default function ExamEditorScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('exam_editor.title', { type: getExamTypeName(examType, isSpanish) })}</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <AmbientGlow />
+        <ScreenHeader title={t('exam_editor.title', { type: getExamTypeName(examType, isSpanish) })} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -1005,14 +997,8 @@ export default function ExamEditorScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('exam_editor.title', { type: getExamTypeName(examType, isSpanish) })}</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <AmbientGlow />
+      <ScreenHeader title={t('exam_editor.title', { type: getExamTypeName(examType, isSpanish) })} />
 
       {/* Tab Selector (only show when there's an active exam) */}
       {(currentExam?.status === 'active' || currentExam?.status === 'paused') && (
@@ -2083,18 +2069,6 @@ export default function ExamEditorScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: { padding: 8 },
-  headerTitle: { fontSize: 18, fontWeight: 'bold' },
-  placeholder: { width: 40 },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   tabWrapper: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   tabContainer: {

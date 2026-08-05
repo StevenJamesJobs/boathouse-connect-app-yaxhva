@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { GameMode, PlayMode, GAME_MODE_INFO, LeaderboardEntry } from '@/types/game';
@@ -44,10 +45,16 @@ export default function MemoryGameLeaderboardScreen() {
   }, [wineVisible, activeMode]);
   const [entries, setEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [highestByMode, setHighestByMode] = useState<Record<string, number>>({});
 
-  useEffect(() => {
-    loadLeaderboard();
-  }, [activeMode, activePlayMode]);
+  // Refetch on every focus as well as on tab change, so a score set through the
+  // Play Now pill is on the board when the game screen pops back here.
+  useFocusEffect(
+    useCallback(() => {
+      loadLeaderboard();
+      loadProgress();
+    }, [activeMode, activePlayMode, user?.id])
+  );
 
   const loadLeaderboard = async () => {
     if (!user?.id) return;
@@ -71,6 +78,23 @@ export default function MemoryGameLeaderboardScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // One self-only RPC returns per-mode aggregates for every game mode at once.
+  const loadProgress = async () => {
+    if (!user?.id) return;
+    const { data } = await supabase.rpc('get_my_game_stats', { p_actor_id: user.id });
+    const byMode: Record<string, number> = {};
+    for (const row of data || []) byMode[row.game_mode] = row.highest_completed_difficulty;
+    setHighestByMode(byMode);
+  };
+
+  const startPlay = () => {
+    // Continue from highest completed + 1, the same rule the Game Hub applies
+    // (menu-memory-game.tsx), so both entry points drop you at the same level.
+    const highest = highestByMode[activeMode] ?? 0;
+    const difficulty = highest > 0 ? Math.min(highest + 1, 5) : 1;
+    router.push(`/memory-game-play?mode=${activeMode}&difficulty=${difficulty}&play_mode=${activePlayMode}`);
   };
 
   const playModes: { key: PlayMode; label: string }[] = [
@@ -232,10 +256,10 @@ export default function MemoryGameLeaderboardScreen() {
           </Text>
           <TouchableOpacity
             style={[styles.playButton, { backgroundColor: colors.primary }]}
-            onPress={() => router.push(`/memory-game-play?mode=${activeMode}&difficulty=1&play_mode=${activePlayMode}`)}
+            onPress={startPlay}
           >
             <Text style={[styles.playButtonText, { color: colors.fireText }]}>
-              {t('memory_game.be_first')}
+              {t('memory_game.play_now')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -245,6 +269,16 @@ export default function MemoryGameLeaderboardScreen() {
           renderItem={renderEntry}
           keyExtractor={item => item.user_id}
           contentContainerStyle={styles.listContent}
+          ListFooterComponent={
+            <TouchableOpacity
+              style={[styles.playButton, styles.playFooterButton, { backgroundColor: colors.primary }]}
+              onPress={startPlay}
+            >
+              <Text style={[styles.playButtonText, { color: colors.fireText }]}>
+                {t('memory_game.play_now')}
+              </Text>
+            </TouchableOpacity>
+          }
         />
       )}
 
@@ -336,6 +370,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 10,
+  },
+  playFooterButton: {
+    alignSelf: 'center',
+    marginTop: 8,
   },
   playButtonText: {
     color: '#fff',

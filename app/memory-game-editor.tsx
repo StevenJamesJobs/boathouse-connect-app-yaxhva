@@ -13,7 +13,6 @@ import {
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
-import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -24,6 +23,8 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 import PremiumGate from '@/components/PremiumGate';
 import { PlayMode } from '@/types/game';
 import { translateServerError } from '@/utils/serverErrors';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
 
 interface WinePairing {
   id: string;
@@ -37,7 +38,6 @@ interface WinePairing {
 type ScoreFilter = 'all' | PlayMode;
 
 export default function MemoryGameEditorScreen() {
-  const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { organizationId } = useOrganization();
@@ -389,13 +389,8 @@ export default function MemoryGameEditorScreen() {
   if (!hasPremium) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('memory_game_editor.title')}</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <AmbientGlow />
+        <ScreenHeader title={t('memory_game_editor.title')} />
         <PremiumGate
           desc={t('game_hub_ui.premium_intro')}
           bullets={[t('game_hub_ui.premium_b1'), t('game_hub_ui.premium_b2')]}
@@ -410,14 +405,9 @@ export default function MemoryGameEditorScreen() {
       style={[styles.container, { backgroundColor: colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
+      <AmbientGlow />
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('memory_game_editor.title')}</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <ScreenHeader title={t('memory_game_editor.title')} />
 
       {/* Tab Selector */}
       <View style={styles.tabWrapper}>
@@ -507,18 +497,6 @@ function EditPairingForm({
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: { padding: 8 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
-  placeholder: { width: 40 },
   tabWrapper: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
   tabContainer: {
     flexDirection: 'row',

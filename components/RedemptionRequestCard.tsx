@@ -1,5 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 
@@ -31,11 +33,13 @@ interface Props {
   onPress?: (row: RedemptionRequestRow) => void;
 }
 
-const TYPE_LABEL: Record<RedemptionType, string> = {
-  food_beverage: 'Food & Beverage',
-  section: 'Choose Your Own Section',
-  side_work: 'Choose Your Own Side Work',
-  side_work_free: 'Side Work Free Shift',
+// The same keys the redeem screen's option cards and the approvals detail
+// modal use (app/manager-approvals.tsx) — so all three finally agree.
+const TYPE_LABEL_KEY: Record<RedemptionType, string> = {
+  food_beverage: 'rewards_ui:redeem_food_title',
+  section: 'rewards_ui:redeem_section_title',
+  side_work: 'rewards_ui:redeem_sidework_title',
+  side_work_free: 'rewards_ui:redeem_freeshift_title',
 };
 
 const TYPE_ICON: Record<RedemptionType, { ios: string; android: string }> = {
@@ -54,21 +58,33 @@ const STATUS_COLOR: Record<RedemptionStatus, string> = {
 
 export function RedemptionRequestCard({ row, managerView, onApprove, onDeny, onPress }: Props) {
   const colors = useThemeColors();
+  const { t } = useTranslation();
+  const { language } = useLanguage();
+  const dateLocale = language === 'es' ? 'es-ES' : 'en-US';
   const icon = TYPE_ICON[row.request_type] || { ios: 'star.circle.fill', android: 'stars' };
   // Custom options aren't in the built-in maps — their name IS the snapshot.
-  const isCustom = !TYPE_LABEL[row.request_type];
-  const typeLabel = TYPE_LABEL[row.request_type] || row.item_name_snapshot || 'Custom Reward';
+  const isCustom = !TYPE_LABEL_KEY[row.request_type];
+  const typeLabel = TYPE_LABEL_KEY[row.request_type]
+    ? t(TYPE_LABEL_KEY[row.request_type])
+    : row.item_name_snapshot || t('rewards_ui:req_custom_reward', 'Custom Reward');
+
+  const STATUS_LABEL: Record<RedemptionStatus, string> = {
+    pending: t('rewards_ui:req_status_pending', 'Pending'),
+    approved: t('rewards_ui:req_status_approved', 'Approved'),
+    denied: t('rewards_ui:req_status_denied', 'Denied'),
+    expired: t('rewards_ui:req_status_expired', 'Expired'),
+  };
 
   const detailLine = (() => {
     if (row.request_type === 'food_beverage') {
-      return row.item_name_snapshot || 'Menu item';
+      return row.item_name_snapshot || t('rewards_ui:req_menu_item', 'Menu item');
     }
     if (isCustom) return '';
     const parts: string[] = [];
-    if (row.shift_date) parts.push(new Date(row.shift_date + 'T00:00:00').toLocaleDateString());
+    if (row.shift_date) parts.push(new Date(row.shift_date + 'T00:00:00').toLocaleDateString(dateLocale));
     if (row.shift_period) parts.push(row.shift_period);
     if (row.comment) parts.push(`— ${row.comment}`);
-    return parts.join(' ').trim() || 'No details';
+    return parts.join(' ').trim() || t('rewards_ui:req_no_details', 'No details');
   })();
 
   const Wrap: any = onPress ? TouchableOpacity : View;
@@ -99,7 +115,10 @@ export function RedemptionRequestCard({ row, managerView, onApprove, onDeny, onP
         <View style={styles.amountCol}>
           <Text style={[styles.amount, { color: colors.primary }]}>${row.bucks_amount}</Text>
           <View style={[styles.statusPill, { backgroundColor: STATUS_COLOR[row.status] + '22' }]}>
-            <Text style={[styles.statusText, { color: STATUS_COLOR[row.status] }]}>{row.status}</Text>
+            {/* ?? keeps an unexpected server enum visible rather than blank. */}
+            <Text style={[styles.statusText, { color: STATUS_COLOR[row.status] }]}>
+              {STATUS_LABEL[row.status] ?? row.status}
+            </Text>
           </View>
         </View>
       </View>
@@ -111,7 +130,7 @@ export function RedemptionRequestCard({ row, managerView, onApprove, onDeny, onP
               style={[styles.actionBtn, { backgroundColor: '#F4433620', borderColor: '#F44336' }]}
               onPress={() => onDeny(row)}
             >
-              <Text style={[styles.actionText, { color: '#F44336' }]}>Deny</Text>
+              <Text style={[styles.actionText, { color: '#F44336' }]}>{t('rewards_ui:req_deny', 'Deny')}</Text>
             </TouchableOpacity>
           ) : null}
           {onApprove ? (
@@ -119,7 +138,7 @@ export function RedemptionRequestCard({ row, managerView, onApprove, onDeny, onP
               style={[styles.actionBtn, { backgroundColor: '#4CAF5020', borderColor: '#4CAF50' }]}
               onPress={() => onApprove(row)}
             >
-              <Text style={[styles.actionText, { color: '#4CAF50' }]}>Approve</Text>
+              <Text style={[styles.actionText, { color: '#4CAF50' }]}>{t('rewards_ui:req_approve', 'Approve')}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -127,7 +146,7 @@ export function RedemptionRequestCard({ row, managerView, onApprove, onDeny, onP
 
       {row.status === 'denied' && row.decision_reason ? (
         <Text style={[styles.reason, { color: colors.textSecondary }]} numberOfLines={3}>
-          Reason: {row.decision_reason}
+          {t('rewards_ui:req_reason', { reason: row.decision_reason, defaultValue: 'Reason: {{reason}}' })}
         </Text>
       ) : null}
     </Wrap>

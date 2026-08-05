@@ -36,6 +36,7 @@ import {
 import { getExamTypeName, type ExamType } from '@/utils/exam/questionGenerator';
 import { getEligibleQuizTypes } from '@/app/weekly-quizzes';
 import { refreshAllUnreadQuizReward } from '@/hooks/useUnreadQuizReward';
+import { refreshAllUnreadQuizzes } from '@/hooks/useUnreadQuizzes';
 import { enqueuePendingSubmit, getPendingSubmit, removePendingSubmit } from '@/utils/exam/pendingSubmits';
 import { useTranslation } from 'react-i18next';
 
@@ -394,6 +395,10 @@ export default function ExamPlayScreen() {
       await refreshUser();
       // Light up the Rewards-tab badge — a quiz reward is now waiting.
       refreshAllUnreadQuizReward();
+      // ...and clear the unread-QUIZ badge: this quiz is now taken, so the tab
+      // bars / Tools tile / BadgeSyncer counts are stale until we broadcast
+      // (they would otherwise sit wrong until their next 30s poll).
+      refreshAllUnreadQuizzes();
     } catch (err) {
       console.error('Submit results error:', err);
       // Park the exact payload in the offline outbox: the quiz now counts as

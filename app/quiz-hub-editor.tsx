@@ -21,6 +21,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import PremiumGate from '@/components/PremiumGate';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
 
 interface ExamSummary {
   id: string;
@@ -215,13 +217,8 @@ export default function QuizHubEditorScreen() {
   if (!hasPremium) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('weekly_quizzes.title')}</Text>
-          <View style={styles.placeholder} />
-        </View>
+        <AmbientGlow />
+        <ScreenHeader title={t('weekly_quizzes.title')} />
         <PremiumGate
           desc={t('weekly_quizzes.premium_desc')}
           bullets={[t('weekly_quizzes.premium_b1'), t('weekly_quizzes.premium_b2'), t('weekly_quizzes.premium_b3')]}
@@ -233,14 +230,9 @@ export default function QuizHubEditorScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AmbientGlow />
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('weekly_quizzes.title')}</Text>
-        <View style={styles.placeholder} />
-      </View>
+      <ScreenHeader title={t('weekly_quizzes.title')} />
 
       <ScrollView contentContainerStyle={styles.contentContainer}>
         {loading ? (
@@ -268,18 +260,6 @@ export default function QuizHubEditorScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: { padding: 8 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
-  placeholder: { width: 40 },
   contentContainer: {
     paddingHorizontal: 16,
     paddingTop: 20,

@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Switch,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export default function JobTitlesManager({ colors }: Props) {
+  const { t } = useTranslation();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
   const { jobTitles, isLoading, refetch } = useOrgJobTitles();
@@ -31,7 +33,10 @@ export default function JobTitlesManager({ colors }: Props) {
     const trimmed = newTitle.trim();
     if (!trimmed) return;
     if (jobTitles.some(jt => jt.title.toLowerCase() === trimmed.toLowerCase())) {
-      Alert.alert('Duplicate', 'This job title already exists.');
+      Alert.alert(
+        t('onboarding:duplicate_title', 'Duplicate'),
+        t('org_settings.job_title_exists', 'This job title already exists.'),
+      );
       return;
     }
 
@@ -47,7 +52,7 @@ export default function JobTitlesManager({ colors }: Props) {
       setNewTitle('');
       await refetch();
     } catch (err: any) {
-      Alert.alert('Error', translateServerError(err, 'Failed to add title.'));
+      Alert.alert(t('common:error'), translateServerError(err, t('org_settings.add_title_failed', 'Failed to add title.')));
     } finally {
       setAdding(false);
     }
@@ -65,7 +70,7 @@ export default function JobTitlesManager({ colors }: Props) {
       if (error) throw error;
       await refetch();
     } catch (err: any) {
-      Alert.alert('Error', translateServerError(err, 'Failed to update.'));
+      Alert.alert(t('common:error'), translateServerError(err, t('org_settings.update_failed', 'Failed to update.')));
     }
   };
 
@@ -84,12 +89,15 @@ export default function JobTitlesManager({ colors }: Props) {
 
   const handleDeleteTitle = (item: OrgJobTitle) => {
     Alert.alert(
-      'Delete Title',
-      `Remove "${item.title}" permanently? Employees with this title won't lose it, but it won't appear in the picker.`,
+      t('org_settings.delete_title_title', 'Delete Title'),
+      t('org_settings.delete_title_msg', {
+        title: item.title,
+        defaultValue: 'Remove "{{title}}" permanently? Employees with this title won\'t lose it, but it won\'t appear in the picker.',
+      }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common:cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common:delete'),
           style: 'destructive',
           onPress: async () => {
             if (!user?.id) return;
@@ -100,7 +108,7 @@ export default function JobTitlesManager({ colors }: Props) {
               });
               await refetch();
             } catch (err: any) {
-              Alert.alert('Error', translateServerError(err, 'Failed to delete.'));
+              Alert.alert(t('common:error'), translateServerError(err, t('org_settings.delete_title_failed', 'Failed to delete.')));
             }
           },
         },
@@ -113,7 +121,7 @@ export default function JobTitlesManager({ colors }: Props) {
   if (isLoading) {
     return (
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Job Titles</Text>
+        <Text style={styles.sectionTitle}>{t('onboarding:step1_title', 'Job Titles')}</Text>
         <ActivityIndicator color={colors.primary} />
       </View>
     );
@@ -121,9 +129,9 @@ export default function JobTitlesManager({ colors }: Props) {
 
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Job Titles</Text>
+      <Text style={styles.sectionTitle}>{t('onboarding:step1_title', 'Job Titles')}</Text>
       <Text style={styles.hint}>
-        Manage the job titles available when adding employees. Toggle off to hide from the picker.
+        {t('org_settings.job_titles_hint', 'Manage the job titles available when adding employees. Toggle off to hide from the picker.')}
       </Text>
 
       {jobTitles.map((item, index) => (
@@ -176,7 +184,7 @@ export default function JobTitlesManager({ colors }: Props) {
           style={styles.addInput}
           value={newTitle}
           onChangeText={setNewTitle}
-          placeholder="New job title..."
+          placeholder={t('org_settings.job_title_ph', 'New job title...')}
           placeholderTextColor={colors.textSecondary}
           onSubmitEditing={handleAddTitle}
           returnKeyType="done"

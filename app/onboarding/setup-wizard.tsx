@@ -56,7 +56,6 @@ export default function SetupWizardScreen() {
   const [menu2Name, setMenu2Name] = useState(t('onboarding.default_menu_2'));
   const [menu1Icon, setMenu1Icon] = useState('snowflake');
   const [menu2Icon, setMenu2Icon] = useState('sun.max.fill');
-  const [headerIcon, setHeaderIcon] = useState('fork.knife');
   const [categoryScope, setCategoryScope] = useState<'shared' | 'per_menu'>('shared');
 
   // Step 3 state — Google Reviews
@@ -118,7 +117,7 @@ export default function SetupWizardScreen() {
     const menuCount = hasSeasonalMenus ? 2 : 1;
     const scope: 'shared' | 'per_menu' = hasSeasonalMenus ? categoryScope : 'shared';
     console.log('[SetupWizard] Saving menu config:', {
-      organizationId, menuCount, scope, menu1Icon, menu2Icon, headerIcon,
+      organizationId, menuCount, scope, menu1Icon, menu2Icon,
     });
     const { data: settingsRes, error: settingsError } = await supabase.rpc('update_organization_settings', {
       p_organization_id: organizationId,
@@ -130,7 +129,6 @@ export default function SetupWizardScreen() {
       p_menu_2_name: menu2Name.trim() || t('onboarding.default_menu_2'),
       p_menu_1_icon: menu1Icon,
       p_menu_2_icon: menu2Icon,
-      p_header_icon: headerIcon,
     });
     const settingsResult: any = typeof settingsRes === 'string' ? JSON.parse(settingsRes) : settingsRes;
     if (settingsError || (settingsResult && settingsResult.success === false)) {
@@ -563,8 +561,6 @@ export default function SetupWizardScreen() {
           </TouchableOpacity>
         </>
       )}
-
-      <MenuIconPicker label={t('onboarding.header_icon_label')} value={headerIcon} onChange={setHeaderIcon} />
 
       {menuUploaded ? (
         <View style={styles.menuDoneNote}>

@@ -1,8 +1,7 @@
 
 import React from 'react';
 import { Redirect, Tabs } from 'expo-router';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { isManagerOrOwner } from '@/utils/roles';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -17,44 +16,7 @@ import JoltOverlay from '@/components/JoltOverlay';
 import AmbientGlow from '@/components/AmbientGlow';
 import { useSegments } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-function EmployeeHeader() {
-  const router = useRouter();
-  const { logout } = useAuth();
-  const { t } = useTranslation();
-  const colors = useThemeColors();
-  const { organization } = useOrganization();
-
-  const handleLogout = async () => {
-    await logout();
-    router.replace('/login');
-  };
-
-  return (
-    <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-      <View style={styles.cornerBrand}>
-        <IconSymbol
-          ios_icon_name={organization?.header_icon || 'sailboat.fill'}
-          android_material_icon_name={organization?.header_icon || 'sailboat.fill'}
-          size={22}
-          color={colors.primary}
-        />
-        <Text style={[styles.cornerBrandText, { color: colors.text }]}>{organization?.name || 'MyResto Connect'}</Text>
-      </View>
-      <Text style={[styles.headerTitle, { color: colors.text }]}>{t('header.employee_portal')}</Text>
-      <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-        <IconSymbol
-          ios_icon_name="rectangle.portrait.and.arrow.right"
-          android_material_icon_name="logout"
-          size={24}
-          color={colors.text}
-        />
-      </TouchableOpacity>
-    </View>
-  );
-}
 
 function EmployeeTabBar(props: any) {
   const { unreadCount } = useUnreadMessages();
@@ -182,34 +144,3 @@ export default function EmployeeLayout() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 48 : 50,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
-    elevation: 4,
-  },
-  cornerBrand: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  cornerBrandText: {
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.3,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  logoutButton: {
-    padding: 8,
-  },
-});
