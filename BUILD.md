@@ -24,6 +24,7 @@ EAS account: **stevenjamesjobs**. Apple Team: **86JRKCMC65** (Steven Eccles — 
 - `eas-cli` installed and logged in: `eas whoami` → `stevenjamesjobs`. (A "version outdated" warning is harmless.)
 - Local Node version doesn't matter — EAS builds on its own Node (pinned to `22.15.0` in the `production` profile).
 - **Gates before building** (same as the dev workflow): `npx tsc --noEmit` with 0 net-new errors, and en/es i18n key parity. Build from a **committed** commit on `main` (EAS archives git state).
+- **Lockfile gate (learned build #11, 2026-08-04):** EAS runs `npm ci --include=dev` on **npm 10** (bundled with the pinned Node 22.15.0). A lockfile written by a newer local npm (11+) can be npm-10-invalid (e.g. a missing optional-peer entry → `EUSAGE … Missing: <pkg> from lock file`) while installing fine locally. Before building — and after ANY dependency change — validate in a scratch copy (never in the checkout): copy `package.json` + `package-lock.json` to a temp dir and run `npx -y npm@10.9.2 ci --include=dev --ignore-scripts`. If it fails, repair with `npx -y npm@10.9.2 install --package-lock-only` in the temp dir, diff, and commit the repaired lock.
 
 ## Versioning
 
