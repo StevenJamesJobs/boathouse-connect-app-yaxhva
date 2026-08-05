@@ -18,11 +18,18 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import type { Database } from '@/app/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMenuCategories, MenuCategory, MenuSubcategory } from '@/hooks/useMenuCategories';
 import { categoryLabel, subcategoryLabel } from '@/utils/menuCategoryLabels';
 import { saveTranslations } from '@/utils/translateContent';
+
+/** The typed name universe for the menu-structure RPC family — a typo here fails the build. */
+type ManageMenuRpcName = Extract<
+  keyof Database['public']['Functions'],
+  `manage_menu_${string}`
+>;
 import { useTranslationSection } from '@/components/TranslationSection';
 import CategoryColorPicker from '@/components/CategoryColorPicker';
 import { translateServerError } from '@/utils/serverErrors';
@@ -46,7 +53,7 @@ export default function ManageMenuCategoriesScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useAuth();
-  const { organizationId, organization } = useOrganization();
+  const { organizationId, organization, isLoading: orgLoading } = useOrganization();
   const perMenu = organization?.menu_category_scope === 'per_menu';
   // In per-menu scope the owner edits one menu's tree at a time (slot 1 / 2).
   const [editSlot, setEditSlot] = useState<1 | 2>(1);
@@ -99,20 +106,47 @@ export default function ManageMenuCategoriesScreen() {
     );
   }
 
+  // Every RPC below needs a concrete organization id; the context resolves it
+  // asynchronously, so hold on a spinner while it loads — and if the fetch
+  // settled without an org (permanent failure), show an exit instead of
+  // spinning forever (refreshOrganization is id-gated, so Retry can't help).
+  if (!organizationId) {
+    return (
+      <View style={[styles.container, styles.center]}>
+        {orgLoading ? (
+          <ActivityIndicator size="large" color={colors.primary} />
+        ) : (
+          <>
+            <Text style={styles.deniedText}>{t('manage_categories:load_failed')}</Text>
+            <TouchableOpacity style={styles.primaryBtn} onPress={() => router.back()}>
+              <Text style={styles.primaryBtnText}>{t('manage_categories:go_back')}</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    );
+  }
+
   // --- RPC helper ----------------------------------------------------------
   // Returns the RPC's JSON payload on success (so callers can read e.g. the new
   // row's `id`), or null on failure. Success with no JSON body resolves to {}.
-  const callRpc = async (fn: string, args: Record<string, any>, doRefresh = true): Promise<any | null> => {
+  const callRpc = async (
+    fn: ManageMenuRpcName,
+    args: Database['public']['Functions'][ManageMenuRpcName]['Args'],
+    doRefresh = true
+  ): Promise<any | null> => {
     if (busy) return null;
     setBusy(true);
     try {
-      const { data, error } = await (supabase.rpc as any)(fn, args);
+      const { data, error } = await supabase.rpc(fn, args);
       if (error) {
         Alert.alert(t('common:error'), translateServerError(error));
         return null;
       }
-      if (data && data.success === false) {
-        Alert.alert(t('common:error'), translateServerError({ message: data.error }, 'Action failed'));
+      // These RPCs return Json — narrow once so the success/error reads typecheck.
+      const payload = data as { success?: boolean; error?: string } | null;
+      if (payload && payload.success === false) {
+        Alert.alert(t('common:error'), translateServerError({ message: payload.error }, 'Action failed'));
         return null;
       }
       if (doRefresh) await refresh();
@@ -159,6 +193,7 @@ export default function ManageMenuCategoriesScreen() {
       table = 'menu_categories';
       targetId = res?.id ?? null;
     } else if (m.mode === 'rename-cat') {
+      if (!m.id) return;
       res = await callRpc('manage_menu_category_rename', {
         p_organization_id: organizationId,
         p_user_id: user!.id,
@@ -168,6 +203,7 @@ export default function ManageMenuCategoriesScreen() {
       table = 'menu_categories';
       targetId = res ? m.id : null;
     } else if (m.mode === 'add-sub') {
+      if (!m.id) return;
       res = await callRpc('manage_menu_subcategory_create', {
         p_organization_id: organizationId,
         p_user_id: user!.id,
@@ -177,6 +213,7 @@ export default function ManageMenuCategoriesScreen() {
       table = 'menu_subcategories';
       targetId = res?.id ?? null;
     } else if (m.mode === 'rename-sub') {
+      if (!m.id) return;
       res = await callRpc('manage_menu_subcategory_rename', {
         p_organization_id: organizationId,
         p_user_id: user!.id,

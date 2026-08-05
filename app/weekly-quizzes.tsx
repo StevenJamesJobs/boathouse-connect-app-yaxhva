@@ -83,7 +83,7 @@ export default function WeeklyQuizzesScreen() {
     try {
       // Fire-and-forget cleanup of expired exams (auto-close)
       try {
-        await supabase.rpc('close_expired_exams_actor' as any, { p_actor_id: user.id });
+        await supabase.rpc('close_expired_exams_actor', { p_actor_id: user.id });
       } catch {
         // ignore — cleanup is best-effort
       }
@@ -100,7 +100,7 @@ export default function WeeklyQuizzesScreen() {
         const titleLabel = labelForType(examType);
 
         // Get active exam for this type
-        const { data: examData } = await (supabase.rpc as any)('get_exam', {
+        const { data: examData } = await supabase.rpc('get_exam', {
           p_actor_id: user?.id,
           p_exam_type: examType,
           p_statuses: ['active', 'paused'],
@@ -114,7 +114,7 @@ export default function WeeklyQuizzesScreen() {
         const exam = examData[0] as ActiveExam;
 
         // Get question count
-        const { data: count } = await (supabase.rpc as any)('get_exam_question_count', {
+        const { data: count } = await supabase.rpc('get_exam_question_count', {
           p_actor_id: user?.id,
           p_exam_id: exam.id,
         });
@@ -122,7 +122,7 @@ export default function WeeklyQuizzesScreen() {
         // Check for existing result
         let result: WeeklyQuizCardResult | null = null;
         if (user?.id) {
-          const { data: resultData } = await (supabase.rpc as any)('get_my_exam_result', {
+          const { data: resultData } = await supabase.rpc('get_my_exam_result', {
             p_actor_id: user.id,
             p_exam_id: exam.id,
           });

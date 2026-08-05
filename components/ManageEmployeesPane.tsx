@@ -186,8 +186,9 @@ export default function ManageEmployeesPane({ width, scrollRef, onScroll, header
           text: t('employee_editor.delete', 'Delete'),
           style: 'destructive',
           onPress: async () => {
+            if (!user?.id) return;
             try {
-              const { error } = await (supabase.rpc as any)('delete_employee', {
+              const { error } = await supabase.rpc('delete_employee', {
                 p_actor_id: user?.id,
                 p_employee_id: emp.id,
                 p_organization_id: organizationId!,

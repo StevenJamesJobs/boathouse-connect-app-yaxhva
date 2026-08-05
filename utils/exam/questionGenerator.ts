@@ -249,7 +249,7 @@ async function fetchLibationRecipes(actorId: string): Promise<LibationRecipe[]> 
 }
 
 async function fetchWinePairings(actorId: string): Promise<WinePairing[]> {
-  let query: any = supabase.rpc('get_wine_pairings', { p_actor_id: actorId });
+  let query = supabase.rpc('get_wine_pairings', { p_actor_id: actorId });
 
   const { data, error } = await query;
   if (error || !data) return [];

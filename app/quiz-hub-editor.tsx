@@ -67,7 +67,7 @@ export default function QuizHubEditorScreen() {
     for (const examType of EXAM_TYPES) {
       try {
         // Get the most recent draft or active exam for this type
-        const { data, error } = await (supabase.rpc as any)('get_exam', {
+        const { data, error } = await supabase.rpc('get_exam', {
           p_actor_id: user?.id,
           p_exam_type: examType,
           p_statuses: ['draft', 'active', 'paused'],
@@ -77,7 +77,7 @@ export default function QuizHubEditorScreen() {
           const exam = data[0];
 
           // Get question count
-          const { data: questionCount } = await (supabase.rpc as any)('get_exam_question_count', {
+          const { data: questionCount } = await supabase.rpc('get_exam_question_count', {
             p_actor_id: user?.id,
             p_exam_id: exam.id,
           });
@@ -88,7 +88,7 @@ export default function QuizHubEditorScreen() {
 
           if (exam.status === 'active' || exam.status === 'paused') {
             try {
-              const { data: completionData } = await supabase.rpc('get_exam_completion_status_actor' as any, {
+              const { data: completionData } = await supabase.rpc('get_exam_completion_status_actor', {
                 p_exam_id: exam.id,
                 p_exam_type: examType,
                 p_actor_id: user.id,
@@ -96,7 +96,7 @@ export default function QuizHubEditorScreen() {
 
               if (completionData) {
                 totalEmployees = completionData.length;
-                completedCount = completionData.filter((e: any) => e.has_completed).length;
+                completedCount = completionData.filter((e) => e.has_completed).length;
               }
             } catch {}
           }
@@ -104,7 +104,7 @@ export default function QuizHubEditorScreen() {
           examMap.set(examType, {
             id: exam.id,
             exam_type: examType,
-            status: exam.status,
+            status: exam.status as ExamSummary['status'],
             time_limit_seconds: exam.time_limit_seconds,
             questionCount: questionCount || 0,
             completedCount,

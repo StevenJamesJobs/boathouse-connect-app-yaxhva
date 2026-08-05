@@ -78,7 +78,7 @@ export function useMenuCategories(opts?: { includeHidden?: boolean; menuSlot?: 1
       if (subRes.error) throw subRes.error;
 
       const subsByCat = new Map<string, MenuSubcategory[]>();
-      for (const s of (subRes.data || []) as any[]) {
+      for (const s of subRes.data || []) {
         if (!includeHidden && s.is_hidden) continue;
         const arr = subsByCat.get(s.category_id) || [];
         arr.push({
@@ -93,7 +93,7 @@ export function useMenuCategories(opts?: { includeHidden?: boolean; menuSlot?: 1
         subsByCat.set(s.category_id, arr);
       }
 
-      const cats: MenuCategory[] = ((catRes.data || []) as any[])
+      const cats: MenuCategory[] = (catRes.data || [])
         .filter((c) => includeHidden || !c.is_hidden)
         .map((c) => ({
           id: c.id,

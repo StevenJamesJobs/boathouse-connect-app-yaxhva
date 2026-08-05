@@ -104,7 +104,7 @@ export default function JoinScreen() {
         p_join_code: code,
       });
 
-      const row = Array.isArray(data) ? data[0] : (data as any);
+      const row = Array.isArray(data) ? data[0] : data;
       if (queryError || !row) {
         setError(t('join.invalid_code'));
         setIsLoading(false);
@@ -166,7 +166,7 @@ export default function JoinScreen() {
         return;
       }
 
-      const row = Array.isArray(data) ? data[0] : (data as any);
+      const row = Array.isArray(data) ? data[0] : data;
       if (!row) {
         setError(t('onboarding.something_went_wrong'));
         return;

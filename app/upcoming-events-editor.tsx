@@ -216,7 +216,7 @@ export default function UpcomingEventsEditorScreen() {
             p_include_inactive: true,
           });
           if (freshEvents) {
-            await resequenceDisplayOrders(freshEvents as any);
+            await resequenceDisplayOrders(freshEvents);
           }
         }
       }
@@ -247,7 +247,7 @@ export default function UpcomingEventsEditorScreen() {
       }
 
       console.log('Upcoming events loaded successfully:', data?.length || 0, 'items');
-      setEvents((data || []) as any);
+      setEvents(data || []);
     } catch (error) {
       console.error('Error loading upcoming events:', error);
       Alert.alert(t('common:error'), t('upcoming_events_editor:load_error'));

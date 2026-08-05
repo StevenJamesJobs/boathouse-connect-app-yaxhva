@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/app/integrations/supabase/client';
+import type { Database } from '@/app/integrations/supabase/types';
 
 // Offline outbox for quiz submissions. A failed submit_exam_and_award_bucks
 // call parks its exact RPC payload here; flushPendingSubmits replays it when
@@ -13,7 +14,7 @@ const STORAGE_KEY = '@mrc_pending_quiz_submits';
 
 export interface PendingQuizSubmit {
   key: string; // `${userId}:${examId}`
-  payload: Record<string, any>; // exact submit_exam_and_award_bucks args
+  payload: Database['public']['Functions']['submit_exam_and_award_bucks']['Args']; // exact submit_exam_and_award_bucks args
   queuedAt: string;
 }
 
@@ -32,7 +33,11 @@ async function writeAll(map: Record<string, PendingQuizSubmit>): Promise<void> {
   } catch {}
 }
 
-export async function enqueuePendingSubmit(userId: string, examId: string, payload: Record<string, any>): Promise<void> {
+export async function enqueuePendingSubmit(
+  userId: string,
+  examId: string,
+  payload: Database['public']['Functions']['submit_exam_and_award_bucks']['Args']
+): Promise<void> {
   const map = await readAll();
   const key = `${userId}:${examId}`;
   map[key] = { key, payload, queuedAt: new Date().toISOString() };
@@ -73,7 +78,7 @@ export async function flushPendingSubmits(userId: string | undefined | null): Pr
     const map = await readAll();
     for (const [key, entry] of Object.entries(map)) {
       if (!key.startsWith(`${userId}:`)) continue;
-      const { error } = await supabase.rpc('submit_exam_and_award_bucks', entry.payload as any);
+      const { error } = await supabase.rpc('submit_exam_and_award_bucks', entry.payload);
       if (!error) {
         delete map[key];
         flushed++;

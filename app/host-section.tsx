@@ -64,8 +64,8 @@ export default function HostSectionScreen() {
     if (!id || !user?.id) return;
     try {
       setLoading(true);
-      const { data: s } = await (supabase.rpc as any)('get_host_sections', { p_actor_id: user.id, p_id: id });
-      const { data: t } = await (supabase.rpc as any)('get_host_section_tiles', { p_actor_id: user.id, p_section_id: id });
+      const { data: s } = await supabase.rpc('get_host_sections', { p_actor_id: user.id, p_id: id });
+      const { data: t } = await supabase.rpc('get_host_section_tiles', { p_actor_id: user.id, p_section_id: id });
       setSection((s?.[0]) as HostSection);
       setTiles((t as HostTile[]) || []);
     } catch (e) {

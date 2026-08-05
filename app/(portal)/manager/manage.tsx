@@ -344,21 +344,22 @@ export default function ManagerManageScreen() {
       const settled = await Promise.allSettled([
         // Content RPCs return rows (org + manager visibility server-side); the
         // tile extraction counts data.length instead of the old head:true count.
-        supabase.rpc('get_announcements', { p_actor_id: actorId }).then((r: any) => ({ count: (r.data || []).length })),
-        supabase.rpc('get_special_features', { p_actor_id: actorId }).then((r: any) => ({ count: (r.data || []).length })),
+        supabase.rpc('get_announcements', { p_actor_id: actorId }).then((r) => ({ count: (r.data || []).length })),
+        supabase.rpc('get_special_features', { p_actor_id: actorId }).then((r) => ({ count: (r.data || []).length })),
         supabase.rpc('get_upcoming_events', { p_actor_id: actorId }),
         supabase.rpc('get_org_roster', { p_actor_id: actorId, p_date: todayIso }),
-        supabase.rpc('get_org_uploads', { p_actor_id: actorId, p_week_start: weekStartIso }).then((r: any) => ({ count: (r.data || []).length })),
+        supabase.rpc('get_org_uploads', { p_actor_id: actorId, p_week_start: weekStartIso }).then((r) => ({ count: (r.data || []).length })),
         supabase.rpc('get_org_google_reviews', { p_actor_id: actorId }),
         supabase.rpc('get_menu_items', { p_actor_id: actorId }),
         getOrgDirectory(actorId).then((rows) => ({ count: rows.filter((r) => r.is_active).length })),
         getOrgDirectory(actorId).then((rows) => ({ data: rows.filter((r) => r.is_active).sort((a, b) => (b.mcloones_bucks || 0) - (a.mcloones_bucks || 0)).slice(0, 3) })),
-        supabase.rpc('get_master_leaderboard_overall_actor' as any, { p_limit: 3, p_actor_id: actorId }),
+        supabase.rpc('get_master_leaderboard_overall_actor', { p_limit: 3, p_actor_id: actorId }),
       ]);
       // Resilient extraction — a single failed query degrades to zeros instead
       // of blanking the whole cockpit.
-      const val = (i: number): any => (settled[i].status === 'fulfilled' ? (settled[i] as any).value : {});
-      const ann = val(0), feat = val(1), eventsRes = val(2), shiftsRes = val(3), uploadRes = val(4), reviewsRes = val(5), itemsRes = val(6), staffRes = val(7), rewardsRes = val(8), gamesRes = val(9);
+      const val = <T,>(s: PromiseSettledResult<T>): Partial<T> =>
+        s.status === 'fulfilled' ? s.value : ({} as Partial<T>);
+      const ann = val(settled[0]), feat = val(settled[1]), eventsRes = val(settled[2]), shiftsRes = val(settled[3]), uploadRes = val(settled[4]), reviewsRes = val(settled[5]), itemsRes = val(settled[6]), staffRes = val(settled[7]), rewardsRes = val(settled[8]), gamesRes = val(settled[9]);
       const firstName = (n: string) => (n || '').trim().split(/\s+/)[0] || '';
       const rewardsTop = (rewardsRes.data || []).map((r: any) => ({ name: firstName(r.name), bucks: r.mcloones_bucks || 0 }));
       const gamesTop = (gamesRes.data || []).map((r: any) => ({ name: firstName(r.name), score: Number(r.total_score) || 0 }));
@@ -418,31 +419,32 @@ export default function ManagerManageScreen() {
       const settled = await Promise.allSettled([
         supabase.rpc('get_org_google_reviews', { p_actor_id: actorId, p_limit: 3 }),
         // Content RPCs order by display_order; the feed wants recency — re-sort + cap client-side.
-        supabase.rpc('get_announcements', { p_actor_id: actorId }).then((r: any) => ({ data: ((r.data || []) as any[]).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 3) })),
-        supabase.rpc('get_special_features', { p_actor_id: actorId }).then((r: any) => ({ data: ((r.data || []) as any[]).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 2) })),
-        supabase.rpc('get_upcoming_events', { p_actor_id: actorId }).then((r: any) => ({ data: ((r.data || []) as any[]).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 2) })),
+        supabase.rpc('get_announcements', { p_actor_id: actorId }).then((r) => ({ data: (r.data || []).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 3) })),
+        supabase.rpc('get_special_features', { p_actor_id: actorId }).then((r) => ({ data: (r.data || []).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 2) })),
+        supabase.rpc('get_upcoming_events', { p_actor_id: actorId }).then((r) => ({ data: (r.data || []).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 2) })),
         supabase.rpc('get_org_uploads', { p_actor_id: actorId, p_limit: 1 }),
         supabase.rpc('get_menu_items', { p_actor_id: actorId }),
-        supabase.rpc('get_guides', { p_actor_id: actorId }).then((r: any) => ({ data: ((r.data || []) as any[]).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 2) })),
+        supabase.rpc('get_guides', { p_actor_id: actorId }).then((r) => ({ data: (r.data || []).slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, 2) })),
         supabase.rpc('get_org_exam_activity', { p_actor_id: actorId, p_since: since.toISOString() }),
       ]);
-      const dataOf = (i: number): any[] => (settled[i].status === 'fulfilled' ? (settled[i] as any).value.data || [] : []);
+      const dataOf = <T,>(s: PromiseSettledResult<{ data: T[] | null }>): T[] =>
+        s.status === 'fulfilled' ? (s.value.data || []) : [];
       const items: ActItem[] = [];
-      dataOf(0).forEach((r: any) => items.push({ key: 'rev-' + r.id, icon: 'star', ios: 'star.fill', blue: true, text: t('manager_manage.act_review_t', { rating: r.review_rating, author: r.author_title || t('manager_manage.act_a_guest', 'a guest'), defaultValue: 'New {{rating}}★ Google review from {{author}}' }), ts: tsOf(r.review_datetime_utc) }));
-      dataOf(1).forEach((a: any) => items.push({ key: 'ann-' + a.id, icon: 'campaign', ios: 'megaphone.fill', text: t('manager_manage.act_announcement_t', { title: a.title, defaultValue: 'Announcement "{{title}}" posted' }), ts: tsOf(a.created_at) }));
-      dataOf(2).forEach((f: any) => items.push({ key: 'feat-' + f.id, icon: 'star', ios: 'star.fill', text: t('manager_manage.act_feature_t', { title: f.title, defaultValue: 'Special feature "{{title}}" added' }), ts: tsOf(f.created_at) }));
-      dataOf(3).forEach((e: any) => items.push({ key: 'evt-' + e.id, icon: 'event', ios: 'calendar', text: t('manager_manage.act_event_t', { title: e.title, defaultValue: 'Event "{{title}}" posted' }), ts: tsOf(e.created_at) }));
+      dataOf(settled[0]).forEach((r: any) => items.push({ key: 'rev-' + r.id, icon: 'star', ios: 'star.fill', blue: true, text: t('manager_manage.act_review_t', { rating: r.review_rating, author: r.author_title || t('manager_manage.act_a_guest', 'a guest'), defaultValue: 'New {{rating}}★ Google review from {{author}}' }), ts: tsOf(r.review_datetime_utc) }));
+      dataOf(settled[1]).forEach((a: any) => items.push({ key: 'ann-' + a.id, icon: 'campaign', ios: 'megaphone.fill', text: t('manager_manage.act_announcement_t', { title: a.title, defaultValue: 'Announcement "{{title}}" posted' }), ts: tsOf(a.created_at) }));
+      dataOf(settled[2]).forEach((f: any) => items.push({ key: 'feat-' + f.id, icon: 'star', ios: 'star.fill', text: t('manager_manage.act_feature_t', { title: f.title, defaultValue: 'Special feature "{{title}}" added' }), ts: tsOf(f.created_at) }));
+      dataOf(settled[3]).forEach((e: any) => items.push({ key: 'evt-' + e.id, icon: 'event', ios: 'calendar', text: t('manager_manage.act_event_t', { title: e.title, defaultValue: 'Event "{{title}}" posted' }), ts: tsOf(e.created_at) }));
       const dl = language === 'es' ? 'es-ES' : 'en-US';
-      dataOf(4).forEach((u: any) => {
+      dataOf(settled[4]).forEach((u: any) => {
         const parts = String(u.week_start || '').split('-').map(Number);
         const wk = parts.length === 3 && parts.every((n) => !isNaN(n))
           ? new Date(parts[0], parts[1] - 1, parts[2]).toLocaleDateString(dl, { month: 'short', day: 'numeric' })
           : '';
         items.push({ key: 'sch-' + u.id, icon: 'upload', ios: 'calendar.badge.clock', text: t('manager_manage.act_schedule_t', { week: wk, defaultValue: 'Schedule uploaded — week of {{week}}' }), ts: tsOf(u.created_at) });
       });
-      dataOf(5).forEach((m: any) => items.push({ key: 'menu-' + m.id, icon: 'restaurant', ios: 'fork.knife', text: t('manager_manage.act_menu_t', { name: m.name, defaultValue: '{{name}} added to the menu' }), ts: tsOf(m.created_at) }));
-      dataOf(6).forEach((g: any) => items.push({ key: 'guide-' + g.id, icon: 'upload-file', ios: 'doc.fill', text: t('manager_manage.act_guide_t', { title: g.title, defaultValue: 'New file "{{title}}" uploaded' }), ts: tsOf(g.created_at) }));
-      const exams = dataOf(7);
+      dataOf(settled[5]).forEach((m: any) => items.push({ key: 'menu-' + m.id, icon: 'restaurant', ios: 'fork.knife', text: t('manager_manage.act_menu_t', { name: m.name, defaultValue: '{{name}} added to the menu' }), ts: tsOf(m.created_at) }));
+      dataOf(settled[6]).forEach((g: any) => items.push({ key: 'guide-' + g.id, icon: 'upload-file', ios: 'doc.fill', text: t('manager_manage.act_guide_t', { title: g.title, defaultValue: 'New file "{{title}}" uploaded' }), ts: tsOf(g.created_at) }));
+      const exams = dataOf(settled[7]);
       if (exams.length) {
         items.push({ key: 'exam', icon: 'sports-esports', ios: 'gamecontroller.fill', text: t('manager_manage.act_quiz_t', { count: exams.length, defaultValue: '{{count}} staff completed a training quiz' }), ts: Math.max(...exams.map((e: any) => tsOf(e.completed_at))) });
       }
@@ -543,11 +545,13 @@ export default function ManagerManageScreen() {
   // Consume one manual refresh (owner-gated, billing-period cap) then fire the
   // async import. The Mon/Thu auto-refresh is free and doesn't count.
   const doRefreshReviews = useCallback(async () => {
+    if (!user?.id || !organizationId) return;
     try {
-      const { data: cap } = await (supabase as any).rpc('consume_review_refresh', {
+      const { data } = await supabase.rpc('consume_review_refresh', {
         p_user_id: user?.id,
         p_organization_id: organizationId,
       });
+      const cap = data as { ok?: boolean; reason?: string; remaining?: number } | null;
       if (!cap?.ok) {
         Alert.alert(
           t('manager_manage.refresh_limit_title', 'No refreshes left'),
@@ -578,13 +582,15 @@ export default function ManagerManageScreen() {
       return;
     }
     if (!isOwner) return;
+    if (!user?.id || !organizationId) return;
     let remaining = 0;
     try {
-      const { data } = await (supabase as any).rpc('get_review_refresh_quota', {
+      const { data } = await supabase.rpc('get_review_refresh_quota', {
         p_user_id: user?.id,
         p_organization_id: organizationId,
       });
-      if (data?.success) remaining = data.remaining ?? 0;
+      const quota = data as { success?: boolean; remaining?: number } | null;
+      if (quota?.success) remaining = quota.remaining ?? 0;
     } catch {
       // fall through with remaining = 0
     }
@@ -609,9 +615,10 @@ export default function ManagerManageScreen() {
       Alert.alert(t('manager_manage.gm_required_title', 'Location required'), t('manager_manage.gm_required_msg', 'Enter your restaurant name and address as it appears on Google Maps.'));
       return;
     }
+    if (!organizationId || !user?.id) return;
     setGmSaving(true);
     try {
-      const { data: saveRes, error: saveErr } = await (supabase.rpc as any)('update_organization_settings', {
+      const { data: saveRes, error: saveErr } = await supabase.rpc('update_organization_settings', {
         p_organization_id: organizationId,
         p_user_id: user?.id,
         p_google_maps_query: q,

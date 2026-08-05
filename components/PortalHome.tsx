@@ -70,6 +70,7 @@ interface MenuItem {
   thumbnail_shape: string;
   display_order: number;
   is_active: boolean;
+  season?: string;
   updated_at?: string;
 }
 
@@ -380,7 +381,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
         if (openAnnouncementId) {
           const { data: rows } = await supabase
             .rpc('get_announcements', { p_actor_id: actorId, p_id: String(openAnnouncementId) });
-          const data = (rows?.[0] ?? null) as any;
+          const data = (rows?.[0] ?? null);
           if (data) {
             const imgs = await fetchContentImagesBatch(actorId, 'announcement', [data.id]);
             const additionalImgs = imgs.get(data.id);
@@ -395,13 +396,13 @@ export default function PortalHome({ role }: PortalHomeProps) {
               imageUrls: allImgs,
               priority: data.priority || undefined,
               link: data.link,
-              guideFile: data.guide_file,
+              guideFile: data.guide_file as GuideFile | null,
             });
           }
         } else if (openEventId) {
           const { data: rows } = await supabase
             .rpc('get_upcoming_events', { p_actor_id: actorId, p_id: String(openEventId) });
-          const data = (rows?.[0] ?? null) as any;
+          const data = (rows?.[0] ?? null);
           if (data) {
             const imgs = await fetchContentImagesBatch(actorId, 'upcoming_event', [data.id]);
             const additionalImgs = imgs.get(data.id);
@@ -417,13 +418,13 @@ export default function PortalHome({ role }: PortalHomeProps) {
               startDateTime: data.start_date_time,
               endDateTime: data.end_date_time,
               link: data.link,
-              guideFile: data.guide_file,
+              guideFile: data.guide_file as GuideFile | null,
             });
           }
         } else if (openFeatureId) {
           const { data: rows } = await supabase
             .rpc('get_special_features', { p_actor_id: actorId, p_id: String(openFeatureId) });
-          const data = (rows?.[0] ?? null) as any;
+          const data = (rows?.[0] ?? null);
           if (data) {
             const imgs = await fetchContentImagesBatch(actorId, 'special_feature', [data.id]);
             const additionalImgs = imgs.get(data.id);
@@ -439,7 +440,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
               startDateTime: data.start_date_time,
               endDateTime: data.end_date_time,
               link: data.link,
-              guideFile: data.guide_file,
+              guideFile: data.guide_file as GuideFile | null,
             });
           }
         }
@@ -858,7 +859,7 @@ export default function PortalHome({ role }: PortalHomeProps) {
             {organization.menu_count === 2 && (
               <View style={[styles.specialMealTag, { backgroundColor: '#1E88E518' }]}>
                 <Text style={[styles.specialTagText, { color: '#1E88E5' }]}>
-                  {menuBadgeForSeason((item as any).season, organization, t).label}
+                  {menuBadgeForSeason(item.season, organization, t).label}
                 </Text>
               </View>
             )}

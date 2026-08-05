@@ -181,7 +181,7 @@ export function useUnreadContent(): UnreadContentResult {
       const eventsCutoff = eventsTs || new Date(0).toISOString();
       const evtCutoff = effectiveEventsContentTs;
       const eventsRes = await supabase.rpc('get_upcoming_events', { p_actor_id: actorId });
-      const eventRows = (((eventsRes.data as any[] | null) ?? []) as { id: string; category: string; created_at: string }[])
+      const eventRows = (eventsRes.data ?? [])
         .filter((r) => new Date(r.created_at || 0) > new Date(evtCutoff));
       const unviewedEvents = eventRows.filter((r) => !evtViewed.has(r.id));
       // Sub-tab badges use the per-tab visit timestamp so swiping to a sub-tab clears its dot
@@ -209,8 +209,8 @@ export function useUnreadContent(): UnreadContentResult {
         supabase.rpc('get_menu_items', { p_actor_id: actorId, p_weekly_special: true }),
       ]);
       const specialIds = new Set<string>([
-        ...((byCatRes.data || []) as any[]).filter((r) => (r.created_at || '') > specialsCutoff).map((r) => r.id),
-        ...((byFlagRes.data || []) as any[]).filter((r) => (r.updated_at || '') > specialsCutoff).map((r) => r.id),
+        ...(byCatRes.data || []).filter((r) => (r.created_at || '') > specialsCutoff).map((r) => r.id),
+        ...(byFlagRes.data || []).filter((r) => (r.updated_at || '') > specialsCutoff).map((r) => r.id),
       ]);
       const specialsCount = specialIds.size;
       setSpecialsHasNew(specialsCount > 0);

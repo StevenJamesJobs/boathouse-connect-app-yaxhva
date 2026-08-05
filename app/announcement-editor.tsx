@@ -209,7 +209,7 @@ export default function AnnouncementEditorScreen() {
       }
 
       console.log('Announcements loaded successfully:', data?.length || 0, 'items');
-      setAnnouncements((data || []) as any);
+      setAnnouncements(data || []);
     } catch (error) {
       console.error('Error loading announcements:', error);
       Alert.alert('Error', t('announcement_editor:load_error'));

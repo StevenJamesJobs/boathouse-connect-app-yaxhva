@@ -434,7 +434,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // authenticated server-side, so no second credential round-trip is needed.
   const adoptSession = async (row: unknown, rememberMe: boolean): Promise<boolean> => {
     try {
-      if (!row || typeof row !== 'object' || !(row as any).id) {
+      if (!row || typeof row !== 'object' || !(row as { id?: unknown }).id) {
         console.log('[AuthContext] adoptSession called with an invalid row');
         return false;
       }

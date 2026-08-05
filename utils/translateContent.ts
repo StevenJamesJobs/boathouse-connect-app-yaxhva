@@ -1,5 +1,12 @@
 import { supabase } from '@/app/integrations/supabase/client';
+import type { Database } from '@/app/integrations/supabase/types';
 import { getCurrentActorId } from '@/utils/currentActor';
+
+/** The typed name universe for the translation-save RPC family — a typo here fails the build. */
+type TranslationRpcName = Extract<
+  keyof Database['public']['Functions'],
+  `update_${string}_translations_actor`
+>;
 
 export interface TranslateResult {
   ok: boolean;
@@ -95,7 +102,7 @@ export function getLocalizedField(
  * and parameter mappings. Using RPCs with SECURITY DEFINER ensures translations
  * are saved regardless of RLS policies on the tables.
  */
-const TRANSLATION_RPC_MAP: Record<string, { rpc: string; paramMap: Record<string, string> }> = {
+const TRANSLATION_RPC_MAP: Record<string, { rpc: TranslationRpcName; paramMap: Record<string, string> }> = {
   announcements: {
     rpc: 'update_announcement_translations_actor',
     paramMap: { title_es: 'p_title_es', content_es: 'p_content_es' },
@@ -172,13 +179,16 @@ export async function saveTranslations(
     }
 
     // Build RPC parameters: always include p_actor_id and p_id, map translation fields to RPC params
-    const rpcParams: Record<string, string | null> = { p_actor_id: actorId, p_id: id };
+    const rpcParams: { p_actor_id: string; p_id: string } & Record<string, string | null> = {
+      p_actor_id: actorId,
+      p_id: id,
+    };
     for (const [fieldName, paramName] of Object.entries(rpcConfig.paramMap)) {
       const value = translations[fieldName];
       rpcParams[paramName] = value && value.trim() ? value : null;
     }
 
-    const { error } = await supabase.rpc(rpcConfig.rpc as any, rpcParams);
+    const { error } = await supabase.rpc(rpcConfig.rpc, rpcParams);
 
     if (error) {
       console.error(`Failed to save translations for ${table}:`, error);

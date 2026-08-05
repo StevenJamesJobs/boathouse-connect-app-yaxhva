@@ -115,13 +115,14 @@ export default function OrganizationSettingsScreen() {
       if (!organizationId || !user?.id) return;
       setScopeSaving(true);
       try {
-        const { data, error } = await (supabase.rpc as any)('set_org_menu_category_scope', {
+        const { data, error } = await supabase.rpc('set_org_menu_category_scope', {
           p_organization_id: organizationId,
           p_user_id: user.id,
           p_scope: next,
         });
-        if (error || (data && data.success === false)) {
-          Alert.alert('Error', (data && data.error) || translateServerError(error, 'Failed to change menu mode'));
+        const res = data as { success?: boolean; error?: string } | null;
+        if (error || (res && res.success === false)) {
+          Alert.alert('Error', (res && res.error) || translateServerError(error, 'Failed to change menu mode'));
           return;
         }
         setMenuScope(next);
@@ -245,6 +246,7 @@ export default function OrganizationSettingsScreen() {
       Alert.alert('Error', 'Restaurant name is required.');
       return;
     }
+    if (!organizationId || !user?.id) return;
 
     // Detect a newly added / changed Google Maps query so we can auto-import
     // reviews after saving (only when it actually changed — avoids a needless
@@ -254,16 +256,16 @@ export default function OrganizationSettingsScreen() {
 
     setSaving(true);
     try {
-      const { data, error } = await (supabase.rpc as any)('update_organization_settings', {
+      const { data, error } = await supabase.rpc('update_organization_settings', {
         p_organization_id: organizationId,
         p_user_id: user.id,
         p_name: name.trim(),
-        p_address: address.trim() || null,
-        p_city: city.trim() || null,
-        p_state: state.trim() || null,
-        p_zip: zip.trim() || null,
-        p_weather_location: weatherLocation.trim() || null,
-        p_google_maps_query: googleMapsQuery.trim() || null,
+        p_address: address.trim() || undefined,
+        p_city: city.trim() || undefined,
+        p_state: state.trim() || undefined,
+        p_zip: zip.trim() || undefined,
+        p_weather_location: weatherLocation.trim() || undefined,
+        p_google_maps_query: googleMapsQuery.trim() || undefined,
         p_reward_currency_name: rewardCurrencyName.trim() || 'Bucks',
         p_allow_self_signup: allowSelfSignup,
         p_staff_can_view_roster: staffCanViewRoster,
@@ -314,11 +316,12 @@ export default function OrganizationSettingsScreen() {
       Alert.alert('Error', 'Enter a Google Maps location first.');
       return;
     }
+    if (!organizationId || !user?.id) return;
     setSavingGmaps(true);
     try {
-      const { data, error } = await (supabase.rpc as any)('update_organization_settings', {
+      const { data, error } = await supabase.rpc('update_organization_settings', {
         p_organization_id: organizationId,
-        p_user_id: user!.id,
+        p_user_id: user.id,
         p_google_maps_query: q,
       });
       if (error) throw error;
@@ -349,11 +352,12 @@ export default function OrganizationSettingsScreen() {
   };
 
   const doRegenerateCode = async () => {
+    if (!organizationId || !user?.id) return;
     setRegeneratingCode(true);
     try {
-      const { data, error } = await (supabase.rpc as any)('regenerate_join_code', {
+      const { data, error } = await supabase.rpc('regenerate_join_code', {
         p_organization_id: organizationId,
-        p_user_id: user!.id,
+        p_user_id: user.id,
       });
 
       if (error) throw error;

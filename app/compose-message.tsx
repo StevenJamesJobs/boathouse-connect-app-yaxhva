@@ -119,7 +119,7 @@ export default function ComposeMessageScreen() {
     try {
       const dir = await getOrgDirectory(user?.id || '');
       const recipient = dir.find(r => r.id === directRecipientId);
-      if (recipient) setSelectedRecipients([recipient] as any);
+      if (recipient) setSelectedRecipients([recipient]);
     } catch (error) {
       console.error('Error loading direct recipient:', error);
     }

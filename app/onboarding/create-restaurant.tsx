@@ -71,7 +71,7 @@ export default function CreateRestaurantScreen() {
 
       // Atomic: creates the organization, the owner account, and the 14-day
       // trial in one transaction, returning the resolved username + join code.
-      const { data, error } = await (supabase.rpc as any)('signup_owner_with_org', {
+      const { data, error } = await supabase.rpc('signup_owner_with_org', {
         p_first_name: params.firstName,
         p_last_name: params.lastName,
         p_email: params.email ?? '',
@@ -79,11 +79,11 @@ export default function CreateRestaurantScreen() {
         p_restaurant_name: restaurantName.trim(),
         p_reward_currency_name: rewardCurrencyName.trim() || 'Bucks',
         p_default_password: defaultPassword.trim() || 'welcome123',
-        p_address: address.trim() || null,
-        p_city: city.trim() || null,
-        p_state: state.trim() || null,
-        p_zip: zip.trim() || null,
-        p_weather_location: weatherLocation || null,
+        p_address: address.trim() || undefined,
+        p_city: city.trim() || undefined,
+        p_state: state.trim() || undefined,
+        p_zip: zip.trim() || undefined,
+        p_weather_location: weatherLocation || undefined,
       });
 
       if (error) {

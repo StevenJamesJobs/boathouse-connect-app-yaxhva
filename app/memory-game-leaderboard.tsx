@@ -53,7 +53,7 @@ export default function MemoryGameLeaderboardScreen() {
     if (!user?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc('get_game_leaderboard_actor' as any, {
+      const { data, error } = await supabase.rpc('get_game_leaderboard_actor', {
         p_game_mode: activeMode,
         p_limit: 20,
         p_play_mode: activePlayMode,
@@ -61,7 +61,7 @@ export default function MemoryGameLeaderboardScreen() {
       });
 
       if (!error && data) {
-        setEntries(data as LeaderboardEntry[]);
+        setEntries(data);
       } else {
         setEntries([]);
       }

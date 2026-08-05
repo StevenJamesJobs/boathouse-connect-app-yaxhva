@@ -251,7 +251,7 @@ export default function EmployeeDetailScreen() {
   };
 
   const handleDeleteEmployee = () => {
-    if (!employee) return;
+    if (!employee || !user?.id) return;
 
     Alert.alert(
       t('delete_employee'),
@@ -263,10 +263,10 @@ export default function EmployeeDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              const { error } = await supabase.rpc('delete_employee' as any, {
-                p_actor_id: user?.id,
+              const { error } = await supabase.rpc('delete_employee', {
+                p_actor_id: user.id,
                 p_employee_id: employee.id,
-                p_organization_id: organizationId,
+                p_organization_id: organizationId ?? undefined,
               });
 
               if (error) throw error;

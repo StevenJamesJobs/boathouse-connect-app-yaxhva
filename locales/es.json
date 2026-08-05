@@ -2328,6 +2328,7 @@
   },
   "manage_categories": {
     "title": "Administrar Categorías",
+    "load_failed": "No se pudo cargar la información de la organización. Inténtalo de nuevo más tarde.",
     "spanish_name_label": "Nombre en español (opcional)",
     "spanish_name_placeholder": "Nombre que verán los hispanohablantes",
     "translate_button": "Traducir",

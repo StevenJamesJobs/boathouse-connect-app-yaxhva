@@ -79,7 +79,7 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
     if (!visible) return;
     // Logout race: an empty actor reaches get_menu_items as uuid '' (22P02).
     // user?.id is in the deps so a reopen after login refetches.
-    if (!user?.id) {
+    if (!user?.id || !organizationId) {
       setRows([]);
       setLoading(false);
       return;
@@ -90,18 +90,18 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
       try {
         const [menuRes, specialsRes, catRes] = await Promise.all([
           supabase.rpc('get_menu_items', { p_actor_id: user.id }),
-          (supabase.from('weekly_specials') as any).select('id, name, day_of_week, price').eq('organization_id', organizationId),
+          supabase.from('weekly_specials').select('id, name, day_of_week, price').eq('organization_id', organizationId),
           supabase.rpc('get_menu_categories', { p_actor_id: user.id }),
         ]);
         if (cancelled) return;
-        const menuRows: RawRow[] = ((menuRes.data as any[]) || []).map((r) => ({
+        const menuRows: RawRow[] = (menuRes.data || []).map((r) => ({
           source: 'menu_items',
           id: r.id,
           name: r.name,
           category: r.category,
           price: r.price,
         }));
-        const specialRows: RawRow[] = ((specialsRes.data as any[]) || []).map((r) => ({
+        const specialRows: RawRow[] = (specialsRes.data || []).map((r) => ({
           source: 'weekly_specials',
           id: r.id,
           name: r.name,
@@ -112,7 +112,7 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
         // Visible categories that actually hold items, deduped across menu
         // slots, in (slot, display_order) order; specials resolved by system_key.
         const itemCats = new Set(menuRows.map((r) => r.category));
-        const catRows = (((catRes.data as any[]) || [])).slice().sort(
+        const catRows = ((catRes.data || [])).slice().sort(
           (a, b) => (a.menu_slot - b.menu_slot) || (a.display_order - b.display_order),
         );
         const wsNames = catRows
@@ -139,7 +139,7 @@ export function MenuItemSearchPicker({ visible, onClose, onSelect }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [visible, user?.id]);
+  }, [visible, user?.id, organizationId]);
 
   const filtered = useMemo<PickedMenuItem[]>(() => {
     const q = query.trim().toLowerCase();

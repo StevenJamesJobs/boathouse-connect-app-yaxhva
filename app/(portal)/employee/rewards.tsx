@@ -32,6 +32,7 @@ import { getLocalizedField } from '@/utils/translateContent';
 import ExamRewardBlurb from '@/components/ExamRewardBlurb';
 import { useUnreadAwards } from '@/hooks/useUnreadAwards';
 import { getOrgDirectory } from '@/utils/orgDirectory';
+import type { Database } from '@/app/integrations/supabase/types';
 
 interface Employee {
   id: string;
@@ -145,7 +146,7 @@ export default function EmployeeRewardsScreen() {
       // Fetch current user's bucks (own row via hardened get_me RPC)
       if (user?.id) {
         const { data: meData, error: userError } = await supabase.rpc('get_me', { p_user_id: user?.id });
-        const userData = (meData as any[])?.[0];
+        const userData = meData?.[0];
 
         if (!userError && userData) {
           setMyBucks(userData.mcloones_bucks || 0);
@@ -166,7 +167,7 @@ export default function EmployeeRewardsScreen() {
       // Fetch last 10 transactions (filter visible on client, show 5). Guard on user?.id:
       // get_org_transactions has no p_actor_id default, so on logout/login the undefined arg
       // is dropped by supabase-js and PostgREST can't resolve the overload (PGRST202).
-      let transData: any[] = [];
+      let transData: Database['public']['Functions']['get_org_transactions']['Returns'] = [];
       if (user?.id) {
         const { data, error: transError } = await supabase.rpc('get_org_transactions', {
           p_actor_id: user.id,
@@ -176,11 +177,11 @@ export default function EmployeeRewardsScreen() {
           console.error('Error fetching transactions:', transError);
           return;
         }
-        transData = (data as any[]) || [];
+        transData = data || [];
       }
 
       // Visible transactions (shared across all employees)
-      const visibleTransactions = transData.filter((t: any) => t.is_visible === true);
+      const visibleTransactions = transData.filter((t) => t.is_visible === true);
 
       // Denied redemption requests for the current user only — surface in their
       // own Recent Awards as a "denied" entry (no balance change).
@@ -190,7 +191,7 @@ export default function EmployeeRewardsScreen() {
           p_user_id: user.id,
           p_statuses: ['denied'],
         });
-        deniedEntries = ((deniedRows as any[]) || []).map((r) => ({
+        deniedEntries = ((deniedRows) || []).map((r) => ({
           id: `denied_${r.id}`,
           user_id: r.user_id,
           amount: -r.bucks_amount,
@@ -204,14 +205,14 @@ export default function EmployeeRewardsScreen() {
         }));
       }
 
-      const userIds = [...new Set(visibleTransactions.map((t: any) => t.user_id))];
+      const userIds = [...new Set(visibleTransactions.map((t) => t.user_id))];
       let userMap = new Map<string, string>();
       if (userIds.length > 0 && user?.id) {
         const usersData = (await getOrgDirectory(user.id)).filter((r) => userIds.includes(r.id));
         if (usersData) userMap = new Map(usersData.map((u) => [u.id, u.name] as [string, string]));
       }
 
-      const decoratedTx: RewardTransaction[] = visibleTransactions.map((trans: any) => ({
+      const decoratedTx: RewardTransaction[] = visibleTransactions.map((trans) => ({
         ...trans,
         user_name: userMap.get(trans.user_id) || 'Unknown Employee',
       }));
@@ -237,7 +238,7 @@ export default function EmployeeRewardsScreen() {
       });
 
       if (!error && data) {
-        setReviews(data as any);
+        setReviews(data);
       }
     } catch (error) {
       console.error('Error fetching reviews:', error);

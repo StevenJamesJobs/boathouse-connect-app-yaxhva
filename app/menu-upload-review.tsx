@@ -160,7 +160,7 @@ export default function MenuUploadReviewScreen() {
   });
 
   const doApply = async () => {
-    if (!user?.id) return;
+    if (!user?.id || !organizationId || !uploadId) return;
     if (includedCount === 0) {
       Alert.alert(t('menu_upload.nothing_title', 'Nothing Selected'), t('menu_upload.nothing_msg', 'Select at least one item to add.'));
       return;
@@ -169,7 +169,7 @@ export default function MenuUploadReviewScreen() {
     const proceed = async () => {
       try {
         setApplying(true);
-        const { data, error } = await (supabase.rpc as any)('apply_parsed_menu', {
+        const { data, error } = await supabase.rpc('apply_parsed_menu', {
           p_user_id: user.id,
           p_organization_id: organizationId,
           p_upload_id: uploadId,
@@ -178,13 +178,14 @@ export default function MenuUploadReviewScreen() {
           p_mode: mode,
         });
         if (error) throw error;
-        if (!data?.success) throw new Error(data?.error || 'Apply failed');
+        const result = data as { success?: boolean; error?: string; items_inserted?: number; items_deleted?: number; items_skipped?: number } | null;
+        if (!result?.success) throw new Error(result?.error || 'Apply failed');
         Alert.alert(
           t('menu_upload.applied_title', 'Menu Updated!'),
           t('menu_upload.applied_msg', {
             defaultValue: 'Added {{ins}} items.{{del}} You can fine-tune anything in the Menu Editor.',
-            ins: data.items_inserted,
-            del: data.items_deleted ? ` Replaced ${data.items_deleted}.` : (data.items_skipped ? ` Skipped ${data.items_skipped} duplicates.` : ''),
+            ins: result.items_inserted,
+            del: result.items_deleted ? ` Replaced ${result.items_deleted}.` : (result.items_skipped ? ` Skipped ${result.items_skipped} duplicates.` : ''),
           }),
           [{ text: t('common.ok', 'OK'), onPress: () => router.back() }]
         );

@@ -124,10 +124,10 @@ export default function ViewAllUpcomingEventsScreen() {
 
       if (error) throw error;
 
-      setEvents((data || []) as any);
+      setEvents((data || []) as UpcomingEvent[]);
 
       if (data && data.length > 0) {
-        const ids = (data as any[]).map((e: any) => e.id);
+        const ids = data.map((e) => e.id);
         const imagesMap = await fetchContentImagesBatch(user.id, 'upcoming_event', ids);
         setContentImagesMap(imagesMap);
       }

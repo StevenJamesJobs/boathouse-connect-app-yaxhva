@@ -28,21 +28,21 @@ export function useUnreadQuizReward() {
       return;
     }
     try {
-      const { data: results } = await (supabase.rpc as any)('get_my_recent_exam_results', {
+      const { data: results } = await supabase.rpc('get_my_recent_exam_results', {
         p_actor_id: user.id,
         p_limit: 5,
       });
-      const list = (results as any[]) || [];
+      const list = results ?? [];
       if (list.length === 0) {
         setCount(0);
         return;
       }
       const resultIds = list.map((r) => r.id);
-      const { data: dismissals } = await (supabase.rpc as any)('get_my_exam_reward_dismissals', {
+      const { data: dismissals } = await supabase.rpc('get_my_exam_reward_dismissals', {
         p_actor_id: user.id,
         p_result_ids: resultIds,
       });
-      const dismissed = new Set(((dismissals as any[]) || []).map((d) => d.exam_result_id));
+      const dismissed = new Set((dismissals ?? []).map((d) => d.exam_result_id));
       // Mirror ExamRewardBlurb: the first (most recent) undismissed result drives
       // the blurb; the badge shows only when that result carries a reward.
       const undismissed = list.find((r) => !dismissed.has(r.id));

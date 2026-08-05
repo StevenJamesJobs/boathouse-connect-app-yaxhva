@@ -60,6 +60,7 @@ interface MenuItem {
   display_order: number;
   is_active: boolean;
   is_weekly_special: boolean;
+  season: string;
   name_es?: string | null;
   description_es?: string | null;
   location?: string | null;
@@ -897,7 +898,7 @@ export default function MenuEditorScreen() {
       flavor_profile_es: item.flavor_profile_es || '',
       unique_selling_points: item.unique_selling_points || '',
       unique_selling_points_es: item.unique_selling_points_es || '',
-      item_season: ((item as any).season as 'winter' | 'summer' | 'both') || 'both',
+      item_season: (item.season as 'winter' | 'summer' | 'both') || 'both',
     });
     setSelectedImageUri(null);
     setShowAddModal(true);
@@ -1211,7 +1212,7 @@ export default function MenuEditorScreen() {
                       </View>
                     </View>
                     {(() => {
-                      const badge = menuBadgeForSeason((item as any).season);
+                      const badge = menuBadgeForSeason(item.season);
                       return (
                         <View style={styles.menuBadge}>
                           <IconSymbol ios_icon_name={badge.icon} android_material_icon_name={menuIconAndroid(badge.icon)} size={12} color={colors.primary} />
@@ -1239,7 +1240,7 @@ export default function MenuEditorScreen() {
                         {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
                       </View>
                       {(() => {
-                        const badge = menuBadgeForSeason((item as any).season);
+                        const badge = menuBadgeForSeason(item.season);
                         return (
                           <View style={styles.menuBadge}>
                             <IconSymbol ios_icon_name={badge.icon} android_material_icon_name={menuIconAndroid(badge.icon)} size={12} color={colors.primary} />
@@ -1387,7 +1388,7 @@ export default function MenuEditorScreen() {
                             )}
                             <View style={styles.menuItemTags}>
                               {isWS && (<>
-                                <View style={[styles.tag, { backgroundColor: '#1E88E518' }]}><Text style={[styles.tagText, { color: '#1E88E5' }]}>{menuBadgeForSeason((item as any).season).label}</Text></View>
+                                <View style={[styles.tag, { backgroundColor: '#1E88E518' }]}><Text style={[styles.tagText, { color: '#1E88E5' }]}>{menuBadgeForSeason(item.season).label}</Text></View>
                                 <View style={[styles.tag, { backgroundColor: '#00897B18' }]}><Text style={[styles.tagText, { color: '#00897B' }]}>{labelForCategoryName(item.category, t, menuCats, language)}</Text></View>
                               </>)}
                               {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
@@ -1411,7 +1412,7 @@ export default function MenuEditorScreen() {
                             {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
                             <View style={[styles.menuItemTags, !item.thumbnail_url && styles.menuItemTagsPriceRoom]}>
                               {isWS && (<>
-                                <View style={[styles.tag, { backgroundColor: '#1E88E518' }]}><Text style={[styles.tagText, { color: '#1E88E5' }]}>{menuBadgeForSeason((item as any).season).label}</Text></View>
+                                <View style={[styles.tag, { backgroundColor: '#1E88E518' }]}><Text style={[styles.tagText, { color: '#1E88E5' }]}>{menuBadgeForSeason(item.season).label}</Text></View>
                                 <View style={[styles.tag, { backgroundColor: '#00897B18' }]}><Text style={[styles.tagText, { color: '#00897B' }]}>{labelForCategoryName(item.category, t, menuCats, language)}</Text></View>
                               </>)}
                               {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}

@@ -2328,6 +2328,7 @@
   },
   "manage_categories": {
     "title": "Manage Categories",
+    "load_failed": "Failed to load organization info. Please try again later.",
     "spanish_name_label": "Spanish name (optional)",
     "spanish_name_placeholder": "Name shown to Spanish speakers",
     "translate_button": "Translate",

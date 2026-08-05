@@ -296,7 +296,7 @@ export default function GuidesAndTrainingEditorScreen() {
 
       if (editingGuide) {
         console.log('Updating guide:', editingGuide.id);
-        const { error } = await (supabase.rpc as any)('update_guide', {
+        const { error } = await supabase.rpc('update_guide', {
           p_user_id: user.id,
           p_guide_id: editingGuide.id,
           p_title: resolved.title.en,
@@ -307,7 +307,7 @@ export default function GuidesAndTrainingEditorScreen() {
           p_file_type: fileType,
           p_file_name: fileName,
           p_display_order: formData.display_order,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
         });
 
         if (error) {
@@ -323,7 +323,7 @@ export default function GuidesAndTrainingEditorScreen() {
         }, user?.id);
       } else {
         console.log('Creating new guide');
-        const { data: newGuideId, error } = await (supabase.rpc as any)('create_guide', {
+        const { data: newGuideId, error } = await supabase.rpc('create_guide', {
           p_user_id: user.id,
           p_title: resolved.title.en,
           p_description: resolved.description.en || null,
@@ -333,7 +333,7 @@ export default function GuidesAndTrainingEditorScreen() {
           p_file_type: fileType,
           p_file_name: fileName,
           p_display_order: formData.display_order,
-          p_organization_id: organizationId,
+          p_organization_id: organizationId ?? undefined,
         });
 
         if (error) {
@@ -373,10 +373,10 @@ export default function GuidesAndTrainingEditorScreen() {
             try {
               console.log('Deleting guide:', guide.id);
 
-              const { error } = await (supabase.rpc as any)('delete_guide', {
+              const { error } = await supabase.rpc('delete_guide', {
                 p_user_id: user?.id,
                 p_guide_id: guide.id,
-                p_organization_id: organizationId,
+                p_organization_id: organizationId ?? undefined,
               });
 
               if (error) {
@@ -400,6 +400,7 @@ export default function GuidesAndTrainingEditorScreen() {
   };
 
   const handleMoveUp = async (index: number) => {
+    if (!user?.id) return;
     const categoryGuides = filteredGuides;
     if (index <= 0) return;
     const newGuides = [...guides];
@@ -416,7 +417,7 @@ export default function GuidesAndTrainingEditorScreen() {
     try {
       const reorderedGroup = [...categoryGuides];
       [reorderedGroup[index - 1], reorderedGroup[index]] = [reorderedGroup[index], reorderedGroup[index - 1]];
-      await (supabase.rpc as any)('reorder_guides', {
+      await supabase.rpc('reorder_guides', {
         p_actor_id: user?.id,
         p_ordered_ids: reorderedGroup.map(g => g.id),
       });
@@ -427,6 +428,7 @@ export default function GuidesAndTrainingEditorScreen() {
   };
 
   const handleMoveDown = async (index: number) => {
+    if (!user?.id) return;
     const categoryGuides = filteredGuides;
     if (index >= categoryGuides.length - 1) return;
     const newGuides = [...guides];
@@ -442,7 +444,7 @@ export default function GuidesAndTrainingEditorScreen() {
     try {
       const reorderedGroup = [...categoryGuides];
       [reorderedGroup[index], reorderedGroup[index + 1]] = [reorderedGroup[index + 1], reorderedGroup[index]];
-      await (supabase.rpc as any)('reorder_guides', {
+      await supabase.rpc('reorder_guides', {
         p_actor_id: user?.id,
         p_ordered_ids: reorderedGroup.map(g => g.id),
       });
@@ -453,6 +455,7 @@ export default function GuidesAndTrainingEditorScreen() {
   };
 
   const handleDragEnd = async ({ data: reorderedData }: { data: GuideItem[] }) => {
+    if (!user?.id) return;
     // Update the full guides array with new display_orders for this category
     const newGuides = [...guides];
     reorderedData.forEach((item, newIndex) => {
@@ -463,7 +466,7 @@ export default function GuidesAndTrainingEditorScreen() {
     });
     setGuides(newGuides);
     try {
-      await (supabase.rpc as any)('reorder_guides', {
+      await supabase.rpc('reorder_guides', {
         p_actor_id: user?.id,
         p_ordered_ids: reorderedData.map(item => item.id),
       });

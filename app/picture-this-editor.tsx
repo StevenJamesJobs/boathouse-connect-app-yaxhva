@@ -70,10 +70,10 @@ export default function PictureThisEditorScreen() {
     const key = category ?? 'all';
     setResetting(key);
     try {
-      const { error } = await (supabase.rpc as any)('reset_picture_this_scores_actor', {
+      const { error } = await supabase.rpc('reset_picture_this_scores_actor', {
         p_actor_id: user.id,
-        p_category: category ?? null,
-        p_difficulty: null,
+        p_category: category ?? undefined,
+        p_difficulty: undefined,
       });
       if (error) throw error;
       const label = category ? t(CATEGORIES.find(c => c.key === category)!.labelKey) : t('pt_editor:all_categories');

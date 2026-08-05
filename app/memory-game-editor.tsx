@@ -63,7 +63,7 @@ export default function MemoryGameEditorScreen() {
       p_include_inactive: true,
     });
     if (!error && data) {
-      setPairings(data as any[]);
+      setPairings(data);
     }
     setLoading(false);
   }, [user?.id]);
@@ -159,12 +159,16 @@ export default function MemoryGameEditorScreen() {
         onPress: async () => {
           if (!user?.id) return;
           try {
-            await (supabase.rpc as any)('reset_game_scores_actor', {
+            const { error: resetError } = await supabase.rpc('reset_game_scores_actor', {
               p_actor_id: user.id,
-              p_game_mode: mode || null,
-              p_play_mode: playModeFilter || null,
+              p_game_mode: mode || undefined,
+              p_play_mode: playModeFilter || undefined,
             });
-            Alert.alert('', t('memory_game.reset_success'));
+            if (resetError) {
+              Alert.alert(t('common.error'), translateServerError(resetError));
+            } else {
+              Alert.alert('', t('memory_game.reset_success'));
+            }
           } catch (e) {
             console.error('Error resetting scores:', e);
           }

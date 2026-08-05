@@ -29,9 +29,9 @@ async function generateWinePairingCards(pairCount: number, organizationId: strin
     });
 
     if (!error && dbPairings && dbPairings.length > 0) {
-      const selected = selectRandom(dbPairings as any[], pairCount);
+      const selected = selectRandom(dbPairings, pairCount);
       const cards: CardData[] = [];
-      selected.forEach((pairing: any, i: number) => {
+      selected.forEach((pairing, i) => {
         const [primary, match] = createCardPair(
           `wine-${i}`,
           pairing.wine,
@@ -77,7 +77,7 @@ async function generateIngredientDishCards(pairCount: number, organizationId: st
     p_actor_id: actorId, p_source_org: sourceOrgId, p_categories: categories,
   });
   // RPC returns all matching active items; the description-non-null filter is applied below.
-  const menuItems = ((rawItems as any[]) || []).filter((m) => m.description != null) as { id: string; name: string; description: string | null }[];
+  const menuItems = (rawItems || []).filter((m) => m.description != null);
 
   if (error || !menuItems || menuItems.length === 0) {
     // Fallback to wine pairings if menu data unavailable
@@ -115,12 +115,9 @@ async function generateIngredientDishCards(pairCount: number, organizationId: st
 async function generateCocktailCards(pairCount: number, organizationId: string, useSampleData: boolean, actorId: string = ''): Promise<CardData[]> {
   const sourceOrgId = await resolveGameSourceOrgId(organizationId, useSampleData);
   // Fetch from both tables via member-gated RPCs (sourceOrgId = own org or the sample org).
-  type CocktailRow = { id: string; name: string; ingredients: string | null; alcohol_type: string };
-  type LibationRow = { id: string; name: string; ingredients: any; category: string };
-
   const [cocktailsResult, libationsResult] = await Promise.all([
-    supabase.rpc('get_cocktails', { p_actor_id: actorId, p_source_org: sourceOrgId }) as unknown as { data: CocktailRow[] | null; error: any },
-    supabase.rpc('get_libation_recipes', { p_actor_id: actorId, p_source_org: sourceOrgId }) as unknown as { data: LibationRow[] | null; error: any },
+    supabase.rpc('get_cocktails', { p_actor_id: actorId, p_source_org: sourceOrgId }),
+    supabase.rpc('get_libation_recipes', { p_actor_id: actorId, p_source_org: sourceOrgId }),
   ]);
 
   const allPairs: { ingredient: string; cocktail: string; id: string }[] = [];
