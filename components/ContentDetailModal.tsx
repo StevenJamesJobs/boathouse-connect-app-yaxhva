@@ -1,5 +1,6 @@
 
 import React, { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   View,
   Text,
@@ -77,6 +78,7 @@ export default function ContentDetailModal({
   colors,
 }: ContentDetailModalProps) {
   // ─── Pull-down-to-dismiss ─────────────────────────────────────────────────
+  const { t } = useTranslation();
   const translateY = useRef(new Animated.Value(0)).current;
   const dragDismissing = useRef(false);
 
@@ -151,11 +153,11 @@ export default function ContentDetailModal({
   const getPriorityLabel = (priority: string) => {
     switch (priority) {
       case 'new':
-        return 'New';
+        return t('common:priority_new');
       case 'important':
-        return 'Important';
+        return t('common:priority_important');
       case 'update':
-        return 'Update';
+        return t('common:priority_update');
       default:
         return priority.charAt(0).toUpperCase() + priority.slice(1);
     }

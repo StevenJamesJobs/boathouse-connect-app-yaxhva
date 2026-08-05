@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
-  Platform,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -25,6 +24,8 @@ import { brokerUploadBase64 } from '@/utils/storageBroker';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { translateServerError } from '@/utils/serverErrors';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
 
 interface ScheduleUpload {
   id: string;
@@ -335,20 +336,8 @@ export default function ScheduleUploadScreen() {
   if (!hasPremium) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol
-              ios_icon_name="chevron.left"
-              android_material_icon_name="arrow-back"
-              size={24}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {t('schedule_upload.title', 'Staff Schedules')}
-          </Text>
-          <View style={styles.headerRight} />
-        </View>
+        <AmbientGlow />
+        <ScreenHeader title={t('schedule_upload.title', 'Staff Schedules')} />
         <PremiumGate
           desc={t('schedule_upload.premium_desc')}
           bullets={[
@@ -366,21 +355,9 @@ export default function ScheduleUploadScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AmbientGlow />
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {t('schedule_upload.title', 'Staff Schedules')}
-        </Text>
-        <View style={styles.headerRight} />
-      </View>
+      <ScreenHeader title={t('schedule_upload.title', 'Staff Schedules')} />
 
       <ScrollView
         style={styles.scrollView}
@@ -597,25 +574,6 @@ export default function ScheduleUploadScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 60 : 16,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  headerRight: {
-    width: 40,
   },
   scrollView: {
     flex: 1,

@@ -20,8 +20,10 @@ import { splashColors } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { translateServerError } from '@/utils/serverErrors';
+import { useTranslation } from 'react-i18next';
 
 export default function ChangePasswordScreen() {
+  const { t } = useTranslation();
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -29,8 +31,8 @@ export default function ChangePasswordScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
-  const { user, refreshUser } = useAuth();
-  const { organizationId, organization } = useOrganization();
+  const { user, refreshUser, logout } = useAuth();
+  const { organizationId, organization, isLoading: orgLoading } = useOrganization();
 
   // Animation values
   const headerOpacity = useRef(new Animated.Value(0)).current;
@@ -73,22 +75,26 @@ export default function ChangePasswordScreen() {
     setError('');
 
     if (!newPassword || !confirmPassword) {
-      setError('Please fill in both fields.');
+      setError(t('change_password_screen.fill_both_fields'));
       return;
     }
 
     if (newPassword.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError(t('onboarding.password_min'));
       return;
     }
 
     if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.');
+      setError(t('onboarding.passwords_no_match'));
       return;
     }
 
     if (!user?.id) {
-      setError('User session not found. Please log in again.');
+      setError(t('change_password_screen.session_missing'));
+      return;
+    }
+
+    if (orgLoading) {
       return;
     }
 
@@ -128,17 +134,16 @@ export default function ChangePasswordScreen() {
       };
 
       if (Platform.OS === 'web') {
-        window.alert('Your password has been updated.');
+        window.alert(t('change_password_screen.updated_msg'));
         navigateToPortal();
       } else {
-        Alert.alert('Success', 'Your password has been updated.', [
-          { text: 'OK', onPress: navigateToPortal },
+        Alert.alert(t('common.success'), t('change_password_screen.updated_msg'), [
+          { text: t('common.ok'), onPress: navigateToPortal },
         ]);
       }
     } catch (e: any) {
       console.error('[ChangePassword] Error:', e);
-      // No fallback arg: the helper's own default is localized (this screen
-      // is otherwise hardcoded EN — its full ES pass is backlog).
+      // No fallback arg: the helper's own default (onboarding.something_went_wrong) is localized.
       setError(translateServerError(e));
     } finally {
       setIsLoading(false);
@@ -170,8 +175,8 @@ export default function ChangePasswordScreen() {
             size={48}
             color={splashColors.primary}
           />
-          <Text style={styles.header}>Change Your Password</Text>
-          <Text style={styles.subtext}>Please set a new password to continue</Text>
+          <Text style={styles.header}>{t('change_password_screen.title')}</Text>
+          <Text style={styles.subtext}>{t('change_password_screen.subtitle')}</Text>
         </Animated.View>
 
         <Animated.View
@@ -194,7 +199,7 @@ export default function ChangePasswordScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="New Password"
+              placeholder={t('change_password_screen.new_password')}
               placeholderTextColor={splashColors.textSecondary}
               value={newPassword}
               onChangeText={(text) => {
@@ -231,7 +236,7 @@ export default function ChangePasswordScreen() {
             />
             <TextInput
               style={styles.input}
-              placeholder="Confirm New Password"
+              placeholder={t('profile.confirm_new_password')}
               placeholderTextColor={splashColors.textSecondary}
               value={confirmPassword}
               onChangeText={(text) => {
@@ -258,20 +263,34 @@ export default function ChangePasswordScreen() {
             </TouchableOpacity>
           </View>
 
-          <Text style={styles.hintText}>Password must be at least 6 characters</Text>
+          <Text style={styles.hintText}>{t('change_password_screen.password_hint')}</Text>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           <TouchableOpacity
-            style={[styles.primaryButton, isLoading && styles.buttonDisabled]}
+            style={[styles.primaryButton, (isLoading || orgLoading) && styles.buttonDisabled]}
             onPress={handleChangePassword}
-            disabled={isLoading}
+            disabled={isLoading || orgLoading}
           >
-            {isLoading ? (
+            {isLoading || orgLoading ? (
               <ActivityIndicator color="#FFFFFF" />
             ) : (
-              <Text style={styles.primaryButtonText}>Update Password</Text>
+              <Text style={styles.primaryButtonText}>{t('profile.update_password')}</Text>
             )}
+          </TouchableOpacity>
+
+          {/* Escape hatch. This route is a trap by design: _layout.tsx re-redirects
+              here on every navigation while forcePasswordChange is true and disables
+              the back gesture. If the org never loads (get_me failure, or a user with
+              no organization_id) the default-password fallback is permanently wrong
+              and the user can neither pass nor leave. Deliberately NOT disabled while
+              isLoading — a hung RPC is exactly when this needs to still work. */}
+          <TouchableOpacity
+            style={styles.logOutContainer}
+            onPress={async () => { await logout(); router.replace('/login'); }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.logOutText}>{t('profile.log_out')}</Text>
           </TouchableOpacity>
         </Animated.View>
       </ScrollView>
@@ -354,6 +373,16 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '600',
+  },
+  logOutContainer: {
+    alignItems: 'center',
+    marginTop: 24,
+    paddingVertical: 12,
+  },
+  logOutText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#E74C3C',
   },
   errorText: {
     color: '#D32F2F',

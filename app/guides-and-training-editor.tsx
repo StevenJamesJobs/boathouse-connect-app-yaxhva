@@ -387,6 +387,21 @@ export default function GuidesAndTrainingEditorScreen() {
               // Delete files from storage via the broker
               await brokerDelete('guides-and-training', [guide.thumbnail_url, guide.file_url], user.id);
 
+              // Close display_order gaps in this category so a later add
+              // (display_order = category count) can never collide.
+              const remaining = guides
+                .filter(g => g.id !== guide.id && g.category === guide.category)
+                .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+              if (remaining.length > 0) {
+                const { error: reorderError } = await supabase.rpc('reorder_guides', {
+                  p_actor_id: user.id,
+                  p_ordered_ids: remaining.map(g => g.id),
+                });
+                if (reorderError) {
+                  console.error('Error resequencing guide display orders:', reorderError);
+                }
+              }
+
               Alert.alert(t('common.success'), t('guides_training_editor.guide_deleted'));
               await loadGuides();
             } catch (error: any) {
@@ -399,83 +414,37 @@ export default function GuidesAndTrainingEditorScreen() {
     );
   };
 
-  const handleMoveUp = async (index: number) => {
+  // Persist a category's new order. `ordered` is that category's guides in
+  // their new sequence; display_order is written 0..n-1 by the RPC and mirrored
+  // into local state so the sorted derived list re-renders immediately.
+  const persistOrder = async (ordered: GuideItem[]) => {
     if (!user?.id) return;
-    const categoryGuides = filteredGuides;
-    if (index <= 0) return;
-    const newGuides = [...guides];
-    const currentItem = categoryGuides[index];
-    const aboveItem = categoryGuides[index - 1];
-    const currentOrder = currentItem.display_order;
-    const aboveOrder = aboveItem.display_order;
-    // Update in the full guides array
-    const currentIdx = newGuides.findIndex(g => g.id === currentItem.id);
-    const aboveIdx = newGuides.findIndex(g => g.id === aboveItem.id);
-    if (currentIdx >= 0) newGuides[currentIdx] = { ...newGuides[currentIdx], display_order: aboveOrder };
-    if (aboveIdx >= 0) newGuides[aboveIdx] = { ...newGuides[aboveIdx], display_order: currentOrder };
-    setGuides(newGuides);
+    const orderMap = new Map(ordered.map((g, idx) => [g.id, idx]));
+    setGuides((prev) =>
+      prev.map((g) => (orderMap.has(g.id) ? { ...g, display_order: orderMap.get(g.id)! } : g))
+    );
     try {
-      const reorderedGroup = [...categoryGuides];
-      [reorderedGroup[index - 1], reorderedGroup[index]] = [reorderedGroup[index], reorderedGroup[index - 1]];
-      await supabase.rpc('reorder_guides', {
-        p_actor_id: user?.id,
-        p_ordered_ids: reorderedGroup.map(g => g.id),
+      const { error } = await supabase.rpc('reorder_guides', {
+        p_actor_id: user.id,
+        p_ordered_ids: ordered.map((g) => g.id),
       });
+      if (error) throw error;
     } catch (error) {
-      console.error('Error moving guide up:', error);
+      console.error('Error reordering guides:', error);
       await loadGuides();
     }
   };
 
-  const handleMoveDown = async (index: number) => {
-    if (!user?.id) return;
-    const categoryGuides = filteredGuides;
-    if (index >= categoryGuides.length - 1) return;
-    const newGuides = [...guides];
-    const currentItem = categoryGuides[index];
-    const belowItem = categoryGuides[index + 1];
-    const currentOrder = currentItem.display_order;
-    const belowOrder = belowItem.display_order;
-    const currentIdx = newGuides.findIndex(g => g.id === currentItem.id);
-    const belowIdx = newGuides.findIndex(g => g.id === belowItem.id);
-    if (currentIdx >= 0) newGuides[currentIdx] = { ...newGuides[currentIdx], display_order: belowOrder };
-    if (belowIdx >= 0) newGuides[belowIdx] = { ...newGuides[belowIdx], display_order: currentOrder };
-    setGuides(newGuides);
-    try {
-      const reorderedGroup = [...categoryGuides];
-      [reorderedGroup[index], reorderedGroup[index + 1]] = [reorderedGroup[index + 1], reorderedGroup[index]];
-      await supabase.rpc('reorder_guides', {
-        p_actor_id: user?.id,
-        p_ordered_ids: reorderedGroup.map(g => g.id),
-      });
-    } catch (error) {
-      console.error('Error moving guide down:', error);
-      await loadGuides();
-    }
+  const handleMove = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= filteredGuides.length) return;
+    const reordered = [...filteredGuides];
+    const [moved] = reordered.splice(index, 1);
+    reordered.splice(target, 0, moved);
+    persistOrder(reordered);
   };
 
-  const handleDragEnd = async ({ data: reorderedData }: { data: GuideItem[] }) => {
-    if (!user?.id) return;
-    // Update the full guides array with new display_orders for this category
-    const newGuides = [...guides];
-    reorderedData.forEach((item, newIndex) => {
-      const idx = newGuides.findIndex(g => g.id === item.id);
-      if (idx >= 0) {
-        newGuides[idx] = { ...newGuides[idx], display_order: newIndex };
-      }
-    });
-    setGuides(newGuides);
-    try {
-      await supabase.rpc('reorder_guides', {
-        p_actor_id: user?.id,
-        p_ordered_ids: reorderedData.map(item => item.id),
-      });
-      console.log('Drag reorder persisted successfully');
-    } catch (error) {
-      console.error('Error persisting drag reorder:', error);
-      await loadGuides();
-    }
-  };
+  const handleDragEnd = ({ data }: { data: GuideItem[] }) => persistOrder(data);
 
   const openAddModal = () => {
     setEditingGuide(null);
@@ -483,7 +452,11 @@ export default function GuidesAndTrainingEditorScreen() {
       title: '',
       description: '',
       category: selectedCategory,
-      display_order: guides.filter(g => g.category === selectedCategory).length,
+      // Highest + 1, not the category count: if a resequence ever fails and
+      // leaves a gap, a count would collide with an existing display_order.
+      display_order: guides
+        .filter(g => g.category === selectedCategory)
+        .reduce((max, g) => Math.max(max, (g.display_order ?? 0) + 1), 0),
       title_es: '',
       description_es: '',
     });
@@ -533,7 +506,12 @@ export default function GuidesAndTrainingEditorScreen() {
     });
   };
 
-  const filteredGuides = guides.filter(g => g.category === selectedCategory);
+  const filteredGuides = guides
+    .filter(g => g.category === selectedCategory)
+    .sort((a, b) =>
+      (a.display_order ?? 0) - (b.display_order ?? 0) ||
+      (a.created_at || '').localeCompare(b.created_at || '') ||
+      a.id.localeCompare(b.id));
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -670,14 +648,14 @@ export default function GuidesAndTrainingEditorScreen() {
                     <View style={[styles.guideActions, { borderTopColor: colors.border }]}>
                       <TouchableOpacity
                         style={[styles.arrowButton, { backgroundColor: colors.background }, index === 0 && styles.arrowButtonDisabled]}
-                        onPress={() => handleMoveUp(index)}
+                        onPress={() => handleMove(index, -1)}
                         disabled={index === 0}
                       >
                         <IconSymbol ios_icon_name="arrow.up" android_material_icon_name="arrow-upward" size={18} color={index === 0 ? colors.textSecondary : colors.highlight} />
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={[styles.arrowButton, { backgroundColor: colors.background }, index === filteredGuides.length - 1 && styles.arrowButtonDisabled]}
-                        onPress={() => handleMoveDown(index)}
+                        onPress={() => handleMove(index, 1)}
                         disabled={index === filteredGuides.length - 1}
                       >
                         <IconSymbol ios_icon_name="arrow.down" android_material_icon_name="arrow-downward" size={18} color={index === filteredGuides.length - 1 ? colors.textSecondary : colors.highlight} />

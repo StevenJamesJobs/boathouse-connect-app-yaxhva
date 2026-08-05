@@ -265,9 +265,13 @@ export function useUnreadContent(): UnreadContentResult {
       AsyncStorage.setItem(STORAGE_KEYS.viewedAnnouncementIds, JSON.stringify(Array.from(next))).catch(() => {});
       return next;
     });
-    // Refresh tab dot state so it can clear if this was the only unviewed item
-    setTimeout(() => checkUnread(), 0);
-  }, [checkUnread]);
+    // Refresh tab dot state so it can clear if this was the only unviewed item.
+    // Broadcast rather than a local checkUnread(): the shade (NotificationDropdown)
+    // holds its OWN useUnreadContent instance, so a local-only refresh left
+    // PortalHome's pills/dots lit for up to 60s. The broadcast reaches every
+    // instance including this one — checkUnread is itself in the listener set.
+    setTimeout(() => refreshAllUnreadContent(), 0);
+  }, []);
 
   const markSpecialFeatureViewed = useCallback(async (id: string) => {
     if (!id) return;
@@ -278,8 +282,9 @@ export function useUnreadContent(): UnreadContentResult {
       AsyncStorage.setItem(STORAGE_KEYS.viewedSpecialFeatureIds, JSON.stringify(Array.from(next))).catch(() => {});
       return next;
     });
-    setTimeout(() => checkUnread(), 0);
-  }, [checkUnread]);
+    // Broadcast so every mounted instance re-derives its pills/dots (see above).
+    setTimeout(() => refreshAllUnreadContent(), 0);
+  }, []);
 
   const markEventViewed = useCallback(async (id: string) => {
     if (!id) return;
@@ -290,8 +295,10 @@ export function useUnreadContent(): UnreadContentResult {
       AsyncStorage.setItem(STORAGE_KEYS.viewedEventIds, JSON.stringify(Array.from(next))).catch(() => {});
       return next;
     });
-    setTimeout(() => checkUnread(), 0);
-  }, [checkUnread]);
+    // Broadcast: view-all-upcoming-events marks on its own instance while
+    // PortalHome stays mounted underneath with the stale event dot.
+    setTimeout(() => refreshAllUnreadContent(), 0);
+  }, []);
 
   const markEventsTabVisited = useCallback(async (category: 'Event' | 'Entertainment') => {
     const now = new Date().toISOString();

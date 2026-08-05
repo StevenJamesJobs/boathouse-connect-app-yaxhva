@@ -12,8 +12,10 @@ import {
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { refreshAllPendingApprovals } from '@/hooks/usePendingApprovals';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,12 +49,15 @@ export default function ManagerApprovalsScreen() {
   useRequireManagerRoute();
   const router = useRouter();
   const colors = useThemeColors();
+  const { t } = useTranslation();
+  const dateLocale = i18n.language === 'es' ? 'es-ES' : 'en-US';
   const { user } = useAuth();
   const { organizationId } = useOrganization();
   const { sendNotification } = useNotification();
 
   const [rows, setRows] = useState<RedemptionRequestRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
 
   const [detailRow, setDetailRow] = useState<RedemptionRequestRow | null>(null);
@@ -64,14 +69,25 @@ export default function ManagerApprovalsScreen() {
     // supabase-js drops an undefined named arg and PostgREST 404s the overload (PGRST202).
     if (!user?.id) {
       setRows([]);
+      setLoadError(null);
       setLoading(false);
       return;
     }
     if (!silent) setLoading(true);
     try {
-      const { data: reqs } = await supabase.rpc('get_pending_redemptions', {
+      const { data: reqs, error } = await supabase.rpc('get_pending_redemptions', {
         p_actor_id: user.id,
       });
+
+      // Without this the fetch failure fell through as `undefined` rows and
+      // rendered the empty state — a broken queue that looked like a clear one.
+      if (error) {
+        console.error('manager-approvals: failed to load pending redemptions', error);
+        setLoadError(translateServerError(error));
+        setRows([]);
+        return;
+      }
+      setLoadError(null);
 
       const today = new Date().toISOString().slice(0, 10);
       const filtered = (reqs || []).filter((r) => {
@@ -86,12 +102,15 @@ export default function ManagerApprovalsScreen() {
         (users || []).forEach((u: any) => userMap.set(u.id, u.name));
       }
       setRows(
-        filtered.map((r) => ({ ...r, user_name: userMap.get(r.user_id) || 'Employee' })) as RedemptionRequestRow[]
+        filtered.map((r) => ({
+          ...r,
+          user_name: userMap.get(r.user_id) || t('rewards_ui:req_employee_fallback', 'Employee'),
+        })) as RedemptionRequestRow[]
       );
     } finally {
       setLoading(false);
     }
-  }, [user?.id, organizationId]);
+  }, [user?.id, organizationId, t]);
 
   useEffect(() => {
     refresh();
@@ -121,7 +140,12 @@ export default function ManagerApprovalsScreen() {
         p_organization_id: organizationId,
       });
       if (error) {
-        Alert.alert(`Could not ${mode}`, translateServerError(error));
+        Alert.alert(
+          mode === 'approve'
+            ? t('rewards_ui:approvals_could_not_approve', 'Could not approve')
+            : t('rewards_ui:approvals_could_not_deny', 'Could not deny'),
+          translateServerError(error)
+        );
         return;
       }
 
@@ -184,6 +208,7 @@ export default function ManagerApprovalsScreen() {
       setDecisionMode(null);
       setReason('');
       refresh();
+      refreshAllPendingApprovals();
     } finally {
       setWorking(false);
     }
@@ -199,7 +224,12 @@ export default function ManagerApprovalsScreen() {
         <TouchableOpacity onPress={() => router.back()} style={[styles.backBtn, { width: 38, height: 38, borderRadius: 12, backgroundColor: colors.glass, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.glassBorder, alignItems: 'center', justifyContent: 'center' }]}>
           <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerText, { color: colors.text, fontFamily: fonts.display.bold }]}>Redemption Approvals</Text>
+        <Text
+          style={[styles.headerText, { color: colors.text, fontFamily: fonts.display.bold }]}
+          numberOfLines={1}
+        >
+          {t('rewards_ui:approvals_title', 'Redemption Approvals')}
+        </Text>
         <View style={{ width: 38 }} />
       </View>
 
@@ -207,11 +237,27 @@ export default function ManagerApprovalsScreen() {
         <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView contentContainerStyle={styles.scroll}>
-          {rows.length === 0 ? (
+          {loadError ? (
+            <View style={styles.emptyWrap}>
+              <IconSymbol ios_icon_name="exclamationmark.triangle.fill" android_material_icon_name="warning" size={44} color="#F44336" />
+              <Text style={[styles.empty, { color: '#F44336' }]}>
+                {t('rewards_ui:approvals_load_failed', 'Could not load redemption requests.')}
+              </Text>
+              {/* The server detail, mapped through translateServerError where it
+                  is a known RAISE and passed through raw (debuggable) otherwise. */}
+              <Text style={[styles.empty, { color: colors.textSecondary }]}>{loadError}</Text>
+              <TouchableOpacity
+                style={[styles.retryBtn, { borderColor: colors.border }]}
+                onPress={() => refresh()}
+              >
+                <Text style={{ color: colors.text, fontWeight: '700' }}>{t('common:retry', 'Retry')}</Text>
+              </TouchableOpacity>
+            </View>
+          ) : rows.length === 0 ? (
             <View style={styles.emptyWrap}>
               <IconSymbol ios_icon_name="tray" android_material_icon_name="inbox" size={48} color={colors.textSecondary} />
               <Text style={[styles.empty, { color: colors.textSecondary }]}>
-                No pending redemption requests.
+                {t('rewards_ui:approvals_empty', 'No pending redemption requests.')}
               </Text>
             </View>
           ) : (
@@ -248,29 +294,52 @@ export default function ManagerApprovalsScreen() {
             {detailRow && (
               <>
                 <Text style={[styles.detailLine, { color: colors.text }]}>
-                  Employee: {detailRow.user_name}
+                  {t('rewards_ui:approvals_employee_label', {
+                    name: detailRow.user_name ?? '',
+                    defaultValue: 'Employee: {{name}}',
+                  })}
                 </Text>
                 <Text style={[styles.detailLine, { color: colors.text }]}>
-                  Cost: ${detailRow.bucks_amount}
+                  {t('rewards_ui:approvals_cost_label', {
+                    amount: detailRow.bucks_amount,
+                    defaultValue: 'Cost: ${{amount}}',
+                  })}
                 </Text>
                 {detailRow.request_type === 'food_beverage' ? (
                   <Text style={[styles.detailLine, { color: colors.text }]}>
-                    Item: {detailRow.item_name_snapshot}
+                    {t('rewards_ui:approvals_item_label', {
+                      item: detailRow.item_name_snapshot ?? '',
+                      defaultValue: 'Item: {{item}}',
+                    })}
                   </Text>
                 ) : (
                   <>
                     <Text style={[styles.detailLine, { color: colors.text }]}>
-                      Shift: {detailRow.shift_date} {detailRow.shift_period}
+                      {t('rewards_ui:approvals_shift_label', {
+                        // 'T00:00:00' keeps a date-only string on the LOCAL day
+                        // (bare ISO dates parse as UTC midnight → off by one).
+                        date: detailRow.shift_date
+                          ? new Date(detailRow.shift_date + 'T00:00:00').toLocaleDateString(dateLocale)
+                          : '',
+                        period: detailRow.shift_period ?? '',
+                        defaultValue: 'Shift: {{date}} {{period}}',
+                      })}
                     </Text>
                     {detailRow.comment ? (
                       <Text style={[styles.detailLine, { color: colors.textSecondary }]}>
-                        Note: {detailRow.comment}
+                        {t('rewards_ui:approvals_note_label', {
+                          note: detailRow.comment,
+                          defaultValue: 'Note: {{note}}',
+                        })}
                       </Text>
                     ) : null}
                   </>
                 )}
                 <Text style={[styles.detailLine, { color: colors.textSecondary, fontStyle: 'italic', marginTop: 8 }]}>
-                  Submitted {new Date(detailRow.created_at).toLocaleString()}
+                  {t('rewards_ui:approvals_submitted', {
+                    when: new Date(detailRow.created_at).toLocaleString(dateLocale),
+                    defaultValue: 'Submitted {{when}}',
+                  })}
                 </Text>
               </>
             )}
@@ -278,13 +347,19 @@ export default function ManagerApprovalsScreen() {
             {decisionMode ? (
               <View style={{ marginTop: 16 }}>
                 <Text style={[styles.fieldLabel, { color: colors.text }]}>
-                  Reason ({decisionMode === 'deny' ? 'optional' : 'optional note'})
+                  {decisionMode === 'deny'
+                    ? t('rewards_ui:approvals_reason_optional', 'Reason (optional)')
+                    : t('rewards_ui:approvals_reason_optional_note', 'Reason (optional note)')}
                 </Text>
                 <TextInput
                   style={[styles.textInput, { backgroundColor: colors.background, color: colors.text }]}
                   value={reason}
                   onChangeText={setReason}
-                  placeholder={decisionMode === 'deny' ? 'e.g. Section already taken' : 'Optional note for the employee'}
+                  placeholder={
+                    decisionMode === 'deny'
+                      ? t('rewards_ui:approvals_deny_ph', 'e.g. Section already taken')
+                      : t('rewards_ui:approvals_approve_ph', 'Optional note for the employee')
+                  }
                   placeholderTextColor={colors.textSecondary}
                   multiline
                 />
@@ -297,7 +372,7 @@ export default function ManagerApprovalsScreen() {
                       setReason('');
                     }}
                   >
-                    <Text style={{ color: colors.text, fontWeight: '700' }}>Back</Text>
+                    <Text style={{ color: colors.text, fontWeight: '700' }}>{t('common:back', 'Back')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[
@@ -311,7 +386,9 @@ export default function ManagerApprovalsScreen() {
                       <ActivityIndicator color="#fff" />
                     ) : (
                       <Text style={{ color: '#fff', fontWeight: '700' }}>
-                        {decisionMode === 'approve' ? 'Approve' : 'Deny'}
+                        {decisionMode === 'approve'
+                          ? t('rewards_ui:req_approve', 'Approve')
+                          : t('rewards_ui:req_deny', 'Deny')}
                       </Text>
                     )}
                   </TouchableOpacity>
@@ -323,19 +400,19 @@ export default function ManagerApprovalsScreen() {
                   style={[styles.actionBtn, { backgroundColor: '#F4433620', borderWidth: 1, borderColor: '#F44336' }]}
                   onPress={() => setDecisionMode('deny')}
                 >
-                  <Text style={{ color: '#F44336', fontWeight: '700' }}>Deny</Text>
+                  <Text style={{ color: '#F44336', fontWeight: '700' }}>{t('rewards_ui:req_deny', 'Deny')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: '#4CAF5020', borderWidth: 1, borderColor: '#4CAF50' }]}
                   onPress={() => setDecisionMode('approve')}
                 >
-                  <Text style={{ color: '#4CAF50', fontWeight: '700' }}>Approve</Text>
+                  <Text style={{ color: '#4CAF50', fontWeight: '700' }}>{t('rewards_ui:req_approve', 'Approve')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.actionBtn, { backgroundColor: colors.border }]}
                   onPress={() => setDetailRow(null)}
                 >
-                  <Text style={{ color: colors.text, fontWeight: '700' }}>Close</Text>
+                  <Text style={{ color: colors.text, fontWeight: '700' }}>{t('common:close', 'Close')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -353,10 +430,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, paddingTop: 48, paddingBottom: 14, borderBottomWidth: 1,
   },
   backBtn: { padding: 4, width: 32 },
-  headerText: { fontSize: 20, fontWeight: '700' },
+  // flex:1 between the two width-38 slots keeps the title optically centered
+  // (as space-between already did) AND gives numberOfLines={1} something to
+  // shrink into — without it the longer ES title would overflow the row.
+  headerText: { flex: 1, fontSize: 20, fontWeight: '700', textAlign: 'center' },
   scroll: { padding: 16, paddingBottom: 80 },
   emptyWrap: { alignItems: 'center', paddingTop: 60, gap: 10 },
   empty: { fontSize: 14, textAlign: 'center' },
+  retryBtn: {
+    marginTop: 6, paddingVertical: 10, paddingHorizontal: 24, borderRadius: 10, borderWidth: 1,
+  },
 
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 20 },
   detailCard: { borderRadius: 16, padding: 20 },

@@ -501,9 +501,9 @@ export default function PortalHome({ role }: PortalHomeProps) {
 
   const getPriorityLabel = (priority: string) => {
     switch (priority) {
-      case 'new': return 'New';
-      case 'important': return 'Important';
-      case 'update': return 'Update';
+      case 'new': return t('common:priority_new');
+      case 'important': return t('common:priority_important');
+      case 'update': return t('common:priority_update');
       default: return priority.charAt(0).toUpperCase() + priority.slice(1);
     }
   };

@@ -23,7 +23,6 @@ export interface Organization {
   menu_2_name: string;
   menu_1_icon: string;
   menu_2_icon: string;
-  header_icon: string;
   default_password: string;
   owner_id: string | null;
   games_use_sample_data: boolean;
@@ -60,7 +59,6 @@ const DEFAULT_ORG: Organization = {
   menu_2_name: 'Summer',
   menu_1_icon: 'snowflake',
   menu_2_icon: 'sun.max.fill',
-  header_icon: 'sailboat.fill',
   default_password: 'boathouseconnect',
   owner_id: null,
   games_use_sample_data: true,
@@ -110,7 +108,6 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         menu_2_name: orgData.menu_2_name || DEFAULT_ORG.menu_2_name,
         menu_1_icon: orgData.menu_1_icon || DEFAULT_ORG.menu_1_icon,
         menu_2_icon: orgData.menu_2_icon || DEFAULT_ORG.menu_2_icon,
-        header_icon: orgData.header_icon || DEFAULT_ORG.header_icon,
         default_password: orgData.default_password || DEFAULT_ORG.default_password,
         owner_id: orgData.owner_id || null,
         games_use_sample_data: orgData.games_use_sample_data ?? true,

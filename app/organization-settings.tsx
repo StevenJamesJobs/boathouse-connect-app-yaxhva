@@ -16,6 +16,7 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
@@ -30,17 +31,18 @@ import { translateServerError } from '@/utils/serverErrors';
 
 type SettingsTab = 'branding' | 'menu' | 'jobs-tools' | 'access';
 
-const TABS: { key: SettingsTab; label: string }[] = [
-  { key: 'branding', label: 'Branding' },
-  { key: 'menu', label: 'Menu' },
-  { key: 'jobs-tools', label: 'Jobs & Tools' },
-  { key: 'access', label: 'Access' },
+const TABS: { key: SettingsTab; labelKey: string }[] = [
+  { key: 'branding', labelKey: 'org_settings.tab_branding' },
+  { key: 'menu', labelKey: 'org_settings.tab_menu' },
+  { key: 'jobs-tools', labelKey: 'org_settings.tab_jobs_tools' },
+  { key: 'access', labelKey: 'org_settings.tab_access' },
 ];
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export default function OrganizationSettingsScreen() {
   const router = useRouter();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
   const { organizationId, organization, refreshOrganization } = useOrganization();
@@ -69,7 +71,6 @@ export default function OrganizationSettingsScreen() {
   const [menu2Name, setMenu2Name] = useState('');
   const [menu1Icon, setMenu1Icon] = useState('snowflake');
   const [menu2Icon, setMenu2Icon] = useState('sun.max.fill');
-  const [headerIcon, setHeaderIcon] = useState('fork.knife');
   const [defaultPassword, setDefaultPassword] = useState('');
   const [menuScope, setMenuScope] = useState<'shared' | 'per_menu'>('shared');
   const [scopeSaving, setScopeSaving] = useState(false);
@@ -91,7 +92,6 @@ export default function OrganizationSettingsScreen() {
     setMenu2Name(organization.menu_2_name);
     setMenu1Icon(organization.menu_1_icon);
     setMenu2Icon(organization.menu_2_icon);
-    setHeaderIcon(organization.header_icon);
     setDefaultPassword(organization.default_password);
     setLogoPreview(organization.logo_url);
   }, [organization]);
@@ -122,33 +122,39 @@ export default function OrganizationSettingsScreen() {
         });
         const res = data as { success?: boolean; error?: string } | null;
         if (error || (res && res.success === false)) {
-          Alert.alert('Error', (res && res.error) || translateServerError(error, 'Failed to change menu mode'));
+          Alert.alert(
+            t('common:error'),
+            translateServerError(
+              { message: (res && res.error) || error?.message || null },
+              t('org_settings.scope_change_failed', 'Failed to change menu mode'),
+            ),
+          );
           return;
         }
         setMenuScope(next);
         await refreshOrganization();
       } catch (e: any) {
-        Alert.alert('Error', translateServerError(e, 'Failed to change menu mode'));
+        Alert.alert(t('common:error'), translateServerError(e, t('org_settings.scope_change_failed', 'Failed to change menu mode')));
       } finally {
         setScopeSaving(false);
       }
     };
     if (next === 'per_menu') {
       Alert.alert(
-        'Switch to Per-Menu categories?',
-        'Each menu gets its own independent category list you can edit separately. New items will belong to a single menu (the "Both" option goes away). Items currently set to both menus stay visible on both until you re-tag them. You can switch back anytime.',
+        t('org_settings.switch_per_menu_title', 'Switch to Per-Menu categories?'),
+        t('org_settings.switch_per_menu_msg', 'Each menu gets its own independent category list you can edit separately. New items will belong to a single menu (the "Both" option goes away). Items currently set to both menus stay visible on both until you re-tag them. You can switch back anytime.'),
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Switch', onPress: apply },
+          { text: t('common:cancel'), style: 'cancel' },
+          { text: t('org_settings.switch_btn', 'Switch'), onPress: apply },
         ],
       );
     } else {
       Alert.alert(
-        'Switch to Shared categories?',
-        'Both menus will share one category list again. Items can appear on Menu 1, Menu 2, or both. Your per-menu edits are kept and reappear if you switch back.',
+        t('org_settings.switch_shared_title', 'Switch to Shared categories?'),
+        t('org_settings.switch_shared_msg', 'Both menus will share one category list again. Items can appear on Menu 1, Menu 2, or both. Your per-menu edits are kept and reappear if you switch back.'),
         [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Switch', onPress: apply },
+          { text: t('common:cancel'), style: 'cancel' },
+          { text: t('org_settings.switch_btn', 'Switch'), onPress: apply },
         ],
       );
     }
@@ -158,7 +164,10 @@ export default function OrganizationSettingsScreen() {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Required', 'Please grant photo library access to upload a logo.');
+        Alert.alert(
+          t('org_settings.permission_required', 'Permission Required'),
+          t('org_settings.photo_permission_msg', 'Please grant photo library access to upload a logo.'),
+        );
         return;
       }
 
@@ -173,7 +182,7 @@ export default function OrganizationSettingsScreen() {
         await uploadLogo(result.assets[0].uri);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick image.');
+      Alert.alert(t('common:error'), t('org_settings.pick_image_failed', 'Failed to pick image.'));
     }
   };
 
@@ -182,7 +191,13 @@ export default function OrganizationSettingsScreen() {
     setUploadingLogo(true);
     try {
       const publicUrl = await brokerUploadImage('org_logo', uri, user.id);
-      if (!publicUrl) throw new Error('Failed to upload logo.');
+      // Early return (not a throw): translateServerError echoes any non-empty
+      // message verbatim, so throwing the English literal would make the
+      // translated fallback in the catch unreachable.
+      if (!publicUrl) {
+        Alert.alert(t('common:error'), t('org_settings.logo_upload_failed', 'Failed to upload logo.'));
+        return;
+      }
 
       const { data: logoRes, error: logoError } = await supabase.rpc('set_org_logo', {
         p_actor_id: user.id,
@@ -194,19 +209,19 @@ export default function OrganizationSettingsScreen() {
 
       setLogoPreview(publicUrl);
       await refreshOrganization();
-      Alert.alert('Done', 'Logo updated successfully.');
+      Alert.alert(t('org_settings.done', 'Done'), t('org_settings.logo_updated', 'Logo updated successfully.'));
     } catch (err: any) {
-      Alert.alert('Error', translateServerError(err, 'Failed to upload logo.'));
+      Alert.alert(t('common:error'), translateServerError(err, t('org_settings.logo_upload_failed', 'Failed to upload logo.')));
     } finally {
       setUploadingLogo(false);
     }
   };
 
   const handleRemoveLogo = () => {
-    Alert.alert('Remove Logo', 'This will remove your restaurant logo. Continue?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('org_settings.remove_logo_title', 'Remove Logo'), t('org_settings.remove_logo_msg', 'This will remove your restaurant logo. Continue?'), [
+      { text: t('common:cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('org_settings.remove', 'Remove'),
         style: 'destructive',
         onPress: async () => {
           try {
@@ -221,7 +236,7 @@ export default function OrganizationSettingsScreen() {
             setLogoPreview(null);
             await refreshOrganization();
           } catch (err: any) {
-            Alert.alert('Error', translateServerError(err, 'Failed to remove logo.'));
+            Alert.alert(t('common:error'), translateServerError(err, t('org_settings.logo_remove_failed', 'Failed to remove logo.')));
           }
         },
       },
@@ -232,10 +247,10 @@ export default function OrganizationSettingsScreen() {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>
-          Only the restaurant owner can access this screen.
+          {t('org_settings.access_denied', 'Only the restaurant owner can access this screen.')}
         </Text>
         <TouchableOpacity style={[styles.saveButton, { marginTop: 20 }]} onPress={() => router.back()}>
-          <Text style={styles.saveButtonText}>Go Back</Text>
+          <Text style={styles.saveButtonText}>{t('manage_categories:go_back', 'Go Back')}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -243,7 +258,7 @@ export default function OrganizationSettingsScreen() {
 
   const handleSave = async () => {
     if (!name.trim()) {
-      Alert.alert('Error', 'Restaurant name is required.');
+      Alert.alert(t('common:error'), t('onboarding:restaurant_name_required', 'Restaurant name is required.'));
       return;
     }
     if (!organizationId || !user?.id) return;
@@ -275,14 +290,13 @@ export default function OrganizationSettingsScreen() {
         p_default_password: defaultPassword.trim() || 'welcome123',
         p_menu_1_icon: menu1Icon,
         p_menu_2_icon: menu2Icon,
-        p_header_icon: headerIcon,
       });
 
       if (error) throw error;
 
       const result = typeof data === 'string' ? JSON.parse(data) : data;
       if (!result.success) {
-        Alert.alert('Error', translateServerError({ message: result.error }, 'Failed to save settings.'));
+        Alert.alert(t('common:error'), translateServerError({ message: result.error }, t('org_settings.save_failed', 'Failed to save settings.')));
         return;
       }
 
@@ -293,16 +307,19 @@ export default function OrganizationSettingsScreen() {
       // time out server-side), so kick it off in the background and refresh the
       // org when it lands. (The Mon/Thu auto-refresh + the Update button retry it.)
       if (queryChanged) {
-        Alert.alert('Saved', 'Organization settings updated.\n\nWe\'re importing Google reviews for this location now — they\'ll appear shortly. You can re-import anytime with the Update button next to the Google Maps field.');
+        Alert.alert(
+          t('org_settings.saved_title', 'Saved'),
+          t('org_settings.saved_importing_msg', 'Organization settings updated.\n\nWe\'re importing Google reviews for this location now — they\'ll appear shortly. You can re-import anytime with the Update button next to the Google Maps field.'),
+        );
         supabase.functions
           .invoke('import-google-reviews', { body: { source: 'manual', user_id: user?.id, organization_id: organizationId, backfill: true } })
           .then(() => refreshOrganization())
           .catch((e: any) => console.error('[OrgSettings] background review import failed:', e));
       } else {
-        Alert.alert('Saved', 'Organization settings updated successfully.');
+        Alert.alert(t('org_settings.saved_title', 'Saved'), t('org_settings.saved_msg', 'Organization settings updated successfully.'));
       }
     } catch (err: any) {
-      Alert.alert('Error', translateServerError(err, 'Failed to save settings.'));
+      Alert.alert(t('common:error'), translateServerError(err, t('org_settings.save_failed', 'Failed to save settings.')));
     } finally {
       setSaving(false);
     }
@@ -313,7 +330,7 @@ export default function OrganizationSettingsScreen() {
   const handleUpdateGoogleMaps = async () => {
     const q = googleMapsQuery.trim();
     if (!q) {
-      Alert.alert('Error', 'Enter a Google Maps location first.');
+      Alert.alert(t('common:error'), t('org_settings.gmaps_required', 'Enter a Google Maps location first.'));
       return;
     }
     if (!organizationId || !user?.id) return;
@@ -326,27 +343,32 @@ export default function OrganizationSettingsScreen() {
       });
       if (error) throw error;
       const result = typeof data === 'string' ? JSON.parse(data) : data;
-      if (!result?.success) throw new Error(result?.error || 'Failed to save location.');
+      // Empty (not an English literal) so the translated fallback in the catch
+      // wins — translateServerError echoes any non-empty message verbatim.
+      if (!result?.success) throw new Error(result?.error || '');
       await refreshOrganization();
       setSavingGmaps(false);
-      Alert.alert('Location saved', "Saved! We're importing Google reviews for this location — they'll appear shortly.");
+      Alert.alert(
+        t('org_settings.location_saved_title', 'Location saved'),
+        t('org_settings.location_saved_msg', "Saved! We're importing Google reviews for this location — they'll appear shortly."),
+      );
       supabase.functions
         .invoke('import-google-reviews', { body: { source: 'manual', user_id: user?.id, organization_id: organizationId, backfill: true } })
         .then(() => refreshOrganization())
         .catch((e: any) => console.error('[OrgSettings] background review import failed:', e));
     } catch (e: any) {
       setSavingGmaps(false);
-      Alert.alert('Error', translateServerError(e, 'Failed to save location.'));
+      Alert.alert(t('common:error'), translateServerError(e, t('org_settings.location_save_failed', 'Failed to save location.')));
     }
   };
 
   const handleRegenerateJoinCode = () => {
     Alert.alert(
-      'Regenerate Join Code',
-      'This will invalidate the current code. Employees who haven\'t joined yet will need the new code. Continue?',
+      t('org_settings.regen_title', 'Regenerate Join Code'),
+      t('org_settings.regen_msg', 'This will invalidate the current code. Employees who haven\'t joined yet will need the new code. Continue?'),
       [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Regenerate', style: 'destructive', onPress: doRegenerateCode },
+        { text: t('common:cancel'), style: 'cancel' },
+        { text: t('org_settings.regen_btn', 'Regenerate'), style: 'destructive', onPress: doRegenerateCode },
       ]
     );
   };
@@ -364,14 +386,17 @@ export default function OrganizationSettingsScreen() {
 
       const result = typeof data === 'string' ? JSON.parse(data) : data;
       if (!result.success) {
-        Alert.alert('Error', translateServerError({ message: result.error }, 'Failed to regenerate code.'));
+        Alert.alert(t('common:error'), translateServerError({ message: result.error }, t('org_settings.regen_failed', 'Failed to regenerate join code.')));
         return;
       }
 
       await refreshOrganization();
-      Alert.alert('Done', `New join code: ${result.join_code}`);
+      Alert.alert(
+        t('org_settings.done', 'Done'),
+        t('org_settings.new_join_code', { code: result.join_code, defaultValue: 'New join code: {{code}}' }),
+      );
     } catch (err: any) {
-      Alert.alert('Error', translateServerError(err, 'Failed to regenerate join code.'));
+      Alert.alert(t('common:error'), translateServerError(err, t('org_settings.regen_failed', 'Failed to regenerate join code.')));
     } finally {
       setRegeneratingCode(false);
     }
@@ -380,7 +405,7 @@ export default function OrganizationSettingsScreen() {
   const copyJoinCode = async () => {
     if (organization.join_code) {
       await Clipboard.setStringAsync(organization.join_code);
-      Alert.alert('Copied', 'Join code copied to clipboard.');
+      Alert.alert(t('org_settings.copied_title', 'Copied'), t('org_settings.join_code_copied', 'Join code copied to clipboard.'));
     }
   };
 
@@ -388,7 +413,7 @@ export default function OrganizationSettingsScreen() {
   const pagerRef = useRef<ScrollView>(null);
 
   const goToTab = (key: SettingsTab) => {
-    const idx = TABS.findIndex(t => t.key === key);
+    const idx = TABS.findIndex(tab => tab.key === key);
     setActiveTab(key);
     pagerRef.current?.scrollTo({ x: idx * SCREEN_WIDTH, animated: true });
   };
@@ -408,7 +433,7 @@ export default function OrganizationSettingsScreen() {
       {saving ? (
         <ActivityIndicator color={colors.fireText} />
       ) : (
-        <Text style={styles.saveButtonText}>Save Changes</Text>
+        <Text style={styles.saveButtonText}>{t('org_settings.save_changes', 'Save Changes')}</Text>
       )}
     </TouchableOpacity>
   );
@@ -428,12 +453,12 @@ export default function OrganizationSettingsScreen() {
             color={colors.primary}
           />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Organization Settings</Text>
+        <Text style={styles.headerTitle}>{t('manager_manage:open_org_settings', 'Organization Settings')}</Text>
         <TouchableOpacity onPress={handleSave} disabled={saving} style={styles.headerSaveButton}>
           {saving ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : (
-            <Text style={styles.headerSaveText}>Save</Text>
+            <Text style={styles.headerSaveText}>{t('common:save')}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -447,8 +472,8 @@ export default function OrganizationSettingsScreen() {
             onPress={() => goToTab(tab.key)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]}>
-              {tab.label}
+            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]} numberOfLines={1}>
+              {t(tab.labelKey)}
             </Text>
           </TouchableOpacity>
         ))}
@@ -469,7 +494,7 @@ export default function OrganizationSettingsScreen() {
           <>
             {/* Branding Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Branding</Text>
+              <Text style={styles.sectionTitle}>{t('org_settings.tab_branding', 'Branding')}</Text>
 
               {/* Logo Upload */}
               <View style={[styles.fieldContainer, { alignItems: 'center' }]}>
@@ -496,7 +521,7 @@ export default function OrganizationSettingsScreen() {
                         color={colors.textSecondary}
                       />
                       <Text style={[styles.logoPlaceholderText, { color: colors.textSecondary }]}>
-                        Add Logo
+                        {t('org_settings.add_logo', 'Add Logo')}
                       </Text>
                     </View>
                   )}
@@ -504,40 +529,34 @@ export default function OrganizationSettingsScreen() {
                 <View style={styles.logoActions}>
                   <TouchableOpacity onPress={handlePickLogo} disabled={uploadingLogo}>
                     <Text style={[styles.logoActionText, { color: colors.primary }]}>
-                      {logoPreview ? 'Change Logo' : 'Upload Logo'}
+                      {logoPreview ? t('org_settings.change_logo', 'Change Logo') : t('org_settings.upload_logo', 'Upload Logo')}
                     </Text>
                   </TouchableOpacity>
                   {logoPreview && (
                     <TouchableOpacity onPress={handleRemoveLogo}>
-                      <Text style={[styles.logoActionText, { color: '#E53935' }]}>Remove</Text>
+                      <Text style={[styles.logoActionText, { color: '#E53935' }]}>{t('org_settings.remove', 'Remove')}</Text>
                     </TouchableOpacity>
                   )}
                 </View>
               </View>
 
-              {/* Header Icon — paired with the logo since both appear in the app header */}
               <View style={styles.fieldContainer}>
-                <MenuIconPicker label="Header Icon (shown next to your restaurant name)" value={headerIcon} onChange={setHeaderIcon} />
-                <Text style={styles.fieldHint}>Displayed on the login screen and app header</Text>
-              </View>
-
-              <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>Restaurant Name</Text>
+                <Text style={styles.fieldLabel}>{t('org_settings.restaurant_name', 'Restaurant Name')}</Text>
                 <TextInput
                   style={styles.input}
                   value={name}
                   onChangeText={setName}
-                  placeholder="Your restaurant name"
+                  placeholder={t('org_settings.restaurant_name_ph', 'Your restaurant name')}
                   placeholderTextColor={colors.textSecondary}
                 />
               </View>
               <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>Reward Currency Name</Text>
+                <Text style={styles.fieldLabel}>{t('onboarding:reward_currency', 'Reward Currency Name')}</Text>
                 <TextInput
                   style={styles.input}
                   value={rewardCurrencyName}
                   onChangeText={setRewardCurrencyName}
-                  placeholder="e.g. Bucks, Points, Stars"
+                  placeholder={t('org_settings.reward_currency_ph', 'e.g. Bucks, Points, Stars')}
                   placeholderTextColor={colors.textSecondary}
                 />
               </View>
@@ -545,30 +564,30 @@ export default function OrganizationSettingsScreen() {
 
             {/* Location Section */}
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Location</Text>
+              <Text style={styles.sectionTitle}>{t('onboarding:gs_location', 'Location')}</Text>
               <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>Address</Text>
+                <Text style={styles.fieldLabel}>{t('onboarding:address', 'Address')}</Text>
                 <TextInput
                   style={styles.input}
                   value={address}
                   onChangeText={setAddress}
-                  placeholder="Street address"
+                  placeholder={t('onboarding:street_address_ph', 'Street address')}
                   placeholderTextColor={colors.textSecondary}
                 />
               </View>
               <View style={styles.row}>
                 <View style={[styles.fieldContainer, { flex: 2 }]}>
-                  <Text style={styles.fieldLabel}>City</Text>
+                  <Text style={styles.fieldLabel}>{t('onboarding:city', 'City')}</Text>
                   <TextInput
                     style={styles.input}
                     value={city}
                     onChangeText={setCity}
-                    placeholder="City"
+                    placeholder={t('onboarding:city', 'City')}
                     placeholderTextColor={colors.textSecondary}
                   />
                 </View>
                 <View style={[styles.fieldContainer, { flex: 1, marginLeft: 12 }]}>
-                  <Text style={styles.fieldLabel}>State</Text>
+                  <Text style={styles.fieldLabel}>{t('onboarding:state', 'State')}</Text>
                   <TextInput
                     style={styles.input}
                     value={state}
@@ -580,7 +599,7 @@ export default function OrganizationSettingsScreen() {
                   />
                 </View>
                 <View style={[styles.fieldContainer, { flex: 1, marginLeft: 12 }]}>
-                  <Text style={styles.fieldLabel}>ZIP</Text>
+                  <Text style={styles.fieldLabel}>{t('onboarding:zip', 'Zip')}</Text>
                   <TextInput
                     style={styles.input}
                     value={zip}
@@ -593,23 +612,23 @@ export default function OrganizationSettingsScreen() {
                 </View>
               </View>
               <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>Weather Location</Text>
+                <Text style={styles.fieldLabel}>{t('org_settings.weather_location', 'Weather Location')}</Text>
                 <TextInput
                   style={styles.input}
                   value={weatherLocation}
                   onChangeText={setWeatherLocation}
-                  placeholder="e.g. Long Branch, NJ"
+                  placeholder={t('org_settings.weather_location_ph', 'e.g. Long Branch, NJ')}
                   placeholderTextColor={colors.textSecondary}
                 />
-                <Text style={styles.fieldHint}>Used for the weather widget on the home screen</Text>
+                <Text style={styles.fieldHint}>{t('org_settings.weather_location_hint', 'Used for the weather widget on the home screen')}</Text>
               </View>
               <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>Google Maps Search</Text>
+                <Text style={styles.fieldLabel}>{t('org_settings.gmaps_label', 'Google Maps Search')}</Text>
                 <TextInput
                   style={styles.input}
                   value={googleMapsQuery}
                   onChangeText={setGoogleMapsQuery}
-                  placeholder="e.g. McLoone's Boathouse, 9 Cherry Lane, West Orange NJ"
+                  placeholder={t('org_settings.gmaps_ph', "e.g. McLoone's Boathouse, 9 Cherry Lane, West Orange NJ")}
                   placeholderTextColor={colors.textSecondary}
                 />
                 <TouchableOpacity
@@ -623,13 +642,12 @@ export default function OrganizationSettingsScreen() {
                   ) : (
                     <>
                       <IconSymbol ios_icon_name="magnifyingglass" android_material_icon_name="search" size={15} color={colors.fireText} />
-                      <Text style={{ color: colors.fireText, fontWeight: '700', fontSize: 13 }}>Update &amp; Import Reviews</Text>
+                      <Text style={{ color: colors.fireText, fontWeight: '700', fontSize: 13 }}>{t('org_settings.gmaps_update_btn', 'Update & Import Reviews')}</Text>
                     </>
                   )}
                 </TouchableOpacity>
                 <Text style={styles.fieldHint}>
-                  Enter your restaurant's name and address exactly as it appears on Google Maps. We'll import
-                  your Google Reviews from this location — tap Update &amp; Import (or save settings) to fetch them.
+                  {t('org_settings.gmaps_hint', "Enter your restaurant's name and address exactly as it appears on Google Maps. We'll import your Google Reviews from this location — tap Update & Import (or save settings) to fetch them.")}
                 </Text>
               </View>
             </View>
@@ -644,23 +662,23 @@ export default function OrganizationSettingsScreen() {
         <View style={{ width: SCREEN_WIDTH }}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Menu Configuration</Text>
+            <Text style={styles.sectionTitle}>{t('onboarding:step2_title', 'Menu Configuration')}</Text>
 
             {/* Number of menus */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Number of Menus</Text>
+              <Text style={styles.fieldLabel}>{t('org_settings.number_of_menus', 'Number of Menus')}</Text>
               <View style={styles.segmentedControl}>
                 <TouchableOpacity
                   style={[styles.segment, menuCount === 1 && styles.segmentActive]}
                   onPress={() => setMenuCount(1)}
                 >
-                  <Text style={[styles.segmentText, menuCount === 1 && styles.segmentTextActive]}>1 Menu</Text>
+                  <Text style={[styles.segmentText, menuCount === 1 && styles.segmentTextActive]}>{t('org_settings.one_menu', '1 Menu')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.segment, menuCount === 2 && styles.segmentActive]}
                   onPress={() => setMenuCount(2)}
                 >
-                  <Text style={[styles.segmentText, menuCount === 2 && styles.segmentTextActive]}>2 Menus</Text>
+                  <Text style={[styles.segmentText, menuCount === 2 && styles.segmentTextActive]}>{t('org_settings.two_menus', '2 Menus')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -668,37 +686,40 @@ export default function OrganizationSettingsScreen() {
             {/* Category mode (2 menus only) — both options described up front */}
             {menuCount === 2 && (
               <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>Category Mode</Text>
+                <Text style={styles.fieldLabel}>{t('org_settings.category_mode', 'Category Mode')}</Text>
                 <View style={styles.segmentedControl}>
                   <TouchableOpacity
                     style={[styles.segment, menuScope === 'shared' && styles.segmentActive]}
                     onPress={() => handleScopeChange('shared')}
                     disabled={scopeSaving}
                   >
-                    <Text style={[styles.segmentText, menuScope === 'shared' && styles.segmentTextActive]}>Shared</Text>
+                    <Text style={[styles.segmentText, menuScope === 'shared' && styles.segmentTextActive]}>{t('org_settings.scope_shared', 'Shared')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[styles.segment, menuScope === 'per_menu' && styles.segmentActive]}
                     onPress={() => handleScopeChange('per_menu')}
                     disabled={scopeSaving}
                   >
-                    <Text style={[styles.segmentText, menuScope === 'per_menu' && styles.segmentTextActive]}>Per-Menu</Text>
+                    <Text style={[styles.segmentText, menuScope === 'per_menu' && styles.segmentTextActive]}>{t('org_settings.scope_per_menu', 'Per-Menu')}</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={styles.scopeBullets}>
                   <View style={styles.scopeBulletRow}>
                     <Text style={styles.scopeBulletDot}>•</Text>
                     <Text style={styles.scopeBulletText}>
-                      <Text style={styles.scopeBulletLead}>Shared — </Text>
-                      both menus use one set of categories; an item can appear on {menu1Name || 'Menu 1'},{' '}
-                      {menu2Name || 'Menu 2'}, or both.
+                      <Text style={styles.scopeBulletLead}>{t('org_settings.scope_shared_lead', 'Shared — ')}</Text>
+                      {t('org_settings.scope_shared_body', {
+                        menu1: menu1Name || t('onboarding:default_menu_1', 'Menu 1'),
+                        menu2: menu2Name || t('onboarding:default_menu_2', 'Menu 2'),
+                        defaultValue: 'both menus use one set of categories; an item can appear on {{menu1}}, {{menu2}}, or both.',
+                      })}
                     </Text>
                   </View>
                   <View style={styles.scopeBulletRow}>
                     <Text style={styles.scopeBulletDot}>•</Text>
                     <Text style={styles.scopeBulletText}>
-                      <Text style={styles.scopeBulletLead}>Per-Menu — </Text>
-                      each menu has its own independent categories; every item belongs to a single menu.
+                      <Text style={styles.scopeBulletLead}>{t('org_settings.scope_per_menu_lead', 'Per-Menu — ')}</Text>
+                      {t('org_settings.scope_per_menu_body', 'each menu has its own independent categories; every item belongs to a single menu.')}
                     </Text>
                   </View>
                 </View>
@@ -707,14 +728,22 @@ export default function OrganizationSettingsScreen() {
 
             {/* Menu 1 name + icon */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Menu 1 Name</Text>
+              <Text style={styles.fieldLabel}>{t('onboarding:menu1_label', 'Menu 1 Name')}</Text>
               <View style={styles.nameIconRow}>
-                <MenuIconPicker compact label={`${menu1Name || 'Menu 1'} Icon`} value={menu1Icon} onChange={setMenu1Icon} />
+                <MenuIconPicker
+                  compact
+                  label={t('onboarding:menu_icon_label', {
+                    menuName: menu1Name || t('onboarding:default_menu_1', 'Menu 1'),
+                    defaultValue: '{{menuName}} Icon',
+                  })}
+                  value={menu1Icon}
+                  onChange={setMenu1Icon}
+                />
                 <TextInput
                   style={[styles.input, styles.nameIconInput]}
                   value={menu1Name}
                   onChangeText={setMenu1Name}
-                  placeholder="e.g. Winter, Lunch, Main"
+                  placeholder={t('org_settings.menu1_ph', 'e.g. Winter, Lunch, Main')}
                   placeholderTextColor={colors.textSecondary}
                 />
               </View>
@@ -723,14 +752,22 @@ export default function OrganizationSettingsScreen() {
             {/* Menu 2 name + icon (2 menus only) */}
             {menuCount === 2 && (
               <View style={styles.fieldContainer}>
-                <Text style={styles.fieldLabel}>Menu 2 Name</Text>
+                <Text style={styles.fieldLabel}>{t('onboarding:menu2_label', 'Menu 2 Name')}</Text>
                 <View style={styles.nameIconRow}>
-                  <MenuIconPicker compact label={`${menu2Name || 'Menu 2'} Icon`} value={menu2Icon} onChange={setMenu2Icon} />
+                  <MenuIconPicker
+                    compact
+                    label={t('onboarding:menu_icon_label', {
+                      menuName: menu2Name || t('onboarding:default_menu_2', 'Menu 2'),
+                      defaultValue: '{{menuName}} Icon',
+                    })}
+                    value={menu2Icon}
+                    onChange={setMenu2Icon}
+                  />
                   <TextInput
                     style={[styles.input, styles.nameIconInput]}
                     value={menu2Name}
                     onChangeText={setMenu2Name}
-                    placeholder="e.g. Summer, Dinner, Seasonal"
+                    placeholder={t('org_settings.menu2_ph', 'e.g. Summer, Dinner, Seasonal')}
                     placeholderTextColor={colors.textSecondary}
                   />
                 </View>
@@ -757,11 +794,11 @@ export default function OrganizationSettingsScreen() {
         <View style={{ width: SCREEN_WIDTH }}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Employee Access</Text>
+            <Text style={styles.sectionTitle}>{t('org_settings.employee_access', 'Employee Access')}</Text>
 
             {/* Join Code */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Join Code</Text>
+              <Text style={styles.fieldLabel}>{t('org_settings.join_code', 'Join Code')}</Text>
               <View style={styles.joinCodeRow}>
                 <View style={styles.joinCodeDisplay}>
                   <Text style={styles.joinCodeText}>{organization.join_code || '—'}</Text>
@@ -791,14 +828,14 @@ export default function OrganizationSettingsScreen() {
                   )}
                 </TouchableOpacity>
               </View>
-              <Text style={styles.fieldHint}>Share this code with employees so they can join your restaurant</Text>
+              <Text style={styles.fieldHint}>{t('org_settings.join_code_hint', 'Share this code with employees so they can join your restaurant')}</Text>
             </View>
 
             {/* Self Signup Toggle */}
             <View style={styles.switchRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>Allow Self-Signup</Text>
-                <Text style={styles.fieldHint}>Employees can create their own accounts using the join code</Text>
+                <Text style={styles.fieldLabel}>{t('org_settings.allow_self_signup', 'Allow Self-Signup')}</Text>
+                <Text style={styles.fieldHint}>{t('org_settings.allow_self_signup_hint', 'Employees can create their own accounts using the join code')}</Text>
               </View>
               <Switch
                 value={allowSelfSignup}
@@ -811,8 +848,8 @@ export default function OrganizationSettingsScreen() {
             {/* Staff Roster Visibility Toggle */}
             <View style={styles.switchRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.fieldLabel}>Staff Can View Roster</Text>
-                <Text style={styles.fieldHint}>Employees can browse the day roster to see coworkers' shifts. Managers always can.</Text>
+                <Text style={styles.fieldLabel}>{t('org_settings.staff_can_view_roster', 'Staff Can View Roster')}</Text>
+                <Text style={styles.fieldHint}>{t('org_settings.staff_can_view_roster_hint', "Employees can browse the day roster to see coworkers' shifts. Managers always can.")}</Text>
               </View>
               <Switch
                 value={staffCanViewRoster}
@@ -824,15 +861,15 @@ export default function OrganizationSettingsScreen() {
 
             {/* Default Password */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Default Password</Text>
+              <Text style={styles.fieldLabel}>{t('org_settings.default_password', 'Default Password')}</Text>
               <TextInput
                 style={styles.input}
                 value={defaultPassword}
                 onChangeText={setDefaultPassword}
-                placeholder="Default password for new accounts"
+                placeholder={t('org_settings.default_password_ph', 'Default password for new accounts')}
                 placeholderTextColor={colors.textSecondary}
               />
-              <Text style={styles.fieldHint}>Used when managers create accounts for employees</Text>
+              <Text style={styles.fieldHint}>{t('org_settings.default_password_hint', 'Used when managers create accounts for employees')}</Text>
             </View>
           </View>
           {saveButtonNode}

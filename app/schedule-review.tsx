@@ -16,7 +16,7 @@ import {
   UIManager,
   Dimensions,
 } from 'react-native';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -29,6 +29,8 @@ import { useTranslation } from 'react-i18next';
 import ShiftEditForm from '@/components/ShiftEditForm';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { translateServerError } from '@/utils/serverErrors';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -36,6 +38,14 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 const ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+// A-Z rail initial, accent-folded: ALPHABET holds no accented letters, so an
+// unfolded 'Á' ("Ángela") matches no button AND renders no button of its own —
+// the employee is invisible under every letter and reachable only via "All".
+// Folding to the base letter files her under A. Used by BOTH the letter filter
+// and the available-letters set so the two always agree.
+const initialLetter = (name: string) =>
+  name.charAt(0).toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 interface ShiftRecord {
   id: string;
@@ -66,9 +76,9 @@ interface GroupedShifts {
 
 export default function ScheduleReviewScreen() {
   useRequireManagerRoute();
-  const router = useRouter();
   const colors = useThemeColors();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const dateLocale = i18n.language === 'es' ? 'es-ES' : 'en-US';
   const { organizationId } = useOrganization();
   const { user } = useAuth();
   const { hasPremium } = useSubscription();
@@ -148,7 +158,10 @@ export default function ScheduleReviewScreen() {
       setUsers(userData || []);
     } catch (error) {
       console.error('Error loading review data:', error);
-      Alert.alert('Error', 'Failed to load schedule data.');
+      Alert.alert(
+        t('common.error', 'Error'),
+        t('schedule_review.load_failed', 'Failed to load schedule data.')
+      );
     } finally {
       setLoading(false);
     }
@@ -186,7 +199,7 @@ export default function ScheduleReviewScreen() {
     if (!selectedLetter) return groupedShifts;
     return groupedShifts.filter((g) => {
       const displayName = g.user_name || g.employee_name;
-      return displayName.charAt(0).toUpperCase() === selectedLetter;
+      return initialLetter(displayName) === selectedLetter;
     });
   }, [groupedShifts, selectedLetter]);
 
@@ -198,14 +211,14 @@ export default function ScheduleReviewScreen() {
     const letters = new Set<string>();
     groupedShifts.forEach((g) => {
       const displayName = g.user_name || g.employee_name;
-      if (displayName) letters.add(displayName.charAt(0).toUpperCase());
+      if (displayName) letters.add(initialLetter(displayName));
     });
     return letters;
   }, [groupedShifts]);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr + 'T00:00:00');
-    return date.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' });
+    return date.toLocaleDateString(dateLocale, { weekday: 'short', month: 'numeric', day: 'numeric' });
   };
 
   const formatTime = (timeStr: string) => {
@@ -218,7 +231,7 @@ export default function ScheduleReviewScreen() {
   const formatWeekDate = (dateStr: string) => {
     if (!dateStr) return '';
     const date = new Date(dateStr + 'T00:00:00');
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return date.toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' });
   };
 
   const toggleCardExpanded = (employeeName: string) => {
@@ -262,14 +275,26 @@ export default function ScheduleReviewScreen() {
       await loadData();
 
       Alert.alert(
-        'Updated',
+        t('schedule_review.updated_title', 'Updated'),
         userId
-          ? `Assigned ${selectedEmployee} to ${users.find((u) => u.id === userId)?.name || 'user'}.`
-          : `Unassigned ${selectedEmployee}.`
+          ? t('schedule_review.assigned_msg', {
+              defaultValue: 'Assigned {{employee}} to {{name}}.',
+              employee: selectedEmployee,
+              name:
+                users.find((u) => u.id === userId)?.name ||
+                t('schedule_review.unknown_user', 'user'),
+            })
+          : t('schedule_review.unassigned_msg', {
+              defaultValue: 'Unassigned {{employee}}.',
+              employee: selectedEmployee,
+            })
       );
     } catch (error: any) {
       console.error('Error assigning user:', error);
-      Alert.alert('Error', translateServerError(error, 'Failed to update assignment.'));
+      Alert.alert(
+        t('common.error', 'Error'),
+        translateServerError(error, t('schedule_review.assign_failed', 'Failed to update assignment.'))
+      );
     } finally {
       setSaving(false);
     }
@@ -277,12 +302,16 @@ export default function ScheduleReviewScreen() {
 
   const handleDeleteShift = (shift: ShiftRecord) => {
     Alert.alert(
-      'Delete Shift',
-      `Remove ${shift.employee_name}'s shift on ${formatDate(shift.shift_date)}?`,
+      t('schedule_review.delete_title', 'Delete Shift'),
+      t('schedule_review.delete_message', {
+        defaultValue: "Remove {{employee}}'s shift on {{date}}?",
+        employee: shift.employee_name,
+        date: formatDate(shift.shift_date),
+      }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('common.cancel', 'Cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('common.delete', 'Delete'),
           style: 'destructive',
           onPress: async () => {
             if (!user?.id) return;
@@ -295,8 +324,12 @@ export default function ScheduleReviewScreen() {
               if (error) throw error;
 
               await loadData();
-            } catch (error) {
+            } catch (error: any) {
               console.error('Delete shift error:', error);
+              Alert.alert(
+                t('common.error', 'Error'),
+                translateServerError(error, t('schedule_review.delete_failed', 'Failed to delete shift.'))
+              );
             }
           },
         },
@@ -352,13 +385,8 @@ export default function ScheduleReviewScreen() {
   if (!hasPremium) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.primary} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Review Schedule</Text>
-          <View style={styles.headerRight} />
-        </View>
+        <AmbientGlow />
+        <ScreenHeader title={t('schedule_review.title', 'Review Schedule')} />
         <PremiumGate
           desc={t('schedule_upload.premium_desc')}
           bullets={[
@@ -377,13 +405,8 @@ export default function ScheduleReviewScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.primary} />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>Review Schedule</Text>
-          <View style={styles.headerRight} />
-        </View>
+        <AmbientGlow />
+        <ScreenHeader title={t('schedule_review.title', 'Review Schedule')} />
         <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 60 }} />
       </View>
     );
@@ -391,28 +414,28 @@ export default function ScheduleReviewScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AmbientGlow />
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>Review Schedule</Text>
-        <TouchableOpacity
-          style={styles.headerAddButton}
-          onPress={() => {
-            setNewScheduleSearch('');
-            setNewScheduleModalVisible(true);
-          }}
-          activeOpacity={0.7}
-        >
-          <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={26} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
+      <ScreenHeader
+        title={t('schedule_review.title', 'Review Schedule')}
+        right={
+          <TouchableOpacity
+            style={styles.headerAddButton}
+            onPress={() => {
+              setNewScheduleSearch('');
+              setNewScheduleModalVisible(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={26} color={colors.primary} />
+          </TouchableOpacity>
+        }
+      />
 
       {saving && (
         <View style={styles.savingOverlay}>
           <ActivityIndicator size="small" color="#FFFFFF" />
-          <Text style={styles.savingText}>Saving...</Text>
+          <Text style={styles.savingText}>{t('schedule_review.saving', 'Saving...')}</Text>
         </View>
       )}
 
@@ -432,21 +455,29 @@ export default function ScheduleReviewScreen() {
             <View style={styles.summaryStats}>
               <View style={styles.summaryStatItem}>
                 <Text style={[styles.summaryStatNumber, { color: colors.primary }]}>{shifts.length}</Text>
-                <Text style={[styles.summaryStatLabel, { color: colors.textSecondary }]}>Shifts</Text>
+                <Text style={[styles.summaryStatLabel, { color: colors.textSecondary }]}>
+                  {t('schedule_review.stat_shifts', 'Shifts')}
+                </Text>
               </View>
               <View style={styles.summaryStatItem}>
                 <Text style={[styles.summaryStatNumber, { color: '#4CAF50' }]}>{matchedCount}</Text>
-                <Text style={[styles.summaryStatLabel, { color: colors.textSecondary }]}>Matched</Text>
+                <Text style={[styles.summaryStatLabel, { color: colors.textSecondary }]}>
+                  {t('schedule_review.stat_matched', 'Matched')}
+                </Text>
               </View>
               {unmatchedCount > 0 && (
                 <View style={styles.summaryStatItem}>
                   <Text style={[styles.summaryStatNumber, { color: '#FF9800' }]}>{unmatchedCount}</Text>
-                  <Text style={[styles.summaryStatLabel, { color: colors.textSecondary }]}>Unmatched</Text>
+                  <Text style={[styles.summaryStatLabel, { color: colors.textSecondary }]}>
+                    {t('schedule_review.stat_unmatched', 'Unmatched')}
+                  </Text>
                 </View>
               )}
               <View style={styles.summaryStatItem}>
                 <Text style={[styles.summaryStatNumber, { color: colors.text }]}>{groupedShifts.length}</Text>
-                <Text style={[styles.summaryStatLabel, { color: colors.textSecondary }]}>Employees</Text>
+                <Text style={[styles.summaryStatLabel, { color: colors.textSecondary }]}>
+                  {t('schedule_review.stat_employees', 'Employees')}
+                </Text>
               </View>
             </View>
           </View>
@@ -456,7 +487,10 @@ export default function ScheduleReviewScreen() {
             <View style={styles.sectionHeader}>
               <IconSymbol ios_icon_name="exclamationmark.triangle.fill" android_material_icon_name="warning" size={16} color="#FF9800" />
               <Text style={[styles.sectionTitle, { color: '#FF9800' }]}>
-                Unmatched Employees ({unmatchedCount})
+                {t('schedule_review.unmatched_section', {
+                  defaultValue: 'Unmatched Employees ({{count}})',
+                  count: unmatchedCount,
+                })}
               </Text>
             </View>
           )}
@@ -497,17 +531,20 @@ export default function ScheduleReviewScreen() {
                           <View style={[styles.matchBadge, { backgroundColor: '#4CAF5015' }]}>
                             <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={10} color="#4CAF50" />
                             <Text style={[styles.matchBadgeText, { color: '#4CAF50' }]}>
-                              Matched{group.user_name && group.user_name !== group.employee_name ? ` → ${group.user_name}` : ''}
+                              {t('schedule_review.badge_matched', 'Matched')}
+                              {group.user_name && group.user_name !== group.employee_name ? ` → ${group.user_name}` : ''}
                             </Text>
                           </View>
                         ) : (
                           <View style={[styles.matchBadge, { backgroundColor: '#FF980015' }]}>
                             <IconSymbol ios_icon_name="exclamationmark.circle.fill" android_material_icon_name="error" size={10} color="#FF9800" />
-                            <Text style={[styles.matchBadgeText, { color: '#FF9800' }]}>Not Matched</Text>
+                            <Text style={[styles.matchBadgeText, { color: '#FF9800' }]}>
+                              {t('schedule_review.badge_not_matched', 'Not Matched')}
+                            </Text>
                           </View>
                         )}
                         <Text style={[styles.shiftCountText, { color: colors.textSecondary }]}>
-                          {group.shifts.length} shift{group.shifts.length !== 1 ? 's' : ''}
+                          {t('manual_schedule.shifts_count', { count: group.shifts.length })}
                         </Text>
                       </View>
                     </View>
@@ -524,7 +561,9 @@ export default function ScheduleReviewScreen() {
                       activeOpacity={0.7}
                     >
                       <IconSymbol ios_icon_name="plus.circle.fill" android_material_icon_name="add-circle" size={13} color="#4CAF50" />
-                      <Text style={[styles.actionButtonText, { color: '#4CAF50' }]}>Add</Text>
+                      <Text style={[styles.actionButtonText, { color: '#4CAF50' }]}>
+                        {t('schedule_review.add', 'Add')}
+                      </Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.actionButton, { backgroundColor: group.user_id ? colors.primary + '15' : '#FF980020' }]}
@@ -541,7 +580,9 @@ export default function ScheduleReviewScreen() {
                         color={group.user_id ? colors.primary : '#FF9800'}
                       />
                       <Text style={[styles.actionButtonText, { color: group.user_id ? colors.primary : '#FF9800' }]}>
-                        {group.user_id ? 'Change' : 'Assign'}
+                        {group.user_id
+                          ? t('schedule_review.change', 'Change')
+                          : t('schedule_review.assign', 'Assign')}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -617,7 +658,10 @@ export default function ScheduleReviewScreen() {
             <View style={[styles.sectionHeader, { marginTop: 8 }]}>
               <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={16} color="#4CAF50" />
               <Text style={[styles.sectionTitle, { color: '#4CAF50' }]}>
-                Matched Employees ({matchedCount})
+                {t('schedule_review.matched_section', {
+                  defaultValue: 'Matched Employees ({{count}})',
+                  count: matchedCount,
+                })}
               </Text>
             </View>
           )}
@@ -625,7 +669,10 @@ export default function ScheduleReviewScreen() {
           {filteredGroups.length === 0 && selectedLetter && (
             <View style={styles.emptyFilter}>
               <Text style={[styles.emptyFilterText, { color: colors.textSecondary }]}>
-                No employees starting with "{selectedLetter}"
+                {t('schedule_review.no_employees_letter', {
+                  defaultValue: 'No employees starting with "{{letter}}"',
+                  letter: selectedLetter,
+                })}
               </Text>
             </View>
           )}
@@ -642,13 +689,15 @@ export default function ScheduleReviewScreen() {
               onPress={() => setSelectedLetter(null)}
             >
               <Text
+                // "All" -> "Todos" fills the 28pt rail button; keep it on one line.
+                numberOfLines={1}
                 style={[
                   styles.alphabetButtonText,
                   { color: colors.textSecondary },
                   selectedLetter === null && [styles.alphabetButtonTextActive, { color: '#FFFFFF' }],
                 ]}
               >
-                All
+                {t('schedule_review.all_letters', 'All')}
               </Text>
             </TouchableOpacity>
             {ALPHABET.map((letter) => {
@@ -684,9 +733,13 @@ export default function ScheduleReviewScreen() {
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={() => setAssignModalVisible(false)} style={styles.modalCancel}>
-              <Text style={[styles.modalCancelText, { color: colors.primary }]}>Cancel</Text>
+              <Text style={[styles.modalCancelText, { color: colors.primary }]}>
+                {t('common.cancel', 'Cancel')}
+              </Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Assign Employee</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {t('schedule_review.assign_title', 'Assign Employee')}
+            </Text>
             <View style={{ width: 60 }} />
           </View>
 
@@ -695,7 +748,7 @@ export default function ScheduleReviewScreen() {
               {selectedEmployee}
             </Text>
             <Text style={[styles.modalHint, { color: colors.textSecondary }]}>
-              Select the staff member this name belongs to
+              {t('schedule_review.assign_hint', 'Select the staff member this name belongs to')}
             </Text>
           </View>
 
@@ -704,7 +757,7 @@ export default function ScheduleReviewScreen() {
             <IconSymbol ios_icon_name="magnifyingglass" android_material_icon_name="search" size={18} color={colors.textSecondary} />
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search by name or ID..."
+              placeholder={t('schedule_review.search_placeholder', 'Search by name or ID...')}
               placeholderTextColor={colors.textSecondary}
               value={userSearch}
               onChangeText={setUserSearch}
@@ -727,8 +780,12 @@ export default function ScheduleReviewScreen() {
               <IconSymbol ios_icon_name="person.slash.fill" android_material_icon_name="person-off" size={18} color="#F44336" />
             </View>
             <View style={styles.userOptionInfo}>
-              <Text style={[styles.userOptionName, { color: '#F44336' }]}>Unassign</Text>
-              <Text style={[styles.userOptionSub, { color: colors.textSecondary }]}>Remove employee match</Text>
+              <Text style={[styles.userOptionName, { color: '#F44336' }]}>
+                {t('schedule_review.unassign', 'Unassign')}
+              </Text>
+              <Text style={[styles.userOptionSub, { color: colors.textSecondary }]}>
+                {t('schedule_review.unassign_sub', 'Remove employee match')}
+              </Text>
             </View>
           </TouchableOpacity>
 
@@ -757,8 +814,16 @@ export default function ScheduleReviewScreen() {
                   <View style={styles.userOptionInfo}>
                     <Text style={[styles.userOptionName, { color: colors.text }]}>{item.name}</Text>
                     <Text style={[styles.userOptionSub, { color: colors.textSecondary }]}>
-                      ID: {item.username}
-                      {assignedTo ? ` • Already assigned to ${assignedTo.employee_name}` : ''}
+                      {t('schedule_review.user_id', {
+                        defaultValue: 'ID: {{username}}',
+                        username: item.username,
+                      })}
+                      {assignedTo
+                        ? ` • ${t('schedule_review.already_assigned_to', {
+                            defaultValue: 'Already assigned to {{name}}',
+                            name: assignedTo.employee_name,
+                          })}`
+                        : ''}
                     </Text>
                   </View>
                   {assignedTo && (
@@ -793,15 +858,19 @@ export default function ScheduleReviewScreen() {
         <View style={[styles.modalContainer, { backgroundColor: colors.background }]}>
           <View style={[styles.modalHeader, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
             <TouchableOpacity onPress={() => setNewScheduleModalVisible(false)} style={styles.modalCancel}>
-              <Text style={[styles.modalCancelText, { color: colors.primary }]}>Cancel</Text>
+              <Text style={[styles.modalCancelText, { color: colors.primary }]}>
+                {t('common.cancel', 'Cancel')}
+              </Text>
             </TouchableOpacity>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>Add New Schedule</Text>
+            <Text style={[styles.modalTitle, { color: colors.text }]}>
+              {t('schedule_review.new_title', 'Add New Schedule')}
+            </Text>
             <View style={{ width: 60 }} />
           </View>
 
           <View style={styles.modalSubheader}>
             <Text style={[styles.modalHint, { color: colors.textSecondary }]}>
-              Select an employee to add shifts for
+              {t('schedule_review.new_hint', 'Select an employee to add shifts for')}
             </Text>
           </View>
 
@@ -810,7 +879,7 @@ export default function ScheduleReviewScreen() {
             <IconSymbol ios_icon_name="magnifyingglass" android_material_icon_name="search" size={18} color={colors.textSecondary} />
             <TextInput
               style={[styles.searchInput, { color: colors.text }]}
-              placeholder="Search by name or ID..."
+              placeholder={t('schedule_review.search_placeholder', 'Search by name or ID...')}
               placeholderTextColor={colors.textSecondary}
               value={newScheduleSearch}
               onChangeText={setNewScheduleSearch}
@@ -847,14 +916,24 @@ export default function ScheduleReviewScreen() {
                   <View style={styles.userOptionInfo}>
                     <Text style={[styles.userOptionName, { color: colors.text }]}>{item.name}</Text>
                     <Text style={[styles.userOptionSub, { color: colors.textSecondary }]}>
-                      ID: {item.username}
-                      {existingGroup ? ` • ${existingGroup.shifts.length} shifts already` : ''}
+                      {t('schedule_review.user_id', {
+                        defaultValue: 'ID: {{username}}',
+                        username: item.username,
+                      })}
+                      {existingGroup
+                        ? ` • ${t('schedule_review.already_has_shifts', {
+                            defaultValue: '{{count}} shifts already',
+                            count: existingGroup.shifts.length,
+                          })}`
+                        : ''}
                     </Text>
                   </View>
                   {existingGroup && (
                     <View style={[styles.matchBadge, { backgroundColor: '#4CAF5015' }]}>
                       <IconSymbol ios_icon_name="checkmark.circle.fill" android_material_icon_name="check-circle" size={10} color="#4CAF50" />
-                      <Text style={[styles.matchBadgeText, { color: '#4CAF50' }]}>Has shifts</Text>
+                      <Text style={[styles.matchBadgeText, { color: '#4CAF50' }]}>
+                        {t('schedule_review.has_shifts_badge', 'Has shifts')}
+                      </Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -871,31 +950,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 60 : 16,
-    paddingBottom: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-  },
-  headerRight: {
-    width: 40,
-  },
   headerAddButton: {
     padding: 4,
   },
   savingOverlay: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 110 : 66,
+    // Pinned just under <ScreenHeader />, which is platform-invariant:
+    // paddingTop 48 + 38pt back chip + paddingBottom 12 = 98pt tall. The old
+    // solid header measured (ios ? 60 : 16) + 40 + 12, and this overlay sat 2pt
+    // above its bottom edge on both platforms — 98 - 2 keeps that exact overlap.
+    top: 96,
     left: 0,
     right: 0,
     zIndex: 10,

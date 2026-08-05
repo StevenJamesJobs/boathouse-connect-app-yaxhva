@@ -4,7 +4,6 @@ import {
   Text,
   ScrollView,
   StyleSheet,
-  TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -20,6 +19,8 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { isManagerOrOwner } from '@/utils/roles';
 import PremiumGate from '@/components/PremiumGate';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
 
 type ExamType = 'server' | 'bartender' | 'host';
 
@@ -184,20 +185,8 @@ export default function WeeklyQuizzesScreen() {
   if (!hasPremium) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol
-              ios_icon_name="chevron.left"
-              android_material_icon_name="arrow-back"
-              size={24}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            {t('weekly_quizzes.title')}
-          </Text>
-          <View style={styles.placeholder} />
-        </View>
+        <AmbientGlow />
+        <ScreenHeader title={t('weekly_quizzes.title')} />
         {isManagerOrOwner(user) ? (
           <PremiumGate
             desc={t('weekly_quizzes.premium_desc')}
@@ -219,21 +208,9 @@ export default function WeeklyQuizzesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AmbientGlow />
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {t('weekly_quizzes.title')}
-        </Text>
-        <View style={styles.placeholder} />
-      </View>
+      <ScreenHeader title={t('weekly_quizzes.title')} />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
         <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
@@ -282,18 +259,6 @@ export default function WeeklyQuizzesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: { padding: 8 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
-  placeholder: { width: 40 },
   scrollView: { flex: 1 },
   contentContainer: {
     paddingTop: 20,

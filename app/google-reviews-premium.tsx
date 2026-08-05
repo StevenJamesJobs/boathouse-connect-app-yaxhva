@@ -1,12 +1,13 @@
 import React from 'react';
-import { View, Text, TouchableOpacity } from 'react-native';
-import { Redirect, useRouter } from 'expo-router';
+import { View } from 'react-native';
+import { Redirect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { IconSymbol } from '@/components/IconSymbol';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import PremiumGate from '@/components/PremiumGate';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
 
 // Sales-copy lock screen for Automatic Google Reviews. The feature itself
 // lives inside the rewards editor and the Manage Rating tile, so this
@@ -14,7 +15,6 @@ import PremiumGate from '@/components/PremiumGate';
 // here are bounced to the rewards & reviews editor.
 export default function GoogleReviewsPremiumScreen() {
   useRequireManagerRoute();
-  const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { hasPremium } = useSubscription();
@@ -25,26 +25,8 @@ export default function GoogleReviewsPremiumScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          backgroundColor: colors.card,
-          borderBottomWidth: 1,
-          borderBottomColor: colors.border,
-        }}
-      >
-        <TouchableOpacity onPress={() => router.back()} style={{ width: 40 }}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="chevron-left" size={22} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>
-          {t('rewards_reviews_editor:gr_premium_screen_title')}
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <AmbientGlow />
+      <ScreenHeader title={t('rewards_reviews_editor:gr_premium_screen_title')} />
       <PremiumGate
         desc={t('rewards_reviews_editor:gr_premium_desc')}
         bullets={[
