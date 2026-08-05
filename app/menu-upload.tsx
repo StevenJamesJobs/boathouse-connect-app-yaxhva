@@ -90,11 +90,12 @@ export default function MenuUploadScreen() {
   const loadQuota = useCallback(async () => {
     if (!user?.id || !organizationId) return;
     try {
-      const { data } = await (supabase.rpc as any)('get_menu_upload_quota', {
+      const { data } = await supabase.rpc('get_menu_upload_quota', {
         p_user_id: user.id,
         p_organization_id: organizationId,
       });
-      if (data?.success) setQuota(data);
+      const result = data as (Quota & { success?: boolean }) | null;
+      if (result?.success) setQuota(result);
     } catch (e) {
       console.error('quota error', e);
     }
@@ -108,7 +109,7 @@ export default function MenuUploadScreen() {
         p_actor_id: user.id, p_limit: 15,
       });
       if (error) throw error;
-      setUploads((data || []) as any);
+      setUploads((data || []) as MenuUpload[]);
     } catch (e) {
       console.error('Error loading menu uploads:', e);
     } finally {
@@ -281,6 +282,7 @@ export default function MenuUploadScreen() {
   };
 
   const confirmDeleteMenu = async () => {
+    if (!user?.id || !organizationId) return;
     const expected = (menuOptions.find((o) => o.slot === deleteSlot)?.label || '').trim();
     if (deleteConfirmText.trim().toLowerCase() !== expected.toLowerCase()) {
       Alert.alert(t('menu_upload.delete_mismatch_title', 'Name Did Not Match'), t('menu_upload.delete_mismatch_msg', 'Type the menu name exactly to confirm.'));
@@ -288,20 +290,21 @@ export default function MenuUploadScreen() {
     }
     try {
       setDeleting(true);
-      const { data, error } = await (supabase.rpc as any)('delete_menu', {
-        p_user_id: user?.id,
+      const { data, error } = await supabase.rpc('delete_menu', {
+        p_user_id: user.id,
         p_organization_id: organizationId,
         p_target_slot: deleteSlot,
         p_delete_custom_categories: deleteAlsoCats,
       });
       if (error) throw error;
-      if (!data?.success) throw new Error(data?.error || 'Delete failed');
+      const result = data as { success?: boolean; error?: string; items_deleted?: number } | null;
+      if (!result?.success) throw new Error(result?.error || 'Delete failed');
       setDeleteVisible(false);
       setDeleteConfirmText('');
       setDeleteAlsoCats(false);
       Alert.alert(
         t('menu_upload.delete_done_title', 'Menu Cleared'),
-        t('menu_upload.delete_done_msg', { defaultValue: 'Removed {{items}} items.', items: data.items_deleted })
+        t('menu_upload.delete_done_msg', { defaultValue: 'Removed {{items}} items.', items: result.items_deleted })
       );
     } catch (e: any) {
       console.error('delete_menu error:', e);

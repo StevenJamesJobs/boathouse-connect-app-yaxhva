@@ -83,7 +83,7 @@ async function tryFetchMenuItemWords(
     const { data: raw, error } = await supabase.rpc('get_menu_items', {
       p_actor_id: actorId, p_source_org: organizationId, p_categories: categories,
     });
-    const data = ((raw as any[]) || []).filter((m) => m.description != null);
+    const data = (raw || []).filter((m) => m.description != null);
 
     if (error || !data || data.length === 0) {
       return null;
@@ -130,7 +130,7 @@ async function fetchLibationWords(
     const { data: rawLib, error: menuError } = await supabase.rpc('get_menu_items', {
       p_actor_id: actorId, p_source_org: organizationId, p_categories: libationCategoryNames,
     });
-    const menuLibations = ((rawLib as any[]) || []).filter((m) => m.description != null);
+    const menuLibations = (rawLib || []).filter((m) => m.description != null);
 
     const allWords: RawWordItem[] = [];
 
@@ -155,7 +155,7 @@ async function fetchLibationWords(
       p_actor_id: actorId, p_source_org: organizationId,
     });
     if (!cocktailError && cocktails && cocktails.length > 0) {
-      const picked = shuffleItems(cocktails as any[]).slice(0, itemCount);
+      const picked = shuffleItems(cocktails).slice(0, itemCount);
       for (const c of picked) {
         const parsed = parseCocktailIngredients(c.ingredients);
         if (parsed.length === 0) continue;

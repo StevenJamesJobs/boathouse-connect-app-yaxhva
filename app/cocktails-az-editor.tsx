@@ -443,8 +443,8 @@ export default function CocktailsAZEditorScreen() {
                 Alert.alert(t('common.error'), t('cocktails_editor.push_error'));
                 return;
               }
-              const seeded = Number((data as any)?.total_seeded ?? 0);
-              const orgs = Number((data as any)?.orgs_processed ?? 0);
+              const seeded = Number((data as { total_seeded?: number; orgs_processed?: number } | null)?.total_seeded ?? 0);
+              const orgs = Number((data as { total_seeded?: number; orgs_processed?: number } | null)?.orgs_processed ?? 0);
               Alert.alert(
                 t('cocktails_editor.push_success_title'),
                 seeded > 0

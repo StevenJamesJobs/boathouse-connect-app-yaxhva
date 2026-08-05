@@ -31,7 +31,7 @@ export async function fetchOrgCategoryNames(actorId: string, sourceOrg?: string)
       p_actor_id: actorId,
       p_source_org: sourceOrg,
     });
-    for (const c of (data || []) as any[]) {
+    for (const c of data || []) {
       if (c.system_key) {
         bySystemKey[c.system_key] = c.display_name;
         const arr = (namesBySystemKey[c.system_key] ||= []);
@@ -91,14 +91,14 @@ export async function fetchMenuCategoryResolver(actorId: string, sourceOrg?: str
       supabase.rpc('get_menu_subcategories', { p_actor_id: actorId, p_source_org: sourceOrg }),
     ]);
     const byKey: Record<string, string[]> = {};
-    for (const c of (catRes.data || []) as any[]) {
+    for (const c of catRes.data || []) {
       if (!c.system_key) continue;
       const arr = (byKey[c.system_key] ||= []);
       if (!arr.includes(c.display_name)) arr.push(c.display_name);
     }
     const cocktailFedSubNames: string[] = [];
     const cocktailFedCatIds = new Set<string>();
-    for (const s of (subRes.data || []) as any[]) {
+    for (const s of subRes.data || []) {
       if (s.is_cocktail_fed && !cocktailFedSubNames.includes(s.display_name)) {
         cocktailFedSubNames.push(s.display_name);
       }
@@ -113,7 +113,7 @@ export async function fetchMenuCategoryResolver(actorId: string, sourceOrg?: str
       if (!foodSeen.has(k)) { foodSeen.add(k); food.push(n); }
     };
     for (const key of ['cat.lunch', 'cat.dinner']) for (const n of byKey[key] || []) pushFood(n);
-    for (const c of (catRes.data || []) as any[]) {
+    for (const c of catRes.data || []) {
       if (c.system_key || c.is_hidden) continue;
       if (cocktailFedCatIds.has(c.id)) continue;
       pushFood(c.display_name);

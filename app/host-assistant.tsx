@@ -47,7 +47,7 @@ export default function HostAssistantScreen() {
   const loadSections = useCallback(async () => {
     if (!user?.id) return;
     try {
-      const { data } = await (supabase.rpc as any)('get_host_sections', { p_actor_id: user?.id });
+      const { data } = await supabase.rpc('get_host_sections', { p_actor_id: user.id });
       setSections((data as HostSectionCard[]) || []);
     } catch (e) {
       console.error('Error loading host sections:', e);

@@ -60,7 +60,7 @@ export function useUnreadAwards() {
         p_user_id: user.id,
         p_statuses: ['approved', 'denied'],
       });
-      const c = ((rows as any[]) || []).filter((r) => r.decided_at && r.decided_at > cutoff).length;
+      const c = ((rows) || []).filter((r) => r.decided_at && r.decided_at > cutoff).length;
       setCount(c || 0);
     } catch (err) {
       console.log('Error checking unread awards:', err);

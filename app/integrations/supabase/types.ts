@@ -3069,6 +3069,189 @@ export type Database = {
         Args: { p_actor_id: string; p_fields: Json; p_question_id: string }
         Returns: undefined
       }
+      get_exam: {
+        Args: {
+          p_actor_id: string
+          p_exam_id?: string
+          p_exam_type?: string
+          p_statuses?: string[]
+        }
+        Returns: {
+          activated_at: string | null
+          close_at: string | null
+          closed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          cycle_key: string
+          exam_type: string
+          id: string
+          notify_on_activate: boolean | null
+          organization_id: string
+          rewards_enabled: boolean
+          status: string
+          time_limit_seconds: number
+        }[]
+      }
+      create_exam: {
+        Args: { p_actor_id: string; p_cycle_key: string; p_exam_type: string }
+        Returns: {
+          activated_at: string | null
+          close_at: string | null
+          closed_at: string | null
+          created_at: string | null
+          created_by: string | null
+          cycle_key: string
+          exam_type: string
+          id: string
+          notify_on_activate: boolean | null
+          organization_id: string
+          rewards_enabled: boolean
+          status: string
+          time_limit_seconds: number
+        }[]
+      }
+      activate_exam: {
+        Args: { p_actor_id: string; p_close_at?: string; p_exam_id: string }
+        Returns: undefined
+      }
+      set_exam_status: {
+        Args: { p_actor_id: string; p_exam_id: string; p_status: string }
+        Returns: undefined
+      }
+      update_exam_settings: {
+        Args: {
+          p_actor_id: string
+          p_clear_close_at?: boolean
+          p_close_at?: string
+          p_exam_id: string
+          p_notify_on_activate?: boolean
+          p_rewards_enabled?: boolean
+          p_time_limit_seconds?: number
+        }
+        Returns: undefined
+      }
+      delete_exam_question: {
+        Args: { p_actor_id: string; p_question_id: string }
+        Returns: undefined
+      }
+      get_exam_questions: {
+        Args: { p_actor_id: string; p_exam_id: string }
+        Returns: {
+          bonus_bucks_value: number | null
+          bucks_value: number | null
+          category_label: string | null
+          correct_option: string
+          created_at: string | null
+          exam_id: string
+          id: string
+          is_bonus: boolean
+          option_a: string
+          option_a_es: string | null
+          option_b: string
+          option_b_es: string | null
+          option_c: string
+          option_c_es: string | null
+          option_d: string
+          option_d_es: string | null
+          organization_id: string
+          question_image_url: string | null
+          question_order: number
+          question_text: string
+          question_text_es: string | null
+          source_table: string | null
+          source_type: string
+        }[]
+      }
+      get_exam_question_count: {
+        Args: { p_actor_id: string; p_exam_id: string }
+        Returns: number
+      }
+      get_my_exam_result: {
+        Args: { p_actor_id: string; p_exam_id: string }
+        Returns: {
+          answers: Json
+          bucks_awarded: number
+          completed_at: string | null
+          correct_count: number
+          exam_id: string
+          id: string
+          is_timed_out: boolean
+          organization_id: string
+          started_at: string | null
+          time_seconds: number
+          total_questions: number
+          user_id: string
+        }[]
+      }
+      get_user_exam_result: {
+        Args: { p_actor_id: string; p_exam_id: string; p_user_id: string }
+        Returns: {
+          answers: Json
+          bucks_awarded: number
+          completed_at: string | null
+          correct_count: number
+          exam_id: string
+          id: string
+          is_timed_out: boolean
+          organization_id: string
+          started_at: string | null
+          time_seconds: number
+          total_questions: number
+          user_id: string
+        }[]
+      }
+      get_my_recent_exam_results: {
+        Args: { p_actor_id: string; p_limit?: number }
+        Returns: {
+          bucks_awarded: number
+          completed_at: string | null
+          correct_count: number
+          exam_id: string
+          id: string
+          organization_id: string
+          total_questions: number
+        }[]
+      }
+      get_my_exam_reward_dismissals: {
+        Args: { p_actor_id: string; p_result_ids: string[] }
+        Returns: {
+          exam_result_id: string
+        }[]
+      }
+      dismiss_exam_reward: {
+        Args: { p_actor_id: string; p_exam_result_id: string }
+        Returns: undefined
+      }
+      get_my_unread_quiz_count: {
+        Args: { p_actor_id: string }
+        Returns: number
+      }
+      reset_user_exam_attempt: {
+        Args: {
+          p_actor_id?: string
+          p_exam_id: string
+          p_organization_id: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      close_expired_exams_actor: {
+        Args: { p_actor_id: string }
+        Returns: undefined
+      }
+      get_exam_completion_status_actor: {
+        Args: { p_actor_id: string; p_exam_id: string; p_exam_type: string }
+        Returns: {
+          bucks_awarded: number
+          correct_count: number
+          has_completed: boolean
+          job_title: string
+          name: string
+          profile_picture_url: string | null
+          total_questions: number
+          user_id: string
+        }[]
+      }
       set_my_preferred_language: {
         Args: { p_language: string; p_user_id: string }
         Returns: undefined
@@ -3093,6 +3276,120 @@ export type Database = {
           title_es: string | null
           updated_at: string
         }[]
+      }
+      reorder_guides: {
+        Args: { p_actor_id: string; p_ordered_ids: string[] }
+        Returns: undefined
+      }
+      get_host_sections: {
+        Args: {
+          p_actor_id: string
+          p_id?: string
+          p_include_inactive?: boolean
+        }
+        Returns: {
+          card_image_shape: string
+          card_image_url: string | null
+          card_subtitle: string | null
+          created_at: string | null
+          display_order: number
+          icon: string | null
+          id: string
+          instructions: string | null
+          is_active: boolean
+          organization_id: string
+          system_key: string | null
+          title: string
+          updated_at: string | null
+        }[]
+      }
+      get_host_section_tiles: {
+        Args: { p_actor_id: string; p_section_id: string }
+        Returns: {
+          created_at: string | null
+          display_order: number
+          id: string
+          image_shape: string
+          image_url: string | null
+          link_description: string | null
+          link_url: string | null
+          organization_id: string
+          section_id: string
+          system_asset_key: string | null
+          title: string | null
+          updated_at: string | null
+        }[]
+      }
+      create_host_section: {
+        Args: {
+          p_actor_id: string
+          p_card_image_shape?: string
+          p_card_image_url?: string | null
+          p_card_subtitle?: string | null
+          p_icon?: string | null
+          p_instructions?: string | null
+          p_org_id: string
+          p_title: string
+        }
+        Returns: string
+      }
+      update_host_section: {
+        Args: {
+          p_actor_id: string
+          p_card_image_shape: string
+          p_card_image_url: string | null
+          p_card_subtitle: string | null
+          p_icon: string | null
+          p_instructions: string | null
+          p_is_active: boolean | null
+          p_section_id: string
+          p_title: string
+        }
+        Returns: boolean
+      }
+      delete_host_section: {
+        Args: { p_actor_id: string; p_section_id: string }
+        Returns: boolean
+      }
+      reorder_host_sections: {
+        Args: { p_actor_id: string; p_ordered_ids: string[]; p_org_id: string }
+        Returns: boolean
+      }
+      create_host_section_tile: {
+        Args: {
+          p_actor_id: string
+          p_image_shape?: string
+          p_image_url?: string | null
+          p_link_description?: string | null
+          p_link_url?: string | null
+          p_section_id: string
+          p_title?: string | null
+        }
+        Returns: string
+      }
+      update_host_section_tile: {
+        Args: {
+          p_actor_id: string
+          p_image_shape: string
+          p_image_url: string | null
+          p_link_description: string | null
+          p_link_url: string | null
+          p_tile_id: string
+          p_title: string | null
+        }
+        Returns: boolean
+      }
+      delete_host_section_tile: {
+        Args: { p_actor_id: string; p_tile_id: string }
+        Returns: boolean
+      }
+      reorder_host_section_tiles: {
+        Args: {
+          p_actor_id: string
+          p_ordered_ids: string[]
+          p_section_id: string
+        }
+        Returns: boolean
       }
       get_redemption_custom_options: {
         Args: { p_actor_id: string; p_include_inactive?: boolean }
@@ -3477,6 +3774,14 @@ export type Database = {
           review_text_es: string
         }[]
       }
+      get_review_refresh_quota: {
+        Args: { p_organization_id: string; p_user_id: string }
+        Returns: Json
+      }
+      consume_review_refresh: {
+        Args: { p_organization_id: string; p_user_id: string }
+        Returns: Json
+      }
       get_my_game_stats: {
         Args: { p_actor_id: string }
         Returns: {
@@ -3669,6 +3974,14 @@ export type Database = {
           username: string
         }[]
       }
+      delete_employee: {
+        Args: {
+          p_actor_id: string
+          p_employee_id: string
+          p_organization_id?: string
+        }
+        Returns: boolean
+      }
       get_user_card: {
         Args: { p_actor_id: string; p_user_id: string }
         Returns: {
@@ -3732,13 +4045,13 @@ export type Database = {
       create_guide: {
         Args: {
           p_category: string
-          p_description: string
+          p_description: string | null
           p_display_order: number
           p_file_name: string
           p_file_type: string
           p_file_url: string
           p_organization_id?: string
-          p_thumbnail_url: string
+          p_thumbnail_url: string | null
           p_title: string
           p_user_id: string
         }
@@ -4010,6 +4323,86 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_game_leaderboard_actor: {
+        Args: {
+          p_actor_id: string
+          p_game_mode: string
+          p_limit?: number
+          p_play_mode?: string
+        }
+        Returns: {
+          best_score: number
+          games_played: number
+          name: string
+          profile_picture_url: string | null
+          user_id: string
+        }[]
+      }
+      get_master_leaderboard_memory_actor: {
+        Args: { p_actor_id: string; p_limit?: number }
+        Returns: {
+          games_played: number
+          name: string
+          profile_picture_url: string | null
+          total_score: number
+          user_id: string
+        }[]
+      }
+      get_master_leaderboard_overall_actor: {
+        Args: { p_actor_id: string; p_limit?: number }
+        Returns: {
+          games_played: number
+          name: string
+          profile_picture_url: string | null
+          total_score: number
+          user_id: string
+        }[]
+      }
+      get_master_leaderboard_picture_this_actor: {
+        Args: { p_actor_id: string; p_limit?: number }
+        Returns: {
+          games_played: number
+          name: string
+          profile_picture_url: string | null
+          total_score: number
+          user_id: string
+        }[]
+      }
+      get_master_leaderboard_word_search_actor: {
+        Args: { p_actor_id: string; p_limit?: number }
+        Returns: {
+          games_played: number
+          name: string
+          profile_picture_url: string | null
+          total_score: number
+          user_id: string
+        }[]
+      }
+      get_picture_this_leaderboard_filtered_actor: {
+        Args: {
+          p_actor_id: string
+          p_category?: string
+          p_limit?: number
+          p_play_mode?: string
+        }
+        Returns: {
+          games_played: number
+          name: string
+          profile_picture_url: string | null
+          total_score: number
+          user_id: string
+        }[]
+      }
+      get_word_search_leaderboard_actor: {
+        Args: { p_actor_id: string; p_category: string; p_limit?: number }
+        Returns: {
+          best_score: number
+          games_played: number
+          name: string
+          profile_picture_url: string | null
+          user_id: string
+        }[]
+      }
       get_organization_subscription: {
         Args: { p_organization_id: string }
         Returns: {
@@ -4023,6 +4416,28 @@ export type Database = {
           trial_end_date: string
           trial_start_date: string
         }[]
+      }
+      get_organization_subscription_actor: {
+        Args: { p_actor_id: string }
+        Returns: {
+          current_period_end: string | null
+          current_period_start: string | null
+          revenuecat_customer_id: string | null
+          subscription_tier: string
+          trial_1d_notified: boolean | null
+          trial_2d_notified: boolean | null
+          trial_7d_notified: boolean | null
+          trial_end_date: string | null
+          trial_start_date: string | null
+        }[]
+      }
+      initialize_org_trial_actor: {
+        Args: { p_actor_id: string }
+        Returns: undefined
+      }
+      expire_org_trial_actor: {
+        Args: { p_actor_id: string }
+        Returns: undefined
       }
       get_passed_users_on_leaderboard: {
         Args: {
@@ -4424,6 +4839,112 @@ export type Database = {
           system_key: string
         }[]
       }
+      manage_menu_category_create: {
+        Args: {
+          p_color?: string
+          p_display_name: string
+          p_menu_slot?: number
+          p_organization_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      manage_menu_category_delete: {
+        Args: {
+          p_category_id: string
+          p_organization_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      manage_menu_category_rename: {
+        Args: {
+          p_category_id: string
+          p_new_name: string
+          p_organization_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      manage_menu_category_reorder: {
+        Args: {
+          p_ordered_ids: string[]
+          p_organization_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      manage_menu_category_set_color: {
+        Args: {
+          p_category_id: string
+          p_color: string
+          p_organization_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      manage_menu_category_set_hidden: {
+        Args: {
+          p_category_id: string
+          p_is_hidden: boolean
+          p_organization_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      manage_menu_subcategory_create: {
+        Args: {
+          p_category_id: string
+          p_display_name: string
+          p_organization_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      manage_menu_subcategory_delete: {
+        Args: {
+          p_organization_id: string
+          p_subcategory_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      manage_menu_subcategory_rename: {
+        Args: {
+          p_new_name: string
+          p_organization_id: string
+          p_subcategory_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      manage_menu_subcategory_reorder: {
+        Args: {
+          p_category_id: string
+          p_ordered_ids: string[]
+          p_organization_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      manage_menu_subcategory_set_cocktail_fed: {
+        Args: {
+          p_is_cocktail_fed: boolean
+          p_organization_id: string
+          p_subcategory_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      manage_menu_subcategory_set_hidden: {
+        Args: {
+          p_is_hidden: boolean
+          p_organization_id: string
+          p_subcategory_id: string
+          p_user_id: string
+        }
+        Returns: Json
+      }
       get_menu_uploads: {
         Args: { p_actor_id: string; p_limit?: number; p_upload_id?: string }
         Returns: {
@@ -4450,6 +4971,30 @@ export type Database = {
           p_source_type: string
         }
         Returns: string
+      }
+      get_menu_upload_quota: {
+        Args: { p_organization_id: string; p_user_id: string }
+        Returns: Json
+      }
+      delete_menu: {
+        Args: {
+          p_delete_custom_categories?: boolean
+          p_organization_id: string
+          p_target_slot: number
+          p_user_id: string
+        }
+        Returns: Json
+      }
+      apply_parsed_menu: {
+        Args: {
+          p_mode: string
+          p_organization_id: string
+          p_payload: Json
+          p_target_slot: number
+          p_upload_id: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       get_unread_message_count: {
         Args: { p_organization_id?: string | null; user_id: string }
@@ -4836,6 +5381,18 @@ export type Database = {
         Args: { p_category?: string; p_organization_id?: string }
         Returns: undefined
       }
+      reset_game_scores_actor: {
+        Args: { p_actor_id: string; p_game_mode?: string; p_play_mode?: string }
+        Returns: undefined
+      }
+      reset_picture_this_scores_actor: {
+        Args: { p_actor_id: string; p_category?: string; p_difficulty?: string }
+        Returns: undefined
+      }
+      reset_word_search_scores_actor: {
+        Args: { p_actor_id: string; p_category?: string }
+        Returns: undefined
+      }
       push_source_cocktails_to_all_orgs: {
         Args: { p_user_id: string; p_source_org?: string }
         Returns: Json
@@ -4847,6 +5404,14 @@ export type Database = {
       seed_org_assistants: { Args: { p_org_id: string }; Returns: undefined }
       seed_org_cocktails: {
         Args: { p_target_org: string; p_source_org?: string }
+        Returns: number
+      }
+      materialize_org_per_menu_categories_actor: {
+        Args: { p_actor_id: string }
+        Returns: undefined
+      }
+      seed_org_cocktails_actor: {
+        Args: { p_actor_id: string; p_source_org?: string }
         Returns: number
       }
       set_user_test_flag: {
@@ -5052,14 +5617,14 @@ export type Database = {
       update_guide: {
         Args: {
           p_category: string
-          p_description: string
+          p_description: string | null
           p_display_order: number
           p_file_name: string
           p_file_type: string
           p_file_url: string
           p_guide_id: string
           p_organization_id?: string
-          p_thumbnail_url: string
+          p_thumbnail_url: string | null
           p_title: string
           p_user_id: string
         }

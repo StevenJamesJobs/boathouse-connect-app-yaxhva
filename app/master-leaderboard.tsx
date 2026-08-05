@@ -22,6 +22,7 @@ import { StorageImage } from '@/components/StorageImage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '../contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
+import type { Database } from '@/app/integrations/supabase/types';
 import { refreshAllUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
 
@@ -42,12 +43,12 @@ const TABS: { key: LeaderboardTab; labelKey: string; icon: { ios: string; androi
   { key: 'picture_this', labelKey: 'master_leaderboard:tab_picture', icon: { ios: 'photo.fill', android: 'photo-camera' } },
 ];
 
-const RPC_MAP: Record<LeaderboardTab, string> = {
+const RPC_MAP = {
   overall: 'get_master_leaderboard_overall_actor',
   memory: 'get_master_leaderboard_memory_actor',
   word_search: 'get_master_leaderboard_word_search_actor',
   picture_this: 'get_master_leaderboard_picture_this_actor',
-};
+} as const satisfies Record<LeaderboardTab, keyof Database['public']['Functions']>;
 
 const RANK_EMOJIS = ['🥇', '🥈', '🥉'];
 
@@ -67,9 +68,9 @@ export default function MasterLeaderboardScreen() {
     if (!user?.id) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.rpc(RPC_MAP[tab] as any, { p_limit: 20, p_actor_id: user.id });
+      const { data, error } = await supabase.rpc(RPC_MAP[tab], { p_limit: 20, p_actor_id: user.id });
       if (!error && data) {
-        setEntries(data as MasterLeaderboardEntry[]);
+        setEntries(data);
       } else {
         setEntries([]);
       }

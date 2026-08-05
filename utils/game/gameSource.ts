@@ -7,7 +7,7 @@ let _sampleOrgId: string | null | undefined;
 async function getSampleOrgId(): Promise<string | null> {
   if (_sampleOrgId !== undefined) return _sampleOrgId;
   const { data } = await supabase.rpc('get_org_id_by_slug', { p_slug: 'mcloones-boathouse' });
-  const resolved: string | null = (data as any) ?? null;
+  const resolved: string | null = data ?? null;
   _sampleOrgId = resolved;
   return resolved;
 }

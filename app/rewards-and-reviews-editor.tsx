@@ -77,7 +77,6 @@ interface GuestReview {
   review_date: string;
   display_order: number;
   is_active: boolean;
-  created_at: string;
 }
 
 interface GoogleReview {
@@ -295,7 +294,7 @@ export default function RewardsAndReviewsEditorScreen() {
     try {
       // Fetch current user's bucks
       if (user?.id) {
-        const { data: meData, error: meError } = await (supabase as any).rpc('get_me', { p_user_id: user?.id });
+        const { data: meData, error: meError } = await supabase.rpc('get_me', { p_user_id: user?.id });
         const me = meData?.[0];
         if (!meError && me) {
           setMyBucks(me.mcloones_bucks || 0);
@@ -368,7 +367,7 @@ export default function RewardsAndReviewsEditorScreen() {
       });
 
       if (error) throw error;
-      setReviews((data || []) as any);
+      setReviews(data || []);
     } catch (error) {
       console.error('Error fetching reviews:', error);
     }
@@ -395,11 +394,12 @@ export default function RewardsAndReviewsEditorScreen() {
   const fetchRefreshQuota = useCallback(async () => {
     if (!isOwner || !user?.id || !organizationId) return;
     try {
-      const { data } = await (supabase as any).rpc('get_review_refresh_quota', {
+      const { data } = await supabase.rpc('get_review_refresh_quota', {
         p_user_id: user.id,
         p_organization_id: organizationId,
       });
-      if (data?.success) setRefreshRemaining(data.remaining ?? 0);
+      const quota = data as { success?: boolean; remaining?: number } | null;
+      if (quota?.success) setRefreshRemaining(quota.remaining ?? 0);
     } catch (e) {
       console.warn('refresh quota error', e);
     }
@@ -481,7 +481,7 @@ export default function RewardsAndReviewsEditorScreen() {
       });
 
       if (!transError && transData) {
-        setLookupTransactions((transData as any[]).map((t: any) => ({ ...t, user_name: employeeName })));
+        setLookupTransactions(transData.map((t) => ({ ...t, user_name: employeeName })));
       }
     } catch (error) {
       console.error('Error fetching employee transactions:', error);
@@ -929,14 +929,16 @@ export default function RewardsAndReviewsEditorScreen() {
   // Owner-only manual refresh, capped per billing period. The Mon/Thu auto
   // refresh is free and does NOT count toward this limit.
   const doRefreshGoogleReviews = async () => {
+    if (!user?.id || !organizationId) return;
     try {
       setRefreshingGoogle(true);
       // Reserve one refresh credit (owner-gated, billing-period cap).
-      const { data: cap, error: capErr } = await (supabase as any).rpc('consume_review_refresh', {
-        p_user_id: user?.id,
+      const { data: capData, error: capErr } = await supabase.rpc('consume_review_refresh', {
+        p_user_id: user.id,
         p_organization_id: organizationId,
       });
       if (capErr) throw capErr;
+      const cap = capData as { ok?: boolean; reason?: string; remaining?: number } | null;
       if (!cap?.ok) {
         if (cap?.reason === 'limit_reached') {
           setRefreshRemaining(0);
@@ -949,7 +951,7 @@ export default function RewardsAndReviewsEditorScreen() {
       setRefreshRemaining(cap.remaining ?? 0);
 
       const { data, error } = await supabase.functions.invoke('import-google-reviews', {
-        body: { source: 'manual', user_id: user?.id, organization_id: organizationId },
+        body: { source: 'manual', user_id: user.id, organization_id: organizationId },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Import failed');
@@ -1437,8 +1439,8 @@ export default function RewardsAndReviewsEditorScreen() {
   }
 
   function renderGoogleReview(review: GoogleReview & { source: 'google' }) {
-    const text = getLocalizedField(review as any, 'review_text', language);
-    const reply = getLocalizedField(review as any, 'owner_answer', language);
+    const text = getLocalizedField(review, 'review_text', language);
+    const reply = getLocalizedField(review, 'owner_answer', language);
     return (
       <GlassCard key={review.id} variant="surface" radius={16} style={styles.rev}>
         <View style={styles.rvHead}>

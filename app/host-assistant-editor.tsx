@@ -44,10 +44,10 @@ export default function HostAssistantEditorScreen() {
 
   const loadSections = useCallback(async () => {
     if (!user?.id) return;
-    const { data } = await (supabase.rpc as any)('get_host_sections', {
+    const { data } = await supabase.rpc('get_host_sections', {
       p_actor_id: user.id, p_include_inactive: true,
     });
-    setSections((data as SectionRow[]) || []);
+    setSections(data || []);
   }, [user?.id]);
 
   useFocusEffect(useCallback(() => { loadSections(); }, [loadSections]));
@@ -55,7 +55,7 @@ export default function HostAssistantEditorScreen() {
   const toggleActive = async (section: SectionRow) => {
     if (!user?.id) return;
     setSections((prev) => prev.map((s) => (s.id === section.id ? { ...s, is_active: !s.is_active } : s)));
-    await supabase.rpc('update_host_section' as any, {
+    await supabase.rpc('update_host_section', {
       p_actor_id: user.id, p_section_id: section.id, p_title: section.title,
       p_card_subtitle: section.card_subtitle, p_instructions: section.instructions,
       p_card_image_url: section.card_image_url, p_card_image_shape: section.card_image_shape || 'square',
@@ -71,7 +71,7 @@ export default function HostAssistantEditorScreen() {
     const [moved] = reordered.splice(index, 1);
     reordered.splice(next, 0, moved);
     setSections(reordered);
-    await supabase.rpc('reorder_host_sections' as any, {
+    await supabase.rpc('reorder_host_sections', {
       p_actor_id: user.id, p_org_id: organizationId, p_ordered_ids: reordered.map((s) => s.id),
     });
   };
@@ -85,7 +85,7 @@ export default function HostAssistantEditorScreen() {
         {
           text: t('common:delete'), style: 'destructive', onPress: async () => {
             if (!user?.id) return;
-            await supabase.rpc('delete_host_section' as any, { p_actor_id: user.id, p_section_id: section.id });
+            await supabase.rpc('delete_host_section', { p_actor_id: user.id, p_section_id: section.id });
             await loadSections();
           },
         },

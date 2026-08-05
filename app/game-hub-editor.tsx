@@ -185,29 +185,29 @@ export default function GameHubEditorScreen() {
             setResettingAll(true);
             try {
               // Actor-gated RPCs — org derived server-side from the actor
-              const { error: err1 } = await (supabase.rpc as any)('reset_game_scores_actor', {
+              const { error: err1 } = await supabase.rpc('reset_game_scores_actor', {
                 p_actor_id: user.id,
-                p_game_mode: null,
-                p_play_mode: null,
+                p_game_mode: undefined,
+                p_play_mode: undefined,
               });
               if (err1) {
                 console.error('Error resetting game scores:', err1);
                 throw err1;
               }
 
-              const { error: err2 } = await (supabase.rpc as any)('reset_word_search_scores_actor', {
+              const { error: err2 } = await supabase.rpc('reset_word_search_scores_actor', {
                 p_actor_id: user.id,
-                p_category: null,
+                p_category: undefined,
               });
               if (err2) {
                 console.error('Error resetting word search scores:', err2);
                 throw err2;
               }
 
-              const { error: err3 } = await (supabase.rpc as any)('reset_picture_this_scores_actor', {
+              const { error: err3 } = await supabase.rpc('reset_picture_this_scores_actor', {
                 p_actor_id: user.id,
-                p_category: null,
-                p_difficulty: null,
+                p_category: undefined,
+                p_difficulty: undefined,
               });
               if (err3) {
                 console.error('Error resetting picture this scores:', err3);

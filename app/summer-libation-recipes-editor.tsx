@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { supabase } from '@/app/integrations/supabase/client';
+import type { Database } from '@/app/integrations/supabase/types';
 import { brokerUploadImage } from '@/utils/storageBroker';
 import { toPublicUrl } from '@/utils/storageResolver';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -62,6 +63,8 @@ interface LibationRecipe {
   display_order: number;
   is_active: boolean;
 }
+
+type SummerLibationRow = Database['public']['Functions']['get_summer_libation_recipes']['Returns'][number];
 
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=400&h=400&fit=crop';
 
@@ -134,9 +137,9 @@ export default function SummerLibationRecipesEditorScreen() {
         console.error('Error loading summer libation recipes:', error);
         throw error;
       }
-      const sorted = (data || []).slice().sort((a: any, b: any) =>
+      const sorted = (data || []).slice().sort((a, b) =>
         (a.category || '').localeCompare(b.category || '') || (a.display_order ?? 0) - (b.display_order ?? 0));
-      setRecipes(sorted as any);
+      setRecipes(sorted as (SummerLibationRow & { ingredients: { amount: string; ingredient: string }[] })[]);
     } catch (error) {
       console.error('Error loading summer libation recipes:', error);
       Alert.alert(t('common.error'), t('summer_libation_editor.no_recipes'));

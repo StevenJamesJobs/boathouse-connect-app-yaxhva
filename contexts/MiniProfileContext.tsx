@@ -124,31 +124,29 @@ export function MiniProfileProvider({ children }: { children: React.ReactNode })
         supabase.rpc('get_user_card', { p_actor_id: user.id, p_user_id: userId }),
         // Same-org gated: a coworker's next shift only, resolved server-side.
         supabase.rpc('get_user_next_shift', { p_actor_id: user.id, p_user_id: userId }),
-        user?.id
-          ? supabase.rpc('get_master_leaderboard_overall_actor' as any, { p_limit: 200, p_actor_id: user.id })
-          : Promise.resolve({ data: null } as any),
+        supabase.rpc('get_master_leaderboard_overall_actor', { p_limit: 200, p_actor_id: user.id }),
       ]);
 
       if (reqId !== reqRef.current) return; // superseded by a newer open()
 
       const userRes = results[0];
-      if (userRes.status === 'fulfilled' && (userRes.value as any).data) {
-        const cardRow = ((userRes.value as any).data as MiniProfileData[])?.[0];
+      if (userRes.status === 'fulfilled' && userRes.value.data) {
+        const cardRow = userRes.value.data?.[0];
         if (cardRow) {
-          setData(cardRow as MiniProfileData);
+          setData(cardRow);
         }
       }
 
       const shiftRes = results[1];
-      if (shiftRes.status === 'fulfilled' && (shiftRes.value as any).data) {
-        const shiftRows = (shiftRes.value as any).data;
+      if (shiftRes.status === 'fulfilled' && shiftRes.value.data) {
+        const shiftRows = shiftRes.value.data;
         const shiftRow = Array.isArray(shiftRows) ? shiftRows[0] : shiftRows;
-        if (shiftRow) setNextShift(shiftRow as NextShift);
+        if (shiftRow) setNextShift(shiftRow);
       }
 
       const lbRes = results[2];
-      if (lbRes.status === 'fulfilled' && Array.isArray((lbRes.value as any).data)) {
-        const entries = (lbRes.value as any).data as { user_id: string; total_score: number }[];
+      if (lbRes.status === 'fulfilled' && Array.isArray(lbRes.value.data)) {
+        const entries = lbRes.value.data;
         const idx = entries.findIndex((e) => e.user_id === userId);
         if (idx >= 0) {
           setRank(idx + 1);

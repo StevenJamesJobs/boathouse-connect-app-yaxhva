@@ -502,9 +502,8 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       );
       // RPC read (B4 batch 4): member-gated, org derived from the actor,
       // active-only server-side — replaces the last direct .from() read here.
-      const { data: slrData } = await (supabase.rpc as any)('get_summer_libation_recipes', {
+      const { data: slrData } = await supabase.rpc('get_summer_libation_recipes', {
         p_actor_id: user.id,
-        p_source_org: null,
       });
 
       if (slrData) {
@@ -544,9 +543,8 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         (i) => !(i.category === libInjection.libationsCategoryName && i.subcategory != null && libInjection.cocktailSubNames.has(i.subcategory))
       );
 
-      const { data: lrData } = await (supabase.rpc as any)('get_libation_recipes', {
+      const { data: lrData } = await supabase.rpc('get_libation_recipes', {
         p_actor_id: user.id,
-        p_source_org: null,
       });
 
       if (lrData) {
@@ -1220,7 +1218,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         const m = trimmed.match(/^\$?(\d+(?:\.\d{1,2})?)$/);
         const parsedPrice = m ? parseFloat(m[1]) : NaN;
         const bucksCost = isFinite(parsedPrice) && parsedPrice > 0 ? foodRedeemCost(parsedPrice, redemptionSettings.food_mode) : null;
-        const isInactive = (selectedMenuItem as any).is_active === false;
+        const isInactive = selectedMenuItem.is_active === false;
         const showRedeem = user?.role === 'employee' && bucksCost !== null && !isInactive
           && redemptionSettings.redemptions_enabled && redemptionSettings.food_enabled;
         const item = selectedMenuItem;

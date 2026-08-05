@@ -33,7 +33,7 @@ import {
   formatCountdown,
   getCountdownUrgency,
 } from '@/utils/exam/examEngine';
-import { getExamTypeName } from '@/utils/exam/questionGenerator';
+import { getExamTypeName, type ExamType } from '@/utils/exam/questionGenerator';
 import { getEligibleQuizTypes } from '@/app/weekly-quizzes';
 import { refreshAllUnreadQuizReward } from '@/hooks/useUnreadQuizReward';
 import { enqueuePendingSubmit, getPendingSubmit, removePendingSubmit } from '@/utils/exam/pendingSubmits';
@@ -140,9 +140,13 @@ export default function ExamPlayScreen() {
   }, []);
 
   const loadExam = async () => {
+    if (!user?.id) {
+      router.back();
+      return;
+    }
     try {
       // Fetch exam info
-      const { data: examRows, error: examError } = await (supabase.rpc as any)('get_exam', {
+      const { data: examRows, error: examError } = await supabase.rpc('get_exam', {
         p_actor_id: user?.id,
         p_exam_id: examId,
       });
@@ -165,7 +169,7 @@ export default function ExamPlayScreen() {
 
       // Check for existing attempt (anti-cheat: detect already completed or already started)
       if (!isPreview && user?.id) {
-        const { data: existingResults } = await (supabase.rpc as any)('get_my_exam_result', {
+        const { data: existingResults } = await supabase.rpc('get_my_exam_result', {
           p_actor_id: user.id,
           p_exam_id: examId,
         });
@@ -196,7 +200,7 @@ export default function ExamPlayScreen() {
       }
 
       // Fetch questions
-      const { data: questionsData, error: questionsError } = await (supabase.rpc as any)('get_exam_questions', {
+      const { data: questionsData, error: questionsError } = await supabase.rpc('get_exam_questions', {
         p_actor_id: user?.id,
         p_exam_id: examId,
       });
@@ -452,7 +456,7 @@ export default function ExamPlayScreen() {
           <View style={[styles.introCard, { backgroundColor: colors.card }]}>
             <IconSymbol ios_icon_name="doc.text.fill" android_material_icon_name="quiz" size={56} color={colors.primary} />
             <Text style={[styles.introTitle, { color: colors.text }]}>
-              {isSpanish ? `Cuestionario Semanal del ${getExamTypeName(examType as any, true)}` : `${getExamTypeName(examType as any)} Weekly Quiz`}
+              {isSpanish ? `Cuestionario Semanal del ${getExamTypeName(examType as ExamType, true)}` : `${getExamTypeName(examType as ExamType)} Weekly Quiz`}
             </Text>
             <Text style={[styles.introSubtitle, { color: colors.textSecondary }]}>
               {examState.questions.length} {isSpanish ? 'Preguntas' : 'Questions'}
@@ -651,15 +655,15 @@ export default function ExamPlayScreen() {
             { backgroundColor: colors.card },
             currentQuestion.is_bonus && { borderWidth: 2, borderColor: '#F59E0B' },
           ]}>
-            {(currentQuestion as any).question_image_url && (
+            {currentQuestion.question_image_url && (
               <StorageImage
-                source={{ uri: (currentQuestion as any).question_image_url }}
+                source={{ uri: currentQuestion.question_image_url }}
                 style={styles.questionImage}
                 resizeMode="cover"
               />
             )}
             <Text style={[styles.questionText, { color: colors.text }]}>
-              {isSpanish && (currentQuestion as any).question_text_es ? (currentQuestion as any).question_text_es : currentQuestion.question_text}
+              {isSpanish && currentQuestion.question_text_es ? currentQuestion.question_text_es : currentQuestion.question_text}
             </Text>
           </View>
 
@@ -667,8 +671,8 @@ export default function ExamPlayScreen() {
           <View style={styles.optionsContainer}>
             {(['A', 'B', 'C', 'D'] as const).map(letter => {
               const optionKey = `option_${letter.toLowerCase()}` as keyof ExamQuestion;
-              const optionKeyEs = `${optionKey}_es`;
-              const optionText = (isSpanish && (currentQuestion as any)[optionKeyEs]) ? (currentQuestion as any)[optionKeyEs] : currentQuestion[optionKey] as string;
+              const optionKeyEs = `${optionKey}_es` as keyof ExamQuestion;
+              const optionText = (isSpanish && currentQuestion[optionKeyEs]) ? (currentQuestion[optionKeyEs] as string) : currentQuestion[optionKey] as string;
               const isSelected = examState.selectedOption === letter;
               const showFeedback = phase === 'feedback';
               const isCorrectOption = letter === currentQuestion.correct_option;

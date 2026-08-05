@@ -34,11 +34,11 @@ interface QuestionReview {
   is_correct: boolean;
   question_image_url?: string | null;
   // Spanish fields
-  question_text_es?: string;
-  option_a_es?: string;
-  option_b_es?: string;
-  option_c_es?: string;
-  option_d_es?: string;
+  question_text_es?: string | null;
+  option_a_es?: string | null;
+  option_b_es?: string | null;
+  option_c_es?: string | null;
+  option_d_es?: string | null;
 }
 
 export default function ExamResultsScreen() {
@@ -83,10 +83,14 @@ export default function ExamResultsScreen() {
   }, []);
 
   const loadQuestionReview = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     try {
       // Fetch questions
-      const { data: questionsData } = await (supabase.rpc as any)('get_exam_questions', {
-        p_actor_id: user?.id,
+      const { data: questionsData } = await supabase.rpc('get_exam_questions', {
+        p_actor_id: user.id,
         p_exam_id: examId,
       });
 
@@ -107,7 +111,7 @@ export default function ExamResultsScreen() {
           }
         }
       } else if (user?.id) {
-        const { data: resultData, error: resultError } = await (supabase.rpc as any)('get_my_exam_result', {
+        const { data: resultData, error: resultError } = await supabase.rpc('get_my_exam_result', {
           p_actor_id: user.id,
           p_exam_id: examId,
         });
@@ -124,7 +128,7 @@ export default function ExamResultsScreen() {
       setAnswers(userAnswers);
 
       // Build review data
-      const reviewQuestions: QuestionReview[] = questionsData.map((q: any, index: number) => {
+      const reviewQuestions: QuestionReview[] = questionsData.map((q, index) => {
         const answer = userAnswers.find((a: any) => a.question_id === q.id);
         // Belt-and-suspenders: if preview mode somehow lost is_correct, derive it
         // from the selected option matching the correct option on the question row.
@@ -134,6 +138,7 @@ export default function ExamResultsScreen() {
             : false;
         return {
           ...q,
+          correct_option: q.correct_option as 'A' | 'B' | 'C' | 'D',
           user_answer: answer?.selected_option || null,
           is_correct: answer?.is_correct ?? derivedCorrect,
         };
@@ -227,7 +232,7 @@ export default function ExamResultsScreen() {
         {/* Question Review */}
         <Text style={[styles.sectionTitle, { color: colors.text }]}>{isSpanish ? 'Revisión de Preguntas' : 'Question Review'}</Text>
 
-        <QuestionReviewList questions={questions as any} />
+        <QuestionReviewList questions={questions} />
 
         {/* Done Button */}
         <TouchableOpacity

@@ -103,7 +103,7 @@ export default function ScheduleUploadScreen() {
       });
 
       if (error) throw error;
-      setUploads((data || []) as any);
+      setUploads((data || []) as ScheduleUpload[]);
     } catch (error) {
       console.error('Error loading uploads:', error);
     } finally {

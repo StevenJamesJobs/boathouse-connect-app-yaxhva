@@ -46,7 +46,7 @@ export async function fetchContentImages(
       return [];
     }
 
-    return ((data as any[]) || []).map((row) => row.image_url);
+    return (data || []).map((row) => row.image_url);
   } catch (err) {
     console.error('Content images fetch error:', err);
     return [];
@@ -77,7 +77,7 @@ export async function fetchContentImagesBatch(
       return result;
     }
 
-    for (const row of (data as any[]) || []) {
+    for (const row of data || []) {
       const existing = result.get(row.content_id) || [];
       existing.push(row.image_url);
       result.set(row.content_id, existing);

@@ -175,7 +175,7 @@ export default function ManualScheduleScreen() {
       });
 
       if (error) throw error;
-      setShifts((data || []) as any);
+      setShifts(data || []);
     } catch (error) {
       console.error('Error loading shifts:', error);
       Alert.alert('Error', 'Failed to load schedule data.');

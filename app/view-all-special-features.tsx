@@ -104,11 +104,11 @@ export default function ViewAllSpecialFeaturesScreen() {
       }
 
       console.log('Special features loaded:', data?.length || 0, 'items');
-      setFeatures((data || []) as any);
+      setFeatures((data || []) as SpecialFeature[]);
 
       // Batch fetch additional content images
       if (data && data.length > 0) {
-        const ids = (data as any[]).map((f: any) => f.id);
+        const ids = data.map((f) => f.id);
         const imagesMap = await fetchContentImagesBatch(user.id, 'special_feature', ids);
         setContentImagesMap(imagesMap);
       }

@@ -74,7 +74,7 @@ export default function ManagerApprovalsScreen() {
       });
 
       const today = new Date().toISOString().slice(0, 10);
-      const filtered = ((reqs as any[]) || []).filter((r) => {
+      const filtered = (reqs || []).filter((r) => {
         if (r.request_type === 'food_beverage') return true;
         return !r.shift_date || r.shift_date >= today;
       });

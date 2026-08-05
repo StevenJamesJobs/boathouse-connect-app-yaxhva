@@ -137,7 +137,7 @@ export default function ScheduleReviewScreen() {
       });
 
       if (shiftError) throw shiftError;
-      setShifts((shiftData || []) as any);
+      setShifts(shiftData || []);
 
       // Load all users for assignment
       const directory = await getOrgDirectory(user?.id);

@@ -42,7 +42,7 @@ export function useUnreadQuizzes() {
       // Opportunistic outbox flush (this hook already runs on foreground +
       // 30s poll); anything STILL queued shouldn't badge as unread.
       await flushPendingSubmits(user.id);
-      const { data } = await (supabase.rpc as any)('get_my_unread_quiz_count', {
+      const { data } = await supabase.rpc('get_my_unread_quiz_count', {
         p_actor_id: user.id,
       });
       let count = typeof data === 'number' ? data : 0;

@@ -15,7 +15,7 @@ export async function fetchOwnWineVisible(
   try {
     const { data } = await supabase.rpc('get_menu_categories', { p_actor_id: actorId });
     if (!data) return true;
-    return (data as any[]).some(
+    return data.some(
       (c) =>
         c.system_key === 'cat.wine' &&
         !c.is_hidden &&

@@ -20,6 +20,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { supabase } from '@/app/integrations/supabase/client';
+import type { Database } from '@/app/integrations/supabase/types';
 import { brokerUploadImage } from '@/utils/storageBroker';
 import { toPublicUrl } from '@/utils/storageResolver';
 import { IconSymbol } from '@/components/IconSymbol';
@@ -48,6 +49,8 @@ interface PureeSyrupRecipe {
   display_order: number;
   is_active: boolean;
 }
+
+type PureeSyrupRow = Database['public']['Functions']['get_puree_syrup_recipes']['Returns'][number];
 
 const CATEGORIES = ['Purees', 'Simple Syrups'];
 
@@ -115,10 +118,10 @@ export default function PureeSyrupRecipesEditorScreen() {
         console.error('Error loading puree syrup recipes:', error);
         throw error;
       }
-      const sorted = (data || []).slice().sort((a: any, b: any) =>
+      const sorted = (data || []).slice().sort((a, b) =>
         (a.category || '').localeCompare(b.category || '') || (a.display_order ?? 0) - (b.display_order ?? 0));
       console.log('Loaded puree syrup recipes:', sorted);
-      setRecipes(sorted as any);
+      setRecipes(sorted as (PureeSyrupRow & { ingredients: { amount: string; ingredient: string }[] })[]);
     } catch (error) {
       console.error('Error loading puree syrup recipes:', error);
       Alert.alert(t('common:error'), t('puree_editor:load_error'));

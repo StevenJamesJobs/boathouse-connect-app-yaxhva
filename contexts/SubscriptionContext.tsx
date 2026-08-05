@@ -83,7 +83,7 @@ function SubscriptionProviderInner({ children }: { children: ReactNode }) {
   // closure) — these callbacks have [] deps and would otherwise pin a stale first-render user.
   const fetchSubscription = useCallback(async (orgId: string, actorId: string) => {
     try {
-      const { data, error } = await (supabase.rpc as any)('get_organization_subscription_actor', {
+      const { data, error } = await supabase.rpc('get_organization_subscription_actor', {
         p_actor_id: actorId,
       });
 
@@ -109,7 +109,7 @@ function SubscriptionProviderInner({ children }: { children: ReactNode }) {
 
   const initializeTrial = useCallback(async (orgId: string, actorId: string) => {
     try {
-      await (supabase.rpc as any)('initialize_org_trial_actor', {
+      await supabase.rpc('initialize_org_trial_actor', {
         p_actor_id: actorId,
       });
     } catch (err) {
@@ -119,7 +119,7 @@ function SubscriptionProviderInner({ children }: { children: ReactNode }) {
 
   const expireTrial = useCallback(async (orgId: string, actorId: string) => {
     try {
-      await (supabase.rpc as any)('expire_org_trial_actor', {
+      await supabase.rpc('expire_org_trial_actor', {
         p_actor_id: actorId,
       });
     } catch (err) {
@@ -160,7 +160,7 @@ function SubscriptionProviderInner({ children }: { children: ReactNode }) {
       }
 
       if (rcTier !== dbTier && (rcTier === 'base' || rcTier === 'premium')) {
-        const { error } = await (supabase.rpc as any)('upsert_organization_subscription', {
+        const { error } = await supabase.rpc('upsert_organization_subscription', {
           p_organization_id: orgId,
           p_subscription_tier: rcTier,
           p_actor_id: actorId,

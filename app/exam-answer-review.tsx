@@ -20,11 +20,11 @@ import QuestionReviewList, { QuestionReviewEntry } from '@/components/QuestionRe
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { getOrgDirectory } from '@/utils/orgDirectory';
 
-interface AnswerRecord {
+type AnswerRecord = {
   question_id: string;
   selected_option: 'A' | 'B' | 'C' | 'D';
   is_correct: boolean;
-}
+};
 
 export default function ExamAnswerReviewScreen() {
   const router = useRouter();
@@ -62,12 +62,16 @@ export default function ExamAnswerReviewScreen() {
   }, [params.examId, params.userId, user?.role]);
 
   const loadData = async () => {
+    if (!user?.id) {
+      setLoading(false);
+      return;
+    }
     try {
       setLoading(true);
       setLoadError(null);
 
       // Fetch questions
-      const { data: qData, error: qError } = await (supabase.rpc as any)('get_exam_questions', {
+      const { data: qData, error: qError } = await supabase.rpc('get_exam_questions', {
         p_actor_id: user?.id,
         p_exam_id: params.examId,
       });
@@ -79,7 +83,7 @@ export default function ExamAnswerReviewScreen() {
       }
 
       // Fetch result
-      const { data: rRows, error: rError } = await (supabase.rpc as any)('get_user_exam_result', {
+      const { data: rRows, error: rError } = await supabase.rpc('get_user_exam_result', {
         p_actor_id: user?.id,
         p_exam_id: params.examId,
         p_user_id: params.userId,
@@ -94,23 +98,23 @@ export default function ExamAnswerReviewScreen() {
       const rData = rRows?.[0];
 
       // Fetch user via hardened org-directory helper (org-scoped by the actor).
-      const directory = await getOrgDirectory(user?.id as string);
+      const directory = await getOrgDirectory(user?.id);
       const uData = directory.find((r) => r.id === (params.userId as string));
 
       if (uData) {
         setTargetUser({
-          name: (uData as any).name,
-          profile_picture_url: (uData as any).profile_picture_url || null,
+          name: uData.name,
+          profile_picture_url: uData.profile_picture_url || null,
         });
       }
 
       if (rData) {
         setSummary({
-          correct_count: (rData as any).correct_count,
-          total_questions: (rData as any).total_questions,
-          bucks_awarded: (rData as any).bucks_awarded,
-          time_seconds: (rData as any).time_seconds,
-          is_timed_out: (rData as any).is_timed_out,
+          correct_count: rData.correct_count,
+          total_questions: rData.total_questions,
+          bucks_awarded: rData.bucks_awarded,
+          time_seconds: rData.time_seconds,
+          is_timed_out: rData.is_timed_out,
         });
       }
 
@@ -118,10 +122,10 @@ export default function ExamAnswerReviewScreen() {
       // or a JSON string depending on the client path. exam-results.tsx handles
       // both shapes — mirror that here (plus Array.isArray belt-and-suspenders).
       const answersByQuestionId: Record<string, AnswerRecord> = {};
-      const rawAnswers = (rData as any)?.answers;
+      const rawAnswers = rData?.answers;
       let answersArray: AnswerRecord[] = [];
       if (Array.isArray(rawAnswers)) {
-        answersArray = rawAnswers;
+        answersArray = rawAnswers as AnswerRecord[];
       } else if (typeof rawAnswers === 'string') {
         try {
           const parsed = JSON.parse(rawAnswers);
@@ -134,7 +138,7 @@ export default function ExamAnswerReviewScreen() {
         answersByQuestionId[a.question_id] = a;
       });
 
-      const reviewEntries: QuestionReviewEntry[] = ((qData as any[]) || []).map((q) => {
+      const reviewEntries: QuestionReviewEntry[] = (qData || []).map((q) => {
         const answer = answersByQuestionId[q.id];
         return {
           id: q.id,
@@ -144,7 +148,7 @@ export default function ExamAnswerReviewScreen() {
           option_b: q.option_b,
           option_c: q.option_c,
           option_d: q.option_d,
-          correct_option: q.correct_option,
+          correct_option: q.correct_option as 'A' | 'B' | 'C' | 'D',
           is_bonus: q.is_bonus,
           bonus_bucks_value: q.bonus_bucks_value,
           question_image_url: q.question_image_url || null,

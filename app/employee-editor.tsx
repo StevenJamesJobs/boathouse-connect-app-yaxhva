@@ -231,11 +231,12 @@ export default function EmployeeEditorScreen() {
           text: t('delete', { defaultValue: 'Delete' }),
           style: 'destructive',
           onPress: async () => {
+            if (!user?.id) return;
             try {
-              const { error } = await (supabase.rpc as any)('delete_employee', {
+              const { error } = await supabase.rpc('delete_employee', {
                 p_actor_id: user?.id,
                 p_employee_id: employee.id,
-                p_organization_id: organizationId,
+                p_organization_id: organizationId ?? undefined,
               });
               if (error) throw error;
               fetchEmployees();

@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import type { Database } from '@/app/integrations/supabase/types';
 import FormattedText from '@/components/FormattedText';
 import { StorageImage } from '@/components/StorageImage';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -46,6 +47,8 @@ interface LibationRecipe {
   display_order: number;
   is_active: boolean;
 }
+
+type LibationRow = Database['public']['Functions']['get_libation_recipes']['Returns'][number];
 
 // Placeholder image for recipes without thumbnails
 const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=400&h=400&fit=crop';
@@ -80,9 +83,9 @@ export default function LibationRecipesScreen() {
         console.error('Error loading libation recipes:', error);
         throw error;
       }
-      const sorted = (data || []).slice().sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
+      const sorted = (data || []).slice().sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
       console.log('Loaded libation recipes:', sorted);
-      setRecipes(sorted as any);
+      setRecipes(sorted as (LibationRow & { ingredients: { amount: string; ingredient: string }[] })[]);
     } catch (error) {
       console.error('Error loading libation recipes:', error);
     } finally {

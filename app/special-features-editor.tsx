@@ -218,7 +218,7 @@ export default function SpecialFeaturesEditorScreen() {
       }
 
       console.log('Special features loaded successfully:', data?.length || 0, 'items');
-      setFeatures((data || []) as any);
+      setFeatures(data || []);
     } catch (error) {
       console.error('Error loading special features:', error);
       Alert.alert(t('common:error'), t('special_features_editor:load_error'));

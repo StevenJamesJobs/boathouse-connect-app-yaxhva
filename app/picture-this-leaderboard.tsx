@@ -92,7 +92,7 @@ export default function PictureThisLeaderboardScreen() {
       try {
         if (!user?.id) { setLoading(false); return; }
         const { data, error } = await supabase.rpc(
-          'get_picture_this_leaderboard_filtered_actor' as any,
+          'get_picture_this_leaderboard_filtered_actor',
           {
             p_category: activeCategory,
             p_play_mode: activePlayMode,
@@ -101,7 +101,7 @@ export default function PictureThisLeaderboardScreen() {
           },
         );
         if (cancelled) return;
-        if (!error && data) setEntries(data as Entry[]);
+        if (!error && data) setEntries(data);
         else setEntries([]);
       } catch (err) {
         console.error('[PictureThis] leaderboard load error:', err);

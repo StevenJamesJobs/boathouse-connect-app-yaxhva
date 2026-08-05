@@ -26,12 +26,16 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import GlassCard from '@/components/GlassCard';
 import { fonts } from '@/constants/fonts';
 import { StorageExpoImage } from '@/components/StorageImage';
+import type { Database } from '@/app/integrations/supabase/types';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 const PAGE_SIZE = 25;
 const SOURCE_FETCH_LIMIT = 100;
 
 type NotificationType = 'announcement' | 'special_feature' | 'upcoming_event' | 'weekly_special' | 'custom_notification';
+
+type CustomNotifData = { destination?: string; exam_id?: string; notificationType?: string; targetUserId?: string; title_es?: string; body_es?: string } | null;
+type CustomNotifRow = Omit<Database['public']['Functions']['get_my_notifications']['Returns'][number], 'data'> & { data: CustomNotifData };
 
 interface NotificationItem {
   id: string;
@@ -151,7 +155,7 @@ export default function NotificationDropdown({
       // cap client-side to preserve the shade's old fetch window.
       const { data: annRows } = await supabase
         .rpc('get_announcements', { p_actor_id: user.id });
-      const announcements = ((annRows as any[]) || [])
+      const announcements = ((annRows) || [])
         .slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
         .slice(0, SOURCE_FETCH_LIMIT);
 
@@ -171,7 +175,7 @@ export default function NotificationDropdown({
       // Fetch special features
       const { data: sfRows } = await supabase
         .rpc('get_special_features', { p_actor_id: user.id });
-      const features = ((sfRows as any[]) || [])
+      const features = ((sfRows) || [])
         .slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
         .slice(0, SOURCE_FETCH_LIMIT);
 
@@ -191,7 +195,7 @@ export default function NotificationDropdown({
       // Fetch upcoming events
       const { data: evtRows } = await supabase
         .rpc('get_upcoming_events', { p_actor_id: user.id });
-      const events = ((evtRows as any[]) || [])
+      const events = ((evtRows) || [])
         .slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
         .slice(0, SOURCE_FETCH_LIMIT);
 
@@ -219,11 +223,11 @@ export default function NotificationDropdown({
         supabase.rpc('get_menu_items', { p_actor_id: user.id, p_weekly_special: true }),
       ]);
       const byCatSpecials = {
-        data: ((byCatRpc.data as any[]) || [])
+        data: (byCatRpc.data || [])
           .slice().sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).slice(0, SOURCE_FETCH_LIMIT),
       };
       const byFlagSpecials = {
-        data: ((byFlagRpc.data as any[]) || [])
+        data: (byFlagRpc.data || [])
           .slice().sort((a, b) => (b.updated_at || '').localeCompare(a.updated_at || '')).slice(0, SOURCE_FETCH_LIMIT),
       };
       const specialsById = new Map<string, any>();
@@ -262,7 +266,7 @@ export default function NotificationDropdown({
       }
 
       if (customNotifs) {
-        for (const cn of customNotifs as any[]) {
+        for (const cn of customNotifs as CustomNotifRow[]) {
           // Hide quiz bell entries that this user has already dismissed
           if (
             cn.data?.destination === 'weekly-quizzes' &&

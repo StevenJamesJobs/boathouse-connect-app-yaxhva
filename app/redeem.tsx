@@ -154,8 +154,8 @@ export default function EmployeeRedeemScreen() {
     if (!silent) setLoading(true);
     try {
       const { data: meRows } = await supabase.rpc('get_me', { p_user_id: user.id });
-      const u = (meRows as any)?.[0];
-      setBalance((u as any)?.mcloones_bucks ?? 0);
+      const u = meRows?.[0];
+      setBalance(u?.mcloones_bucks ?? 0);
 
       const { data: rows } = await supabase.rpc('get_my_redemptions', {
         p_user_id: user.id,
@@ -163,7 +163,7 @@ export default function EmployeeRedeemScreen() {
       });
 
       const today = new Date().toISOString().slice(0, 10);
-      const filtered = ((rows as any[]) || []).filter((r) => {
+      const filtered = (rows || []).filter((r) => {
         if (r.request_type === 'food_beverage') return true;
         return !r.shift_date || r.shift_date >= today;
       });
@@ -271,7 +271,7 @@ export default function EmployeeRedeemScreen() {
 
       const { data: requestId, error } = await supabase.rpc('submit_redemption_request', {
         p_user_id: user.id,
-        p_request_type: (isCustom ? 'custom' : activeOption) as any,
+        p_request_type: isCustom ? 'custom' : activeOption!,
         p_bucks_amount: requestedBucks,
         p_menu_item_id: isFood && pickedItem?.source === 'menu_items' ? pickedItem.id : null,
         p_weekly_special_id: isFood && pickedItem?.source === 'weekly_specials' ? pickedItem.id : null,

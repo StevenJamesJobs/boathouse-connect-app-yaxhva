@@ -82,15 +82,18 @@ export default function HostSectionEditorScreen() {
   const [savingTile, setSavingTile] = useState(false);
 
   const loadTiles = useCallback(async (sid: string) => {
-    const { data } = await (supabase.rpc as any)('get_host_section_tiles', { p_actor_id: user?.id, p_section_id: sid });
+    if (!user?.id) return;
+    const { data } = await supabase.rpc('get_host_section_tiles', { p_actor_id: user.id, p_section_id: sid });
     setTiles((data as Tile[]) || []);
   }, [user?.id]);
 
   const load = useCallback(async () => {
-    if (isNew || !id) return;
+    // Userless early-out leaves the initial spinner up until auth hydrates;
+    // the [user?.id] dep below retriggers load, which then clears it.
+    if (isNew || !id || !user?.id) return;
     try {
       setLoading(true);
-      const { data } = await (supabase.rpc as any)('get_host_sections', { p_actor_id: user?.id, p_id: id });
+      const { data } = await supabase.rpc('get_host_sections', { p_actor_id: user.id, p_id: id });
       const s = data?.[0];
       if (s) {
         setTitle(s.title || '');
@@ -136,7 +139,7 @@ export default function HostSectionEditorScreen() {
         if (uploaded) cardUrl = uploaded;
       }
       if (sectionId) {
-        const { error } = await supabase.rpc('update_host_section' as any, {
+        const { error } = await supabase.rpc('update_host_section', {
           p_actor_id: user.id, p_section_id: sectionId, p_title: title.trim(),
           p_card_subtitle: cardSubtitle.trim() || null, p_instructions: instructions.trim() || null,
           p_card_image_url: cardUrl || null, p_card_image_shape: cardImageShape, p_icon: icon || null,
@@ -147,7 +150,7 @@ export default function HostSectionEditorScreen() {
         setLocalCardUri(null);
         Alert.alert('Saved', 'Section updated.');
       } else {
-        const { data, error } = await supabase.rpc('create_host_section' as any, {
+        const { data, error } = await supabase.rpc('create_host_section', {
           p_actor_id: user.id, p_org_id: organizationId, p_title: title.trim(),
           p_card_subtitle: cardSubtitle.trim() || null, p_instructions: instructions.trim() || null,
           p_card_image_url: cardUrl || null, p_card_image_shape: cardImageShape, p_icon: icon || null,
@@ -194,14 +197,14 @@ export default function HostSectionEditorScreen() {
       const rawLink = tLinkUrl.trim();
       const linkUrl = rawLink ? (/^https?:\/\//i.test(rawLink) ? rawLink : `https://${rawLink}`) : null;
       if (editingTile) {
-        const { error } = await supabase.rpc('update_host_section_tile' as any, {
+        const { error } = await supabase.rpc('update_host_section_tile', {
           p_actor_id: user.id, p_tile_id: editingTile.id, p_title: tTitle.trim() || null,
           p_image_url: imgUrl || null, p_image_shape: tImageShape,
           p_link_url: linkUrl, p_link_description: tLinkDesc.trim() || null,
         });
         if (error) throw error;
       } else {
-        const { error } = await supabase.rpc('create_host_section_tile' as any, {
+        const { error } = await supabase.rpc('create_host_section_tile', {
           p_actor_id: user.id, p_section_id: sectionId, p_title: tTitle.trim() || null,
           p_image_url: imgUrl || null, p_image_shape: tImageShape,
           p_link_url: linkUrl, p_link_description: tLinkDesc.trim() || null,
@@ -225,7 +228,7 @@ export default function HostSectionEditorScreen() {
     const [moved] = reordered.splice(index, 1);
     reordered.splice(next, 0, moved);
     setTiles(reordered);
-    await supabase.rpc('reorder_host_section_tiles' as any, {
+    await supabase.rpc('reorder_host_section_tiles', {
       p_actor_id: user.id, p_section_id: sectionId, p_ordered_ids: reordered.map((t) => t.id),
     });
   };
@@ -236,7 +239,7 @@ export default function HostSectionEditorScreen() {
       {
         text: 'Delete', style: 'destructive', onPress: async () => {
           if (!user?.id || !sectionId) return;
-          await supabase.rpc('delete_host_section_tile' as any, { p_actor_id: user.id, p_tile_id: tile.id });
+          await supabase.rpc('delete_host_section_tile', { p_actor_id: user.id, p_tile_id: tile.id });
           await loadTiles(sectionId);
         },
       },

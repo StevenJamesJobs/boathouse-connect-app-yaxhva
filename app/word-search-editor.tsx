@@ -62,9 +62,9 @@ export default function WordSearchEditorScreen() {
     const key = category ?? 'all';
     setResetting(key);
     try {
-      const { error } = await (supabase.rpc as any)('reset_word_search_scores_actor', {
+      const { error } = await supabase.rpc('reset_word_search_scores_actor', {
         p_actor_id: user.id,
-        p_category: category ?? null,
+        p_category: category ?? undefined,
       });
       if (error) throw error;
       const label = category ? t(CATEGORY_LABEL_KEYS[category]) : t('ws_editor:all_categories_long');

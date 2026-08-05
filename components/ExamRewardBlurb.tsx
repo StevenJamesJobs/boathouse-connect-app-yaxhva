@@ -5,7 +5,7 @@ import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { getExamTypeName } from '@/utils/exam/questionGenerator';
+import { getExamTypeName, type ExamType } from '@/utils/exam/questionGenerator';
 import { refreshAllUnreadQuizReward } from '@/hooks/useUnreadQuizReward';
 
 interface UndismissedResult {
@@ -31,7 +31,7 @@ export default function ExamRewardBlurb() {
 
     try {
       // Get user's recent exam results
-      const { data: results, error: resultsError } = await (supabase.rpc as any)('get_my_recent_exam_results', {
+      const { data: results, error: resultsError } = await supabase.rpc('get_my_recent_exam_results', {
         p_actor_id: user.id,
         p_limit: 5,
       });
@@ -39,23 +39,23 @@ export default function ExamRewardBlurb() {
       if (resultsError || !results || results.length === 0) return;
 
       // Check which ones are already dismissed
-      const resultIds = results.map((r: any) => r.id);
-      const { data: dismissals } = await (supabase.rpc as any)('get_my_exam_reward_dismissals', {
+      const resultIds = results.map((r) => r.id);
+      const { data: dismissals } = await supabase.rpc('get_my_exam_reward_dismissals', {
         p_actor_id: user.id,
         p_result_ids: resultIds,
       });
 
-      const dismissedIds = new Set((dismissals || []).map((d: any) => d.exam_result_id));
+      const dismissedIds = new Set((dismissals || []).map((d) => d.exam_result_id));
 
       // Find the most recent undismissed result
-      const undismissed = results.find((r: any) => !dismissedIds.has(r.id));
+      const undismissed = results.find((r) => !dismissedIds.has(r.id));
       if (!undismissed) {
         setResult(null);
         return;
       }
 
       // Get the exam type
-      const { data: examRows } = await (supabase.rpc as any)('get_exam', {
+      const { data: examRows } = await supabase.rpc('get_exam', {
         p_actor_id: user.id,
         p_exam_id: undismissed.exam_id,
       });
@@ -78,7 +78,7 @@ export default function ExamRewardBlurb() {
     if (!user?.id || !result) return;
 
     try {
-      await (supabase.rpc as any)('dismiss_exam_reward', {
+      await supabase.rpc('dismiss_exam_reward', {
         p_actor_id: user.id,
         p_exam_result_id: result.id,
       });
@@ -102,7 +102,7 @@ export default function ExamRewardBlurb() {
         <View style={styles.textContainer}>
           <Text style={[styles.title, { color: '#10B981' }]}>{t('weekly_quizzes.reward_blurb_title')}</Text>
           <Text style={[styles.description, { color: colors.text }]}>
-            {t('weekly_quizzes.reward_blurb_desc', { amount: result.bucks_awarded, type: getExamTypeName(result.exam_type as any, isSpanish) })}
+            {t('weekly_quizzes.reward_blurb_desc', { amount: result.bucks_awarded, type: getExamTypeName(result.exam_type as ExamType, isSpanish) })}
           </Text>
         </View>
         <TouchableOpacity onPress={handleDismiss} style={styles.dismissButton}>

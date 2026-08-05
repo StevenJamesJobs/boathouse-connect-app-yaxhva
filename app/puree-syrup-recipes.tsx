@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
+import type { Database } from '@/app/integrations/supabase/types';
 import FormattedText from '@/components/FormattedText';
 import { StorageImage } from '@/components/StorageImage';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -39,6 +40,8 @@ interface PureeSyrupRecipe {
   display_order: number;
   is_active: boolean;
 }
+
+type PureeSyrupRow = Database['public']['Functions']['get_puree_syrup_recipes']['Returns'][number];
 
 const CATEGORIES = ['Purees', 'Simple Syrups'];
 
@@ -73,9 +76,9 @@ export default function PureeSyrupRecipesScreen() {
         console.error('Error loading puree syrup recipes:', error);
         throw error;
       }
-      const sorted = (data || []).slice().sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
+      const sorted = (data || []).slice().sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
       console.log('Loaded puree syrup recipes:', sorted);
-      setRecipes(sorted as any);
+      setRecipes(sorted as (PureeSyrupRow & { ingredients: { amount: string; ingredient: string }[] })[]);
     } catch (error) {
       console.error('Error loading puree syrup recipes:', error);
     } finally {

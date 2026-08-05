@@ -27,7 +27,7 @@ import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { generateQuizQuestions, generatePhotoQuestion, getCurrentWeekKey, getExamTypeName } from '@/utils/exam/questionGenerator';
-import type { ExamType } from '@/utils/exam/questionGenerator';
+import type { ExamType, GeneratedQuestion } from '@/utils/exam/questionGenerator';
 import { useTranslationSection } from '@/components/TranslationSection';
 import { formatTime, formatCountdown, getCountdownUrgency } from '@/utils/exam/examEngine';
 import { sendCustomNotification, bothLanguages } from '@/utils/notificationHelpers';
@@ -196,13 +196,13 @@ export default function ExamEditorScreen() {
       // Auto-close any active exams whose close_at has passed. Fire-and-forget
       // — if it fails we still show the (now slightly stale) data below.
       try {
-        await supabase.rpc('close_expired_exams_actor' as any, { p_actor_id: user.id });
+        await supabase.rpc('close_expired_exams_actor', { p_actor_id: user.id });
       } catch (cleanupErr) {
         console.warn('close_expired_exams cleanup failed:', cleanupErr);
       }
 
       // Get the most recent draft/active/paused exam for this type (org-scoped server-side)
-      const { data, error } = await (supabase.rpc as any)('get_exam', {
+      const { data, error } = await supabase.rpc('get_exam', {
         p_actor_id: user?.id,
         p_exam_type: examType,
         p_statuses: ['draft', 'active', 'paused'],
@@ -254,7 +254,8 @@ export default function ExamEditorScreen() {
   }, [closeAt, currentExam?.status]);
 
   const fetchQuestions = async (examId: string) => {
-    const { data, error } = await (supabase.rpc as any)('get_exam_questions', {
+    if (!user?.id) return;
+    const { data, error } = await supabase.rpc('get_exam_questions', {
       p_actor_id: user?.id,
       p_exam_id: examId,
     });
@@ -267,7 +268,7 @@ export default function ExamEditorScreen() {
   const fetchCompletionData = async (examId: string) => {
     if (!user?.id) return;
     try {
-      const { data, error } = await supabase.rpc('get_exam_completion_status_actor' as any, {
+      const { data, error } = await supabase.rpc('get_exam_completion_status_actor', {
         p_exam_id: examId,
         p_exam_type: examType,
         p_actor_id: user.id,
@@ -287,13 +288,14 @@ export default function ExamEditorScreen() {
 
   // Generate new quiz
   const handleGenerate = async () => {
+    if (!user?.id) return;
     setGenerating(true);
     try {
       const cycleKey = getCurrentWeekKey();
 
       // Create the exam record (server derives org, gates manager/owner, and does the
       // unique-cycle_key suffix retry internally — returns the row with its final cycle_key)
-      const { data: examRows, error: examError } = await (supabase.rpc as any)('create_exam', {
+      const { data: examRows, error: examError } = await supabase.rpc('create_exam', {
         p_actor_id: user?.id,
         p_exam_type: examType,
         p_cycle_key: cycleKey,
@@ -351,15 +353,16 @@ export default function ExamEditorScreen() {
 
   // Update time limit
   const handleUpdateTimeLimit = async (newSeconds: number) => {
-    if (!currentExam) return;
+    if (!currentExam || !user?.id) return;
     setTimeLimit(newSeconds);
-    await (supabase.rpc as any)('update_exam_settings', {
+    await supabase.rpc('update_exam_settings', {
       p_actor_id: user?.id, p_exam_id: currentExam.id, p_time_limit_seconds: newSeconds,
     });
   };
 
   // Activate quiz
   const handleActivate = () => {
+    if (!user?.id) return;
     if (!currentExam || questions.length === 0) {
       Alert.alert(t('common.error'), t('exam_editor.no_questions_activate'));
       return;
@@ -386,7 +389,7 @@ export default function ExamEditorScreen() {
 
               // Atomic: server closes any other active exam of this type, then activates
               // this one (activated_at + close_at + notify reset) — one call.
-              await (supabase.rpc as any)('activate_exam', {
+              await supabase.rpc('activate_exam', {
                 p_actor_id: user?.id,
                 p_exam_id: currentExam.id,
                 p_close_at: effectiveCloseAt.toISOString(),
@@ -437,7 +440,7 @@ export default function ExamEditorScreen() {
   };
 
   const handlePause = () => {
-    if (!currentExam) return;
+    if (!currentExam || !user?.id) return;
     Alert.alert(
       t('exam_editor.pause_quiz'),
       t('exam_editor.pause_msg'),
@@ -446,7 +449,7 @@ export default function ExamEditorScreen() {
         {
           text: t('exam_editor.pause_btn'),
           onPress: async () => {
-            await (supabase.rpc as any)('set_exam_status', {
+            await supabase.rpc('set_exam_status', {
               p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'paused',
             });
             await fetchCurrentExam();
@@ -457,7 +460,7 @@ export default function ExamEditorScreen() {
   };
 
   const handleResume = () => {
-    if (!currentExam) return;
+    if (!currentExam || !user?.id) return;
     Alert.alert(
       t('exam_editor.resume_quiz'),
       t('exam_editor.resume_msg'),
@@ -466,7 +469,7 @@ export default function ExamEditorScreen() {
         {
           text: t('exam_editor.resume_btn'),
           onPress: async () => {
-            await (supabase.rpc as any)('set_exam_status', {
+            await supabase.rpc('set_exam_status', {
               p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'active',
             });
             await fetchCurrentExam();
@@ -478,13 +481,13 @@ export default function ExamEditorScreen() {
 
   // Persist a new close_at value (draft or active)
   const handleUpdateCloseAt = async (next: Date | null) => {
-    if (!currentExam) return;
+    if (!currentExam || !user?.id) return;
     setCloseAt(next);
     try {
-      await (supabase.rpc as any)('update_exam_settings', {
+      await supabase.rpc('update_exam_settings', {
         p_actor_id: user?.id,
         p_exam_id: currentExam.id,
-        p_close_at: next ? next.toISOString() : null,
+        p_close_at: next ? next.toISOString() : undefined,
         p_clear_close_at: !next,
       });
     } catch (err) {
@@ -495,11 +498,11 @@ export default function ExamEditorScreen() {
   // Persist the No Rewards toggle (draft only). When false, no Bucks awarded
   // for this quiz regardless of per-question values.
   const handleToggleRewardsEnabled = async (next: boolean) => {
-    if (!currentExam || currentExam.status !== 'draft') return;
+    if (!currentExam || currentExam.status !== 'draft' || !user?.id) return;
     setRewardsEnabled(next);
     setCurrentExam({ ...currentExam, rewards_enabled: next });
     try {
-      await (supabase.rpc as any)('update_exam_settings', {
+      await supabase.rpc('update_exam_settings', {
         p_actor_id: user?.id, p_exam_id: currentExam.id, p_rewards_enabled: next,
       });
     } catch (err) {
@@ -528,10 +531,10 @@ export default function ExamEditorScreen() {
 
   // Persist the Notify Staff toggle (draft only)
   const handleToggleNotifyOnActivate = async (next: boolean) => {
-    if (!currentExam || currentExam.status !== 'draft') return;
+    if (!currentExam || currentExam.status !== 'draft' || !user?.id) return;
     setNotifyOnActivate(next);
     try {
-      await (supabase.rpc as any)('update_exam_settings', {
+      await supabase.rpc('update_exam_settings', {
         p_actor_id: user?.id, p_exam_id: currentExam.id, p_notify_on_activate: next,
       });
     } catch (err) {
@@ -541,7 +544,7 @@ export default function ExamEditorScreen() {
 
   // Close quiz
   const handleClose = () => {
-    if (!currentExam) return;
+    if (!currentExam || !user?.id) return;
 
     Alert.alert(
       t('exam_editor.close_quiz'),
@@ -552,7 +555,7 @@ export default function ExamEditorScreen() {
           text: t('common.close'),
           style: 'destructive',
           onPress: async () => {
-            await (supabase.rpc as any)('set_exam_status', {
+            await supabase.rpc('set_exam_status', {
               p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'closed',
             });
 
@@ -567,6 +570,7 @@ export default function ExamEditorScreen() {
 
   // Reset and start new
   const handleResetAndNew = () => {
+    if (!user?.id) return;
     Alert.alert(
       t('exam_editor.reset_new_quiz'),
       t('exam_editor.reset_new_msg'),
@@ -577,7 +581,7 @@ export default function ExamEditorScreen() {
           style: 'destructive',
           onPress: async () => {
             if (currentExam) {
-              await (supabase.rpc as any)('set_exam_status', {
+              await supabase.rpc('set_exam_status', {
                 p_actor_id: user?.id, p_exam_id: currentExam.id, p_status: 'closed',
               });
             }
@@ -651,6 +655,7 @@ export default function ExamEditorScreen() {
 
   // Delete question
   const handleDeleteQuestion = (question: ExamQuestion) => {
+    if (!user?.id) return;
     Alert.alert(
       t('exam_editor.delete_q_title'),
       t('exam_editor.delete_q_msg'),
@@ -660,7 +665,7 @@ export default function ExamEditorScreen() {
           text: t('common.delete'),
           style: 'destructive',
           onPress: async () => {
-            await (supabase.rpc as any)('delete_exam_question', {
+            await supabase.rpc('delete_exam_question', {
               p_actor_id: user?.id, p_question_id: question.id,
             });
             if (currentExam) await fetchQuestions(currentExam.id);
@@ -680,7 +685,7 @@ export default function ExamEditorScreen() {
       // If the current question has an image, regenerate another photo
       // question against the same pool (this yields a fresh item + prompt).
       // Otherwise fall back to the text-template batch path below.
-      let newQuestion = null as any;
+      let newQuestion: GeneratedQuestion | null = null;
       if (question.question_image_url) {
         const photo = await generatePhotoQuestion(
           organizationId ?? '',
@@ -878,7 +883,7 @@ export default function ExamEditorScreen() {
 
   // Reset a specific user's quiz result so they can retake
   const handleResetUserQuiz = (entry: CompletionEntry) => {
-    if (!user?.id || !currentExam) return;
+    if (!user?.id || !currentExam || !organizationId) return;
     const actorId = user.id;
 
     Alert.alert(
@@ -892,7 +897,7 @@ export default function ExamEditorScreen() {
           onPress: async () => {
             try {
               // Reset via gated RPC: deletes the result + dismissals and claws back awarded bucks
-              const { error: resetError } = await (supabase.rpc as any)('reset_user_exam_attempt', {
+              const { error: resetError } = await supabase.rpc('reset_user_exam_attempt', {
                 p_exam_id: currentExam.id,
                 p_user_id: entry.user_id,
                 p_organization_id: organizationId,

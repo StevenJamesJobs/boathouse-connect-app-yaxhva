@@ -212,12 +212,12 @@ export default function GameHubScreen() {
         if (!user?.id) { setLoadingLeaders(false); return; }
         setLoadingLeaders(true);
         try {
-          const { data, error } = await supabase.rpc('get_master_leaderboard_overall_actor' as any, {
+          const { data, error } = await supabase.rpc('get_master_leaderboard_overall_actor', {
             p_limit: 3,
             p_actor_id: user.id,
           });
           if (!error && data) {
-            setTopLeaders(data as LeaderboardEntry[]);
+            setTopLeaders(data);
           }
         } catch (err) {
           console.error('Error fetching top leaders:', err);

@@ -14,6 +14,7 @@ export interface ExamQuestion {
   bucks_value: number | null;
   category_label: string | null;
   source_type: 'auto' | 'custom' | 'bonus';
+  question_image_url?: string | null;
   // Spanish translations
   question_text_es?: string | null;
   option_a_es?: string | null;
