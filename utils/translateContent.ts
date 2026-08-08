@@ -149,6 +149,15 @@ const TRANSLATION_RPC_MAP: Record<string, { rpc: TranslationRpcName; paramMap: R
   },
 };
 
+export interface SaveTranslationsOptions {
+  /**
+   * Field names (paramMap keys, e.g. 'title_es') whose BLANK value means the
+   * manager deliberately CLEARED the translation — sent as '' so the RPC's
+   * COALESCE overwrites the stored text. Every other blank stays null.
+   */
+  clearBlank?: string[];
+}
+
 /**
  * Saves Spanish translation fields to a Supabase table via RPC.
  * B4 batch 2: routed to the actor-gated update_*_translations_actor family —
@@ -160,12 +169,14 @@ const TRANSLATION_RPC_MAP: Record<string, { rpc: TranslationRpcName; paramMap: R
  * @param id - The record ID to update
  * @param translations - Object with _es field names and values (e.g., { title_es: '...', content_es: '...' })
  * @param actorId - The signed-in manager/owner's user id (useAuth().user.id)
+ * @param opts - Per-field overrides; see SaveTranslationsOptions.clearBlank
  */
 export async function saveTranslations(
   table: string,
   id: string,
   translations: Record<string, string>,
-  actorId: string | null | undefined
+  actorId: string | null | undefined,
+  opts?: SaveTranslationsOptions
 ): Promise<boolean> {
   try {
     const rpcConfig = TRANSLATION_RPC_MAP[table];
@@ -183,9 +194,18 @@ export async function saveTranslations(
       p_actor_id: actorId,
       p_id: id,
     };
+    // ⚠️ TRAP: this loop walks the table's FULL paramMap, so EVERY _es column
+    // is sent on every call — including ones the caller never touched. Blank
+    // therefore has to default to null ("leave alone", since the RPCs are
+    // `COALESCE(p_x, x)`): menu-editor sends `location_es` as
+    // `resolved.location?.es ?? ''` and non-wine items have no location field
+    // at all, so a global blank→'' would wipe every non-wine location_es.
+    // A caller that means "clear it" opts that one field in via clearBlank.
+    const clearBlank = new Set(opts?.clearBlank ?? []);
     for (const [fieldName, paramName] of Object.entries(rpcConfig.paramMap)) {
       const value = translations[fieldName];
-      rpcParams[paramName] = value && value.trim() ? value : null;
+      const blank = !value || !value.trim();
+      rpcParams[paramName] = blank ? (clearBlank.has(fieldName) ? '' : null) : value;
     }
 
     const { error } = await supabase.rpc(rpcConfig.rpc, rpcParams);

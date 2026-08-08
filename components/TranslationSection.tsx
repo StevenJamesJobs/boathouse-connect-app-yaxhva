@@ -13,7 +13,10 @@ import {
   View,
 } from 'react-native';
 import { useTranslation } from 'react-i18next';
+import GlassCard from '@/components/GlassCard';
 import { IconSymbol } from '@/components/IconSymbol';
+import { fonts } from '@/constants/fonts';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { translateTextsDetailed } from '@/utils/translateContent';
 
 /**
@@ -29,6 +32,10 @@ import { translateTextsDetailed } from '@/utils/translateContent';
  *    once (Keep current / Update) before touching a pre-existing translation
  *    that might be hand-tuned, and never replaces a pencil-edit made this
  *    session;
+ *  - emptying a field that still has text on the other side asks once (Clear
+ *    both / Keep the other) — without that, the blank side was simply skipped
+ *    and the next open machine-translated the survivor straight back into it,
+ *    so a clear could never stick;
  *  - when the author side is empty but the other side has content (item
  *    authored in the other language), the author side auto-fills on open so
  *    the form is never blank — persisted only if the manager saves.
@@ -44,6 +51,15 @@ export interface BilingualFieldSpec {
   multiline?: boolean;
   /** Shown in the preview/pencil modal but never machine-translated (e.g. menu location). */
   noMachine?: boolean;
+  /**
+   * OPTIONAL raw stored column values, straight off the row — nullable, NOT
+   * collapsed to ''. They are the only way to tell "never authored" (NULL)
+   * from "deliberately cleared" ('') apart, which is what makes a clear stay
+   * true across sessions (see `wasCleared`). Omit them and behavior is exactly
+   * as shipped: both read as "never authored".
+   */
+  enStored?: string | null;
+  esStored?: string | null;
 }
 
 export interface ResolvedPair {
@@ -62,14 +78,20 @@ interface UseTranslationSectionOpts {
 export interface TranslationSectionApi {
   element: React.ReactElement;
   /**
-   * Runs the staleness rules (fill / silent refresh / one-tap ask), performs
-   * any needed translation in ONE edge-fn call, pushes results into the host
-   * state, and returns the final {en, es} value per field key for persisting.
+   * Runs the staleness rules (fill / silent refresh / one-tap ask / clear),
+   * performs any needed translation in ONE edge-fn call, pushes results into
+   * the host state, and returns the final {en, es} value per field key for
+   * persisting.
    * Returns NULL when the save must abort: a fill toward English failed
    * (translate service down), the modal session changed mid-resolve (closed
    * or reopened — prevents cross-item and blank writes), or a second Save
    * re-entered while one was in flight (double-tap). Callers abort on null;
    * other failures degrade gracefully (ES display falls back to EN).
+   *
+   * A pair may legitimately come back with a side set to '' (a confirmed
+   * clear). Do NOT re-collapse it to null on the way out — pass it to
+   * saveTranslations with that field named in `opts.clearBlank`, or the RPC's
+   * COALESCE keeps the old text and the clear is lost.
    */
   resolveOnSave: () => Promise<Record<string, ResolvedPair> | null>;
 }
@@ -77,6 +99,7 @@ export interface TranslationSectionApi {
 export function useTranslationSection(opts: UseTranslationSectionOpts): TranslationSectionApi {
   const { fields, sessionKey, active } = opts;
   const { t, i18n } = useTranslation();
+  const colors = useThemeColors();
   const isSpanish = i18n.language === 'es';
 
   const [translating, setTranslating] = useState(false);
@@ -137,6 +160,29 @@ export function useTranslationSection(opts: UseTranslationSectionOpts): Translat
   const authorLang = isSpanish ? 'es' : 'en';
   const otherLang = isSpanish ? 'en' : 'es';
 
+  /**
+   * Did the manager deliberately empty THIS side in an earlier session?
+   * '' means yes (the save wrote an empty string over the column), NULL means
+   * the side was simply never authored. A cleared side is off-limits to every
+   * machine write — the auto-fill on open and the fill bucket on save — or the
+   * translator immediately puts the text back and the clear undoes itself.
+   * Callers that don't pass the raw stored value get the shipped behavior.
+   */
+  const wasCleared = (f: BilingualFieldSpec, lang: 'en' | 'es') => {
+    const stored = lang === 'es' ? f.esStored : f.enStored;
+    return typeof stored === 'string' && !stored.trim();
+  };
+
+  /**
+   * Whether a persisted clear on the OTHER side still stands. It does only
+   * while the author side is untouched: the moment the manager types new
+   * content the old intent is stale, and honoring it forever would strand the
+   * other language — no machine write would ever reach it again, while the
+   * preview kept insisting there was nothing to translate over a full field.
+   */
+  const clearStands = (f: BilingualFieldSpec) =>
+    wasCleared(f, otherLang) && authorOf(f) === (initialAuthorRef.current[f.key] ?? '');
+
   useEffect(() => {
     if (!active) {
       // Closing the modal invalidates the session: any continuation still in
@@ -165,8 +211,13 @@ export function useTranslationSection(opts: UseTranslationSectionOpts): Translat
     machineWroteRef.current = {};
     handEditedRef.current = new Set();
 
-    // Auto-fill the author side when the item was authored in the other language.
-    const needsFill = fs.filter((f) => !f.noMachine && !authorOf(f).trim() && otherOf(f).trim());
+    // Auto-fill the author side when the item was authored in the other
+    // language — unless the author side was deliberately cleared, in which case
+    // refilling it is exactly the bug this guard exists to stop.
+    const needsFill = fs.filter(
+      (f) =>
+        !f.noMachine && !authorOf(f).trim() && otherOf(f).trim() && !wasCleared(f, authorLang)
+    );
     if (needsFill.length === 0) return;
     setAutoFilling(true);
     let run: Promise<void> | null = null;
@@ -246,6 +297,29 @@ export function useTranslationSection(opts: UseTranslationSectionOpts): Translat
       );
     });
 
+  const confirmClear = (): Promise<boolean> =>
+    new Promise((resolve) => {
+      Alert.alert(
+        t('translation_section:clear_prompt_title'),
+        isSpanish
+          ? t('translation_section:clear_prompt_msg_en')
+          : t('translation_section:clear_prompt_msg_es'),
+        [
+          {
+            text: t('translation_section:clear_keep_btn'),
+            style: 'cancel',
+            onPress: () => resolve(false),
+          },
+          {
+            text: t('translation_section:clear_both_btn'),
+            style: 'destructive',
+            onPress: () => resolve(true),
+          },
+        ],
+        { cancelable: false }
+      );
+    });
+
   const resolveOnSave = async (): Promise<Record<string, ResolvedPair> | null> => {
     // Re-entry latch: a second Save during an in-flight resolve aborts.
     if (resolvingRef.current) return null;
@@ -267,19 +341,48 @@ export function useTranslationSection(opts: UseTranslationSectionOpts): Translat
       const fill: BilingualFieldSpec[] = [];
       const refresh: BilingualFieldSpec[] = [];
       const ask: BilingualFieldSpec[] = [];
+      const clear: BilingualFieldSpec[] = [];
 
       fs.forEach((f) => {
         if (f.noMachine) return;
         const author = authorOf(f);
         const other = otherOf(f);
-        if (!author.trim()) return;
+        const initial = initialAuthorRef.current[f.key] || '';
         const authorChanged = author !== initialAuthorRef.current[f.key];
         const handEdited = handEditedRef.current.has(f.key);
         const machineOwned =
           machineWroteRef.current[f.key] !== undefined && other === machineWroteRef.current[f.key];
+        if (!author.trim()) {
+          // Emptied in THIS session while the other side still has text: the
+          // clear only sticks if the other side goes with it, so ask once.
+          //
+          // OPT-IN ONLY (enStored/esStored present). A caller that does not
+          // pass them also does not pass saveTranslations' `clearBlank`, so its
+          // blank _es goes over as null and the RPC's COALESCE keeps the old
+          // text — the prompt would prove a lie, and worse: "Clear Both" blanks
+          // the OTHER side, which for those callers is the base column their
+          // own RPC assigns directly. The manager would confirm a clear and get
+          // the exact inverse — base column destroyed, translation surviving.
+          //
+          // Gated too on the field having HELD content: one that merely OPENED
+          // blank (auto-fill failed, or it joined mid-session) is not a clear.
+          // `machineWrote`/`handEdited` cover the type-it-then-delete-it case,
+          // where the baseline is blank but this session did author the other
+          // side — leaving that ungated would orphan the translation and let
+          // auto-fill refill from it, the very loop this exists to close.
+          const optedIn = f.enStored !== undefined || f.esStored !== undefined;
+          const heldContent =
+            initial.trim() ||
+            machineWroteRef.current[f.key] !== undefined ||
+            handEditedRef.current.has(f.key);
+          if (optedIn && heldContent && other.trim()) clear.push(f);
+          return;
+        }
         if (!other.trim()) {
           // A this-session pencil-clear is a deliberate hand edit — honor it.
-          if (!handEdited) fill.push(f);
+          // So is a clear an earlier session persisted as '' — but only while
+          // the author side still holds what it opened with (see clearStands).
+          if (!handEdited && !clearStands(f)) fill.push(f);
         } else if (authorChanged && !handEdited) {
           if (machineOwned) {
             refresh.push(f);
@@ -293,6 +396,14 @@ export function useTranslationSection(opts: UseTranslationSectionOpts): Translat
         const approved = await confirmRefresh();
         if (epoch !== sessionEpochRef.current) return null; // session changed — abort
         if (approved) refresh.push(...ask);
+      }
+
+      if (clear.length > 0) {
+        // ONE prompt for every emptied field — Steve's shape: confirm the same
+        // clear on the other language, or keep it as a one-language entry.
+        const clearBoth = await confirmClear();
+        if (epoch !== sessionEpochRef.current) return null; // session changed — abort
+        if (clearBoth) clear.forEach((f) => setOther(f, ''));
       }
 
       const toTranslate = [...fill, ...refresh];
@@ -326,8 +437,18 @@ export function useTranslationSection(opts: UseTranslationSectionOpts): Translat
       // Catch-all: never persist a blank English base column for a field the
       // author filled — covers a pencil-cleared EN side and a translator
       // returning empty for non-empty input (EN display has no fallback).
+      //
+      // A clear that STANDS is exempt. Without that exemption an English
+      // manager clearing a description and keeping the Spanish would lock the
+      // guide: every later save from a Spanish device sees a filled author side
+      // against a deliberately-empty English one, fails this check, and aborts
+      // — so the category could never be changed again. Once the author types
+      // something new, clearStands goes false, the fill bucket restores the
+      // English, and this guard is back in force.
       if (otherLang === 'en') {
-        const missingEn = fs.some((f) => !f.noMachine && authorOf(f).trim() && !otherOf(f).trim());
+        const missingEn = fs.some(
+          (f) => !f.noMachine && authorOf(f).trim() && !otherOf(f).trim() && !clearStands(f)
+        );
         if (missingEn) {
           Alert.alert(t('common:error'), t('translation_section:en_required'));
           return null;
@@ -378,36 +499,60 @@ export function useTranslationSection(opts: UseTranslationSectionOpts): Translat
     : t('translation_section:section_title_es');
   const busy = translating || autoFilling || resolving;
 
+  // Completeness reads the OTHER side of every machine-translatable field, so
+  // a manager can see at a glance whether the item ships bilingual — without
+  // expanding the section.
+  const machineFields = fields.filter((f) => !f.noMachine);
+  const doneCount = machineFields.filter((f) => otherOf(f).trim()).length;
+
   const element = (
     <View>
-      <View style={sectionStyles.container}>
+      <View
+        style={[
+          sectionStyles.container,
+          { backgroundColor: colors.primary + '12', borderColor: colors.primary + '42' },
+        ]}
+      >
         <TouchableOpacity
           style={sectionStyles.headerRow}
           onPress={() => setExpanded((prev) => !prev)}
           accessibilityLabel={sectionTitle}
         >
-          <Text style={sectionStyles.previewTitle}>{sectionTitle}</Text>
+          <Text style={[sectionStyles.previewTitle, { color: colors.primary }]} numberOfLines={1}>
+            {sectionTitle}
+          </Text>
           <View style={sectionStyles.headerRight}>
-            {busy && <ActivityIndicator size="small" color="#3498DB" />}
+            {busy && <ActivityIndicator size="small" color={colors.primary} />}
+            {machineFields.length > 0 && (
+              <Text style={[sectionStyles.completeness, { color: colors.textSecondary }]}>
+                {t('translation_section:completeness', {
+                  done: doneCount,
+                  total: machineFields.length,
+                })}
+              </Text>
+            )}
             <IconSymbol
               ios_icon_name={expanded ? 'chevron.up' : 'chevron.down'}
               android_material_icon_name={expanded ? 'expand-less' : 'expand-more'}
               size={20}
-              color="#2C6E9E"
+              color={colors.primary}
             />
           </View>
         </TouchableOpacity>
         {expanded && (
         <View style={sectionStyles.body}>
         <TouchableOpacity
-          style={sectionStyles.translateButton}
+          style={[
+            sectionStyles.translateButton,
+            { backgroundColor: colors.primary + '2E', borderColor: colors.primary + '6B' },
+          ]}
           onPress={handleTranslatePress}
           disabled={busy}
         >
           {busy ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : (
-            <Text style={sectionStyles.translateButtonText}>
+            <Text style={[sectionStyles.translateButtonText, { color: colors.primary }]}>
               {isSpanish
                 ? t('translation_section:translate_to_en')
                 : t('translation_section:translate_to_es')}
@@ -419,39 +564,50 @@ export function useTranslationSection(opts: UseTranslationSectionOpts): Translat
           <TouchableOpacity
             onPress={openPencil}
             disabled={busy}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            // 18pt glyph + 14 hitSlop = a 46pt target; hitSlop 8 left it at 34.
+            hitSlop={{ top: 14, bottom: 14, left: 14, right: 14 }}
             accessibilityLabel={t('translation_section:edit_translation')}
           >
             <IconSymbol
               ios_icon_name="pencil"
               android_material_icon_name="edit"
               size={18}
-              color={busy ? '#A8C6DD' : '#3498DB'}
+              color={busy ? colors.textSecondary + '66' : colors.textSecondary}
             />
           </TouchableOpacity>
         </View>
         {fields.map((f) => (
-          <View key={f.key} style={sectionStyles.previewField}>
+          <View
+            key={f.key}
+            style={[
+              sectionStyles.previewField,
+              { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+            ]}
+          >
             {fields.length > 1 && (
-              <Text style={sectionStyles.previewLabel}>{t(f.labelKey)}</Text>
+              <Text style={[sectionStyles.previewLabel, { color: colors.textSecondary }]}>
+                {t(f.labelKey)}
+              </Text>
             )}
             {f.esValue.trim() || f.enValue.trim() ? (
               otherOf(f).trim() ? (
                 <Text
-                  style={sectionStyles.previewText}
+                  style={[sectionStyles.previewText, { color: colors.text }]}
                   numberOfLines={f.multiline ? 3 : 1}
                 >
                   {otherOf(f)}
                 </Text>
               ) : (
-                <Text style={sectionStyles.previewEmpty}>
-                  {f.noMachine
+                <Text style={[sectionStyles.previewEmpty, { color: colors.textSecondary }]}>
+                  {/* A deliberately cleared side will NOT be refilled on save,
+                      so never promise a translation that can't come. */}
+                  {f.noMachine || clearStands(f)
                     ? t('translation_section:empty_preview')
                     : t('translation_section:will_translate_on_save')}
                 </Text>
               )
             ) : (
-              <Text style={sectionStyles.previewEmpty}>
+              <Text style={[sectionStyles.previewEmpty, { color: colors.textSecondary }]}>
                 {t('translation_section:empty_preview')}
               </Text>
             )}
@@ -471,12 +627,14 @@ export function useTranslationSection(opts: UseTranslationSectionOpts): Translat
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={sectionStyles.pencilOverlay}
         >
-          <View style={sectionStyles.pencilCard}>
+          <GlassCard variant="glass" radius={20} intensity={32} style={sectionStyles.pencilCard}>
             <View style={sectionStyles.pencilHeader}>
-              <Text style={sectionStyles.pencilTitle}>
+              <Text style={[sectionStyles.pencilTitle, { color: colors.text }]} numberOfLines={1}>
                 {t('translation_section:edit_translation')}
               </Text>
-              <Text style={sectionStyles.pencilLang}>{otherLangName}</Text>
+              <Text style={[sectionStyles.pencilLang, { color: colors.primary }]}>
+                {otherLangName}
+              </Text>
             </View>
             <ScrollView
               keyboardShouldPersistTaps="handled"
@@ -484,12 +642,17 @@ export function useTranslationSection(opts: UseTranslationSectionOpts): Translat
             >
               {fields.map((f) => (
                 <View key={f.key} style={sectionStyles.pencilField}>
-                  <Text style={sectionStyles.previewLabel}>{t(f.labelKey)}</Text>
+                  <Text style={[sectionStyles.previewLabel, { color: colors.textSecondary }]}>
+                    {t(f.labelKey)}
+                  </Text>
                   <TextInput
-                    style={[sectionStyles.pencilInput, f.multiline && sectionStyles.pencilInputMultiline]}
+                    style={[
+                      sectionStyles.pencilInput,
+                      { backgroundColor: colors.glass, borderColor: colors.glassBorder, color: colors.text },
+                      f.multiline && sectionStyles.pencilInputMultiline,
+                    ]}
                     value={drafts[f.key] ?? ''}
                     onChangeText={(text) => setDrafts((prev) => ({ ...prev, [f.key]: text }))}
-                    placeholderTextColor="#999999"
                     multiline={!!f.multiline}
                     numberOfLines={f.multiline ? 4 : 1}
                   />
@@ -498,19 +661,29 @@ export function useTranslationSection(opts: UseTranslationSectionOpts): Translat
             </ScrollView>
             <View style={sectionStyles.pencilButtons}>
               <TouchableOpacity
-                style={[sectionStyles.pencilButton, sectionStyles.pencilCancel]}
+                style={[
+                  sectionStyles.pencilButton,
+                  { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+                ]}
                 onPress={() => setPencilOpen(false)}
               >
-                <Text style={sectionStyles.pencilCancelText}>{t('common:cancel')}</Text>
+                <Text style={[sectionStyles.pencilButtonText, { color: colors.text }]}>
+                  {t('common:cancel')}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[sectionStyles.pencilButton, sectionStyles.pencilSave]}
+                style={[
+                  sectionStyles.pencilButton,
+                  { backgroundColor: colors.primary, borderColor: colors.primary },
+                ]}
                 onPress={savePencil}
               >
-                <Text style={sectionStyles.pencilSaveText}>{t('common:save')}</Text>
+                <Text style={[sectionStyles.pencilButtonText, { color: colors.fireText }]}>
+                  {t('common:save')}
+                </Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </GlassCard>
         </KeyboardAvoidingView>
       </Modal>
     </View>
@@ -520,28 +693,16 @@ export function useTranslationSection(opts: UseTranslationSectionOpts): Translat
 }
 
 const sectionStyles = StyleSheet.create({
-  translateButton: {
-    backgroundColor: '#3498DB',
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  translateButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
-  },
   container: {
-    backgroundColor: '#F0F8FF',
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 12,
-    borderWidth: 1,
-    borderColor: '#D0E8FF',
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 10,
   },
   headerRight: {
     flexDirection: 'row',
@@ -551,44 +712,74 @@ const sectionStyles = StyleSheet.create({
   body: {
     marginTop: 10,
   },
+  // minHeight, not a fixed height: swapping the label for the spinner can't
+  // jitter the row, and a long ES label wraps instead of clipping.
+  translateButton: {
+    minHeight: 38,
+    borderRadius: 11,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+  },
+  translateButtonText: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 13,
+  },
   pencilRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
     marginTop: 10,
     marginBottom: 2,
   },
+  // flexShrink:1 (RN defaults it to 0) + numberOfLines: the title now shares a
+  // space-between row with the completeness badge, so a long ES title has to
+  // ellipsize rather than push the chevron off the row.
   previewTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#2C6E9E',
+    flexShrink: 1,
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+  },
+  completeness: {
+    fontFamily: fonts.mono.medium,
+    fontSize: 9.5,
   },
   previewField: {
     marginTop: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 11,
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
   previewLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#5A7A94',
-    marginBottom: 2,
+    fontFamily: fonts.mono.medium,
+    fontSize: 9,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 3,
   },
   previewText: {
-    fontSize: 14,
-    color: '#1A1A1A',
+    fontFamily: fonts.body.regular,
+    fontSize: 13,
+    lineHeight: 18,
   },
   previewEmpty: {
+    fontFamily: fonts.body.regular,
     fontSize: 13,
-    color: '#8AA4B8',
     fontStyle: 'italic',
   },
   pencilOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    // Same scrim as the shared GlassSheet, so the pencil dims its host modal
+    // exactly like every other sheet in the app.
+    backgroundColor: 'rgba(6,10,18,0.55)',
     justifyContent: 'center',
     padding: 24,
   },
   pencilCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
     padding: 16,
     maxHeight: '80%',
   },
@@ -596,17 +787,20 @@ const sectionStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
     marginBottom: 12,
   },
   pencilTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1A1A1A',
+    flexShrink: 1,
+    fontFamily: fonts.display.bold,
+    fontSize: 17,
+    letterSpacing: -0.2,
   },
   pencilLang: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#3498DB',
+    fontFamily: fonts.mono.semibold,
+    fontSize: 9,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
   },
   pencilScroll: {
     flexGrow: 0,
@@ -615,14 +809,13 @@ const sectionStyles = StyleSheet.create({
     marginBottom: 12,
   },
   pencilInput: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    color: '#1A1A1A',
+    minHeight: 46,
+    borderRadius: 13,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontFamily: fonts.body.regular,
+    fontSize: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
   pencilInputMultiline: {
     height: 100,
@@ -635,24 +828,16 @@ const sectionStyles = StyleSheet.create({
     gap: 10,
   },
   pencilButton: {
-    borderRadius: 10,
-    paddingVertical: 10,
+    minHeight: 44,
+    borderRadius: 12,
+    paddingVertical: 11,
     paddingHorizontal: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
-  pencilCancel: {
-    backgroundColor: '#F0F0F0',
-  },
-  pencilCancelText: {
-    color: '#555555',
+  pencilButtonText: {
+    fontFamily: fonts.body.semibold,
     fontSize: 14,
-    fontWeight: '600',
-  },
-  pencilSave: {
-    backgroundColor: '#3498DB',
-  },
-  pencilSaveText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
   },
 });

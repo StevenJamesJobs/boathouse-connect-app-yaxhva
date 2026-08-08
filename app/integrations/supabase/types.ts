@@ -918,6 +918,50 @@ export type Database = {
           },
         ]
       }
+      guide_categories: {
+        Row: {
+          created_at: string
+          display_order: number
+          id: string
+          is_hidden: boolean
+          name: string
+          name_es: string | null
+          organization_id: string
+          system_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_hidden?: boolean
+          name: string
+          name_es?: string | null
+          organization_id: string
+          system_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_hidden?: boolean
+          name?: string
+          name_es?: string | null
+          organization_id?: string
+          system_key?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guide_categories_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guides_and_training: {
         Row: {
           category: string
@@ -3254,6 +3298,45 @@ export type Database = {
       }
       set_my_preferred_language: {
         Args: { p_language: string; p_user_id: string }
+        Returns: undefined
+      }
+      get_guide_categories: {
+        Args: { p_actor_id: string; p_include_hidden?: boolean }
+        Returns: {
+          display_order: number
+          id: string
+          is_hidden: boolean
+          name: string
+          name_es: string | null
+          system_key: string | null
+        }[]
+      }
+      manage_guide_category_create: {
+        Args: { p_actor_id: string; p_name: string }
+        Returns: string
+      }
+      manage_guide_category_delete: {
+        Args: { p_actor_id: string; p_id: string }
+        Returns: undefined
+      }
+      manage_guide_category_rename: {
+        Args: { p_actor_id: string; p_id: string; p_new_name: string }
+        Returns: undefined
+      }
+      manage_guide_category_reorder: {
+        Args: { p_actor_id: string; p_ordered_ids: string[] }
+        Returns: undefined
+      }
+      manage_guide_category_set_hidden: {
+        Args: { p_actor_id: string; p_id: string; p_is_hidden: boolean }
+        Returns: undefined
+      }
+      seed_org_guide_categories: {
+        Args: { p_org_id: string }
+        Returns: undefined
+      }
+      update_guide_category_translations_actor: {
+        Args: { p_actor_id: string; p_id: string; p_name_es: string }
         Returns: undefined
       }
       get_guides: {
