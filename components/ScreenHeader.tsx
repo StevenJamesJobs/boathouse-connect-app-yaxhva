@@ -14,6 +14,19 @@ interface ScreenHeaderProps {
   onBack?: () => void;
   /** Optional trailing action, replacing the width-38 spacer. */
   right?: React.ReactNode;
+  /**
+   * Let the trailing slot size to its content instead of the fixed 38pt icon
+   * box. Needed for a LABELLED action: `HeaderNavButton` measures ~102pt
+   * ("To Editor" = 10+15+4+text+10), so in the 38pt box its label collapses and
+   * — worse on Android, which does not dispatch touches to a child painted
+   * outside its parent's bounds — most of the pill stops being tappable.
+   *
+   * The title then truncates to one line rather than wrapping, which is exactly
+   * what the pre-glass headers on these screens did (both carried the same pill
+   * beside a `numberOfLines={1}` title). Off by default, so every icon-slot
+   * caller is untouched.
+   */
+  rightWide?: boolean;
 }
 
 /**
@@ -35,7 +48,7 @@ interface ScreenHeaderProps {
  * pinned to the old header height need that offset recomputed against this one
  * (see app/schedule-review.tsx styles.savingOverlay).
  */
-export default function ScreenHeader({ title, eyebrow, onBack, right }: ScreenHeaderProps) {
+export default function ScreenHeader({ title, eyebrow, onBack, right, rightWide }: ScreenHeaderProps) {
   const router = useRouter();
   const colors = useThemeColors();
   const handleBack = onBack ?? (() => router.back());
@@ -60,8 +73,15 @@ export default function ScreenHeader({ title, eyebrow, onBack, right }: ScreenHe
 
       <View style={styles.titleWrap}>
         {/* No numberOfLines: a long ES title wraps (header grows) rather than
-            being truncated — matches the old header, which also wrapped. */}
-        <Text style={[styles.title, { color: colors.text }]}>{title}</Text>
+            being truncated — matches the old header, which also wrapped. With a
+            wide labelled action there is not enough room left to wrap into, so
+            that variant truncates instead. */}
+        <Text
+          style={[styles.title, { color: colors.text }]}
+          numberOfLines={rightWide ? 1 : undefined}
+        >
+          {title}
+        </Text>
         {!!eyebrow && (
           <Text style={[styles.eyebrow, { color: colors.tint }]} numberOfLines={1}>
             {eyebrow}
@@ -69,8 +89,10 @@ export default function ScreenHeader({ title, eyebrow, onBack, right }: ScreenHe
         )}
       </View>
 
-      {/* Always a width-38 box, so a trailing action cannot pull the title off-centre. */}
-      <View style={styles.spacer}>{right}</View>
+      {/* A width-38 box, so an icon action cannot pull the title off-centre.
+          `rightWide` relaxes it to a minimum so a labelled pill can size to its
+          own content (the title loses that width instead). */}
+      <View style={[styles.spacer, rightWide && styles.spacerWide]}>{right}</View>
     </View>
   );
 }
@@ -113,4 +135,7 @@ const styles = StyleSheet.create({
   // alignItems keeps a trailing action optically centred in the slot; without it
   // the child stretches to the full 38pt and the glyph sits flush-left.
   spacer: { width: 38, alignItems: 'center', justifyContent: 'center' },
+  // flexShrink:0 (RN's default, stated for the reader) keeps the pill at its
+  // natural width; `width: 'auto'` is required to override the 38 above.
+  spacerWide: { width: 'auto', minWidth: 38, flexShrink: 0 },
 });

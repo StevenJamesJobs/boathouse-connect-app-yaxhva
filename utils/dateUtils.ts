@@ -48,6 +48,26 @@ export function formatMonthYear(date: Date, locale: string): string {
   });
 }
 
+/**
+ * Formats a date as a short "Mar 4, 2026" / "4 mar 2026" (locale-aware).
+ *
+ * Takes the app's `'en' | 'es'` language code — NOT a BCP-47 tag. Passing
+ * 'en-US'/'es-ES' misses LOCALE_MAP and silently falls back to English.
+ *
+ * Accepts the raw DB timestamp string so callers can drop their own local
+ * `formatDate` helpers (which hardcoded 'en-US' and rendered English months
+ * to Spanish users).
+ */
+export function formatShortDate(date: Date | string, locale: string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(LOCALE_MAP[locale] || 'en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 /** Returns a short day name like "Sun", "Mon" (locale-aware). */
 export function getShortDayName(date: Date, locale: string): string {
   return date.toLocaleDateString(LOCALE_MAP[locale] || 'en-US', {
