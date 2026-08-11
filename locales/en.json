@@ -398,7 +398,70 @@
     "owner_setup_hint": "Upload your first menu, or create and edit it by hand.",
     "setup_menu_now": "Set up Menu Now",
     "search_menu": "Search Menu",
-    "search_menu_ph": "Search food, beverages, weekly specials"
+    "search_menu_ph": "Search food, beverages, weekly specials",
+    "redeem_cta": "Redeem · ${{amount}}",
+    "gl": "Gl",
+    "btl": "Btl",
+    "mbr": "Mbr"
+  },
+  "menu_sheet": {
+    "title": "Menu",
+    "subtitle": "Everything behind the menu, in one place.",
+    "edit_menu": "Edit Menu",
+    "edit_menu_sub": "Add, edit, reorder and delete items",
+    "edit_categories": "Edit Categories",
+    "edit_categories_sub": "Rename, hide, reorder, set colours",
+    "upload_menu": "Upload Menu",
+    "upload_menu_sub": "Read a PDF or photo into items",
+    "menu_configuration": "Menu Configuration",
+    "menu_configuration_sub": "Menu names, icons, one menu or two",
+    "ask_owner": "Ask your owner to enable this",
+    "granted_note": "You have been granted permission to access these features.",
+    "granted_credits": "Uploads spend monthly subscription credits, so check with your General Manager beforehand."
+  },
+  "menu_upload_sheet": {
+    "title": "Upload Menu",
+    "subtitle": "Pick a source. Nothing is saved until you approve the parsed items.",
+    "choose_file": "Choose a file",
+    "choose_file_sub": "PDF or images",
+    "choose_library": "Choose from library",
+    "choose_library_sub": "Pick an existing photo",
+    "take_photo": "Take a photo",
+    "take_photo_sub": "Shoot the printed menu now",
+    "view_history": "View History",
+    "view_history_sub": "Past uploads and the full upload page",
+    "camera_denied_title": "Camera Access Needed",
+    "camera_denied_msg": "Allow camera access in Settings to photograph your menu."
+  },
+  "menu_detail": {
+    "dietary": "Dietary",
+    "pricing": "Pricing",
+    "by_the_glass": "By the glass",
+    "bottle": "Bottle",
+    "member_bottle": "Member bottle",
+    "tasting_notes": "Tasting notes",
+    "selling_points": "Selling points",
+    "allergen_note": "Always double check with your management and kitchen about allergens & prep."
+  },
+  "dietary": {
+    "gf_abbrev": "GF",
+    "gf": "Gluten Free",
+    "gfa_abbrev": "GFA",
+    "gfa": "Gluten Free Available",
+    "v_abbrev": "V",
+    "v": "Vegetarian",
+    "va_abbrev": "VA",
+    "va": "Vegetarian Available",
+    "df_abbrev": "DF",
+    "df": "Dairy Free",
+    "ef_abbrev": "EF",
+    "ef": "Egg Free",
+    "nf_abbrev": "NF",
+    "nf": "Nut Free",
+    "sf_abbrev": "SF",
+    "sf": "Sugar Free",
+    "nos_abbrev": "NO-S",
+    "nos": "Salt Free"
   },
   "employee_menus": {
     "title": "Menus",
@@ -2551,7 +2614,10 @@
     "insufficient_msg": "This needs {{cost}} credits but you have {{have}} left this month. Credits reset next month.",
     "upload_hint": "Reading a menu takes about 40 seconds to 3 minutes depending on the file size. Please don't close the app while it scans your menu file or image.",
     "onboarding_done": "Your first menu has been uploaded and created!",
-    "return_to_onboarding": "Return to Onboarding"
+    "return_to_onboarding": "Return to Onboarding",
+    "permission_needed_title": "Permission Needed",
+    "permission_needed_msg": "Menu uploads need the owner's permission. Ask your owner to enable AI Menu Uploads for managers.",
+    "poll_failed": "Could not check the upload status. Open Upload History to see the result."
   },
   "redeem_settings": {
     "add": "Add Option",
@@ -2787,7 +2853,9 @@
     "primary_owner_role_locked": "The primary owner's role cannot be changed",
     "balance_insufficient_at_approval": "Employee balance insufficient at approval time",
     "redemption_not_pending": "This request was already decided",
-    "insufficient_balance": "Insufficient balance. Available: {{available}}, Required: {{required}}"
+    "insufficient_balance": "Insufficient balance. Available: {{available}}, Required: {{required}}",
+    "menu_upload_forbidden": "You do not have permission to upload menus.",
+    "menu_upload_out_of_credits": "You're out of menu-upload credits this month. They reset next month, or upgrade for more."
   },
   "subscription": {
     "owner_only": "Ask your owner to upgrade the plan",

@@ -16,7 +16,8 @@ export default function EmployeeMenusScreen() {
   }, [router]);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    // Transparent: the layout-level AmbientGlow must read through (s68 glass wave).
+    <View style={styles.container}>
       <MenuDisplay colors={colors} onSwipeToWelcome={handleSwipeToWelcome} />
     </View>
   );

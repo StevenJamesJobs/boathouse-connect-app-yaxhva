@@ -43,7 +43,7 @@ export default function ManagerLayout() {
   // tab + Manage = the Command Center). Excludes the still-solid tabs; the
   // transparent spacer + transparent scenes let it read continuously.
   const lastSeg = segments[segments.length - 1] as string;
-  const showAmbient = !['menus', 'tools', 'profile'].includes(lastSeg);
+  const showAmbient = !['tools', 'profile'].includes(lastSeg);
 
   // Role guard: the manager shell (incl. Manage) is for managers/owners only.
   // An employee who reaches a /(portal)/manager URL — deep link, stale route,

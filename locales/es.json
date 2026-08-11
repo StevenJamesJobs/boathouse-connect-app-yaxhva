@@ -398,7 +398,70 @@
     "owner_setup_hint": "Sube tu primer menú, o créalo y edítalo a mano.",
     "setup_menu_now": "Configurar menú ahora",
     "search_menu": "Buscar en el Menú",
-    "search_menu_ph": "Buscar comida, bebidas, especiales de la semana"
+    "search_menu_ph": "Buscar comida, bebidas, especiales de la semana",
+    "redeem_cta": "Canjear · ${{amount}}",
+    "gl": "Copa",
+    "btl": "Bot",
+    "mbr": "Socio"
+  },
+  "menu_sheet": {
+    "title": "Menú",
+    "subtitle": "Todo lo del menú, en un solo lugar.",
+    "edit_menu": "Editar Menú",
+    "edit_menu_sub": "Agrega, edita, reordena y elimina platillos",
+    "edit_categories": "Editar Categorías",
+    "edit_categories_sub": "Renombra, oculta, reordena y elige colores",
+    "upload_menu": "Subir Menú",
+    "upload_menu_sub": "Convierte un PDF o foto en platillos",
+    "menu_configuration": "Configuración del Menú",
+    "menu_configuration_sub": "Nombres, íconos, uno o dos menús",
+    "ask_owner": "Pídele al dueño que lo habilite",
+    "granted_note": "Se te ha otorgado permiso para acceder a estas funciones.",
+    "granted_credits": "Las subidas gastan créditos mensuales de la suscripción, así que consulta antes con tu Gerente General."
+  },
+  "menu_upload_sheet": {
+    "title": "Subir Menú",
+    "subtitle": "Elige una fuente. No se guarda nada hasta que apruebes los platillos leídos.",
+    "choose_file": "Elegir un archivo",
+    "choose_file_sub": "PDF o imágenes",
+    "choose_library": "Elegir de la galería",
+    "choose_library_sub": "Elige una foto existente",
+    "take_photo": "Tomar una foto",
+    "take_photo_sub": "Fotografía el menú impreso ahora",
+    "view_history": "Ver Historial",
+    "view_history_sub": "Subidas anteriores y la página completa",
+    "camera_denied_title": "Se Necesita la Cámara",
+    "camera_denied_msg": "Permite el acceso a la cámara en Ajustes para fotografiar tu menú."
+  },
+  "menu_detail": {
+    "dietary": "Dietas",
+    "pricing": "Precios",
+    "by_the_glass": "Por copa",
+    "bottle": "Botella",
+    "member_bottle": "Botella de socio",
+    "tasting_notes": "Notas de cata",
+    "selling_points": "Puntos de venta",
+    "allergen_note": "Confirma siempre con tu gerencia y cocina los alérgenos y la preparación."
+  },
+  "dietary": {
+    "gf_abbrev": "SG",
+    "gf": "Sin Gluten",
+    "gfa_abbrev": "SG-D",
+    "gfa": "Sin Gluten Disponible",
+    "v_abbrev": "V",
+    "v": "Vegetariano",
+    "va_abbrev": "V-D",
+    "va": "Vegetariano Disponible",
+    "df_abbrev": "SL",
+    "df": "Sin Lácteos",
+    "ef_abbrev": "SH",
+    "ef": "Sin Huevo",
+    "nf_abbrev": "SN",
+    "nf": "Sin Nueces",
+    "sf_abbrev": "SA",
+    "sf": "Sin Azúcar",
+    "nos_abbrev": "SIN-S",
+    "nos": "Sin Sal"
   },
   "employee_menus": {
     "title": "Menús",
@@ -2551,7 +2614,10 @@
     "insufficient_msg": "Esto necesita {{cost}} créditos pero te quedan {{have}} este mes. Los créditos se reinician el próximo mes.",
     "upload_hint": "Leer un menú tarda entre 40 segundos y 3 minutos según el tamaño del archivo. Por favor, no cierres la aplicación mientras escanea tu archivo o imagen del menú.",
     "onboarding_done": "¡Tu primer menú ha sido subido y creado!",
-    "return_to_onboarding": "Volver a la Configuración Inicial"
+    "return_to_onboarding": "Volver a la Configuración Inicial",
+    "permission_needed_title": "Se Necesita Permiso",
+    "permission_needed_msg": "Subir menús requiere permiso del dueño. Pídele que habilite las Subidas de Menú con IA para gerentes.",
+    "poll_failed": "No se pudo verificar el estado. Abre el Historial de Subidas para ver el resultado."
   },
   "redeem_settings": {
     "title": "Configuración de Canje",
@@ -2787,7 +2853,9 @@
     "primary_owner_role_locked": "El rol del propietario principal no se puede cambiar",
     "balance_insufficient_at_approval": "El saldo del empleado es insuficiente al momento de aprobar",
     "redemption_not_pending": "Esta solicitud ya fue decidida",
-    "insufficient_balance": "Saldo insuficiente. Disponible: {{available}}, Requerido: {{required}}"
+    "insufficient_balance": "Saldo insuficiente. Disponible: {{available}}, Requerido: {{required}}",
+    "menu_upload_forbidden": "No tienes permiso para subir menús.",
+    "menu_upload_out_of_credits": "Se agotaron tus créditos de subida de menú este mes. Se reinician el próximo mes, o mejora tu plan para más."
   },
   "subscription": {
     "owner_only": "Pide al propietario que mejore el plan",

@@ -18,6 +18,7 @@ import {
   NativeScrollEvent,
   LayoutChangeEvent,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StorageExpoImage } from '@/components/StorageImage';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -66,6 +67,16 @@ interface MenuItem {
   is_gluten_free_available: boolean;
   is_vegetarian: boolean;
   is_vegetarian_available: boolean;
+  is_dairy_free: boolean;
+  is_egg_free: boolean;
+  is_nut_free: boolean;
+  is_sugar_free: boolean;
+  is_salt_free: boolean;
+  // Wine rows carry these; their presence is also the wine signal for the
+  // contain-on-white thumb treatment (no category tree loads on Welcome).
+  glass_price?: string | null;
+  bottle_price?: string | null;
+  member_bottle_price?: string | null;
   thumbnail_url: string | null;
   thumbnail_shape: string;
   display_order: number;
@@ -818,84 +829,145 @@ export default function PortalHome({ role }: PortalHomeProps) {
     </TouchableOpacity>
   );
 
-  const renderSpecialCard = (item: MenuItem, index: number) => (
-    <TouchableOpacity
-      key={item.id}
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
-      onPress={() => openDetailModal({
-        title: getLocalizedField(item, 'name', language),
-        content: `${getLocalizedField(item, 'description', language) || item.description || ''}\n\nPrice: ${formatPrice(item.price)}${item.is_gluten_free ? '\n• Gluten Free' : ''}${item.is_gluten_free_available ? '\n• Gluten Free Available' : ''}${item.is_vegetarian ? '\n• Vegetarian' : ''}${item.is_vegetarian_available ? '\n• Vegetarian Available' : ''}`,
-        thumbnailUrl: item.thumbnail_url,
-        thumbnailShape: item.thumbnail_shape,
-      })}
-      activeOpacity={0.7}
-    >
-      {item.thumbnail_shape === 'banner' && item.thumbnail_url && (
-        <StorageExpoImage
-          source={getImageUrl(item.thumbnail_url, item.updated_at)!}
-          style={styles.bannerCardImage}
-          contentFit="cover"
-        />
-      )}
-      <View style={styles.cardRow}>
-        {item.thumbnail_shape !== 'banner' && item.thumbnail_url && (
+  // All nine dietary abbreviations for a specials row, localized. Literal t()
+  // calls so the i18n harvester sees every key (same rule as MenuDisplay).
+  const specialDietKeys = (item: MenuItem): string[] => {
+    const out: string[] = [];
+    if (item.is_gluten_free) out.push(t('dietary.gf_abbrev'));
+    if (item.is_gluten_free_available) out.push(t('dietary.gfa_abbrev'));
+    if (item.is_vegetarian) out.push(t('dietary.v_abbrev'));
+    if (item.is_vegetarian_available) out.push(t('dietary.va_abbrev'));
+    if (item.is_dairy_free) out.push(t('dietary.df_abbrev'));
+    if (item.is_egg_free) out.push(t('dietary.ef_abbrev'));
+    if (item.is_nut_free) out.push(t('dietary.nf_abbrev'));
+    if (item.is_sugar_free) out.push(t('dietary.sf_abbrev'));
+    if (item.is_salt_free) out.push(t('dietary.nos_abbrev'));
+    return out;
+  };
+
+  const renderSpecialCard = (item: MenuItem, index: number) => {
+    const openSpecial = () => openDetailModal({
+      title: getLocalizedField(item, 'name', language),
+      content: `${getLocalizedField(item, 'description', language) || item.description || ''}\n\nPrice: ${formatPrice(item.price)}${item.is_gluten_free ? '\n• Gluten Free' : ''}${item.is_gluten_free_available ? '\n• Gluten Free Available' : ''}${item.is_vegetarian ? '\n• Vegetarian' : ''}${item.is_vegetarian_available ? '\n• Vegetarian Available' : ''}`,
+      thumbnailUrl: item.thumbnail_url,
+      thumbnailShape: item.thumbnail_shape,
+    });
+
+    // Banner specials get the s68 menu-banner treatment — the photo IS the
+    // card, bottom scrim, MENU · CATEGORY eyebrow pill, tint price chip
+    // (Steve's smoke: the old top-image-in-a-card style stuck out next to the
+    // rebuilt menu). Square specials keep the row card below.
+    if (item.thumbnail_shape === 'banner' && item.thumbnail_url) {
+      const eyebrow = [
+        organization.menu_count === 2 ? menuBadgeForSeason(item.season, organization, t).label : null,
+        labelForCategoryName(item.category, t),
+      ].filter(Boolean).join(' · ');
+      return (
+        <TouchableOpacity
+          key={item.id}
+          style={[styles.specialBannerCard, { backgroundColor: colors.thumbPlaceholder }]}
+          onPress={openSpecial}
+          activeOpacity={0.85}
+        >
           <StorageExpoImage
             source={getImageUrl(item.thumbnail_url, item.updated_at)!}
-            style={styles.cardImage}
+            style={StyleSheet.absoluteFill}
             contentFit="cover"
           />
-        )}
-        <View style={styles.cardContent}>
-          <View style={styles.cardTitleRow}>
-            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
-              {getLocalizedField(item, 'name', language)}
-            </Text>
-            <Text style={[styles.priceText, { color: colors.primary }]}>
-              {formatPrice(item.price)}
+          <LinearGradient
+            colors={['rgba(14,11,9,0.94)', 'rgba(14,11,9,0.05)']}
+            locations={[0.08, 0.64]}
+            start={{ x: 0, y: 1 }}
+            end={{ x: 0, y: 0 }}
+            style={StyleSheet.absoluteFill}
+            pointerEvents="none"
+          />
+          <View style={styles.specialBannerEyebrow}>
+            <Text style={styles.specialBannerEyebrowText} numberOfLines={1}>
+              {eyebrow}
             </Text>
           </View>
-          <View style={styles.specialTagsRow}>
+          <View style={[styles.specialBannerPriceChip, { backgroundColor: colors.tint }]}>
+            <Text style={styles.specialBannerPriceText}>{formatPrice(item.price)}</Text>
+          </View>
+          <View style={styles.specialBannerBody}>
+            <Text style={styles.specialBannerTitle} numberOfLines={1}>
+              {getLocalizedField(item, 'name', language)}
+            </Text>
+            {item.description ? (
+              <Text style={styles.specialBannerDesc} numberOfLines={2}>
+                {stripFormattingTags(getLocalizedField(item, 'description', language) || item.description)}
+              </Text>
+            ) : null}
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    // Square specials wear the s68 menu row-card design (62pt thumb, Bricolage
+    // title, mono primary price, desc, then abbrev chips BELOW it — Steve's
+    // second smoke: Welcome's glow design is done, its rows shouldn't lag the
+    // menu). No category-colour fade here: Welcome doesn't load the category
+    // tree. Wine signal = the wine price columns (same reason).
+    const isWineSpecial = !!(item.glass_price || item.bottle_price || item.member_bottle_price);
+    const specialPrice = item.price?.trim() ? item.price : (item.glass_price || '');
+    const diet = specialDietKeys(item);
+    return (
+    <TouchableOpacity
+      key={item.id}
+      style={[styles.specialSquareCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
+      onPress={openSpecial}
+      activeOpacity={0.7}
+    >
+      <View style={styles.specialSquareRow}>
+        {item.thumbnail_url && (
+          <StorageExpoImage
+            source={getImageUrl(item.thumbnail_url, item.updated_at)!}
+            style={isWineSpecial ? [styles.specialSquareThumb, styles.specialSquareThumbWine] : styles.specialSquareThumb}
+            contentFit={isWineSpecial ? 'contain' : 'cover'}
+          />
+        )}
+        <View style={styles.specialSquareContent}>
+          <View style={styles.specialSquareTitleRow}>
+            <Text style={[styles.specialSquareTitle, { color: colors.text }]} numberOfLines={1}>
+              {getLocalizedField(item, 'name', language)}
+            </Text>
+            {!!specialPrice && (
+              <Text style={[styles.specialSquarePrice, { color: colors.primary }]}>
+                {formatPrice(specialPrice)}
+              </Text>
+            )}
+          </View>
+          {!!(getLocalizedField(item, 'description', language) || item.description) && (
+            <Text style={[styles.specialSquareDesc, { color: colors.textSecondary }]} numberOfLines={2}>
+              {stripFormattingTags(getLocalizedField(item, 'description', language) || item.description || '')}
+            </Text>
+          )}
+          <View style={styles.specialSquareTags}>
             {/* "Both Menus"/menu badges only make sense on 2-menu orgs */}
             {organization.menu_count === 2 && (
-              <View style={[styles.specialMealTag, { backgroundColor: '#1E88E518' }]}>
-                <Text style={[styles.specialTagText, { color: '#1E88E5' }]}>
+              <View style={[styles.specialMetaTag, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '42' }]}>
+                <Text style={[styles.specialMetaTagText, { color: colors.primary }]}>
                   {menuBadgeForSeason(item.season, organization, t).label}
                 </Text>
               </View>
             )}
-            <View style={[styles.specialMealTag, { backgroundColor: '#00897B18' }]}>
-              <Text style={[styles.specialTagText, { color: '#00897B' }]}>
+            <View style={[styles.specialMetaTag, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '42' }]}>
+              <Text style={[styles.specialMetaTagText, { color: colors.primary }]}>
                 {labelForCategoryName(item.category, t)}
               </Text>
             </View>
-            {item.is_gluten_free && (
-              <View style={[styles.specialDietTag, { backgroundColor: colors.highlight }]}>
-                <Text style={[styles.specialTagText, { color: colors.text }]}>GF</Text>
+            {diet.map((abbrev) => (
+              <View key={abbrev} style={[styles.specialMetaTag, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '42' }]}>
+                <Text style={[styles.specialMetaTagText, { color: colors.primary }]}>{abbrev}</Text>
               </View>
-            )}
-            {item.is_gluten_free_available && (
-              <View style={[styles.specialDietTag, { backgroundColor: colors.highlight }]}>
-                <Text style={[styles.specialTagText, { color: colors.text }]}>GFA</Text>
-              </View>
-            )}
-            {item.is_vegetarian && (
-              <View style={[styles.specialDietTag, { backgroundColor: colors.highlight }]}>
-                <Text style={[styles.specialTagText, { color: colors.text }]}>V</Text>
-              </View>
-            )}
-            {item.is_vegetarian_available && (
-              <View style={[styles.specialDietTag, { backgroundColor: colors.highlight }]}>
-                <Text style={[styles.specialTagText, { color: colors.text }]}>VA</Text>
-              </View>
-            )}
+            ))}
           </View>
-          <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
-            {stripFormattingTags(getLocalizedField(item, 'description', language) || item.description || '')}
-          </Text>
         </View>
       </View>
     </TouchableOpacity>
-  );
+    );
+  };
 
   // ===== SECTION RENDERERS =====
 
@@ -1562,29 +1634,124 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#FFFFFF',
   },
-  priceText: {
-    fontSize: 16,
-    fontWeight: '700',
+  // s68 row-card treatment for square specials — mirrors MenuDisplay's square
+  // card (62pt thumb, Bricolage title, mono primary price, chips below desc).
+  specialSquareCard: {
+    borderRadius: 16,
+    marginBottom: 10,
+    padding: 11,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    overflow: 'hidden',
   },
-  specialTagsRow: {
+  specialSquareRow: {
+    flexDirection: 'row',
+    gap: 11,
+  },
+  specialSquareThumb: {
+    width: 62,
+    height: 62,
+    borderRadius: 12,
+  },
+  // Wine thumbs contain on a white ground — same call as the menu cards.
+  specialSquareThumbWine: {
+    backgroundColor: '#FFFFFF',
+  },
+  specialSquareContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  specialSquareTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 9,
+  },
+  specialSquareTitle: {
+    flex: 1,
+    fontFamily: fonts.display.semibold,
+    fontSize: 14.5,
+  },
+  specialSquarePrice: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 13.5,
+  },
+  specialSquareDesc: {
+    fontFamily: fonts.body.regular,
+    fontSize: 11.5,
+    lineHeight: 15,
+    marginTop: 3,
+  },
+  specialSquareTags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 4,
-    marginBottom: 4,
+    marginTop: 6,
   },
-  specialMealTag: {
-    paddingHorizontal: 8,
+  specialMetaTag: {
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 10,
+    borderRadius: 7,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
-  specialDietTag: {
+  specialMetaTagText: {
+    fontFamily: fonts.mono.medium,
+    fontSize: 9,
+    letterSpacing: 0.4,
+  },
+  // s68 banner treatment for banner-shaped specials — mirrors MenuDisplay's
+  // banner card (photo IS the card; literals are photo-anchored, not themed).
+  specialBannerCard: {
+    height: 152,
+    borderRadius: 18,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  specialBannerEyebrow: {
+    position: 'absolute',
+    top: 9,
+    left: 9,
+    maxWidth: '62%',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 7,
+    backgroundColor: 'rgba(20,16,14,0.55)',
+  },
+  specialBannerEyebrowText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 9,
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    color: '#FFB07A',
+  },
+  specialBannerPriceChip: {
+    position: 'absolute',
+    top: 9,
+    right: 9,
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
   },
-  specialTagText: {
-    fontSize: 10,
-    fontWeight: '600',
+  specialBannerPriceText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 13,
+    color: '#14100E',
+  },
+  specialBannerBody: {
+    position: 'absolute',
+    left: 12,
+    right: 12,
+    bottom: 10,
+  },
+  specialBannerTitle: {
+    fontFamily: fonts.display.bold,
+    fontSize: 19,
+    color: '#FFFFFF',
+  },
+  specialBannerDesc: {
+    fontFamily: fonts.body.regular,
+    fontSize: 11.5,
+    lineHeight: 15,
+    marginTop: 2,
+    color: '#D7D0C6',
   },
   eventsContainer: {
     padding: 12,
