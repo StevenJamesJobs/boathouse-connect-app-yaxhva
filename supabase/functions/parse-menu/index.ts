@@ -3,8 +3,9 @@
 // category->subcategory->item structure, then PARK the result for human review.
 //
 // Mirrors parse-schedule (background task + 202 + client polls status), but:
-//   * verifies the caller is the org OWNER server-side (custom auth — never trust
-//     the Authorization header; load users by user_id with the service role key);
+//   * verifies the caller may upload server-side — org owner, or a manager whose
+//     org holds the premium.ai_menu_upload grant (custom auth — never trust the
+//     Authorization header; load users by user_id with the service role key);
 //   * uses claude-opus-4-8 (latest vision) and feeds the org's EXISTING category
 //     tree into the prompt so the AI reuses real category names;
 //   * does NOT write to menu_items — it stores parsed_result on menu_uploads and
@@ -334,14 +335,27 @@ serve(async (req) => {
     }
     uploadOrgVerified = true;
 
-    // Server-side OWNER verification (custom auth — do NOT trust the Authorization
-    // header). Only the org owner may run an AI menu upload.
+    // Server-side permission verification (custom auth — do NOT trust the
+    // Authorization header). An AI menu upload may be run by the org owner, or by
+    // a manager whose org holds the premium.ai_menu_upload grant (_may_upload_menu
+    // is the same rule inside the five upload RPCs).
     const { data: caller, error: callerErr } = await supabase
       .from('users')
       .select('role, organization_id')
       .eq('id', body.user_id)
       .single();
-    if (callerErr || !caller || caller.role !== 'owner' || caller.organization_id !== body.organization_id) {
+    let callerMayUpload =
+      !!caller && caller.organization_id === body.organization_id && caller.role === 'owner';
+    if (!callerMayUpload && caller && caller.organization_id === body.organization_id && caller.role === 'manager') {
+      const { data: perm } = await supabase
+        .from('manager_permissions')
+        .select('granted')
+        .eq('organization_id', body.organization_id)
+        .eq('permission_key', 'premium.ai_menu_upload')
+        .maybeSingle();
+      callerMayUpload = perm?.granted === true;
+    }
+    if (callerErr || !caller || !callerMayUpload) {
       // Mark the upload failed so the client stops polling — but only when the
       // caller is at least a member of the org that owns the verified upload row;
       // any other caller gets a plain 403 with no writes.
@@ -354,7 +368,7 @@ serve(async (req) => {
         } catch (_) { /* noop */ }
       }
       return new Response(
-        JSON.stringify({ success: false, error: 'Only the restaurant owner can upload a menu.' }),
+        JSON.stringify({ success: false, error: 'You do not have permission to upload menus.' }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
       );
     }

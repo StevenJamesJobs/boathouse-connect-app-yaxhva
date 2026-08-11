@@ -15,9 +15,10 @@ import {
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,13 +43,21 @@ const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export default function OrganizationSettingsScreen() {
   const router = useRouter();
+  const { tab, scoped } = useLocalSearchParams<{ tab?: string; scoped?: string }>();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
   const { organizationId, organization, refreshOrganization } = useOrganization();
+  const { perms, loading: permsLoading } = useManagerPermissions();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>('branding');
+  // Scoped entry (?tab=menu&scoped=1): a granted manager deep-links here from
+  // the Menu sheet and sees ONLY the Menu page — no tab bar, no sibling pages,
+  // and Save writes just the menu fields. Plain ?tab=menu (owner deep-link)
+  // keeps the full screen and merely preselects the Menu tab.
+  const scopedMenu = tab === 'menu' && scoped === '1';
+
+  const [activeTab, setActiveTab] = useState<SettingsTab>(scopedMenu ? 'menu' : tab === 'menu' ? 'menu' : 'branding');
   const [saving, setSaving] = useState(false);
   const [savingGmaps, setSavingGmaps] = useState(false);
   const [regeneratingCode, setRegeneratingCode] = useState(false);
@@ -103,6 +112,25 @@ export default function OrganizationSettingsScreen() {
   // Save from writing stale defaults back over good data.
   useEffect(() => {
     refreshOrganization();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Paged horizontal tabs (content follows the finger, like the home screen).
+  // Declared above the access gate: the scoped-entry spinner below returns
+  // early while permissions load, so every hook must run before that return
+  // to keep the hook order stable across renders.
+  const pagerRef = useRef<ScrollView>(null);
+
+  // Owner deep-link (?tab=menu without scoped=1): activeTab already starts on
+  // Menu, so just land the pager there too. Deferred a frame so the pager has
+  // laid out before the jump. Scoped mode renders the Menu page as the only
+  // child, so no jump is needed.
+  useEffect(() => {
+    if (scopedMenu || tab !== 'menu') return;
+    requestAnimationFrame(() => {
+      const idx = TABS.findIndex(tb => tb.key === 'menu');
+      pagerRef.current?.scrollTo({ x: idx * SCREEN_WIDTH, animated: false });
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -243,21 +271,36 @@ export default function OrganizationSettingsScreen() {
     ]);
   };
 
+  // Owners always pass. A manager passes ONLY into the scoped Menu entry, and
+  // only with the menuConfig grant; while the grant check is in flight, show a
+  // plain spinner rather than flashing the access-denied bounce.
   if (user?.role !== 'owner') {
-    return (
-      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>
-          {t('org_settings.access_denied', 'Only the restaurant owner can access this screen.')}
-        </Text>
-        <TouchableOpacity style={[styles.saveButton, { marginTop: 20 }]} onPress={() => router.back()}>
-          <Text style={styles.saveButtonText}>{t('manage_categories:go_back', 'Go Back')}</Text>
-        </TouchableOpacity>
-      </View>
-    );
+    const scopedManager = scopedMenu && user?.role === 'manager';
+    if (scopedManager && permsLoading) {
+      return (
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      );
+    }
+    if (!scopedManager || !perms.menuConfig) {
+      return (
+        <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+          <Text style={[styles.sectionTitle, { textAlign: 'center' }]}>
+            {t('org_settings.access_denied', 'Only the restaurant owner can access this screen.')}
+          </Text>
+          <TouchableOpacity style={[styles.saveButton, { marginTop: 20 }]} onPress={() => router.back()}>
+            <Text style={styles.saveButtonText}>{t('manage_categories:go_back', 'Go Back')}</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
   }
 
   const handleSave = async () => {
-    if (!name.trim()) {
+    // Scoped mode doesn't send the name, so don't validate a field the manager
+    // can neither see nor save.
+    if (!scopedMenu && !name.trim()) {
       Alert.alert(t('common:error'), t('onboarding:restaurant_name_required', 'Restaurant name is required.'));
       return;
     }
@@ -265,32 +308,45 @@ export default function OrganizationSettingsScreen() {
 
     // Detect a newly added / changed Google Maps query so we can auto-import
     // reviews after saving (only when it actually changed — avoids a needless
-    // Outscraper call on unrelated saves).
+    // Outscraper call on unrelated saves). Never in scoped mode: the query
+    // isn't part of a scoped save.
     const newQuery = googleMapsQuery.trim();
-    const queryChanged = !!newQuery && newQuery !== (organization.google_maps_query || '').trim();
+    const queryChanged = !scopedMenu && !!newQuery && newQuery !== (organization.google_maps_query || '').trim();
 
     setSaving(true);
     try {
-      const { data, error } = await supabase.rpc('update_organization_settings', {
-        p_organization_id: organizationId,
-        p_user_id: user.id,
-        p_name: name.trim(),
-        p_address: address.trim() || undefined,
-        p_city: city.trim() || undefined,
-        p_state: state.trim() || undefined,
-        p_zip: zip.trim() || undefined,
-        p_weather_location: weatherLocation.trim() || undefined,
-        p_google_maps_query: googleMapsQuery.trim() || undefined,
-        p_reward_currency_name: rewardCurrencyName.trim() || 'Bucks',
-        p_allow_self_signup: allowSelfSignup,
-        p_staff_can_view_roster: staffCanViewRoster,
-        p_menu_count: menuCount,
-        p_menu_1_name: menu1Name.trim() || 'Menu 1',
-        p_menu_2_name: menu2Name.trim() || 'Menu 2',
-        p_default_password: defaultPassword.trim() || 'welcome123',
-        p_menu_1_icon: menu1Icon,
-        p_menu_2_icon: menu2Icon,
-      });
+      // Scoped managers may write ONLY the menu fields — the server rejects any
+      // non-NULL non-menu param from a manager, so nothing else is sent.
+      const { data, error } = await supabase.rpc('update_organization_settings', scopedMenu
+        ? {
+            p_organization_id: organizationId,
+            p_user_id: user.id,
+            p_menu_count: menuCount,
+            p_menu_1_name: menu1Name.trim() || 'Menu 1',
+            p_menu_2_name: menu2Name.trim() || 'Menu 2',
+            p_menu_1_icon: menu1Icon,
+            p_menu_2_icon: menu2Icon,
+          }
+        : {
+            p_organization_id: organizationId,
+            p_user_id: user.id,
+            p_name: name.trim(),
+            p_address: address.trim() || undefined,
+            p_city: city.trim() || undefined,
+            p_state: state.trim() || undefined,
+            p_zip: zip.trim() || undefined,
+            p_weather_location: weatherLocation.trim() || undefined,
+            p_google_maps_query: googleMapsQuery.trim() || undefined,
+            p_reward_currency_name: rewardCurrencyName.trim() || 'Bucks',
+            p_allow_self_signup: allowSelfSignup,
+            p_staff_can_view_roster: staffCanViewRoster,
+            p_menu_count: menuCount,
+            p_menu_1_name: menu1Name.trim() || 'Menu 1',
+            p_menu_2_name: menu2Name.trim() || 'Menu 2',
+            p_default_password: defaultPassword.trim() || 'welcome123',
+            p_menu_1_icon: menu1Icon,
+            p_menu_2_icon: menu2Icon,
+          });
 
       if (error) throw error;
 
@@ -409,16 +465,17 @@ export default function OrganizationSettingsScreen() {
     }
   };
 
-  // Paged horizontal tabs (content follows the finger, like the home screen).
-  const pagerRef = useRef<ScrollView>(null);
-
   const goToTab = (key: SettingsTab) => {
+    if (scopedMenu) return; // single-page pager — no tab bar, nowhere to go
     const idx = TABS.findIndex(tab => tab.key === key);
     setActiveTab(key);
     pagerRef.current?.scrollTo({ x: idx * SCREEN_WIDTH, animated: true });
   };
 
   const handlePagerScroll = (e: any) => {
+    // In scoped mode the pager holds ONE page, so the index math would resolve
+    // any stray momentum to TABS[0] and flip activeTab to branding. Never let it.
+    if (scopedMenu) return;
     const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     const next = TABS[idx];
     if (next && next.key !== activeTab) setActiveTab(next.key);
@@ -463,21 +520,23 @@ export default function OrganizationSettingsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Tab Bar */}
-      <View style={styles.tabBar}>
-        {TABS.map(tab => (
-          <TouchableOpacity
-            key={tab.key}
-            style={[styles.tab, activeTab === tab.key && styles.tabActive]}
-            onPress={() => goToTab(tab.key)}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]} numberOfLines={1}>
-              {t(tab.labelKey)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {/* Tab Bar (hidden in scoped mode — the Menu page is the whole screen) */}
+      {!scopedMenu && (
+        <View style={styles.tabBar}>
+          {TABS.map(tab => (
+            <TouchableOpacity
+              key={tab.key}
+              style={[styles.tab, activeTab === tab.key && styles.tabActive]}
+              onPress={() => goToTab(tab.key)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.tabText, activeTab === tab.key && styles.tabTextActive]} numberOfLines={1}>
+                {t(tab.labelKey)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       <ScrollView
         ref={pagerRef}
@@ -488,7 +547,8 @@ export default function OrganizationSettingsScreen() {
         onMomentumScrollEnd={handlePagerScroll}
         scrollEventThrottle={16}
       >
-        {/* ─── Branding Tab ──────────────────────────────────────────── */}
+        {/* ─── Branding Tab (hidden in scoped mode) ──────────────────── */}
+        {!scopedMenu && (
         <View style={{ width: SCREEN_WIDTH }}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator={false}>
           <>
@@ -657,6 +717,7 @@ export default function OrganizationSettingsScreen() {
           <View style={{ height: 60 }} />
           </ScrollView>
         </View>
+        )}
 
         {/* ─── Menu Tab ───────────────────────────────────────────────── */}
         <View style={{ width: SCREEN_WIDTH }}>
@@ -779,7 +840,8 @@ export default function OrganizationSettingsScreen() {
           </ScrollView>
         </View>
 
-        {/* ─── Jobs & Tools Tab ───────────────────────────────────────── */}
+        {/* ─── Jobs & Tools Tab (hidden in scoped mode) ───────────────── */}
+        {!scopedMenu && (
         <View style={{ width: SCREEN_WIDTH }}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator={false}>
           <>
@@ -789,8 +851,10 @@ export default function OrganizationSettingsScreen() {
           <View style={{ height: 60 }} />
           </ScrollView>
         </View>
+        )}
 
-        {/* ─── Access Tab ─────────────────────────────────────────────── */}
+        {/* ─── Access Tab (hidden in scoped mode) ─────────────────────── */}
+        {!scopedMenu && (
         <View style={{ width: SCREEN_WIDTH }}>
           <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" nestedScrollEnabled showsVerticalScrollIndicator={false}>
           <View style={styles.section}>
@@ -876,6 +940,7 @@ export default function OrganizationSettingsScreen() {
           <View style={{ height: 60 }} />
           </ScrollView>
         </View>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

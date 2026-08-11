@@ -95,6 +95,17 @@ const EXACT_MAP: Record<string, string> = {
   "The primary owner's role cannot be changed": 'server_errors.primary_owner_role_locked',
   // Redemption decision race
   'Employee balance insufficient at approval time': 'server_errors.balance_insufficient_at_approval',
+
+  // ——— s68: parse-menu edge-fn upload guards (static literals verified against
+  // the deployed source). The credits raise lands in menu_uploads.error_message
+  // on the failed row (surfaced by the upload poll); the permission string is
+  // the invoke response's error field. U+2019 in You’re is byte-exact.
+  'You do not have permission to upload menus.': 'server_errors.menu_upload_forbidden',
+  // The upload RPCs RAISE the same denial without the period (parse-menu's 403
+  // carries it) — map every variant or a revoked-mid-flow manager sees raw English.
+  'You do not have permission to upload menus': 'server_errors.menu_upload_forbidden',
+  'You do not have permission to view menu uploads': 'server_errors.menu_upload_forbidden',
+  'You’re out of menu-upload credits this month. They reset next month, or upgrade for more.': 'server_errors.menu_upload_out_of_credits',
 };
 
 export function translateServerError(

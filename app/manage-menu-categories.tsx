@@ -20,6 +20,7 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import type { Database } from '@/app/integrations/supabase/types';
 import { useAuth } from '@/contexts/AuthContext';
+import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMenuCategories, MenuCategory, MenuSubcategory } from '@/hooks/useMenuCategories';
 import { categoryLabel, subcategoryLabel } from '@/utils/menuCategoryLabels';
@@ -53,6 +54,7 @@ export default function ManageMenuCategoriesScreen() {
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { user } = useAuth();
+  const { perms, loading: permsLoading } = useManagerPermissions();
   const { organizationId, organization, isLoading: orgLoading } = useOrganization();
   const perMenu = organization?.menu_category_scope === 'per_menu';
   // In per-menu scope the owner edits one menu's tree at a time (slot 1 / 2).
@@ -95,7 +97,17 @@ export default function ManageMenuCategoriesScreen() {
 
   const selectedCategory = cats.find((c) => c.id === selectedCategoryId) || null;
 
-  if (user?.role !== 'owner') {
+  // s68: owner, or a manager the owner granted 'menu.edit_categories' (the whole
+  // manage_menu_* server suite enforces the same rule). While a manager's grants
+  // are still loading, hold on a spinner rather than flashing the bounce.
+  if (user?.role !== 'owner' && !perms.editCategories) {
+    if (user?.role === 'manager' && permsLoading) {
+      return (
+        <View style={[styles.container, styles.center]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      );
+    }
     return (
       <View style={[styles.container, styles.center]}>
         <Text style={styles.deniedText}>{t('manage_categories:access_denied')}</Text>

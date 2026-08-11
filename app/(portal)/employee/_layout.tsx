@@ -48,6 +48,8 @@ export default function EmployeeLayout() {
   // ambient glow at the layout level so it reads behind the status-bar spacer
   // (otherwise the parent's solid background shows as a strip at the very top).
   const onRewards = lastSegment === 'rewards';
+  // Menus joined the glass wave in s68 — it needs the layout-level glow too.
+  const onMenus = lastSegment === 'menus';
   // B8 inverse of the manager-shell guard: when the (re)validated role is manager/owner,
   // hop up to the manager portal so a promotion is as visible as a demotion. Nothing
   // legitimately navigates a manager INTO the employee shell (verified in the B8 recon);
@@ -60,7 +62,7 @@ export default function EmployeeLayout() {
       {/* Ambient glow on the transparent, edge-to-edge tabs (Welcome + Rewards);
           absolute → no layout impact; the transparent spacer + transparent screen
           let it read edge-to-edge under the status bar. */}
-      {(onWelcome || onRewards) && <AmbientGlow />}
+      {(onWelcome || onRewards || onMenus) && <AmbientGlow />}
       <View style={{ height: insets.top }} />
       <Tabs
         tabBar={(props) => <EmployeeTabBar {...props} />}

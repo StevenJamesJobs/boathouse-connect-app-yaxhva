@@ -69,6 +69,9 @@ interface Gate {
   maxBytes: number;
   mimes: string[] | null;
   path: (c: PathCtx) => string;
+  // Owner-gated purposes may name a manager_permissions key that also admits a
+  // manager whose org holds the grant (s68 manager-permissions feature).
+  grantKey?: string;
 }
 
 const GATES: Record<string, Gate> = {
@@ -144,9 +147,11 @@ const GATES: Record<string, Gate> = {
     path: (c) => `${c.orgId}/logo_${c.ts}.${c.ext}`,
   },
   menu_upload_file: {
-    // parse-menu enforces owner server-side — mirror the tightest gate.
+    // parse-menu enforces owner-or-granted-manager server-side — mirror that gate
+    // (_may_upload_menu: owner, or manager with the premium.ai_menu_upload grant).
     bucket: 'menu-uploads', roles: 'owner', maxBytes: 25 * MB, mimes: UPLOAD_DOC_TYPES,
     path: (c) => `${c.orgId}/${c.ts}-${c.safeName}`,
+    grantKey: 'premium.ai_menu_upload',
   },
   schedule_upload_file: {
     bucket: 'schedules', roles: 'manager', maxBytes: 25 * MB, mimes: UPLOAD_DOC_TYPES,
@@ -318,7 +323,20 @@ serve(async (req) => {
       const gate = GATES[String(body?.purpose ?? '')];
       if (!gate) return json({ success: false, error: 'Unknown purpose' }, 400);
 
-      if (gate.roles === 'owner' && !isOwner) return json({ success: false, error: 'Not authorized' }, 403);
+      if (gate.roles === 'owner' && !isOwner) {
+        // A manager may pass an owner gate only via the purpose's named grant.
+        let granted = false;
+        if (gate.grantKey && actor.role === 'manager') {
+          const { data: perm } = await supabase
+            .from('manager_permissions')
+            .select('granted')
+            .eq('organization_id', actor.organization_id)
+            .eq('permission_key', gate.grantKey)
+            .maybeSingle();
+          granted = perm?.granted === true;
+        }
+        if (!granted) return json({ success: false, error: 'Not authorized' }, 403);
+      }
       if (gate.roles === 'manager' && !isManager) return json({ success: false, error: 'Not authorized' }, 403);
 
       // profile_picture: default target self; managers may target same-org users.

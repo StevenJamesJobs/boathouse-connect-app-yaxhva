@@ -6,20 +6,19 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  Modal,
   ActivityIndicator,
   Dimensions,
-  TextInput,
   FlatList,
+  Animated,
+  Easing,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { StorageExpoImage } from '@/components/StorageImage';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
-import { GestureHandlerRootView, PanGestureHandler } from 'react-native-gesture-handler';
-import ContentDetailModal from '@/components/ContentDetailModal';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useTranslation } from 'react-i18next';
 import { stripFormattingTags } from '@/components/FormattedText';
-import CategoryPill from '@/components/CategoryPill';
 import { getLocalizedField } from '@/utils/translateContent';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getImageUrl } from '@/utils/imageUrl';
@@ -27,17 +26,25 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import SeasonSelector, { type Season } from '@/components/SeasonSelector';
 import { menuIconAndroid } from '@/constants/menuIcons';
+import { fonts } from '@/constants/fonts';
+import type { ThemeColorSet } from '@/styles/commonStyles';
+import { isManagerOrOwner } from '@/utils/roles';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
 import { useRedemptionSettings, foodRedeemCost } from '@/hooks/useRedemptionSettings';
+import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import {
   labelForCategoryName,
   labelForSubcategoryName,
-  findCategoryByName,
   resolveRecipeSubName,
 } from '@/utils/menuCategoryLabels';
 import { menuBadgeForSeason as menuBadgeForSeasonUtil, compareBySectionThenOrder } from '@/utils/menuBadges';
+import MenuTopArea, { MenuSeasonTabs } from '@/components/MenuTopArea';
+import MenuSearchRow from '@/components/MenuSearchRow';
+import MenuCategoryTabs from '@/components/MenuCategoryTabs';
+import MenuItemDetailSheet, { type MenuItemForDetail } from '@/components/MenuItemDetailSheet';
+import MenuFilterSheet, { type DietKey } from '@/components/MenuFilterSheet';
+import MenuSheet from '@/components/MenuSheet';
 
 interface MenuItem {
   id: string;
@@ -54,6 +61,11 @@ interface MenuItem {
   is_gluten_free_available: boolean;
   is_vegetarian: boolean;
   is_vegetarian_available: boolean;
+  is_dairy_free: boolean;
+  is_egg_free: boolean;
+  is_nut_free: boolean;
+  is_sugar_free: boolean;
+  is_salt_free: boolean;
   thumbnail_url: string | null;
   thumbnail_shape: string;
   display_order: number;
@@ -74,11 +86,17 @@ interface MenuItem {
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
+// Legacy wire values: 'winter' = Menu 1, 'summer' = Menu 2. Unchanged.
+type Season = 'winter' | 'summer';
+
 // The category tree (and each category's accent color) is loaded per-org from
 // the DB via useMenuCategories. The swipe-pager page sequence — one page per
 // subcategory plus a virtual 'All' page per category — is derived per-render in
 // the component. 'All' is never persisted; it stays a display-only affordance.
 const ALL_PAGE_KEY = 'All';
+
+// The subcategory-tab row's virtual 'All' entry (rendered FIRST, never persisted).
+const SUB_ALL_TAB = '__all__';
 
 interface PageConfig {
   category: string;
@@ -93,34 +111,25 @@ const WELCOME_BRIDGE_PAGE: PageConfig = { category: '__welcome-bridge__', subcat
 // (RECIPE_CATEGORY_TO_SUBCATEGORY_KEY in utils/menuCategoryLabels), so injected
 // cocktails follow subcategory renames. See `libInjection` in the component.
 
-// Filter options
-const FILTER_OPTIONS = [
-  { key: 'dinner', label: 'Dinner' },
-  { key: 'lunch', label: 'Lunch' },
-  { key: 'gf', label: 'GF' },
-  { key: 'gfa', label: 'GFA' },
-  { key: 'v', label: 'V' },
-  { key: 'va', label: 'VA' },
-  { key: 'wine', label: 'Wine' },
-  { key: 'libations', label: 'Libations' },
-  { key: 'happyHour', label: 'Happy Hour' },
-  { key: 'weeklySpecials', label: 'Weekly Specials' },
-];
+// The nine dietary flags, in display order (abbrev + full labels live in the
+// `dietary` i18n namespace).
+const DIET_KEYS: DietKey[] = ['gf', 'gfa', 'v', 'va', 'df', 'ef', 'nf', 'sf', 'nos'];
+
+// Case-insensitive category/subcategory name key — the DB unique indexes are
+// lower()-based and the AI upload path writes free-text names, so 'Chow Fun'
+// and 'chow fun' are the same category (the s66 guides fix). Matching always
+// normalizes; display always prints the stored/translated name.
+const catKey = (name: string | null | undefined) => (name || '').toLowerCase();
+
+// Search-collapse geometry: the search row is 46pt + 11pt margin. The chrome
+// overlay glides up by exactly this much when the row collapses.
+const SEARCH_ROW_H = 57;
 
 // Category/subcategory labels resolve through utils/menuCategoryLabels:
 // built-ins keep their i18n labels; renamed/custom names show raw.
 
 interface MenuDisplayProps {
-  colors: {
-    background: string;
-    text: string;
-    textSecondary: string;
-    primary: string;
-    fireText: string;
-    card: string;
-    highlight: string;
-    border: string;
-  };
+  colors: ThemeColorSet;
   /** Called when user swipes right past Weekly Specials (first page) to go back to Welcome */
   onSwipeToWelcome?: () => void;
 }
@@ -140,9 +149,14 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
 
   const perMenu = organization?.menu_category_scope === 'per_menu';
   // Behavior resolvers — key off system_key / filter_behavior, not display name,
-  // so Wine/Lunch/Dinner/Libations behavior survives renames.
+  // so Wine/Lunch/Dinner/Libations behavior survives renames. Lookup is
+  // case-insensitive (catKey) against the loaded tree.
   const catOf = useCallback(
-    (name: string | null | undefined) => findCategoryByName(menuCats, name),
+    (name: string | null | undefined) => {
+      if (!name) return undefined;
+      const key = catKey(name);
+      return menuCats.find((c) => catKey(c.display_name) === key);
+    },
     [menuCats],
   );
   const isWineName = useCallback(
@@ -158,14 +172,15 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       if (!perMenu && fb === 'dinner') return item.available_for_dinner;
       // Weekly Specials is an overlay: items flagged is_weekly_special surface
       // here too, on top of items actually categorized as Weekly Specials.
-      if (fb === 'weekly_specials') return item.category === categoryName || !!item.is_weekly_special;
-      return item.category === categoryName;
+      if (fb === 'weekly_specials') return catKey(item.category) === catKey(categoryName) || !!item.is_weekly_special;
+      return catKey(item.category) === catKey(categoryName);
     },
     [catOf, perMenu],
   );
 
-  // Single source of truth for the filter-chip predicates (modal options,
-  // active-chip row, and the filtered results all agree).
+  // Single source of truth for the filter predicates (sheet options, the
+  // count badge, and the filtered results all agree). The category-behavior
+  // cases survive from the old chip system and stay keyed off system_key.
   const matchesFilter = useCallback(
     (item: MenuItem, filter: string): boolean => {
       switch (filter) {
@@ -175,6 +190,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         case 'gfa': return item.is_gluten_free_available;
         case 'v': return item.is_vegetarian;
         case 'va': return item.is_vegetarian_available;
+        case 'df': return item.is_dairy_free;
+        case 'ef': return item.is_egg_free;
+        case 'nf': return item.is_nut_free;
+        case 'sf': return item.is_sugar_free;
+        case 'nos': return item.is_salt_free;
         case 'wine': return isWineName(item.category);
         case 'libations': return catOf(item.category)?.system_key === 'cat.libations';
         case 'happyHour': return catOf(item.category)?.system_key === 'cat.happy_hour';
@@ -198,14 +218,14 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   // Filter items for a given page
   const getItemsForPage = useCallback((page: PageConfig): MenuItem[] => {
     // Featured Specials combines flagged items from BOTH menus (allItems) so the
-    // pill shows the same set on Menu 1 and Menu 2; every other page stays scoped
+    // tab shows the same set on Menu 1 and Menu 2; every other page stays scoped
     // to the active menu (menuItems).
     const isSpecials = catOf(page.category)?.filter_behavior === 'weekly_specials';
     let filtered = (isSpecials ? allItems : menuItems).filter(item => categoryMatches(item, page.category));
 
     // Filter by subcategory if not null and not the virtual "All" page
     if (page.subcategory && page.subcategory !== ALL_PAGE_KEY) {
-      filtered = filtered.filter(item => item.subcategory === page.subcategory);
+      filtered = filtered.filter(item => catKey(item.subcategory) === catKey(page.subcategory));
     }
 
     // Group the combined Specials list by category → subcategory → order so
@@ -273,29 +293,24 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     return hasBridge ? [WELCOME_BRIDGE_PAGE, ...menuPages] : menuPages;
   }, [hasBridge, menuPages]);
   const bridgeOffset = hasBridge ? 1 : 0;
-  // Pills mirror the surviving pages (empty categories carry no pill).
+  // Tabs mirror the surviving pages (empty categories carry no tab).
   const visibleCats = useMemo(
-    () => menuCats.filter((c) => menuPages.some((p) => p.category === c.display_name)),
+    () => menuCats.filter((c) => menuPages.some((p) => catKey(p.category) === catKey(c.display_name))),
     [menuCats, menuPages],
   );
 
-  // A filter chip only shows when it would match at least one item on the
-  // active menu — hidden categories self-zero (catOf can't see them), and
-  // orgs that never set the meal flags drop the Lunch/Dinner chips. Per-menu
-  // scope drops Lunch/Dinner outright (meal overlay doesn't apply there).
-  const availableFilterKeys = useMemo(() => {
-    if (loading) return new Set(FILTER_OPTIONS.map((o) => o.key));
-    return new Set(
-      FILTER_OPTIONS
-        .filter((o) => !(perMenu && (o.key === 'lunch' || o.key === 'dinner')))
-        .filter((o) => menuItems.some((item) => matchesFilter(item, o.key)))
-        .map((o) => o.key),
-    );
-  }, [loading, perMenu, menuItems, matchesFilter]);
+  // A dietary option only shows in the filter sheet when it would match at
+  // least one item on the active menu, so orgs that never set a flag don't get
+  // a dead checkbox.
+  const availableDietKeys = useMemo(() => {
+    if (loading) return new Set<DietKey>(DIET_KEYS);
+    return new Set<DietKey>(DIET_KEYS.filter((k) => menuItems.some((item) => matchesFilter(item, k))));
+  }, [loading, menuItems, matchesFilter]);
 
   // Cocktail-recipe injection: map the fixed recipe vocabulary to the org's
   // CURRENT Libations subcategory names (by system_key) so injected cocktails
-  // follow renames; plus the set of cocktail-fed names for the winter dedup.
+  // follow renames; plus the set of cocktail-fed names for the winter dedup
+  // (names normalized via catKey).
   const libInjection = useMemo(() => {
     const libCat = menuCats.find((c) => c.system_key === 'cat.libations');
     const libationsCategoryName = libCat?.display_name ?? 'Libations';
@@ -304,112 +319,242 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     if (libCat) {
       for (const s of libCat.subcategories) {
         if (s.system_key) subNameByKey[s.system_key] = s.display_name;
-        if (s.is_cocktail_fed) cocktailSubNames.add(s.display_name);
+        if (s.is_cocktail_fed) cocktailSubNames.add(catKey(s.display_name));
       }
     }
     return { libationsCategoryName, subNameByKey, cocktailSubNames };
   }, [menuCats]);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPageIndex, setCurrentPageIndex] = useState(bridgeOffset);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedMenuItem, setSelectedMenuItem] = useState<MenuItem | null>(null);
-  const [detailModalVisible, setDetailModalVisible] = useState(false);
-  const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [activeFilters, setActiveFilters] = useState<string[]>([]);
-  // Drop stale active filters whose chip is no longer offered (per-menu
-  // Lunch/Dinner, hidden categories, zero-match chips) so they can't linger
-  // with no way to untoggle them.
+  const [detailSheetVisible, setDetailSheetVisible] = useState(false);
+  const [filterSheetVisible, setFilterSheetVisible] = useState(false);
+  const [menuSheetVisible, setMenuSheetVisible] = useState(false);
+  const [dietFilters, setDietFilters] = useState<DietKey[]>([]);
+  // The filter sheet's menu row ('both' = no menu narrowing — the default, and
+  // the only value on single-menu orgs).
+  const [menuFilterValue, setMenuFilterValue] = useState<'winter' | 'summer' | 'both'>('both');
+  // Drop stale dietary filters whose option is no longer offered (zero-match
+  // flags after a menu switch) so they can't linger with no way to untoggle.
   useEffect(() => {
     if (loading) return;
-    setActiveFilters((prev) => {
-      const next = prev.filter((f) => availableFilterKeys.has(f));
+    setDietFilters((prev) => {
+      const next = prev.filter((f) => availableDietKeys.has(f));
       return next.length === prev.length ? prev : next;
     });
-  }, [loading, availableFilterKeys]);
+  }, [loading, availableDietKeys]);
+  // A single-menu org has no menu row in the sheet — never let a stale value linger.
+  useEffect(() => {
+    if (organization.menu_count !== 2 && menuFilterValue !== 'both') setMenuFilterValue('both');
+  }, [organization.menu_count, menuFilterValue]);
   const { user } = useAuth();
   const { settings: redemptionSettings } = useRedemptionSettings();
+  const { perms: managerPerms } = useManagerPermissions();
   const router = useRouter();
 
+  const showActionChips = isManagerOrOwner(user);
+
   const pagerRef = useRef<FlatList>(null);
-  const categoryScrollRef = useRef<ScrollView>(null);
-  const subcategoryScrollRef = useRef<ScrollView>(null);
-  const categoryLayoutsRef = useRef<{ [key: string]: { x: number; width: number } }>({});
-  const subcategoryLayoutsRef = useRef<{ [key: string]: { x: number; width: number } }>({});
+
+  // ── Search collapse + sticky-tab backdrop, driven by the ACTIVE page's scrollY ──
+  // The collapse is NOT scroll-linked 1:1 — a fast fling made the raw mapping
+  // read as an instant jump, and on pages barely taller than the viewport it
+  // oscillated (collapsing frees 57pt → the offset falls back → re-expand →
+  // shake; smoke-found). Instead the offset only picks a STATE through a
+  // hysteresis band, and a timed ease animates the row between the two states.
+  // Pages too short to meaningfully scroll never collapse at all.
+  const collapseAnim = useRef(new Animated.Value(0)).current; // 0 open → 1 collapsed
+  const collapsedRef = useRef(false);
+  const collapseRunRef = useRef<Animated.CompositeAnimation | null>(null);
+  const pageOffsetsRef = useRef<{ [index: number]: number }>({});
+  const pageScrollRefs = useRef<{ [index: number]: ScrollView | null }>({});
+  // Every page gets minHeight = viewport + band, so even a two-item category
+  // has real room to scroll into and the collapse HOLDS (no clamp-back →
+  // no reopen shake). This replaced the old short-page no-collapse gate:
+  // Steve's round-5 rule is that every page collapses uniformly.
+  const [pageViewportH, setPageViewportH] = useState(0);
+  const backdropOnRef = useRef(false);
+  const [backdropOn, setBackdropOn] = useState(false);
+  const currentPageIndexRef = useRef(currentPageIndex);
+
+  // Collapse fires past 48pt; reopen fires already at 28pt — early enough that
+  // the row glides back WHILE the list is still visibly moving instead of
+  // popping open after everything has settled (Steve's second smoke). The
+  // 20pt gap between the two is the anti-shake hysteresis band.
+  const COLLAPSE_AT = 48;
+  const EXPAND_AT = 28;
+
+  // The chrome (search row + tab rows) is an OVERLAY translating on the NATIVE
+  // driver over a constant-padding pager — nothing resizes. Round 2 animated
+  // the row's HEIGHT (a layout property, JS-thread driven), and the JS thread
+  // is busiest exactly at the end of a hard fling, so the reopen started late
+  // and popped no matter how soft the curve (Steve's third smoke). Transforms
+  // + opacity run on the UI thread and glide through the fling's settle.
+  // Measured height of the collapsing band (Menu 1/2 tabs + search row) — the
+  // overlay glides up by exactly this much, parking the category rows directly
+  // under the header. Estimate until the first onLayout corrects it.
+  const [bandH, setBandH] = useState(
+    organization.menu_count === 2 ? SEARCH_ROW_H + 51 : SEARCH_ROW_H
+  );
+
+  // The band fades out faster than it travels (gone by ~65% of the glide) so
+  // it has dissolved before its slide carries it over the header chips.
+  // Parked, the tabs' backdrop meets the header exactly — the breathing room
+  // lives INSIDE the frosted bar (MenuCategoryTabs' top padding), never as a
+  // see-through slot with cards swimming in it (Steve's round-6 screenshot).
+  const collapseOpacity = collapseAnim.interpolate({
+    inputRange: [0, 0.65, 1],
+    outputRange: [1, 0, 0],
+  });
+  const overlayTranslate = collapseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -bandH],
+  });
+
+  // Mirrors collapsedRef as state: the collapsed (invisible) search row is
+  // transform-parked over the Menu 1/2 tabs, and a transformed Pressable STILL
+  // receives touches at its new position — it must go pointerEvents:none.
+  const [chromeCollapsed, setChromeCollapsed] = useState(false);
+
+  const setCollapsed = useCallback((next: boolean) => {
+    if (collapsedRef.current === next) return;
+    collapsedRef.current = next;
+    setChromeCollapsed(next);
+    collapseRunRef.current?.stop();
+    collapseRunRef.current = Animated.timing(collapseAnim, {
+      toValue: next ? 1 : 0,
+      // Both directions glide with the same gentle inOut; the exit runs a
+      // touch quicker than the return so browsing still feels responsive
+      // (Steve's final tune: the way up wanted the same softness as the way
+      // back down — the old out-cubic front-loaded the exit).
+      duration: next ? 280 : 300,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true, // transform + opacity only — UI-thread animation
+    });
+    collapseRunRef.current.start();
+  }, [collapseAnim]);
+
+  // Measured height of the open chrome overlay — the pages pad their content
+  // by it so the list top sits exactly under the open rows. Transforms don't
+  // affect layout, so the measurement is stable while the overlay glides.
+  const [chromeH, setChromeH] = useState(SEARCH_ROW_H + 88);
+
+  const resetCollapse = useCallback(() => {
+    collapseRunRef.current?.stop();
+    collapsedRef.current = false;
+    setChromeCollapsed(false);
+    collapseAnim.setValue(0);
+  }, [collapseAnim]);
+
+  // A page collapses only when hiding the row still leaves real content to
+  // scroll — otherwise the freed 57pt immediately un-scrolls the page and the
+  // header shakes open/shut.
+  const syncBackdrop = useCallback((y: number) => {
+    const on = y > 6;
+    if (on !== backdropOnRef.current) {
+      backdropOnRef.current = on;
+      setBackdropOn(on);
+    }
+  }, []);
+
+  // Each page records its own offset; only the active page drives the shared
+  // collapse state (a background page's late momentum must not fight it).
+  // Every page can collapse (minHeight guarantees the room); reopening
+  // requires an actual pull back under EXPAND_AT.
+  const handlePageScroll = useCallback((pageIndex: number, y: number) => {
+    pageOffsetsRef.current[pageIndex] = y;
+    if (pageIndex !== currentPageIndexRef.current) return;
+    if (y > COLLAPSE_AT) {
+      setCollapsed(true);
+    } else if (y < EXPAND_AT) {
+      setCollapsed(false);
+    } // between the thresholds: keep whatever state we're in (hysteresis)
+    syncBackdrop(y);
+  }, [setCollapsed, syncBackdrop]);
+
+  // Page swipes NEVER change the collapse state (Steve's round-4 rule: once
+  // the chrome is tucked away, browsing categories keeps it away — only a
+  // pull-down brings it back). Retarget the active page + backdrop; and when
+  // arriving collapsed on a page still resting near its top, tuck it to
+  // y=bandH so the first cards sit under the parked tabs instead of a
+  // band-sized gap (the constant padding reserves space for the OPEN chrome).
+  useEffect(() => {
+    currentPageIndexRef.current = currentPageIndex;
+    let y = pageOffsetsRef.current[currentPageIndex] ?? 0;
+    if (collapsedRef.current && y < bandH) {
+      pageScrollRefs.current[currentPageIndex]?.scrollTo({ y: bandH, animated: false });
+      pageOffsetsRef.current[currentPageIndex] = bandH;
+      y = bandH;
+    }
+    syncBackdrop(y);
+  }, [currentPageIndex, bandH, syncBackdrop]);
 
   // Derive selected category/subcategory from page index
   const currentPage = PAGES[currentPageIndex];
   const selectedCategory = currentPage?.category || '';
   const selectedSubcategory = currentPage?.subcategory || null;
   // Surviving sub-page names for the selected category ('All' included only
-  // when it survived the empty-page filter; empty => no sub-pill row).
+  // when it survived the empty-page filter; empty => no sub row).
   const visibleSubNames = useMemo(
-    () => menuPages.filter((p) => p.category === selectedCategory && p.subcategory !== null).map((p) => p.subcategory as string),
+    () => menuPages.filter((p) => catKey(p.category) === catKey(selectedCategory) && p.subcategory !== null).map((p) => p.subcategory as string),
     [menuPages, selectedCategory],
   );
-  // Availability tags + filter chips follow the lunch/dinner (and other built-in) renames.
-  const lunchName = labelForCategoryName(menuCats.find((c) => c.filter_behavior === 'lunch')?.display_name || 'Lunch', t, menuCats, language);
-  const dinnerName = labelForCategoryName(menuCats.find((c) => c.filter_behavior === 'dinner')?.display_name || 'Dinner', t, menuCats, language);
-  const filterChipLabel = (key: string, fallback: string): string => {
-    switch (key) {
-      case 'lunch': return lunchName;
-      case 'dinner': return dinnerName;
-      case 'wine': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.wine')?.display_name || 'Wine', t, menuCats, language);
-      case 'libations': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.libations')?.display_name || 'Libations', t, menuCats, language);
-      case 'happyHour': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.happy_hour')?.display_name || 'Happy Hour', t, menuCats, language);
-      case 'weeklySpecials': return labelForCategoryName(menuCats.find((c) => c.system_key === 'cat.weekly_specials')?.display_name || 'Weekly Specials', t, menuCats, language);
-      default: return fallback;
-    }
-  };
-
-  // Auto-scroll category pills to center the active one
-  useEffect(() => {
-    const layout = categoryLayoutsRef.current[selectedCategory];
-    if (layout && categoryScrollRef.current) {
-      const scrollToX = Math.max(0, layout.x - (SCREEN_WIDTH / 2) + (layout.width / 2));
-      categoryScrollRef.current.scrollTo({ x: scrollToX, animated: true });
-    }
-  }, [selectedCategory]);
-
-  // Auto-scroll subcategory pills to center the active one
-  const prevCategoryRef = useRef(selectedCategory);
-  useEffect(() => {
-    if (!selectedSubcategory || !subcategoryScrollRef.current) return;
-
-    const categoryChanged = prevCategoryRef.current !== selectedCategory;
-    prevCategoryRef.current = selectedCategory;
-
-    if (categoryChanged) {
-      // Category just changed — new pills are rendering, layouts aren't measured yet.
-      // Scroll to start immediately (first subcategory is always at x=0),
-      // then try to center after a short delay once onLayout has fired.
-      subcategoryLayoutsRef.current = {};
-      subcategoryScrollRef.current.scrollTo({ x: 0, animated: true });
-      setTimeout(() => {
-        const layoutKey = `${selectedCategory}_${selectedSubcategory}`;
-        const layout = subcategoryLayoutsRef.current[layoutKey];
-        if (layout && subcategoryScrollRef.current) {
-          const scrollToX = Math.max(0, layout.x - (SCREEN_WIDTH / 2) + (layout.width / 2));
-          subcategoryScrollRef.current.scrollTo({ x: scrollToX, animated: true });
-        }
-      }, 100);
-    } else {
-      // Same category, just subcategory changed — layouts are already measured
-      const layoutKey = `${selectedCategory}_${selectedSubcategory}`;
-      const layout = subcategoryLayoutsRef.current[layoutKey];
-      if (layout) {
-        const scrollToX = Math.max(0, layout.x - (SCREEN_WIDTH / 2) + (layout.width / 2));
-        subcategoryScrollRef.current.scrollTo({ x: scrollToX, animated: true });
-      }
-    }
-  }, [selectedCategory, selectedSubcategory]);
 
   const getCategoryLabel = (category: string) => labelForCategoryName(category, t, menuCats, language);
   const getSubcategoryLabel = (subcategory: string) => labelForSubcategoryName(subcategory, t, menuCats, language);
 
+  // Full dietary labels (filter sheet) + card abbreviations, via literal t()
+  // calls so the i18n harvester sees every key.
+  const dietLabel = (k: DietKey): string => {
+    switch (k) {
+      case 'gf': return t('dietary.gf');
+      case 'gfa': return t('dietary.gfa');
+      case 'v': return t('dietary.v');
+      case 'va': return t('dietary.va');
+      case 'df': return t('dietary.df');
+      case 'ef': return t('dietary.ef');
+      case 'nf': return t('dietary.nf');
+      case 'sf': return t('dietary.sf');
+      case 'nos': return t('dietary.nos');
+    }
+  };
+  const dietAbbrev = (k: DietKey): string => {
+    switch (k) {
+      case 'gf': return t('dietary.gf_abbrev');
+      case 'gfa': return t('dietary.gfa_abbrev');
+      case 'v': return t('dietary.v_abbrev');
+      case 'va': return t('dietary.va_abbrev');
+      case 'df': return t('dietary.df_abbrev');
+      case 'ef': return t('dietary.ef_abbrev');
+      case 'nf': return t('dietary.nf_abbrev');
+      case 'sf': return t('dietary.sf_abbrev');
+      case 'nos': return t('dietary.nos_abbrev');
+    }
+  };
+
+  // The dietary flags a card should chip, in display order.
+  const cardDietKeys = (item: MenuItem): DietKey[] => {
+    const out: DietKey[] = [];
+    if (item.is_gluten_free) out.push('gf');
+    if (item.is_gluten_free_available) out.push('gfa');
+    if (item.is_vegetarian) out.push('v');
+    if (item.is_vegetarian_available) out.push('va');
+    if (item.is_dairy_free) out.push('df');
+    if (item.is_egg_free) out.push('ef');
+    if (item.is_nut_free) out.push('nf');
+    if (item.is_sugar_free) out.push('sf');
+    if (item.is_salt_free) out.push('nos');
+    return out;
+  };
+
   useEffect(() => {
     if (categoriesLoading) return; // wait for the category tree so injection resolves names
     loadMenuItems();
+    // A menu/tree change replaces every page's content — the stored per-page
+    // offsets no longer describe what's on screen, so open the search row.
+    pageOffsetsRef.current = {};
+    resetCollapse();
+    syncBackdrop(0);
     // PAGES can be shorter than bridgeOffset+1 (logout teardown empties menuCats;
     // a zero-category org is legit too) — scrollToIndex past the end throws an
     // out-of-range Invariant caught by the root ErrorBoundary. Clamp to the list.
@@ -444,11 +589,33 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     }
   }, [PAGES.length, currentPageIndex]);
 
+  const isSearchOrFilterMode =
+    searchQuery.trim().length > 0 ||
+    dietFilters.length > 0 ||
+    (organization.menu_count === 2 && menuFilterValue !== 'both');
+
+  // Entering/leaving search-filter mode unmounts/remounts the pager, so the
+  // stored per-page offsets no longer describe live scroll views — reset the
+  // collapse fully open either way (the search row must be usable while typing).
+  useEffect(() => {
+    pageOffsetsRef.current = {};
+    resetCollapse();
+    syncBackdrop(0);
+  }, [isSearchOrFilterMode, resetCollapse, syncBackdrop]);
+
   // Get filtered items for search/filter mode
   const getSearchFilteredItems = useCallback(() => {
     // A text search spans the WHOLE menu (allItems); filter-only stays on the
-    // active menu (menuItems).
-    let filtered = searchQuery.trim() ? allItems : menuItems;
+    // active menu (menuItems). The filter sheet's menu row can then narrow
+    // either corpus to a single menu ('both' applies no narrowing, which
+    // preserves the classic behavior exactly).
+    const menuScoped = organization.menu_count === 2 && menuFilterValue !== 'both';
+    let filtered = menuScoped ? allItems : (searchQuery.trim() ? allItems : menuItems);
+    if (menuScoped) {
+      filtered = filtered.filter((item) =>
+        menuFilterValue === 'winter' ? item.season !== 'summer' : item.season !== 'winter'
+      );
+    }
 
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
@@ -469,14 +636,19 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       );
     }
 
-    if (activeFilters.length > 0) {
-      filtered = filtered.filter(item => activeFilters.every(filter => matchesFilter(item, filter)));
+    if (dietFilters.length > 0) {
+      filtered = filtered.filter(item => dietFilters.every(filter => matchesFilter(item, filter)));
     }
 
     return filtered;
-  }, [menuItems, allItems, searchQuery, activeFilters, matchesFilter]);
+  }, [menuItems, allItems, searchQuery, dietFilters, menuFilterValue, organization.menu_count, matchesFilter]);
 
-  const isSearchOrFilterMode = searchQuery.trim().length > 0 || activeFilters.length > 0;
+  // Computed ONCE per render (the old code filtered the corpus twice: once for
+  // the length check and again for the map).
+  const searchFilteredItems = useMemo(
+    () => (isSearchOrFilterMode ? getSearchFilteredItems() : []),
+    [isSearchOrFilterMode, getSearchFilteredItems],
+  );
 
   // Build the full item list for ONE menu (regular items + that menu's injected
   // cocktail recipes). Used both for the active display and the cross-menu
@@ -498,7 +670,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       // Mirror the winter dedup: hide manually-entered Libations cocktail menu
       // items so they can't double-render next to the injected summer recipes.
       items = items.filter(
-        (i) => !(i.category === libInjection.libationsCategoryName && i.subcategory != null && libInjection.cocktailSubNames.has(i.subcategory))
+        (i) => !(catKey(i.category) === catKey(libInjection.libationsCategoryName) && i.subcategory != null && libInjection.cocktailSubNames.has(catKey(i.subcategory)))
       );
       // RPC read (B4 batch 4): member-gated, org derived from the actor,
       // active-only server-side — replaces the last direct .from() read here.
@@ -522,6 +694,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
           is_gluten_free_available: false,
           is_vegetarian: false,
           is_vegetarian_available: false,
+          is_dairy_free: false,
+          is_egg_free: false,
+          is_nut_free: false,
+          is_sugar_free: false,
+          is_salt_free: false,
           thumbnail_url: r.thumbnail_url,
           thumbnail_shape: 'square',
           display_order: r.is_featured ? -1000 + r.display_order : r.display_order,
@@ -540,7 +717,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       // beer/wine Libations subcategories (Draft Beer, Bottle & Cans, etc.)
       // are untouched. No data is deleted; manual rows just aren't re-rendered.
       items = items.filter(
-        (i) => !(i.category === libInjection.libationsCategoryName && i.subcategory != null && libInjection.cocktailSubNames.has(i.subcategory))
+        (i) => !(catKey(i.category) === catKey(libInjection.libationsCategoryName) && i.subcategory != null && libInjection.cocktailSubNames.has(catKey(i.subcategory)))
       );
 
       const { data: lrData } = await supabase.rpc('get_libation_recipes', {
@@ -563,6 +740,11 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
           is_gluten_free_available: false,
           is_vegetarian: false,
           is_vegetarian_available: false,
+          is_dairy_free: false,
+          is_egg_free: false,
+          is_nut_free: false,
+          is_sugar_free: false,
+          is_salt_free: false,
           thumbnail_url: r.thumbnail_url,
           thumbnail_shape: 'square',
           display_order: r.is_featured ? -1000 + r.display_order : r.display_order,
@@ -599,44 +781,23 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     }
   };
 
-  const openDetailModal = (item: MenuItem) => {
+  const openDetailSheet = (item: MenuItem) => {
     setSelectedMenuItem(item);
-    setDetailModalVisible(true);
+    setDetailSheetVisible(true);
   };
 
-  const closeDetailModal = () => {
-    setDetailModalVisible(false);
-    setSelectedMenuItem(null);
-  };
+  // Keep the item mounted through the sheet's slide-out; the next open replaces it.
+  const closeDetailSheet = () => setDetailSheetVisible(false);
 
-  const openFilterModal = () => setFilterModalVisible(true);
-  const closeFilterModal = () => setFilterModalVisible(false);
-
-  const toggleFilter = (filterKey: string) => {
-    setActiveFilters(prev =>
+  const toggleDietFilter = (filterKey: DietKey) => {
+    setDietFilters(prev =>
       prev.includes(filterKey) ? prev.filter(f => f !== filterKey) : [...prev, filterKey]
     );
   };
 
-  const removeFilter = (filterKey: string) => {
-    setActiveFilters(prev => prev.filter(f => f !== filterKey));
-  };
-
-  const clearAllFilters = () => setActiveFilters([]);
-
-  const getFilterLabel = (filterKey: string) => {
-    const filterTranslationMap: { [key: string]: string } = {
-      'dinner': 'menu_display.dinner',
-      'lunch': 'menu_display.lunch',
-      'wine': 'menu_display.wine',
-      'libations': 'menu_display.libations',
-      'happyHour': 'menu_display.happy_hour',
-      'weeklySpecials': 'menu_display.weekly_specials',
-    };
-    const translationKey = filterTranslationMap[filterKey];
-    if (translationKey) return t(translationKey);
-    const option = FILTER_OPTIONS.find(opt => opt.key === filterKey);
-    return option ? option.label : filterKey;
+  const clearAllFilters = () => {
+    setDietFilters([]);
+    setMenuFilterValue('both');
   };
 
   const formatPrice = (price: string) => {
@@ -644,64 +805,53 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     return `$${price}`;
   };
 
-  const buildDetailedDescription = (item: MenuItem) => {
-    let description = getLocalizedField(item, 'description', language) || item.description || '';
-
-    if (isWineName(item.category)) {
-      const loc = getLocalizedField(item, 'location', language) || item.location;
-      if (loc) description = `📍 ${loc}\n\n${description}`.trim();
-
-      const priceLines: string[] = [];
-      if (item.glass_price) priceLines.push(`Glass: ${formatPrice(item.glass_price)}`);
-      if (item.bottle_price) priceLines.push(`Bottle: ${formatPrice(item.bottle_price)}`);
-      if (item.member_bottle_price) priceLines.push(`Member Bottle: ${formatPrice(item.member_bottle_price)}`);
-      if (priceLines.length > 0) {
-        description += `\n\n${priceLines.join('\n')}`;
+  // ── Menu sheet (⚙) wiring — quota fetched lazily when the sheet opens ──────
+  const [uploadQuota, setUploadQuota] = useState<{ remaining: number; max: number; freeAvailable: boolean } | null>(null);
+  const canSeeUploadQuota = user?.role === 'owner' || managerPerms.aiUpload;
+  const fetchQuota = useCallback(async () => {
+    if (!user?.id || !organizationId) return;
+    try {
+      const { data } = await supabase.rpc('get_menu_upload_quota', {
+        p_user_id: user.id,
+        p_organization_id: organizationId,
+      });
+      const result = data as any;
+      if (result?.success) {
+        setUploadQuota({
+          remaining: result.credits_remaining ?? 0,
+          max: result.monthly_allowance ?? 0,
+          // The first upload is free even without premium — the sheet's guard
+          // must honor it exactly like menu-upload.tsx's guardUpload does.
+          freeAvailable: result.free_available === true,
+        });
       }
-
-      const flavor = getLocalizedField(item, 'flavor_profile', language);
-      if (flavor && flavor.trim()) {
-        const label = language === 'es' ? 'Sabor / Sensorial Clave' : 'Flavor / Key Sensory';
-        description += `\n\n🍇 ${label}:\n${flavor}`;
-      }
-      const usp = getLocalizedField(item, 'unique_selling_points', language);
-      if (usp && usp.trim()) {
-        const label = language === 'es' ? 'Puntos de Venta Únicos' : 'Unique Selling Points';
-        description += `\n\n✨ ${label}:\n${usp}`;
-      }
+    } catch (e) {
+      console.error('Error loading menu upload quota:', e);
     }
+  }, [user?.id, organizationId]);
+  useEffect(() => {
+    if (menuSheetVisible && canSeeUploadQuota) fetchQuota();
+  }, [menuSheetVisible, canSeeUploadQuota, fetchQuota]);
+  // Stable identity: MenuSheet's defer() (and through it the upload sheet's
+  // poll effect) depends on onClose — an inline arrow here would restart the
+  // poll interval on every MenuDisplay re-render.
+  const closeMenuSheet = useCallback(() => setMenuSheetVisible(false), []);
 
-    const dietaryInfo = [];
-    if (item.is_gluten_free) dietaryInfo.push('Gluten Free');
-    if (item.is_gluten_free_available) dietaryInfo.push('Gluten Free Available');
-    if (item.is_vegetarian) dietaryInfo.push('Vegetarian');
-    if (item.is_vegetarian_available) dietaryInfo.push('Vegetarian Available');
-
-    if (dietaryInfo.length > 0) {
-      description += `\n\nDietary Options: ${dietaryInfo.join(', ')}`;
-    }
-
-    const availability = [];
-    if (item.available_for_lunch) availability.push(lunchName);
-    if (item.available_for_dinner) availability.push(dinnerName);
-
-    if (availability.length > 0) {
-      description += `\n\nAvailable for: ${availability.join(', ')}`;
-    }
-
-    if (item.category) description += `\n\nCategory: ${getCategoryLabel(item.category)}`;
-    if (item.subcategory) description += `\nSubcategory: ${getSubcategoryLabel(item.subcategory)}`;
-
-    return description;
+  const handleMenuConfiguration = () => {
+    // Managers arrive scoped to the Menu tab only (org-settings enforces it).
+    const params: Record<string, string> = { tab: 'menu' };
+    if (user?.role === 'manager') params.scoped = '1';
+    router.push({ pathname: '/organization-settings', params } as any);
   };
 
   // Navigate to a specific page by category/subcategory
   const navigateToPage = (category: string, subcategory?: string | null) => {
     let targetIndex: number;
+    const target = catKey(category);
     if (subcategory) {
-      targetIndex = PAGES.findIndex(p => p.category === category && p.subcategory === subcategory);
+      targetIndex = PAGES.findIndex(p => catKey(p.category) === target && catKey(p.subcategory) === catKey(subcategory));
     } else {
-      targetIndex = PAGES.findIndex(p => p.category === category);
+      targetIndex = PAGES.findIndex(p => catKey(p.category) === target);
     }
     if (targetIndex >= 0) {
       setCurrentPageIndex(targetIndex);
@@ -732,129 +882,172 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     }
   };
 
-  // Render a single menu item card (compact style matching Welcome page)
   // Which menu an item belongs to (winter → Menu 1, summer → Menu 2, both →
-  // shared) — shown as a badge on whole-menu search results.
+  // shared) — shown as a badge on whole-menu search results and in the banner
+  // eyebrow / detail sheet.
   const menuBadgeForSeason = (s: string | null | undefined): { icon: string; label: string } =>
     menuBadgeForSeasonUtil(s, organization, t);
 
+  // "{menu} · {category}" for the banner eyebrow (category alone on 1-menu orgs).
+  const bannerEyebrowText = (item: MenuItem): string => {
+    const cat = getCategoryLabel(item.category);
+    if (organization.menu_count === 2) return `${menuBadgeForSeason(item.season).label} · ${cat}`;
+    return cat;
+  };
+
+  // ── Cards ──────────────────────────────────────────────────────────────────
+  // The 2.5pt category-colour fade across the top edge of both card shapes.
+  const renderTopFade = (categoryColor: string) => (
+    <LinearGradient
+      colors={[categoryColor, categoryColor + '4D', 'transparent']}
+      locations={[0, 0.34, 0.68]}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.cardTopFade}
+      pointerEvents="none"
+    />
+  );
+
+  // Banner card — the photo IS the card. Wine never banners (no thumb on wine).
+  const renderBannerCard = (item: MenuItem, categoryColor: string) => (
+    <TouchableOpacity
+      key={item.id}
+      style={styles.bannerCard}
+      onPress={() => openDetailSheet(item)}
+      activeOpacity={0.85}
+    >
+      <StorageExpoImage
+        source={getImageUrl(item.thumbnail_url!, item.updated_at)!}
+        style={StyleSheet.absoluteFill}
+        contentFit="cover"
+      />
+      {/* Bottom scrim so the white body copy reads on any photo. */}
+      <LinearGradient
+        colors={['rgba(14,11,9,0.94)', 'rgba(14,11,9,0.05)']}
+        locations={[0.08, 0.64]}
+        start={{ x: 0, y: 1 }}
+        end={{ x: 0, y: 0 }}
+        style={StyleSheet.absoluteFill}
+        pointerEvents="none"
+      />
+      {renderTopFade(categoryColor)}
+      <View style={styles.bannerEyebrow}>
+        <Text style={styles.bannerEyebrowText} numberOfLines={1}>
+          {bannerEyebrowText(item)}
+        </Text>
+      </View>
+      <View style={styles.bannerPriceChip}>
+        <Text style={styles.bannerPriceText}>{formatPrice(item.price)}</Text>
+      </View>
+      <View style={styles.bannerBody}>
+        <Text style={styles.bannerTitle} numberOfLines={1}>
+          {getLocalizedField(item, 'name', language)}
+        </Text>
+        {item.description ? (
+          <Text style={styles.bannerDesc} numberOfLines={2}>
+            {stripFormattingTags(getLocalizedField(item, 'description', language) || item.description)}
+          </Text>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+
+  // Render a single menu item card. Square cards are translucent surface rows
+  // (per-card blur is forbidden — overdraw); banner cards are full-bleed photos.
   const renderMenuCard = (item: MenuItem, categoryColor: string, menuBadge?: { icon: string; label: string }, specialsContext: boolean = false) => {
     const isWine = isWineName(item.category);
     const localizedLocation = isWine ? getLocalizedField(item, 'location', language) : '';
-    // Banner items render the image full-width across the top of the card;
-    // square items keep the inline 80×80 thumbnail (matches the Menu Editor).
-    const isBanner = item.thumbnail_shape === 'banner';
+    // Banner items render as photo cards; wine stays a row card (bottle shots
+    // don't crop into a 152pt band) but DOES carry the left thumb like every
+    // other row — Steve's smoke call reversed the mockup's hidden wine thumb.
+    // `contain` so the bottle isn't decapitated inside the 62pt square.
+    const isBanner = !isWine && item.thumbnail_shape === 'banner' && !!item.thumbnail_url;
+    if (isBanner) return renderBannerCard(item, categoryColor);
+    const diet = cardDietKeys(item);
     return (
     <TouchableOpacity
       key={item.id}
-      style={[
-        styles.menuItemCard,
-        {
-          backgroundColor: colors.card,
-          borderLeftColor: categoryColor,
-        },
-      ]}
-      onPress={() => openDetailModal(item)}
+      style={styles.squareCard}
+      onPress={() => openDetailSheet(item)}
       activeOpacity={0.7}
     >
-      {isBanner && item.thumbnail_url && (
-        <StorageExpoImage
-          source={getImageUrl(item.thumbnail_url, item.updated_at)!}
-          style={styles.cardImageBanner}
-          contentFit="cover"
-        />
-      )}
+      {renderTopFade(categoryColor)}
       <View style={styles.cardRow}>
-        {!isBanner && item.thumbnail_url && (
+        {item.thumbnail_url && (
           <StorageExpoImage
             source={getImageUrl(item.thumbnail_url, item.updated_at)!}
-            style={styles.cardImage}
-            contentFit="cover"
+            style={isWine ? [styles.cardThumb, styles.cardThumbWine] : styles.cardThumb}
+            contentFit={isWine ? 'contain' : 'cover'}
           />
         )}
         <View style={styles.cardContent}>
           {menuBadge && !specialsContext && (
             <View style={styles.menuBadge}>
               <IconSymbol ios_icon_name={menuBadge.icon} android_material_icon_name={menuIconAndroid(menuBadge.icon)} size={11} color={colors.primary} />
-              <Text style={[styles.menuBadgeText, { color: colors.primary }]} numberOfLines={1}>{menuBadge.label}</Text>
+              <Text style={styles.menuBadgeText} numberOfLines={1}>{menuBadge.label}</Text>
             </View>
           )}
           <View style={styles.cardTitleRow}>
-            <Text style={[styles.cardTitle, { color: colors.text }]} numberOfLines={1}>
+            <Text style={styles.cardTitle} numberOfLines={1}>
               {getLocalizedField(item, 'name', language)}
             </Text>
             {isWine ? (
               <View style={styles.winePriceStack}>
                 {item.glass_price ? (
                   <Text style={[styles.winePriceLine, { color: colors.primary }]}>
-                    Gl {formatPrice(item.glass_price)}
+                    {t('menu_display.gl')} {formatPrice(item.glass_price)}
                   </Text>
                 ) : null}
                 {item.bottle_price ? (
                   <Text style={[styles.winePriceLine, { color: colors.primary }]}>
-                    Btl {formatPrice(item.bottle_price)}
+                    {t('menu_display.btl')} {formatPrice(item.bottle_price)}
                   </Text>
                 ) : null}
                 {item.member_bottle_price ? (
                   <Text style={[styles.winePriceLine, { color: colors.textSecondary }]}>
-                    Mbr {formatPrice(item.member_bottle_price)}
+                    {t('menu_display.mbr')} {formatPrice(item.member_bottle_price)}
                   </Text>
                 ) : null}
               </View>
             ) : (
-              <Text style={[styles.cardPrice, { color: colors.primary }]}>
+              <Text style={styles.cardPrice}>
                 {formatPrice(item.price)}
               </Text>
             )}
           </View>
           {isWine && localizedLocation ? (
-            <Text style={[styles.wineLocation, { color: colors.textSecondary }]} numberOfLines={1}>
+            <Text style={styles.wineLocation} numberOfLines={1}>
               📍 {localizedLocation}
             </Text>
           ) : null}
-          {(specialsContext || item.is_gluten_free || item.is_gluten_free_available ||
-            item.is_vegetarian || item.is_vegetarian_available) ? (
+          {item.description && (
+            <Text style={styles.cardDesc} numberOfLines={2}>
+              {stripFormattingTags(getLocalizedField(item, 'description', language) || item.description)}
+            </Text>
+          )}
+          {/* Chips sit BELOW the description — the mockup's card stack. */}
+          {(specialsContext || diet.length > 0) ? (
             <View style={styles.tagsRow}>
               {specialsContext && (
                 <>
                   {/* "Both Menus"/menu badges only make sense on 2-menu orgs */}
                   {organization.menu_count === 2 && (
-                    <View style={[styles.tag, { backgroundColor: '#1E88E518' }]}>
-                      <Text style={[styles.tagText, { color: '#1E88E5' }]}>{menuBadgeForSeason(item.season).label}</Text>
+                    <View style={styles.metaTag}>
+                      <Text style={styles.metaTagText}>{menuBadgeForSeason(item.season).label}</Text>
                     </View>
                   )}
-                  <View style={[styles.tag, { backgroundColor: '#00897B18' }]}>
-                    <Text style={[styles.tagText, { color: '#00897B' }]}>{getCategoryLabel(item.category)}</Text>
+                  <View style={styles.metaTag}>
+                    <Text style={styles.metaTagText}>{getCategoryLabel(item.category)}</Text>
                   </View>
                 </>
               )}
-              {item.is_gluten_free && (
-                <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
-                  <Text style={[styles.tagText, { color: colors.text }]}>GF</Text>
+              {diet.map((k) => (
+                <View key={k} style={styles.dietChip}>
+                  <Text style={styles.dietChipText}>{dietAbbrev(k)}</Text>
                 </View>
-              )}
-              {item.is_gluten_free_available && (
-                <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
-                  <Text style={[styles.tagText, { color: colors.text }]}>GFA</Text>
-                </View>
-              )}
-              {item.is_vegetarian && (
-                <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
-                  <Text style={[styles.tagText, { color: colors.text }]}>V</Text>
-                </View>
-              )}
-              {item.is_vegetarian_available && (
-                <View style={[styles.tag, { backgroundColor: colors.highlight }]}>
-                  <Text style={[styles.tagText, { color: colors.text }]}>VA</Text>
-                </View>
-              )}
+              ))}
             </View>
           ) : null}
-          {item.description && (
-            <Text style={[styles.cardSubtitle, { color: colors.textSecondary }]} numberOfLines={2}>
-              {stripFormattingTags(getLocalizedField(item, 'description', language) || item.description)}
-            </Text>
-          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -877,9 +1070,25 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     return (
       <View style={{ width: SCREEN_WIDTH }}>
         <ScrollView
+          ref={(r) => { pageScrollRefs.current[index] = r; }}
           style={styles.pageScrollView}
-          contentContainerStyle={styles.pageContentContainer}
+          // The overlay chrome sits ABOVE this scroller (absolute) — pad the
+          // content by its measured height so the list top starts below the
+          // open rows, and give every page minHeight = viewport + band so the
+          // collapse always has room to hold (short categories included).
+          // Constant while scrolling: the overlay only transforms.
+          contentContainerStyle={[
+            styles.pageContentContainer,
+            { paddingTop: chromeH + 8 },
+            pageViewportH > 0 && { minHeight: pageViewportH + bandH },
+          ]}
           showsVerticalScrollIndicator={false}
+          onScroll={(e) => handlePageScroll(index, e.nativeEvent.contentOffset.y)}
+          scrollEventThrottle={16}
+          onLayout={(e) => {
+            const h = Math.round(e.nativeEvent.layout.height);
+            if (h > 0) setPageViewportH((prev) => (prev === h ? prev : h));
+          }}
         >
           {pageItems.length === 0 ? (
             <View style={styles.emptyContainer}>
@@ -889,23 +1098,23 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
                 size={64}
                 color={colors.textSecondary}
               />
-              <Text style={[styles.emptyText, { color: colors.text }]}>{t('menu_display.no_items')}</Text>
+              <Text style={styles.emptyText}>{t('menu_display.no_items')}</Text>
               {user?.role === 'owner' ? (
                 <>
-                  <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                  <Text style={styles.emptySubtext}>
                     {t('menu_display.owner_setup_hint', 'Upload your first menu, or create and edit it by hand.')}
                   </Text>
                   <TouchableOpacity
-                    style={[styles.setupMenuButton, { backgroundColor: colors.primary }]}
+                    style={styles.setupMenuButton}
                     onPress={() => router.push('/menu-editor' as any)}
                     activeOpacity={0.85}
                   >
                     <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={18} color={colors.fireText} />
-                    <Text style={[styles.setupMenuButtonText, { color: colors.fireText }]}>{t('menu_display.setup_menu_now', 'Set up Menu Now')}</Text>
+                    <Text style={styles.setupMenuButtonText}>{t('menu_display.setup_menu_now', 'Set up Menu Now')}</Text>
                   </TouchableOpacity>
                 </>
               ) : (
-                <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
+                <Text style={styles.emptySubtext}>
                   {t('menu_display.check_back')}
                 </Text>
               )}
@@ -922,457 +1131,338 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     );
   };
 
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  // ── Category/subcategory tab models ────────────────────────────────────────
+  const categoryTabs = useMemo(
+    () => visibleCats.map((c) => ({
+      name: c.display_name,
+      label: labelForCategoryName(c.display_name, t, menuCats, language),
+      color: c.color,
+    })),
+    [visibleCats, menuCats, t, language],
+  );
+  const subTabs = useMemo(() => {
+    const hasAll = visibleSubNames.includes(ALL_PAGE_KEY);
+    const subs = visibleSubNames
+      .filter((s) => s !== ALL_PAGE_KEY)
+      .map((s) => ({ name: s, label: labelForSubcategoryName(s, t, menuCats, language) }));
+    // The virtual 'All' entry renders FIRST in the row (the All PAGE stays at
+    // the end of the category's page run — row order is display-only).
+    return hasAll ? [{ name: SUB_ALL_TAB, label: t('menu_display.all') }, ...subs] : subs;
+  }, [visibleSubNames, menuCats, t, language]);
+  const activeSubTab = selectedSubcategory === ALL_PAGE_KEY ? SUB_ALL_TAB : (selectedSubcategory || '');
+  const activeCategoryColor = catOf(selectedCategory)?.color || colors.primary;
+  const handleSelectSubcategory = (name: string) => {
+    navigateToPage(selectedCategory, name === SUB_ALL_TAB ? ALL_PAGE_KEY : name);
+  };
+
+  const activeFilterCount =
+    dietFilters.length + (organization.menu_count === 2 && menuFilterValue !== 'both' ? 1 : 0);
+
+  const dietaryOptions = useMemo(
+    () => DIET_KEYS.filter((k) => availableDietKeys.has(k)).map((k) => ({
+      key: k,
+      label: dietLabel(k),
+      abbrev: dietAbbrev(k),
+    })),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [availableDietKeys, t],
+  );
+
+  // ── Detail-sheet context — LANE rule: the redeem gate is computed HERE; the
+  // sheet only renders what it's handed. Employees only, food only (never wine
+  // or libations — happy hour keeps Redeem), active items with a parseable
+  // price, and only while the org has food redemptions switched on.
+  const detailCtx = (() => {
+    const item = selectedMenuItem;
+    if (!item) return { detailItem: null as MenuItemForDetail | null, menuLabel: '', isWine: false, isLibations: false, redeem: null as { label: string; onPress: () => void } | null };
+    const isWine = isWineName(item.category);
+    const isLibations = catOf(item.category)?.system_key === 'cat.libations';
+    const trimmed = (item.price || '').trim();
+    const m = trimmed.match(/^\$?(\d+(?:\.\d{1,2})?)$/);
+    const parsedPrice = m ? parseFloat(m[1]) : NaN;
+    const bucksCost = isFinite(parsedPrice) && parsedPrice > 0 ? foodRedeemCost(parsedPrice, redemptionSettings.food_mode) : null;
+    const showRedeem = user?.role === 'employee' && !isWine && !isLibations && bucksCost !== null
+      && item.is_active !== false && redemptionSettings.redemptions_enabled && redemptionSettings.food_enabled;
+    const redeem = showRedeem && bucksCost !== null
+      ? {
+          label: t('menu_display.redeem_cta', { amount: bucksCost }),
+          onPress: () => {
+            closeDetailSheet();
+            router.push({
+              pathname: '/redeem',
+              params: {
+                prefillItemId: item.id,
+                prefillItemSource: 'menu_items',
+                prefillItemName: item.name,
+                prefillItemPrice: item.price,
+              },
+            } as any);
+          },
+        }
+      : null;
+    const detailItem: MenuItemForDetail = {
+      id: item.id,
+      name: item.name,
+      name_es: item.name_es ?? null,
+      description: item.description,
+      description_es: item.description_es ?? null,
+      price: item.price,
+      thumbnail_url: item.thumbnail_url,
+      thumbnail_shape: item.thumbnail_shape,
+      location: item.location ?? null,
+      location_es: item.location_es ?? null,
+      glass_price: item.glass_price ?? null,
+      bottle_price: item.bottle_price ?? null,
+      member_bottle_price: item.member_bottle_price ?? null,
+      flavor_profile: item.flavor_profile ?? null,
+      flavor_profile_es: item.flavor_profile_es ?? null,
+      unique_selling_points: item.unique_selling_points ?? null,
+      unique_selling_points_es: item.unique_selling_points_es ?? null,
+      is_active: item.is_active,
+      dietary: {
+        gf: item.is_gluten_free,
+        gfa: item.is_gluten_free_available,
+        v: item.is_vegetarian,
+        va: item.is_vegetarian_available,
+        df: item.is_dairy_free,
+        ef: item.is_egg_free,
+        nf: item.is_nut_free,
+        sf: item.is_sugar_free,
+        nos: item.is_salt_free,
+      },
+    };
+    const menuLabel = organization.menu_count === 2 ? menuBadgeForSeason(item.season).label : '';
+    return { detailItem, menuLabel, isWine, isLibations, redeem };
+  })();
 
   return (
     <GestureHandlerRootView style={styles.container}>
-      {/* Fixed Header Area: Season toggle + Search + Filter + Category/Subcategory pills */}
-      <View style={styles.headerArea}>
-        {/* Season Selector — hidden when org only has one menu */}
-        {organization.menu_count === 2 && (
-          <View style={styles.seasonSelectorContainer}>
-            <SeasonSelector
-              selectedSeason={season}
-              onSeasonChange={setSeason}
-              menu1Label={organization.menu_1_name}
-              menu2Label={organization.menu_2_name}
-              menu1Icon={organization.menu_1_icon}
-              menu2Icon={organization.menu_2_icon}
-            />
-          </View>
-        )}
+      {/* Fixed chrome — identical user↔editor: header + menu tabs, then the
+          scroll-collapsing search row, then the sticky category rows. The
+          AmbientGlow behind all of it comes from the PORTAL LAYOUT. */}
+      <MenuTopArea
+        colors={colors}
+        mode="user"
+        showActionChips={showActionChips}
+        onOpenMenuSheet={() => setMenuSheetVisible(true)}
+        onFlipSide={() => router.push('/menu-editor' as any)}
+        season={season}
+        onSeasonChange={setSeason}
+        // Normal browse mode carries the Menu 1/2 tabs in the COLLAPSING band
+        // (they dissolve with the search row — a scrolled user has settled
+        // their menu choice); only search mode pins them here.
+        showMenuTabs={isSearchOrFilterMode && organization.menu_count === 2}
+        menu1Label={organization.menu_1_name}
+        menu2Label={organization.menu_2_name}
+        menu1Icon={organization.menu_1_icon}
+        menu2Icon={organization.menu_2_icon}
+      />
 
-        {/* Search Bar and Filter Button */}
-        <View style={styles.searchFilterContainer}>
-          <View style={styles.searchContainer}>
-            <IconSymbol
-              ios_icon_name="magnifyingglass"
-              android_material_icon_name="search"
-              size={20}
-              color={colors.textSecondary}
-            />
-            <TextInput
-              style={[styles.searchInput, { color: colors.text }]}
-              placeholder={t('menu_display.search_placeholder')}
-              placeholderTextColor={colors.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={20}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            )}
-          </View>
-          <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.card }]} onPress={openFilterModal}>
-            <IconSymbol
-              ios_icon_name="line.3.horizontal.decrease.circle"
-              android_material_icon_name="filter-list"
-              size={20}
-              color={colors.text}
-            />
-            <Text style={[styles.filterButtonText, { color: colors.text }]}>{t('menu_display.filter')}</Text>
-            {activeFilters.length > 0 && (
-              <View style={[styles.filterBadge, { backgroundColor: colors.primary }]}>
-                <Text style={[styles.filterBadgeText, { color: colors.fireText }]}>{activeFilters.length}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
-
-        {/* Active Filter Chips */}
-        {activeFilters.length > 0 && (
-          <View style={styles.activeFiltersContainer}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.activeFiltersContent}
-            >
-              {activeFilters.map((filter, index) => (
-                <View key={index} style={[styles.activeFilterChip, { backgroundColor: colors.highlight }]}>
-                  <Text style={[styles.activeFilterChipText, { color: colors.text }]}>{filterChipLabel(filter, getFilterLabel(filter))}</Text>
-                  <TouchableOpacity onPress={() => removeFilter(filter)}>
-                    <IconSymbol
-                      ios_icon_name="xmark"
-                      android_material_icon_name="close"
-                      size={14}
-                      color={colors.text}
-                    />
-                  </TouchableOpacity>
-                </View>
-              ))}
-              <TouchableOpacity
-                style={[styles.clearAllButton, { backgroundColor: colors.card, borderColor: colors.border }]}
-                onPress={clearAllFilters}
-              >
-                <Text style={[styles.clearAllButtonText, { color: colors.textSecondary }]}>{t('menu_display.clear_all')}</Text>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        )}
-
-        {/* Category Tabs — only in normal mode */}
-        {!isSearchOrFilterMode && (
-          <ScrollView
-            ref={categoryScrollRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoryScroll}
-            contentContainerStyle={styles.categoryScrollContent}
-          >
-            {visibleCats.map((cat) => (
-              <CategoryPill
-                key={cat.id}
-                size="lg"
-                label={getCategoryLabel(cat.display_name)}
-                selected={selectedCategory === cat.display_name}
-                onPress={() => navigateToPage(cat.display_name)}
-                onLayout={(e) => {
-                  categoryLayoutsRef.current[cat.display_name] = {
-                    x: e.nativeEvent.layout.x,
-                    width: e.nativeEvent.layout.width,
-                  };
-                }}
-              />
-            ))}
-          </ScrollView>
-        )}
-
-        {/* Subcategory Tabs — only in normal mode and when category has subcategories.
-            A virtual 'All' pill is appended (never persisted). */}
-        {!isSearchOrFilterMode && visibleSubNames.length > 0 && (
-          <ScrollView
-            ref={subcategoryScrollRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.subcategoryScroll}
-            contentContainerStyle={styles.subcategoryScrollContent}
-          >
-            {visibleSubNames.map((subcategory, index) => (
-              <CategoryPill
-                key={index}
-                size="sm"
-                label={getSubcategoryLabel(subcategory)}
-                selected={selectedSubcategory === subcategory}
-                onPress={() => navigateToPage(selectedCategory, subcategory)}
-                onLayout={(e) => {
-                  subcategoryLayoutsRef.current[`${selectedCategory}_${subcategory}`] = {
-                    x: e.nativeEvent.layout.x,
-                    width: e.nativeEvent.layout.width,
-                  };
-                }}
-              />
-            ))}
-          </ScrollView>
-        )}
-      </View>
-
-      {/* Main Content Area */}
-      {(loading || categoriesLoading) ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : isSearchOrFilterMode ? (
-        /* Search/Filter mode: flat scrollable list */
-        <ScrollView style={styles.pageScrollView} contentContainerStyle={styles.pageContentContainer}>
-          {getSearchFilteredItems().length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <IconSymbol
-                ios_icon_name="fork.knife"
-                android_material_icon_name="restaurant-menu"
-                size={64}
-                color={colors.textSecondary}
-              />
-              <Text style={[styles.emptyText, { color: colors.text }]}>{t('menu_display.no_items')}</Text>
-              <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                {t('menu_display.adjust_search')}
-              </Text>
+      {isSearchOrFilterMode ? (
+        <>
+          {/* Search/Filter mode: static search row + flat scrollable list —
+              no overlay, no collapse (the row must be usable while typing). */}
+          <MenuSearchRow
+            colors={colors}
+            mode="user"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={t('menu_display.search_placeholder')}
+            onRightPress={() => setFilterSheetVisible(true)}
+            filterCount={activeFilterCount}
+          />
+          {(loading || categoriesLoading) ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : (
-            getSearchFilteredItems().map(item =>
-              renderMenuCard(
-                item,
-                catOf(item.category)?.color || colors.primary,
-                searchQuery.trim() && organization.menu_count === 2 ? menuBadgeForSeason(item.season) : undefined,
-              )
-            )
-          )}
-        </ScrollView>
-      ) : (
-        /* Normal mode: horizontal swipe pager */
-        <FlatList
-          ref={pagerRef}
-          data={PAGES}
-          renderItem={renderPage}
-          keyExtractor={(_, index) => `page-${index}`}
-          horizontal
-          pagingEnabled
-          bounces={false}
-          showsHorizontalScrollIndicator={false}
-          onMomentumScrollEnd={onMomentumScrollEnd}
-          getItemLayout={(_, index) => ({
-            length: SCREEN_WIDTH,
-            offset: SCREEN_WIDTH * index,
-            index,
-          })}
-          initialScrollIndex={Math.min(bridgeOffset, Math.max(PAGES.length - 1, 0))}
-        />
-      )}
-
-      {/* Filter Modal */}
-      <Modal
-        visible={filterModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={closeFilterModal}
-      >
-        <View style={styles.filterModalContainer}>
-          <TouchableOpacity
-            style={styles.filterModalBackdrop}
-            activeOpacity={1}
-            onPress={closeFilterModal}
-          />
-          <View style={[styles.filterModalContent, { backgroundColor: colors.card }]}>
-            <View style={[styles.filterModalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.filterModalTitle, { color: colors.text }]}>{t('menu_display.filter_title')}</Text>
-              <TouchableOpacity onPress={closeFilterModal}>
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color={colors.textSecondary}
-                />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView style={styles.filterModalScroll} contentContainerStyle={styles.filterModalScrollContent}>
-              {/* Only chips that would match something on this menu (hidden
-                  categories and unused meal flags never present dead filters). */}
-              {FILTER_OPTIONS.filter((o) => availableFilterKeys.has(o.key)).map((option) => (
-                <TouchableOpacity
-                  key={option.key}
-                  style={[
-                    styles.filterOption,
-                    { backgroundColor: colors.background },
-                    activeFilters.includes(option.key) && { backgroundColor: colors.highlight },
-                  ]}
-                  onPress={() => toggleFilter(option.key)}
-                >
-                  <View
-                    style={[
-                      styles.filterCheckbox,
-                      { borderColor: colors.border, backgroundColor: colors.card },
-                      activeFilters.includes(option.key) && { backgroundColor: colors.primary, borderColor: colors.primary },
-                    ]}
-                  >
-                    {activeFilters.includes(option.key) && (
-                      <IconSymbol
-                        ios_icon_name="checkmark"
-                        android_material_icon_name="check"
-                        size={16}
-                        color={colors.fireText}
-                      />
-                    )}
-                  </View>
-                  <Text
-                    style={[
-                      styles.filterOptionText,
-                      { color: colors.text },
-                      activeFilters.includes(option.key) && styles.filterOptionTextActive,
-                    ]}
-                  >
-                    {filterChipLabel(option.key, option.label)}
+            <ScrollView style={styles.pageScrollView} contentContainerStyle={styles.pageContentContainer}>
+              {searchFilteredItems.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <IconSymbol
+                    ios_icon_name="fork.knife"
+                    android_material_icon_name="restaurant-menu"
+                    size={64}
+                    color={colors.textSecondary}
+                  />
+                  <Text style={styles.emptyText}>{t('menu_display.no_items')}</Text>
+                  <Text style={styles.emptySubtext}>
+                    {t('menu_display.adjust_search')}
                   </Text>
-                </TouchableOpacity>
-              ))}
-
-              {activeFilters.length > 0 && (
-                <TouchableOpacity
-                  style={[styles.clearFiltersButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-                  onPress={clearAllFilters}
-                >
-                  <Text style={[styles.clearFiltersButtonText, { color: colors.textSecondary }]}>
-                    {t('menu_display.clear_all_filters')}
-                  </Text>
-                </TouchableOpacity>
+                </View>
+              ) : (
+                searchFilteredItems.map(item =>
+                  renderMenuCard(
+                    item,
+                    catOf(item.category)?.color || colors.primary,
+                    searchQuery.trim() && organization.menu_count === 2 ? menuBadgeForSeason(item.season) : undefined,
+                  )
+                )
               )}
             </ScrollView>
+          )}
+        </>
+      ) : (
+        /* Normal mode: the pager fills the area; the chrome (search row + tab
+           rows) is an ABSOLUTE OVERLAY gliding on the native driver above it.
+           Pages pad their content by the measured overlay height, so nothing
+           reflows when the search row collapses or returns. */
+        <View style={styles.pagerArea}>
+          {(loading || categoriesLoading) ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <FlatList
+              ref={pagerRef}
+              data={PAGES}
+              renderItem={renderPage}
+              keyExtractor={(_, index) => `page-${index}`}
+              horizontal
+              pagingEnabled
+              bounces={false}
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={onMomentumScrollEnd}
+              getItemLayout={(_, index) => ({
+                length: SCREEN_WIDTH,
+                offset: SCREEN_WIDTH * index,
+                index,
+              })}
+              initialScrollIndex={Math.min(bridgeOffset, Math.max(PAGES.length - 1, 0))}
+            />
+          )}
 
-            <TouchableOpacity style={[styles.applyFiltersButton, { backgroundColor: colors.primary }]} onPress={closeFilterModal}>
-              <Text style={[styles.applyFiltersButtonText, { color: colors.fireText }]}>
-                {t('menu_display.apply_filters')} {activeFilters.length > 0 && `(${activeFilters.length})`}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          <Animated.View
+            style={[styles.chromeOverlay, { transform: [{ translateY: overlayTranslate }] }]}
+            onLayout={(e) => {
+              const h = Math.round(e.nativeEvent.layout.height);
+              if (h > 0 && h !== chromeH) setChromeH(h);
+            }}
+          >
+            {/* The collapsing band: Menu 1/2 tabs + search row dissolve and
+                glide away together; category rows park under the header.
+                pointerEvents none while collapsed — the invisible band sits
+                transform-parked over the header chips, and transformed views
+                still receive touches. */}
+            <Animated.View
+              style={{ opacity: collapseOpacity }}
+              pointerEvents={chromeCollapsed ? 'none' : 'auto'}
+              onLayout={(e) => {
+                const h = Math.round(e.nativeEvent.layout.height);
+                if (h > 0 && h !== bandH) setBandH(h);
+              }}
+            >
+              {organization.menu_count === 2 && (
+                <MenuSeasonTabs
+                  colors={colors}
+                  season={season}
+                  onSeasonChange={setSeason}
+                  menu1Label={organization.menu_1_name}
+                  menu2Label={organization.menu_2_name}
+                  menu1Icon={organization.menu_1_icon}
+                  menu2Icon={organization.menu_2_icon}
+                  style={styles.overlaySeasonTabs}
+                />
+              )}
+              <MenuSearchRow
+                colors={colors}
+                mode="user"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder={t('menu_display.search_placeholder')}
+                onRightPress={() => setFilterSheetVisible(true)}
+                filterCount={activeFilterCount}
+              />
+            </Animated.View>
+            <MenuCategoryTabs
+              colors={colors}
+              categories={categoryTabs}
+              activeCategory={selectedCategory}
+              onSelectCategory={(name) => navigateToPage(name)}
+              subcategories={subTabs}
+              activeSubcategory={activeSubTab}
+              onSelectSubcategory={handleSelectSubcategory}
+              activeColor={activeCategoryColor}
+              showBackdrop={backdropOn}
+            />
+          </Animated.View>
         </View>
-      </Modal>
+      )}
 
-      {/* Content Detail Modal for Menu Items */}
-      {selectedMenuItem && (() => {
-        const trimmed = (selectedMenuItem.price || '').trim();
-        const m = trimmed.match(/^\$?(\d+(?:\.\d{1,2})?)$/);
-        const parsedPrice = m ? parseFloat(m[1]) : NaN;
-        const bucksCost = isFinite(parsedPrice) && parsedPrice > 0 ? foodRedeemCost(parsedPrice, redemptionSettings.food_mode) : null;
-        const isInactive = selectedMenuItem.is_active === false;
-        const showRedeem = user?.role === 'employee' && bucksCost !== null && !isInactive
-          && redemptionSettings.redemptions_enabled && redemptionSettings.food_enabled;
-        const item = selectedMenuItem;
-        return (
-          <ContentDetailModal
-            visible={detailModalVisible}
-            onClose={closeDetailModal}
-            title={
-              isWineName(item.category)
-                ? getLocalizedField(item, 'name', language)
-                : `${getLocalizedField(item, 'name', language)} - ${formatPrice(item.price)}`
-            }
-            content={buildDetailedDescription(item)}
-            thumbnailUrl={item.thumbnail_url}
-            thumbnailShape={item.thumbnail_shape}
-            colors={colors}
-            redeemAction={
-              showRedeem
-                ? {
-                    label: t('rewards_ui:redeem_for', { amount: bucksCost }),
-                    onPress: () => {
-                      closeDetailModal();
-                      router.push({
-                        pathname: '/redeem',
-                        params: {
-                          prefillItemId: item.id,
-                          prefillItemSource: 'menu_items',
-                          prefillItemName: item.name,
-                          prefillItemPrice: item.price,
-                        },
-                      } as any);
-                    },
-                  }
-                : null
-            }
-          />
-        );
-      })()}
+      {/* Filter sheet — menu narrowing + dietary flags (live-applied; Apply closes) */}
+      <MenuFilterSheet
+        visible={filterSheetVisible}
+        onClose={() => setFilterSheetVisible(false)}
+        colors={colors}
+        showMenuSection={organization.menu_count === 2}
+        menuValue={menuFilterValue}
+        onMenuValue={setMenuFilterValue}
+        menu1Label={organization.menu_1_name}
+        menu2Label={organization.menu_2_name}
+        dietaryOptions={dietaryOptions}
+        selected={dietFilters}
+        onToggle={toggleDietFilter}
+        onClear={clearAllFilters}
+        onApply={() => setFilterSheetVisible(false)}
+      />
+
+      {/* Item detail sheet (replaces the old ContentDetailModal blob for menu items) */}
+      <MenuItemDetailSheet
+        visible={detailSheetVisible}
+        onClose={closeDetailSheet}
+        colors={colors}
+        item={detailCtx.detailItem}
+        menuLabel={detailCtx.menuLabel}
+        categoryLabel={selectedMenuItem ? getCategoryLabel(selectedMenuItem.category) : ''}
+        subcategoryLabel={selectedMenuItem?.subcategory ? getSubcategoryLabel(selectedMenuItem.subcategory) : null}
+        isWine={detailCtx.isWine}
+        isLibations={detailCtx.isLibations}
+        redeem={detailCtx.redeem}
+      />
+
+      {/* The ⚙ Menu sheet — managers/owners only (employees never see the chip) */}
+      {showActionChips && user && (
+        <MenuSheet
+          visible={menuSheetVisible}
+          onClose={closeMenuSheet}
+          colors={colors}
+          role={user.role === 'owner' ? 'owner' : 'manager'}
+          perms={managerPerms}
+          onEditMenu={() => router.push('/menu-editor' as any)}
+          onEditCategories={() => router.push('/manage-menu-categories' as any)}
+          onMenuConfiguration={handleMenuConfiguration}
+          quota={uploadQuota}
+          refreshQuota={fetchQuota}
+        />
+      )}
     </GestureHandlerRootView>
   );
 }
 
-const createStyles = (colors: any) =>
+const createStyles = (colors: ThemeColorSet) =>
   StyleSheet.create({
+    // Transparent root — the portal layout owns the background + AmbientGlow.
     container: {
       flex: 1,
-      backgroundColor: colors.background,
     },
-    headerArea: {
-      paddingTop: 20,
-    },
-    seasonSelectorContainer: {
-      paddingHorizontal: 16,
-      marginBottom: 12,
-    },
-    // Search & Filter
-    searchFilterContainer: {
-      flexDirection: 'row',
-      paddingHorizontal: 16,
-      marginBottom: 12,
-      gap: 8,
-    },
-    searchContainer: {
+    // Normal-mode content area: the pager fills it, the chrome overlay glides
+    // absolutely above it (native-driver transform — never a layout change).
+    pagerArea: {
       flex: 1,
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.card,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderRadius: 12,
-      boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
-      elevation: 2,
     },
-    searchInput: {
-      flex: 1,
-      marginLeft: 8,
-      fontSize: 15,
+    chromeOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
     },
-    filterButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderRadius: 12,
-      gap: 6,
-      boxShadow: '0px 2px 4px rgba(0, 0, 0, 0.1)',
-      elevation: 2,
-    },
-    filterButtonText: {
-      fontSize: 14,
-      fontWeight: '600',
-    },
-    filterBadge: {
-      borderRadius: 10,
-      width: 20,
-      height: 20,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginLeft: 4,
-    },
-    filterBadgeText: {
-      fontSize: 11,
-      fontWeight: 'bold',
-      color: '#FFFFFF',
-    },
-    // Active filters
-    activeFiltersContainer: {
-      paddingHorizontal: 16,
-      marginBottom: 12,
-    },
-    activeFiltersContent: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    activeFilterChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
-      gap: 6,
-    },
-    activeFilterChipText: {
-      fontSize: 13,
-      fontWeight: '600',
-    },
-    clearAllButton: {
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
-      justifyContent: 'center',
-      borderWidth: 1,
-    },
-    clearAllButtonText: {
-      fontSize: 13,
-      fontWeight: '600',
-    },
-    // Category tabs
-    categoryScroll: {
-      maxHeight: 50,
-      marginBottom: 12,
-    },
-    categoryScrollContent: {
-      paddingHorizontal: 16,
-      gap: 8,
-    },
-    // Subcategory tabs
-    subcategoryScroll: {
-      maxHeight: 40,
-      marginBottom: 8,
-    },
-    subcategoryScrollContent: {
-      paddingHorizontal: 16,
-      gap: 8,
+    // MenuSeasonTabs standalone in the overlay (MenuTopArea's wrap normally
+    // supplies the 16pt gutters).
+    overlaySeasonTabs: {
+      marginHorizontal: 16,
     },
     // Page content
     pageScrollView: {
@@ -1383,29 +1473,38 @@ const createStyles = (colors: any) =>
       paddingTop: 8,
       paddingBottom: 100,
     },
-    // Compact menu item card (matches Welcome page style)
-    menuItemCard: {
-      borderRadius: 12,
+    // Square card — translucent surface (NO per-card blur), category fade on top.
+    squareCard: {
+      borderRadius: 16,
       marginBottom: 10,
-      padding: 12,
-      borderLeftWidth: 4,
-      boxShadow: '0px 2px 6px rgba(0, 0, 0, 0.08)',
-      elevation: 2,
+      padding: 11,
+      backgroundColor: colors.surface,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.surfaceBorder,
+      overflow: 'hidden',
+    },
+    cardTopFade: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 2.5,
+      opacity: 0.85,
+      zIndex: 1,
     },
     cardRow: {
       flexDirection: 'row',
-      gap: 12,
+      gap: 11,
     },
-    cardImage: {
-      width: 80,
-      height: 80,
-      borderRadius: 10,
+    cardThumb: {
+      width: 62,
+      height: 62,
+      borderRadius: 12,
     },
-    cardImageBanner: {
-      width: '100%',
-      aspectRatio: 16 / 9,
-      borderRadius: 10,
-      marginBottom: 10,
+    // Wine thumbs contain on a white ground — label/bottle shots are almost
+    // always on white, so the square reads as one continuous image.
+    cardThumbWine: {
+      backgroundColor: '#FFFFFF',
     },
     cardContent: {
       flex: 1,
@@ -1424,57 +1523,148 @@ const createStyles = (colors: any) =>
       maxWidth: 150,
     },
     menuBadgeText: {
+      fontFamily: fonts.mono.medium,
       fontSize: 10,
-      fontWeight: '600',
+      color: colors.primary,
     },
     cardTitleRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 4,
+      marginBottom: 3,
       gap: 8,
     },
     cardTitle: {
       flex: 1,
-      fontSize: 15,
-      fontWeight: '600',
+      fontFamily: fonts.display.semibold,
+      fontSize: 14.5,
+      color: colors.text,
     },
     cardPrice: {
-      fontSize: 15,
-      fontWeight: '600',
+      fontFamily: fonts.mono.semibold,
+      fontSize: 13.5,
+      color: colors.primary,
     },
     winePriceStack: {
       alignItems: 'flex-end',
     },
     winePriceLine: {
+      fontFamily: fonts.mono.semibold,
       fontSize: 12,
-      fontWeight: '700',
-      lineHeight: 14,
+      lineHeight: 15,
     },
     wineLocation: {
+      // No italic — fontStyle synthesis is unreliable with the bundled custom
+      // families, and the detail sheet's location line made the same call.
+      fontFamily: fonts.body.regular,
       fontSize: 12,
       marginTop: 1,
       marginBottom: 2,
-      fontStyle: 'italic',
+      color: colors.textSecondary,
     },
-    cardSubtitle: {
-      fontSize: 13,
-      lineHeight: 18,
+    cardDesc: {
+      fontFamily: fonts.body.regular,
+      fontSize: 11.5,
+      lineHeight: 16,
+      color: colors.textSecondary,
     },
     tagsRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 4,
-      marginBottom: 4,
+      marginTop: 1,
+      marginBottom: 3,
     },
-    tag: {
-      paddingHorizontal: 8,
+    // Specials meta tags (menu + home category) — token-tinted, no fixed hexes.
+    metaTag: {
+      paddingHorizontal: 7,
       paddingVertical: 2,
-      borderRadius: 10,
+      borderRadius: 7,
+      backgroundColor: colors.primary + '12',
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.primary + '42',
     },
-    tagText: {
-      fontSize: 10,
-      fontWeight: '600',
+    metaTagText: {
+      fontFamily: fonts.mono.medium,
+      fontSize: 9,
+      letterSpacing: 0.4,
+      color: colors.primary,
+    },
+    dietChip: {
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 7,
+      backgroundColor: colors.primary + '12',
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.primary + '42',
+    },
+    dietChipText: {
+      fontFamily: fonts.mono.medium,
+      fontSize: 9,
+      letterSpacing: 0.4,
+      color: colors.primary,
+    },
+    // Banner card — the photo IS the card.
+    bannerCard: {
+      height: 152,
+      borderRadius: 18,
+      overflow: 'hidden',
+      marginBottom: 10,
+      backgroundColor: colors.thumbPlaceholder,
+    },
+    bannerEyebrow: {
+      position: 'absolute',
+      top: 9,
+      left: 9,
+      maxWidth: '62%',
+      paddingHorizontal: 7,
+      paddingVertical: 3,
+      borderRadius: 7,
+      backgroundColor: 'rgba(20,16,14,0.55)',
+    },
+    bannerEyebrowText: {
+      fontFamily: fonts.mono.semibold,
+      fontSize: 9,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      // Photo-anchored literal (the mockup's dark-theme ember): the pill behind
+      // it is fixed dark, and colors.ember goes DARK in the light themes.
+      color: '#FFB07A',
+    },
+    bannerPriceChip: {
+      position: 'absolute',
+      top: 9,
+      right: 9,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 8,
+      backgroundColor: colors.tint,
+    },
+    bannerPriceText: {
+      fontFamily: fonts.mono.semibold,
+      fontSize: 13,
+      // Deliberate literal: the chip sits on a photo over the warm tint fill in
+      // both themes, so the ink stays dark regardless of palette.
+      color: '#14100E',
+    },
+    bannerBody: {
+      position: 'absolute',
+      left: 12,
+      right: 12,
+      bottom: 10,
+    },
+    bannerTitle: {
+      fontFamily: fonts.display.bold,
+      fontSize: 19,
+      // Deliberate literals: body copy sits on the photo scrim, not a themed surface.
+      color: '#FFFFFF',
+    },
+    bannerDesc: {
+      fontFamily: fonts.body.regular,
+      fontSize: 11.5,
+      lineHeight: 15,
+      marginTop: 2,
+      color: '#D7D0C6',
     },
     // Loading & empty states
     loadingContainer: {
@@ -1491,115 +1681,32 @@ const createStyles = (colors: any) =>
       paddingHorizontal: 32,
     },
     emptyText: {
-      fontSize: 18,
-      fontWeight: '600',
+      fontFamily: fonts.display.bold,
+      fontSize: 20,
       marginTop: 16,
       textAlign: 'center',
+      color: colors.text,
     },
     emptySubtext: {
-      fontSize: 14,
+      fontFamily: fonts.body.regular,
+      fontSize: 13.5,
       marginTop: 8,
       textAlign: 'center',
+      color: colors.textSecondary,
     },
     setupMenuButton: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 8,
+      height: 47,
       paddingHorizontal: 20,
-      paddingVertical: 12,
-      borderRadius: 24,
-      marginTop: 24,
+      borderRadius: 13,
+      marginTop: 20,
+      backgroundColor: colors.primary,
     },
     setupMenuButtonText: {
-      color: '#FFFFFF',
+      fontFamily: fonts.body.semibold,
       fontSize: 15,
-      fontWeight: '700',
-    },
-    // Filter Modal
-    filterModalContainer: {
-      flex: 1,
-      justifyContent: 'flex-end',
-    },
-    filterModalBackdrop: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    },
-    filterModalContent: {
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      height: '70%',
-      boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.2)',
-      elevation: 10,
-    },
-    filterModalHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: 20,
-      paddingTop: 20,
-      paddingBottom: 16,
-      borderBottomWidth: 1,
-    },
-    filterModalTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-    },
-    filterModalScroll: {
-      flex: 1,
-    },
-    filterModalScrollContent: {
-      padding: 20,
-      paddingBottom: 20,
-    },
-    filterOption: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-      borderRadius: 12,
-      marginBottom: 10,
-      gap: 12,
-    },
-    filterCheckbox: {
-      width: 24,
-      height: 24,
-      borderRadius: 6,
-      borderWidth: 2,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    filterOptionText: {
-      fontSize: 16,
-      fontWeight: '500',
-    },
-    filterOptionTextActive: {
-      fontWeight: '600',
-    },
-    clearFiltersButton: {
-      borderRadius: 12,
-      paddingVertical: 14,
-      alignItems: 'center',
-      marginTop: 10,
-      borderWidth: 1,
-    },
-    clearFiltersButtonText: {
-      fontSize: 15,
-      fontWeight: '600',
-    },
-    applyFiltersButton: {
-      marginHorizontal: 20,
-      marginVertical: 16,
-      borderRadius: 12,
-      paddingVertical: 16,
-      alignItems: 'center',
-    },
-    applyFiltersButtonText: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      color: '#FFFFFF',
+      color: colors.fireText,
     },
   });

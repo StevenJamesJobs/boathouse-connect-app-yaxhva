@@ -1270,8 +1270,13 @@ export type Database = {
           glass_price: string | null
           id: string
           is_active: boolean | null
+          is_dairy_free: boolean
+          is_egg_free: boolean
           is_gluten_free: boolean | null
           is_gluten_free_available: boolean | null
+          is_nut_free: boolean
+          is_salt_free: boolean
+          is_sugar_free: boolean
           is_vegetarian: boolean | null
           is_vegetarian_available: boolean | null
           is_weekly_special: boolean | null
@@ -1305,8 +1310,13 @@ export type Database = {
           glass_price?: string | null
           id?: string
           is_active?: boolean | null
+          is_dairy_free?: boolean
+          is_egg_free?: boolean
           is_gluten_free?: boolean | null
           is_gluten_free_available?: boolean | null
+          is_nut_free?: boolean
+          is_salt_free?: boolean
+          is_sugar_free?: boolean
           is_vegetarian?: boolean | null
           is_vegetarian_available?: boolean | null
           is_weekly_special?: boolean | null
@@ -1340,8 +1350,13 @@ export type Database = {
           glass_price?: string | null
           id?: string
           is_active?: boolean | null
+          is_dairy_free?: boolean
+          is_egg_free?: boolean
           is_gluten_free?: boolean | null
           is_gluten_free_available?: boolean | null
+          is_nut_free?: boolean
+          is_salt_free?: boolean
+          is_sugar_free?: boolean
           is_vegetarian?: boolean | null
           is_vegetarian_available?: boolean | null
           is_weekly_special?: boolean | null
@@ -4151,8 +4166,13 @@ export type Database = {
           p_flavor_profile?: string
           p_flavor_profile_es?: string
           p_glass_price?: string
+          p_is_dairy_free?: boolean
+          p_is_egg_free?: boolean
           p_is_gluten_free: boolean
           p_is_gluten_free_available: boolean
+          p_is_nut_free?: boolean
+          p_is_salt_free?: boolean
+          p_is_sugar_free?: boolean
           p_is_vegetarian: boolean
           p_is_vegetarian_available: boolean
           p_is_weekly_special?: boolean
@@ -4746,8 +4766,13 @@ export type Database = {
           glass_price: string
           id: string
           is_active: boolean
+          is_dairy_free: boolean
+          is_egg_free: boolean
           is_gluten_free: boolean
           is_gluten_free_available: boolean
+          is_nut_free: boolean
+          is_salt_free: boolean
+          is_sugar_free: boolean
           is_vegetarian: boolean
           is_vegetarian_available: boolean
           is_weekly_special: boolean
@@ -5077,6 +5102,17 @@ export type Database = {
           p_upload_id: string
           p_user_id: string
         }
+        Returns: Json
+      }
+      get_manager_permissions: {
+        Args: { p_actor_id: string }
+        Returns: {
+          granted: boolean
+          permission_key: string
+        }[]
+      }
+      set_manager_permission: {
+        Args: { p_actor_id: string; p_granted: boolean; p_key: string }
         Returns: Json
       }
       get_unread_message_count: {
@@ -5760,8 +5796,13 @@ export type Database = {
           p_flavor_profile?: string
           p_flavor_profile_es?: string
           p_glass_price?: string
+          p_is_dairy_free?: boolean
+          p_is_egg_free?: boolean
           p_is_gluten_free: boolean
           p_is_gluten_free_available: boolean
+          p_is_nut_free?: boolean
+          p_is_salt_free?: boolean
+          p_is_sugar_free?: boolean
           p_is_vegetarian: boolean
           p_is_vegetarian_available: boolean
           p_is_weekly_special?: boolean

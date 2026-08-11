@@ -14,6 +14,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { brokerUploadBase64 } from '@/utils/storageBroker';
@@ -62,6 +63,7 @@ export default function MenuUploadScreen() {
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
   const { hasPremium } = useSubscription();
+  const { perms } = useManagerPermissions();
   const { t } = useTranslation();
 
   const [uploads, setUploads] = useState<MenuUpload[]>([]);
@@ -78,6 +80,10 @@ export default function MenuUploadScreen() {
   const [deleting, setDeleting] = useState(false);
 
   const isOwner = user?.role === 'owner';
+  // Owner, or a manager the owner has granted AI Menu Uploads. Employees never
+  // reach this route (useRequireManagerRoute bounces them). Menu DELETION below
+  // stays owner-only — delete_menu is owner-gated server-side.
+  const canAiUpload = isOwner || perms.aiUpload;
   const menuOptions = targetMenuOptions(
     organization.menu_count,
     organization.menu_category_scope,
@@ -125,14 +131,27 @@ export default function MenuUploadScreen() {
   );
 
   // Poll for parse completion, then route to the review screen.
+  // An rpc error or 5 consecutive empty polls (e.g. a permission denial
+  // returns no row) stops the poll instead of spinning forever.
   useEffect(() => {
     if (!processingId) return;
+    let emptyTicks = 0;
     const interval = setInterval(async () => {
       if (!user?.id) return;
-      const { data: pollRows } = await supabase.rpc('get_menu_uploads', {
+      const { data: pollRows, error: pollError } = await supabase.rpc('get_menu_uploads', {
         p_actor_id: user.id, p_upload_id: processingId,
       });
       const data: any = Array.isArray(pollRows) ? pollRows[0] : null;
+      if (pollError || (!data && ++emptyTicks >= 5)) {
+        clearInterval(interval);
+        setProcessingId(null);
+        Alert.alert(
+          t('menu_upload.failed_title', 'Could Not Read Menu'),
+          t('menu_upload.poll_failed', 'Could not check the upload status. Open Upload History to see the result.')
+        );
+        return;
+      }
+      if (data) emptyTicks = 0;
       if (data && data.status !== 'processing') {
         const id = processingId;
         setProcessingId(null);
@@ -192,11 +211,15 @@ export default function MenuUploadScreen() {
     loadUploads();
   };
 
-  // Returns true if the owner may start an upload costing `minCost` credits.
-  // First upload is always free; afterwards premium + enough credits.
+  // Returns true if the actor (owner, or manager granted AI uploads) may start
+  // an upload costing `minCost` credits. First upload is always free;
+  // afterwards premium + enough credits.
   const guardUpload = (minCost: number): boolean => {
-    if (!isOwner) {
-      Alert.alert(t('menu_upload.owner_only_title', 'Owner Only'), t('menu_upload.owner_only_msg', 'Only the restaurant owner can upload a menu.'));
+    if (!canAiUpload) {
+      Alert.alert(
+        t('menu_upload.permission_needed_title', 'Permission Needed'),
+        t('menu_upload.permission_needed_msg', "Menu uploads need the owner's permission. Ask your owner to enable AI Menu Uploads for managers.")
+      );
       return false;
     }
     if (quota?.free_available) return true;
