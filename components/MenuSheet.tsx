@@ -12,6 +12,12 @@ export interface MenuSheetProps {
   colors: any;
   /** Employees never see the ⚙ chip, so this sheet only ever opens for these. */
   role: 'owner' | 'manager';
+  /**
+   * Which side opened the sheet. In the editor the first row flips to
+   * "Back to Menu" (the host passes an onEditMenu that navigates back) —
+   * Steve's smoke: "Edit Menu" reads wrong when you're already editing.
+   */
+  mode?: 'user' | 'editor';
   /** From useManagerPermissions — owners arrive with all three true. */
   perms: { menuConfig: boolean; editCategories: boolean; aiUpload: boolean };
   /** Host navigates (push '/menu-editor') — fired AFTER this sheet dismisses. */
@@ -44,6 +50,7 @@ export default function MenuSheet({
   onClose,
   colors,
   role,
+  mode = 'user',
   perms,
   onEditMenu,
   onEditCategories,
@@ -155,14 +162,23 @@ export default function MenuSheet({
       title={t('menu_sheet.title')}
       subtitle={t('menu_sheet.subtitle')}
     >
-      {row({
-        key: 'edit',
-        iosIcon: 'pencil',
-        androidIcon: 'edit',
-        label: t('menu_sheet.edit_menu'),
-        sub: t('menu_sheet.edit_menu_sub'),
-        onPress: () => defer(onEditMenu),
-      })}
+      {mode === 'editor'
+        ? row({
+            key: 'edit',
+            iosIcon: 'eye.fill',
+            androidIcon: 'visibility',
+            label: t('menu_sheet.back_to_menu'),
+            sub: t('menu_sheet.back_to_menu_sub'),
+            onPress: () => defer(onEditMenu),
+          })
+        : row({
+            key: 'edit',
+            iosIcon: 'pencil',
+            androidIcon: 'edit',
+            label: t('menu_sheet.edit_menu'),
+            sub: t('menu_sheet.edit_menu_sub'),
+            onPress: () => defer(onEditMenu),
+          })}
 
       {row({
         key: 'categories',

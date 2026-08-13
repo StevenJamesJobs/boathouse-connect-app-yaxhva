@@ -179,9 +179,10 @@ export default function GlassSheet({
 
           {scroll ? (
             <ScrollView
+              style={styles.bodyScroll}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.body}
+              contentContainerStyle={styles.bodyContent}
             >
               {children}
             </ScrollView>
@@ -209,6 +210,11 @@ const styles = StyleSheet.create({
     // Overridden per-render with the safe-area inset; kept as the floor.
     paddingBottom: 20,
     maxHeight: '88%',
+    // Shrinkable against the KAV wrap's DEFINITE height (maxHeight alone does
+    // not give Yoga a constraint context to shrink children under) — this is
+    // what lets bodyScroll's flexShrink actually bound the viewport when a
+    // sheet's content is taller than the cap, keyboard open included.
+    flexShrink: 1,
   },
   grab: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
   titleRow: {
@@ -231,6 +237,22 @@ const styles = StyleSheet.create({
   // and grows the target inward.
   close: { width: 44, height: 44, alignItems: 'flex-end', justifyContent: 'center' },
   subtitle: { fontFamily: fonts.body.regular, fontSize: 13, lineHeight: 18, marginBottom: 12 },
+  // flexShrink:1 on the SCROLLVIEW (RN defaults it to 0): when a sheet's body
+  // is taller than GlassCard's `maxHeight: '88%'`, the unshrinkable ScrollView
+  // used to take its full content height and get CLIPPED by the card's
+  // overflow:'hidden' — contentSize equalled the view's height, so there was
+  // nothing to scroll, just the iOS rubber-band (the s69 Add/Edit form was the
+  // first body tall enough to hit it). Shrinking bounds the viewport inside
+  // the card, which is what makes the body actually scrollable; sheets that
+  // fit keep their content-sized height (flexGrow stays 0), so shorter sheets
+  // render exactly as before.
+  bodyScroll: { flexGrow: 0, flexShrink: 1 },
+  // ⚠️ The SCROLL branch's content container must NOT be shrinkable: Yoga
+  // shrinks it to the viewport, contentSize == bounds, and the sheet "scrolls"
+  // by rubber-band only while everything past the fold is clipped (the s69
+  // Add/Edit smoke, twice). Shrink belongs to bodyScroll (the viewport), never
+  // to the content.
+  bodyContent: { gap: 9, paddingBottom: 4 },
   // flexShrink:1 (RN defaults it to 0) so the non-scroll body can give height
   // back under GlassCard's `maxHeight: '88%'`. Without it the negative free
   // space stops here and never reaches a child that CAN shrink — a nested drag

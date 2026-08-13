@@ -402,7 +402,8 @@
     "redeem_cta": "Canjear · ${{amount}}",
     "gl": "Copa",
     "btl": "Bot",
-    "mbr": "Socio"
+    "mbr": "Socio",
+    "filter_categories": "Categorías"
   },
   "menu_sheet": {
     "title": "Menú",
@@ -417,7 +418,9 @@
     "menu_configuration_sub": "Nombres, íconos, uno o dos menús",
     "ask_owner": "Pídele al dueño que lo habilite",
     "granted_note": "Se te ha otorgado permiso para acceder a estas funciones.",
-    "granted_credits": "Las subidas gastan créditos mensuales de la suscripción, así que consulta antes con tu Gerente General."
+    "granted_credits": "Las subidas gastan créditos mensuales de la suscripción, así que consulta antes con tu Gerente General.",
+    "back_to_menu": "Volver al Menú",
+    "back_to_menu_sub": "Regresa a la vista del cliente"
   },
   "menu_upload_sheet": {
     "title": "Subir Menú",
@@ -1634,7 +1637,25 @@
     "ai_button": "IA",
     "ai_upload_button": "Subir menú con IA",
     "upload_menu_button": "Subir menú",
-    "winter_libation_banner": "Los cócteles de {{menu}} se gestionan en el Editor de Recetas de Bebidas de {{menu}}."
+    "winter_libation_banner": "Los cócteles de {{menu}} se gestionan en el Editor de Recetas de Bebidas de {{menu}}.",
+    "items_count_one": "{{count}} platillo",
+    "items_count_other": "{{count}} platillos",
+    "drag_to_reorder": "arrastra para reordenar",
+    "wine_photo_tip": "La imagen del vino se ve mejor en el Menú con un fondo blanco.",
+    "photo_title": "Foto del Platillo",
+    "photo_remove": "Quitar la foto",
+    "wine_location_label": "Región",
+    "wine_location_placeholder": "p. ej. Valle de Napa, California",
+    "wine_glass_price_label": "Precio por Copa",
+    "wine_bottle_price_label": "Precio por Botella",
+    "wine_member_bottle_price_label": "Precio Botella de Socio",
+    "wine_flavor_label": "Sabor / Notas Clave",
+    "wine_flavor_placeholder": "p. ej. Manzana verde crujiente, cítricos, final mineral",
+    "wine_selling_points_label": "Puntos de Venta Únicos",
+    "wine_selling_points_placeholder": "p. ej. Viñedo familiar, biodinámico, solo 200 cajas",
+    "wine_libations_note": "Las bebidas y los cócteles se gestionan en los Editores de Recetas del Asistente de Bartender.",
+    "position_of": "posición {{n}} de {{total}}",
+    "open_recipes_editor": "Abrir Editor de Recetas"
   },
   "season_selector": {
     "winter": "Menú de Invierno",

@@ -86,11 +86,11 @@ export default function MenuSearchRow({
         </TouchableOpacity>
       ) : (
         <TouchableOpacity
-          style={[styles.rightBtn, styles.rightBtnIconOnly]}
+          style={[styles.rightBtn, styles.rightBtnIconOnly, styles.rightBtnAdd]}
           onPress={onRightPress}
           activeOpacity={0.7}
         >
-          <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={22} color={colors.text} />
+          <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={22} color={colors.primary} />
         </TouchableOpacity>
       )}
     </View>
@@ -146,6 +146,13 @@ const createStyles = (colors: any) =>
     rightBtnIconOnly: {
       width: 46,
       paddingHorizontal: 0,
+    },
+    // The editor's + is primary-tinted (the mockup's .sbtn.add — same fire
+    // 18%/42% mix as the header's flip chip); the user side's Filter stays
+    // neutral glass.
+    rightBtnAdd: {
+      backgroundColor: colors.primary + '2E',
+      borderColor: colors.primary + '6B',
     },
     rightBtnLabel: {
       fontFamily: fonts.body.semibold,

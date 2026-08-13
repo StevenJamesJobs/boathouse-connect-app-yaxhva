@@ -12,8 +12,6 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { StorageExpoImage } from '@/components/StorageImage';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -26,11 +24,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
-import { menuIconAndroid } from '@/constants/menuIcons';
 import { fonts } from '@/constants/fonts';
 import type { ThemeColorSet } from '@/styles/commonStyles';
 import { isManagerOrOwner } from '@/utils/roles';
-import { useMenuCategories } from '@/hooks/useMenuCategories';
+import { useMenuCategories, type MenuCategory } from '@/hooks/useMenuCategories';
 import { useRedemptionSettings, foodRedeemCost } from '@/hooks/useRedemptionSettings';
 import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import {
@@ -43,6 +40,7 @@ import MenuTopArea, { MenuSeasonTabs } from '@/components/MenuTopArea';
 import MenuSearchRow from '@/components/MenuSearchRow';
 import MenuCategoryTabs from '@/components/MenuCategoryTabs';
 import MenuItemDetailSheet, { type MenuItemForDetail } from '@/components/MenuItemDetailSheet';
+import { MenuItemSquareCard, MenuItemBannerCard } from '@/components/MenuItemCards';
 import MenuFilterSheet, { type DietKey } from '@/components/MenuFilterSheet';
 import MenuSheet from '@/components/MenuSheet';
 
@@ -144,6 +142,13 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const { categories: menuCats, loading: categoriesLoading } = useMenuCategories({
     menuSlot: season === 'winter' ? 1 : 2,
   });
+  // Filter-sheet Categories needs BOTH menus' trees regardless of which one
+  // the pager is showing (menuCats above tracks the PAGER's season only) —
+  // two slot-pinned calls, always mounted (hooks can't be conditional). In
+  // 'shared' scope both resolve to the same effectiveSlot=0 tree (harmless
+  // duplicate fetch, never wrong data); in 'per_menu' scope they diverge.
+  const { categories: menuCatsSlot1 } = useMenuCategories({ menuSlot: 1 });
+  const { categories: menuCatsSlot2 } = useMenuCategories({ menuSlot: 2 });
 
   const hasBridge = !!onSwipeToWelcome;
 
@@ -176,6 +181,48 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       return catKey(item.category) === catKey(categoryName);
     },
     [catOf, perMenu],
+  );
+
+  // ── Categories filter (Steve's feature) — needs BOTH menus' trees, not
+  // just the pager's active one, so a selection resolves the same regardless
+  // of which menu it lives on or which row the sheet's own Menu control shows.
+  const unionCatTree = useMemo(() => {
+    if (organization.menu_count !== 2) return menuCatsSlot1;
+    // Dedup by system_key when present (built-ins survive renames), else by
+    // catKey(display_name) for customs — first occurrence (slot 1) wins the
+    // colour, matching "first colour wins" for anything that legitimately
+    // exists on both trees.
+    const seen = new Set<string>();
+    const out: MenuCategory[] = [];
+    for (const c of [...menuCatsSlot1, ...menuCatsSlot2]) {
+      const dedupeKey = c.system_key || catKey(c.display_name);
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      out.push(c);
+    }
+    return out;
+  }, [organization.menu_count, menuCatsSlot1, menuCatsSlot2]);
+  const unionCatOf = useCallback(
+    (name: string | null | undefined) => {
+      if (!name) return undefined;
+      const key = catKey(name);
+      return unionCatTree.find((c) => catKey(c.display_name) === key);
+    },
+    [unionCatTree],
+  );
+  // Same shape as categoryMatches above, resolved against the UNION tree — a
+  // selected category keeps matching correctly even if the sheet's own Menu
+  // row later narrows to a menu whose tree doesn't carry this category's
+  // filter_behavior. Callers OR this across selections (getSearchFilteredItems).
+  const filterCatMatches = useCallback(
+    (item: MenuItem, categoryName: string): boolean => {
+      const fb = unionCatOf(categoryName)?.filter_behavior;
+      if (!perMenu && fb === 'lunch') return item.available_for_lunch;
+      if (!perMenu && fb === 'dinner') return item.available_for_dinner;
+      if (fb === 'weekly_specials') return catKey(item.category) === catKey(categoryName) || !!item.is_weekly_special;
+      return catKey(item.category) === catKey(categoryName);
+    },
+    [unionCatOf, perMenu],
   );
 
   // Single source of truth for the filter predicates (sheet options, the
@@ -334,6 +381,9 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   // The filter sheet's menu row ('both' = no menu narrowing — the default, and
   // the only value on single-menu orgs).
   const [menuFilterValue, setMenuFilterValue] = useState<'winter' | 'summer' | 'both'>('both');
+  // Category filter chips — catKey'd display names, OR'd across selections
+  // (see filterCatMatches). Same lifecycle as dietFilters, independent state.
+  const [catFilters, setCatFilters] = useState<string[]>([]);
   // Drop stale dietary filters whose option is no longer offered (zero-match
   // flags after a menu switch) so they can't linger with no way to untoggle.
   useEffect(() => {
@@ -347,6 +397,51 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   useEffect(() => {
     if (organization.menu_count !== 2 && menuFilterValue !== 'both') setMenuFilterValue('both');
   }, [organization.menu_count, menuFilterValue]);
+
+  // The Categories filter's own corpus: allItems narrowed the same way
+  // getSearchFilteredItems' menuScoped branch narrows it, so the offered
+  // chips always match what menuFilterValue would actually search (unlike
+  // dietaryOptions above, which stays pinned to the pager's season today).
+  const menuScopedItemsForFilter = useMemo(() => {
+    if (organization.menu_count !== 2 || menuFilterValue === 'both') return allItems;
+    return allItems.filter((item) =>
+      menuFilterValue === 'winter' ? item.season !== 'summer' : item.season !== 'winter'
+    );
+  }, [allItems, organization.menu_count, menuFilterValue]);
+  // Which tree backs the OFFERED chip list — follows the sheet's OWN Menu
+  // row, not the pager's season. 'both' reuses the union tree so the dedup
+  // logic lives in exactly one place.
+  const filterCatTree = useMemo(() => {
+    if (organization.menu_count !== 2) return menuCatsSlot1;
+    if (menuFilterValue === 'winter') return menuCatsSlot1;
+    if (menuFilterValue === 'summer') return menuCatsSlot2;
+    return unionCatTree;
+  }, [organization.menu_count, menuFilterValue, menuCatsSlot1, menuCatsSlot2, unionCatTree]);
+  // Item-backed per the visibleCats honesty precedent — no dead chips. Hidden
+  // categories are already excluded by useMenuCategories (no includeHidden
+  // passed to any of the three hook calls above). Wine/Libations are ordinary
+  // rows here — no special-casing, so they appear like any other category.
+  const categoryOptions = useMemo(
+    () =>
+      filterCatTree
+        .filter((c) => menuScopedItemsForFilter.some((item) => filterCatMatches(item, c.display_name)))
+        .map((c) => ({
+          key: catKey(c.display_name),
+          label: labelForCategoryName(c.display_name, t, filterCatTree, language),
+          color: c.color,
+        })),
+    [filterCatTree, menuScopedItemsForFilter, filterCatMatches, t, language],
+  );
+  // Drop a selected category no longer offered (menu-row switch, tree
+  // reload) — mirrors the dietFilters cleanup effect above.
+  useEffect(() => {
+    if (loading) return;
+    const offered = new Set(categoryOptions.map((o) => o.key));
+    setCatFilters((prev) => {
+      const next = prev.filter((k) => offered.has(k));
+      return next.length === prev.length ? prev : next;
+    });
+  }, [loading, categoryOptions]);
   const { user } = useAuth();
   const { settings: redemptionSettings } = useRedemptionSettings();
   const { perms: managerPerms } = useManagerPermissions();
@@ -592,6 +687,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   const isSearchOrFilterMode =
     searchQuery.trim().length > 0 ||
     dietFilters.length > 0 ||
+    catFilters.length > 0 ||
     (organization.menu_count === 2 && menuFilterValue !== 'both');
 
   // Entering/leaving search-filter mode unmounts/remounts the pager, so the
@@ -605,12 +701,16 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
 
   // Get filtered items for search/filter mode
   const getSearchFilteredItems = useCallback(() => {
-    // A text search spans the WHOLE menu (allItems); filter-only stays on the
-    // active menu (menuItems). The filter sheet's menu row can then narrow
-    // either corpus to a single menu ('both' applies no narrowing, which
-    // preserves the classic behavior exactly).
+    // A text search spans the WHOLE menu (allItems); dietary-only filtering
+    // stays on the active menu (menuItems — the classic behavior). A CATEGORY
+    // selection also spans both menus: its chips are offered from the
+    // cross-menu corpus, so the searched corpus must match that promise or a
+    // chip backed only by the other menu returns an empty list (verify-lens
+    // finding). The sheet's menu row can then narrow either corpus.
     const menuScoped = organization.menu_count === 2 && menuFilterValue !== 'both';
-    let filtered = menuScoped ? allItems : (searchQuery.trim() ? allItems : menuItems);
+    let filtered = menuScoped
+      ? allItems
+      : (searchQuery.trim() || catFilters.length > 0 ? allItems : menuItems);
     if (menuScoped) {
       filtered = filtered.filter((item) =>
         menuFilterValue === 'winter' ? item.season !== 'summer' : item.season !== 'winter'
@@ -640,8 +740,15 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       filtered = filtered.filter(item => dietFilters.every(filter => matchesFilter(item, filter)));
     }
 
+    // Categories: OR across selections (any match keeps the item), AND with
+    // everything above. filterCatMatches resolves via the union tree so a
+    // selection stays correct regardless of the sheet's own Menu row.
+    if (catFilters.length > 0) {
+      filtered = filtered.filter(item => catFilters.some(name => filterCatMatches(item, name)));
+    }
+
     return filtered;
-  }, [menuItems, allItems, searchQuery, dietFilters, menuFilterValue, organization.menu_count, matchesFilter]);
+  }, [menuItems, allItems, searchQuery, dietFilters, catFilters, menuFilterValue, organization.menu_count, matchesFilter, filterCatMatches]);
 
   // Computed ONCE per render (the old code filtered the corpus twice: once for
   // the length check and again for the map).
@@ -795,8 +902,15 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     );
   };
 
+  const toggleCategoryFilter = (key: string) => {
+    setCatFilters(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
+
   const clearAllFilters = () => {
     setDietFilters([]);
+    setCatFilters([]);
     setMenuFilterValue('both');
   };
 
@@ -896,161 +1010,72 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   };
 
   // ── Cards ──────────────────────────────────────────────────────────────────
-  // The 2.5pt category-colour fade across the top edge of both card shapes.
-  const renderTopFade = (categoryColor: string) => (
-    <LinearGradient
-      colors={[categoryColor, categoryColor + '4D', 'transparent']}
-      locations={[0, 0.34, 0.68]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 0 }}
-      style={styles.cardTopFade}
-      pointerEvents="none"
-    />
-  );
-
-  // Banner card — the photo IS the card. Wine never banners (no thumb on wine).
-  const renderBannerCard = (item: MenuItem, categoryColor: string) => (
-    <TouchableOpacity
-      key={item.id}
-      style={styles.bannerCard}
-      onPress={() => openDetailSheet(item)}
-      activeOpacity={0.85}
-    >
-      <StorageExpoImage
-        source={getImageUrl(item.thumbnail_url!, item.updated_at)!}
-        style={StyleSheet.absoluteFill}
-        contentFit="cover"
-      />
-      {/* Bottom scrim so the white body copy reads on any photo. */}
-      <LinearGradient
-        colors={['rgba(14,11,9,0.94)', 'rgba(14,11,9,0.05)']}
-        locations={[0.08, 0.64]}
-        start={{ x: 0, y: 1 }}
-        end={{ x: 0, y: 0 }}
-        style={StyleSheet.absoluteFill}
-        pointerEvents="none"
-      />
-      {renderTopFade(categoryColor)}
-      <View style={styles.bannerEyebrow}>
-        <Text style={styles.bannerEyebrowText} numberOfLines={1}>
-          {bannerEyebrowText(item)}
-        </Text>
-      </View>
-      <View style={styles.bannerPriceChip}>
-        <Text style={styles.bannerPriceText}>{formatPrice(item.price)}</Text>
-      </View>
-      <View style={styles.bannerBody}>
-        <Text style={styles.bannerTitle} numberOfLines={1}>
-          {getLocalizedField(item, 'name', language)}
-        </Text>
-        {item.description ? (
-          <Text style={styles.bannerDesc} numberOfLines={2}>
-            {stripFormattingTags(getLocalizedField(item, 'description', language) || item.description)}
-          </Text>
-        ) : null}
-      </View>
-    </TouchableOpacity>
-  );
-
-  // Render a single menu item card. Square cards are translucent surface rows
-  // (per-card blur is forbidden — overdraw); banner cards are full-bleed photos.
+  // Compute the shared display props once and dispatch to the presentational
+  // square/banner card (components/MenuItemCards.tsx, s69 extraction — the
+  // manager editor renders the identical components off the same contract).
+  // Both call sites below invoke this exactly as they invoked the old inline
+  // renderer, so the rendered output stays byte-identical for users.
   const renderMenuCard = (item: MenuItem, categoryColor: string, menuBadge?: { icon: string; label: string }, specialsContext: boolean = false) => {
     const isWine = isWineName(item.category);
-    const localizedLocation = isWine ? getLocalizedField(item, 'location', language) : '';
+    const title = getLocalizedField(item, 'name', language);
+    const description = item.description
+      ? stripFormattingTags(getLocalizedField(item, 'description', language) || item.description)
+      : null;
+    const thumbnailUrl = item.thumbnail_url ? getImageUrl(item.thumbnail_url, item.updated_at) : null;
     // Banner items render as photo cards; wine stays a row card (bottle shots
     // don't crop into a 152pt band) but DOES carry the left thumb like every
     // other row — Steve's smoke call reversed the mockup's hidden wine thumb.
-    // `contain` so the bottle isn't decapitated inside the 62pt square.
     const isBanner = !isWine && item.thumbnail_shape === 'banner' && !!item.thumbnail_url;
-    if (isBanner) return renderBannerCard(item, categoryColor);
-    const diet = cardDietKeys(item);
+
+    if (isBanner) {
+      return (
+        <MenuItemBannerCard
+          key={item.id}
+          colors={colors}
+          title={title}
+          description={description}
+          thumbnailUrl={thumbnailUrl!}
+          eyebrow={bannerEyebrowText(item)}
+          priceLabel={formatPrice(item.price)}
+          catColor={categoryColor}
+          onPress={() => openDetailSheet(item)}
+        />
+      );
+    }
+
+    const dietaryAbbrevs = cardDietKeys(item).map(dietAbbrev);
+    // Specials pages pass menuBadge+specialsContext together (old renderer
+    // suppressed the top-badge pill there and showed the same info as a meta
+    // tag instead) — mirror that split: metaTags carries it, menuBadge prop
+    // to the card is omitted.
+    const metaTags = specialsContext
+      ? [
+          ...(organization.menu_count === 2 ? [menuBadgeForSeason(item.season).label] : []),
+          getCategoryLabel(item.category),
+        ]
+      : undefined;
+
     return (
-    <TouchableOpacity
-      key={item.id}
-      style={styles.squareCard}
-      onPress={() => openDetailSheet(item)}
-      activeOpacity={0.7}
-    >
-      {renderTopFade(categoryColor)}
-      <View style={styles.cardRow}>
-        {item.thumbnail_url && (
-          <StorageExpoImage
-            source={getImageUrl(item.thumbnail_url, item.updated_at)!}
-            style={isWine ? [styles.cardThumb, styles.cardThumbWine] : styles.cardThumb}
-            contentFit={isWine ? 'contain' : 'cover'}
-          />
-        )}
-        <View style={styles.cardContent}>
-          {menuBadge && !specialsContext && (
-            <View style={styles.menuBadge}>
-              <IconSymbol ios_icon_name={menuBadge.icon} android_material_icon_name={menuIconAndroid(menuBadge.icon)} size={11} color={colors.primary} />
-              <Text style={styles.menuBadgeText} numberOfLines={1}>{menuBadge.label}</Text>
-            </View>
-          )}
-          <View style={styles.cardTitleRow}>
-            <Text style={styles.cardTitle} numberOfLines={1}>
-              {getLocalizedField(item, 'name', language)}
-            </Text>
-            {isWine ? (
-              <View style={styles.winePriceStack}>
-                {item.glass_price ? (
-                  <Text style={[styles.winePriceLine, { color: colors.primary }]}>
-                    {t('menu_display.gl')} {formatPrice(item.glass_price)}
-                  </Text>
-                ) : null}
-                {item.bottle_price ? (
-                  <Text style={[styles.winePriceLine, { color: colors.primary }]}>
-                    {t('menu_display.btl')} {formatPrice(item.bottle_price)}
-                  </Text>
-                ) : null}
-                {item.member_bottle_price ? (
-                  <Text style={[styles.winePriceLine, { color: colors.textSecondary }]}>
-                    {t('menu_display.mbr')} {formatPrice(item.member_bottle_price)}
-                  </Text>
-                ) : null}
-              </View>
-            ) : (
-              <Text style={styles.cardPrice}>
-                {formatPrice(item.price)}
-              </Text>
-            )}
-          </View>
-          {isWine && localizedLocation ? (
-            <Text style={styles.wineLocation} numberOfLines={1}>
-              📍 {localizedLocation}
-            </Text>
-          ) : null}
-          {item.description && (
-            <Text style={styles.cardDesc} numberOfLines={2}>
-              {stripFormattingTags(getLocalizedField(item, 'description', language) || item.description)}
-            </Text>
-          )}
-          {/* Chips sit BELOW the description — the mockup's card stack. */}
-          {(specialsContext || diet.length > 0) ? (
-            <View style={styles.tagsRow}>
-              {specialsContext && (
-                <>
-                  {/* "Both Menus"/menu badges only make sense on 2-menu orgs */}
-                  {organization.menu_count === 2 && (
-                    <View style={styles.metaTag}>
-                      <Text style={styles.metaTagText}>{menuBadgeForSeason(item.season).label}</Text>
-                    </View>
-                  )}
-                  <View style={styles.metaTag}>
-                    <Text style={styles.metaTagText}>{getCategoryLabel(item.category)}</Text>
-                  </View>
-                </>
-              )}
-              {diet.map((k) => (
-                <View key={k} style={styles.dietChip}>
-                  <Text style={styles.dietChipText}>{dietAbbrev(k)}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-        </View>
-      </View>
-    </TouchableOpacity>
+      <MenuItemSquareCard
+        key={item.id}
+        colors={colors}
+        title={title}
+        description={description}
+        thumbnailUrl={thumbnailUrl}
+        isWine={isWine}
+        priceLabel={isWine ? null : formatPrice(item.price)}
+        winePrices={isWine ? {
+          gl: item.glass_price ? `${t('menu_display.gl')} ${formatPrice(item.glass_price)}` : undefined,
+          btl: item.bottle_price ? `${t('menu_display.btl')} ${formatPrice(item.bottle_price)}` : undefined,
+          mbr: item.member_bottle_price ? `${t('menu_display.mbr')} ${formatPrice(item.member_bottle_price)}` : undefined,
+        } : null}
+        wineLocation={isWine ? getLocalizedField(item, 'location', language) : null}
+        dietaryAbbrevs={dietaryAbbrevs}
+        metaTags={metaTags}
+        menuBadge={specialsContext ? undefined : menuBadge}
+        catColor={categoryColor}
+        onPress={() => openDetailSheet(item)}
+      />
     );
   };
 
@@ -1090,6 +1115,20 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
             if (h > 0) setPageViewportH((prev) => (prev === h ? prev : h));
           }}
         >
+          {/* "{n} items · {section}" — the editor's count voice, count-only on
+              this side, right-aligned so it sits exactly where the editor's
+              does and the user↔editor flip keeps it still (Steve's round 4). */}
+          {pageItems.length > 0 && (
+            <View style={styles.countRow}>
+              <Text style={styles.countRowText} numberOfLines={1}>
+                {t('menu_editor:items_count', { count: pageItems.length })}
+                {' · '}
+                {page.subcategory && page.subcategory !== ALL_PAGE_KEY
+                  ? getSubcategoryLabel(page.subcategory)
+                  : getCategoryLabel(page.category)}
+              </Text>
+            </View>
+          )}
           {pageItems.length === 0 ? (
             <View style={styles.emptyContainer}>
               <IconSymbol
@@ -1158,7 +1197,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   };
 
   const activeFilterCount =
-    dietFilters.length + (organization.menu_count === 2 && menuFilterValue !== 'both' ? 1 : 0);
+    dietFilters.length + catFilters.length + (organization.menu_count === 2 && menuFilterValue !== 'both' ? 1 : 0);
 
   const dietaryOptions = useMemo(
     () => DIET_KEYS.filter((k) => availableDietKeys.has(k)).map((k) => ({
@@ -1241,24 +1280,30 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
     <GestureHandlerRootView style={styles.container}>
       {/* Fixed chrome — identical user↔editor: header + menu tabs, then the
           scroll-collapsing search row, then the sticky category rows. The
-          AmbientGlow behind all of it comes from the PORTAL LAYOUT. */}
-      <MenuTopArea
-        colors={colors}
-        mode="user"
-        showActionChips={showActionChips}
-        onOpenMenuSheet={() => setMenuSheetVisible(true)}
-        onFlipSide={() => router.push('/menu-editor' as any)}
-        season={season}
-        onSeasonChange={setSeason}
-        // Normal browse mode carries the Menu 1/2 tabs in the COLLAPSING band
-        // (they dissolve with the search row — a scrolled user has settled
-        // their menu choice); only search mode pins them here.
-        showMenuTabs={isSearchOrFilterMode && organization.menu_count === 2}
-        menu1Label={organization.menu_1_name}
-        menu2Label={organization.menu_2_name}
-        menu1Icon={organization.menu_1_icon}
-        menu2Icon={organization.menu_2_icon}
-      />
+          AmbientGlow behind all of it comes from the PORTAL LAYOUT.
+          zIndex lifts the header's chips ABOVE the pager's translated chrome
+          overlay in sibling stacking — the parked (invisible) band otherwise
+          intercepted chip taps on iOS despite pointerEvents:none (s69 smoke:
+          ⚙/pencil dead while collapsed). */}
+      <View style={styles.topAreaLayer}>
+        <MenuTopArea
+          colors={colors}
+          mode="user"
+          showActionChips={showActionChips}
+          onOpenMenuSheet={() => setMenuSheetVisible(true)}
+          onFlipSide={() => router.push('/menu-editor' as any)}
+          season={season}
+          onSeasonChange={setSeason}
+          // Normal browse mode carries the Menu 1/2 tabs in the COLLAPSING band
+          // (they dissolve with the search row — a scrolled user has settled
+          // their menu choice); only search mode pins them here.
+          showMenuTabs={isSearchOrFilterMode && organization.menu_count === 2}
+          menu1Label={organization.menu_1_name}
+          menu2Label={organization.menu_2_name}
+          menu1Icon={organization.menu_1_icon}
+          menu2Icon={organization.menu_2_icon}
+        />
+      </View>
 
       {isSearchOrFilterMode ? (
         <>
@@ -1297,7 +1342,10 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
                   renderMenuCard(
                     item,
                     catOf(item.category)?.color || colors.primary,
-                    searchQuery.trim() && organization.menu_count === 2 ? menuBadgeForSeason(item.season) : undefined,
+                    // Badge whenever the corpus spans both menus (query OR a
+                    // category selection) — the reader needs to know which
+                    // menu a cross-menu hit lives on.
+                    (searchQuery.trim() || catFilters.length > 0) && organization.menu_count === 2 ? menuBadgeForSeason(item.season) : undefined,
                   )
                 )
               )}
@@ -1336,6 +1384,9 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
 
           <Animated.View
             style={[styles.chromeOverlay, { transform: [{ translateY: overlayTranslate }] }]}
+            // box-none: the overlay CONTAINER must never capture a touch
+            // itself — only its interactive children may.
+            pointerEvents="box-none"
             onLayout={(e) => {
               const h = Math.round(e.nativeEvent.layout.height);
               if (h > 0 && h !== chromeH) setChromeH(h);
@@ -1401,6 +1452,9 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
         onMenuValue={setMenuFilterValue}
         menu1Label={organization.menu_1_name}
         menu2Label={organization.menu_2_name}
+        categoryOptions={categoryOptions}
+        selectedCategories={catFilters}
+        onToggleCategory={toggleCategoryFilter}
         dietaryOptions={dietaryOptions}
         selected={dietFilters}
         onToggle={toggleDietFilter}
@@ -1447,6 +1501,12 @@ const createStyles = (colors: ThemeColorSet) =>
     container: {
       flex: 1,
     },
+    // Above the pager subtree (and its translated chrome overlay) in sibling
+    // stacking, so the header chips stay tappable while the band is parked
+    // over them.
+    topAreaLayer: {
+      zIndex: 20,
+    },
     // Normal-mode content area: the pager fills it, the chrome overlay glides
     // absolutely above it (native-driver transform — never a layout change).
     pagerArea: {
@@ -1473,198 +1533,20 @@ const createStyles = (colors: ThemeColorSet) =>
       paddingTop: 8,
       paddingBottom: 100,
     },
-    // Square card — translucent surface (NO per-card blur), category fade on top.
-    squareCard: {
-      borderRadius: 16,
+    // The editor's .cntrow voice, count-only on this side (right-aligned to
+    // match the editor's count position through the flip).
+    countRow: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
       marginBottom: 10,
-      padding: 11,
-      backgroundColor: colors.surface,
-      borderWidth: StyleSheet.hairlineWidth + 0.5,
-      borderColor: colors.surfaceBorder,
-      overflow: 'hidden',
     },
-    cardTopFade: {
-      position: 'absolute',
-      top: 0,
-      left: 0,
-      right: 0,
-      height: 2.5,
-      opacity: 0.85,
-      zIndex: 1,
-    },
-    cardRow: {
-      flexDirection: 'row',
-      gap: 11,
-    },
-    cardThumb: {
-      width: 62,
-      height: 62,
-      borderRadius: 12,
-    },
-    // Wine thumbs contain on a white ground — label/bottle shots are almost
-    // always on white, so the square reads as one continuous image.
-    cardThumbWine: {
-      backgroundColor: '#FFFFFF',
-    },
-    cardContent: {
-      flex: 1,
-      justifyContent: 'center',
-    },
-    menuBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      alignSelf: 'flex-start',
-      gap: 3,
-      paddingHorizontal: 6,
-      paddingVertical: 2,
-      borderRadius: 8,
-      backgroundColor: colors.primary + '18',
-      marginBottom: 4,
-      maxWidth: 150,
-    },
-    menuBadgeText: {
-      fontFamily: fonts.mono.medium,
+    countRowText: {
+      fontFamily: fonts.mono.semibold,
       fontSize: 10,
-      color: colors.primary,
-    },
-    cardTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 3,
-      gap: 8,
-    },
-    cardTitle: {
-      flex: 1,
-      fontFamily: fonts.display.semibold,
-      fontSize: 14.5,
-      color: colors.text,
-    },
-    cardPrice: {
-      fontFamily: fonts.mono.semibold,
-      fontSize: 13.5,
-      color: colors.primary,
-    },
-    winePriceStack: {
-      alignItems: 'flex-end',
-    },
-    winePriceLine: {
-      fontFamily: fonts.mono.semibold,
-      fontSize: 12,
-      lineHeight: 15,
-    },
-    wineLocation: {
-      // No italic — fontStyle synthesis is unreliable with the bundled custom
-      // families, and the detail sheet's location line made the same call.
-      fontFamily: fonts.body.regular,
-      fontSize: 12,
-      marginTop: 1,
-      marginBottom: 2,
-      color: colors.textSecondary,
-    },
-    cardDesc: {
-      fontFamily: fonts.body.regular,
-      fontSize: 11.5,
-      lineHeight: 16,
-      color: colors.textSecondary,
-    },
-    tagsRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: 4,
-      marginTop: 1,
-      marginBottom: 3,
-    },
-    // Specials meta tags (menu + home category) — token-tinted, no fixed hexes.
-    metaTag: {
-      paddingHorizontal: 7,
-      paddingVertical: 2,
-      borderRadius: 7,
-      backgroundColor: colors.primary + '12',
-      borderWidth: StyleSheet.hairlineWidth + 0.5,
-      borderColor: colors.primary + '42',
-    },
-    metaTagText: {
-      fontFamily: fonts.mono.medium,
-      fontSize: 9,
-      letterSpacing: 0.4,
-      color: colors.primary,
-    },
-    dietChip: {
-      paddingHorizontal: 7,
-      paddingVertical: 2,
-      borderRadius: 7,
-      backgroundColor: colors.primary + '12',
-      borderWidth: StyleSheet.hairlineWidth + 0.5,
-      borderColor: colors.primary + '42',
-    },
-    dietChipText: {
-      fontFamily: fonts.mono.medium,
-      fontSize: 9,
-      letterSpacing: 0.4,
-      color: colors.primary,
-    },
-    // Banner card — the photo IS the card.
-    bannerCard: {
-      height: 152,
-      borderRadius: 18,
-      overflow: 'hidden',
-      marginBottom: 10,
-      backgroundColor: colors.thumbPlaceholder,
-    },
-    bannerEyebrow: {
-      position: 'absolute',
-      top: 9,
-      left: 9,
-      maxWidth: '62%',
-      paddingHorizontal: 7,
-      paddingVertical: 3,
-      borderRadius: 7,
-      backgroundColor: 'rgba(20,16,14,0.55)',
-    },
-    bannerEyebrowText: {
-      fontFamily: fonts.mono.semibold,
-      fontSize: 9,
-      letterSpacing: 1,
+      letterSpacing: 1.2,
       textTransform: 'uppercase',
-      // Photo-anchored literal (the mockup's dark-theme ember): the pill behind
-      // it is fixed dark, and colors.ember goes DARK in the light themes.
-      color: '#FFB07A',
-    },
-    bannerPriceChip: {
-      position: 'absolute',
-      top: 9,
-      right: 9,
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 8,
-      backgroundColor: colors.tint,
-    },
-    bannerPriceText: {
-      fontFamily: fonts.mono.semibold,
-      fontSize: 13,
-      // Deliberate literal: the chip sits on a photo over the warm tint fill in
-      // both themes, so the ink stays dark regardless of palette.
-      color: '#14100E',
-    },
-    bannerBody: {
-      position: 'absolute',
-      left: 12,
-      right: 12,
-      bottom: 10,
-    },
-    bannerTitle: {
-      fontFamily: fonts.display.bold,
-      fontSize: 19,
-      // Deliberate literals: body copy sits on the photo scrim, not a themed surface.
-      color: '#FFFFFF',
-    },
-    bannerDesc: {
-      fontFamily: fonts.body.regular,
-      fontSize: 11.5,
-      lineHeight: 15,
-      marginTop: 2,
-      color: '#D7D0C6',
+      color: colors.textSecondary,
+      flexShrink: 1,
     },
     // Loading & empty states
     loadingContainer: {
