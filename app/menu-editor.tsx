@@ -6,41 +6,48 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   Alert,
-  Modal,
   ActivityIndicator,
-  Platform,
-  KeyboardAvoidingView,
-  ActionSheetIOS,
   FlatList,
   Dimensions,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
-import { StorageImage } from '@/components/StorageImage';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import * as ImagePicker from 'expo-image-picker';
-import { brokerDelete, brokerUploadImage } from '@/utils/storageBroker';
+import { brokerDelete } from '@/utils/storageBroker';
 import { useTranslation } from 'react-i18next';
-import { saveTranslations, getLocalizedField } from '@/utils/translateContent';
-import { useTranslationSection } from '@/components/TranslationSection';
+import { getLocalizedField } from '@/utils/translateContent';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useLanguage } from '@/contexts/LanguageContext';
-import RichTextToolbar from '@/components/RichTextToolbar';
-import FormattedText from '@/components/FormattedText';
-import CategoryPill from '@/components/CategoryPill';
-import SeasonSelector, { type Season } from '@/components/SeasonSelector';
+import { stripFormattingTags } from '@/components/FormattedText';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useMenuCategories } from '@/hooks/useMenuCategories';
-import { categoryLabel, subcategoryLabel, findCategoryByName, labelForCategoryName } from '@/utils/menuCategoryLabels';
-import { compareBySectionThenOrder } from '@/utils/menuBadges';
-import { menuIconAndroid } from '@/constants/menuIcons';
+import { useManagerPermissions } from '@/hooks/useManagerPermissions';
+import { labelForCategoryName, labelForSubcategoryName } from '@/utils/menuCategoryLabels';
+import { menuBadgeForSeason as menuBadgeForSeasonUtil, compareBySectionThenOrder } from '@/utils/menuBadges';
+import { getImageUrl } from '@/utils/imageUrl';
 import { translateServerError } from '@/utils/serverErrors';
+import { fonts } from '@/constants/fonts';
+import type { ThemeColorSet } from '@/styles/commonStyles';
+import AmbientGlow from '@/components/AmbientGlow';
+import BottomNavBar from '@/components/BottomNavBar';
+import JoltOverlay from '@/components/JoltOverlay';
+import MenuTopArea, { MenuSeasonTabs } from '@/components/MenuTopArea';
+import MenuSearchRow from '@/components/MenuSearchRow';
+import MenuCategoryTabs from '@/components/MenuCategoryTabs';
+import MenuSheet from '@/components/MenuSheet';
+import MenuItemDetailSheet, { type MenuItemForDetail } from '@/components/MenuItemDetailSheet';
+import GlassActionSheet, { type GlassAction } from '@/components/GlassActionSheet';
+import OrderPositionModal from '@/components/OrderPositionModal';
+import { MenuItemSquareCard, MenuItemBannerCard } from '@/components/MenuItemCards';
+import MenuItemEditSheet from '@/components/MenuItemEditSheet';
 
 interface MenuItem {
   id: string;
@@ -55,6 +62,11 @@ interface MenuItem {
   is_gluten_free_available: boolean;
   is_vegetarian: boolean;
   is_vegetarian_available: boolean;
+  is_dairy_free: boolean;
+  is_egg_free: boolean;
+  is_nut_free: boolean;
+  is_sugar_free: boolean;
+  is_salt_free: boolean;
   thumbnail_url: string | null;
   thumbnail_shape: string;
   display_order: number;
@@ -72,58 +84,95 @@ interface MenuItem {
   flavor_profile_es?: string | null;
   unique_selling_points?: string | null;
   unique_selling_points_es?: string | null;
+  updated_at?: string;
 }
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
-// The category/subcategory tree is loaded per-org from the DB (useMenuCategories).
-// Labels/behavior resolve through utils/menuCategoryLabels: built-ins keep their
-// i18n labels; renamed or custom names show raw. The swipe-pager page sequence is
-// derived per-render from the loaded categories (see `pages` in the component).
+// Legacy wire values: 'winter' = Menu 1, 'summer' = Menu 2. Unchanged.
+type Season = 'winter' | 'summer';
+
 interface PageConfig {
   category: string;
   subcategory: string | null;
 }
 
+// Case-insensitive category/subcategory name key — the DB unique indexes are
+// lower()-based and the AI upload path writes free-text names. Matching always
+// normalizes; display always prints the stored/translated name.
+const catKey = (name: string | null | undefined) => (name || '').toLowerCase();
+
+// Search-collapse geometry — identical to the user side (MenuDisplay): the
+// search row is 46pt + 11pt margin; the chrome band glides up by its measured
+// height when collapsed.
+const SEARCH_ROW_H = 57;
+
 export default function MenuEditorScreen() {
   useRequireManagerRoute();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const colors = useThemeColors();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
+  const { language } = useLanguage();
+  const { perms: managerPerms } = useManagerPermissions();
+
   // Default to Menu 1 (winter slot) — the more natural landing menu.
   const [season, setSeason] = useState<Season>('winter');
   const perMenu = organization?.menu_category_scope === 'per_menu';
-  // In per-menu scope the active season selects which menu's category tree to edit.
+  // In per-menu scope the active season selects which menu's category tree to
+  // edit. includeHidden keeps a legacy item's now-hidden category resolvable.
   const { categories: menuCats, loading: categoriesLoading, refresh: refreshCategories } = useMenuCategories({
     includeHidden: true,
     menuSlot: season === 'winter' ? 1 : 2,
   });
-  const { language } = useLanguage();
+
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  // All org items across BOTH menus (no season filter) — used so the search box
-  // spans the whole menu database, not just the active menu.
+  // All org items across BOTH menus (no season filter) — the search corpus and
+  // the cross-menu Featured Specials page.
   const [allItems, setAllItems] = useState<MenuItem[]>([]);
-  const [filteredItems, setFilteredItems] = useState<MenuItem[]>([]);
-  // Order Position picker (opened from a card's ··· menu): which item, its
-  // category+subcategory siblings, and its current 0-based slot.
-  const [positionPicker, setPositionPicker] = useState<{ item: MenuItem; siblings: MenuItem[]; currentIndex: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
   const pagerRef = useRef<FlatList>(null);
-  const categoryScrollRef = useRef<ScrollView>(null);
-  const subcategoryScrollRef = useRef<ScrollView>(null);
-  const categoryLayoutsRef = useRef<{ [key: string]: { x: number; width: number } }>({});
-  const subcategoryLayoutsRef = useRef<{ [key: string]: { x: number; width: number } }>({});
-  // Page sequence derived from the loaded category tree: one page per
-  // subcategory, or a single page for a category with no subcategories.
+
+  // Behavior resolvers — key off system_key / filter_behavior via catKey, never
+  // raw string equality (renames + AI-written case must both keep working).
+  const catOf = useCallback(
+    (name: string | null | undefined) => {
+      if (!name) return undefined;
+      const key = catKey(name);
+      return menuCats.find((c) => catKey(c.display_name) === key);
+    },
+    [menuCats],
+  );
+  const isWineName = useCallback(
+    (name: string | null | undefined) => catOf(name)?.system_key === 'cat.wine',
+    [catOf],
+  );
+  const categoryMatches = useCallback(
+    (item: MenuItem, categoryName: string): boolean => {
+      const fb = catOf(categoryName)?.filter_behavior;
+      // Per-menu treats Lunch/Dinner as normal categories (placement by
+      // assignment); shared mode keeps the meal-availability overlay.
+      if (!perMenu && fb === 'lunch') return item.available_for_lunch;
+      if (!perMenu && fb === 'dinner') return item.available_for_dinner;
+      if (fb === 'weekly_specials') return catKey(item.category) === catKey(categoryName) || !!item.is_weekly_special;
+      return catKey(item.category) === catKey(categoryName);
+    },
+    [catOf, perMenu],
+  );
+
+  // Page sequence from the loaded tree: one page per visible subcategory, or a
+  // single page for a category with no subcategories. Empty pages stay — the
+  // editor must be able to reach them to add the first item. No 'All' pages,
+  // no Welcome bridge: real pages start at index 0.
   const pages = useMemo<PageConfig[]>(() => {
     const out: PageConfig[] = [];
     for (const cat of menuCats) {
-      if (cat.is_hidden) continue; // hidden categories don't appear as editor tabs
+      if (cat.is_hidden) continue;
       const visibleSubs = (cat.subcategories || []).filter((s) => !s.is_hidden);
       if (visibleSubs.length === 0) {
         out.push({ category: cat.display_name, subcategory: null });
@@ -136,227 +185,253 @@ export default function MenuEditorScreen() {
     return out;
   }, [menuCats]);
 
-  // Derive selected category/subcategory from current page index
   const currentPage = pages[currentPageIndex] || pages[0] || { category: '', subcategory: null };
   const selectedCategory = currentPage.category;
   const selectedSubcategory = currentPage.subcategory;
-
-  // Behavior resolves by (possibly renamed) display name → system_key/filter_behavior.
-  const categoryMatches = useCallback(
-    (item: MenuItem, categoryName: string): boolean => {
-      const fb = findCategoryByName(menuCats, categoryName)?.filter_behavior;
-      // Per-menu treats Lunch/Dinner as normal categories — placement is by the
-      // item's category assignment, not the "Available for" flags (which are a
-      // shared-mode meal-service overlay).
-      if (!perMenu && fb === 'lunch') return item.available_for_lunch;
-      if (!perMenu && fb === 'dinner') return item.available_for_dinner;
-      // Featured/Weekly Specials page surfaces both items tagged to it AND any item
-      // flagged "Show on Featured Specials" (mirrors the customer MenuDisplay overlay).
-      if (fb === 'weekly_specials') return item.category === categoryName || item.is_weekly_special;
-      return item.category === categoryName;
-    },
-    [menuCats, perMenu],
+  const selectedCategoryObj = catOf(selectedCategory);
+  const selectedSubObj = selectedCategoryObj?.subcategories.find(
+    (s) => catKey(s.display_name) === catKey(selectedSubcategory),
   );
-  const isWineName = useCallback(
-    (name: string | null | undefined) => findCategoryByName(menuCats, name)?.system_key === 'cat.wine',
-    [menuCats],
-  );
-  const selectedCategoryObj = findCategoryByName(menuCats, selectedCategory);
-  const selectedSubObj = selectedCategoryObj?.subcategories.find((s) => s.display_name === selectedSubcategory);
-  // Availability tag labels on the editor item cards follow lunch/dinner renames.
-  // (The add/edit form uses its own menu-aware form* variants — see below.)
-  const lunchName = menuCats.find((c) => c.filter_behavior === 'lunch')?.display_name || t('menu_editor:available_lunch');
-  const dinnerName = menuCats.find((c) => c.filter_behavior === 'dinner')?.display_name || t('menu_editor:available_dinner');
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    price: '',
-    category: 'Weekly Specials',
-    subcategory: '',
-    available_for_lunch: false,
-    available_for_dinner: false,
-    is_gluten_free: false,
-    is_gluten_free_available: false,
-    is_vegetarian: false,
-    is_vegetarian_available: false,
-    thumbnail_shape: 'square',
-    display_order: 0,
-    is_weekly_special: false,
-    name_es: '',
-    description_es: '',
-    location: '',
-    location_es: '',
-    glass_price: '',
-    bottle_price: '',
-    member_bottle_price: '',
-    flavor_profile: '',
-    flavor_profile_es: '',
-    unique_selling_points: '',
-    unique_selling_points_es: '',
-    item_season: 'both' as 'winter' | 'summer' | 'both',
+  const isSearchMode = searchQuery.trim().length > 0;
+
+  // ── Search collapse + sticky-tab backdrop — the user side's architecture,
+  // ported verbatim (MenuDisplay): the chrome band is an absolute overlay on a
+  // native-driver transform; nothing resizes during scroll. Hysteresis picks a
+  // state; a timed ease glides between them.
+  const collapseAnim = useRef(new Animated.Value(0)).current; // 0 open → 1 collapsed
+  const collapsedRef = useRef(false);
+  const collapseRunRef = useRef<Animated.CompositeAnimation | null>(null);
+  const pageOffsetsRef = useRef<{ [index: number]: number }>({});
+  const pageListRefs = useRef<{ [index: number]: FlatList<MenuItem> | null }>({});
+  const [pageViewportH, setPageViewportH] = useState(0);
+  const backdropOnRef = useRef(false);
+  const [backdropOn, setBackdropOn] = useState(false);
+  const currentPageIndexRef = useRef(currentPageIndex);
+
+  const COLLAPSE_AT = 48;
+  const EXPAND_AT = 28;
+
+  const [bandH, setBandH] = useState(
+    organization.menu_count === 2 ? SEARCH_ROW_H + 51 : SEARCH_ROW_H
+  );
+  const collapseOpacity = collapseAnim.interpolate({
+    inputRange: [0, 0.65, 1],
+    outputRange: [1, 0, 0],
   });
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const [selectedImageUri, setSelectedImageUri] = useState<string | null>(null);
-  const descriptionInputRef = useRef<TextInput>(null);
-  const [descriptionSelection, setDescriptionSelection] = useState({ start: 0, end: 0 });
-
-  // Hybrid bilingual authoring (s61): the primary inputs bind the device
-  // language; the shared section shows the other-language preview + translate
-  // button + pencil edit. resolveOnSave() runs the staleness rules.
-  // Location is preview/pencil-only (noMachine) — it was never machine-translated.
-  // Wine-only flavor/USP fields join the set when the item's category is a wine.
-  const isSpanishAuthor = i18n.language === 'es';
-  const addSessionRef = useRef(0);
-  const translation = useTranslationSection({
-    fields: [
-      {
-        key: 'name',
-        labelKey: 'translation_section:field_name',
-        enValue: formData.name,
-        esValue: formData.name_es,
-        setEnValue: (v) => setFormData(prev => ({ ...prev, name: v })),
-        setEsValue: (v) => setFormData(prev => ({ ...prev, name_es: v })),
-      },
-      {
-        key: 'description',
-        labelKey: 'translation_section:field_description',
-        enValue: formData.description,
-        esValue: formData.description_es,
-        setEnValue: (v) => setFormData(prev => ({ ...prev, description: v })),
-        setEsValue: (v) => setFormData(prev => ({ ...prev, description_es: v })),
-        multiline: true,
-      },
-      ...(isWineName(formData.category)
-        ? [
-            {
-              key: 'location',
-              labelKey: 'translation_section:field_location',
-              enValue: formData.location,
-              esValue: formData.location_es,
-              setEnValue: (v: string) => setFormData(prev => ({ ...prev, location: v })),
-              setEsValue: (v: string) => setFormData(prev => ({ ...prev, location_es: v })),
-              noMachine: true,
-            },
-            {
-              key: 'flavor_profile',
-              labelKey: 'translation_section:field_flavor_profile',
-              enValue: formData.flavor_profile,
-              esValue: formData.flavor_profile_es,
-              setEnValue: (v: string) => setFormData(prev => ({ ...prev, flavor_profile: v })),
-              setEsValue: (v: string) => setFormData(prev => ({ ...prev, flavor_profile_es: v })),
-              multiline: true,
-            },
-            {
-              key: 'unique_selling_points',
-              labelKey: 'translation_section:field_selling_points',
-              enValue: formData.unique_selling_points,
-              esValue: formData.unique_selling_points_es,
-              setEnValue: (v: string) => setFormData(prev => ({ ...prev, unique_selling_points: v })),
-              setEsValue: (v: string) => setFormData(prev => ({ ...prev, unique_selling_points_es: v })),
-              multiline: true,
-            },
-          ]
-        : []),
-    ],
-    sessionKey: editingItem ? `edit:${editingItem.id}` : `new:${addSessionRef.current}`,
-    active: showAddModal,
+  const overlayTranslate = collapseAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, -bandH],
   });
 
-  // The add/edit form's category/subcategory pills must reflect the menu the
-  // item is being assigned to (formData.item_season) — NOT whichever menu the
-  // editor is currently viewing. In per-menu each menu has its own tree; in
-  // shared mode this resolves to the single shared tree.
-  const formMenuSlot: 1 | 2 = formData.item_season === 'summer' ? 2 : 1;
-  const { categories: formMenuCats } = useMenuCategories({ includeHidden: true, menuSlot: formMenuSlot });
-  const formWeeklySpecialsCat = formMenuCats.find((c) => c.system_key === 'cat.weekly_specials' && !c.is_hidden);
-  const formHasWeeklySpecialsCat = !!formWeeklySpecialsCat;
-  const formWeeklySpecialsLabel = formWeeklySpecialsCat ? categoryLabel(formWeeklySpecialsCat, t, language) : '';
-  const formHasLunchCat = formMenuCats.some((c) => c.filter_behavior === 'lunch' && !c.is_hidden);
-  const formHasDinnerCat = formMenuCats.some((c) => c.filter_behavior === 'dinner' && !c.is_hidden);
-  const formLunchName = formMenuCats.find((c) => c.filter_behavior === 'lunch')?.display_name || t('menu_editor:available_lunch');
-  const formDinnerName = formMenuCats.find((c) => c.filter_behavior === 'dinner')?.display_name || t('menu_editor:available_dinner');
+  // Transform-parked views still receive touches — the collapsed (invisible)
+  // band sits over the header chips, so it must go pointerEvents:none.
+  const [chromeCollapsed, setChromeCollapsed] = useState(false);
+
+  const setCollapsed = useCallback((next: boolean) => {
+    if (collapsedRef.current === next) return;
+    collapsedRef.current = next;
+    setChromeCollapsed(next);
+    collapseRunRef.current?.stop();
+    collapseRunRef.current = Animated.timing(collapseAnim, {
+      toValue: next ? 1 : 0,
+      duration: next ? 280 : 300,
+      easing: Easing.inOut(Easing.cubic),
+      useNativeDriver: true, // transform + opacity only — UI-thread animation
+    });
+    collapseRunRef.current.start();
+  }, [collapseAnim]);
+
+  const [chromeH, setChromeH] = useState(SEARCH_ROW_H + 88);
+
+  const resetCollapse = useCallback(() => {
+    collapseRunRef.current?.stop();
+    collapsedRef.current = false;
+    setChromeCollapsed(false);
+    collapseAnim.setValue(0);
+  }, [collapseAnim]);
+
+  const syncBackdrop = useCallback((y: number) => {
+    const on = y > 6;
+    if (on !== backdropOnRef.current) {
+      backdropOnRef.current = on;
+      setBackdropOn(on);
+    }
+  }, []);
+
+  // Each page records its own offset; only the active page drives the shared
+  // collapse state. Between the thresholds the state holds (hysteresis).
+  const handlePageScroll = useCallback((pageIndex: number, y: number) => {
+    pageOffsetsRef.current[pageIndex] = y;
+    if (pageIndex !== currentPageIndexRef.current) return;
+    if (y > COLLAPSE_AT) {
+      setCollapsed(true);
+    } else if (y < EXPAND_AT) {
+      setCollapsed(false);
+    }
+    syncBackdrop(y);
+  }, [setCollapsed, syncBackdrop]);
+
+  // Page swipes NEVER change collapse state — only retarget + the
+  // collapsed-arrival snap to y=bandH (pre-paint) so cards sit tucked under
+  // the parked tabs instead of a band-sized gap.
+  useEffect(() => {
+    currentPageIndexRef.current = currentPageIndex;
+    let y = pageOffsetsRef.current[currentPageIndex] ?? 0;
+    if (collapsedRef.current && y < bandH) {
+      pageListRefs.current[currentPageIndex]?.scrollToOffset({ offset: bandH, animated: false });
+      pageOffsetsRef.current[currentPageIndex] = bandH;
+      y = bandH;
+    }
+    syncBackdrop(y);
+  }, [currentPageIndex, bandH, syncBackdrop]);
+
+  // Entering/leaving search mode swaps the pager for a flat list — the stored
+  // offsets no longer describe live views; the row must be usable while typing.
+  useEffect(() => {
+    pageOffsetsRef.current = {};
+    resetCollapse();
+    syncBackdrop(0);
+  }, [isSearchMode, resetCollapse, syncBackdrop]);
+
+  // Loud loads only on mount/menu-switch; mutations reload silently so the
+  // pager (and the collapse state) survives in place — the old full-spinner
+  // reload would unmount every page on each edit.
+  // The generation counter drops stale responses: a meatball action's deferred
+  // silent reload (bound to the season it was opened under) must never clobber
+  // a fresh season's items if the manager switches menus while it's in flight.
+  const loadSeqRef = useRef(0);
+  const loadMenuItems = useCallback(async (silent = false) => {
+    if (!user?.id) return;
+    const seq = ++loadSeqRef.current;
+    try {
+      if (!silent) setLoading(true);
+      const [scoped, all] = await Promise.all([
+        supabase.rpc('get_menu_items', { p_actor_id: user.id, p_season: season }),
+        supabase.rpc('get_menu_items', { p_actor_id: user.id }),
+      ]);
+      if (seq !== loadSeqRef.current) return;
+      if (scoped.error) throw scoped.error;
+      setMenuItems((scoped.data || []) as MenuItem[]);
+      setAllItems((all.data || []) as MenuItem[]);
+    } catch (error) {
+      if (seq !== loadSeqRef.current) return;
+      console.error('Error loading menu items:', error);
+      Alert.alert(t('common:error'), t('menu_editor:load_error'));
+    } finally {
+      if (!silent && seq === loadSeqRef.current) setLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, season]);
 
   useEffect(() => {
     loadMenuItems();
     setCurrentPageIndex(0);
-    pagerRef.current?.scrollToIndex({ index: 0, animated: false });
+    // Empty pager data (a menu with no visible categories yet) — scrollToIndex
+    // throws an out-of-range Invariant on an empty list (MenuDisplay's clamp
+    // comment; verify-lens finding).
+    if (pages.length > 0) pagerRef.current?.scrollToIndex({ index: 0, animated: false });
+    // A menu switch replaces every page's content — reopen the chrome.
+    pageOffsetsRef.current = {};
+    resetCollapse();
+    syncBackdrop(0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [season]);
 
-  // Refresh the category tree when returning from the Manage Categories screen.
+  // The tree can also change WITHOUT a season switch (returning from Manage
+  // Categories refreshes it) — the stored per-page offsets then describe pages
+  // that no longer exist; reopen the chrome when the page sequence really
+  // changed (not on every focus-driven refetch of an identical tree).
+  const pagesSig = useMemo(
+    () => pages.map((p) => `${p.category}|${p.subcategory ?? ''}`).join('~'),
+    [pages],
+  );
+  const pagesSigRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (pagesSigRef.current === pagesSig) return;
+    const first = pagesSigRef.current === null;
+    pagesSigRef.current = pagesSig;
+    if (first) return;
+    pageOffsetsRef.current = {};
+    resetCollapse();
+    syncBackdrop(0);
+  }, [pagesSig, resetCollapse, syncBackdrop]);
+
+  // Refresh the category tree when returning from Manage Categories.
   useFocusEffect(
     useCallback(() => {
       refreshCategories();
     }, [refreshCategories]),
   );
 
-  const loadMenuItems = async () => {
-    if (!user?.id) return;
-    try {
-      setLoading(true);
-      // Active-menu items (season-scoped) feed the swipe pager; the full set
-      // (all menus) backs the whole-database search.
-      const [scoped, all] = await Promise.all([
-        supabase.rpc('get_menu_items', { p_actor_id: user.id, p_season: season }),
-        supabase.rpc('get_menu_items', { p_actor_id: user.id }),
-      ]);
-
-      if (scoped.error) throw scoped.error;
-      setMenuItems((scoped.data || []) as MenuItem[]);
-      setAllItems((all.data || []) as MenuItem[]);
-    } catch (error) {
-      console.error('Error loading menu items:', error);
-      Alert.alert(t('common:error'), t('menu_editor:load_error'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterItems = useCallback(() => {
-    // Search spans the WHOLE org (both menus) via allItems; browsing without a
-    // query stays scoped to the active menu's pager (menuItems).
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      setFilteredItems(
-        allItems.filter(
-          item =>
-            item.name.toLowerCase().includes(query) ||
-            (item.description && item.description.toLowerCase().includes(query)) ||
-            item.category.toLowerCase().includes(query) ||
-            (item.subcategory && item.subcategory.toLowerCase().includes(query)) ||
-            (item.is_gluten_free && 'gf'.includes(query)) ||
-            (item.is_gluten_free_available && 'gfa'.includes(query)) ||
-            (item.is_vegetarian && ('v'.includes(query) || 'vegetarian'.includes(query))) ||
-            (item.is_vegetarian_available && ('va'.includes(query) || 'vegetarian available'.includes(query)))
-        )
-      );
-      return;
-    }
-
-    // No query: filter by the active page's category/subcategory.
-    // Lunch/Dinner resolve to availability booleans; everything else matches
-    // the category field (see categoryMatches).
-    let filtered = menuItems.filter(item => categoryMatches(item, selectedCategory));
-    if (selectedSubcategory) {
-      filtered = filtered.filter(item => item.subcategory === selectedSubcategory);
-    }
-    setFilteredItems(filtered);
-  }, [menuItems, allItems, searchQuery, selectedCategory, selectedSubcategory, categoryMatches]);
-
+  // Pages can shrink after category edits — keep the index inside the list.
   useEffect(() => {
-    filterItems();
-  }, [filterItems]);
+    if (pages.length > 0 && currentPageIndex > pages.length - 1) {
+      const clamped = Math.max(0, pages.length - 1);
+      setCurrentPageIndex(clamped);
+      pagerRef.current?.scrollToIndex({ index: clamped, animated: false });
+    }
+  }, [pages.length, currentPageIndex]);
 
-  // Navigate pager to a specific page by category/subcategory
+  // Search spans the WHOLE org (both menus); browsing stays on the active menu.
+  const filteredItems = useMemo(() => {
+    if (!isSearchMode) return [];
+    const query = searchQuery.toLowerCase();
+    return allItems.filter(
+      item =>
+        item.name.toLowerCase().includes(query) ||
+        (item.description && item.description.toLowerCase().includes(query)) ||
+        item.category.toLowerCase().includes(query) ||
+        (item.subcategory && item.subcategory.toLowerCase().includes(query)) ||
+        (item.is_gluten_free && 'gf'.includes(query)) ||
+        (item.is_gluten_free_available && 'gfa'.includes(query)) ||
+        (item.is_vegetarian && ('v'.includes(query) || 'vegetarian'.includes(query))) ||
+        (item.is_vegetarian_available && ('va'.includes(query) || 'vegetarian available'.includes(query)))
+    );
+  }, [isSearchMode, searchQuery, allItems]);
+
+  // Items for one pager page. Featured Specials combines flagged items from
+  // BOTH menus (allItems) so the tab shows the same set on Menu 1 and Menu 2.
+  const getItemsForPage = useCallback((page: PageConfig): MenuItem[] => {
+    const isSpecials = catOf(page.category)?.filter_behavior === 'weekly_specials';
+    let filtered = (isSpecials ? allItems : menuItems).filter(item => categoryMatches(item, page.category));
+    if (page.subcategory) {
+      filtered = filtered.filter(item => catKey(item.subcategory) === catKey(page.subcategory));
+    }
+    if (isSpecials) filtered = [...filtered].sort(compareBySectionThenOrder);
+    return filtered;
+  }, [menuItems, allItems, categoryMatches, catOf]);
+
+  // Reordering is only coherent on a page that is ONE category/subcategory's
+  // complete season-scoped set — never the cross-menu Featured Specials
+  // combination, and never search results. Structural guard (plan §7.3).
+  const canReorderPage = useCallback(
+    (page: PageConfig) => catOf(page.category)?.filter_behavior !== 'weekly_specials',
+    [catOf],
+  );
+
+  // Rows living in a cocktail-fed Libations subcategory mirror the Bartender
+  // recipe editors — they DISPLAY here but must never be edited, moved or
+  // deleted from this screen (Steve's smoke rule: the recipes editors own
+  // their ordering and the bridge both ways). Manual Libations subs (Draft
+  // Beer, Bottles & Cans, custom ones) stay fully editable.
+  const isRecipeFedItem = useCallback(
+    (item: MenuItem): boolean => {
+      const cat = catOf(item.category);
+      if (cat?.system_key !== 'cat.libations' || !item.subcategory) return false;
+      const sub = cat.subcategories.find((s) => catKey(s.display_name) === catKey(item.subcategory));
+      return !!sub?.is_cocktail_fed;
+    },
+    [catOf],
+  );
+
   const navigateToPage = (category: string, subcategory?: string | null) => {
     let targetIndex: number;
+    const target = catKey(category);
     if (subcategory) {
-      targetIndex = pages.findIndex(p => p.category === category && p.subcategory === subcategory);
+      targetIndex = pages.findIndex(p => catKey(p.category) === target && catKey(p.subcategory) === catKey(subcategory));
     } else {
-      targetIndex = pages.findIndex(p => p.category === category);
+      targetIndex = pages.findIndex(p => catKey(p.category) === target);
     }
     if (targetIndex >= 0) {
       setCurrentPageIndex(targetIndex);
@@ -364,7 +439,6 @@ export default function MenuEditorScreen() {
     }
   };
 
-  // Handle swipe end — sync page index
   const onMomentumScrollEnd = (event: any) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const newIndex = Math.round(offsetX / SCREEN_WIDTH);
@@ -373,240 +447,42 @@ export default function MenuEditorScreen() {
     }
   };
 
-  // Auto-scroll category pills to center the active one
-  useEffect(() => {
-    const layout = categoryLayoutsRef.current[selectedCategory];
-    if (layout && categoryScrollRef.current) {
-      const scrollToX = Math.max(0, layout.x - (SCREEN_WIDTH / 2) + (layout.width / 2));
-      categoryScrollRef.current.scrollTo({ x: scrollToX, animated: true });
-    }
-  }, [selectedCategory]);
-
-  // Auto-scroll subcategory pills to center the active one
-  const prevCategoryRef = useRef(selectedCategory);
-  useEffect(() => {
-    if (!selectedSubcategory || !subcategoryScrollRef.current) return;
-    const categoryChanged = prevCategoryRef.current !== selectedCategory;
-    prevCategoryRef.current = selectedCategory;
-    if (categoryChanged) {
-      subcategoryLayoutsRef.current = {};
-      subcategoryScrollRef.current.scrollTo({ x: 0, animated: true });
-      setTimeout(() => {
-        const layoutKey = `${selectedCategory}_${selectedSubcategory}`;
-        const layout = subcategoryLayoutsRef.current[layoutKey];
-        if (layout && subcategoryScrollRef.current) {
-          const scrollToX = Math.max(0, layout.x - (SCREEN_WIDTH / 2) + (layout.width / 2));
-          subcategoryScrollRef.current.scrollTo({ x: scrollToX, animated: true });
-        }
-      }, 100);
-    } else {
-      const layoutKey = `${selectedCategory}_${selectedSubcategory}`;
-      const layout = subcategoryLayoutsRef.current[layoutKey];
-      if (layout) {
-        const scrollToX = Math.max(0, layout.x - (SCREEN_WIDTH / 2) + (layout.width / 2));
-        subcategoryScrollRef.current.scrollTo({ x: scrollToX, animated: true });
-      }
-    }
-  }, [selectedCategory, selectedSubcategory]);
-
-  // Get items for a specific page (used by the horizontal pager)
-  const getItemsForPage = useCallback((page: PageConfig): MenuItem[] => {
-    // Featured Specials combines flagged items from BOTH menus (allItems) so the
-    // pill shows the same set on Menu 1 and Menu 2; other pages stay scoped to
-    // the active menu (menuItems).
-    const isSpecials = findCategoryByName(menuCats, page.category)?.filter_behavior === 'weekly_specials';
-    let filtered = (isSpecials ? allItems : menuItems).filter(item => categoryMatches(item, page.category));
-    if (page.subcategory) {
-      filtered = filtered.filter(item => item.subcategory === page.subcategory);
-    }
-    // Group the combined Specials list by category → subcategory → order so
-    // flagged items from the same section stay together.
-    if (isSpecials) filtered = [...filtered].sort(compareBySectionThenOrder);
-    return filtered;
-  }, [menuItems, allItems, categoryMatches, menuCats]);
-
-  const pickImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: formData.thumbnail_shape === 'square' ? [1, 1] : [16, 9],
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets[0]) {
-        setSelectedImageUri(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Error picking image:', error);
-      Alert.alert(t('common:error'), t('menu_editor:pick_image_error'));
-    }
+  // ── Formatting helpers ─────────────────────────────────────────────────────
+  const formatPrice = (price: string) => {
+    if (price.includes('$')) return price;
+    return `$${price}`;
   };
 
-  const uploadImage = async (uri: string): Promise<string | null> => {
-    if (!user?.id) return null;
-    try {
-      setUploadingImage(true);
-      console.log('Starting image upload for menu item');
+  const menuBadgeForSeason = (s: string | null | undefined): { icon: string; label: string } =>
+    menuBadgeForSeasonUtil(s, organization, t);
 
-      const publicUrl = await brokerUploadImage('menu_item_image', uri, user.id);
+  const getCategoryLabel = (category: string) => labelForCategoryName(category, t, menuCats, language);
+  const getSubcategoryLabel = (subcategory: string) => labelForSubcategoryName(subcategory, t, menuCats, language);
 
-      if (!publicUrl) {
-        Alert.alert(t('common:error'), t('menu_editor:upload_image_error'));
-        return null;
-      }
-
-      console.log('Public URL:', publicUrl);
-
-      return publicUrl;
-    } finally {
-      setUploadingImage(false);
-    }
+  // Card dietary abbreviations — literal t() calls so the harvester sees keys.
+  const cardDietAbbrevs = (item: MenuItem): string[] => {
+    const out: string[] = [];
+    if (item.is_gluten_free) out.push(t('dietary.gf_abbrev'));
+    if (item.is_gluten_free_available) out.push(t('dietary.gfa_abbrev'));
+    if (item.is_vegetarian) out.push(t('dietary.v_abbrev'));
+    if (item.is_vegetarian_available) out.push(t('dietary.va_abbrev'));
+    if (item.is_dairy_free) out.push(t('dietary.df_abbrev'));
+    if (item.is_egg_free) out.push(t('dietary.ef_abbrev'));
+    if (item.is_nut_free) out.push(t('dietary.nf_abbrev'));
+    if (item.is_sugar_free) out.push(t('dietary.sf_abbrev'));
+    if (item.is_salt_free) out.push(t('dietary.nos_abbrev'));
+    return out;
   };
 
-  const handleSave = async () => {
-    const isWine = isWineName(formData.category);
-    const authorName = isSpanishAuthor ? formData.name_es : formData.name;
-    // Wines validate on glass OR bottle price (members may not order all tiers);
-    // non-wines still require the legacy single price.
-    const winePriceMissing = isWine && !formData.glass_price && !formData.bottle_price;
-    if (!authorName || (!isWine && !formData.price) || winePriceMissing) {
-      Alert.alert(t('common:error'), t('menu_editor:error_fill_fields'));
-      return;
-    }
-
-    if (!user?.id) {
-      Alert.alert(t('common:error'), t('menu_editor:error_not_authenticated'));
-      return;
-    }
-
-    // Fill/refresh the other language per the s61 staleness rules (may ask once).
-    const resolved = await translation.resolveOnSave();
-    if (!resolved) return;
-
-    try {
-      let thumbnailUrl = editingItem?.thumbnail_url || null;
-
-      // Upload image if selected
-      if (selectedImageUri) {
-        const uploadedUrl = await uploadImage(selectedImageUri);
-        if (uploadedUrl) {
-          thumbnailUrl = uploadedUrl;
-          console.log('New thumbnail URL:', thumbnailUrl);
-        }
-      }
-
-      if (editingItem) {
-        // Update existing item using database function
-        const { data, error } = await supabase.rpc('update_menu_item', {
-          p_user_id: user.id,
-          p_organization_id: organizationId ?? undefined,
-          p_menu_item_id: editingItem.id,
-          p_name: resolved.name.en,
-          p_description: (resolved.description.en || null) as string,
-          p_price: formData.price,
-          p_category: formData.category,
-          p_subcategory: (formData.subcategory || null) as string,
-          p_available_for_lunch: formData.available_for_lunch,
-          p_available_for_dinner: formData.available_for_dinner,
-          p_is_gluten_free: formData.is_gluten_free,
-          p_is_gluten_free_available: formData.is_gluten_free_available,
-          p_is_vegetarian: formData.is_vegetarian,
-          p_is_vegetarian_available: formData.is_vegetarian_available,
-          p_thumbnail_url: thumbnailUrl as string,
-          p_thumbnail_shape: formData.thumbnail_shape,
-          p_display_order: formData.display_order,
-          p_location: isWine ? (resolved.location?.en || undefined) : undefined,
-          p_glass_price: isWine ? (formData.glass_price || undefined) : undefined,
-          p_bottle_price: isWine ? (formData.bottle_price || undefined) : undefined,
-          p_member_bottle_price: isWine ? (formData.member_bottle_price || undefined) : undefined,
-          p_flavor_profile: isWine ? (resolved.flavor_profile?.en || undefined) : undefined,
-          p_flavor_profile_es: isWine ? (resolved.flavor_profile?.es || undefined) : undefined,
-          p_unique_selling_points: isWine ? (resolved.unique_selling_points?.en || undefined) : undefined,
-          p_unique_selling_points_es: isWine ? (resolved.unique_selling_points?.es || undefined) : undefined,
-          p_season: formData.item_season,
-          p_is_weekly_special: formData.is_weekly_special,
-        });
-
-        if (error) {
-          console.error('Error updating menu item:', error);
-          throw error;
-        }
-        console.log('Menu item updated successfully');
-        Alert.alert(t('common:success'), t('menu_editor:updated_success'));
-
-        // Save Spanish translations (server null semantics vary — most content tables COALESCE-keep when blank)
-        await saveTranslations('menu_items', editingItem.id, {
-          name_es: resolved.name.es,
-          description_es: resolved.description.es,
-          location_es: resolved.location?.es ?? '',
-        }, user?.id);
-      } else {
-        // New items append to the END of their category/subcategory list;
-        // ordering is then adjusted via drag or the Order Position picker.
-        const siblings = menuItems.filter(
-          (m) => m.category === formData.category &&
-            (formData.subcategory ? m.subcategory === formData.subcategory : !m.subcategory),
-        );
-        const nextOrder = siblings.length
-          ? Math.max(...siblings.map((s) => s.display_order ?? 0)) + 1
-          : 0;
-        // Create new item using database function
-        const { data, error } = await supabase.rpc('create_menu_item', {
-          p_user_id: user.id,
-          p_organization_id: organizationId ?? undefined,
-          p_name: resolved.name.en,
-          p_description: (resolved.description.en || null) as string,
-          p_price: formData.price,
-          p_category: formData.category,
-          p_subcategory: (formData.subcategory || null) as string,
-          p_available_for_lunch: formData.available_for_lunch,
-          p_available_for_dinner: formData.available_for_dinner,
-          p_is_gluten_free: formData.is_gluten_free,
-          p_is_gluten_free_available: formData.is_gluten_free_available,
-          p_is_vegetarian: formData.is_vegetarian,
-          p_is_vegetarian_available: formData.is_vegetarian_available,
-          p_thumbnail_url: thumbnailUrl as string,
-          p_thumbnail_shape: formData.thumbnail_shape,
-          p_display_order: nextOrder,
-          p_location: isWine ? (resolved.location?.en || undefined) : undefined,
-          p_glass_price: isWine ? (formData.glass_price || undefined) : undefined,
-          p_bottle_price: isWine ? (formData.bottle_price || undefined) : undefined,
-          p_member_bottle_price: isWine ? (formData.member_bottle_price || undefined) : undefined,
-          p_flavor_profile: isWine ? (resolved.flavor_profile?.en || undefined) : undefined,
-          p_flavor_profile_es: isWine ? (resolved.flavor_profile?.es || undefined) : undefined,
-          p_unique_selling_points: isWine ? (resolved.unique_selling_points?.en || undefined) : undefined,
-          p_unique_selling_points_es: isWine ? (resolved.unique_selling_points?.es || undefined) : undefined,
-          p_season: formData.item_season,
-          p_is_weekly_special: formData.is_weekly_special,
-        });
-
-        if (error) {
-          console.error('Error creating menu item:', error);
-          throw error;
-        }
-        console.log('Menu item created successfully');
-        Alert.alert(t('common:success'), t('menu_editor:created_success'));
-
-        // Save Spanish translations for newly created item (create_menu_item returns its id).
-        if (data) {
-          await saveTranslations('menu_items', data as string, {
-            name_es: resolved.name.es,
-            description_es: resolved.description.es,
-            location_es: resolved.location?.es ?? '',
-          }, user?.id);
-        }
-      }
-
-      closeModal();
-      loadMenuItems();
-    } catch (error: any) {
-      console.error('Error saving menu item:', error);
-      Alert.alert(t('common:error'), translateServerError(error, t('menu_editor:save_error')));
-    }
+  // "{menu} · {category}" for the banner eyebrow (category alone on 1-menu orgs).
+  const bannerEyebrowText = (item: MenuItem): string => {
+    const cat = getCategoryLabel(item.category);
+    if (organization.menu_count === 2) return `${menuBadgeForSeason(item.season).label} · ${cat}`;
+    return cat;
   };
 
-  const handleDelete = async (item: MenuItem) => {
+  // ── Mutations ──────────────────────────────────────────────────────────────
+  const handleDelete = (item: MenuItem) => {
     Alert.alert(
       t('menu_editor:delete_title'),
       t('menu_editor:delete_confirm', { name: item.name }),
@@ -621,26 +497,23 @@ export default function MenuEditorScreen() {
                 Alert.alert(t('common:error'), t('menu_editor:error_not_authenticated'));
                 return;
               }
-
-              // Delete using database function
               const { error } = await supabase.rpc('delete_menu_item', {
                 p_user_id: user.id,
                 p_organization_id: organizationId ?? undefined,
                 p_menu_item_id: item.id,
               });
-
-              if (error) {
-                console.error('Error deleting menu item:', error);
-                throw error;
-              }
-
-              // Delete image if exists
+              if (error) throw error;
+              // Blob cleanup is best-effort — a storage failure must not
+              // report the (already committed) delete as failed.
               if (item.thumbnail_url) {
-                await brokerDelete('menu-items', [item.thumbnail_url], user.id);
+                try {
+                  await brokerDelete('menu-items', [item.thumbnail_url], user.id);
+                } catch (e) {
+                  console.error('Error deleting menu item image:', e);
+                }
               }
-
               Alert.alert(t('common:success'), t('menu_editor:deleted_success'));
-              loadMenuItems();
+              loadMenuItems(true);
             } catch (error: any) {
               console.error('Error deleting menu item:', error);
               Alert.alert(t('common:error'), translateServerError(error, t('menu_editor:delete_error')));
@@ -651,82 +524,44 @@ export default function MenuEditorScreen() {
     );
   };
 
-  const handleMoveUp = async (index: number) => {
+  // Move an item one slot within ITS page's list, resolved by id — never by a
+  // row index against a different list (the old cross-list index bug).
+  const moveItem = async (itemId: string, page: PageConfig, delta: -1 | 1) => {
     if (!user?.id) return;
-    if (index <= 0) return;
-    const items = [...filteredItems];
-    const currentItem = items[index];
-    const aboveItem = items[index - 1];
-    const currentOrder = currentItem.display_order;
-    const aboveOrder = aboveItem.display_order;
-    // Swap in filteredItems
-    items[index] = { ...aboveItem, display_order: currentOrder };
-    items[index - 1] = { ...currentItem, display_order: aboveOrder };
-    setFilteredItems(items);
-    // Also update in main menuItems array
-    const newMenuItems = [...menuItems];
-    const ci = newMenuItems.findIndex(m => m.id === currentItem.id);
-    const ai = newMenuItems.findIndex(m => m.id === aboveItem.id);
-    if (ci >= 0) newMenuItems[ci] = { ...newMenuItems[ci], display_order: aboveOrder };
-    if (ai >= 0) newMenuItems[ai] = { ...newMenuItems[ai], display_order: currentOrder };
-    setMenuItems(newMenuItems);
-    try {
-      // Persist the whole filtered group's new order (reindexed 0..N-1) via the gated RPC,
-      // then reload so the editor reflects the DB's normalized display_order live.
-      const { error } = await supabase.rpc('reorder_menu_items', {
-        p_actor_id: user.id, p_ordered_ids: items.map((i) => i.id),
-      });
-      if (error) throw error;
-      loadMenuItems();
-    } catch (error) {
-      console.error('Error moving menu item up:', error);
-      loadMenuItems();
-    }
-  };
-
-  const handleMoveDown = async (index: number) => {
-    if (!user?.id) return;
-    if (index >= filteredItems.length - 1) return;
-    const items = [...filteredItems];
-    const currentItem = items[index];
-    const belowItem = items[index + 1];
-    const currentOrder = currentItem.display_order;
-    const belowOrder = belowItem.display_order;
-    items[index] = { ...belowItem, display_order: currentOrder };
-    items[index + 1] = { ...currentItem, display_order: belowOrder };
-    setFilteredItems(items);
-    const newMenuItems = [...menuItems];
-    const ci = newMenuItems.findIndex(m => m.id === currentItem.id);
-    const bi = newMenuItems.findIndex(m => m.id === belowItem.id);
-    if (ci >= 0) newMenuItems[ci] = { ...newMenuItems[ci], display_order: belowOrder };
-    if (bi >= 0) newMenuItems[bi] = { ...newMenuItems[bi], display_order: currentOrder };
-    setMenuItems(newMenuItems);
+    const items = getItemsForPage(page);
+    const idx = items.findIndex((i) => i.id === itemId);
+    const target = idx + delta;
+    if (idx < 0 || target < 0 || target > items.length - 1) return;
+    const reordered = [...items];
+    const [moved] = reordered.splice(idx, 1);
+    reordered.splice(target, 0, moved);
+    // Optimistic: swap display_order in local state so the row moves now.
+    const orderById = new Map(reordered.map((it, i) => [it.id, i]));
+    const apply = (list: MenuItem[]) =>
+      list.map((m) => (orderById.has(m.id) ? { ...m, display_order: orderById.get(m.id)! } : m));
+    setMenuItems(apply);
+    setAllItems(apply);
     try {
       const { error } = await supabase.rpc('reorder_menu_items', {
-        p_actor_id: user.id, p_ordered_ids: items.map((i) => i.id),
+        p_actor_id: user.id, p_ordered_ids: reordered.map((i) => i.id),
       });
       if (error) throw error;
-      loadMenuItems();
     } catch (error) {
-      console.error('Error moving menu item down:', error);
-      loadMenuItems();
+      console.error('Error moving menu item:', error);
     }
+    loadMenuItems(true);
   };
 
-  // Open the Order Position picker for an item — a quick way to jump it to an
-  // exact slot within its category/subcategory without dragging.
+  // Order Position picker — id-based; siblings are the item's own page set.
+  const [positionPicker, setPositionPicker] = useState<{ item: MenuItem; siblings: MenuItem[]; currentIndex: number } | null>(null);
   const openPositionPicker = (item: MenuItem) => {
     const siblings = getItemsForPage({ category: item.category, subcategory: item.subcategory });
     const currentIndex = siblings.findIndex((s) => s.id === item.id);
     if (siblings.length < 2 || currentIndex < 0) return;
     setPositionPicker({ item, siblings, currentIndex });
   };
-
-  // Commit a chosen 1-based position: splice the item into the new slot, then
-  // rewrite display_order across the sibling group and reload.
   const applyPositionChange = async (newPos: number) => {
-    if (!user?.id) return;
-    if (!positionPicker) return;
+    if (!user?.id || !positionPicker) return;
     const { item, siblings, currentIndex } = positionPicker;
     const newIndex = newPos - 1;
     setPositionPicker(null);
@@ -742,2030 +577,904 @@ export default function MenuEditorScreen() {
     } catch (error) {
       console.error('Error applying position change:', error);
     }
-    loadMenuItems();
+    loadMenuItems(true);
   };
 
-  // Overflow (⋮) action sheet for a menu item row. Edit / Move Up / Move Down /
-  // Order Position / Delete in one compact menu. Drag-to-reorder is the primary
-  // reorder path; Move Up/Down (non-search only) and Order Position are quick
-  // alternatives so cards stay clean.
-  const openItemActions = (item: MenuItem, index: number, opts?: { allowReorder?: boolean }) => {
-    // Featured Specials is a read-only combined overview — its overflow menu
-    // omits the reorder actions (Move Up/Down/Order Position).
-    const allowReorder = opts?.allowReorder !== false;
-    const inSearch = searchQuery.trim().length > 0;
-    const isFirst = index === 0;
-    const isLast = index === filteredItems.length - 1;
-    const siblingCount = getItemsForPage({ category: item.category, subcategory: item.subcategory }).length;
-
-    const editLabel = t('common:edit');
-    const moveUpLabel = t('upcoming_events_editor:move_up');
-    const moveDownLabel = t('upcoming_events_editor:move_down');
-    const orderLabel = t('menu_editor:order_position');
-    const deleteLabel = t('common:delete');
-    const cancelLabel = t('common:cancel');
-
-    if (Platform.OS === 'ios') {
-      const options: string[] = [editLabel];
-      const actions: Array<() => void> = [() => openEditModal(item)];
-      if (allowReorder && !inSearch && !isFirst) {
-        options.push(moveUpLabel);
-        actions.push(() => handleMoveUp(index));
-      }
-      if (allowReorder && !inSearch && !isLast) {
-        options.push(moveDownLabel);
-        actions.push(() => handleMoveDown(index));
-      }
-      if (allowReorder && siblingCount > 1) {
-        options.push(orderLabel);
-        actions.push(() => openPositionPicker(item));
-      }
-      options.push(deleteLabel);
-      actions.push(() => handleDelete(item));
-      options.push(cancelLabel);
-
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          destructiveButtonIndex: options.length - 2,
-          cancelButtonIndex: options.length - 1,
-          title: item.name,
-        },
-        (buttonIndex) => {
-          if (buttonIndex === options.length - 1) return;
-          actions[buttonIndex]?.();
-        }
-      );
-    } else {
-      const buttons: Array<{ text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }> = [
-        { text: editLabel, onPress: () => openEditModal(item) },
-      ];
-      if (allowReorder && !inSearch && !isFirst) buttons.push({ text: moveUpLabel, onPress: () => handleMoveUp(index) });
-      if (allowReorder && !inSearch && !isLast) buttons.push({ text: moveDownLabel, onPress: () => handleMoveDown(index) });
-      if (allowReorder && siblingCount > 1) buttons.push({ text: orderLabel, onPress: () => openPositionPicker(item) });
-      buttons.push({ text: deleteLabel, style: 'destructive', onPress: () => handleDelete(item) });
-      buttons.push({ text: cancelLabel, style: 'cancel' });
-      Alert.alert(item.name, undefined, buttons);
-    }
-  };
-
-  const handleDragEnd = async ({ data: reorderedData }: { data: MenuItem[] }) => {
+  // Drag persists the page's complete new order (page-scoped by construction —
+  // handleDragEnd is only wired on reorderable pages).
+  const handleDragEnd = async (reorderedData: MenuItem[]) => {
     if (!user?.id) return;
-    const updatedFiltered = reorderedData.map((item, index) => ({
-      ...item,
-      display_order: index,
-    }));
-    setFilteredItems(updatedFiltered);
-    // Update in main menuItems array too
-    const newMenuItems = [...menuItems];
-    updatedFiltered.forEach((item) => {
-      const idx = newMenuItems.findIndex(m => m.id === item.id);
-      if (idx >= 0) newMenuItems[idx] = { ...newMenuItems[idx], display_order: item.display_order };
-    });
-    setMenuItems(newMenuItems);
+    const orderById = new Map(reorderedData.map((it, i) => [it.id, i]));
+    const apply = (list: MenuItem[]) =>
+      list.map((m) => (orderById.has(m.id) ? { ...m, display_order: orderById.get(m.id)! } : m));
+    setMenuItems(apply);
+    setAllItems(apply);
     try {
       const { error } = await supabase.rpc('reorder_menu_items', {
         p_actor_id: user.id, p_ordered_ids: reorderedData.map((item) => item.id),
       });
       if (error) throw error;
-      console.log('Drag reorder persisted successfully');
     } catch (error) {
       console.error('Error persisting drag reorder:', error);
-      loadMenuItems();
+      loadMenuItems(true);
     }
   };
 
-  const openAddModal = () => {
-    setEditingItem(null);
-    setFormData({
-      name: '',
-      description: '',
-      price: '',
-      category: selectedCategory,
-      subcategory: selectedSubcategory || '',
-      available_for_lunch: findCategoryByName(menuCats, selectedCategory)?.filter_behavior === 'lunch',
-      available_for_dinner: findCategoryByName(menuCats, selectedCategory)?.filter_behavior === 'dinner',
-      is_gluten_free: false,
-      is_gluten_free_available: false,
-      is_vegetarian: false,
-      is_vegetarian_available: false,
-      thumbnail_shape: 'square',
-      display_order: 0,
-      is_weekly_special: false,
-      name_es: '',
-      description_es: '',
-      location: '',
-      location_es: '',
-      glass_price: '',
-      bottle_price: '',
-      member_bottle_price: '',
-      flavor_profile: '',
-      flavor_profile_es: '',
-      unique_selling_points: '',
-      unique_selling_points_es: '',
-      item_season: season === 'summer' ? 'summer' : season === 'winter' ? 'winter' : 'both',
+  // ── The meatball (⋯) — GlassActionSheet, all rows reachable on Android ─────
+  // (Alert.alert keeps only three buttons there; the old six-button meatball
+  // made Delete unreachable — plan §B1.)
+  const [itemActions, setItemActions] = useState<{ item: MenuItem; page: PageConfig | null } | null>(null);
+
+  const actionSheetModel = useMemo(() => {
+    if (!itemActions) return null;
+    const { item, page } = itemActions;
+    const siblings = getItemsForPage({ category: item.category, subcategory: item.subcategory });
+    const sibIdx = siblings.findIndex((i) => i.id === item.id);
+    const pageItems = page ? getItemsForPage(page) : [];
+    const idx = page ? pageItems.findIndex((i) => i.id === item.id) : -1;
+    const reorderable = page ? canReorderPage(page) : false;
+
+    const subtitleParts = [getCategoryLabel(item.category)];
+    if (item.subcategory) subtitleParts.push(getSubcategoryLabel(item.subcategory));
+    if (sibIdx >= 0 && siblings.length > 1) {
+      subtitleParts.push(t('menu_editor:position_of', { n: sibIdx + 1, total: siblings.length }));
+    }
+
+    const actions: GlassAction[] = [
+      {
+        key: 'edit',
+        label: t('common:edit'),
+        iosIcon: 'pencil',
+        androidIcon: 'edit',
+        onPress: () => openEdit(item),
+      },
+    ];
+    if (reorderable && idx > 0) {
+      actions.push({
+        key: 'up',
+        label: t('upcoming_events_editor:move_up'),
+        iosIcon: 'arrow.up',
+        androidIcon: 'arrow-upward',
+        onPress: () => moveItem(item.id, page!, -1),
+      });
+    }
+    if (reorderable && idx >= 0 && idx < pageItems.length - 1) {
+      actions.push({
+        key: 'down',
+        label: t('upcoming_events_editor:move_down'),
+        iosIcon: 'arrow.down',
+        androidIcon: 'arrow-downward',
+        onPress: () => moveItem(item.id, page!, 1),
+      });
+    }
+    // Order Position works from the item's own sibling set, so it stays safe
+    // (and available) from search results too — matching the old behavior.
+    if (siblings.length > 1 && (page ? reorderable : true)) {
+      actions.push({
+        key: 'order',
+        label: t('menu_editor:order_position'),
+        iosIcon: 'list.number',
+        androidIcon: 'format-list-numbered',
+        onPress: () => openPositionPicker(item),
+      });
+    }
+    actions.push({
+      key: 'delete',
+      label: t('common:delete'),
+      iosIcon: 'trash',
+      androidIcon: 'delete',
+      destructive: true,
+      onPress: () => handleDelete(item),
     });
-    setSelectedImageUri(null);
-    addSessionRef.current += 1;
-    setShowAddModal(true);
+    return { title: item.name, subtitle: subtitleParts.join(' · '), actions };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itemActions, getItemsForPage, canReorderPage, t]);
+
+  // ── Recipe-fed item detail (read-only tap-through, Steve's round-3 ask) ────
+  // Tapping a locked libations card opens the USER-side detail sheet so the
+  // manager sees exactly what customers see, with an "Open Recipes Editor"
+  // button in place of Redeem-side affordances. (Deep-linking into that
+  // editor's own edit modal is queued for the Bartender design wave.)
+  const [recipeDetail, setRecipeDetail] = useState<MenuItem | null>(null);
+  const [recipeDetailVisible, setRecipeDetailVisible] = useState(false);
+  const openRecipeDetail = (item: MenuItem) => {
+    setRecipeDetail(item);
+    setRecipeDetailVisible(true);
+  };
+  // Keep the item mounted through the slide-out; the next open replaces it.
+  const closeRecipeDetail = useCallback(() => setRecipeDetailVisible(false), []);
+
+  // Which recipes editor owns the item: its own menu when it has one, else the
+  // menu being viewed (legacy 'both' rows) — mirrors the ＋ guard's routing.
+  const recipesEditorPathFor = (item: MenuItem): string => {
+    const s = item.season === 'summer' || item.season === 'winter' ? item.season : season;
+    return s === 'summer' ? '/summer-libation-recipes-editor' : '/libation-recipes-editor';
   };
 
-  const openEditModal = (item: MenuItem) => {
-    setEditingItem(item);
-    setFormData({
+  const recipeDetailCtx = (() => {
+    const item = recipeDetail;
+    if (!item) {
+      return { detailItem: null as MenuItemForDetail | null, menuLabel: '', isWine: false, isLibations: false, editAction: null as { label: string; onPress: () => void } | null };
+    }
+    const detailItem: MenuItemForDetail = {
+      id: item.id,
       name: item.name,
-      description: item.description || '',
+      name_es: item.name_es ?? null,
+      description: item.description,
+      description_es: item.description_es ?? null,
       price: item.price,
-      category: item.category,
-      subcategory: item.subcategory || '',
-      available_for_lunch: item.available_for_lunch,
-      available_for_dinner: item.available_for_dinner,
-      is_gluten_free: item.is_gluten_free,
-      is_gluten_free_available: item.is_gluten_free_available,
-      is_vegetarian: item.is_vegetarian,
-      is_vegetarian_available: item.is_vegetarian_available,
+      thumbnail_url: item.thumbnail_url,
       thumbnail_shape: item.thumbnail_shape,
-      display_order: item.display_order,
-      is_weekly_special: item.is_weekly_special,
-      name_es: item.name_es || '',
-      description_es: item.description_es || '',
-      location: item.location || '',
-      location_es: item.location_es || '',
-      glass_price: item.glass_price || '',
-      bottle_price: item.bottle_price || '',
-      member_bottle_price: item.member_bottle_price || '',
-      flavor_profile: item.flavor_profile || '',
-      flavor_profile_es: item.flavor_profile_es || '',
-      unique_selling_points: item.unique_selling_points || '',
-      unique_selling_points_es: item.unique_selling_points_es || '',
-      item_season: (item.season as 'winter' | 'summer' | 'both') || 'both',
+      location: item.location ?? null,
+      location_es: item.location_es ?? null,
+      glass_price: item.glass_price ?? null,
+      bottle_price: item.bottle_price ?? null,
+      member_bottle_price: item.member_bottle_price ?? null,
+      flavor_profile: item.flavor_profile ?? null,
+      flavor_profile_es: item.flavor_profile_es ?? null,
+      unique_selling_points: item.unique_selling_points ?? null,
+      unique_selling_points_es: item.unique_selling_points_es ?? null,
+      is_active: item.is_active,
+      dietary: {
+        gf: item.is_gluten_free,
+        gfa: item.is_gluten_free_available,
+        v: item.is_vegetarian,
+        va: item.is_vegetarian_available,
+        df: item.is_dairy_free,
+        ef: item.is_egg_free,
+        nf: item.is_nut_free,
+        sf: item.is_sugar_free,
+        nos: item.is_salt_free,
+      },
+    };
+    return {
+      detailItem,
+      menuLabel: organization.menu_count === 2 ? menuBadgeForSeason(item.season).label : '',
+      isWine: isWineName(item.category),
+      isLibations: catOf(item.category)?.system_key === 'cat.libations',
+      editAction: {
+        label: t('menu_editor:open_recipes_editor'),
+        onPress: () => router.push(recipesEditorPathFor(item) as any),
+      },
+    };
+  })();
+
+  // ── Add/Edit sheet hosting ─────────────────────────────────────────────────
+  const [editSheet, setEditSheet] = useState<{ visible: boolean; item: MenuItem | null }>({ visible: false, item: null });
+
+  const openAdd = () => {
+    // COCKTAIL-FED subcategory pages mirror the Bartender recipe editors —
+    // the ＋ points there instead. Manual Libations subs (Draft Beer, Bottles
+    // & Cans, custom ones) add normally (Steve's carve-out).
+    if (!isSearchMode && selectedSubObj?.is_cocktail_fed) {
+      const bannerText =
+        organization?.menu_count === 1
+          ? t('menu_editor:libation_banner_single')
+          : t(
+              season === 'summer' ? 'menu_editor:summer_libation_banner' : 'menu_editor:winter_libation_banner',
+              {
+                menu: season === 'summer'
+                  ? (organization?.menu_2_name || t('onboarding.default_menu_2'))
+                  : (organization?.menu_1_name || t('onboarding.default_menu_1')),
+              }
+            );
+      Alert.alert(bannerText, undefined, [
+        { text: t('common:cancel'), style: 'cancel' },
+        {
+          text: t('menu_editor:open_recipes_editor'),
+          onPress: () =>
+            router.push((season === 'summer' ? '/summer-libation-recipes-editor' : '/libation-recipes-editor') as any),
+        },
+      ]);
+      return;
+    }
+    // Prefill from the page the manager is parked on (never in search mode).
+    setEditSheet({ visible: true, item: null });
+  };
+  const openEdit = (item: MenuItem) => setEditSheet({ visible: true, item });
+  const closeEditSheet = useCallback(() => setEditSheet((prev) => ({ ...prev, visible: false })), []);
+
+  // New items append to the END of their target category/subcategory list —
+  // siblings resolved with catKey over the FORM's menu scope (allItems carries
+  // both menus; 'both'-season legacy rows count on either menu).
+  const computeNextOrder = useCallback((category: string, subcategory: string, itemSeason: 'winter' | 'summer' | 'both'): number => {
+    const siblings = allItems.filter((m) => {
+      if (catKey(m.category) !== catKey(category)) return false;
+      const subOk = subcategory ? catKey(m.subcategory) === catKey(subcategory) : !m.subcategory;
+      if (!subOk) return false;
+      if (itemSeason === 'both') return true;
+      return m.season === itemSeason || m.season === 'both';
     });
-    setSelectedImageUri(null);
-    setShowAddModal(true);
-  };
+    return siblings.length ? Math.max(...siblings.map((s) => s.display_order ?? 0)) + 1 : 0;
+  }, [allItems]);
 
-  const closeModal = () => {
-    setShowAddModal(false);
-    setEditingItem(null);
-    setSelectedImageUri(null);
-  };
+  // The success alert must wait out the sheet's Modal teardown — UIKit
+  // silently drops a presentation issued mid-dismissal. The sheet's iOS
+  // onDismiss is the real "it's gone" signal; the 500ms timer is the Android
+  // floor (RN Modal onDismiss never fires there) and the iOS fallback —
+  // whichever lands first runs it, the other finds the ref empty. Same
+  // contract as useSheetHandoff (500ms is its iOS constant; verify-lens fix).
+  const pendingSavedAlertRef = useRef<(() => void) | null>(null);
+  const flushSavedAlert = useCallback(() => {
+    const fn = pendingSavedAlertRef.current;
+    if (!fn) return;
+    pendingSavedAlertRef.current = null;
+    fn();
+  }, []);
 
-  const handleBackPress = () => {
-    router.replace('/(portal)/manager/manage');
-  };
+  const handleSaved = useCallback(() => {
+    const wasEdit = !!editSheet.item;
+    setEditSheet((prev) => ({ ...prev, visible: false }));
+    loadMenuItems(true);
+    pendingSavedAlertRef.current = () => {
+      Alert.alert(
+        t('common:success'),
+        wasEdit ? t('menu_editor:updated_success') : t('menu_editor:created_success'),
+      );
+    };
+    setTimeout(flushSavedAlert, 500);
+  }, [editSheet.item, loadMenuItems, flushSavedAlert, t]);
 
-  // Helper function to get image URL with cache busting
-  const getImageUrl = (url: string | null) => {
-    if (!url) return null;
-    return url;
-  };
-
-  // Helper function to format price with $ sign
-  const formatPrice = (price: string) => {
-    // If price already has $, return as is
-    if (price.includes('$')) {
-      return price;
+  // ── ⚙ Menu sheet wiring (identical to the user side) ───────────────────────
+  const [menuSheetVisible, setMenuSheetVisible] = useState(false);
+  const [uploadQuota, setUploadQuota] = useState<{ remaining: number; max: number; freeAvailable: boolean } | null>(null);
+  const canSeeUploadQuota = user?.role === 'owner' || managerPerms.aiUpload;
+  const fetchQuota = useCallback(async () => {
+    if (!user?.id || !organizationId) return;
+    try {
+      const { data } = await supabase.rpc('get_menu_upload_quota', {
+        p_user_id: user.id,
+        p_organization_id: organizationId,
+      });
+      const result = data as any;
+      if (result?.success) {
+        setUploadQuota({
+          remaining: result.credits_remaining ?? 0,
+          max: result.monthly_allowance ?? 0,
+          freeAvailable: result.free_available === true,
+        });
+      }
+    } catch (e) {
+      console.error('Error loading menu upload quota:', e);
     }
-    // Otherwise add $ at the beginning
-    return `$${price}`;
+  }, [user?.id, organizationId]);
+  useEffect(() => {
+    if (menuSheetVisible && canSeeUploadQuota) fetchQuota();
+  }, [menuSheetVisible, canSeeUploadQuota, fetchQuota]);
+  // Stable identity: MenuSheet's defer() (and the upload sheet's poll effect)
+  // depends on onClose — an inline arrow would restart the poll per render.
+  const closeMenuSheet = useCallback(() => setMenuSheetVisible(false), []);
+
+  const handleMenuConfiguration = () => {
+    const params: Record<string, string> = { tab: 'menu' };
+    if (user?.role === 'manager') params.scoped = '1';
+    router.push({ pathname: '/organization-settings', params } as any);
   };
 
-  // Compact price label for the editor preview card. Wines collapse to
-  // "Glass / Bottle" tiers; non-wines fall back to the legacy single price.
-  const formatItemPriceLabel = (item: MenuItem) => {
-    if (isWineName(item.category)) {
-      const parts: string[] = [];
-      if (item.glass_price) parts.push(`Gl ${formatPrice(item.glass_price)}`);
-      if (item.bottle_price) parts.push(`Btl ${formatPrice(item.bottle_price)}`);
-      if (parts.length > 0) return parts.join(' / ');
+  // ── Cards ──────────────────────────────────────────────────────────────────
+  const renderCard = (
+    item: MenuItem,
+    categoryColor: string,
+    opts: {
+      editor?: { onMeatball: () => void; drag?: () => void; dragActive?: boolean; showGrabber: boolean };
+      menuBadge?: { icon: string; label: string } | null;
+      metaTags?: string[];
+      // Only recipe-fed (display-only) cards carry a tap — it opens the
+      // user-side detail sheet; editable cards keep grab/meatball only.
+      onPress?: () => void;
+    },
+  ) => {
+    const isWine = isWineName(item.category);
+    const title = getLocalizedField(item, 'name', language);
+    const rawDesc = item.description
+      ? stripFormattingTags(getLocalizedField(item, 'description', language) || item.description)
+      : null;
+    const isBanner = !isWine && item.thumbnail_shape === 'banner' && !!item.thumbnail_url;
+    if (isBanner) {
+      return (
+        <MenuItemBannerCard
+          key={item.id}
+          colors={colors}
+          title={title}
+          description={rawDesc}
+          thumbnailUrl={getImageUrl(item.thumbnail_url!, item.updated_at)!}
+          eyebrow={bannerEyebrowText(item)}
+          priceLabel={formatPrice(item.price)}
+          catColor={categoryColor}
+          editor={opts.editor}
+          onPress={opts.onPress}
+        />
+      );
     }
-    return formatPrice(item.price);
+    return (
+      <MenuItemSquareCard
+        key={item.id}
+        colors={colors}
+        title={title}
+        description={rawDesc}
+        thumbnailUrl={item.thumbnail_url ? getImageUrl(item.thumbnail_url, item.updated_at) : null}
+        isWine={isWine}
+        priceLabel={isWine ? null : formatPrice(item.price)}
+        winePrices={
+          isWine
+            ? {
+                gl: item.glass_price ? `${t('menu_display.gl')} ${formatPrice(item.glass_price)}` : undefined,
+                btl: item.bottle_price ? `${t('menu_display.btl')} ${formatPrice(item.bottle_price)}` : undefined,
+                mbr: item.member_bottle_price ? `${t('menu_display.mbr')} ${formatPrice(item.member_bottle_price)}` : undefined,
+              }
+            : null
+        }
+        wineLocation={isWine ? getLocalizedField(item, 'location', language) : null}
+        dietaryAbbrevs={cardDietAbbrevs(item)}
+        metaTags={opts.metaTags}
+        menuBadge={opts.menuBadge ?? null}
+        catColor={categoryColor}
+        editor={opts.editor}
+        onPress={opts.onPress}
+      />
+    );
   };
 
-  // Which menu an item belongs to (winter → Menu 1, summer → Menu 2, both →
-  // shared/legacy) — drives the badge on whole-database search results.
-  const menuBadgeForSeason = (s: string | null | undefined): { icon: string; label: string } => {
-    if (s === 'winter') return { icon: organization?.menu_1_icon || 'snowflake', label: organization?.menu_1_name || t('menu_editor:season_winter') };
-    if (s === 'summer') return { icon: organization?.menu_2_icon || 'sun.max.fill', label: organization?.menu_2_name || t('menu_editor:season_summer') };
-    return { icon: 'circle.grid.2x2', label: t('menu_editor:season_both') };
+  // ── One pager page: count row + libation banner + draggable list ───────────
+  const renderPage = ({ item: page, index }: { item: PageConfig; index: number }) => {
+    const pageItems = getItemsForPage(page);
+    const categoryColor = catOf(page.category)?.color || colors.primary;
+    const isSpecialsPage = catOf(page.category)?.filter_behavior === 'weekly_specials';
+    const pageSub = catOf(page.category)?.subcategories.find(
+      (s) => catKey(s.display_name) === catKey(page.subcategory),
+    );
+    // Recipe-fed pages are display-only (see isRecipeFedItem).
+    const isCocktailFed = !!pageSub?.is_cocktail_fed;
+    const reorderable = canReorderPage(page) && !isCocktailFed;
+    const showDragHint = reorderable && pageItems.length > 1;
+
+    const listHeader = (
+      <View>
+        {/* Drag hint LEFT (it sits over the grabbers), count RIGHT — the count
+            then occupies the same spot as the user side's, so the flip keeps
+            it still while the hint appears/disappears (Steve's round 4). */}
+        <View style={styles.countRow}>
+          {showDragHint && <Text style={styles.countRowText}>{t('menu_editor:drag_to_reorder')}</Text>}
+          <Text style={[styles.countRowText, styles.countRowCount]} numberOfLines={1}>
+            {t('menu_editor:items_count', { count: pageItems.length })}
+            {' · '}
+            {page.subcategory ? getSubcategoryLabel(page.subcategory) : getCategoryLabel(page.category)}
+          </Text>
+        </View>
+        {isCocktailFed && (
+          <TouchableOpacity
+            style={styles.libationBanner}
+            onPress={() => router.push((season === 'summer' ? '/summer-libation-recipes-editor' : '/libation-recipes-editor') as any)}
+            activeOpacity={0.7}
+          >
+            <IconSymbol ios_icon_name="info.circle.fill" android_material_icon_name="info" size={20} color={colors.primary} />
+            <Text style={styles.libationBannerText}>
+              {organization?.menu_count === 1
+                ? t('menu_editor:libation_banner_single')
+                : t(
+                    season === 'summer' ? 'menu_editor:summer_libation_banner' : 'menu_editor:winter_libation_banner',
+                    {
+                      menu: season === 'summer'
+                        ? (organization?.menu_2_name || t('onboarding.default_menu_2'))
+                        : (organization?.menu_1_name || t('onboarding.default_menu_1')),
+                    }
+                  )}
+            </Text>
+            <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={18} color={colors.primary} />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+
+    const listEmpty = (
+      <View style={styles.emptyContainer}>
+        <IconSymbol
+          ios_icon_name="fork.knife"
+          android_material_icon_name="restaurant-menu"
+          size={64}
+          color={colors.textSecondary}
+        />
+        <Text style={styles.emptyText}>{t('menu_editor:empty_title')}</Text>
+        {!isCocktailFed && (
+          <>
+            <Text style={styles.emptySubtext}>{t('menu_editor:empty_subtext')}</Text>
+            <TouchableOpacity style={styles.emptyCta} onPress={openAdd} activeOpacity={0.85}>
+              <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={18} color={colors.fireText} />
+              <Text style={styles.emptyCtaText}>{t('menu_editor:add_button')}</Text>
+            </TouchableOpacity>
+            {/* AI upload only offered on a fully empty menu — single-item adds
+                belong in the Add sheet, not the credit funnel. */}
+            {user?.role === 'owner' && menuItems.length === 0 && (
+              <TouchableOpacity
+                style={styles.emptyCta}
+                onPress={() => router.push('/menu-upload' as any)}
+                activeOpacity={0.85}
+              >
+                <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={18} color={colors.fireText} />
+                <Text style={styles.emptyCtaText}>{t('menu_editor:upload_menu_button', 'Upload Menu')}</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+      </View>
+    );
+
+    return (
+      <View
+        style={{ width: SCREEN_WIDTH }}
+        onLayout={(e) => {
+          const h = Math.round(e.nativeEvent.layout.height);
+          if (h > 0) setPageViewportH((prev) => (prev === h ? prev : h));
+        }}
+      >
+        <DraggableFlatList
+          ref={(r: any) => { pageListRefs.current[index] = r; }}
+          data={pageItems}
+          keyExtractor={(item) => item.id}
+          onDragEnd={reorderable ? ({ data }) => handleDragEnd(data) : undefined}
+          activationDistance={10}
+          onScrollOffsetChange={(y: number) => handlePageScroll(index, y)}
+          contentContainerStyle={[
+            styles.pageContentContainer,
+            { paddingTop: chromeH + 8 },
+            pageViewportH > 0 && { minHeight: pageViewportH + bandH },
+          ]}
+          showsVerticalScrollIndicator={false}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={listEmpty}
+          renderItem={({ item, drag, isActive }: RenderItemParams<MenuItem>) => {
+            // Recipe-fed rows (whole cocktail-fed pages, or strays surfaced on
+            // Featured Specials) render with NO editor affordances — display
+            // only; tapping one opens the user-side detail (Steve's round 3).
+            const readOnly = isCocktailFed || isRecipeFedItem(item);
+            return (
+              <ScaleDecorator>
+                {renderCard(item, categoryColor, {
+                  editor: readOnly
+                    ? undefined
+                    : {
+                        onMeatball: () => setItemActions({ item, page }),
+                        drag: reorderable ? drag : undefined,
+                        dragActive: isActive,
+                        showGrabber: showDragHint,
+                      },
+                  onPress: readOnly ? () => openRecipeDetail(item) : undefined,
+                  metaTags: isSpecialsPage
+                    ? [
+                        ...(organization.menu_count === 2 ? [menuBadgeForSeason(item.season).label] : []),
+                        getCategoryLabel(item.category),
+                      ]
+                    : undefined,
+                })}
+              </ScaleDecorator>
+            );
+          }}
+        />
+      </View>
+    );
   };
+
+  // ── Category/subcategory tab models (editor: full visible tree, empty pages
+  // included — a manager must be able to reach an empty subcategory to fill it).
+  const categoryTabs = useMemo(
+    () => menuCats.filter((c) => !c.is_hidden).map((c) => ({
+      name: c.display_name,
+      label: labelForCategoryName(c.display_name, t, menuCats, language),
+      color: c.color,
+    })),
+    [menuCats, t, language],
+  );
+  const subTabs = useMemo(() => {
+    const cat = catOf(selectedCategory);
+    if (!cat) return [];
+    return cat.subcategories
+      .filter((s) => !s.is_hidden)
+      .map((s) => ({ name: s.display_name, label: labelForSubcategoryName(s.display_name, t, menuCats, language) }));
+  }, [catOf, selectedCategory, menuCats, t, language]);
+  const activeCategoryColor = catOf(selectedCategory)?.color || colors.primary;
 
   return (
-    <View style={styles.container}>
-      {/* Header with Back Button */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('menu_editor:title')}</Text>
-        {user?.role === 'owner' ? (
-          <View style={styles.headerActions}>
-            <TouchableOpacity
-              onPress={() => router.push('/menu-upload' as any)}
-              style={styles.aiButton}
-              accessibilityLabel={t('menu_editor:ai_upload_button', 'AI Menu Upload')}
-            >
-              <IconSymbol
-                ios_icon_name="sparkles"
-                android_material_icon_name="auto-awesome"
-                size={15}
-                color={colors.primary}
-              />
-              <Text style={styles.aiButtonText}>{t('menu_editor:ai_button', 'AI')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => router.push('/manage-menu-categories' as any)}
-              style={styles.manageCatsButton}
-              accessibilityLabel={t('menu_editor:manage_categories_button')}
-            >
-              <IconSymbol
-                ios_icon_name="square.grid.2x2"
-                android_material_icon_name="grid-view"
-                size={16}
-                color={colors.primary}
-              />
-              <Text style={styles.manageCatsButtonText}>{t('menu_editor:manage_categories_button')}</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <View style={styles.backButton} />
-        )}
+    <GestureHandlerRootView style={styles.container}>
+      {/* Pushed screen — it owns its backdrop (the portal layout renders these
+          for tab pages); the inset spacer mirrors the portal layout's exactly
+          so the user↔editor flip does not move the chrome. */}
+      <AmbientGlow />
+      <View style={{ height: insets.top }} />
+
+      {/* zIndex lifts the header's chips ABOVE the pager's translated chrome
+          overlay in sibling stacking — the parked (invisible) band otherwise
+          intercepted chip taps on iOS despite pointerEvents:none (Steve's
+          smoke: ⚙/eye dead while collapsed). */}
+      <View style={styles.topAreaLayer}>
+        <MenuTopArea
+          colors={colors}
+          mode="editor"
+          showActionChips
+          onOpenMenuSheet={() => setMenuSheetVisible(true)}
+          onFlipSide={() => router.back()}
+          season={season}
+          onSeasonChange={setSeason}
+          showMenuTabs={isSearchMode && organization.menu_count === 2}
+          menu1Label={organization.menu_1_name}
+          menu2Label={organization.menu_2_name}
+          menu1Icon={organization.menu_1_icon}
+          menu2Icon={organization.menu_2_icon}
+        />
       </View>
 
-      {/* Season Selector — only for two-menu orgs. A single-menu org has no
-          Menu 1 / Menu 2 choice, so we hide the tabs (matches the customer
-          MenuDisplay, which also gates this on menu_count === 2). */}
-      {organization?.menu_count === 2 && (
-        <View style={styles.seasonSelectorContainer}>
-          <SeasonSelector
-            selectedSeason={season}
-            onSeasonChange={setSeason}
-            menu1Label={organization?.menu_1_name}
-            menu2Label={organization?.menu_2_name}
-            menu1Icon={organization?.menu_1_icon}
-            menu2Icon={organization?.menu_2_icon}
-          />
-        </View>
-      )}
-
-      {/* Search Bar + Add Button */}
-      <View style={styles.searchRow}>
-        <View style={styles.searchContainer}>
-          <IconSymbol
-            ios_icon_name="magnifyingglass"
-            android_material_icon_name="search"
-            size={20}
-            color={colors.textSecondary}
-          />
-          <TextInput
-            style={styles.searchInput}
-            placeholder={t('menu_editor:search_placeholder')}
-            placeholderTextColor={colors.textSecondary}
+      {isSearchMode ? (
+        <>
+          {/* Search mode: static search row + flat cross-menu results — no
+              overlay, no collapse (the row must be usable while typing). */}
+          <MenuSearchRow
+            colors={colors}
+            mode="editor"
             value={searchQuery}
             onChangeText={setSearchQuery}
+            placeholder={t('menu_editor:search_placeholder')}
+            onRightPress={openAdd}
           />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <IconSymbol
-                ios_icon_name="xmark.circle.fill"
-                android_material_icon_name="cancel"
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-          )}
-        </View>
-        <TouchableOpacity
-          style={styles.addIconButton}
-          onPress={openAddModal}
-          accessibilityLabel={t('menu_editor:add_button')}
-          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-        >
-          <IconSymbol
-            ios_icon_name="plus"
-            android_material_icon_name="add"
-            size={26}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-      </View>
-
-      {searchQuery.length > 0 && (
-        <View style={styles.searchInfoBanner}>
-          <IconSymbol
-            ios_icon_name="magnifyingglass"
-            android_material_icon_name="search"
-            size={16}
-            color={colors.primary}
-          />
-          <Text style={styles.searchInfoText}>
-            {filteredItems.length === 1
-              ? t('menu_editor:search_results', { count: filteredItems.length })
-              : t('menu_editor:search_results_plural', { count: filteredItems.length })}
-          </Text>
-        </View>
-      )}
-
-      {/* Category Tabs - Only show when NOT searching */}
-      {!searchQuery && (
-        <ScrollView
-          ref={categoryScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
-          contentContainerStyle={styles.categoryScrollContent}
-        >
-          {menuCats.filter((c) => !c.is_hidden).map((cat) => (
-            <CategoryPill
-              key={cat.id}
-              size="lg"
-              label={categoryLabel(cat, t, language)}
-              selected={selectedCategory === cat.display_name}
-              onPress={() => navigateToPage(cat.display_name)}
-              onLayout={(e) => {
-                categoryLayoutsRef.current[cat.display_name] = {
-                  x: e.nativeEvent.layout.x,
-                  width: e.nativeEvent.layout.width,
-                };
-              }}
-            />
-          ))}
-        </ScrollView>
-      )}
-
-      {/* Subcategory Tabs - Only show when NOT searching */}
-      {!searchQuery && selectedCategoryObj && selectedCategoryObj.subcategories.some((s) => !s.is_hidden) && (
-        <ScrollView
-          ref={subcategoryScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={styles.subcategoryScroll}
-          contentContainerStyle={styles.subcategoryScrollContent}
-        >
-          {selectedCategoryObj.subcategories.filter((s) => !s.is_hidden).map((sub) => (
-            <CategoryPill
-              key={sub.id}
-              size="sm"
-              label={subcategoryLabel(sub, t, language)}
-              selected={selectedSubcategory === sub.display_name}
-              onPress={() => navigateToPage(selectedCategory, sub.display_name)}
-              onLayout={(e) => {
-                subcategoryLayoutsRef.current[`${selectedCategory}_${sub.display_name}`] = {
-                  x: e.nativeEvent.layout.x,
-                  width: e.nativeEvent.layout.width,
-                };
-              }}
-            />
-          ))}
-        </ScrollView>
-      )}
-
-      {/* Libation cocktails redirect banner — Menu 1 (winter) feeds from the Libation
-          Recipes Editor; Menu 2 (summer) from the Summer Libation Recipes Editor. */}
-      {selectedSubObj?.is_cocktail_fed && !searchQuery && (
-        <TouchableOpacity
-          style={styles.libationBanner}
-          onPress={() => router.push((season === 'summer' ? '/summer-libation-recipes-editor' : '/libation-recipes-editor') as any)}
-          activeOpacity={0.7}
-        >
-          <IconSymbol ios_icon_name="info.circle.fill" android_material_icon_name="info" size={20} color={colors.primary} />
-          <Text style={styles.libationBannerText}>
-            {organization?.menu_count === 1
-              ? t('menu_editor:libation_banner_single')
-              : t(
-                  season === 'summer' ? 'menu_editor:summer_libation_banner' : 'menu_editor:winter_libation_banner',
-                  {
-                    menu: season === 'summer'
-                      ? (organization?.menu_2_name || t('onboarding.default_menu_2'))
-                      : (organization?.menu_1_name || t('onboarding.default_menu_1')),
-                  }
-                )}
-          </Text>
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={18} color={colors.primary} />
-        </TouchableOpacity>
-      )}
-
-      {/* Menu Items List */}
-      {(loading || categoriesLoading) ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      ) : (
-        <>
-        {searchQuery && filteredItems.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <IconSymbol
-              ios_icon_name="fork.knife"
-              android_material_icon_name="restaurant-menu"
-              size={64}
-              color={colors.textSecondary}
-            />
-            <Text style={styles.emptyText}>
-              {t('menu_editor:empty_title')}
-            </Text>
-            <Text style={styles.emptySubtext}>
-              {t('menu_editor:empty_search_subtext')}
-            </Text>
-          </View>
-        ) : searchQuery ? (
-          <ScrollView style={styles.itemsList} contentContainerStyle={styles.itemsListContent}>
-            {filteredItems.map((item, index) => (
-              <View key={item.id} style={styles.menuItemCard}>
-                {/* Overflow menu (Edit / Move Up / Move Down / Delete) */}
-                <TouchableOpacity
-                  style={styles.overflowButton}
-                  onPress={() => openItemActions(item, index)}
-                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                  <IconSymbol
-                    ios_icon_name="ellipsis"
-                    android_material_icon_name="more-vert"
-                    size={20}
-                    color="#FFFFFF"
-                  />
-                </TouchableOpacity>
-
-                {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
-                  <View style={styles.squareLayout}>
-                    <StorageImage key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.squareImage} />
-                    <View style={styles.squareContent}>
-                      <View style={styles.squareHeader}>
-                        <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>
-                        <Text style={styles.menuItemName} numberOfLines={1}>{getLocalizedField(item, 'name', language)}</Text>
-                      </View>
-                      {item.description && (
-                        <FormattedText style={styles.squareDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>
-                      )}
-                      <View style={styles.menuItemTags}>
-                        {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                        {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{lunchName}</Text></View>}
-                        {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{dinnerName}</Text></View>}
-                        {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
-                        {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
-                        {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
-                        {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
-                      </View>
-                    </View>
-                    {(() => {
-                      const badge = menuBadgeForSeason(item.season);
-                      return (
-                        <View style={styles.menuBadge}>
-                          <IconSymbol ios_icon_name={badge.icon} android_material_icon_name={menuIconAndroid(badge.icon)} size={12} color={colors.primary} />
-                          <Text style={styles.menuBadgeText} numberOfLines={1}>{badge.label}</Text>
-                        </View>
-                      );
-                    })()}
-                  </View>
-                ) : (
-                  <>
-                    {item.thumbnail_url && <StorageImage key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.menuItemImageBanner} />}
-                    <View style={styles.menuItemContent}>
-                      <View style={styles.menuItemHeader}>
-                        <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>
-                        <Text style={styles.menuItemName} numberOfLines={1}>{getLocalizedField(item, 'name', language)}</Text>
-                      </View>
-                      {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
-                      <View style={styles.menuItemTags}>
-                        {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                        {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{lunchName}</Text></View>}
-                        {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{dinnerName}</Text></View>}
-                        {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
-                        {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
-                        {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
-                        {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
-                      </View>
-                      {(() => {
-                        const badge = menuBadgeForSeason(item.season);
-                        return (
-                          <View style={styles.menuBadge}>
-                            <IconSymbol ios_icon_name={badge.icon} android_material_icon_name={menuIconAndroid(badge.icon)} size={12} color={colors.primary} />
-                            <Text style={styles.menuBadgeText} numberOfLines={1}>{badge.label}</Text>
-                          </View>
-                        );
-                      })()}
-                    </View>
-                  </>
-                )}
-              </View>
-            ))}
-          </ScrollView>
-        ) : (
-          /* Normal mode: horizontal swipe pager — one page per category/subcategory */
-          <FlatList
-            ref={pagerRef}
-            style={{ flex: 1 }}
-            data={pages}
-            keyExtractor={(_, index) => `page-${index}`}
-            horizontal
-            pagingEnabled
-            bounces={false}
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={onMomentumScrollEnd}
-            getItemLayout={(_, index) => ({
-              length: SCREEN_WIDTH,
-              offset: SCREEN_WIDTH * index,
-              index,
-            })}
-            // The loading spinner (line ~1157) unmounts this pager on every
-            // loadMenuItems() (move up/down, add/edit/delete, position picker) —
-            // remount on the ACTIVE page, not page 0, so the visible list stays
-            // on the category/subcategory pills the user is parked on. Clamped:
-            // pages can shrink after category edits.
-            initialScrollIndex={Math.max(0, Math.min(currentPageIndex, pages.length - 1))}
-            renderItem={({ item: page }) => {
-              const pageItems = getItemsForPage(page);
-              // Featured Specials is a combined cross-menu overview — read-only
-              // ordering here (drag + Move/Order disabled), with menu + category chips.
-              const isWS = findCategoryByName(menuCats, page.category)?.filter_behavior === 'weekly_specials';
-              if (pageItems.length === 0) {
-                // Cocktail-fed subs are managed in the recipes editors — the
-                // banner above is the page's action; hide the add/upload CTAs.
-                const pageSub = findCategoryByName(menuCats, page.category)?.subcategories.find(
-                  (s) => s.display_name === page.subcategory
-                );
-                const isCocktailFed = !!pageSub?.is_cocktail_fed;
-                return (
-                  <View style={{ width: SCREEN_WIDTH }}>
-                    <View style={styles.emptyContainer}>
-                      <IconSymbol
-                        ios_icon_name="fork.knife"
-                        android_material_icon_name="restaurant-menu"
-                        size={64}
-                        color={colors.textSecondary}
-                      />
-                      <Text style={styles.emptyText}>{t('menu_editor:empty_title')}</Text>
-                      {!isCocktailFed && (
-                        <Text style={styles.emptySubtext}>{t('menu_editor:empty_subtext')}</Text>
-                      )}
-                      {!isCocktailFed && (
-                        <TouchableOpacity
-                          style={styles.uploadMenuButton}
-                          onPress={openAddModal}
-                          activeOpacity={0.85}
-                        >
-                          <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={18} color={colors.fireText} />
-                          <Text style={styles.uploadMenuButtonText}>{t('menu_editor:add_button')}</Text>
-                        </TouchableOpacity>
-                      )}
-                      {/* AI upload only offered on a fully empty menu — 1-item
-                          adds belong in the Add modal, not the credit funnel. */}
-                      {!isCocktailFed && user?.role === 'owner' && menuItems.length === 0 && (
-                        <TouchableOpacity
-                          style={styles.uploadMenuButton}
-                          onPress={() => router.push('/menu-upload' as any)}
-                          activeOpacity={0.85}
-                        >
-                          <IconSymbol ios_icon_name="sparkles" android_material_icon_name="auto-awesome" size={18} color={colors.fireText} />
-                          <Text style={styles.uploadMenuButtonText}>{t('menu_editor:upload_menu_button', 'Upload Menu')}</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                  </View>
-                );
-              }
-              return (
-                <View style={[styles.itemsList, { width: SCREEN_WIDTH }]}>
-                  {pageItems.length > 1 && !isWS && (
-                    <Text style={styles.reorderHint}>{t('upcoming_events_editor:reorder_hint')}</Text>
-                  )}
-                  <DraggableFlatList
-                    data={pageItems}
-                    keyExtractor={(item) => item.id}
-                    onDragEnd={handleDragEnd}
-                    activationDistance={10}
-                    contentContainerStyle={styles.itemsListContent}
-                    renderItem={({ item, getIndex, drag, isActive }: RenderItemParams<MenuItem>) => {
-                      const index = getIndex() ?? 0;
-
-                return (
-                  <ScaleDecorator>
-                    <View style={[styles.menuItemCard, isActive && styles.menuItemCardDragging]}>
-                      {/* Drag Handle — hidden on the read-only Featured Specials overview */}
-                      {!isWS && (
-                        <TouchableOpacity
-                          onLongPress={drag}
-                          disabled={isActive}
-                          style={styles.dragHandle}
-                        >
-                          <IconSymbol
-                            ios_icon_name="line.3.horizontal.decrease"
-                            android_material_icon_name="drag-indicator"
-                            size={20}
-                            color="#FFFFFF"
-                          />
-                        </TouchableOpacity>
-                      )}
-
-                      {/* Overflow menu (Edit / Move Up / Move Down / Delete) */}
-                      <TouchableOpacity
-                        style={styles.overflowButton}
-                        onPress={() => openItemActions(item, index, { allowReorder: !isWS })}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      >
-                        <IconSymbol
-                          ios_icon_name="ellipsis"
-                          android_material_icon_name="more-vert"
-                          size={20}
-                          color="#FFFFFF"
-                        />
-                      </TouchableOpacity>
-
-                      {item.thumbnail_shape === 'square' && item.thumbnail_url ? (
-                        <View style={styles.squareLayout}>
-                          <StorageImage key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.squareImage} />
-                          <View style={styles.squareContent}>
-                            <View style={styles.squareHeader}>
-                              <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>
-                              <Text style={styles.menuItemName} numberOfLines={1}>{getLocalizedField(item, 'name', language)}</Text>
-                            </View>
-                            {item.description && (
-                              <FormattedText style={styles.squareDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>
-                            )}
-                            <View style={styles.menuItemTags}>
-                              {isWS && (<>
-                                <View style={[styles.tag, { backgroundColor: '#1E88E518' }]}><Text style={[styles.tagText, { color: '#1E88E5' }]}>{menuBadgeForSeason(item.season).label}</Text></View>
-                                <View style={[styles.tag, { backgroundColor: '#00897B18' }]}><Text style={[styles.tagText, { color: '#00897B' }]}>{labelForCategoryName(item.category, t, menuCats, language)}</Text></View>
-                              </>)}
-                              {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                              {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{lunchName}</Text></View>}
-                              {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{dinnerName}</Text></View>}
-                              {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
-                              {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
-                              {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
-                              {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
-                            </View>
-                          </View>
-                        </View>
-                      ) : (
-                        <>
-                          {item.thumbnail_url && <StorageImage key={getImageUrl(item.thumbnail_url)} source={{ uri: getImageUrl(item.thumbnail_url) }} style={styles.menuItemImageBanner} />}
-                          <View style={styles.menuItemContent}>
-                            <View style={[styles.menuItemHeader, !item.thumbnail_url && !isWS && styles.menuItemHeaderClear]}>
-                              {item.thumbnail_url && <Text style={styles.menuItemPrice}>{formatItemPriceLabel(item)}</Text>}
-                              <Text style={styles.menuItemName} numberOfLines={1}>{getLocalizedField(item, 'name', language)}</Text>
-                            </View>
-                            {item.description && <FormattedText style={styles.menuItemDescription} numberOfLines={2}>{getLocalizedField(item, 'description', language)}</FormattedText>}
-                            <View style={[styles.menuItemTags, !item.thumbnail_url && styles.menuItemTagsPriceRoom]}>
-                              {isWS && (<>
-                                <View style={[styles.tag, { backgroundColor: '#1E88E518' }]}><Text style={[styles.tagText, { color: '#1E88E5' }]}>{menuBadgeForSeason(item.season).label}</Text></View>
-                                <View style={[styles.tag, { backgroundColor: '#00897B18' }]}><Text style={[styles.tagText, { color: '#00897B' }]}>{labelForCategoryName(item.category, t, menuCats, language)}</Text></View>
-                              </>)}
-                              {item.subcategory && <View style={styles.tag}><Text style={styles.tagText}>{item.subcategory}</Text></View>}
-                              {!perMenu && item.available_for_lunch && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{lunchName}</Text></View>}
-                              {!perMenu && item.available_for_dinner && <View style={[styles.tag, styles.tagAvailability]}><Text style={[styles.tagText, { color: colors.fireText }]}>{dinnerName}</Text></View>}
-                              {item.is_gluten_free && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GF</Text></View>}
-                              {item.is_gluten_free_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>GFA</Text></View>}
-                              {item.is_vegetarian && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>V</Text></View>}
-                              {item.is_vegetarian_available && <View style={[styles.tag, styles.tagDietary]}><Text style={styles.tagText}>VA</Text></View>}
-                            </View>
-                            {!item.thumbnail_url && <Text style={styles.menuItemPriceCorner}>{formatItemPriceLabel(item)}</Text>}
-                          </View>
-                        </>
-                      )}
-                    </View>
-                  </ScaleDecorator>
-                );
-              }}
-                  />
-                </View>
-              );
-            }}
-          />
-        )}
-        </>
-      )}
-
-      {/* Add/Edit Modal */}
-      <Modal
-        visible={showAddModal}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={closeModal}
-      >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalContainer}
-          keyboardVerticalOffset={0}
-        >
-          <TouchableOpacity 
-            style={styles.modalBackdrop} 
-            activeOpacity={1} 
-            onPress={closeModal}
-          />
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingItem ? t('menu_editor:modal_edit') : t('menu_editor:modal_add')}
-              </Text>
-              <TouchableOpacity onPress={closeModal}>
+          {(loading || categoriesLoading) ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <ScrollView style={styles.pageScrollView} contentContainerStyle={styles.searchListContent}>
+              <View style={styles.searchInfoBanner}>
                 <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color="#666666"
+                  ios_icon_name="magnifyingglass"
+                  android_material_icon_name="search"
+                  size={16}
+                  color={colors.primary}
                 />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView 
-              style={styles.modalScroll} 
-              contentContainerStyle={styles.modalScrollContent}
-              showsVerticalScrollIndicator={true}
-              bounces={false}
-              keyboardShouldPersistTaps="handled"
-            >
-              {/* ── SECTION: Item basics ───────────────────────────── */}
-              <View style={styles.formSection}>
-              {/* Thumbnail (80×80, top-left) + Name (right) */}
-              <View style={styles.thumbAndNameRow}>
-                <View style={styles.thumbColumn}>
-                  <TouchableOpacity style={styles.thumbSquare} onPress={pickImage}>
-                    {selectedImageUri || editingItem?.thumbnail_url ? (
-                      <StorageImage
-                        source={{ uri: selectedImageUri || getImageUrl(editingItem?.thumbnail_url || '') || '' }}
-                        style={styles.thumbImage}
-                        key={selectedImageUri || getImageUrl(editingItem?.thumbnail_url || '')}
-                      />
-                    ) : (
-                      <View style={styles.thumbPlaceholder}>
-                        <IconSymbol
-                          ios_icon_name="photo"
-                          android_material_icon_name="add-photo-alternate"
-                          size={28}
-                          color="#999999"
-                        />
-                      </View>
-                    )}
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.nameColumn}>
-                  <Text style={styles.formLabel}>{t('menu_editor:name_label')}</Text>
-                  <TextInput
-                    style={styles.input}
-                    placeholder={t('menu_editor:name_placeholder')}
-                    placeholderTextColor="#999999"
-                    value={isSpanishAuthor ? formData.name_es : formData.name}
-                    onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, name_es: text } : { ...prev, name: text })}
-                  />
-                </View>
-              </View>
-
-              {/* Image shape (left, under the thumbnail) + Price (right, under the
-                  Name). Wines hide the legacy single Price (Glass/Bottle/Member
-                  live in the wine section); the shape selector then takes the full
-                  width. */}
-              <View style={styles.priceShapeRow}>
-                <View style={styles.shapeCol}>
-                  <Text style={styles.formLabel}>{t('menu_editor:shape_label')}</Text>
-                  <View style={styles.shapeSegmented}>
-                    <TouchableOpacity
-                      style={[styles.shapeSegment, formData.thumbnail_shape === 'square' && styles.shapeSegmentActive]}
-                      onPress={() => setFormData({ ...formData, thumbnail_shape: 'square' })}
-                    >
-                      <Text style={[styles.shapeSegmentText, formData.thumbnail_shape === 'square' && styles.shapeSegmentTextActive]}>
-                        {t('menu_editor:shape_square')}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.shapeSegment, formData.thumbnail_shape === 'banner' && styles.shapeSegmentActive]}
-                      onPress={() => setFormData({ ...formData, thumbnail_shape: 'banner' })}
-                    >
-                      <Text style={[styles.shapeSegmentText, formData.thumbnail_shape === 'banner' && styles.shapeSegmentTextActive]}>
-                        {t('menu_editor:shape_banner')}
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-                {!isWineName(formData.category) && (
-                  <View style={styles.priceCol}>
-                    <Text style={styles.formLabel}>{t('menu_editor:price_label')}</Text>
-                    <View style={styles.inputWithAdornment}>
-                      <Text style={styles.inputAdornment}>$</Text>
-                      <TextInput
-                        style={styles.inputAdornmentField}
-                        placeholder={t('menu_editor:price_placeholder')}
-                        placeholderTextColor="#999999"
-                        value={formData.price}
-                        onChangeText={(text) => setFormData({ ...formData, price: text })}
-                        keyboardType="decimal-pad"
-                      />
-                    </View>
-                  </View>
-                )}
-              </View>
-
-              {/* Description */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('menu_editor:description_label')}</Text>
-                <RichTextToolbar
-                  text={isSpanishAuthor ? formData.description_es : formData.description}
-                  onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, description_es: text } : { ...prev, description: text })}
-                  selection={descriptionSelection}
-                  onSelectionChange={setDescriptionSelection}
-                  textInputRef={descriptionInputRef}
-                  accentColor={colors.highlight}
-                />
-                <TextInput
-                  ref={descriptionInputRef}
-                  style={[styles.input, styles.textArea]}
-                  placeholder={t('menu_editor:description_placeholder')}
-                  placeholderTextColor="#999999"
-                  value={isSpanishAuthor ? formData.description_es : formData.description}
-                  onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, description_es: text } : { ...prev, description: text })}
-                  multiline
-                  numberOfLines={4}
-                  onSelectionChange={(e) => setDescriptionSelection(e.nativeEvent.selection)}
-                />
-              </View>
-
-              {/* Wine-specific fields: location + 3 prices.
-                  Source-of-truth for auto-generated quiz/game questions. */}
-              {isWineName(formData.category) && (
-                <>
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Location</Text>
-                    <TextInput
-                      style={styles.input}
-                      placeholder="e.g. Napa Valley, California"
-                      placeholderTextColor="#999999"
-                      value={isSpanishAuthor ? formData.location_es : formData.location}
-                      onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, location_es: text } : { ...prev, location: text })}
-                    />
-                  </View>
-                  <View style={styles.priceOrderRow}>
-                    <View style={styles.priceOrderCol}>
-                      <Text style={styles.formLabel}>Glass Price</Text>
-                      <View style={styles.inputWithAdornment}>
-                        <Text style={styles.inputAdornment}>$</Text>
-                        <TextInput
-                          style={styles.inputAdornmentField}
-                          placeholder="12"
-                          placeholderTextColor="#999999"
-                          value={formData.glass_price}
-                          onChangeText={(text) => setFormData({ ...formData, glass_price: text })}
-                          keyboardType="decimal-pad"
-                        />
-                      </View>
-                    </View>
-                    <View style={styles.priceOrderCol}>
-                      <Text style={styles.formLabel}>Bottle Price</Text>
-                      <View style={styles.inputWithAdornment}>
-                        <Text style={styles.inputAdornment}>$</Text>
-                        <TextInput
-                          style={styles.inputAdornmentField}
-                          placeholder="45"
-                          placeholderTextColor="#999999"
-                          value={formData.bottle_price}
-                          onChangeText={(text) => setFormData({ ...formData, bottle_price: text })}
-                          keyboardType="decimal-pad"
-                        />
-                      </View>
-                    </View>
-                  </View>
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Member Bottle Price</Text>
-                    <View style={styles.inputWithAdornment}>
-                      <Text style={styles.inputAdornment}>$</Text>
-                      <TextInput
-                        style={styles.inputAdornmentField}
-                        placeholder="40"
-                        placeholderTextColor="#999999"
-                        value={formData.member_bottle_price}
-                        onChangeText={(text) => setFormData({ ...formData, member_bottle_price: text })}
-                        keyboardType="decimal-pad"
-                      />
-                    </View>
-                  </View>
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Flavor / Key Sensory</Text>
-                    <TextInput
-                      style={[styles.input, styles.textArea]}
-                      placeholder="e.g. Crisp green apple, citrus, mineral finish"
-                      placeholderTextColor="#999999"
-                      value={isSpanishAuthor ? formData.flavor_profile_es : formData.flavor_profile}
-                      onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, flavor_profile_es: text } : { ...prev, flavor_profile: text })}
-                      multiline
-                      numberOfLines={3}
-                    />
-                  </View>
-                  <View style={styles.formGroup}>
-                    <Text style={styles.formLabel}>Unique Selling Points</Text>
-                    <TextInput
-                      style={[styles.input, styles.textArea]}
-                      placeholder="e.g. Family-owned estate, biodynamic, limited 200 cases"
-                      placeholderTextColor="#999999"
-                      value={isSpanishAuthor ? formData.unique_selling_points_es : formData.unique_selling_points}
-                      onChangeText={(text) => setFormData(prev => isSpanishAuthor ? { ...prev, unique_selling_points_es: text } : { ...prev, unique_selling_points: text })}
-                      multiline
-                      numberOfLines={3}
-                    />
-                  </View>
-                </>
-              )}
-
-              {/* Bilingual authoring (s61 hybrid) — placed after ALL authored
-                  text fields (incl. wine flavor/USP) per Steve's s61 walk
-                  feedback, so the preview sits where the eye lands last. */}
-              <View style={styles.formGroup}>
-                {translation.element}
-              </View>
-
-              {/* close SECTION: Item basics */}
-              </View>
-
-              {/* ── SECTION: Menu placement & options ──────────────── */}
-              <View style={styles.formSection}>
-
-              {/* Menu Choice — pick the menu FIRST so the category pills below
-                  reflect that menu's tree (per-menu) or the shared tree. Hidden
-                  for single-menu orgs — there's only one menu, so items just
-                  default to showing on it (item_season stays 'both'). */}
-              {organization?.menu_count === 2 && (
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('menu_editor:season_label')}</Text>
-                <View style={styles.seasonTagRow}>
-                  {(((): readonly ('winter' | 'both' | 'summer')[] => {
-                    // Per-menu scope: an item belongs to ONE menu, so the "Both"
-                    // option is dropped for new/edited items. Legacy items already
-                    // tagged 'both' keep the option so they're never stranded.
-                    if (organization?.menu_category_scope !== 'per_menu') return ['winter', 'both', 'summer'] as const;
-                    return formData.item_season === 'both'
-                      ? (['winter', 'both', 'summer'] as const)
-                      : (['winter', 'summer'] as const);
-                  })()).map((s) => {
-                    // Reflect the org's custom Menu 1 / Menu 2 names; "Both"
-                    // stays translated since it spans both menus.
-                    const seasonLabel =
-                      s === 'winter'
-                        ? organization?.menu_1_name || t('menu_editor:season_winter')
-                        : s === 'summer'
-                        ? organization?.menu_2_name || t('menu_editor:season_summer')
-                        : t('menu_editor:season_both');
-                    return (
-                      <TouchableOpacity
-                        key={s}
-                        style={[
-                          styles.seasonTagOption,
-                          formData.item_season === s && { backgroundColor: colors.primary },
-                        ]}
-                        onPress={() => {
-                          // Switching to a DIFFERENT menu (per-menu) clears the
-                          // category/subcategory — each menu has its own tree.
-                          const newSlot = s === 'summer' ? 2 : 1;
-                          const oldSlot = formData.item_season === 'summer' ? 2 : 1;
-                          if (perMenu && newSlot !== oldSlot) {
-                            setFormData({ ...formData, item_season: s, category: '', subcategory: '' });
-                          } else {
-                            setFormData({ ...formData, item_season: s });
-                          }
-                        }}
-                      >
-                        <Text style={[
-                          styles.seasonTagText,
-                          { color: formData.item_season === s ? colors.fireText : colors.text },
-                        ]}>
-                          {seasonLabel}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                {organization?.menu_category_scope === 'per_menu' && formData.item_season === 'both' && (
-                  <Text style={styles.seasonLegacyHint}>{t('menu_editor:season_both_legacy_hint')}</Text>
-                )}
-              </View>
-              )}
-
-              {/* Category — pills come from the SELECTED menu's tree (formMenuCats). */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('menu_editor:category_label')}</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.optionsScroll}
-                >
-                  {/* Hidden categories stay out of the picker; a legacy item's
-                      current (now-hidden) category remains selectable. */}
-                  {formMenuCats.filter((c) => !c.is_hidden || c.display_name === formData.category).map((cat) => (
-                    <CategoryPill
-                      key={cat.id}
-                      size="sm"
-                      label={categoryLabel(cat, t, language)}
-                      selected={formData.category === cat.display_name}
-                      onPress={() => setFormData({ ...formData, category: cat.display_name, subcategory: '' })}
-                    />
-                  ))}
-                </ScrollView>
-              </View>
-
-              {/* Subcategory — also from the selected menu's tree. */}
-              {(() => {
-                const formCat = findCategoryByName(formMenuCats, formData.category);
-                const formVisibleSubs = formCat
-                  ? formCat.subcategories.filter((s) => !s.is_hidden || s.display_name === formData.subcategory)
-                  : [];
-                if (!formCat || formVisibleSubs.length === 0) return null;
-                return (
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>{t('menu_editor:subcategory_label')}</Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    style={styles.optionsScroll}
-                  >
-                    {formVisibleSubs.map((sub) => (
-                      <CategoryPill
-                        key={sub.id}
-                        size="sm"
-                        label={subcategoryLabel(sub, t, language)}
-                        selected={formData.subcategory === sub.display_name}
-                        onPress={() => setFormData({ ...formData, subcategory: sub.display_name })}
-                      />
-                    ))}
-                  </ScrollView>
-                </View>
-                );
-              })()}
-
-              {/* Availability — shared-mode meal overlay (Lunch/Dinner). Hidden in
-                  per-menu and when neither category is present/visible. */}
-              {!perMenu && (formHasLunchCat || formHasDinnerCat) && (() => {
-                const fb = findCategoryByName(formMenuCats, formData.category)?.filter_behavior;
-                return fb === 'lunch' || fb === 'dinner' || fb === 'weekly_specials';
-              })() && (
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>{t('menu_editor:available_for_label')}</Text>
-                  <Text style={styles.seasonLegacyHint}>{t('menu_editor:available_for_hint')}</Text>
-                  <View style={styles.checkboxGroup}>
-                    {formHasLunchCat && (
-                    <TouchableOpacity
-                      style={styles.checkbox}
-                      onPress={() =>
-                        setFormData({
-                          ...formData,
-                          available_for_lunch: !formData.available_for_lunch,
-                        })
-                      }
-                    >
-                      <View
-                        style={[
-                          styles.checkboxBox,
-                          formData.available_for_lunch && styles.checkboxBoxChecked,
-                        ]}
-                      >
-                        {formData.available_for_lunch && (
-                          <IconSymbol
-                            ios_icon_name="checkmark"
-                            android_material_icon_name="check"
-                            size={16}
-                            color={colors.fireText}
-                          />
-                        )}
-                      </View>
-                      <Text style={styles.checkboxLabel}>{formLunchName}</Text>
-                    </TouchableOpacity>
-                    )}
-                    {formHasDinnerCat && (
-                    <TouchableOpacity
-                      style={styles.checkbox}
-                      onPress={() =>
-                        setFormData({
-                          ...formData,
-                          available_for_dinner: !formData.available_for_dinner,
-                        })
-                      }
-                    >
-                      <View
-                        style={[
-                          styles.checkboxBox,
-                          formData.available_for_dinner && styles.checkboxBoxChecked,
-                        ]}
-                      >
-                        {formData.available_for_dinner && (
-                          <IconSymbol
-                            ios_icon_name="checkmark"
-                            android_material_icon_name="check"
-                            size={16}
-                            color={colors.fireText}
-                          />
-                        )}
-                      </View>
-                      <Text style={styles.checkboxLabel}>{formDinnerName}</Text>
-                    </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              )}
-
-              {/* Dietary Options */}
-              <View style={styles.formGroup}>
-                <Text style={styles.formLabel}>{t('menu_editor:dietary_label')}</Text>
-                <View style={styles.checkboxGroup}>
-                  <TouchableOpacity
-                    style={styles.checkbox}
-                    onPress={() =>
-                      setFormData({
-                        ...formData,
-                        is_gluten_free: !formData.is_gluten_free,
-                      })
-                    }
-                  >
-                    <View
-                      style={[
-                        styles.checkboxBox,
-                        formData.is_gluten_free && styles.checkboxBoxChecked,
-                      ]}
-                    >
-                      {formData.is_gluten_free && (
-                        <IconSymbol
-                          ios_icon_name="checkmark"
-                          android_material_icon_name="check"
-                          size={16}
-                          color={colors.fireText}
-                        />
-                      )}
-                    </View>
-                    <Text style={styles.checkboxLabel}>GF</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.checkbox}
-                    onPress={() =>
-                      setFormData({
-                        ...formData,
-                        is_gluten_free_available: !formData.is_gluten_free_available,
-                      })
-                    }
-                  >
-                    <View
-                      style={[
-                        styles.checkboxBox,
-                        formData.is_gluten_free_available && styles.checkboxBoxChecked,
-                      ]}
-                    >
-                      {formData.is_gluten_free_available && (
-                        <IconSymbol
-                          ios_icon_name="checkmark"
-                          android_material_icon_name="check"
-                          size={16}
-                          color={colors.fireText}
-                        />
-                      )}
-                    </View>
-                    <Text style={styles.checkboxLabel}>GFA</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.checkbox}
-                    onPress={() =>
-                      setFormData({
-                        ...formData,
-                        is_vegetarian: !formData.is_vegetarian,
-                      })
-                    }
-                  >
-                    <View
-                      style={[
-                        styles.checkboxBox,
-                        formData.is_vegetarian && styles.checkboxBoxChecked,
-                      ]}
-                    >
-                      {formData.is_vegetarian && (
-                        <IconSymbol
-                          ios_icon_name="checkmark"
-                          android_material_icon_name="check"
-                          size={16}
-                          color={colors.fireText}
-                        />
-                      )}
-                    </View>
-                    <Text style={styles.checkboxLabel}>V</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.checkbox}
-                    onPress={() =>
-                      setFormData({
-                        ...formData,
-                        is_vegetarian_available: !formData.is_vegetarian_available,
-                      })
-                    }
-                  >
-                    <View
-                      style={[
-                        styles.checkboxBox,
-                        formData.is_vegetarian_available && styles.checkboxBoxChecked,
-                      ]}
-                    >
-                      {formData.is_vegetarian_available && (
-                        <IconSymbol
-                          ios_icon_name="checkmark"
-                          android_material_icon_name="check"
-                          size={16}
-                          color={colors.fireText}
-                        />
-                      )}
-                    </View>
-                    <Text style={styles.checkboxLabel}>VA</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Feature on Weekly Specials — overlay, kept LAST before save:
-                  also shows the item on the Weekly Specials page/tab while it
-                  stays in its home category. Hidden when it already lives there. */}
-              {formHasWeeklySpecialsCat && findCategoryByName(formMenuCats, formData.category)?.system_key !== 'cat.weekly_specials' && (
-                <View style={styles.formGroup}>
-                  <Text style={styles.formLabel}>{t('menu_editor:weekly_special_label', { name: formWeeklySpecialsLabel })}</Text>
-                  <Text style={styles.seasonLegacyHint}>{t('menu_editor:weekly_special_hint', { name: formWeeklySpecialsLabel })}</Text>
-                  <TouchableOpacity
-                    style={styles.checkbox}
-                    onPress={() => setFormData({ ...formData, is_weekly_special: !formData.is_weekly_special })}
-                  >
-                    <View style={[styles.checkboxBox, formData.is_weekly_special && styles.checkboxBoxChecked]}>
-                      {formData.is_weekly_special && (
-                        <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={16} color={colors.fireText} />
-                      )}
-                    </View>
-                    <Text style={styles.checkboxLabel}>{t('menu_editor:weekly_special_checkbox', { name: formWeeklySpecialsLabel })}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-
-              {/* close SECTION: Menu placement & options */}
-              </View>
-
-              {/* ── SECTION: actions ───────────────────────────────── */}
-              <View style={styles.formSectionActions}>
-              {/* Cancel + Save — side by side */}
-              <View style={styles.formFooter}>
-                <TouchableOpacity
-                  style={[styles.cancelButton, styles.footerButton]}
-                  onPress={closeModal}
-                >
-                  <Text style={styles.cancelButtonText}>{t('menu_editor:cancel_button')}</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.saveButton, styles.footerButton]}
-                  onPress={handleSave}
-                  disabled={uploadingImage}
-                >
-                  {uploadingImage ? (
-                    <ActivityIndicator color={colors.fireText} />
-                  ) : (
-                    <Text style={styles.saveButtonText}>
-                      {editingItem ? t('menu_editor:save_button') : t('menu_editor:add_save_button')}
-                    </Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-              {/* close SECTION: actions */}
-              </View>
-            </ScrollView>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Order Position picker — jump an item to an exact slot within its
-          category/subcategory without dragging. */}
-      <Modal
-        visible={!!positionPicker}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setPositionPicker(null)}
-      >
-        <View style={styles.modalContainer}>
-          <TouchableOpacity style={styles.modalBackdrop} activeOpacity={1} onPress={() => setPositionPicker(null)} />
-          <View style={styles.positionSheet}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{t('menu_editor:order_position')}</Text>
-              <TouchableOpacity onPress={() => setPositionPicker(null)}>
-                <IconSymbol ios_icon_name="xmark.circle.fill" android_material_icon_name="cancel" size={28} color="#666666" />
-              </TouchableOpacity>
-            </View>
-            {positionPicker && (
-              <>
-                <Text style={styles.positionSubtitle}>
-                  {t('menu_editor:order_position_subtitle', { name: positionPicker.item.name })}
+                <Text style={styles.searchInfoText}>
+                  {filteredItems.length === 1
+                    ? t('menu_editor:search_results', { count: filteredItems.length })
+                    : t('menu_editor:search_results_plural', { count: filteredItems.length })}
                 </Text>
-                <ScrollView style={styles.positionScroll} contentContainerStyle={{ paddingBottom: 24 }}>
-                  {Array.from({ length: positionPicker.siblings.length }, (_, i) => i + 1).map((pos) => {
-                    const isCurrent = pos - 1 === positionPicker.currentIndex;
-                    return (
-                      <TouchableOpacity
-                        key={pos}
-                        style={[styles.positionRow, isCurrent && styles.positionRowActive]}
-                        onPress={() => applyPositionChange(pos)}
-                      >
-                        <Text style={[styles.positionRowText, isCurrent && styles.positionRowTextActive]}>{pos}</Text>
-                        {isCurrent && (
-                          <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={18} color={colors.primary} />
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </>
-            )}
-          </View>
+              </View>
+              {filteredItems.length === 0 ? (
+                <View style={styles.emptyContainer}>
+                  <IconSymbol
+                    ios_icon_name="fork.knife"
+                    android_material_icon_name="restaurant-menu"
+                    size={64}
+                    color={colors.textSecondary}
+                  />
+                  <Text style={styles.emptyText}>{t('menu_editor:empty_title')}</Text>
+                  <Text style={styles.emptySubtext}>{t('menu_editor:empty_search_subtext')}</Text>
+                </View>
+              ) : (
+                filteredItems.map((item) =>
+                  renderCard(item, catOf(item.category)?.color || colors.primary, {
+                    editor: isRecipeFedItem(item)
+                      ? undefined
+                      : {
+                          onMeatball: () => setItemActions({ item, page: null }),
+                          showGrabber: false,
+                        },
+                    onPress: isRecipeFedItem(item) ? () => openRecipeDetail(item) : undefined,
+                    menuBadge: organization.menu_count === 2 ? menuBadgeForSeason(item.season) : null,
+                  })
+                )
+              )}
+            </ScrollView>
+          )}
+        </>
+      ) : (
+        /* Normal mode: pager + the collapsing chrome overlay (native-driver
+           transform over constant-padding pages — nothing resizes on scroll). */
+        <View style={styles.pagerArea}>
+          {(loading || categoriesLoading) ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+            </View>
+          ) : (
+            <FlatList
+              ref={pagerRef}
+              data={pages}
+              renderItem={renderPage}
+              keyExtractor={(_, index) => `page-${index}`}
+              horizontal
+              pagingEnabled
+              bounces={false}
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={onMomentumScrollEnd}
+              getItemLayout={(_, index) => ({
+                length: SCREEN_WIDTH,
+                offset: SCREEN_WIDTH * index,
+                index,
+              })}
+              // Loud reloads remount the pager — land on the page the manager
+              // is parked on, clamped (pages can shrink after category edits).
+              initialScrollIndex={Math.max(0, Math.min(currentPageIndex, Math.max(pages.length - 1, 0)))}
+            />
+          )}
+
+          <Animated.View
+            style={[styles.chromeOverlay, { transform: [{ translateY: overlayTranslate }] }]}
+            // box-none: the overlay CONTAINER must never capture a touch
+            // itself — only its interactive children may.
+            pointerEvents="box-none"
+            onLayout={(e) => {
+              const h = Math.round(e.nativeEvent.layout.height);
+              if (h > 0 && h !== chromeH) setChromeH(h);
+            }}
+          >
+            {/* The collapsing band: Menu 1/2 tabs + search row dissolve and
+                glide away together; category rows park under the header. */}
+            <Animated.View
+              style={{ opacity: collapseOpacity }}
+              pointerEvents={chromeCollapsed ? 'none' : 'auto'}
+              onLayout={(e) => {
+                const h = Math.round(e.nativeEvent.layout.height);
+                if (h > 0 && h !== bandH) setBandH(h);
+              }}
+            >
+              {organization.menu_count === 2 && (
+                <MenuSeasonTabs
+                  colors={colors}
+                  season={season}
+                  onSeasonChange={setSeason}
+                  menu1Label={organization.menu_1_name}
+                  menu2Label={organization.menu_2_name}
+                  menu1Icon={organization.menu_1_icon}
+                  menu2Icon={organization.menu_2_icon}
+                  style={styles.overlaySeasonTabs}
+                />
+              )}
+              <MenuSearchRow
+                colors={colors}
+                mode="editor"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder={t('menu_editor:search_placeholder')}
+                onRightPress={openAdd}
+              />
+            </Animated.View>
+            <MenuCategoryTabs
+              colors={colors}
+              categories={categoryTabs}
+              activeCategory={selectedCategory}
+              onSelectCategory={(name) => navigateToPage(name)}
+              subcategories={subTabs}
+              activeSubcategory={selectedSubcategory || ''}
+              onSelectSubcategory={(name) => navigateToPage(selectedCategory, name)}
+              activeColor={activeCategoryColor}
+              showBackdrop={backdropOn}
+            />
+          </Animated.View>
         </View>
-      </Modal>
-    </View>
+      )}
+
+      {/* Overflow (⋯) actions — a real sheet so every row survives Android. */}
+      <GlassActionSheet
+        visible={!!itemActions}
+        onClose={() => setItemActions(null)}
+        title={actionSheetModel?.title ?? ''}
+        subtitle={actionSheetModel?.subtitle}
+        actions={actionSheetModel?.actions ?? []}
+      />
+
+      {/* Read-only view of a recipe-fed libations row — the user side's sheet,
+          Redeem-less, with the jump to its Recipes Editor. */}
+      <MenuItemDetailSheet
+        visible={recipeDetailVisible}
+        onClose={closeRecipeDetail}
+        colors={colors}
+        item={recipeDetailCtx.detailItem}
+        menuLabel={recipeDetailCtx.menuLabel}
+        categoryLabel={recipeDetail ? getCategoryLabel(recipeDetail.category) : ''}
+        subcategoryLabel={recipeDetail?.subcategory ? getSubcategoryLabel(recipeDetail.subcategory) : null}
+        isWine={recipeDetailCtx.isWine}
+        isLibations={recipeDetailCtx.isLibations}
+        redeem={null}
+        editAction={recipeDetailCtx.editAction}
+      />
+
+      {/* Shared Order Position picker (the inline duplicate is gone — §B4). */}
+      <OrderPositionModal
+        visible={!!positionPicker}
+        title={t('menu_editor:order_position')}
+        subtitle={positionPicker ? t('menu_editor:order_position_subtitle', { name: positionPicker.item.name }) : ''}
+        count={positionPicker?.siblings.length ?? 0}
+        currentIndex={positionPicker?.currentIndex ?? 0}
+        onClose={() => setPositionPicker(null)}
+        onApply={applyPositionChange}
+      />
+
+      {/* The Add/Edit sheet owns the whole form incl. save; the host only
+          reloads + alerts after it reports success. */}
+      <MenuItemEditSheet
+        visible={editSheet.visible}
+        onClose={closeEditSheet}
+        onSaved={handleSaved}
+        onDismissed={flushSavedAlert}
+        colors={colors}
+        editingItem={editSheet.item}
+        initialSeason={season}
+        initialCategory={!isSearchMode ? selectedCategory || null : null}
+        initialSubcategory={!isSearchMode ? selectedSubcategory : null}
+        computeNextOrder={computeNextOrder}
+      />
+
+      {/* The ⚙ Menu sheet — same sheet as the user side; Edit Menu is a no-op
+          here (we are already in the editor, the row just closes the sheet). */}
+      {user && (
+        <MenuSheet
+          visible={menuSheetVisible}
+          onClose={closeMenuSheet}
+          colors={colors}
+          role={user.role === 'owner' ? 'owner' : 'manager'}
+          mode="editor"
+          perms={managerPerms}
+          onEditMenu={() => router.back()}
+          onEditCategories={() => router.push('/manage-menu-categories' as any)}
+          onMenuConfiguration={handleMenuConfiguration}
+          quota={uploadQuota}
+          refreshQuota={fetchQuota}
+        />
+      )}
+
+      {/* Steve's smoke ask: the editor carries the floating nav + Jolt like
+          the Menus tab (the pushed-editor family precedent — guides editor,
+          redeem, etc.); also stages the later Jolt-dock session. The pages'
+          paddingBottom 100 already clears the bar. */}
+      <BottomNavBar activeTab="menus" />
+      {/* On the Menus tab, Jolt is rendered by the PORTAL LAYOUT — a layer
+          above the whole scene, so nothing in the screen can paint over it.
+          Here Jolt shares the screen root with the zIndexed header (20) and
+          the chrome overlay (10), which painted OVER its expanded panel
+          (Steve's smoke screenshots) — the absoluteFill zIndex:30 layer
+          reproduces the portal's stacking; box-none so it never eats touches
+          meant for the screen. */}
+      <View style={styles.joltLayer} pointerEvents="box-none">
+        <JoltOverlay role="manager" />
+      </View>
+    </GestureHandlerRootView>
   );
 }
 
-const createStyles = (colors: ReturnType<typeof useThemeColors>) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 48 : 60,
-    paddingBottom: 12,
-    backgroundColor: colors.card,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  backButton: {
-    padding: 8,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  manageCatsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 16,
-    backgroundColor: colors.primary + '18',
-  },
-  manageCatsButtonText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  aiButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 16,
-    backgroundColor: colors.primary + '18',
-  },
-  aiButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  seasonSelectorContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-  libationBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary + '10',
-    marginHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 4,
-    borderRadius: 12,
-    padding: 12,
-    gap: 8,
-  },
-  libationBannerText: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.text,
-    lineHeight: 18,
-  },
-  seasonTagRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  seasonTagOption: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  seasonTagText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  seasonLegacyHint: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 6,
-    fontStyle: 'italic',
-  },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: 16,
-    gap: 10,
-  },
-  searchContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  addIconButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.highlight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
-    color: colors.text,
-  },
-  searchInfoBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    marginHorizontal: 16,
-    marginTop: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 8,
-  },
-  searchInfoText: {
-    fontSize: 14,
-    color: colors.highlight,
-    fontWeight: '600',
-  },
-  categoryScroll: {
-    marginTop: 16,
-    maxHeight: 50,
-  },
-  categoryScrollContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  subcategoryScroll: {
-    marginTop: 12,
-    maxHeight: 40,
-  },
-  subcategoryScrollContent: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  itemsList: {
-    flex: 1,
-    marginTop: 16,
-  },
-  itemsListContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 100,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text,
-    marginTop: 16,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-  uploadMenuButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 24,
-    marginTop: 24,
-  },
-  uploadMenuButtonText: {
-    color: colors.fireText,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  menuItemCard: {
-    backgroundColor: colors.card,
-    borderRadius: 16,
-    marginBottom: 16,
-    overflow: 'hidden',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 3,
-  },
-  menuItemCardDragging: {
-    opacity: 0.9,
-    transform: [{ scale: 1.02 }],
-  },
-  // Square layout styles (image on left, content on right)
-  squareLayout: {
-    flexDirection: 'row',
-    padding: 12,
-    gap: 12,
-  },
-  squareImage: {
-    width: 100,
-    height: 100,
-    borderRadius: 12,
-    resizeMode: 'cover',
-  },
-  squareContent: {
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
-  squareHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-    gap: 8,
-    paddingRight: 40, // leave space for overflow ⋮ button
-  },
-  squareDescription: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 6,
-    lineHeight: 18,
-  },
-  menuItemImageBanner: {
-    width: '100%',
-    height: 120,
-    resizeMode: 'cover',
-  },
-  menuItemContent: {
-    padding: 12,
-  },
-  menuItemHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-    gap: 8,
-    paddingRight: 40, // leave space for overflow ⋮ button
-  },
-  menuItemName: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text,
-  },
-  menuItemPrice: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.highlight,
-  },
-  displayOrderCorner: {
-    position: 'absolute',
-    bottom: 6,
-    right: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  displayOrderTextCompact: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textSecondary,
-    opacity: 0.7,
-  },
-  menuBadge: {
-    position: 'absolute',
-    bottom: 6,
-    right: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-    backgroundColor: colors.primary + '18',
-    maxWidth: 130,
-  },
-  menuBadgeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  menuItemHeaderClear: {
-    paddingLeft: 40, // clear the drag handle on no-thumbnail cards
-  },
-  menuItemTagsPriceRoom: {
-    paddingRight: 64, // leave room for the bottom-right price on no-thumbnail cards
-  },
-  menuItemPriceCorner: {
-    position: 'absolute',
-    bottom: 10,
-    right: 14,
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.highlight,
-  },
-  positionSheet: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: '70%',
-    marginTop: 'auto',
-    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
-    elevation: 10,
-  },
-  positionSubtitle: {
-    fontSize: 14,
-    color: '#666666',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 4,
-  },
-  positionScroll: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-  },
-  positionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    backgroundColor: '#F5F5F5',
-    marginBottom: 8,
-  },
-  positionRowActive: {
-    backgroundColor: colors.primary + '22',
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  positionRowText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  positionRowTextActive: {
-    color: colors.primary,
-  },
-  menuItemDescription: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  menuItemTags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 8,
-  },
-  tag: {
-    backgroundColor: colors.background,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  tagAvailability: {
-    backgroundColor: colors.primary,
-  },
-  tagDietary: {
-    backgroundColor: colors.highlight,
-  },
-  tagText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  displayOrderBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    marginTop: 4,
-  },
-  displayOrderText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  dragHandle: {
-    position: 'absolute',
-    top: 8,
-    left: 8,
-    padding: 6,
-    zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 14,
-  },
-  overflowButton: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    padding: 6,
-    zIndex: 10,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    borderRadius: 14,
-  },
-  reorderHint: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    fontStyle: 'italic',
-    textAlign: 'center',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-    marginTop: 12,
-  },
-  // Modal styles
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '95%',
-    marginTop: 'auto',
-    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
-    elevation: 10,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-  },
-  modalScroll: {
-    flex: 1,
-    backgroundColor: '#EEEFF1',
-  },
-  modalScrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  // White cards that group the form into scannable sections on the gray scroll.
-  formSection: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 14,
-    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.06)',
-  },
-  formSectionActions: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 4,
-    boxShadow: '0px 1px 4px rgba(0, 0, 0, 0.06)',
-  },
-  priceShapeRow: {
-    flexDirection: 'row',
-    gap: 12,
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  priceCol: {
-    width: 120,
-  },
-  shapeCol: {
-    flex: 1,
-  },
-  formGroup: {
-    marginBottom: 20,
-  },
-  formLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1A1A1A',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#1A1A1A',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-    paddingTop: 14,
-  },
-  // Compact 80x80 thumbnail + name row
-  thumbAndNameRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-    alignItems: 'flex-start',
-  },
-  thumbColumn: {
-    width: 80,
-    alignItems: 'center',
-  },
-  nameColumn: {
-    flex: 1,
-  },
-  thumbSquare: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    backgroundColor: '#F5F5F5',
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-  },
-  thumbImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  thumbPlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  // Square / Banner segmented control — full-width row below thumb+name
-  shapeSegmented: {
-    flexDirection: 'row',
-    borderRadius: 10,
-    backgroundColor: '#F5F5F5',
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    overflow: 'hidden',
-  },
-  shapeSegment: {
-    flex: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  shapeSegmentActive: {
-    backgroundColor: colors.primary,
-  },
-  shapeSegmentText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666666',
-  },
-  shapeSegmentTextActive: {
-    color: colors.fireText,
-  },
-  // Price + Display Order row
-  priceOrderRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
-  },
-  priceOrderCol: {
-    flex: 1,
-  },
-  inputWithAdornment: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    paddingHorizontal: 12,
-  },
-  inputAdornment: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666666',
-    marginRight: 6,
-  },
-  inputAdornmentField: {
-    flex: 1,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#1A1A1A',
-  },
-  formFooter: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 24,
-  },
-  footerButton: {
-    flex: 1,
-    marginTop: 0,
-  },
-  optionsScroll: {
-    maxHeight: 50,
-  },
-  checkboxGroup: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 16,
-  },
-  checkbox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  checkboxBox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#F5F5F5',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  checkboxBoxChecked: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  checkboxLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#1A1A1A',
-  },
-  saveButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 24,
-  },
-  saveButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.fireText,
-  },
-  cancelButton: {
-    backgroundColor: '#F5F5F5',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#666666',
-  },
-});
+const createStyles = (colors: ThemeColorSet) =>
+  StyleSheet.create({
+    // The screen owns its background (pushed route — no portal layout behind).
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    // Above the pager subtree (and its translated chrome overlay) in sibling
+    // stacking, so the header chips stay tappable while the band is parked
+    // over them.
+    topAreaLayer: {
+      zIndex: 20,
+    },
+    // Jolt paints above EVERYTHING (30 > header 20 > chrome overlay 10) —
+    // mirrors the portal layout rendering it above the whole tab scene.
+    joltLayer: {
+      ...StyleSheet.absoluteFillObject,
+      zIndex: 30,
+    },
+    pagerArea: {
+      flex: 1,
+    },
+    chromeOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      zIndex: 10,
+    },
+    overlaySeasonTabs: {
+      marginHorizontal: 16,
+    },
+    pageScrollView: {
+      flex: 1,
+    },
+    pageContentContainer: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 100,
+    },
+    searchListContent: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+      paddingBottom: 100,
+    },
+    // {n} items · {section} left · drag hint right — mono uppercase, the
+    // mockup's .cntrow voice.
+    countRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
+      gap: 12,
+    },
+    countRowText: {
+      fontFamily: fonts.mono.semibold,
+      fontSize: 10,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+      color: colors.textSecondary,
+      flexShrink: 1,
+    },
+    // Right-aligned whether or not the drag hint renders beside it.
+    countRowCount: {
+      marginLeft: 'auto',
+    },
+    searchInfoBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 13,
+      paddingVertical: 10,
+      borderRadius: 13,
+      backgroundColor: colors.surface,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.surfaceBorder,
+      marginBottom: 10,
+    },
+    searchInfoText: {
+      flex: 1,
+      fontFamily: fonts.body.medium,
+      fontSize: 12.5,
+      color: colors.textSecondary,
+    },
+    libationBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingHorizontal: 13,
+      paddingVertical: 11,
+      borderRadius: 13,
+      backgroundColor: colors.primary + '10',
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.primary + '2E',
+      marginBottom: 10,
+    },
+    libationBannerText: {
+      flex: 1,
+      fontFamily: fonts.body.regular,
+      fontSize: 12,
+      lineHeight: 16,
+      color: colors.text,
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      paddingTop: 64,
+      paddingHorizontal: 24,
+      gap: 10,
+    },
+    emptyText: {
+      fontFamily: fonts.display.semibold,
+      fontSize: 16,
+      color: colors.text,
+      textAlign: 'center',
+    },
+    emptySubtext: {
+      fontFamily: fonts.body.regular,
+      fontSize: 12.5,
+      lineHeight: 17,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+    emptyCta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 7,
+      height: 42,
+      paddingHorizontal: 18,
+      borderRadius: 13,
+      backgroundColor: colors.primary,
+      marginTop: 6,
+    },
+    emptyCtaText: {
+      fontFamily: fonts.display.semibold,
+      fontSize: 14,
+      color: colors.fireText,
+    },
+  });

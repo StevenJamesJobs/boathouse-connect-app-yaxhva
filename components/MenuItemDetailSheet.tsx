@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import GlassCard from '@/components/GlassCard';
+import { useSheetHandoff } from '@/components/GlassSheet';
 import FormattedText from '@/components/FormattedText';
 import { StorageExpoImage } from '@/components/StorageImage';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -74,6 +75,14 @@ export interface MenuItemDetailSheetProps {
   isLibations: boolean;
   /** null hides the button — MenuDisplay owns the whole gating chain. */
   redeem: { label: string; onPress: () => void } | null;
+  /**
+   * Optional second footer button (label passed in pre-translated — this sheet
+   * stays i18n-agnostic about it). Used by the menu EDITOR's recipe-fed
+   * libations cards: view the item here, jump to its Recipes Editor from the
+   * button. The press navigates, so it runs through the sheet's dismissal
+   * handoff — never in the same commit as the close.
+   */
+  editAction?: { label: string; onPress: () => void } | null;
 }
 
 // Same normalization as MenuDisplay's card price.
@@ -119,9 +128,14 @@ export default function MenuItemDetailSheet({
   subcategoryLabel,
   isWine,
   redeem,
+  editAction,
 }: MenuItemDetailSheetProps) {
   const { t } = useTranslation();
   const { language } = useLanguage();
+  // editAction navigates after the sheet closes — a presentation/navigation in
+  // the same commit as a Modal dismissal is the freeze class this codebase
+  // keeps re-finding (defer + Modal onDismiss BOTH, per the GlassSheet rules).
+  const { defer, onDismiss } = useSheetHandoff(onClose);
   // The sheet is anchored to the bottom edge, so its last row lands under the
   // Android nav dock / iOS home indicator without this. Same expression as
   // GlassSheet, including the Android floor — a Modal does not always report
@@ -335,6 +349,7 @@ export default function MenuItemDetailSheet({
       animationType={dragDismissing.current ? 'none' : 'slide'}
       transparent
       onRequestClose={onClose}
+      onDismiss={onDismiss}
       statusBarTranslucent
       onShow={() => {
         translateY.setValue(0);
@@ -449,17 +464,32 @@ export default function MenuItemDetailSheet({
                   <Text style={[styles.allergenNote, { color: colors.textSecondary }]}>
                     {t('menu_detail.allergen_note')}
                   </Text>
-                  <Pressable
-                    style={[
-                      styles.closeBtn,
-                      { backgroundColor: colors.glass, borderColor: colors.glassBorder },
-                    ]}
-                    onPress={onClose}
-                  >
-                    <Text style={[styles.closeLabel, { color: colors.textSecondary }]}>
-                      {t('common.close')}
-                    </Text>
-                  </Pressable>
+                  <View style={styles.footerRow}>
+                    <Pressable
+                      style={[
+                        styles.closeBtn,
+                        { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+                      ]}
+                      onPress={onClose}
+                    >
+                      <Text style={[styles.closeLabel, { color: colors.textSecondary }]}>
+                        {t('common.close')}
+                      </Text>
+                    </Pressable>
+                    {!!editAction && (
+                      <Pressable
+                        style={[
+                          styles.closeBtn,
+                          { backgroundColor: colors.primary, borderColor: colors.primary },
+                        ]}
+                        onPress={() => defer(editAction.onPress)}
+                      >
+                        <Text style={[styles.closeLabel, { color: colors.fireText }]} numberOfLines={1}>
+                          {editAction.label}
+                        </Text>
+                      </Pressable>
+                    )}
+                  </View>
                 </View>
               </>
             )}
@@ -626,13 +656,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 12,
   },
+  // One child (Close alone) fills the row exactly as the old full-width
+  // button did; with an editAction the two split it Cancel/Save-style.
+  footerRow: { flexDirection: 'row', gap: 11 },
   closeBtn: {
+    flex: 1,
     marginTop: 9,
     height: 47,
     borderRadius: 13,
     borderWidth: StyleSheet.hairlineWidth + 0.5,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 12,
   },
   closeLabel: { fontFamily: fonts.body.semibold, fontSize: 15 },
 });

@@ -113,7 +113,11 @@ export default function MenuTopArea({
     <View style={styles.wrap}>
       <View style={styles.headerRow}>
         <View style={styles.titleBlock}>
-          <Text style={styles.title}>{t('tabs.menus')}</Text>
+          {/* Steve's smoke call (s69): the editor names itself so the two
+              sides read as distinct places — the geometry stays identical. */}
+          <Text style={styles.title}>
+            {mode === 'editor' ? t('menu_editor:title') : t('tabs.menus')}
+          </Text>
           <Text style={styles.eyebrow} numberOfLines={1}>
             {organization.name}
           </Text>

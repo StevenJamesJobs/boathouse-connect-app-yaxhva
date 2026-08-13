@@ -402,7 +402,8 @@
     "redeem_cta": "Redeem · ${{amount}}",
     "gl": "Gl",
     "btl": "Btl",
-    "mbr": "Mbr"
+    "mbr": "Mbr",
+    "filter_categories": "Categories"
   },
   "menu_sheet": {
     "title": "Menu",
@@ -417,7 +418,9 @@
     "menu_configuration_sub": "Menu names, icons, one menu or two",
     "ask_owner": "Ask your owner to enable this",
     "granted_note": "You have been granted permission to access these features.",
-    "granted_credits": "Uploads spend monthly subscription credits, so check with your General Manager beforehand."
+    "granted_credits": "Uploads spend monthly subscription credits, so check with your General Manager beforehand.",
+    "back_to_menu": "Back to Menu",
+    "back_to_menu_sub": "Return to the customer view"
   },
   "menu_upload_sheet": {
     "title": "Upload Menu",
@@ -1634,7 +1637,25 @@
     "ai_button": "AI",
     "ai_upload_button": "AI Menu Upload",
     "upload_menu_button": "Upload Menu",
-    "winter_libation_banner": "{{menu}} cocktails are managed via the {{menu}} Libation Recipes Editor."
+    "winter_libation_banner": "{{menu}} cocktails are managed via the {{menu}} Libation Recipes Editor.",
+    "items_count_one": "{{count}} item",
+    "items_count_other": "{{count}} items",
+    "drag_to_reorder": "drag to reorder",
+    "wine_photo_tip": "Image of wine looks best in the Menu with a white background.",
+    "photo_title": "Item Photo",
+    "photo_remove": "Remove photo",
+    "wine_location_label": "Location",
+    "wine_location_placeholder": "e.g. Napa Valley, California",
+    "wine_glass_price_label": "Glass Price",
+    "wine_bottle_price_label": "Bottle Price",
+    "wine_member_bottle_price_label": "Member Bottle Price",
+    "wine_flavor_label": "Flavor / Key Sensory",
+    "wine_flavor_placeholder": "e.g. Crisp green apple, citrus, mineral finish",
+    "wine_selling_points_label": "Unique Selling Points",
+    "wine_selling_points_placeholder": "e.g. Family-owned estate, biodynamic, limited 200 cases",
+    "wine_libations_note": "Libations and cocktails are managed via the Bartender Assistant Recipe Editors.",
+    "position_of": "position {{n}} of {{total}}",
+    "open_recipes_editor": "Open Recipes Editor"
   },
   "season_selector": {
     "winter": "Winter Menu",

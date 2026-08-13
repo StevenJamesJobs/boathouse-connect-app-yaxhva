@@ -19,6 +19,10 @@ export interface MenuFilterSheetProps {
   /** The org's OWN menu names (organization.menu_1_name / menu_2_name) — DB values, never translated. */
   menu1Label: string;
   menu2Label: string;
+  /** Item-backed per the org's menuValue-scoped corpus — no dead chips. key = catKey(display_name). */
+  categoryOptions: { key: string; label: string; color: string }[];
+  selectedCategories: string[];
+  onToggleCategory: (key: string) => void;
   /** ONLY flags at least one item on this org's menu carries — no dead chips. */
   dietaryOptions: { key: DietKey; label: string; abbrev: string }[];
   selected: DietKey[];
@@ -46,6 +50,9 @@ export default function MenuFilterSheet({
   onMenuValue,
   menu1Label,
   menu2Label,
+  categoryOptions,
+  selectedCategories,
+  onToggleCategory,
   dietaryOptions,
   selected,
   onToggle,
@@ -83,7 +90,9 @@ export default function MenuFilterSheet({
           >
             <Text style={[styles.footerBtnLabel, { color: colors.fireText }]}>
               {t('menu_display.apply_filters')}
-              {selected.length > 0 ? ` (${selected.length})` : ''}
+              {selected.length + selectedCategories.length > 0
+                ? ` (${selected.length + selectedCategories.length})`
+                : ''}
             </Text>
           </Pressable>
         </View>
@@ -117,8 +126,48 @@ export default function MenuFilterSheet({
         </View>
       )}
 
-      {dietaryOptions.length > 0 && (
+      {categoryOptions.length > 0 && (
+        // dietGap goes on whichever section immediately follows Menu — with
+        // Categories now in the middle, Dietary only needs it when Categories
+        // is empty (see below), matching the original 2-section spacing exactly.
         <View style={showMenuSection ? styles.dietGap : undefined}>
+          <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+            {t('menu_display.filter_categories')}
+          </Text>
+          <View style={styles.chipsWrap}>
+            {categoryOptions.map((opt) => {
+              const on = selectedCategories.includes(opt.key);
+              return (
+                <Pressable
+                  key={opt.key}
+                  onPress={() => onToggleCategory(opt.key)}
+                  style={[
+                    styles.categoryChip,
+                    on
+                      ? { backgroundColor: colors.blue + '29', borderColor: colors.blue + '57' }
+                      : { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
+                  ]}
+                >
+                  <Text
+                    style={[styles.categoryChipLabel, { color: on ? colors.blueText : colors.textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {opt.label}
+                  </Text>
+                  {/* Category colour is underline-only — the app's category
+                      grammar (MenuCategoryTabs), never coloured text. Always
+                      in-flow (transparent when off) so toggling never shifts
+                      the chip's height. */}
+                  <View style={[styles.categoryChipUnderline, { backgroundColor: on ? opt.color : 'transparent' }]} />
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+      )}
+
+      {dietaryOptions.length > 0 && (
+        <View style={showMenuSection && categoryOptions.length === 0 ? styles.dietGap : undefined}>
           {/* Section label reuses menu_detail.dietary — the same "Dietary" string; no new key. */}
           <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
             {t('menu_detail.dietary')}
@@ -195,6 +244,25 @@ const styles = StyleSheet.create({
   },
   dietAbbrev: { fontFamily: fonts.mono.medium, fontSize: 10, letterSpacing: 0.4 },
   dietLabel: { fontFamily: fonts.body.semibold, fontSize: 11.5 },
+  // Category chips — same pill family + on/off tinted-fill treatment as the
+  // dietary chips, PLUS a category-specific signal: the selected chip's
+  // underline bar renders in the category's own colour (never its text —
+  // matching MenuCategoryTabs' chipUnderline / the app's category grammar).
+  categoryChip: {
+    paddingHorizontal: 10,
+    paddingTop: 7,
+    paddingBottom: 5,
+    borderRadius: 9,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    alignItems: 'center',
+  },
+  categoryChipLabel: { fontFamily: fonts.body.semibold, fontSize: 11.5 },
+  categoryChipUnderline: {
+    alignSelf: 'stretch',
+    height: 2.5,
+    borderRadius: 1.5,
+    marginTop: 4,
+  },
   sheetFooter: { flexDirection: 'row', gap: 11, marginTop: 12 },
   footerBtn: {
     flex: 1,

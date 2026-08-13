@@ -19,6 +19,8 @@ interface GlassActionSheetProps {
   visible: boolean;
   onClose: () => void;
   title: string;
+  /** Context line under the title (e.g. "Dinner · Entrees · position 1 of 7"). */
+  subtitle?: string;
   actions: GlassAction[];
 }
 
@@ -44,6 +46,7 @@ export default function GlassActionSheet({
   visible,
   onClose,
   title,
+  subtitle,
   actions,
 }: GlassActionSheetProps) {
   const colors = useThemeColors();
@@ -52,7 +55,7 @@ export default function GlassActionSheet({
   const { defer, onDismiss } = useSheetHandoff(onClose);
 
   return (
-    <GlassSheet visible={visible} onClose={onClose} title={title} onDismiss={onDismiss}>
+    <GlassSheet visible={visible} onClose={onClose} title={title} subtitle={subtitle} onDismiss={onDismiss}>
       {actions.map((a) => (
         <Pressable
           key={a.key}
