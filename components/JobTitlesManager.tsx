@@ -1,14 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
+  Pressable,
   TextInput,
   Alert,
   ActivityIndicator,
   Switch,
 } from 'react-native';
+import { NestableDraggableFlatList, ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { useTranslation } from 'react-i18next';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useOrganization } from '@/contexts/OrganizationContext';
@@ -16,18 +18,38 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrgJobTitles, OrgJobTitle } from '@/hooks/useOrgJobTitles';
 import { supabase } from '@/app/integrations/supabase/client';
 import { translateServerError } from '@/utils/serverErrors';
+import { fonts } from '@/constants/fonts';
 
 interface Props {
   colors: any;
+  /** Render bare content (no card, no title) — the host's fold group provides
+      the chrome. Non-embedded keeps the legacy standalone card. NOTE: the
+      titles render in a NestableDraggableFlatList, so the HOST's vertical
+      scroller must be a NestableScrollContainer (org-settings' Jobs & Tools
+      page is) or the drag gesture fights the outer scroll. */
+  embedded?: boolean;
+  /** Reports the job-title count once loaded (the host's fold badge). */
+  onCountChange?: (n: number) => void;
 }
 
-export default function JobTitlesManager({ colors }: Props) {
+export default function JobTitlesManager({ colors, embedded, onCountChange }: Props) {
   const { t } = useTranslation();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
   const { jobTitles, isLoading, refetch } = useOrgJobTitles();
   const [newTitle, setNewTitle] = useState('');
   const [adding, setAdding] = useState(false);
+
+  // Local order for the draggable list: optimistic during a drag, re-synced
+  // from the hook whenever the server list changes (add/delete/refetch).
+  const [localTitles, setLocalTitles] = useState<OrgJobTitle[]>([]);
+  useEffect(() => {
+    setLocalTitles(jobTitles);
+  }, [jobTitles]);
+
+  useEffect(() => {
+    if (!isLoading) onCountChange?.(jobTitles.length);
+  }, [isLoading, jobTitles.length, onCountChange]);
 
   const handleAddTitle = async () => {
     const trimmed = newTitle.trim();
@@ -74,17 +96,27 @@ export default function JobTitlesManager({ colors }: Props) {
     }
   };
 
-  const handleMoveUp = async (index: number) => {
-    if (index === 0 || !user?.id) return;
+  // Drag-to-reorder (Steve's s70 smoke ask — the one-step-per-tap arrows were
+  // tedious): commit the dropped order optimistically and persist the full id
+  // list. SUCCESS DOES NOT REFETCH (the s69 menu-editor pattern): the RPC
+  // writes exactly the order we hold, and a refetch would raise isLoading and
+  // unmount the draggable list — which, mid-another-drag, strands the outer
+  // NestableScrollContainer with scrolling disabled (the library re-enables it
+  // only from its own onDragEnd). Refetch only to restore server truth on error.
+  const handleDragEnd = async ({ from, to, data }: { from: number; to: number; data: OrgJobTitle[] }) => {
+    if (from === to) return;
+    setLocalTitles(data);
+    if (!user?.id) return;
     try {
-      const reordered = [...jobTitles];
-      [reordered[index - 1], reordered[index]] = [reordered[index], reordered[index - 1]];
-      await supabase.rpc('reorder_org_job_titles', {
+      const { error } = await supabase.rpc('reorder_org_job_titles', {
         p_actor_id: user.id,
-        p_ordered_ids: reordered.map(j => j.id),
+        p_ordered_ids: data.map(j => j.id),
       });
+      if (error) throw error;
+    } catch (err: any) {
+      Alert.alert(t('common:error'), translateServerError(err, t('org_settings.update_failed', 'Failed to update.')));
       await refetch();
-    } catch {}
+    }
   };
 
   const handleDeleteTitle = (item: OrgJobTitle) => {
@@ -118,7 +150,13 @@ export default function JobTitlesManager({ colors }: Props) {
 
   const styles = createStyles(colors);
 
-  if (isLoading) {
+  // Spinner ONLY on the empty initial load: refetches (toggle/add/delete) keep
+  // the list mounted while fresh data swaps in. Unmounting the draggable list
+  // mid-refetch is what stranded the outer scroll (see handleDragEnd note).
+  if (isLoading && localTitles.length === 0) {
+    if (embedded) {
+      return <ActivityIndicator color={colors.primary} style={{ paddingVertical: 16 }} />;
+    }
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('onboarding:step1_title', 'Job Titles')}</Text>
@@ -127,56 +165,60 @@ export default function JobTitlesManager({ colors }: Props) {
     );
   }
 
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{t('onboarding:step1_title', 'Job Titles')}</Text>
+  const body = (
+    <>
       <Text style={styles.hint}>
         {t('org_settings.job_titles_hint', 'Manage the job titles available when adding employees. Toggle off to hide from the picker.')}
       </Text>
 
-      {jobTitles.map((item, index) => (
-        <View key={item.id} style={styles.titleRow}>
-          <TouchableOpacity
-            onPress={() => handleMoveUp(index)}
-            disabled={index === 0}
-            style={styles.reorderButton}
-          >
-            <IconSymbol
-              ios_icon_name="chevron.up"
-              android_material_icon_name="expand-less"
-              size={18}
-              color={index === 0 ? colors.border : colors.textSecondary}
-            />
-          </TouchableOpacity>
-          <Text
-            style={[
-              styles.titleText,
-              !item.is_active && { opacity: 0.4, textDecorationLine: 'line-through' },
-            ]}
-            numberOfLines={1}
-          >
-            {item.title}
-          </Text>
-          <Switch
-            value={item.is_active}
-            onValueChange={() => handleToggleActive(item)}
-            trackColor={{ false: colors.border, true: colors.primary + '80' }}
-            thumbColor={item.is_active ? colors.primary : colors.textSecondary}
-            style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
-          />
-          <TouchableOpacity
-            onPress={() => handleDeleteTitle(item)}
-            style={styles.deleteButton}
-          >
-            <IconSymbol
-              ios_icon_name="trash"
-              android_material_icon_name="delete"
-              size={16}
-              color="#E53935"
-            />
-          </TouchableOpacity>
-        </View>
-      ))}
+      <NestableDraggableFlatList
+        data={localTitles}
+        keyExtractor={(j) => j.id}
+        onDragEnd={handleDragEnd}
+        renderItem={({ item, drag, isActive }: RenderItemParams<OrgJobTitle>) => (
+          <ScaleDecorator>
+            <View style={[styles.titleRow, isActive && styles.titleRowActive]}>
+              {/* Grabber: long-press to lift, drag to reorder (the menu-editor
+                  grip pattern; drag activates from this surface only). */}
+              <Pressable onLongPress={drag} disabled={isActive} hitSlop={6} style={styles.grabber}>
+                <IconSymbol
+                  ios_icon_name="line.3.horizontal"
+                  android_material_icon_name="drag-handle"
+                  size={18}
+                  color={colors.textSecondary}
+                />
+              </Pressable>
+              <Text
+                style={[
+                  styles.titleText,
+                  !item.is_active && { opacity: 0.4, textDecorationLine: 'line-through' },
+                ]}
+                numberOfLines={1}
+              >
+                {item.title}
+              </Text>
+              <Switch
+                value={item.is_active}
+                onValueChange={() => handleToggleActive(item)}
+                trackColor={{ false: colors.surfaceBorder, true: colors.primary }}
+                thumbColor={colors.card}
+                style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
+              />
+              <TouchableOpacity
+                onPress={() => handleDeleteTitle(item)}
+                style={styles.deleteButton}
+              >
+                <IconSymbol
+                  ios_icon_name="trash"
+                  android_material_icon_name="delete"
+                  size={16}
+                  color="#E53935"
+                />
+              </TouchableOpacity>
+            </View>
+          </ScaleDecorator>
+        )}
+      />
 
       {/* Add New Title */}
       <View style={styles.addRow}>
@@ -206,43 +248,70 @@ export default function JobTitlesManager({ colors }: Props) {
           )}
         </TouchableOpacity>
       </View>
+    </>
+  );
+
+  if (embedded) {
+    return <View>{body}</View>;
+  }
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{t('onboarding:step1_title', 'Job Titles')}</Text>
+      {body}
     </View>
   );
 }
 
 function createStyles(colors: any) {
   return StyleSheet.create({
+    // Standalone (non-embedded) fallback chrome — the org-settings fold is the
+    // live path and supplies its own.
     section: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
+      backgroundColor: colors.surface,
+      borderRadius: 17,
       padding: 16,
       marginBottom: 16,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.surfaceBorder,
     },
     sectionTitle: {
-      fontSize: 16,
-      fontWeight: '700',
+      fontFamily: fonts.display.semibold,
+      fontSize: 15.5,
       color: colors.text,
       marginBottom: 4,
     },
     hint: {
-      fontSize: 12,
+      fontFamily: fonts.body.regular,
+      fontSize: 11.5,
+      lineHeight: 15,
       color: colors.textSecondary,
-      marginBottom: 12,
+      marginBottom: 10,
     },
     titleRow: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingVertical: 8,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border + '40',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.hairline,
     },
-    reorderButton: {
-      padding: 4,
-      marginRight: 8,
+    titleRowActive: {
+      opacity: 0.92,
+      backgroundColor: colors.glass,
+      borderRadius: 10,
+      borderBottomWidth: 0,
+    },
+    grabber: {
+      width: 26,
+      alignItems: 'center',
+      justifyContent: 'center',
+      alignSelf: 'stretch',
+      marginRight: 6,
     },
     titleText: {
       flex: 1,
-      fontSize: 15,
+      fontFamily: fonts.body.medium,
+      fontSize: 14,
       color: colors.text,
     },
     deleteButton: {
@@ -257,19 +326,21 @@ function createStyles(colors: any) {
     },
     addInput: {
       flex: 1,
-      backgroundColor: colors.background,
-      borderRadius: 10,
-      paddingHorizontal: 14,
+      backgroundColor: colors.glass,
+      borderRadius: 13,
+      paddingHorizontal: 13,
       paddingVertical: 10,
-      fontSize: 15,
+      minHeight: 43,
+      fontFamily: fonts.body.regular,
+      fontSize: 14,
       color: colors.text,
-      borderWidth: 1,
-      borderColor: colors.border,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.glassBorder,
     },
     addButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 10,
+      width: 43,
+      height: 43,
+      borderRadius: 13,
       backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',

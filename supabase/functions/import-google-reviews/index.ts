@@ -11,9 +11,10 @@
 // reconcile sweep here (safety net, runs inline on the Mon/Thu cron and polls
 // results_location for any pending row a webhook never landed for).
 //
-// Entry modes (unchanged): manual (body.user_id = manager/owner), single-org
-// cron (source=cron + organization_id), cron_all (source=cron, no org). New:
-// source=cron + mode=reconcile runs only the sweep.
+// Entry modes: manual (body.user_id = owner, or a manager whose org holds the
+// premium.review_refresh grant — v16/s70b), single-org cron (source=cron +
+// organization_id), cron_all (source=cron, no org), and source=cron +
+// mode=reconcile which runs only the sweep.
 //
 // NOTE: translateBatch / extractReviews / ingestReviews are duplicated verbatim
 // in google-reviews-webhook/index.ts. Edge functions deploy independently and
@@ -460,7 +461,7 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    // --- Auth: cron secret OR manager/owner user_id ---
+    // --- Auth: cron secret OR owner / review-refresh-granted manager user_id ---
     const cronSecret = Deno.env.get('CRON_SECRET');
     const requestCronSecret = req.headers.get('x-cron-secret');
     let isAuthorized = false;
@@ -477,7 +478,20 @@ serve(async (req) => {
         .select('role, organization_id')
         .eq('id', body.user_id)
         .single();
-      const isManager = userData?.role === 'manager' || userData?.role === 'owner';
+      const isOwnerRole = userData?.role === 'owner';
+      // v16 (s70b): a MANAGER additionally needs the premium.review_refresh
+      // grant — mirrors _may_refresh_reviews / consume_review_refresh, so all
+      // layers agree (the keyed manager-permissions lattice, s68 pattern).
+      let managerGranted = false;
+      if (!isOwnerRole && userData?.role === 'manager' && userData?.organization_id) {
+        const { data: perm } = await adminClient
+          .from('manager_permissions')
+          .select('granted')
+          .eq('organization_id', userData.organization_id)
+          .eq('permission_key', 'premium.review_refresh')
+          .maybeSingle();
+        managerGranted = perm?.granted === true;
+      }
       // Manual callers may ONLY import for their OWN org — require an explicit
       // organization_id that matches the caller's, or an anon with a known
       // manager id could trigger paid Outscraper scrapes for any/every org.
@@ -485,9 +499,16 @@ serve(async (req) => {
         !!userData?.organization_id &&
         !!body.organization_id &&
         userData.organization_id === body.organization_id;
-      if (isManager && orgMatch) {
+      if ((isOwnerRole || managerGranted) && orgMatch) {
         isAuthorized = true;
         source = 'manual';
+      } else if (userData?.role === 'manager' && orgMatch && !managerGranted) {
+        // Distinct, client-mapped denial for an ungranted manager (EXACT_MAP →
+        // server_errors.review_refresh_forbidden).
+        return new Response(
+          JSON.stringify({ success: false, error: 'You do not have permission to refresh reviews.' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 }
+        );
       }
     }
 

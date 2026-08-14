@@ -28,6 +28,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { IconSymbol } from '@/components/IconSymbol';
 import GlassCard from '@/components/GlassCard';
@@ -115,10 +116,13 @@ export default function RewardsAndReviewsEditorScreen() {
   const { pendingCount } = usePendingApprovals();
   const { hasNew: managerRecentHasNew, markRecentViewed: markManagerRecentViewed } = useUnreadAwards();
 
-  // Role gating: managers/owners manage; only the OWNER can manually refresh
-  // Google reviews (they pay for the subscription / Outscraper usage).
+  // Role gating: managers/owners manage. Manual Google-review refreshes are
+  // owner-or-granted (premium.review_refresh, s70b) — the quota RPCs and the
+  // import edge fn enforce the same grant server-side.
   const isOwner = user?.role === 'owner';
   const isManagerOrOwner = user?.role === 'owner' || user?.role === 'manager';
+  const { perms } = useManagerPermissions();
+  const canRefreshReviews = isOwner || perms.reviewRefresh;
 
   const [activeTab, setActiveTab] = useState<'rewards' | 'reviews'>('rewards');
   const [loading, setLoading] = useState(false);
@@ -390,9 +394,9 @@ export default function RewardsAndReviewsEditorScreen() {
     }
   }, [user?.id, organizationId]);
 
-  // Owner-only: load the remaining manual refreshes for the billing period.
+  // Owner-or-granted: load the remaining manual refreshes for the period.
   const fetchRefreshQuota = useCallback(async () => {
-    if (!isOwner || !user?.id || !organizationId) return;
+    if (!canRefreshReviews || !user?.id || !organizationId) return;
     try {
       const { data } = await supabase.rpc('get_review_refresh_quota', {
         p_user_id: user.id,
@@ -403,7 +407,7 @@ export default function RewardsAndReviewsEditorScreen() {
     } catch (e) {
       console.warn('refresh quota error', e);
     }
-  }, [isOwner, user?.id, organizationId]);
+  }, [canRefreshReviews, user?.id, organizationId]);
 
   const allReviews: ReviewItem[] = useMemo(() => {
     const manual: ReviewItem[] = reviews.map((r) => ({ ...r, source: 'manual' as const }));
@@ -978,7 +982,7 @@ export default function RewardsAndReviewsEditorScreen() {
       router.push('/google-reviews-premium' as any);
       return;
     }
-    if (!isOwner) return; // owners only — the button is hidden for managers
+    if (!canRefreshReviews) return; // ungranted managers never see the button
     const remaining = refreshRemaining ?? 0;
     Alert.alert(
       t('rewards_reviews_editor:refresh_confirm_title'),
@@ -1402,7 +1406,7 @@ export default function RewardsAndReviewsEditorScreen() {
             <Text style={[styles.rvbTxt, { color: colors.text }]}>{t('rewards_reviews_editor:add_review_button', 'Add Review')}</Text>
           </Pressable>
         )}
-        {isOwner && (
+        {canRefreshReviews && (
           <Pressable style={[styles.rvb, styles.rvbRef]} onPress={handleRefreshGoogleReviews} disabled={refreshingGoogle}>
             {refreshingGoogle ? (
               <ActivityIndicator size="small" color={colors.blueText} />

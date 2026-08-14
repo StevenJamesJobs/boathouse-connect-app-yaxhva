@@ -4,19 +4,36 @@ import { useAuth } from '@/contexts/AuthContext';
 
 // s68 Manager Permissions — the keyed grants an owner flips in Org Settings →
 // Jobs & Tools. A `manager_permissions` row exists only when a grant has been
-// touched, so absence of a key simply means "not granted". Three keys are live:
+// touched, so absence of a key simply means "not granted". SEVEN keys are live
+// (s68 minted the first three; s70b wired the next four):
 //   'org_settings.menu'       → manager may open the scoped Menu tab of Org Settings
 //   'menu.edit_categories'    → manager may open Edit Categories (manage_menu_* suite)
 //   'premium.ai_menu_upload'  → manager may run the AI menu upload (spends the org's credits)
+//   'org_settings.branding'   → manager may open/edit the Branding tab (incl. logo)
+//   'org_settings.jobs_tools' → manager may open/edit Jobs & Tools (titles + assistants;
+//                                the Manager Permissions group stays owner-ROLE-only)
+//   'org_settings.access'     → manager may open/edit the Access tab (join code,
+//                                self-signup, roster toggle, default password)
+//   'premium.review_refresh'  → manager may run manual Google-review refreshes
 
 export interface ManagerPermissions {
   menuConfig: boolean;
   editCategories: boolean;
   aiUpload: boolean;
+  branding: boolean;
+  jobsTools: boolean;
+  access: boolean;
+  reviewRefresh: boolean;
 }
 
-const NONE: ManagerPermissions = { menuConfig: false, editCategories: false, aiUpload: false };
-const ALL: ManagerPermissions = { menuConfig: true, editCategories: true, aiUpload: true };
+const NONE: ManagerPermissions = {
+  menuConfig: false, editCategories: false, aiUpload: false,
+  branding: false, jobsTools: false, access: false, reviewRefresh: false,
+};
+const ALL: ManagerPermissions = {
+  menuConfig: true, editCategories: true, aiUpload: true,
+  branding: true, jobsTools: true, access: true, reviewRefresh: true,
+};
 
 interface UseManagerPermissionsResult {
   perms: ManagerPermissions;
@@ -58,6 +75,10 @@ export function useManagerPermissions(): UseManagerPermissionsResult {
         menuConfig: byKey.get('org_settings.menu') ?? false,
         editCategories: byKey.get('menu.edit_categories') ?? false,
         aiUpload: byKey.get('premium.ai_menu_upload') ?? false,
+        branding: byKey.get('org_settings.branding') ?? false,
+        jobsTools: byKey.get('org_settings.jobs_tools') ?? false,
+        access: byKey.get('org_settings.access') ?? false,
+        reviewRefresh: byKey.get('premium.review_refresh') ?? false,
       });
     } catch (e) {
       // Fail CLOSED — an unreadable grant must never unlock anything.

@@ -104,6 +104,12 @@ const EXACT_MAP: Record<string, string> = {
   // The upload RPCs RAISE the same denial without the period (parse-menu's 403
   // carries it) — map every variant or a revoked-mid-flow manager sees raw English.
   'You do not have permission to upload menus': 'server_errors.menu_upload_forbidden',
+  // import-google-reviews v16 (s70b): a revoked-mid-flow manager's manual refresh.
+  'You do not have permission to refresh reviews.': 'server_errors.review_refresh_forbidden',
+  // update_organization_settings (s70b field groups): reachable when a scoped
+  // manager's grant is revoked while they sit in the screen (perms are fetched
+  // per mount) — the Save still sends that group's params and gets this back.
+  'You do not have permission to change these settings.': 'server_errors.org_settings_forbidden',
   'You do not have permission to view menu uploads': 'server_errors.menu_upload_forbidden',
   'You’re out of menu-upload credits this month. They reset next month, or upgrade for more.': 'server_errors.menu_upload_out_of_credits',
 };

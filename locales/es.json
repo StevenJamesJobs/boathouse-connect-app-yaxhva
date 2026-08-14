@@ -621,7 +621,7 @@
     "items": "artículos",
     "featured_specials": "Especiales destacados",
     "setup_menu": "Configura tu menú",
-    "tile_plan": "Plan",
+    "tile_plan": "Plan y Acceso",
     "manage_subscription": "Gestionar suscripción",
     "plan_premium": "Premium",
     "plan_base": "Base",
@@ -2876,6 +2876,8 @@
     "redemption_not_pending": "Esta solicitud ya fue decidida",
     "insufficient_balance": "Saldo insuficiente. Disponible: {{available}}, Requerido: {{required}}",
     "menu_upload_forbidden": "No tienes permiso para subir menús.",
+    "review_refresh_forbidden": "No tienes permiso para actualizar las reseñas. Pídele al dueño que lo habilite.",
+    "org_settings_forbidden": "No tienes permiso para cambiar esta configuración. Pídele al dueño que lo habilite.",
     "menu_upload_out_of_credits": "Se agotaron tus créditos de subida de menú este mes. Se reinician el próximo mes, o mejora tu plan para más."
   },
   "subscription": {
@@ -2975,6 +2977,18 @@
     "who_can_access": "¿Quién puede acceder a esta herramienta?",
     "no_active_titles": "No hay puestos activos. Agrega algunos arriba primero.",
     "no_assistants": "No hay asistentes configurados para esta organización.",
-    "update_access_failed": "No se pudo actualizar el acceso."
+    "update_access_failed": "No se pudo actualizar el acceso.",
+    "group_manager_permissions": "Permisos de Gerentes",
+    "owner_only_badge": "SOLO DUEÑO",
+    "later_badge": "PRONTO",
+    "perm_section_org": "Configuración de la organización",
+    "perm_section_premium": "Funciones premium",
+    "perm_ai_uploads": "Subidas de Menú con IA",
+    "perm_review_refresh": "Actualizaciones Manuales de Reseñas",
+    "perm_schedule_uploads": "Subidas de Horarios con IA",
+    "perm_intro": "Elige a qué funciones pueden acceder tus gerentes. Los gerentes con permisos nunca ven esta sección, así que no pueden ampliar ni revocar su propio acceso.",
+    "perm_section_menu": "Acceso al Menú",
+    "perm_premium_footnote": "Las Funciones Premium marcadas gastan tus créditos mensuales de subida.",
+    "perm_save_failed": "No se pudo actualizar el permiso."
   }
 }
