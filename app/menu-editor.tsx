@@ -117,7 +117,7 @@ export default function MenuEditorScreen() {
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
   const { language } = useLanguage();
-  const { perms: managerPerms } = useManagerPermissions();
+  const { perms: managerPerms, reload: reloadPerms } = useManagerPermissions();
 
   // Default to Menu 1 (winter slot) — the more natural landing menu.
   const [season, setSeason] = useState<Season>('winter');
@@ -841,6 +841,13 @@ export default function MenuEditorScreen() {
   useEffect(() => {
     if (menuSheetVisible && canSeeUploadQuota) fetchQuota();
   }, [menuSheetVisible, canSeeUploadQuota, fetchQuota]);
+  // Refetch grants on every ⚙ open, so a flip the owner made since the last
+  // open locks/unlocks the rows without a remount or re-login (smoke-found).
+  // Contract: fresh per OPEN — a revocation while the sheet is already open
+  // still waits for the next open (the server enforces it regardless).
+  useEffect(() => {
+    if (menuSheetVisible) reloadPerms();
+  }, [menuSheetVisible, reloadPerms]);
   // Stable identity: MenuSheet's defer() (and the upload sheet's poll effect)
   // depends on onClose — an inline arrow would restart the poll per render.
   const closeMenuSheet = useCallback(() => setMenuSheetVisible(false), []);

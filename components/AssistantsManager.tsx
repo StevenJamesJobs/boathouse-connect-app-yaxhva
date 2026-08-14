@@ -15,6 +15,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useOrgJobTitles } from '@/hooks/useOrgJobTitles';
 import { supabase } from '@/app/integrations/supabase/client';
 import { translateServerError } from '@/utils/serverErrors';
+import { fonts } from '@/constants/fonts';
 
 interface OrgAssistant {
   id: string;
@@ -41,9 +42,14 @@ const ASSISTANT_INFO: Record<string, { labelKey: string; descKey: string }> = {
 
 interface Props {
   colors: any;
+  /** Render bare content (no card, no title) — the host's fold group provides
+      the chrome. Non-embedded keeps the legacy standalone card. */
+  embedded?: boolean;
+  /** Reports the assistant count once loaded (the host's fold badge). */
+  onCountChange?: (n: number) => void;
 }
 
-export default function AssistantsManager({ colors }: Props) {
+export default function AssistantsManager({ colors, embedded, onCountChange }: Props) {
   const { t } = useTranslation();
   const { organizationId } = useOrganization();
   const { user } = useAuth();
@@ -52,6 +58,10 @@ export default function AssistantsManager({ colors }: Props) {
   const [mappings, setMappings] = useState<TitleMapping[]>([]);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isLoading) onCountChange?.(assistants.length);
+  }, [isLoading, assistants.length, onCountChange]);
 
   const fetchData = async () => {
     if (!organizationId || !user?.id) return;
@@ -119,6 +129,9 @@ export default function AssistantsManager({ colors }: Props) {
   const styles = createStyles(colors);
 
   if (isLoading) {
+    if (embedded) {
+      return <ActivityIndicator color={colors.primary} style={{ paddingVertical: 16 }} />;
+    }
     return (
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('org_settings.tools_assistants', 'Tools & Assistants')}</Text>
@@ -127,9 +140,8 @@ export default function AssistantsManager({ colors }: Props) {
     );
   }
 
-  return (
-    <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{t('org_settings.tools_assistants', 'Tools & Assistants')}</Text>
+  const body = (
+    <>
       <Text style={styles.hint}>
         {t('org_settings.tools_assistants_hint', 'Toggle tools on/off, then tap a tool to configure which job titles can access it.')}
       </Text>
@@ -175,8 +187,8 @@ export default function AssistantsManager({ colors }: Props) {
               <Switch
                 value={item.is_active}
                 onValueChange={() => handleToggle(item)}
-                trackColor={{ false: colors.border, true: colors.primary + '80' }}
-                thumbColor={item.is_active ? colors.primary : colors.textSecondary}
+                trackColor={{ false: colors.surfaceBorder, true: colors.primary }}
+                thumbColor={colors.card}
               />
             </TouchableOpacity>
 
@@ -195,7 +207,7 @@ export default function AssistantsManager({ colors }: Props) {
                       <View style={[
                         styles.checkbox,
                         checked && { backgroundColor: colors.primary, borderColor: colors.primary },
-                        !checked && { borderColor: colors.border },
+                        !checked && { borderColor: colors.glassBorder },
                       ]}>
                         {checked && (
                           <IconSymbol
@@ -222,35 +234,52 @@ export default function AssistantsManager({ colors }: Props) {
       {assistants.length === 0 && (
         <Text style={styles.emptyText}>{t('org_settings.no_assistants', 'No assistants configured for this organization.')}</Text>
       )}
+    </>
+  );
+
+  if (embedded) {
+    return <View>{body}</View>;
+  }
+
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{t('org_settings.tools_assistants', 'Tools & Assistants')}</Text>
+      {body}
     </View>
   );
 }
 
 function createStyles(colors: any) {
   return StyleSheet.create({
+    // Standalone (non-embedded) fallback chrome — the org-settings fold is the
+    // live path and supplies its own.
     section: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
+      backgroundColor: colors.surface,
+      borderRadius: 17,
       padding: 16,
       marginBottom: 16,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.surfaceBorder,
     },
     sectionTitle: {
-      fontSize: 16,
-      fontWeight: '700',
+      fontFamily: fonts.display.semibold,
+      fontSize: 15.5,
       color: colors.text,
       marginBottom: 4,
     },
     hint: {
-      fontSize: 12,
+      fontFamily: fonts.body.regular,
+      fontSize: 11.5,
+      lineHeight: 15,
       color: colors.textSecondary,
-      marginBottom: 12,
+      marginBottom: 10,
     },
     assistantRow: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border + '40',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.hairline,
     },
     chevronWrap: {
       width: 24,
@@ -258,12 +287,14 @@ function createStyles(colors: any) {
       marginRight: 4,
     },
     assistantName: {
-      fontSize: 15,
-      fontWeight: '600',
+      fontFamily: fonts.body.semibold,
+      fontSize: 14,
       color: colors.text,
     },
     assistantDesc: {
-      fontSize: 12,
+      fontFamily: fonts.body.regular,
+      fontSize: 11.5,
+      lineHeight: 15,
       color: colors.textSecondary,
       marginTop: 2,
     },
@@ -271,12 +302,14 @@ function createStyles(colors: any) {
       paddingLeft: 28,
       paddingVertical: 8,
       paddingBottom: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border + '40',
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.hairline,
     },
     titlesHeader: {
-      fontSize: 13,
-      fontWeight: '600',
+      fontFamily: fonts.mono.semibold,
+      fontSize: 10,
+      letterSpacing: 1.1,
+      textTransform: 'uppercase',
       color: colors.textSecondary,
       marginBottom: 8,
     },
@@ -288,20 +321,22 @@ function createStyles(colors: any) {
     checkbox: {
       width: 22,
       height: 22,
-      borderRadius: 4,
-      borderWidth: 2,
+      borderRadius: 6,
+      borderWidth: 1.5,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 10,
+      backgroundColor: colors.glass,
     },
     titleCheckLabel: {
+      fontFamily: fonts.body.regular,
       fontSize: 14,
       color: colors.text,
     },
     emptyText: {
-      fontSize: 14,
+      fontFamily: fonts.body.regular,
+      fontSize: 13,
       color: colors.textSecondary,
-      fontStyle: 'italic',
       textAlign: 'center',
       paddingVertical: 16,
     },

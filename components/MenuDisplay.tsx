@@ -444,7 +444,7 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   }, [loading, categoryOptions]);
   const { user } = useAuth();
   const { settings: redemptionSettings } = useRedemptionSettings();
-  const { perms: managerPerms } = useManagerPermissions();
+  const { perms: managerPerms, reload: reloadPerms } = useManagerPermissions();
   const router = useRouter();
 
   const showActionChips = isManagerOrOwner(user);
@@ -671,6 +671,17 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
       if (!categoriesLoading && user?.id) loadMenuItems(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [season, menuCats, categoriesLoading, user?.id])
+  );
+
+  // Grants can flip while this tab stays mounted (the owner toggles them in
+  // Org Settings → Manager Permissions) and the hook only fetches per mount —
+  // so refresh once per tab focus (own effect: the data-refresh callback above
+  // re-fires on season switches too, which would spam the RPC). The ⚙-open
+  // effect below covers the in-tab case. Smoke-found staleness (s70 round 1).
+  useFocusEffect(
+    useCallback(() => {
+      reloadPerms();
+    }, [reloadPerms])
   );
 
   // PAGES can shrink when the item-aware filter lands (a menu switch can race
@@ -946,6 +957,13 @@ export default function MenuDisplay({ colors, onSwipeToWelcome }: MenuDisplayPro
   useEffect(() => {
     if (menuSheetVisible && canSeeUploadQuota) fetchQuota();
   }, [menuSheetVisible, canSeeUploadQuota, fetchQuota]);
+  // Refetch grants on every ⚙ open, so a flip the owner made since the last
+  // open locks/unlocks the rows without a remount or re-login (smoke-found).
+  // Contract: fresh per OPEN — a revocation while the sheet is already open
+  // still waits for the next open (the server enforces it regardless).
+  useEffect(() => {
+    if (menuSheetVisible) reloadPerms();
+  }, [menuSheetVisible, reloadPerms]);
   // Stable identity: MenuSheet's defer() (and through it the upload sheet's
   // poll effect) depends on onClose — an inline arrow here would restart the
   // poll interval on every MenuDisplay re-render.

@@ -26,6 +26,10 @@
 // + sample-org prefixes (legacy-flat/user-prefix allowances removed — every
 // live object is org-prefixed now); v2 delete requires the actor's own org
 // prefix. admin-move-batch stays until the ~30-day soak closes (rollback tool).
+//
+// v10 (session 70b): org_logo gains grantKey 'org_settings.branding' — a
+// branding-granted manager may upload the logo (set_org_logo enforces the same
+// grant server-side; the generic grantKey mechanism from v9 does the rest).
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -142,9 +146,11 @@ const GATES: Record<string, Gate> = {
     path: (c) => `${c.orgId}/${c.targetUserId}/${c.ts}.${c.ext}`,
   },
   org_logo: {
+    // set_org_logo enforces owner-or-branding-granted server-side (s70b) — mirror it.
     bucket: 'organization-logos', roles: 'owner', maxBytes: 5 * MB,
     mimes: ['image/jpeg', 'image/png', 'image/webp'],
     path: (c) => `${c.orgId}/logo_${c.ts}.${c.ext}`,
+    grantKey: 'org_settings.branding',
   },
   menu_upload_file: {
     // parse-menu enforces owner-or-granted-manager server-side — mirror that gate

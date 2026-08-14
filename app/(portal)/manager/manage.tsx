@@ -21,6 +21,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useManagerPermissions } from '@/hooks/useManagerPermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
@@ -282,6 +283,13 @@ export default function ManagerManageScreen() {
   const { organizationId, organization, refreshOrganization } = useOrganization();
   const { tier, isTrialActive, trialDaysRemaining, hasPremium } = useSubscription();
   const isOwner = user?.role === 'owner';
+  // s70b keyed grants: managers may hold org-settings tab grants (→ the Plan &
+  // Access tile's Organization Settings button) and premium.review_refresh
+  // (→ the Rating tile's Refresh Reviews). Owners resolve all-true.
+  const { perms, reload: reloadPerms } = useManagerPermissions();
+  const canRefreshReviews = isOwner || perms.reviewRefresh;
+  const hasOrgSettingsGrant =
+    perms.menuConfig || perms.branding || perms.jobsTools || perms.access;
 
   // ---- Live tile data (refetched on focus) ----
   const [tiles, setTiles] = useState({
@@ -518,6 +526,10 @@ export default function ManagerManageScreen() {
     loadTileData();
     loadActivity();
     loadSeen();
+    // Manage is a long-lived tab and the grants hook fetches per mount — the
+    // owner can flip a grant while a manager sits here, so refresh per focus
+    // (the s70 staleness lesson from the Menus tab).
+    reloadPerms();
     // Return to the top so the header is expanded before we measure the slot
     // (prevents docking to a collapsed/translated-up position on return visits).
     resetCollapseRef.current?.();
@@ -538,12 +550,12 @@ export default function ManagerManageScreen() {
       dockHiddenRef.current = false;
       setDockActive(false);
     };
-  }, [loadTileData, loadActivity, loadSeen, playBoltLand, measureAndDock]));
+  }, [loadTileData, loadActivity, loadSeen, playBoltLand, measureAndDock, reloadPerms]));
 
   // Manual Google-review refresh (premium-gated; honors the same path as the
-  // Reviews editor). The 10/month cap is a deferred follow-up.
-  // Consume one manual refresh (owner-gated, billing-period cap) then fire the
-  // async import. The Mon/Thu auto-refresh is free and doesn't count.
+  // Reviews editor). Consume one manual refresh (owner or review-refresh-
+  // granted manager since s70b; billing-period cap) then fire the async
+  // import. The Mon/Thu auto-refresh is free and doesn't count.
   const doRefreshReviews = useCallback(async () => {
     if (!user?.id || !organizationId) return;
     try {
@@ -572,8 +584,9 @@ export default function ManagerManageScreen() {
     }
   }, [user?.id, organizationId, t, loadTileData]);
 
-  // Owner-only manual refresh, capped per billing period. Shows the count + the
-  // auto-refresh reminder before consuming a credit. Managers never see this.
+  // Manual refresh, capped per billing period — owner, or a manager whose org
+  // holds premium.review_refresh (s70b; the RPCs + edge fn enforce the same
+  // grant). Shows the count + the auto-refresh reminder before consuming.
   const handleRefreshReviews = useCallback(async () => {
     if (!hasPremium) {
       // Base tier gets the Google Reviews sales-copy lock screen — a better
@@ -581,7 +594,7 @@ export default function ManagerManageScreen() {
       router.push('/google-reviews-premium' as any);
       return;
     }
-    if (!isOwner) return;
+    if (!canRefreshReviews) return;
     if (!user?.id || !organizationId) return;
     let remaining = 0;
     try {
@@ -605,10 +618,11 @@ export default function ManagerManageScreen() {
         { text: t('manager_manage.refresh_now', 'Refresh now'), onPress: () => doRefreshReviews() },
       ]
     );
-  }, [hasPremium, isOwner, organizationId, user?.id, t, router, doRefreshReviews]);
+  }, [hasPremium, canRefreshReviews, organizationId, user?.id, t, router, doRefreshReviews]);
 
-  // Save the org's Google Maps location (owner-gated RPC, COALESCE-safe) then
-  // import reviews — the Rating tile's "Add Google Maps Location" setup flow.
+  // Save the org's Google Maps location (owner or branding-granted manager
+  // since s70b, COALESCE-safe) then import reviews — the Rating tile's
+  // "Add Google Maps Location" setup flow.
   const handleSaveGoogleMaps = useCallback(async () => {
     const q = gmQuery.trim();
     if (!q) {
@@ -637,20 +651,31 @@ export default function ManagerManageScreen() {
       // Location is saved (fast). The review scrape can be slow / time out
       // server-side, so kick it off in the background — the tile refetches when
       // it lands, and the Mon/Thu auto-refresh + the Refresh button retry it.
-      Alert.alert(
-        t('manager_manage.gm_saved_title', 'Location saved'),
-        t('manager_manage.gm_importing_msg', "Saved! We're importing your Google reviews now — they'll appear on the Rating tile shortly. You can also tap Refresh Reviews anytime.")
-      );
-      supabase.functions
-        .invoke('import-google-reviews', { body: { source: 'manual', user_id: user?.id, organization_id: organizationId } })
-        .then(() => loadTileData())
-        .catch((e) => console.warn('[Manage] review import failed', e));
+      // s70b: only callers the import edge fn admits may trigger it (owner, or
+      // a review-refresh-granted manager) — a branding-only manager saves the
+      // location and the cron imports for them, so the alert must not promise
+      // an immediate import it cannot start.
+      if (canRefreshReviews) {
+        Alert.alert(
+          t('manager_manage.gm_saved_title', 'Location saved'),
+          t('manager_manage.gm_importing_msg', "Saved! We're importing your Google reviews now — they'll appear on the Rating tile shortly. You can also tap Refresh Reviews anytime.")
+        );
+        supabase.functions
+          .invoke('import-google-reviews', { body: { source: 'manual', user_id: user?.id, organization_id: organizationId } })
+          .then(() => loadTileData())
+          .catch((e) => console.warn('[Manage] review import failed', e));
+      } else {
+        Alert.alert(
+          t('manager_manage.gm_saved_title', 'Location saved'),
+          t('org_settings.saved_msg', 'Organization settings updated successfully.')
+        );
+      }
       loadTileData();
     } catch (e: any) {
       setGmSaving(false);
       Alert.alert(t('common.error', 'Error'), e?.message || 'Save failed');
     }
-  }, [gmQuery, organizationId, user?.id, refreshOrganization, t, loadTileData]);
+  }, [gmQuery, organizationId, user?.id, refreshOrganization, t, loadTileData, canRefreshReviews]);
 
   // ---- Plan tile copy (derived from subscription state) ----
   const planBig =
@@ -921,12 +946,12 @@ export default function ManagerManageScreen() {
           ratingOk
             ? [
                 { label: t('manager_manage.open_reviews', 'Open Reviews'), android: 'star', ios: 'star.fill', primary: true, onPress: () => router.push({ pathname: '/rewards-and-reviews-editor', params: { tab: 'reviews' } }) },
-                ...(isOwner ? [{ label: t('manager_manage.refresh_reviews', 'Refresh Reviews'), android: 'refresh', ios: 'arrow.clockwise', onPress: handleRefreshReviews }] : []),
+                ...(canRefreshReviews ? [{ label: t('manager_manage.refresh_reviews', 'Refresh Reviews'), android: 'refresh', ios: 'arrow.clockwise', onPress: handleRefreshReviews }] : []),
               ]
             : tiles.reviewsConnected
             ? [
                 { label: t('manager_manage.edit_google_maps', 'Edit Location'), android: 'edit-location-alt', ios: 'mappin.and.ellipse', primary: true, onPress: openGmModal },
-                ...(isOwner ? [{ label: t('manager_manage.refresh_reviews', 'Refresh Reviews'), android: 'refresh', ios: 'arrow.clockwise', onPress: handleRefreshReviews }] : []),
+                ...(canRefreshReviews ? [{ label: t('manager_manage.refresh_reviews', 'Refresh Reviews'), android: 'refresh', ios: 'arrow.clockwise', onPress: handleRefreshReviews }] : []),
               ]
             : [
                 { label: t('manager_manage.add_google_maps', 'Add Google Maps Location'), android: 'add-location-alt', ios: 'mappin.and.ellipse', primary: true, onPress: openGmModal },
@@ -1009,7 +1034,7 @@ export default function ManagerManageScreen() {
         backTitle={t('manager_manage.back_menu', 'Menu')}
         buttons={[
           { label: t('manager_manage.menu_editor', 'Menu Editor'), android: 'restaurant', ios: 'fork.knife', primary: true, onPress: () => router.push('/menu-editor') },
-          { label: t('manager_manage.menu_config', 'Menu Config'), android: 'tune', ios: 'slider.horizontal.3', onPress: () => router.push('/organization-settings') },
+          { label: t('manager_manage.menu_config', 'Menu Config'), android: 'tune', ios: 'slider.horizontal.3', onPress: () => router.push({ pathname: '/organization-settings', params: user?.role === 'manager' ? { tab: 'menu', scoped: '1' } : { tab: 'menu' } } as any) },
         ]}
       >
         <Text style={[styles.bignum, { color: colors.text }]}>
@@ -1028,7 +1053,7 @@ export default function ManagerManageScreen() {
         colors={colors}
         icon="workspace-premium"
         ios="crown.fill"
-        title={t('manager_manage.tile_plan', 'Plan')}
+        title={t('manager_manage.tile_plan', 'Plan & Access')}
         highlight
         attention={planAttn}
         setupLabel={setUp}
@@ -1037,6 +1062,15 @@ export default function ManagerManageScreen() {
           isOwner
             ? [
                 { label: t('manager_manage.open_org_settings', 'Organization Settings'), android: 'settings', ios: 'gearshape.fill', primary: true, onPress: () => router.push('/organization-settings') },
+                { label: t('manager_manage.manage_subscription', 'Manage Subscription'), android: 'credit-card', ios: 'creditcard.fill', onPress: () => router.push('/subscription-management') },
+              ]
+            : hasOrgSettingsGrant
+            ? [
+                // s70b: a manager holding ANY org-settings grant gets the scoped
+                // entry (their granted tab set; the server enforces the same
+                // groups). Steve's "Plan & Access" ask — the tile is the outside
+                // door to Menu Configuration & friends for granted managers.
+                { label: t('manager_manage.open_org_settings', 'Organization Settings'), android: 'settings', ios: 'gearshape.fill', primary: true, onPress: () => router.push({ pathname: '/organization-settings', params: { scoped: '1' } } as any) },
                 { label: t('manager_manage.manage_subscription', 'Manage Subscription'), android: 'credit-card', ios: 'creditcard.fill', onPress: () => router.push('/subscription-management') },
               ]
             : [

@@ -1,5 +1,5 @@
 // Curated catalog of icons an owner can pick for their seasonal menus
-// (SeasonSelector / MenuDisplay) and for the portal header brand mark.
+// (MenuIconPicker / MenuDisplay) and for the portal header brand mark.
 //
 // Each entry pairs an iOS SF Symbol name with an Android MaterialIcons glyph.
 // SF Symbol names are chosen from the iOS 15–16 catalog (the app's min target)

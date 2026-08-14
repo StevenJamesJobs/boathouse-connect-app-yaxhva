@@ -621,7 +621,7 @@
     "items": "items",
     "featured_specials": "Featured Specials",
     "setup_menu": "Set up your menu",
-    "tile_plan": "Plan",
+    "tile_plan": "Plan & Access",
     "manage_subscription": "Manage Subscription",
     "plan_premium": "Premium",
     "plan_base": "Base",
@@ -2876,6 +2876,8 @@
     "redemption_not_pending": "This request was already decided",
     "insufficient_balance": "Insufficient balance. Available: {{available}}, Required: {{required}}",
     "menu_upload_forbidden": "You do not have permission to upload menus.",
+    "review_refresh_forbidden": "You don't have permission to refresh reviews. Ask your owner to enable it.",
+    "org_settings_forbidden": "You don't have permission to change these settings. Ask your owner to enable it.",
     "menu_upload_out_of_credits": "You're out of menu-upload credits this month. They reset next month, or upgrade for more."
   },
   "subscription": {
@@ -2975,6 +2977,18 @@
     "who_can_access": "Who can access this tool?",
     "no_active_titles": "No active job titles. Add some above first.",
     "no_assistants": "No assistants configured for this organization.",
-    "update_access_failed": "Failed to update access."
+    "update_access_failed": "Failed to update access.",
+    "group_manager_permissions": "Manager Permissions",
+    "owner_only_badge": "OWNER ONLY",
+    "later_badge": "LATER",
+    "perm_section_org": "Organization settings",
+    "perm_section_premium": "Premium features",
+    "perm_ai_uploads": "AI Menu Uploads",
+    "perm_review_refresh": "Manual Review Refreshes",
+    "perm_schedule_uploads": "AI Schedule Uploads",
+    "perm_intro": "Choose what features your managers can access. Granted managers never see this section, so they cannot extend or revoke their own access.",
+    "perm_section_menu": "Menu Access",
+    "perm_premium_footnote": "Marked Premium Features will spend your monthly upload credits.",
+    "perm_save_failed": "Failed to update permission."
   }
 }
