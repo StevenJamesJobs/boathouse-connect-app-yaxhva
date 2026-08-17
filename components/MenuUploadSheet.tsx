@@ -13,6 +13,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import GlassSheet, { useSheetHandoff } from '@/components/GlassSheet';
+import ScanQuip from '@/components/MenuScanQuips';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
 import { brokerUploadBase64 } from '@/utils/storageBroker';
@@ -375,8 +376,12 @@ export default function MenuUploadSheet({
       )}
 
       {busy ? (
-        <View style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
-          <ActivityIndicator size="small" color={colors.primary} />
+        <View style={[styles.processingCol, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+          <View style={styles.processingTop}>
+            <ActivityIndicator size="small" color={colors.primary} />
+            {/* The rotating scan quips — same rotor as the upload page (s72). */}
+            <ScanQuip style={[styles.processingQuip, { color: colors.text }]} />
+          </View>
           <Text style={[styles.processingText, { color: colors.textSecondary }]}>
             {t('menu_upload.processing_message', 'AI is reading your menu… this can take 40 seconds to 3 minutes depending on the file size. Please don\'t close the app while it scans your file.')}
           </Text>
@@ -464,6 +469,15 @@ const styles = StyleSheet.create({
   },
   creditsNum: { fontFamily: fonts.mono.semibold, fontSize: 15 },
   creditsText: { flex: 1, flexShrink: 1, fontFamily: fonts.body.regular, fontSize: 11.5, lineHeight: 16 },
+  processingCol: {
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    gap: 8,
+  },
+  processingTop: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  processingQuip: { flex: 1, fontFamily: fonts.body.semibold, fontSize: 12.5 },
   processingText: { flex: 1, flexShrink: 1, fontFamily: fonts.body.regular, fontSize: 12, lineHeight: 17 },
   divider: { height: 1, marginVertical: 3 },
 });

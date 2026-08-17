@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Categories Editor Concepts</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 12px 60px;background:#0C0D11;
+  font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center;max-width:780px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb:focus-visible{outline:2px solid #FF7A2F;outline-offset:2px}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:620px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+
+/* ---------- phone shell + palettes ---------- */
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --ember:#C7CDD2; --blue:#8FA0AC; --bluetext:#CDD8DF; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --sheen:rgba(255,255,255,0.13); --thumbbg:#252A31; --glowA:rgba(230,234,238,0.12); --glowB:rgba(255,122,47,0.10);
+  --danger:#E74C3C; --scrim:rgba(6,10,18,0.55);
+  position:relative;width:392px;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--ember:#2A313C;--blue:#7E8A94;--bluetext:#2A313C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--sheen:rgba(255,255,255,0.92);--thumbbg:#D8D8DC;--glowA:rgba(58,66,80,0.10);--glowB:rgba(236,106,30,0.12);--danger:#C0392B;--scrim:rgba(6,10,18,0.35)}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--ember:#6BADE8;--blue:#5DADE2;--bluetext:#BFE3F7;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--sheen:rgba(255,255,255,0.13);--thumbbg:#2C3E50;--glowA:rgba(74,144,226,0.32);--glowB:rgba(93,173,226,0.16)}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--ember:#1565C0;--blue:#42A5F5;--bluetext:#0D47A1;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--sheen:rgba(255,255,255,0.95);--thumbbg:#CFE4EC;--glowA:rgba(25,118,210,0.18);--glowB:rgba(66,165,245,0.13);--danger:#C0392B;--scrim:rgba(6,10,18,0.35)}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--text)}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 40px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.design{display:none;padding:6px 16px 0;animation:fade .35s ease}
+.design.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.concept{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:7px;margin:4px 2px 12px}
+.concept b{color:var(--tint)}
+.concept .ln{flex:1;height:1px;background:var(--hair)}
+
+/* ---------- shared glass pieces ---------- */
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.gcard{background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.scard{background:var(--surf);border:1px solid var(--surfbd)}
+.c38{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.c38.tinted{color:var(--tint)}
+.hdr{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
+.hsp{width:38px;flex:0 0 auto}
+.hmid{flex:1;text-align:center;min-width:0}
+.eyebrow{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600}
+.htitle{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.seg{display:flex;border-radius:13px;padding:3px;gap:3px;margin-bottom:12px;background:var(--glass);border:1px solid var(--glassbd)}
+.seg span{flex:1;text-align:center;padding:8px 10px;border-radius:10px;font-size:12.5px;color:var(--muted);cursor:pointer;white-space:nowrap}
+.seg .on{background:color-mix(in srgb,var(--tint) 18%,transparent);color:var(--tint);font-weight:600}
+.seg.mini{margin:0 0 10px;padding:2.5px}
+.seg.mini span{padding:6px 8px;font-size:11px}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.zlabel{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:16px 2px 10px}
+.zlabel .ln{flex:1;height:1px;background:var(--hair)}
+.dot{border-radius:50%;flex:0 0 auto;border:1px solid rgba(0,0,0,0.18)}
+.grabc{color:var(--muted);opacity:.8;cursor:grab;flex:0 0 auto}
+.abtn{width:28px;height:28px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;flex:0 0 auto}
+.abtn.tint{color:var(--tint)}
+.abtn.red{color:var(--danger)}
+.abtn.lock{opacity:.75}
+.abtn.dim{opacity:.4}
+.abtn.linked{background:color-mix(in srgb,var(--tint) 14%,transparent);color:var(--tint)}
+.bpill{display:inline-flex;align-items:center;gap:4px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--bluetext);background:color-mix(in srgb,var(--blue) 20%,transparent);padding:2.5px 7px;border-radius:6px;white-space:nowrap}
+.bpill .ic{width:10px;height:10px}
+.cpill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:600;color:var(--bluetext);background:color-mix(in srgb,var(--blue) 20%,transparent);padding:2px 8px;border-radius:9px;white-space:nowrap}
+.ghost{display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;margin-top:6px;border-radius:13px;border:1.5px dashed color-mix(in srgb,var(--tint) 55%,transparent);color:var(--tint);font-size:13.5px;font-weight:600;cursor:pointer}
+.ghost .ic{width:16px;height:16px}
+.ghost.sm{padding:9px;font-size:12px;border-radius:11px;margin-top:2px}
+.escap{font-size:10.5px;color:var(--tint);margin-top:2px}
+.bcap{font-size:10.5px;color:var(--muted);font-style:italic;margin-top:3px;line-height:1.45}
+.statline{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted);text-align:center;margin:0 0 12px;letter-spacing:.4px}
+.statline b{color:var(--tint);font-weight:600}
+
+/* ---------- rails ---------- */
+.rail{display:flex;gap:7px;align-items:center;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:none;margin:0 -2px}
+.rail::-webkit-scrollbar{display:none}
+.ctab{padding:8px 12px;border-radius:11px 11px 4px 4px;font-size:13px;color:var(--muted);white-space:nowrap;cursor:pointer;flex:0 0 auto;display:flex;align-items:center;gap:6px;
+  box-shadow:inset 0 -2.5px 0 color-mix(in srgb,var(--catc,transparent) 38%,transparent)}
+.ctab .n{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;opacity:.85}
+.ctab.on{color:var(--text);font-weight:600;box-shadow:inset 0 -2.5px 0 var(--catc,#E67E22)}
+.ctab.dim{opacity:.45}
+.ctab .ic{width:12px;height:12px}
+.railacts{display:flex;gap:8px;margin:0 0 12px}
+.railacts .ract{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:10px;border-radius:12px;font-size:12.5px;font-weight:600;color:var(--tint);border:1.5px dashed color-mix(in srgb,var(--tint) 55%,transparent);cursor:pointer}
+.railacts .ract .ic{width:14px;height:14px}
+/* tile rail (B/C) */
+.trail{display:flex;gap:9px;overflow-x:auto;padding:2px 2px 12px;scrollbar-width:none;margin:0 -2px}
+.trail::-webkit-scrollbar{display:none}
+.ttile{flex:0 0 148px;border-radius:15px;padding:11px 12px 10px;position:relative;overflow:hidden;cursor:pointer;transition:.15s;border-width:1.5px}
+.ttile:active{transform:scale(.97)}
+.ttile .fade{position:absolute;top:0;left:0;right:0;height:2.5px;background:linear-gradient(90deg,var(--catc),color-mix(in srgb,var(--catc) 30%,transparent) 60%,transparent)}
+.ttile .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-size:12.5px;font-weight:700;letter-spacing:-0.15px;line-height:1.15;display:flex;align-items:center;gap:5px;padding-right:16px;white-space:nowrap;overflow:hidden}
+.ttile .nm .ic{width:10px;height:10px;color:var(--muted);opacity:.8}
+.ttile .cnt{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:17px;font-weight:700;color:var(--tint);margin-top:6px;line-height:1}
+.ttile .cnt small{font-size:8px;font-weight:600;letter-spacing:.7px;color:var(--muted);margin-left:4px;text-transform:uppercase}
+.ttile .sec{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ttile.hid{opacity:.5}
+.ttile.sel{border-color:var(--catc)}
+.ttile .opill{top:7px;right:7px}
+.opill{position:absolute;min-width:16px;height:16px;border-radius:6px;background:var(--glass);border:1px solid var(--glassbd);
+  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;justify-content:center;padding:0 4px}
+.ttile.add{border:1.5px dashed color-mix(in srgb,var(--tint) 55%,transparent);background:transparent;display:flex;align-items:center;justify-content:center;gap:6px;color:var(--tint);font-weight:600;font-size:11.5px;min-height:72px}
+.jig{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;color:var(--muted);text-align:center;margin-top:12px;letter-spacing:.4px}
+
+/* ---------- category card + panels ---------- */
+.catcard{border-radius:17px;padding:12px 13px;position:relative;overflow:hidden;margin-bottom:4px}
+.catcard .fade{position:absolute;top:0;left:0;right:0;height:2.5px;background:linear-gradient(90deg,var(--catc),color-mix(in srgb,var(--catc) 30%,transparent) 55%,transparent)}
+.catcard .top{display:flex;align-items:center;gap:10px}
+.catcard .dot{width:24px;height:24px;cursor:pointer}
+.catcard .tt{flex:1;min-width:0}
+.catcard .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-size:16px;font-weight:700;letter-spacing:-0.2px}
+.bigct{margin-left:auto;text-align:right;flex:0 0 auto}
+.bigct .n{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:19px;font-weight:700;color:var(--tint);line-height:1}
+.bigct .l{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.actrow{display:flex;align-items:center;gap:7px;margin-top:10px}
+.iact{width:34px;height:30px;border-radius:9px;background:var(--glass);border:1px solid var(--glassbd);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;color:var(--muted)}
+.iact .ic{width:14px;height:14px}
+.iact.tint{color:var(--tint)}
+.iact.red{color:var(--danger)}
+.iact.dim{opacity:.5;cursor:default}
+.actrow .bpill{margin-left:auto}
+.c2p{display:none}
+.c2p.on{display:block;animation:fade .3s ease}
+.srow3{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:11px;margin-bottom:6px}
+.srow3 .nm{font-size:13px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.srow3 .nm .escap{display:block;font-weight:400}
+.srow3 .n{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted)}
+.srow3.hid{opacity:.5}
+.srow3 .abtn{width:26px;height:26px}
+.mstrip{display:flex;gap:6px;margin:2px 0 10px;flex-wrap:wrap}
+.mchip{display:inline-flex;align-items:center;gap:4px;padding:5.5px 9px;border-radius:9px;font-size:11px;font-weight:600;color:var(--text);background:var(--surf);border:1px solid var(--surfbd);cursor:pointer}
+.mchip .ic{width:12px;height:12px;color:var(--tint)}
+.mchip.red{color:var(--danger)}.mchip.red .ic{color:var(--danger)}
+.mchip.dim{opacity:.55;cursor:default}
+.cexp{border-radius:15px;padding:12px;position:relative;overflow:hidden;animation:fade .25s ease;background:var(--glass);border:1px solid var(--glassbd)}
+.cexp .fade{position:absolute;top:0;left:0;right:0;height:2.5px;background:linear-gradient(90deg,var(--catc),color-mix(in srgb,var(--catc) 30%,transparent) 55%,transparent)}
+.bguide{border-radius:15px;padding:22px 16px;text-align:center;color:var(--muted);font-size:12px;line-height:1.6;border:1.5px dashed var(--hair)}
+.bguide b{color:var(--text);font-weight:600}
+
+/* ---------- overlays: sheets ---------- */
+.ovl{position:absolute;inset:0;z-index:50;display:none;flex-direction:column;justify-content:flex-end}
+.ovl.show{display:flex}
+.ovl .scr{position:absolute;inset:0;background:var(--scrim)}
+.sheet{position:relative;z-index:2;border-radius:26px 26px 0 0;padding:10px 18px 26px;max-height:82%;overflow-y:auto;animation:up .32s cubic-bezier(.32,.72,.28,1);scrollbar-width:none;
+  background:color-mix(in srgb,var(--bg) 90%,var(--text) 10%);box-shadow:0 -18px 44px rgba(0,0,0,0.25)}
+.sheet::-webkit-scrollbar{display:none}
+@keyframes up{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--hair);margin:2px auto 12px}
+.shead{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.shead .t{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:17px;flex:1;display:flex;align-items:center;gap:8px;min-width:0}
+.xbtn{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);flex:0 0 auto}
+.lrow{display:flex;align-items:flex-start;gap:12px;padding:10px 11px;border-radius:13px;margin-bottom:7px}
+.lrow .lic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;background:color-mix(in srgb,var(--tint) 13%,transparent);color:var(--tint)}
+.lrow .lic.mut{background:var(--glass);color:var(--muted)}
+.lrow .lic.red{background:color-mix(in srgb,var(--danger) 13%,transparent);color:var(--danger)}
+.lrow b{font-size:13px;font-weight:600;display:block}
+.lrow p{font-size:11.5px;color:var(--muted);line-height:1.45;margin-top:1px}
+.tipfoot{font-size:11px;color:var(--muted);line-height:1.5;padding:10px 4px 0;text-align:center}
+.frow{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:13px;margin-bottom:8px}
+.frow .bd{flex:1;min-width:0}
+.frow .l1{font-size:13.5px;font-weight:600}
+.frow .l2{font-size:11px;color:var(--muted);margin-top:1px}
+.frow.del{color:var(--danger)}
+.frow.del .l1{color:var(--danger)}
+.frow.del .ic{color:var(--danger)}
+.frow .hint2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted)}
+.frow .star{color:var(--tint)}
+.frow.locked{opacity:.6}
+.sw{width:44px;height:26px;border-radius:13px;background:var(--tint);position:relative;flex:0 0 auto;cursor:pointer}
+.sw::after{content:"";position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,0.3)}
+.sw.off{background:var(--thumbbg)}
+.sw.off::after{right:auto;left:3px}
+.dotrow{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.dotrow .dot{width:20px;height:20px;cursor:pointer}
+.dotrow .dot.on{outline:2px solid var(--tint);outline-offset:2px}
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true"><defs>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+<symbol id="i-chevr" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+<symbol id="i-chevd" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></symbol>
+<symbol id="i-grab" viewBox="0 0 24 24"><path d="M4 8h16M4 16h16"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></symbol>
+<symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-eyeoff" viewBox="0 0 24 24"><path d="M17.9 17.9A10.6 10.6 0 0112 19c-7 0-11-7-11-7a19.4 19.4 0 015.1-5.9M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 7 11 7a19.3 19.3 0 01-2.9 3.9M1 1l22 22"/><path d="M9.9 9.9a3 3 0 104.2 4.2"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M7 7l1 13h8l1-13M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></symbol>
+<symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 007.5.5l3-3a5 5 0 00-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 00-7.5-.5l-3 3a5 5 0 007 7l1.7-1.7"/></symbol>
+<symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+<symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 21a9 9 0 110-18 9 8 0 019 8 4.5 4.5 0 01-4.5 4.5H14a2 2 0 00-1.5 3.3c.3.4.5.7.5 1.2a1 1 0 01-1 1z"/><circle cx="7.5" cy="11.5" r=".8"/><circle cx="11" cy="7.5" r=".8"/><circle cx="16" cy="9" r=".8"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.34 1.87l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.87-.34 1.7 1.7 0 00-1 1.55V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.55 1.7 1.7 0 00-1.87.34l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.34-1.87 1.7 1.7 0 00-1.55-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.55-1 1.7 1.7 0 00-.34-1.87l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.87.34h0a1.7 1.7 0 001-1.55V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.55h0a1.7 1.7 0 001.87-.34l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.34 1.87v0a1.7 1.7 0 001.55 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.55 1z"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3 6.6 7 .9-5.2 4.8 1.4 7-6.2-3.6L5.8 21l1.4-7L2 9.5l7-.9z"/></symbol>
+<symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4M12 4l-4 4M12 4l4 4M4 16v3a1 1 0 001 1h14a1 1 0 001-1v-3"/></symbol>
+</defs></svg>
+
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Concept</span>
+    <button class="tb on" data-c="ca">A · Rail Pro</button>
+    <button class="tb" data-c="cb">B · Tile Rail · Sheet</button>
+    <button class="tb" data-c="cc">C · Tile Rail · Expand</button>
+  </div>
+  <div class="grp"><span class="gl2">Palette</span>
+    <button class="tb on" data-t="">Mono·D</button>
+    <button class="tb" data-t="t-mono-l">Mono·L</button>
+    <button class="tb" data-t="t-ocean-d">Ocean·D</button>
+    <button class="tb" data-t="t-ocean-l">Ocean·L</button>
+  </div>
+</div>
+<p class="hint">Round 3 — the Rail, evolved + the tile-rail experiment. <b>A</b>: ⚙ Menu-Options chip in the header (tap it — with an Owner/Manager gating demo), Add/Reorder moved ABOVE the rail, and the card's Rename/Colour/Hide chips open the 5a editor sheet. <b>B</b>: deck tiles compressed into a sliding rail, tap → sheet. <b>C</b>: same tile rail, tap → expands the panel below. ⓘ = legend, as always.</p>
+
+<div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div>
+  <div class="sb"><span>9:41</span><span>▦ ⌁ ▮</span></div>
+  <div class="screen">
+
+  <!-- ================= A · RAIL PRO ================= -->
+  <div class="design on" id="ca">
+    <div class="concept"><b>A</b> Rail Pro — the Rail with your three fixes <span class="ln"></span></div>
+    <div class="hdr">
+      <span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Myresto Test</div><div class="htitle">Menu Categories</div></div>
+      <span class="c38" data-legend><svg class="ic"><use href="#i-info"/></svg></span>
+      <span class="c38" data-menusheet><svg class="ic"><use href="#i-gear"/></svg></span>
+    </div>
+    <div class="seg"><span class="on">🥗 Healthy</span><span>☀️ Summer</span></div>
+    <div class="railacts">
+      <span class="ract"><svg class="ic"><use href="#i-plus"/></svg>Add Category</span>
+      <span class="ract" id="careorderbtn"><svg class="ic"><use href="#i-swap"/></svg>Reorder</span>
+    </div>
+    <div class="rail" id="carail"></div>
+    <div id="capanels"></div>
+    <div class="c2p" id="ca-reorder">
+      <div class="zlabel">Reorder categories · drag<span class="ln"></span></div>
+      <div id="careorderlist"></div>
+      <div class="ghost sm" id="careorderdone" style="border-style:solid;background:color-mix(in srgb,var(--tint) 14%,transparent)">Done</div>
+    </div>
+  </div>
+
+  <!-- ================= B · TILE RAIL + SHEET ================= -->
+  <div class="design" id="cb">
+    <div class="concept"><b>B</b> Tile Rail — slide the tiles, tap → editor sheet <span class="ln"></span></div>
+    <div class="hdr">
+      <span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Myresto Test</div><div class="htitle">Menu Categories</div></div>
+      <span class="c38" data-legend><svg class="ic"><use href="#i-info"/></svg></span>
+      <span class="c38" data-menusheet><svg class="ic"><use href="#i-gear"/></svg></span>
+    </div>
+    <div class="seg"><span class="on">🥗 Healthy</span><span>☀️ Summer</span></div>
+    <div class="railacts">
+      <span class="ract"><svg class="ic"><use href="#i-plus"/></svg>Add Category</span>
+      <span class="ract"><svg class="ic"><use href="#i-swap"/></svg>Reorder</span>
+    </div>
+    <div class="trail" id="cbtrail"></div>
+    <div class="statline"><b>175</b> items · <b>8</b> categories · <b>18</b> subcategories</div>
+    <div class="bguide">Everything for a category lives in its <b>sheet</b> — tap any tile.<br>
+      <span class="mono" style="font-size:9.5px">slide the rail for more · hold &amp; drag a tile to reorder · № = order</span></div>
+  </div>
+
+  <!-- ================= C · TILE RAIL + EXPAND ================= -->
+  <div class="design" id="cc">
+    <div class="concept"><b>C</b> Tile Rail — slide the tiles, tap → panel below <span class="ln"></span></div>
+    <div class="hdr">
+      <span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Myresto Test</div><div class="htitle">Menu Categories</div></div>
+      <span class="c38" data-legend><svg class="ic"><use href="#i-info"/></svg></span>
+      <span class="c38" data-menusheet><svg class="ic"><use href="#i-gear"/></svg></span>
+    </div>
+    <div class="seg"><span class="on">🥗 Healthy</span><span>☀️ Summer</span></div>
+    <div class="railacts">
+      <span class="ract"><svg class="ic"><use href="#i-plus"/></svg>Add Category</span>
+      <span class="ract"><svg class="ic"><use href="#i-swap"/></svg>Reorder</span>
+    </div>
+    <div class="trail" id="cctrail"></div>
+    <div id="ccexpwrap"></div>
+    <div class="jig">tap a tile to open its panel · chips open the editor sheet · № = order</div>
+  </div>
+
+  </div><!-- /screen -->
+
+  <!-- ===== overlay: icon legend sheet ===== -->
+  <div class="ovl" id="legendovl">
+    <div class="scr" data-close="legendovl"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="shead"><span class="t">Editing Guide</span><span class="xbtn scard" data-close="legendovl"><svg class="ic" style="width:14px;height:14px"><use href="#i-x"/></svg></span></div>
+      <div class="lrow scard"><span class="lic mut"><svg class="ic" style="width:15px;height:15px"><use href="#i-grab"/></svg></span><div><b>Hold &amp; drag to reorder</b><p>Categories and subcategories keep the order you set, everywhere the menu shows.</p></div></div>
+      <div class="lrow scard"><span class="lic" style="background:#8E44AD;color:#fff"></span><div><b>Colour dot</b><p>Tap to change the category colour — it shows as the underline and card fade on the menu, never as text colour.</p></div></div>
+      <div class="lrow scard"><span class="lic"><svg class="ic" style="width:15px;height:15px"><use href="#i-pencil"/></svg></span><div><b>Rename</b><p>English + Spanish together — the other language fills itself on save.</p></div></div>
+      <div class="lrow scard"><span class="lic mut"><svg class="ic" style="width:15px;height:15px"><use href="#i-eye"/></svg></span><div><b>Hide / show</b><p>Hidden categories vanish from the customer menu; their items stay put.</p></div></div>
+      <div class="lrow scard"><span class="lic red"><svg class="ic" style="width:15px;height:15px"><use href="#i-trash"/></svg></span><div><b>Delete</b><p>Custom categories and subcategories only — and only when nothing links to them.</p></div></div>
+      <div class="lrow scard"><span class="lic mut"><svg class="ic" style="width:15px;height:15px"><use href="#i-lock"/></svg></span><div><b>Built-in</b><p>Ships with every menu and can't be deleted — rename or hide it instead.</p></div></div>
+      <div class="lrow scard"><span class="lic"><svg class="ic" style="width:15px;height:15px"><use href="#i-link"/></svg></span><div><b>Recipe-fed <span class="mono" style="font-size:9px;color:var(--muted)">(Libations)</span></b><p>This subcategory's items come from the Bartender recipe editors — edit them there, not here.</p></div></div>
+      <div class="lrow scard"><span class="lic mono" style="font-size:11px;font-weight:700">57</span><div><b>Live counts</b><p>Item counts per category and subcategory, for the menu you're editing.</p></div></div>
+    </div>
+  </div>
+
+  <!-- ===== overlay: category editor sheet ===== -->
+  <div class="ovl" id="c5ovl">
+    <div class="scr" data-close="c5ovl"></div>
+    <div class="sheet" id="c5sheetbody"></div>
+  </div>
+
+  <!-- ===== overlay: MenuSheet (⚙ Menu Options) ===== -->
+  <div class="ovl" id="menuovl">
+    <div class="scr" data-close="menuovl"></div>
+    <div class="sheet" id="menusheetbody"></div>
+  </div>
+
+</div><!-- /phone -->
+
+<script>
+(function(){
+  var phone=document.getElementById('phone');
+  function all(s,fn){[].slice.call(document.querySelectorAll(s)).forEach(fn)}
+  function el(id){return document.getElementById(id)}
+
+  /* ---------- the shared category data (fixture-flavoured) ---------- */
+  var PALETTE=['#E67E22','#43A047','#2980B9','#8E44AD','#B03A2E','#16A085','#D81B60','#F39C12'];
+  var CATS=[
+    {id:'ws',  name:'Weekly Specials', color:'#E67E22', builtin:true,  count:4,  cap:'Items tagged here rotate into the Weekly Specials banner', subs:[]},
+    {id:'br',  name:'Brunch',          color:'#43A047', builtin:true,  count:18, subs:[{n:'Benedicts',c:5},{n:'Griddle',c:6},{n:'Handhelds',c:7}]},
+    {id:'dm',  name:'Dinner Mains',    es:'Platos Fuertes', color:'#8E44AD', builtin:true, count:57, subs:[{n:'Starters',c:12},{n:'Entrees',c:24,es:'Platos Principales'},{n:'Handhelds',c:13},{n:'Sides',c:8}]},
+    {id:'wi',  name:'Wine',            color:'#B03A2E', builtin:true,  count:42, cap:'Bottle & glass pricing · label photos on white', subs:[{n:'Reds',c:16},{n:'Whites',c:14},{n:'Bubbles',c:7},{n:'Rosé',c:5}]},
+    {id:'lb',  name:'Libations',       color:'#2980B9', builtin:true,  count:31, cap:'Subcategories can be fed by the cocktail recipe editors', linkable:true,
+      subs:[{n:'Cocktails',c:12,linked:true,builtin:true},{n:'Summer Cocktails',c:8,linked:true,builtin:true},{n:'Draft Beer',c:6,builtin:true},{n:'Bottles & Cans',c:5,builtin:true},{n:'Mocktails',c:0}]},
+    {id:'hh',  name:'Happy Hour',      color:'#16A085', builtin:true,  count:9,  subs:[]},
+    {id:'de',  name:'Desserts',        es:'Postres', color:'#D81B60', builtin:false, count:6, subs:[{n:'Frozen',c:2},{n:'Baked',c:4}]},
+    {id:'sn',  name:'Snacks',          color:'#F39C12', builtin:false, hidden:true, count:8, subs:[]}
+  ];
+  function byId(id){return CATS.filter(function(x){return x.id===id})[0]}
+
+  function I(name,sz,cls){return '<svg class="ic'+(cls?' '+cls:'')+'" style="width:'+sz+'px;height:'+sz+'px"><use href="#i-'+name+'"/></svg>'}
+  function subLine(c){
+    if(!c.subs.length) return 'no subcategories';
+    var s=c.subs.length+' subcategories';
+    var linked=c.subs.filter(function(x){return x.linked}).length;
+    if(linked) s+=' · '+linked+' recipe-fed';
+    if(c.es) s+=' · ES ✓';
+    return s;
+  }
+
+  function subRow(s,cat){
+    var h='<div class="srow3 scard'+(s.hidden?' hid':'')+'"><span class="grabc">'+I('grab',13)+'</span>';
+    h+='<span class="nm">'+s.n+(s.es?'<span class="escap">ES · '+s.es+'</span>':'')+'</span>';
+    if(s.linked) h+='<span class="cpill">recipe-fed</span>';
+    h+='<span class="n">'+s.c+'</span>';
+    if(s.linked){ h+='<span class="abtn linked">'+I('link',12)+'</span><span class="abtn">'+I('eye',12)+'</span><span class="abtn lock">'+I('lock',11)+'</span>'; }
+    else{
+      h+='<span class="abtn tint">'+I('pencil',12)+'</span>';
+      if(cat.linkable) h+='<span class="abtn'+(s.builtin?' dim':'')+'">'+I('link',12)+'</span>';
+      h+='<span class="abtn">'+I(s.hidden?'eyeoff':'eye',12)+'</span>';
+      h+=s.builtin?'<span class="abtn lock">'+I('lock',11)+'</span>':'<span class="abtn red">'+I('trash',12)+'</span>';
+    }
+    return h+'</div>';
+  }
+  function subBlock(c){
+    var h='<div class="zlabel">Subcategories · drag to reorder<span class="ln"></span></div>';
+    if(c.subs.length) h+=c.subs.map(function(s){return subRow(s,c)}).join('');
+    else h+='<div class="statline" style="margin-top:10px">No subcategories — items sit directly in this category</div>';
+    h+='<div class="ghost sm">'+I('plus',12)+'Add Subcategory</div>';
+    return h;
+  }
+  function actChips(c){
+    var h='<div class="mstrip"><span class="mchip" data-sheet="'+c.id+'">'+I('pencil',12)+'Rename</span><span class="mchip" data-sheet="'+c.id+'">'+I('palette',12)+'Colour</span>';
+    h+='<span class="mchip" data-sheet="'+c.id+'">'+I(c.hidden?'eyeoff':'eye',12)+(c.hidden?'Show':'Hide')+'</span>';
+    h+=c.builtin?'<span class="mchip dim">'+I('lock',12)+'Built-in</span>':'<span class="mchip red" data-sheet="'+c.id+'">'+I('trash',12)+'Delete</span>';
+    return h+'</div>';
+  }
+
+  /* ---------- category editor sheet (shared) ---------- */
+  function sheetHTML(c){
+    var h='<div class="grab"></div>';
+    h+='<div class="shead"><span class="t"><span class="dot" style="width:20px;height:20px;background:'+c.color+'"></span>'+c.name;
+    h+='<span class="bpill">'+(c.builtin?I('lock',10)+'Built-in':'Custom')+'</span></span>';
+    h+='<span class="xbtn scard" data-close="c5ovl">'+I('x',14)+'</span></div>';
+    var linked=c.subs.filter(function(x){return x.linked}).length;
+    h+='<div class="statline" style="margin:0 0 10px"><b>'+c.count+'</b> items'+(c.subs.length?' · <b>'+c.subs.length+'</b> subcategories':'')+(linked?' · <b>'+linked+'</b> recipe-fed':'')+'</div>';
+    h+='<div class="frow scard"><div class="bd"><div class="l1">Name</div><div class="l2">'+c.name+(c.es?' · ES: '+c.es:' · ES auto-fills on save')+'</div></div><span class="abtn tint">'+I('pencil',15)+'</span></div>';
+    h+='<div class="frow scard"><div class="bd"><div class="l1">Colour</div></div><div class="dotrow">'
+      +PALETTE.map(function(p){return '<span class="dot'+(p===c.color?' on':'')+'" style="background:'+p+'"></span>'}).join('')+'</div></div>';
+    h+='<div class="frow scard"><div class="bd"><div class="l1">Visible on the menu</div><div class="l2">Items stay put while hidden</div></div><span class="sw'+(c.hidden?' off':'')+'"></span></div>';
+    if(c.cap) h+='<div class="bcap" style="margin:2px 4px 8px">'+c.cap+'</div>';
+    h+=subBlock(c);
+    if(!c.builtin) h+='<div class="frow scard del" style="margin-top:12px">'+I('trash',15)+'<div class="bd"><div class="l1">Delete Category</div><div class="l2">Only when its subcategories are gone too</div></div></div>';
+    else h+='<div class="tipfoot">Built-in category — rename or hide it, never delete</div>';
+    if(c.linkable) h+='<div class="tipfoot">Recipe-fed subcategories are edited in the Bartender recipe editors</div>';
+    return h;
+  }
+  function openSheet(cid){
+    el('c5sheetbody').innerHTML=sheetHTML(byId(cid));
+    el('c5ovl').classList.add('show'); bindClose();
+  }
+
+  /* ---------- MenuSheet (⚙) with the gating demo ---------- */
+  var menuMode='owner';
+  function menuRow(icon,label,hint,state){
+    // state: 'plain' | 'star' | 'lock'
+    var h='<div class="frow scard'+(state==='lock'?' locked':'')+'">'+I(icon,15,state==='lock'?'':'tint');
+    h+='<div class="bd"><div class="l1">'+label+'</div></div>';
+    if(state==='star') h+='<span class="abtn star">'+I('star',14)+'</span>';
+    if(state==='lock') h+='<span class="abtn lock">'+I('lock',13)+'</span>';
+    h+='<span class="hint2">'+hint+'</span></div>';
+    return h;
+  }
+  function menuSheetHTML(){
+    var m=menuMode==='manager';
+    var h='<div class="grab"></div>';
+    h+='<div class="shead"><span class="t">Menu Options</span><span class="xbtn scard" data-close="menuovl">'+I('x',14)+'</span></div>';
+    h+='<div class="seg mini" id="menumodeseg"><span'+(m?'':' class="on"')+' data-mm="owner">Owner view</span><span'+(m?' class="on"':'')+' data-mm="manager">Manager view</span></div>';
+    h+=menuRow('pencil','Edit Menu','›', m?'star':'plain');
+    h+=menuRow('upload','Upload Menu','6 credits', m?'lock':'plain');
+    h+=menuRow('gear','Menu Config','›', m?'lock':'plain');
+    h+='<div class="tipfoot">'+(m
+      ?'Locked rows stay visible with a padlock — granted ones swap it for a <b>star</b> (here: this manager holds Edit Menu only).'
+      :'Owners see every row. Flip to Manager view to see the grant gating.')+'</div>';
+    return h;
+  }
+  function openMenuSheet(){
+    el('menusheetbody').innerHTML=menuSheetHTML();
+    el('menuovl').classList.add('show');
+    all('#menumodeseg [data-mm]',function(sp){sp.addEventListener('click',function(){
+      menuMode=sp.getAttribute('data-mm'); openMenuSheet();
+    })});
+    bindClose();
+  }
+
+  /* ---------- A · Rail Pro ---------- */
+  el('carail').innerHTML=CATS.map(function(c){
+    return '<span class="ctab'+(c.id==='dm'?' on':'')+(c.hidden?' dim':'')+'" data-p="cap-'+c.id+'" style="--catc:'+c.color+'">'
+      +(c.hidden?I('eyeoff',12):'')+c.name+' <span class="n">'+c.count+'</span></span>';
+  }).join('');
+  el('capanels').innerHTML=CATS.map(function(c){
+    var h='<div class="c2p'+(c.id==='dm'?' on':'')+'" id="cap-'+c.id+'">';
+    h+='<div class="catcard gcard" style="--catc:'+c.color+(c.hidden?';opacity:.75':'')+'"><span class="fade"></span><div class="top">';
+    h+='<span class="dot" data-sheet="'+c.id+'" style="background:'+c.color+'"></span><div class="tt"><div class="nm">'+c.name+'</div>'+(c.es?'<div class="escap">ES · '+c.es+'</div>':'')+'</div>';
+    h+='<div class="bigct"><div class="n">'+c.count+'</div><div class="l">items</div></div></div>';
+    h+='<div class="actrow"><span class="iact tint" data-sheet="'+c.id+'" title="Rename">'+I('pencil',14)+'</span><span class="iact" data-sheet="'+c.id+'" title="Colour">'+I('palette',14)+'</span>';
+    h+='<span class="iact'+(c.hidden?' tint':'')+'" data-sheet="'+c.id+'" title="'+(c.hidden?'Show':'Hide')+'">'+I(c.hidden?'eyeoff':'eye',14)+'</span>';
+    h+=c.builtin?'<span class="iact dim" title="Built-in">'+I('lock',13)+'</span>':'<span class="iact red" data-sheet="'+c.id+'" title="Delete">'+I('trash',14)+'</span>';
+    h+='<span class="bpill">'+(c.hidden?I('eyeoff',10)+'Hidden':(c.builtin?I('lock',10)+'Built-in':'Custom'))+'</span></div>';
+    if(c.cap) h+='<div class="bcap">'+c.cap+'</div>';
+    h+='</div>'+subBlock(c)+'</div>';
+    return h;
+  }).join('');
+  el('careorderlist').innerHTML=CATS.map(function(c){
+    return '<div class="srow3 scard'+(c.hidden?' hid':'')+'"'+(c.id==='dm'?' style="border-color:var(--tint)"':'')+'><span class="grabc"'+(c.id==='dm'?' style="color:var(--tint)"':'')+'>'+I('grab',13)+'</span>'
+      +'<span class="dot" style="width:16px;height:16px;background:'+c.color+'"></span><span class="nm">'+c.name+'</span><span class="n">'+c.count+'</span></div>';
+  }).join('');
+  function caShow(pid){
+    all('#ca .c2p',function(p){p.classList.remove('on')});
+    el(pid).classList.add('on');
+    all('#ca .ctab',function(x){x.classList.toggle('on',x.getAttribute('data-p')===pid)});
+  }
+  all('#ca .ctab',function(tb){tb.addEventListener('click',function(){caShow(tb.getAttribute('data-p'))})});
+  el('careorderbtn').addEventListener('click',function(){
+    all('#ca .c2p',function(p){p.classList.remove('on')});
+    all('#ca .ctab',function(x){x.classList.remove('on')});
+    el('ca-reorder').classList.add('on');
+  });
+  el('careorderdone').addEventListener('click',function(){caShow('cap-dm')});
+
+  /* ---------- tile rails (B + C) ---------- */
+  function railTile(c,i){
+    var h='<div class="ttile scard'+(c.hidden?' hid':'')+'" data-tile="'+c.id+'" style="--catc:'+c.color+'">';
+    h+='<span class="fade"></span><span class="opill">'+(i+1)+'</span>';
+    h+='<div class="nm">'+c.name+(c.builtin?I('lock',10):'')+(c.hidden?I('eyeoff',10):'')+'</div>';
+    h+='<div class="cnt">'+c.count+'<small>items</small></div>';
+    h+='<div class="sec">'+subLine(c)+'</div></div>';
+    return h;
+  }
+  function renderTrail(id){
+    el(id).innerHTML=CATS.map(railTile).join('')+'<div class="ttile add">'+I('plus',13)+'Add</div>';
+  }
+  renderTrail('cbtrail'); renderTrail('cctrail');
+
+  /* B: tap → sheet */
+  all('#cbtrail .ttile[data-tile]',function(d){d.addEventListener('click',function(){openSheet(d.getAttribute('data-tile'))})});
+
+  /* C: tap → select + expand below */
+  function ccExpand(cid){
+    var c=byId(cid);
+    all('#cctrail .ttile',function(t){t.classList.toggle('sel',t.getAttribute('data-tile')===cid)});
+    el('ccexpwrap').innerHTML='<div class="cexp" style="--catc:'+c.color+'"><span class="fade"></span>'
+      +(c.cap?'<div class="bcap" style="margin:0 0 8px">'+c.cap+'</div>':'')
+      +actChips(c)+subBlock(c)+'</div>';
+    bindSheetChips();
+  }
+  all('#cctrail .ttile[data-tile]',function(d){d.addEventListener('click',function(){ccExpand(d.getAttribute('data-tile'))})});
+  ccExpand('dm');
+
+  /* ---------- wiring: chips → sheet, switchers, overlays ---------- */
+  function bindSheetChips(){
+    all('[data-sheet]',function(x){x.onclick=function(e){e.stopPropagation();openSheet(x.getAttribute('data-sheet'))}});
+  }
+  bindSheetChips();
+  all('[data-menusheet]',function(b){b.addEventListener('click',openMenuSheet)});
+  all('[data-c]',function(b){b.addEventListener('click',function(){
+    all('[data-c]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    all('.design',function(d){d.classList.remove('on')});
+    el(b.getAttribute('data-c')).classList.add('on');
+  })});
+  all('[data-t]',function(b){b.addEventListener('click',function(){
+    all('[data-t]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    phone.className='phone '+b.getAttribute('data-t');
+  })});
+  all('[data-legend]',function(b){b.addEventListener('click',function(){el('legendovl').classList.add('show')})});
+  function bindClose(){ all('[data-close]',function(b){b.onclick=function(){el(b.getAttribute('data-close')).classList.remove('show')}}) }
+  bindClose();
+  all('.seg:not(.mini)',function(sg){[].slice.call(sg.children).forEach(function(sp){
+    sp.addEventListener('click',function(){
+      [].slice.call(sg.children).forEach(function(x){x.classList.remove('on')});
+      sp.classList.add('on');
+    });
+  })});
+})();
+</script>
+</body>
+</html>

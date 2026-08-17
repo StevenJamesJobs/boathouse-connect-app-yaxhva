@@ -89,6 +89,7 @@ const EXACT_MAP: Record<string, string> = {
   'Built-in categories cannot be deleted; hide them instead': 'server_errors.builtin_category_undeletable',
   'Built-in subcategories cannot be deleted; hide them instead': 'server_errors.builtin_subcategory_undeletable',
   'Only Libations subcategories can be recipe-backed': 'server_errors.libations_only_recipe_backed',
+  'The specials category cannot hold subcategories': 'server_errors.weekly_specials_no_subcategories',
   'Template subcategories are always recipe-linked and cannot be unlinked': 'server_errors.template_subcategory_locked',
   // Owner protections
   'The primary owner account cannot be deleted': 'server_errors.primary_owner_undeletable',

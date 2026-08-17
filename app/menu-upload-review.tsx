@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -20,6 +21,9 @@ import { useOrganization } from '@/contexts/OrganizationContext';
 import { useTranslation } from 'react-i18next';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
 import { translateServerError } from '@/utils/serverErrors';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import { fonts } from '@/constants/fonts';
 
 interface EItem {
   name: string;
@@ -63,15 +67,19 @@ function normalizeTree(parsed: any): ECat[] {
 export default function MenuUploadReviewScreen() {
   useRequireManagerRoute();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const colors = useThemeColors();
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
-  const { t } = useTranslation();
-  const params = useLocalSearchParams<{ upload_id?: string; onboarding?: string }>();
+  const { t, i18n } = useTranslation();
+  const params = useLocalSearchParams<{ upload_id?: string; onboarding?: string; view?: string }>();
   const uploadId = params.upload_id;
   // Onboarding = the owner's very first menu, so there's nothing to replace —
   // hide the Add/Replace choice and just add it (mode stays 'add').
   const isOnboarding = params.onboarding === '1';
+  // s72: read-only viewer for an APPLIED upload — the parsed_result snapshot
+  // outlives the apply (and any later replace), so old scans stay browsable.
+  const isViewer = params.view === '1';
 
   const [loading, setLoading] = useState(true);
   const [applying, setApplying] = useState(false);
@@ -79,6 +87,11 @@ export default function MenuUploadReviewScreen() {
   const [cocktails, setCocktails] = useState<string[]>([]);
   const [existingNames, setExistingNames] = useState<Set<string>>(new Set());
   const [mode, setMode] = useState<'add' | 'replace'>('add');
+  const [uploadMeta, setUploadMeta] = useState<{
+    items_inserted: number | null;
+    target_menu_slot: number | null;
+    created_at: string | null;
+  }>({ items_inserted: null, target_menu_slot: null, created_at: null });
 
   const menuOptions = useMemo(
     () => targetMenuOptions(organization.menu_count, organization.menu_category_scope, organization.menu_1_name, organization.menu_2_name),
@@ -101,9 +114,16 @@ export default function MenuUploadReviewScreen() {
         const data: any = Array.isArray(uplRows) ? uplRows[0] : null;
         setTree(normalizeTree(data?.parsed_result));
         setCocktails(Array.isArray(data?.parsed_result?.flagged_cocktails) ? data.parsed_result.flagged_cocktails : []);
-        // existing item names for a duplicate hint
-        const { data: items } = await supabase.rpc('get_menu_items', { p_actor_id: user.id });
-        if (!cancelled && items) setExistingNames(new Set(items.map((i: any) => String(i.name || '').toLowerCase())));
+        setUploadMeta({
+          items_inserted: data?.items_inserted ?? null,
+          target_menu_slot: data?.target_menu_slot ?? null,
+          created_at: data?.created_at ?? null,
+        });
+        if (!isViewer) {
+          // existing item names for a duplicate hint (meaningless in the viewer)
+          const { data: items } = await supabase.rpc('get_menu_items', { p_actor_id: user.id });
+          if (!cancelled && items) setExistingNames(new Set(items.map((i: any) => String(i.name || '').toLowerCase())));
+        }
       } catch (e) {
         console.error('load review error', e);
         Alert.alert(t('menu_upload.failed_title', 'Could Not Load'), t('menu_upload.review_load_failed', 'Could not load the parsed menu.'));
@@ -216,6 +236,7 @@ export default function MenuUploadReviewScreen() {
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, justifyContent: 'center' }]}>
+        <AmbientGlow />
         <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
@@ -223,21 +244,35 @@ export default function MenuUploadReviewScreen() {
 
   return (
     <KeyboardAvoidingView style={[styles.container, { backgroundColor: colors.background }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('menu_upload.review_title', 'Review Menu')}</Text>
-        <View style={styles.headerRight} />
-      </View>
+      <AmbientGlow />
+      {/* Menu-family rhythm — same chrome height as the upload page behind it. */}
+      <ScreenHeader
+        title={isViewer ? t('menu_upload.view_title', 'Uploaded Scan') : t('menu_upload.review_title', 'Review Menu')}
+        eyebrow={organization?.name}
+        topOffset={insets.top + 12}
+      />
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <Text style={[styles.intro, { color: colors.textSecondary }]}>
-          {t('menu_upload.review_intro', 'Check what the AI found, edit anything, and uncheck items you don’t want. Nothing is added until you tap “Add to Menu”.')}
-        </Text>
+        {isViewer ? (
+          <Text style={[styles.intro, { color: colors.textSecondary }]}>
+            {(() => {
+              const date = uploadMeta.created_at
+                ? new Date(uploadMeta.created_at).toLocaleDateString(i18n.language === 'es' ? 'es' : 'en', { year: 'numeric', month: 'short', day: 'numeric' })
+                : '';
+              const menuLabel = menuOptions.find((o) => o.slot === uploadMeta.target_menu_slot)?.label;
+              return menuLabel
+                ? t('menu_upload.view_added_to', { defaultValue: 'Added {{n}} items to {{menu}} · {{date}}', n: uploadMeta.items_inserted ?? 0, menu: menuLabel, date })
+                : t('menu_upload.view_added_plain', { defaultValue: 'Added {{n}} items · {{date}}', n: uploadMeta.items_inserted ?? 0, date });
+            })()}
+          </Text>
+        ) : (
+          <Text style={[styles.intro, { color: colors.textSecondary }]}>
+            {t('menu_upload.review_intro', 'Check what the AI found, edit anything, and uncheck items you don’t want. Nothing is added until you tap “Add to Menu”.')}
+          </Text>
+        )}
 
         {/* Target menu + mode */}
-        {menuOptions.length > 1 && (
+        {!isViewer && menuOptions.length > 1 && (
           <>
             <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('menu_upload.target_menu', 'Add to which menu?')}</Text>
             <View style={styles.segmentRow}>
@@ -250,7 +285,7 @@ export default function MenuUploadReviewScreen() {
           </>
         )}
 
-        {!isOnboarding && (
+        {!isViewer && !isOnboarding && (
           <>
             <Text style={[styles.fieldLabel, { color: colors.text }]}>{t('menu_upload.mode', 'How should this be added?')}</Text>
             <View style={styles.segmentRow}>
@@ -262,9 +297,9 @@ export default function MenuUploadReviewScreen() {
               </TouchableOpacity>
             </View>
             {mode === 'replace' && (
-              <View style={[styles.warnBanner, { backgroundColor: '#FFF3E0' }]}>
-                <IconSymbol ios_icon_name="exclamationmark.triangle.fill" android_material_icon_name="warning" size={15} color="#E65100" />
-                <Text style={styles.warnText}>{t('menu_upload.replace_warn', 'Replace deletes this menu’s current items first. Items shared with the other menu are kept.')}</Text>
+              <View style={[styles.warnBanner, { backgroundColor: '#FF980018', borderColor: '#FF98004D' }]}>
+                <IconSymbol ios_icon_name="exclamationmark.triangle.fill" android_material_icon_name="warning" size={15} color="#FF9800" />
+                <Text style={[styles.warnText, { color: colors.text }]}>{t('menu_upload.replace_warn', 'Replace deletes this menu’s current items first. Items shared with the other menu are kept.')}</Text>
               </View>
             )}
           </>
@@ -272,7 +307,7 @@ export default function MenuUploadReviewScreen() {
 
         {/* Flagged cocktails */}
         {cocktails.length > 0 && (
-          <View style={[styles.cocktailCard, { backgroundColor: colors.primary + '10' }]}>
+          <View style={[styles.cocktailCard, { backgroundColor: colors.primary + '12', borderColor: colors.primary + '38' }]}>
             <Text style={[styles.cocktailTitle, { color: colors.primary }]}>{t('menu_upload.cocktails_title', 'Cocktails found')}</Text>
             <Text style={[styles.cocktailSub, { color: colors.textSecondary }]}>
               {t('menu_upload.cocktails_sub', 'These aren’t added here — add cocktails in the Bartender Recipe editors so they get recipes, glassware and garnish:')}
@@ -286,13 +321,15 @@ export default function MenuUploadReviewScreen() {
           const catItemCount = cat.subcategories.reduce((m, s) => m + s.items.length, 0);
           if (catItemCount === 0) return null;
           return (
-            <View key={`c-${ci}`} style={[styles.catCard, { backgroundColor: colors.card }]}>
+            <View key={`c-${ci}`} style={[styles.catCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
               <View style={styles.catHeader}>
                 <Text style={[styles.catName, { color: colors.text }]}>{cat.name || t('menu_upload.untitled_cat', 'Uncategorized')}</Text>
-                <View style={styles.catActions}>
-                  <TouchableOpacity onPress={() => toggleCategory(ci, true)}><Text style={[styles.catAction, { color: colors.primary }]}>{t('menu_upload.all', 'All')}</Text></TouchableOpacity>
-                  <TouchableOpacity onPress={() => toggleCategory(ci, false)}><Text style={[styles.catAction, { color: colors.textSecondary }]}>{t('menu_upload.none', 'None')}</Text></TouchableOpacity>
-                </View>
+                {!isViewer && (
+                  <View style={styles.catActions}>
+                    <TouchableOpacity onPress={() => toggleCategory(ci, true)}><Text style={[styles.catAction, { color: colors.primary }]}>{t('menu_upload.all', 'All')}</Text></TouchableOpacity>
+                    <TouchableOpacity onPress={() => toggleCategory(ci, false)}><Text style={[styles.catAction, { color: colors.textSecondary }]}>{t('menu_upload.none', 'None')}</Text></TouchableOpacity>
+                  </View>
+                )}
               </View>
               {cat.subcategories.map((sub, si) => (
                 <View key={`s-${ci}-${si}`}>
@@ -301,51 +338,62 @@ export default function MenuUploadReviewScreen() {
                     const dup = existingNames.has(it.name.trim().toLowerCase());
                     return (
                       <View key={`i-${ci}-${si}-${ii}`} style={[styles.itemRow, !it.include && { opacity: 0.45 }]}>
-                        <TouchableOpacity onPress={() => setItem(ci, si, ii, { include: !it.include })} style={styles.checkbox} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                          <IconSymbol
-                            ios_icon_name={it.include ? 'checkmark.square.fill' : 'square'}
-                            android_material_icon_name={it.include ? 'check-box' : 'check-box-outline-blank'}
-                            size={22}
-                            color={it.include ? colors.primary : colors.textSecondary}
-                          />
-                        </TouchableOpacity>
+                        {!isViewer && (
+                          <TouchableOpacity onPress={() => setItem(ci, si, ii, { include: !it.include })} style={styles.checkbox} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                            <IconSymbol
+                              ios_icon_name={it.include ? 'checkmark.square.fill' : 'square'}
+                              android_material_icon_name={it.include ? 'check-box' : 'check-box-outline-blank'}
+                              size={22}
+                              color={it.include ? colors.primary : colors.textSecondary}
+                            />
+                          </TouchableOpacity>
+                        )}
                         <View style={{ flex: 1 }}>
                           <View style={styles.itemTopRow}>
                             <TextInput
-                              style={[styles.itemName, { color: colors.text, borderBottomColor: colors.border }]}
+                              style={[styles.itemName, { color: colors.text, borderBottomColor: isViewer ? 'transparent' : colors.border }]}
                               value={it.name}
                               onChangeText={(v) => setItem(ci, si, ii, { name: v })}
-                              placeholder={t('menu_upload.item_name', 'Item name')}
+                              placeholder={isViewer ? undefined : t('menu_upload.item_name', 'Item name')}
                               placeholderTextColor={colors.textSecondary}
+                              editable={!isViewer}
                             />
                             <TextInput
-                              style={[styles.itemPrice, { color: colors.text, borderBottomColor: colors.border }]}
+                              style={[styles.itemPrice, { color: colors.text, borderBottomColor: isViewer ? 'transparent' : colors.border }]}
                               value={it.price}
                               onChangeText={(v) => setItem(ci, si, ii, { price: v })}
-                              placeholder="$"
+                              placeholder={isViewer ? undefined : "$"}
                               placeholderTextColor={colors.textSecondary}
+                              editable={!isViewer}
                             />
                           </View>
-                          <TextInput
-                            style={[styles.itemDesc, { color: colors.textSecondary }]}
-                            value={it.description}
-                            onChangeText={(v) => setItem(ci, si, ii, { description: v })}
-                            placeholder={t('menu_upload.item_desc', 'Description (optional)')}
-                            placeholderTextColor={colors.textSecondary}
-                            multiline
-                          />
+                          {(!isViewer || !!it.description) && (
+                            <TextInput
+                              style={[styles.itemDesc, { color: colors.textSecondary }]}
+                              value={it.description}
+                              onChangeText={(v) => setItem(ci, si, ii, { description: v })}
+                              placeholder={isViewer ? undefined : t('menu_upload.item_desc', 'Description (optional)')}
+                              placeholderTextColor={colors.textSecondary}
+                              multiline
+                              editable={!isViewer}
+                            />
+                          )}
                           <View style={styles.badgeRow}>
-                            {dup && (
+                            {!isViewer && dup && (
                               <View style={[styles.badge, { backgroundColor: '#FF980020' }]}>
                                 <Text style={[styles.badgeText, { color: '#E65100' }]}>{t('menu_upload.dup', 'Possible duplicate')}</Text>
                               </View>
                             )}
-                            <TouchableOpacity onPress={() => setItem(ci, si, ii, { is_gluten_free: !it.is_gluten_free })} style={[styles.badge, { backgroundColor: it.is_gluten_free ? '#4CAF5020' : 'rgba(128,128,128,0.12)' }]}>
-                              <Text style={[styles.badgeText, { color: it.is_gluten_free ? '#2E7D32' : colors.textSecondary }]}>{t('menu_upload.gf', 'GF')}</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity onPress={() => setItem(ci, si, ii, { is_vegetarian: !it.is_vegetarian })} style={[styles.badge, { backgroundColor: it.is_vegetarian ? '#4CAF5020' : 'rgba(128,128,128,0.12)' }]}>
-                              <Text style={[styles.badgeText, { color: it.is_vegetarian ? '#2E7D32' : colors.textSecondary }]}>{t('menu_upload.veg', 'Veg')}</Text>
-                            </TouchableOpacity>
+                            {(!isViewer || it.is_gluten_free) && (
+                              <TouchableOpacity disabled={isViewer} onPress={() => setItem(ci, si, ii, { is_gluten_free: !it.is_gluten_free })} style={[styles.badge, { backgroundColor: it.is_gluten_free ? '#4CAF5020' : 'rgba(128,128,128,0.12)' }]}>
+                                <Text style={[styles.badgeText, { color: it.is_gluten_free ? '#2E7D32' : colors.textSecondary }]}>{t('menu_upload.gf', 'GF')}</Text>
+                              </TouchableOpacity>
+                            )}
+                            {(!isViewer || it.is_vegetarian) && (
+                              <TouchableOpacity disabled={isViewer} onPress={() => setItem(ci, si, ii, { is_vegetarian: !it.is_vegetarian })} style={[styles.badge, { backgroundColor: it.is_vegetarian ? '#4CAF5020' : 'rgba(128,128,128,0.12)' }]}>
+                                <Text style={[styles.badgeText, { color: it.is_vegetarian ? '#2E7D32' : colors.textSecondary }]}>{t('menu_upload.veg', 'Veg')}</Text>
+                              </TouchableOpacity>
+                            )}
                           </View>
                         </View>
                       </View>
@@ -360,56 +408,68 @@ export default function MenuUploadReviewScreen() {
         <View style={{ height: 90 }} />
       </ScrollView>
 
-      {/* Sticky apply bar */}
+      {/* Sticky apply bar — Save & Review Later is a deliberate back-out: the
+          upload stays ready_for_review either way (s72, Steve's hand-off ask).
+          The read-only viewer has no bar at all — the back chip is the exit. */}
+      {!isViewer && (
       <View style={[styles.applyBar, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
         <Text style={[styles.applyCount, { color: colors.textSecondary }]}>{t('menu_upload.selected_count', { defaultValue: '{{n}} items selected', n: includedCount })}</Text>
-        <TouchableOpacity style={[styles.applyButton, { backgroundColor: colors.primary, opacity: applying || includedCount === 0 ? 0.6 : 1 }]} onPress={doApply} disabled={applying || includedCount === 0}>
-          {applying ? <ActivityIndicator color={colors.fireText} size="small" /> : <Text style={[styles.applyButtonText, { color: colors.fireText }]}>{t('menu_upload.add_to_menu', 'Add to Menu')}</Text>}
-        </TouchableOpacity>
+        <View style={styles.applyRow}>
+          <TouchableOpacity
+            style={[styles.saveLaterButton, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder, opacity: applying ? 0.6 : 1 }]}
+            // ALWAYS lands on the AI Menu Upload page (navigate pops back to it
+            // when it's in the stack, pushes it when the review was reached from
+            // the ⚙ sheet) — so the "Ready to review" row is right there and the
+            // page's location sticks, especially on first use (Steve's s72 call).
+            onPress={() => router.navigate({ pathname: '/menu-upload', params: isOnboarding ? { onboarding: '1' } : {} } as any)}
+            disabled={applying}
+          >
+            <Text style={[styles.saveLaterText, { color: colors.text }]}>{t('menu_upload.save_later', 'Save & Review Later')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={[styles.applyButton, { backgroundColor: colors.primary, opacity: applying || includedCount === 0 ? 0.6 : 1 }]} onPress={doApply} disabled={applying || includedCount === 0}>
+            {applying ? <ActivityIndicator color={colors.fireText} size="small" /> : <Text style={[styles.applyButtonText, { color: colors.fireText }]}>{t('menu_upload.add_to_menu', 'Add to Menu')}</Text>}
+          </TouchableOpacity>
+        </View>
       </View>
+      )}
     </KeyboardAvoidingView>
   );
 }
 
 const createStyles = (colors: any) => StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingTop: Platform.OS === 'ios' ? 60 : 16, paddingBottom: 12, paddingHorizontal: 16,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  backButton: { padding: 8, width: 40 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  headerRight: { width: 40 },
-  scrollContent: { padding: 16, paddingBottom: 20 },
-  intro: { fontSize: 13, lineHeight: 18, marginBottom: 16 },
-  fieldLabel: { fontSize: 13, fontWeight: '700', marginBottom: 8, marginTop: 6 },
+  scrollContent: { padding: 16, paddingTop: 4, paddingBottom: 20 },
+  intro: { fontSize: 13, fontFamily: fonts.body.regular, lineHeight: 18, marginBottom: 16 },
+  fieldLabel: { fontSize: 13, fontFamily: fonts.display.semibold, marginBottom: 8, marginTop: 6 },
   segmentRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
-  segment: { flex: 1, paddingVertical: 9, borderRadius: 8, alignItems: 'center', backgroundColor: 'rgba(128,128,128,0.12)' },
-  segmentText: { fontSize: 12.5, fontWeight: '600' },
-  warnBanner: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', padding: 10, borderRadius: 8, marginBottom: 14 },
-  warnText: { flex: 1, fontSize: 12, color: '#E65100', lineHeight: 16 },
-  cocktailCard: { padding: 14, borderRadius: 12, marginBottom: 16 },
-  cocktailTitle: { fontSize: 14, fontWeight: '700' },
-  cocktailSub: { fontSize: 12, marginTop: 4, lineHeight: 16 },
-  cocktailList: { fontSize: 12.5, fontWeight: '600', marginTop: 8, lineHeight: 18 },
-  catCard: { borderRadius: 12, padding: 12, marginBottom: 12 },
+  segment: { flex: 1, paddingVertical: 9, borderRadius: 10, alignItems: 'center', backgroundColor: 'rgba(128,128,128,0.12)' },
+  segmentText: { fontSize: 12.5, fontFamily: fonts.body.semibold },
+  warnBanner: { flexDirection: 'row', gap: 8, alignItems: 'flex-start', padding: 10, borderRadius: 13, borderWidth: StyleSheet.hairlineWidth + 0.5, marginBottom: 14 },
+  warnText: { flex: 1, fontSize: 12, fontFamily: fonts.body.regular, lineHeight: 16 },
+  cocktailCard: { padding: 14, borderRadius: 15, borderWidth: StyleSheet.hairlineWidth + 0.5, marginBottom: 16 },
+  cocktailTitle: { fontSize: 14, fontFamily: fonts.display.semibold },
+  cocktailSub: { fontSize: 12, fontFamily: fonts.body.regular, marginTop: 4, lineHeight: 16 },
+  cocktailList: { fontSize: 12.5, fontFamily: fonts.body.semibold, marginTop: 8, lineHeight: 18 },
+  catCard: { borderRadius: 17, borderWidth: StyleSheet.hairlineWidth + 0.5, padding: 12, marginBottom: 12 },
   catHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  catName: { fontSize: 16, fontWeight: '700', flex: 1 },
+  catName: { fontSize: 16, fontFamily: fonts.display.semibold, flex: 1 },
   catActions: { flexDirection: 'row', gap: 14 },
-  catAction: { fontSize: 12.5, fontWeight: '600' },
-  subName: { fontSize: 12, fontWeight: '600', marginTop: 8, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 0.4 },
+  catAction: { fontSize: 12.5, fontFamily: fonts.body.semibold },
+  subName: { fontSize: 10.5, fontFamily: fonts.mono.semibold, marginTop: 8, marginBottom: 2, textTransform: 'uppercase', letterSpacing: 1 },
   itemRow: { flexDirection: 'row', gap: 8, paddingVertical: 8, alignItems: 'flex-start' },
   checkbox: { paddingTop: 2 },
   itemTopRow: { flexDirection: 'row', gap: 8, alignItems: 'flex-end' },
-  itemName: { flex: 1, fontSize: 14, fontWeight: '600', borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 2 },
-  itemPrice: { width: 64, fontSize: 13, fontWeight: '600', textAlign: 'right', borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 2 },
-  itemDesc: { fontSize: 12.5, marginTop: 4, paddingVertical: 0 },
+  itemName: { flex: 1, fontSize: 14, fontFamily: fonts.body.semibold, borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 2 },
+  itemPrice: { width: 64, fontSize: 13, fontFamily: fonts.mono.medium, textAlign: 'right', borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: 2 },
+  itemDesc: { fontSize: 12.5, fontFamily: fonts.body.regular, marginTop: 4, paddingVertical: 0 },
   badgeRow: { flexDirection: 'row', gap: 6, marginTop: 6, flexWrap: 'wrap' },
   badge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
-  badgeText: { fontSize: 10.5, fontWeight: '700' },
-  applyBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 28 : 14, borderTopWidth: StyleSheet.hairlineWidth },
-  applyCount: { fontSize: 13, fontWeight: '600' },
-  applyButton: { paddingVertical: 12, paddingHorizontal: 28, borderRadius: 10 },
-  applyButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
+  badgeText: { fontSize: 10, fontFamily: fonts.mono.semibold },
+  applyBar: { paddingHorizontal: 16, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 26 : 14, borderTopWidth: StyleSheet.hairlineWidth },
+  applyCount: { fontSize: 11.5, fontFamily: fonts.mono.medium, textAlign: 'center', marginBottom: 8 },
+  applyRow: { flexDirection: 'row', gap: 8 },
+  saveLaterButton: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth + 0.5 },
+  saveLaterText: { fontSize: 13, fontFamily: fonts.body.semibold },
+  applyButton: { flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
+  applyButtonText: { fontSize: 14, fontFamily: fonts.body.semibold },
 });
