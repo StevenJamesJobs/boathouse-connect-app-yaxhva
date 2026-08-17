@@ -27,6 +27,14 @@ interface ScreenHeaderProps {
    * caller is untouched.
    */
   rightWide?: boolean;
+  /**
+   * Top padding override (default 48 — the pushed-screen rhythm). The MENU
+   * FAMILY sits its chrome at `insets.top + 12` instead (the Menus tab inherits
+   * the portal layout's inset spacer; the editor mirrors it) — a member screen
+   * (manage-menu-categories) passes that here so the user↔editor↔categories
+   * flips never move the header (Steve's s72 continuity call).
+   */
+  topOffset?: number;
 }
 
 /**
@@ -48,13 +56,13 @@ interface ScreenHeaderProps {
  * pinned to the old header height need that offset recomputed against this one
  * (see app/schedule-review.tsx styles.savingOverlay).
  */
-export default function ScreenHeader({ title, eyebrow, onBack, right, rightWide }: ScreenHeaderProps) {
+export default function ScreenHeader({ title, eyebrow, onBack, right, rightWide, topOffset }: ScreenHeaderProps) {
   const router = useRouter();
   const colors = useThemeColors();
   const handleBack = onBack ?? (() => router.back());
 
   return (
-    <View style={styles.header}>
+    <View style={[styles.header, topOffset !== undefined && { paddingTop: topOffset }]}>
       <TouchableOpacity
         onPress={handleBack}
         hitSlop={8}

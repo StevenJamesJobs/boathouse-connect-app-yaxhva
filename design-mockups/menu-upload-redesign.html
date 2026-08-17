@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Menu Upload Concepts</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 12px 60px;background:#0C0D11;
+  font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+.toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center;max-width:780px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb:focus-visible{outline:2px solid #FF7A2F;outline-offset:2px}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:620px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --blue:#8FA0AC; --bluetext:#CDD8DF; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --thumbbg:#252A31; --glowA:rgba(230,234,238,0.12); --glowB:rgba(255,122,47,0.10); --danger:#E74C3C; --scrim:rgba(6,10,18,0.55);
+  position:relative;width:392px;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--blue:#7E8A94;--bluetext:#2A313C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--thumbbg:#D8D8DC;--glowA:rgba(58,66,80,0.10);--glowB:rgba(236,106,30,0.12);--danger:#C0392B;--scrim:rgba(6,10,18,0.35)}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--blue:#5DADE2;--bluetext:#BFE3F7;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--thumbbg:#2C3E50;--glowA:rgba(74,144,226,0.32);--glowB:rgba(93,173,226,0.16)}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--blue:#42A5F5;--bluetext:#0D47A1;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--thumbbg:#CFE4EC;--glowA:rgba(25,118,210,0.18);--glowB:rgba(66,165,245,0.13);--danger:#C0392B;--scrim:rgba(6,10,18,0.35)}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 40px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.design{display:none;padding:6px 16px 0;animation:fade .35s ease}
+.design.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.concept{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:7px;margin:4px 2px 12px}
+.concept b{color:var(--tint)}
+.concept .ln{flex:1;height:1px;background:var(--hair)}
+
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.gcard{background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.scard{background:var(--surf);border:1px solid var(--surfbd)}
+.c38{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer}
+.hdr{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
+.hsp{width:38px;flex:0 0 auto}
+.hmid{flex:1;text-align:center;min-width:0}
+.eyebrow{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600}
+.htitle{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.zlabel{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:16px 2px 10px}
+.zlabel .ln{flex:1;height:1px;background:var(--hair)}
+.cpill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:600;color:var(--bluetext);background:color-mix(in srgb,var(--blue) 20%,transparent);padding:2px 8px;border-radius:9px;white-space:nowrap}
+
+/* credits banner */
+.credits{display:flex;gap:11px;align-items:flex-start;padding:13px 14px;border-radius:17px;margin-bottom:13px;
+  background:color-mix(in srgb,var(--tint) 9%,transparent);border:1px solid color-mix(in srgb,var(--tint) 26%,transparent)}
+.credits .ct{font-size:14px;font-weight:700;color:var(--tint);font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif}
+.credits .cs{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.45}
+.credits .cs b{font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--text);font-weight:600}
+
+/* A: slim method buttons (3-up) */
+.methods3{display:flex;gap:8px;margin-bottom:13px}
+.m3{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:11px 6px 9px;border-radius:14px;cursor:pointer;
+  background:color-mix(in srgb,var(--tint) 16%,transparent);border:1px solid color-mix(in srgb,var(--tint) 38%,transparent)}
+.m3 .ic{color:var(--tint);width:19px;height:19px}
+.m3 .l{font-size:11.5px;font-weight:700;color:var(--text)}
+.m3 .c{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;color:var(--muted)}
+
+/* C: sheet-style method rows */
+.mrow{display:flex;align-items:center;gap:12px;padding:12px 13px;border-radius:13px;margin-bottom:8px;cursor:pointer}
+.mrow .mic{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex:0 0 auto;
+  background:color-mix(in srgb,var(--tint) 14%,transparent);color:var(--tint)}
+.mrow .bd{flex:1;min-width:0}
+.mrow .l1{font-size:13.5px;font-weight:600}
+.mrow .l2{font-size:11px;color:var(--muted);margin-top:1px}
+.mrow .cost{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted)}
+
+/* scanning card + quips */
+.scan{display:none;padding:14px;border-radius:15px;margin-bottom:13px;border:1px solid color-mix(in srgb,#FF9800 30%,transparent);
+  background:color-mix(in srgb,#FF9800 9%,transparent)}
+.scan.show{display:block;animation:fade .3s ease}
+.scan .top{display:flex;align-items:center;gap:10px}
+.spin{width:18px;height:18px;border-radius:50%;border:2.5px solid color-mix(in srgb,#FF9800 30%,transparent);border-top-color:#FF9800;animation:spin 1s linear infinite;flex:0 0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+.quip{flex:1;font-size:13px;font-weight:600;color:var(--text);min-height:18px;transition:opacity .3s}
+.quip.fade{opacity:0}
+.scan .sub{font-size:11px;color:var(--muted);line-height:1.5;margin-top:9px}
+.devbtn{display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:10px;margin-bottom:13px;cursor:pointer;
+  border:1.5px dashed color-mix(in srgb,var(--tint) 55%,transparent);color:var(--tint);
+  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:.8px;font-weight:700}
+
+/* history rows */
+.hrow{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:13px;margin-bottom:7px}
+.hrow .hic{color:var(--muted)}
+.hrow .bd{flex:1;min-width:0}
+.hrow .n{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hrow .m{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;margin-top:2px}
+.st-ok{color:#4CAF50}.st-rev{color:var(--tint)}.st-proc{color:#FF9800}.st-fail{color:#F44336}
+
+/* seg tabs (B) */
+.seg{display:flex;border-radius:13px;padding:3px;gap:3px;margin-bottom:13px;background:var(--glass);border:1px solid var(--glassbd)}
+.seg span{flex:1;text-align:center;padding:8px 10px;border-radius:10px;font-size:12.5px;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+.seg .on{background:color-mix(in srgb,var(--tint) 18%,transparent);color:var(--tint);font-weight:600}
+.seg .bub{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;background:color-mix(in srgb,var(--blue) 22%,transparent);color:var(--bluetext);border-radius:8px;padding:1px 6px}
+
+/* fold (C history) */
+details.fold{border-radius:15px;overflow:hidden;margin-top:4px}
+details.fold summary{list-style:none;display:flex;align-items:center;gap:9px;padding:12px 13px;cursor:pointer}
+details.fold summary::-webkit-details-marker{display:none}
+.fnm{font-size:14px;font-weight:600;flex:1}
+.chev{margin-left:auto;transition:transform .18s;color:var(--muted)}
+details[open] .chev{transform:rotate(180deg)}
+.fbody{padding:0 11px 11px}
+
+/* danger + ghost */
+.danger{display:flex;align-items:center;justify-content:center;gap:8px;padding:12px;border-radius:13px;margin-top:16px;cursor:pointer;
+  border:1.5px dashed color-mix(in srgb,#F44336 45%,transparent);color:#F44336;font-size:12.5px;font-weight:600}
+
+/* status modal (C) */
+.ovl{position:absolute;inset:0;z-index:50;display:none;flex-direction:column;justify-content:flex-end}
+.ovl.show{display:flex}
+.ovl .scr{position:absolute;inset:0;background:var(--scrim)}
+.sheet{position:relative;z-index:2;border-radius:26px 26px 0 0;padding:10px 18px 30px;
+  background:color-mix(in srgb,var(--bg) 90%,var(--text) 10%);box-shadow:0 -18px 44px rgba(0,0,0,0.25);animation:up .32s cubic-bezier(.32,.72,.28,1)}
+@keyframes up{from{transform:translateY(60px);opacity:0}to{transform:none;opacity:1}}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--hair);margin:2px auto 14px}
+.bigspin{width:44px;height:44px;border-radius:50%;border:3.5px solid color-mix(in srgb,#FF9800 25%,transparent);border-top-color:#FF9800;animation:spin 1s linear infinite;margin:6px auto 14px}
+.sheet .t{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:17px;text-align:center}
+.sheet .q{font-size:13.5px;font-weight:600;color:var(--tint);text-align:center;margin-top:10px;min-height:20px;transition:opacity .3s}
+.sheet .q.fade{opacity:0}
+.sheet .s{font-size:11.5px;color:var(--muted);text-align:center;line-height:1.55;margin-top:12px}
+.sheet .hidebtn{margin:16px auto 0;display:flex;align-items:center;justify-content:center;padding:10px;border-radius:12px;width:60%;
+  background:var(--glass);border:1px solid var(--glassbd);font-size:12.5px;font-weight:600;cursor:pointer}
+</style>
+</head>
+<body>
+
+<svg style="display:none" aria-hidden="true"><defs>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+<symbol id="i-doc" viewBox="0 0 24 24"><path d="M14 2H7a2 2 0 00-2 2v16a2 2 0 002 2h10a2 2 0 002-2V7z"/><path d="M14 2v5h5"/></symbol>
+<symbol id="i-photos" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="M21 15l-4.5-4.5L8 19"/></symbol>
+<symbol id="i-camera" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 011 1v10a1 1 0 01-1 1H4a1 1 0 01-1-1V9a1 1 0 011-1z"/><circle cx="12" cy="13" r="3.4"/></symbol>
+<symbol id="i-spark" viewBox="0 0 24 24"><path d="M12 3l1.8 4.9L19 9.7l-4.6 2.4L13 17l-2.4-4.3L6 11.4l4.7-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.1 1L19 21l-.9-2L16 18l2.2-.8z"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M7 7l1 13h8l1-13M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/></symbol>
+<symbol id="i-chevr" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+<symbol id="i-chevd" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"/></symbol>
+</defs></svg>
+
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Concept</span>
+    <button class="tb on" data-c="ua">A · One-Page</button>
+    <button class="tb" data-c="ub">B · Two-Tab</button>
+    <button class="tb" data-c="uc">C · Rows + Status Modal</button>
+  </div>
+  <div class="grp"><span class="gl2">Palette</span>
+    <button class="tb on" data-t="">Mono·D</button>
+    <button class="tb" data-t="t-mono-l">Mono·L</button>
+    <button class="tb" data-t="t-ocean-d">Ocean·D</button>
+    <button class="tb" data-t="t-ocean-l">Ocean·L</button>
+  </div>
+</div>
+<p class="hint">The AI Menu Upload page, glass-era. All three add <b>Take Photo</b> and slim the buttons. Tap <b>DEV · SIMULATE SCAN</b> in any concept to watch the rotating quips (2.2s here; real app 5–6s). <b>A</b> one page (your lean) · <b>B</b> Upload/Recent tabs · <b>C</b> ⚙-sheet-style rows, history in a fold, and the scan as a status MODAL instead of inline.</p>
+
+<div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div>
+  <div class="sb"><span>9:41</span><span>▦ ⌁ ▮</span></div>
+  <div class="screen">
+
+  <!-- ============ A · ONE-PAGE ============ -->
+  <div class="design on" id="ua">
+    <div class="concept"><b>A</b> One-Page — slim methods, everything in flow <span class="ln"></span></div>
+    <div class="hdr">
+      <span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Myresto Test</div><div class="htitle">AI Menu Upload</div></div>
+      <span class="hsp"></span>
+    </div>
+
+    <div class="credits">
+      <svg class="ic" style="color:var(--tint)"><use href="#i-spark"/></svg>
+      <div><div class="ct">6 of 10 credits left this month</div>
+      <div class="cs">PDF = <b>3</b> credits · each photo = <b>1</b> credit · resets monthly</div></div>
+    </div>
+
+    <div class="methods3">
+      <div class="m3"><svg class="ic"><use href="#i-doc"/></svg><span class="l">Upload File</span><span class="c">PDF · 3 cr</span></div>
+      <div class="m3"><svg class="ic"><use href="#i-photos"/></svg><span class="l">Photos</span><span class="c">1 cr each</span></div>
+      <div class="m3"><svg class="ic"><use href="#i-camera"/></svg><span class="l">Take Photo</span><span class="c">1 cr</span></div>
+    </div>
+
+    <span class="devbtn" data-scan="a"><svg class="ic" style="width:11px;height:11px"><use href="#i-play"/></svg>DEV · SIMULATE SCAN</span>
+
+    <div class="scan" id="scan-a">
+      <div class="top"><span class="spin"></span><span class="quip" id="quip-a">Preheating the neural network...</span></div>
+      <div class="sub">Reading a menu takes about 40 seconds to 3 minutes depending on the file size. Please don't close the app while it scans your menu.</div>
+    </div>
+
+    <div class="zlabel">Recent uploads<span class="ln"></span></div>
+    <div class="hrow scard"><svg class="ic hic" style="width:16px;height:16px"><use href="#i-doc"/></svg>
+      <div class="bd"><div class="n">dinner-menu-fall.pdf</div><div class="m st-rev">Ready to review · 3 credits</div></div>
+      <svg class="ic" style="width:14px;height:14px;color:var(--tint)"><use href="#i-chevr"/></svg></div>
+    <div class="hrow scard"><svg class="ic hic" style="width:16px;height:16px"><use href="#i-photos"/></svg>
+      <div class="bd"><div class="n">Menu photos (3)</div><div class="m st-ok">Added · 47 items · 3 credits</div></div></div>
+    <div class="hrow scard"><svg class="ic hic" style="width:16px;height:16px"><use href="#i-doc"/></svg>
+      <div class="bd"><div class="n">brunch-v2.pdf</div><div class="m st-ok">Added · 18 items · FREE</div></div></div>
+    <div class="hrow scard"><svg class="ic hic" style="width:16px;height:16px"><use href="#i-photos"/></svg>
+      <div class="bd"><div class="n">Menu photo</div><div class="m st-fail">Failed</div></div></div>
+
+    <div class="danger"><svg class="ic" style="width:15px;height:15px"><use href="#i-trash"/></svg>Delete a menu (start fresh)</div>
+  </div>
+
+  <!-- ============ B · TWO-TAB ============ -->
+  <div class="design" id="ub">
+    <div class="concept"><b>B</b> Two-Tab — Upload | Recent Uploads <span class="ln"></span></div>
+    <div class="hdr">
+      <span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Myresto Test</div><div class="htitle">AI Menu Upload</div></div>
+      <span class="hsp"></span>
+    </div>
+
+    <div class="seg" id="ubseg">
+      <span class="on" data-ubtab="ub-up">Upload</span>
+      <span data-ubtab="ub-hist">Recent Uploads <span class="bub">4</span></span>
+    </div>
+
+    <div id="ub-up">
+      <div class="credits">
+        <svg class="ic" style="color:var(--tint)"><use href="#i-spark"/></svg>
+        <div><div class="ct">6 of 10 credits left this month</div>
+        <div class="cs">PDF = <b>3</b> credits · each photo = <b>1</b> credit · resets monthly</div></div>
+      </div>
+      <div class="methods3">
+        <div class="m3"><svg class="ic"><use href="#i-doc"/></svg><span class="l">Upload File</span><span class="c">PDF · 3 cr</span></div>
+        <div class="m3"><svg class="ic"><use href="#i-photos"/></svg><span class="l">Photos</span><span class="c">1 cr each</span></div>
+        <div class="m3"><svg class="ic"><use href="#i-camera"/></svg><span class="l">Take Photo</span><span class="c">1 cr</span></div>
+      </div>
+      <span class="devbtn" data-scan="b"><svg class="ic" style="width:11px;height:11px"><use href="#i-play"/></svg>DEV · SIMULATE SCAN</span>
+      <div class="scan" id="scan-b">
+        <div class="top"><span class="spin"></span><span class="quip" id="quip-b">Whisking pixels into data...</span></div>
+        <div class="sub">Reading a menu takes about 40 seconds to 3 minutes depending on the file size. Please don't close the app while it scans your menu.</div>
+      </div>
+      <div class="danger"><svg class="ic" style="width:15px;height:15px"><use href="#i-trash"/></svg>Delete a menu (start fresh)</div>
+    </div>
+
+    <div id="ub-hist" style="display:none">
+      <div class="hrow scard"><svg class="ic hic" style="width:16px;height:16px"><use href="#i-doc"/></svg>
+        <div class="bd"><div class="n">dinner-menu-fall.pdf</div><div class="m st-rev">Ready to review · 3 credits</div></div>
+        <svg class="ic" style="width:14px;height:14px;color:var(--tint)"><use href="#i-chevr"/></svg></div>
+      <div class="hrow scard"><svg class="ic hic" style="width:16px;height:16px"><use href="#i-photos"/></svg>
+        <div class="bd"><div class="n">Menu photos (3)</div><div class="m st-ok">Added · 47 items · 3 credits</div></div></div>
+      <div class="hrow scard"><svg class="ic hic" style="width:16px;height:16px"><use href="#i-doc"/></svg>
+        <div class="bd"><div class="n">brunch-v2.pdf</div><div class="m st-ok">Added · 18 items · FREE</div></div></div>
+      <div class="hrow scard"><svg class="ic hic" style="width:16px;height:16px"><use href="#i-photos"/></svg>
+        <div class="bd"><div class="n">Menu photo</div><div class="m st-fail">Failed</div></div></div>
+    </div>
+  </div>
+
+  <!-- ============ C · SHEET ROWS + STATUS MODAL ============ -->
+  <div class="design" id="uc">
+    <div class="concept"><b>C</b> ⚙-sheet rows · history fold · scan modal <span class="ln"></span></div>
+    <div class="hdr">
+      <span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="eyebrow">Myresto Test</div><div class="htitle">AI Menu Upload</div></div>
+      <span class="hsp"></span>
+    </div>
+
+    <div class="credits">
+      <svg class="ic" style="color:var(--tint)"><use href="#i-spark"/></svg>
+      <div><div class="ct">6 of 10 credits left this month</div>
+      <div class="cs">First menu FREE · PDF = <b>3</b> · photo = <b>1</b> · resets monthly</div></div>
+    </div>
+
+    <div class="mrow scard"><span class="mic"><svg class="ic" style="width:17px;height:17px"><use href="#i-doc"/></svg></span>
+      <div class="bd"><div class="l1">Upload a File</div><div class="l2">PDF or an image from Files</div></div>
+      <span class="cost">3 credits</span></div>
+    <div class="mrow scard"><span class="mic"><svg class="ic" style="width:17px;height:17px"><use href="#i-photos"/></svg></span>
+      <div class="bd"><div class="l1">Choose Photos</div><div class="l2">Pick menu pages from your library</div></div>
+      <span class="cost">1 cr each</span></div>
+    <div class="mrow scard"><span class="mic"><svg class="ic" style="width:17px;height:17px"><use href="#i-camera"/></svg></span>
+      <div class="bd"><div class="l1">Take Photo</div><div class="l2">Snap the menu right now</div></div>
+      <span class="cost">1 credit</span></div>
+
+    <span class="devbtn" data-scanmodal="1" style="margin-top:4px"><svg class="ic" style="width:11px;height:11px"><use href="#i-play"/></svg>DEV · SIMULATE SCAN (MODAL)</span>
+
+    <details class="fold gcard">
+      <summary><svg class="ic" style="width:15px;height:15px;color:var(--muted)"><use href="#i-clock"/></svg>
+        <span class="fnm">Recent Uploads</span><span class="cpill">4</span>
+        <svg class="ic chev" style="width:15px;height:15px"><use href="#i-chevd"/></svg></summary>
+      <div class="fbody">
+        <div class="hrow scard"><svg class="ic hic" style="width:16px;height:16px"><use href="#i-doc"/></svg>
+          <div class="bd"><div class="n">dinner-menu-fall.pdf</div><div class="m st-rev">Ready to review · 3 credits</div></div>
+          <svg class="ic" style="width:14px;height:14px;color:var(--tint)"><use href="#i-chevr"/></svg></div>
+        <div class="hrow scard"><svg class="ic hic" style="width:16px;height:16px"><use href="#i-photos"/></svg>
+          <div class="bd"><div class="n">Menu photos (3)</div><div class="m st-ok">Added · 47 items · 3 credits</div></div></div>
+        <div class="hrow scard"><svg class="ic hic" style="width:16px;height:16px"><use href="#i-doc"/></svg>
+          <div class="bd"><div class="n">brunch-v2.pdf</div><div class="m st-ok">Added · 18 items · FREE</div></div></div>
+        <div class="hrow scard"><svg class="ic hic" style="width:16px;height:16px"><use href="#i-photos"/></svg>
+          <div class="bd"><div class="n">Menu photo</div><div class="m st-fail">Failed</div></div></div>
+      </div>
+    </details>
+
+    <div class="danger"><svg class="ic" style="width:15px;height:15px"><use href="#i-trash"/></svg>Delete a menu (start fresh)</div>
+  </div>
+
+  </div><!-- /screen -->
+
+  <!-- status modal (C) -->
+  <div class="ovl" id="scanovl">
+    <div class="scr" data-close="scanovl"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="bigspin"></div>
+      <div class="t">Reading your menu…</div>
+      <div class="q" id="quip-m">Teaching AI what a burrito looks like...</div>
+      <div class="s">This takes about 40 seconds to 3 minutes depending on the file size.<br>Please don't close the app while it scans your menu.</div>
+      <div class="hidebtn" data-close="scanovl">Hide — keep scanning</div>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+
+<script>
+(function(){
+  var phone=document.getElementById('phone');
+  function all(s,fn){[].slice.call(document.querySelectorAll(s)).forEach(fn)}
+  function el(id){return document.getElementById(id)}
+
+  /* Steve's rotating scan quips (23) — light copyedit only. Real cadence 5–6s; demo 2.2s. */
+  var QUIPS=[
+    "Teaching AI what a burrito looks like...",
+    "Downloading culinary intelligence...",
+    "Matrixing your mozzarella...",
+    "Resolving conflicts between carbs and proteins...",
+    "Translating chef's handwriting into English...",
+    "Calibrating the digital tastebuds...",
+    "Pretending to work very hard...",
+    "Reading your menu (and judging your prices)...",
+    "Adding extra bytes of flavor...",
+    "Growing a brain, please hold...",
+    "Finding the typos so you don't have to...",
+    "Staring intensely at your appetizers...",
+    "Chopping data into bite-sized pieces...",
+    "Preheating the neural network...",
+    "Whisking pixels into data...",
+    "Marinating the text for better flavor...",
+    "Shuffling the ingredients...",
+    "Trying not to drool on the motherboard...",
+    "Calculating the exact definition of \"spicy\"...",
+    "Arguing with the server about calorie counts...",
+    "Don't panic, the AI is just hungry...",
+    "Locating the secret sauce...",
+    "Sweating over your dessert section..."
+  ];
+  var timers={};
+  function startRotor(quipId){
+    stopRotor(quipId);
+    var node=el(quipId), i=Math.floor(Math.random()*QUIPS.length);
+    node.textContent=QUIPS[i];
+    timers[quipId]=setInterval(function(){
+      node.classList.add('fade');
+      setTimeout(function(){
+        i=(i+1)%QUIPS.length;
+        node.textContent=QUIPS[i];
+        node.classList.remove('fade');
+      },300);
+    },2200);
+  }
+  function stopRotor(quipId){ if(timers[quipId]){clearInterval(timers[quipId]);delete timers[quipId];} }
+
+  /* inline scan toggles (A/B) */
+  all('[data-scan]',function(b){b.addEventListener('click',function(){
+    var k=b.getAttribute('data-scan');
+    var card=el('scan-'+k);
+    var on=!card.classList.contains('show');
+    card.classList.toggle('show',on);
+    if(on) startRotor('quip-'+k); else stopRotor('quip-'+k);
+  })});
+  /* modal scan (C) */
+  all('[data-scanmodal]',function(b){b.addEventListener('click',function(){
+    el('scanovl').classList.add('show'); startRotor('quip-m');
+  })});
+  all('[data-close]',function(b){b.addEventListener('click',function(){
+    el(b.getAttribute('data-close')).classList.remove('show'); stopRotor('quip-m');
+  })});
+
+  /* B tabs */
+  all('#ubseg [data-ubtab]',function(sp){sp.addEventListener('click',function(){
+    all('#ubseg span',function(x){x.classList.remove('on')}); sp.classList.add('on');
+    el('ub-up').style.display=sp.getAttribute('data-ubtab')==='ub-up'?'':'none';
+    el('ub-hist').style.display=sp.getAttribute('data-ubtab')==='ub-hist'?'':'none';
+  })});
+
+  /* concept + palette switchers */
+  all('[data-c]',function(b){b.addEventListener('click',function(){
+    all('[data-c]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    all('.design',function(d){d.classList.remove('on')});
+    el(b.getAttribute('data-c')).classList.add('on');
+  })});
+  all('[data-t]',function(b){b.addEventListener('click',function(){
+    all('[data-t]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    phone.className='phone '+b.getAttribute('data-t');
+  })});
+})();
+</script>
+</body>
+</html>
