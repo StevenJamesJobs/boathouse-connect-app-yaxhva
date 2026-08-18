@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,15 +8,7 @@ import {
   TouchableOpacity,
   TextInput,
   ActivityIndicator,
-  Modal,
-  Platform,
-  Animated,
-  PanResponder,
-  Dimensions,
 } from 'react-native';
-
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const DISMISS_THRESHOLD = 120;
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
@@ -27,8 +19,15 @@ import { StorageImage } from '@/components/StorageImage';
 import { GlasswareGlyph } from '@/components/GlasswareIconPicker';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { isManagerOrOwner } from '@/utils/roles';
+import { LinearGradient } from 'expo-linear-gradient';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import HeaderNavMenu from '@/components/HeaderNavMenu';
+import { useManagerPermissions } from '@/hooks/useManagerPermissions';
+import GlassHeroSheet from '@/components/GlassHeroSheet';
+import { fonts } from '@/constants/fonts';
 
 interface Cocktail {
   id: string;
@@ -69,8 +68,9 @@ export default function CocktailsAZScreen() {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const colors = useThemeColors();
-  const { organizationId } = useOrganization();
   const { user } = useAuth();
+  const isManager = isManagerOrOwner(user);
+  const { perms } = useManagerPermissions();
   const [cocktails, setCocktails] = useState<Cocktail[]>([]);
   const [filteredCocktails, setFilteredCocktails] = useState<Cocktail[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,7 +120,6 @@ export default function CocktailsAZScreen() {
 
       if (error) throw error;
       const sorted = (data || []).slice().sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''));
-      console.log('Loaded cocktails:', sorted);
       setCocktails(sorted);
     } catch (error) {
       console.error('Error loading cocktails:', error);
@@ -139,78 +138,74 @@ export default function CocktailsAZScreen() {
     setSelectedCocktail(null);
   };
 
-  // Pull-down-to-dismiss
-  const modalTranslateY = useRef(new Animated.Value(0)).current;
-  const dragDismissing = useRef(false);
-  const modalPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 4 && Math.abs(gs.dy) > Math.abs(gs.dx),
-      onPanResponderMove: (_, gs) => { if (gs.dy > 0) modalTranslateY.setValue(gs.dy); },
-      onPanResponderRelease: (_, gs) => {
-        if (gs.dy > DISMISS_THRESHOLD) {
-          dragDismissing.current = true;
-          Animated.timing(modalTranslateY, { toValue: SCREEN_HEIGHT, duration: 250, useNativeDriver: true }).start(() => {
-            closeDetailModal();
-          });
-        } else {
-          Animated.spring(modalTranslateY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 10 }).start();
-        }
-      },
-    })
-  ).current;
-
-  const handleBackPress = () => {
-    router.back();
-  };
-
-  // Helper function to get image URL with cache busting
-  const getImageUrl = (url: string | null) => {
-    if (!url) return null;
-    return url;
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card }]}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
+      <AmbientGlow />
+      <ScreenHeader
+        title={t('cocktails.title')}
+        rightWide={isManager}
+        right={isManager ? (
+          <HeaderNavMenu
+            label={t('common:to_editor')}
+            iconIos="pencil"
+            iconAndroid="edit"
+            sheetTitle={t('cocktails.title')}
+            actions={[
+              {
+                key: 'switch',
+                label: t('common:to_editor'),
+                iosIcon: 'pencil',
+                androidIcon: 'edit',
+                onPress: () => router.replace('/cocktails-az-editor'),
+              },
+              {
+                key: 'cats',
+                label: t('menu_sheet.edit_categories'),
+                iosIcon: 'square.grid.2x2',
+                androidIcon: 'grid-view',
+                disabled: !(user?.role === 'owner' || perms.editCategories),
+                onPress: () => router.push({ pathname: '/manage-menu-categories', params: { cat: 'cat.libations' } } as any),
+              },
+              {
+                key: 'menu',
+                label: t('menu_sheet.edit_menu'),
+                iosIcon: 'fork.knife',
+                androidIcon: 'restaurant-menu',
+                onPress: () => router.push('/menu-editor' as any),
+              },
+            ]}
           />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('cocktails.title')}</Text>
-        <View style={styles.backButton} />
-      </View>
+        ) : undefined}
+      />
 
-      {/* Search Bar */}
-      <View style={[styles.searchContainer, { backgroundColor: colors.card }]}>
-        <IconSymbol
-          ios_icon_name="magnifyingglass"
-          android_material_icon_name="search"
-          size={20}
-          color={colors.textSecondary}
-        />
-        <TextInput
-          style={[styles.searchInput, { color: colors.text }]}
-          placeholder={t('cocktails.search_placeholder')}
-          placeholderTextColor={colors.textSecondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <IconSymbol
-              ios_icon_name="xmark.circle.fill"
-              android_material_icon_name="cancel"
-              size={20}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-        )}
+      {/* Search Bar — MenuSearchRow geometry (46pt glass field) minus the right
+          slot; this screen has no filter/add action, the field runs full width. */}
+      <View style={styles.searchRow}>
+        <View style={[styles.searchField, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+          <IconSymbol
+            ios_icon_name="magnifyingglass"
+            android_material_icon_name="search"
+            size={20}
+            color={colors.textSecondary}
+          />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder={t('cocktails.search_placeholder')}
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
+              <IconSymbol
+                ios_icon_name="xmark.circle.fill"
+                android_material_icon_name="cancel"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       <View style={styles.contentContainer}>
@@ -235,11 +230,12 @@ export default function CocktailsAZScreen() {
                 </Text>
               </View>
             ) : (
-              filteredCocktails.map((cocktail, index) => (
+              filteredCocktails.map((cocktail) => (
                 <TouchableOpacity
-                  key={index}
-                  style={[styles.cocktailCard, { backgroundColor: colors.card }]}
+                  key={cocktail.id}
+                  style={[styles.cocktailCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
                   onPress={() => openDetailModal(cocktail)}
+                  activeOpacity={0.7}
                 >
                   <View style={styles.cocktailInfo}>
                     <Text style={[styles.cocktailName, { color: colors.text }]}>{cocktail.name}</Text>
@@ -248,7 +244,7 @@ export default function CocktailsAZScreen() {
                   <IconSymbol
                     ios_icon_name="chevron.right"
                     android_material_icon_name="chevron-right"
-                    size={20}
+                    size={18}
                     color={colors.textSecondary}
                   />
                 </TouchableOpacity>
@@ -257,8 +253,8 @@ export default function CocktailsAZScreen() {
           </ScrollView>
         )}
 
-        {/* Alphabetical Navigation Bar */}
-        <View style={[styles.alphabetNav, { backgroundColor: colors.card }]}>
+        {/* Alphabetical Navigation Rail */}
+        <View style={[styles.alphabetNav, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.alphabetNavContent}
@@ -266,23 +262,25 @@ export default function CocktailsAZScreen() {
             <TouchableOpacity
               style={[
                 styles.alphabetButton,
+                styles.alphabetAllButton,
                 selectedLetter === null && { backgroundColor: colors.primary },
               ]}
               onPress={() => setSelectedLetter(null)}
             >
               <Text
                 style={[
-                  styles.alphabetButtonText,
+                  styles.alphabetAllText,
                   { color: colors.textSecondary },
                   selectedLetter === null && { color: colors.fireText },
                 ]}
+                numberOfLines={1}
               >
                 {t('cocktails.all')}
               </Text>
             </TouchableOpacity>
-            {ALPHABET.map((letter, index) => (
+            {ALPHABET.map((letter) => (
               <TouchableOpacity
-                key={index}
+                key={letter}
                 style={[
                   styles.alphabetButton,
                   selectedLetter === letter && { backgroundColor: colors.primary },
@@ -304,104 +302,76 @@ export default function CocktailsAZScreen() {
         </View>
       </View>
 
-      {/* Detail Modal */}
-      <Modal
+      {/* Detail Sheet — hero photo flush to the top edge, the
+          MenuItemDetailSheet continuity (Steve's smoke call). */}
+      <GlassHeroSheet
         visible={showDetailModal}
-        animationType={dragDismissing.current ? 'none' : 'slide'}
-        transparent={true}
-        onRequestClose={closeDetailModal}
-        onShow={() => {
-          modalTranslateY.setValue(0);
-          dragDismissing.current = false;
-        }}
+        onClose={closeDetailModal}
+        hero={selectedCocktail?.thumbnail_url ? (
+          <>
+            <StorageImage
+              source={{ uri: selectedCocktail.thumbnail_url }}
+              style={styles.heroFill}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={['rgba(14,11,9,0)', 'rgba(14,11,9,0.92)']}
+              locations={[0.42, 0.94]}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+          </>
+        ) : undefined}
       >
-        <View style={styles.modalContainer}>
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={closeDetailModal}
-          />
-          <Animated.View style={[styles.modalContent, { transform: [{ translateY: modalTranslateY }] }]}>
-            {/* Drag Handle */}
-            <View {...modalPanResponder.panHandlers} style={styles.dragHandleArea}>
-              <View style={styles.dragHandle} />
-            </View>
+        <Text style={[styles.detailTitle, { color: colors.text }]}>{selectedCocktail?.name}</Text>
 
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>{selectedCocktail?.name}</Text>
-              <TouchableOpacity onPress={closeDetailModal}>
-                <IconSymbol
-                  ios_icon_name="xmark.circle.fill"
-                  android_material_icon_name="cancel"
-                  size={28}
-                  color="#666666"
-                />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              style={styles.modalScroll}
-              contentContainerStyle={styles.modalScrollContent}
-              showsVerticalScrollIndicator={true}
-            >
-              {selectedCocktail?.thumbnail_url && (
-                <StorageImage
-                  source={{ uri: getImageUrl(selectedCocktail.thumbnail_url) }}
-                  style={styles.modalImage}
-                  resizeMode="cover"
-                />
-              )}
-
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>{t('cocktails.alcohol_type')}</Text>
-                <View style={[styles.alcoholTypeBadge, { backgroundColor: colors.primary }]}>
-                  <Text style={[styles.alcoholTypeText, { color: colors.fireText }]}>{selectedCocktail?.alcohol_type}</Text>
-                </View>
-              </View>
-
-              {(selectedCocktail?.glassware || selectedCocktail?.garnish) && (
-                <View style={styles.detailSection}>
-                  {selectedCocktail?.glassware ? (
-                    <>
-                      <Text style={styles.detailLabel}>{t('cocktails.glassware')}</Text>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <GlasswareGlyph name={selectedCocktail.glassware} size={22} color={colors.primary} />
-                        <Text style={[styles.detailText, { marginLeft: 8 }]}>{selectedCocktail.glassware}</Text>
-                      </View>
-                    </>
-                  ) : null}
-                  {selectedCocktail?.garnish ? (
-                    <>
-                      <Text style={[styles.detailLabel, selectedCocktail?.glassware ? { marginTop: 10 } : null]}>{t('cocktails.garnish')}</Text>
-                      <Text style={styles.detailText}>{selectedCocktail.garnish}</Text>
-                    </>
-                  ) : null}
-                </View>
-              )}
-
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>{t('cocktails.ingredients')}</Text>
-                {(() => {
-                  const rows = parseCocktailIngredients(selectedCocktail?.ingredients || null);
-                  if (rows.length === 0) {
-                    return <Text style={styles.detailText}>{selectedCocktail?.ingredients}</Text>;
-                  }
-                  return rows.map((row, i) => (
-                    <Text key={i} style={styles.detailText}>
-                      {'•'} {row.amount ? `${row.amount} ` : ''}{row.ingredient}
-                    </Text>
-                  ));
-                })()}
-              </View>
-
-              <View style={styles.detailSection}>
-                <Text style={styles.detailLabel}>{t('cocktails.procedure')}</Text>
-                <FormattedText style={styles.detailText}>{getLocalizedField(selectedCocktail || {}, 'procedure', language)}</FormattedText>
-              </View>
-            </ScrollView>
-          </Animated.View>
+        <View style={styles.detailSection}>
+          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('cocktails.alcohol_type')}</Text>
+          <View style={[styles.alcoholTypeBadge, { backgroundColor: colors.primary }]}>
+            <Text style={[styles.alcoholTypeText, { color: colors.fireText }]}>{selectedCocktail?.alcohol_type}</Text>
+          </View>
         </View>
-      </Modal>
+
+        {(selectedCocktail?.glassware || selectedCocktail?.garnish) && (
+          <View style={styles.detailSection}>
+            {selectedCocktail?.glassware ? (
+              <>
+                <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('cocktails.glassware')}</Text>
+                <View style={styles.glasswareRow}>
+                  <GlasswareGlyph name={selectedCocktail.glassware} size={22} color={colors.primary} />
+                  <Text style={[styles.detailText, { color: colors.text, marginLeft: 8 }]}>{selectedCocktail.glassware}</Text>
+                </View>
+              </>
+            ) : null}
+            {selectedCocktail?.garnish ? (
+              <>
+                <Text style={[styles.detailLabel, { color: colors.textSecondary }, selectedCocktail?.glassware ? { marginTop: 12 } : null]}>{t('cocktails.garnish')}</Text>
+                <Text style={[styles.detailText, { color: colors.text }]}>{selectedCocktail.garnish}</Text>
+              </>
+            ) : null}
+          </View>
+        )}
+
+        <View style={styles.detailSection}>
+          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('cocktails.ingredients')}</Text>
+          {(() => {
+            const rows = parseCocktailIngredients(selectedCocktail?.ingredients || null);
+            if (rows.length === 0) {
+              return <Text style={[styles.detailText, { color: colors.text }]}>{selectedCocktail?.ingredients}</Text>;
+            }
+            return rows.map((row, i) => (
+              <Text key={i} style={[styles.detailText, { color: colors.text }]}>
+                {'•'} {row.amount ? `${row.amount} ` : ''}{row.ingredient}
+              </Text>
+            ));
+          })()}
+        </View>
+
+        <View style={styles.detailSection}>
+          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('cocktails.procedure')}</Text>
+          <FormattedText style={[styles.detailText, { color: colors.text }]}>{getLocalizedField(selectedCocktail || {}, 'procedure', language)}</FormattedText>
+        </View>
+      </GlassHeroSheet>
     </View>
   );
 }
@@ -410,44 +380,28 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
+  searchRow: {
+    paddingHorizontal: 16,
+    marginBottom: 11,
+  },
+  searchField: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 48 : 60,
-    paddingBottom: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
-  },
-  backButton: {
-    padding: 8,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: 16,
-    marginTop: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+    gap: 8,
+    height: 46,
+    borderRadius: 13,
+    paddingHorizontal: 13,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
   searchInput: {
     flex: 1,
-    marginLeft: 12,
-    fontSize: 16,
+    fontFamily: fonts.body.regular,
+    fontSize: 15,
+    padding: 0,
   },
   contentContainer: {
     flex: 1,
     flexDirection: 'row',
-    marginTop: 16,
   },
   loadingContainer: {
     flex: 1,
@@ -469,144 +423,113 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
+    fontFamily: fonts.display.semibold,
+    fontSize: 16,
+    marginTop: 14,
   },
   emptySubtext: {
-    fontSize: 14,
-    marginTop: 8,
+    fontFamily: fonts.body.regular,
+    fontSize: 13,
+    marginTop: 6,
     textAlign: 'center',
   },
   cocktailCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    padding: 14,
+    marginBottom: 10,
   },
   cocktailInfo: {
     flex: 1,
+    marginRight: 10,
   },
   cocktailName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 4,
+    fontFamily: fonts.display.semibold,
+    fontSize: 16,
+    marginBottom: 3,
   },
   cocktailAlcoholType: {
-    fontSize: 14,
+    fontFamily: fonts.body.regular,
+    fontSize: 13,
   },
+  // Floating glass index rail — full column height beside the list.
   alphabetNav: {
     width: 40,
-    borderTopLeftRadius: 12,
-    borderBottomLeftRadius: 12,
-    marginRight: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    marginRight: 10,
+    marginBottom: 12,
   },
   alphabetNavContent: {
     paddingVertical: 8,
     alignItems: 'center',
   },
   alphabetButton: {
-    width: 32,
-    height: 32,
+    width: 30,
+    height: 30,
     justifyContent: 'center',
     alignItems: 'center',
     marginVertical: 2,
-    borderRadius: 16,
+    borderRadius: 15,
+  },
+  // The All chip is wider than a letter chip: ES "Todos" (uppercased) needs the
+  // room even at mono 9pt — a 30pt circle clips it.
+  alphabetAllButton: {
+    width: 34,
+    borderRadius: 12,
+  },
+  alphabetAllText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 9,
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
   },
   alphabetButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.mono.semibold,
+    fontSize: 11,
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-start',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-  },
-  modalContent: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    height: '90%',
-    marginTop: 'auto',
-    boxShadow: '0px -4px 20px rgba(0, 0, 0, 0.4)',
-    elevation: 10,
-  },
-  dragHandleArea: {
-    alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 4,
-  },
-  dragHandle: {
-    width: 40,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
-  },
-  modalTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    flex: 1,
-  },
-  modalScroll: {
-    flex: 1,
-  },
-  modalScrollContent: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  modalImage: {
+  // The hero box/radii come from GlassHeroSheet; this just fills it.
+  heroFill: {
     width: '100%',
-    height: 250,
-    borderRadius: 16,
-    marginBottom: 24,
+    height: '100%',
+  },
+  detailTitle: {
+    fontFamily: fonts.display.bold,
+    fontSize: 22,
+    letterSpacing: -0.3,
+    marginTop: 12,
+    marginBottom: 10,
   },
   detailSection: {
-    marginBottom: 24,
+    marginBottom: 6,
   },
   detailLabel: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#1A1A1A',
-    marginBottom: 8,
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    marginBottom: 7,
   },
   alcoholTypeBadge: {
     alignSelf: 'flex-start',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
   },
   alcoholTypeText: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontFamily: fonts.body.semibold,
+    fontSize: 13,
+  },
+  glasswareRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   detailText: {
-    fontSize: 15,
-    color: '#333333',
-    lineHeight: 24,
+    fontFamily: fonts.body.regular,
+    fontSize: 14,
+    lineHeight: 21,
   },
 });

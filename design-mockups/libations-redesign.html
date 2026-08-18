@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Libations Recipes Concepts</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 12px 60px;background:#0C0D11;
+  font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center;max-width:820px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb:focus-visible{outline:2px solid #FF7A2F;outline-offset:2px}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:680px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+
+/* ---------- phone shell + palettes (the s72 ritual set, verbatim) ---------- */
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --ember:#C7CDD2; --blue:#8FA0AC; --bluetext:#CDD8DF; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --sheen:rgba(255,255,255,0.13); --thumbbg:#252A31; --glowA:rgba(230,234,238,0.12); --glowB:rgba(255,122,47,0.10);
+  --danger:#E74C3C; --scrim:rgba(6,10,18,0.55);
+  position:relative;width:392px;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--ember:#2A313C;--blue:#7E8A94;--bluetext:#2A313C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--sheen:rgba(255,255,255,0.92);--thumbbg:#D8D8DC;--glowA:rgba(58,66,80,0.10);--glowB:rgba(236,106,30,0.12);--danger:#C0392B;--scrim:rgba(6,10,18,0.35)}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--ember:#6BADE8;--blue:#5DADE2;--bluetext:#BFE3F7;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--sheen:rgba(255,255,255,0.13);--thumbbg:#2C3E50;--glowA:rgba(74,144,226,0.32);--glowB:rgba(93,173,226,0.16)}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--ember:#1565C0;--blue:#42A5F5;--bluetext:#0D47A1;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--sheen:rgba(255,255,255,0.95);--thumbbg:#CFE4EC;--glowA:rgba(25,118,210,0.18);--glowB:rgba(66,165,245,0.13);--danger:#C0392B;--scrim:rgba(6,10,18,0.35)}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--text)}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 40px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.design{display:none;padding:6px 16px 0;animation:fade .35s ease}
+.design.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.concept{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:7px;margin:4px 2px 12px}
+.concept b{color:var(--tint)}
+.concept .ln{flex:1;height:1px;background:var(--hair)}
+
+/* ---------- shared glass pieces ---------- */
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.gcard{background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.scard{background:var(--surf);border:1px solid var(--surfbd)}
+.c38{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.hdr{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
+.hmid{flex:1;text-align:center;min-width:0}
+.eyebrow{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600}
+.htitle{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navpill{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:16px;font-size:12.5px;font-weight:700;color:var(--tint);background:color-mix(in srgb,var(--tint) 11%,transparent);cursor:pointer;white-space:nowrap;flex:0 0 auto}
+.navpill .ic{width:14px;height:14px}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.zlabel{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:14px 2px 10px}
+.zlabel .ln{flex:1;height:1px;background:var(--hair)}
+.zlabel .n{opacity:.8}
+.bcap{font-size:10.5px;color:var(--muted);font-style:italic;margin:2px 2px 10px;line-height:1.45}
+.starpill{display:inline-flex;align-items:center;gap:3px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--fireText);background:var(--tint);padding:2.5px 6px;border-radius:6px}
+.starpill .ic{width:9px;height:9px}
+
+/* search row (MenuSearchRow geometry: 46pt field, 13 radius) */
+.srow{display:flex;gap:10px;margin:0 0 11px}
+.sfield{flex:1;display:flex;align-items:center;gap:8px;height:46px;border-radius:13px;padding:0 13px;background:var(--glass);border:1px solid var(--glassbd);color:var(--muted);font-size:14.5px}
+.sfield .ic{width:19px;height:19px}
+.sbtn{width:46px;height:46px;border-radius:13px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;cursor:pointer;background:color-mix(in srgb,var(--tint) 18%,transparent);border:1px solid color-mix(in srgb,var(--tint) 42%,transparent);color:var(--tint)}
+.sbtn .ic{width:21px;height:21px}
+
+/* photo tile stand-ins (real thumbnails in the app) */
+.ph{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.ph .emoji{font-size:44px;filter:saturate(1.05);text-shadow:0 6px 22px rgba(0,0,0,0.35)}
+.ph .shade{position:absolute;inset:auto 0 0 0;height:58%;background:linear-gradient(to top,rgba(8,10,14,0.82),rgba(8,10,14,0.28) 62%,transparent)}
+.tmeta{position:absolute;left:0;right:0;bottom:0;padding:9px 10px;display:flex;flex-direction:column;gap:1px}
+.tname{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:13.5px;color:#FFFFFF;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tprice{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:700;color:#FFB07A}
+.cornerpill{position:absolute;top:7px;width:26px;height:26px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;background:rgba(8,10,14,0.5);border:1px solid rgba(255,255,255,0.22);color:#FFFFFF;cursor:pointer;z-index:4}
+.cornerpill .ic{width:13px;height:13px}
+.cornerpill.cl{left:7px;cursor:grab}
+.cornerpill.cr{right:7px}
+.tstar{position:absolute;top:8px;right:8px;z-index:3}
+.tstar.shift{right:40px}
+
+/* A · grid */
+.grid2{display:flex;flex-wrap:wrap;justify-content:space-between}
+.gtile{width:48.4%;aspect-ratio:1;border-radius:14px;margin-bottom:11px;cursor:pointer;border:1px solid var(--glassbd)}
+
+/* A editor · horizontal rail */
+.hrail{display:flex;gap:10px;overflow-x:auto;padding:2px 2px 12px;margin:0 -2px;scrollbar-width:none}
+.hrail::-webkit-scrollbar{display:none}
+.htile{width:150px;aspect-ratio:1;flex:0 0 auto;border-radius:14px;cursor:pointer;border:1px solid var(--glassbd)}
+
+/* B · page flip */
+.ftabs{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 12px;margin:0 -2px;scrollbar-width:none}
+.ftabs::-webkit-scrollbar{display:none}
+.ftab{padding:8px 13px;border-radius:11px;font-size:12.5px;color:var(--muted);white-space:nowrap;cursor:pointer;flex:0 0 auto;background:var(--surf);border:1px solid var(--surfbd)}
+.ftab .n{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;opacity:.85;margin-left:4px}
+.ftab.on{color:var(--tint);font-weight:600;background:color-mix(in srgb,var(--tint) 14%,transparent);border-color:color-mix(in srgb,var(--tint) 40%,transparent)}
+.flowwrap{position:relative;height:352px;margin:2px -16px 6px;overflow:hidden}
+.fcard{position:absolute;top:8px;left:50%;width:236px;height:308px;border-radius:20px;border:1px solid var(--glassbd);cursor:pointer;
+  transition:transform .38s cubic-bezier(.33,.9,.35,1),opacity .38s,filter .38s;transform-origin:center}
+.fcard .emoji{font-size:74px}
+.fcard .tname{font-size:17px}
+.fcard .tprice{font-size:12.5px}
+.farrow{position:absolute;top:142px;z-index:6;width:34px;height:34px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.farrow.l{left:10px}.farrow.r{right:10px}
+.fdots{display:flex;gap:5px;justify-content:center;margin:2px 0 10px}
+.fdots span{width:6px;height:6px;border-radius:3px;background:var(--hair);transition:.25s}
+.fdots span.on{width:16px;background:var(--tint)}
+.fmeta{text-align:center;margin-bottom:8px}
+.fmeta .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:18px}
+.fmeta .sub{font-size:11.5px;color:var(--muted);margin-top:3px}
+.fmeta .sub b{color:var(--tint);font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:700}
+.forder{display:flex;align-items:center;justify-content:center;gap:9px;margin:2px 0 10px}
+.forder .opill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:700;color:var(--bluetext);background:color-mix(in srgb,var(--blue) 20%,transparent);padding:5px 11px;border-radius:9px;cursor:pointer}
+.forder .oarr{width:30px;height:30px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:var(--surf);border:1px solid var(--surfbd);color:var(--text);cursor:pointer}
+.forder .oarr.dim{opacity:.35}
+.factions{display:flex;gap:8px;justify-content:center;margin-bottom:8px}
+
+/* C · shelves */
+.hero{position:relative;height:172px;border-radius:18px;overflow:hidden;border:1px solid var(--glassbd);cursor:pointer;margin-bottom:4px}
+.hero .emoji{font-size:64px}
+.hero .tname{font-size:19px}
+.hero .tprice{font-size:12.5px}
+.shelf{display:flex;gap:9px;overflow-x:auto;padding:2px 2px 8px;margin:0 -2px;scrollbar-width:none}
+.shelf::-webkit-scrollbar{display:none}
+.stile{width:124px;aspect-ratio:1;flex:0 0 auto;border-radius:13px;cursor:pointer;border:1px solid var(--glassbd)}
+.stile .emoji{font-size:36px}
+.stile .tname{font-size:11.5px;-webkit-line-clamp:1}
+.stile .tprice{font-size:10px}
+
+/* D · speed rail */
+.chips{display:flex;gap:7px;overflow-x:auto;padding:2px 2px 12px;margin:0 -2px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{padding:7px 12px;border-radius:999px;font-size:12px;color:var(--muted);white-space:nowrap;cursor:pointer;flex:0 0 auto;background:var(--surf);border:1px solid var(--surfbd)}
+.chip.on{color:var(--fireText);font-weight:700;background:var(--tint);border-color:var(--tint)}
+.rrow{display:flex;align-items:center;gap:10px;border-radius:14px;padding:8px;margin-bottom:8px;cursor:pointer;background:var(--surf);border:1px solid var(--surfbd)}
+.rthumb{width:54px;height:54px;border-radius:11px;flex:0 0 auto;border:1px solid var(--glassbd)}
+.rthumb .emoji{font-size:24px}
+.rbd{flex:1;min-width:0}
+.rnm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:14.5px;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rhint{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rpr{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:700;color:var(--tint);flex:0 0 auto}
+.rgrab{color:var(--muted);opacity:.75;cursor:grab;flex:0 0 auto}
+.rmeat{width:28px;height:28px;border-radius:9px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;flex:0 0 auto}
+.rstar{color:var(--tint);flex:0 0 auto;width:14px;height:14px}
+
+/* ---------- sheets ---------- */
+.ovl{position:absolute;inset:0;z-index:40;display:none;align-items:flex-end;background:var(--scrim)}
+.ovl.show{display:flex}
+.sheet{position:relative;width:100%;max-height:86%;border-radius:26px 26px 0 0;padding:10px 18px 26px;overflow-y:auto;scrollbar-width:none;
+  background:var(--glass);border:1px solid var(--glassbd);border-bottom:0;backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);animation:up .3s ease}
+.sheet::-webkit-scrollbar{display:none}
+@keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--glassbd);margin:0 auto 10px}
+.shead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.shead .t{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.2px;display:flex;align-items:center;gap:8px;min-width:0}
+.xbtn{width:34px;height:34px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;flex:0 0 auto}
+.dhero{position:relative;height:190px;border-radius:16px;overflow:hidden;border:1px solid var(--glassbd);margin-bottom:12px}
+.dhero .emoji{font-size:64px}
+.dlabel{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;color:var(--muted);margin:0 0 7px}
+.dsec{margin-bottom:14px}
+.pricepill{display:inline-flex;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;font-weight:700;color:var(--fireText);background:var(--tint);padding:6px 12px;border-radius:999px}
+.dgrid{display:flex;gap:14px;flex-wrap:wrap}
+.dgrid>div{flex:1;min-width:44%}
+.dval{font-size:14px;font-weight:600}
+.irow{display:flex;align-items:center;gap:10px;padding:8px 11px;border-radius:11px;margin-bottom:7px;background:var(--surf);border:1px solid var(--surfbd)}
+.iamt{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;font-weight:700;color:var(--tint);min-width:64px}
+.inm{font-size:13.5px}
+.proc{font-size:13.5px;line-height:1.65;padding:12px 13px;border-radius:13px;background:var(--surf);border:1px solid var(--surfbd)}
+.arow{display:flex;align-items:center;gap:11px;padding:13px 12px;border-radius:13px;margin-bottom:8px;cursor:pointer;background:var(--surf);border:1px solid var(--surfbd);font-size:14px;font-weight:600}
+.arow .ic{width:16px;height:16px;color:var(--tint)}
+.arow.red,.arow.red .ic{color:var(--danger)}
+.ogrid{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 6px}
+.onum{width:52px;height:44px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:14px;font-weight:700;cursor:pointer;background:var(--surf);border:1px solid var(--surfbd);color:var(--text)}
+.onum.on{background:var(--tint);border-color:var(--tint);color:var(--fireText)}
+.tipfoot{font-size:10.5px;color:var(--muted);font-style:italic;margin-top:10px;line-height:1.5;text-align:center}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+<symbol id="i-fwd" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3l4 4L8 20l-5 1 1-5z"/></symbol>
+<symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></symbol>
+<symbol id="i-grab" viewBox="0 0 24 24"><path d="M4 8h16M4 12h16M4 16h16"/></symbol>
+<symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.8 6.3.7-4.7 4.3 1.3 6.2L12 16.9 6.4 20l1.3-6.2L3 9.5l6.3-.7z"/></symbol>
+<symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V5h6v2m-8 0l1 13h8l1-13"/></symbol>
+<symbol id="i-order" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01" stroke-width="2.6"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M12 5v14M19 12l-7 7-7-7"/></symbol>
+</defs></svg>
+
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Concept</span>
+    <button class="tb on" data-c="a">A · Glass Grid</button>
+    <button class="tb" data-c="b">B · Page Flip</button>
+    <button class="tb" data-c="c">C · Shelf Flow</button>
+    <button class="tb" data-c="d">D · Speed Rail</button>
+  </div>
+  <div class="grp"><span class="gl2">Side</span>
+    <button class="tb on" data-s="u">User</button>
+    <button class="tb" data-s="e">Editor</button>
+  </div>
+  <div class="grp"><span class="gl2">Palette</span>
+    <button class="tb on" data-t="">Mono·D</button>
+    <button class="tb" data-t="t-mono-l">Mono·L</button>
+    <button class="tb" data-t="t-ocean-d">Ocean·D</button>
+    <button class="tb" data-t="t-ocean-l">Ocean·L</button>
+  </div>
+</div>
+<p class="hint">The Libations round — one design lands on BOTH Menu 1 &amp; Menu 2. Common to all four: ScreenHeader + <b>To Editor / To User</b> pills, the search row in the SAME spot on both sides (editor adds the ＋), detail &amp; edit modals go GlassSheet like the cocktails pass. Gradient tiles stand in for the real photo thumbnails. <b>A</b> keeps today's layouts, glassed. <b>B</b> is the book-style page flip. <b>C</b> is a featured hero + photo shelves. <b>D</b> is the mid-shift speed list — and the strongest reorder story (vertical drag, the proven pattern). Tap tiles, meatballs, and order pills — the sheets are live.</p>
+
+<div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div>
+  <div class="sb"><span>9:41</span><span>𝗠𝗥</span></div>
+  <div class="screen">
+
+    <!-- ================= A · USER ================= -->
+    <div class="design on" id="d-a-u">
+      <div class="concept"><b>A · Glass Grid</b> · user · today's grid, glassed<span class="ln"></span></div>
+      <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+        <div class="hmid"><div class="htitle">Menu 1 Libations</div><div class="eyebrow">Recipes</div></div>
+        <span class="navpill"><svg class="ic"><use href="#i-pencil"/></svg>To Editor</span></div>
+      <div class="srow"><div class="sfield"><svg class="ic"><use href="#i-search"/></svg>Search recipes…</div></div>
+      <div id="au-list"></div>
+    </div>
+
+    <!-- ================= A · EDITOR ================= -->
+    <div class="design" id="d-a-e">
+      <div class="concept"><b>A · Glass Grid</b> · editor · rails + grabber/meatball<span class="ln"></span></div>
+      <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+        <div class="hmid"><div class="htitle">Menu 1 Libations Editor</div></div>
+        <span class="navpill"><svg class="ic"><use href="#i-person"/></svg>To User</span></div>
+      <div class="srow"><div class="sfield"><svg class="ic"><use href="#i-search"/></svg>Search recipes…</div><span class="sbtn"><svg class="ic"><use href="#i-plus"/></svg></span></div>
+      <div class="bcap">Reorder = hold the grabber and drag along the rail (today's mechanic, kept) · ··· opens the glass action sheet with Order Position.</div>
+      <div id="ae-list"></div>
+    </div>
+
+    <!-- ================= B · USER ================= -->
+    <div class="design" id="d-b-u">
+      <div class="concept"><b>B · Page Flip</b> · user · Steve's cover-flow<span class="ln"></span></div>
+      <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+        <div class="hmid"><div class="htitle">Menu 1 Libations</div><div class="eyebrow">Recipes</div></div>
+        <span class="navpill"><svg class="ic"><use href="#i-pencil"/></svg>To Editor</span></div>
+      <div class="srow"><div class="sfield"><svg class="ic"><use href="#i-search"/></svg>Search recipes…</div></div>
+      <div class="ftabs" id="bu-tabs"></div>
+      <div class="flowwrap" id="bu-flow"><span class="farrow l" data-flow="bu" data-dir="-1"><svg class="ic" style="width:16px;height:16px"><use href="#i-back"/></svg></span><span class="farrow r" data-flow="bu" data-dir="1"><svg class="ic" style="width:16px;height:16px"><use href="#i-fwd"/></svg></span></div>
+      <div class="fdots" id="bu-dots"></div>
+      <div class="fmeta" id="bu-meta"></div>
+      <div class="bcap" style="text-align:center">Swipe (or arrows) flips the deck like menu pages · switching the rail above swaps in that subcategory's deck · tap the card for the full recipe.</div>
+    </div>
+
+    <!-- ================= B · EDITOR ================= -->
+    <div class="design" id="d-b-e">
+      <div class="concept"><b>B · Page Flip</b> · editor · same deck, edit chrome<span class="ln"></span></div>
+      <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+        <div class="hmid"><div class="htitle">Menu 1 Libations Editor</div></div>
+        <span class="navpill"><svg class="ic"><use href="#i-person"/></svg>To User</span></div>
+      <div class="srow"><div class="sfield"><svg class="ic"><use href="#i-search"/></svg>Search recipes…</div><span class="sbtn"><svg class="ic"><use href="#i-plus"/></svg></span></div>
+      <div class="ftabs" id="be-tabs"></div>
+      <div class="flowwrap" id="be-flow"><span class="farrow l" data-flow="be" data-dir="-1"><svg class="ic" style="width:16px;height:16px"><use href="#i-back"/></svg></span><span class="farrow r" data-flow="be" data-dir="1"><svg class="ic" style="width:16px;height:16px"><use href="#i-fwd"/></svg></span></div>
+      <div class="forder" id="be-order"></div>
+      <div class="factions">
+        <span class="navpill" data-open="editnote"><svg class="ic"><use href="#i-pencil"/></svg>Edit</span>
+        <span class="navpill" data-meat="be"><svg class="ic"><use href="#i-dots"/></svg>More</span>
+      </div>
+      <div class="bcap" style="text-align:center">No drag in a flip deck — order moves with the ‹ › nudgers or the position pill (tap it). The focused card is always the one you're acting on.</div>
+    </div>
+
+    <!-- ================= C · USER ================= -->
+    <div class="design" id="d-c-u">
+      <div class="concept"><b>C · Shelf Flow</b> · user · featured hero + shelves<span class="ln"></span></div>
+      <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+        <div class="hmid"><div class="htitle">Menu 1 Libations</div><div class="eyebrow">Recipes</div></div>
+        <span class="navpill"><svg class="ic"><use href="#i-pencil"/></svg>To Editor</span></div>
+      <div class="srow"><div class="sfield"><svg class="ic"><use href="#i-search"/></svg>Search recipes…</div></div>
+      <div id="cu-list"></div>
+    </div>
+
+    <!-- ================= C · EDITOR ================= -->
+    <div class="design" id="d-c-e">
+      <div class="concept"><b>C · Shelf Flow</b> · editor · shelves + corner pills<span class="ln"></span></div>
+      <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+        <div class="hmid"><div class="htitle">Menu 1 Libations Editor</div></div>
+        <span class="navpill"><svg class="ic"><use href="#i-person"/></svg>To User</span></div>
+      <div class="srow"><div class="sfield"><svg class="ic"><use href="#i-search"/></svg>Search recipes…</div><span class="sbtn"><svg class="ic"><use href="#i-plus"/></svg></span></div>
+      <div class="bcap">Same shelves the user sees, one tile size — drag along the shelf to reorder, ··· for the sheet. The Featured strip is view-only here (a recipe joins it via its ✦ toggle in Edit).</div>
+      <div id="ce-list"></div>
+    </div>
+
+    <!-- ================= D · USER ================= -->
+    <div class="design" id="d-d-u">
+      <div class="concept"><b>D · Speed Rail</b> · user · mid-shift lookup mode<span class="ln"></span></div>
+      <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+        <div class="hmid"><div class="htitle">Menu 1 Libations</div><div class="eyebrow">Recipes</div></div>
+        <span class="navpill"><svg class="ic"><use href="#i-pencil"/></svg>To Editor</span></div>
+      <div class="srow"><div class="sfield"><svg class="ic"><use href="#i-search"/></svg>Search name, ingredient, glass…</div></div>
+      <div class="chips" id="du-chips"></div>
+      <div id="du-list"></div>
+    </div>
+
+    <!-- ================= D · EDITOR ================= -->
+    <div class="design" id="d-d-e">
+      <div class="concept"><b>D · Speed Rail</b> · editor · vertical drag rows<span class="ln"></span></div>
+      <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+        <div class="hmid"><div class="htitle">Menu 1 Libations Editor</div></div>
+        <span class="navpill"><svg class="ic"><use href="#i-person"/></svg>To User</span></div>
+      <div class="srow"><div class="sfield"><svg class="ic"><use href="#i-search"/></svg>Search recipes…</div><span class="sbtn"><svg class="ic"><use href="#i-plus"/></svg></span></div>
+      <div class="bcap">The reorder answer: rows drag VERTICALLY inside each group — the app's most proven drag pattern (menu editor, guides). Grabber left, ··· right, tap row to edit.</div>
+      <div id="de-list"></div>
+    </div>
+
+  </div>
+
+  <!-- recipe detail sheet -->
+  <div class="ovl" id="detovl"><div class="sheet" id="detsheet"></div></div>
+  <!-- editor action sheet -->
+  <div class="ovl" id="actovl"><div class="sheet" id="actsheet"></div></div>
+  <!-- order position sheet -->
+  <div class="ovl" id="ordovl"><div class="sheet" id="ordsheet"></div></div>
+</div>
+
+<script>
+(function(){
+  var phone=document.getElementById('phone');
+  function all(s,fn){[].slice.call(document.querySelectorAll(s)).forEach(fn)}
+  function el(id){return document.getElementById(id)}
+  function I(n,sz){return '<svg class="ic" style="width:'+sz+'px;height:'+sz+'px"><use href="#i-'+n+'"/></svg>'}
+
+  /* ---------- fixture-flavoured recipe data ---------- */
+  var GROUPS=[
+    {id:'sig',label:'Signature Cocktails'},
+    {id:'mar',label:'Martinis'},
+    {id:'san',label:'Sangrias'},
+    {id:'zer',label:'Zero Proof'}
+  ];
+  var DRINKS=[
+    {id:1,g:'sig',n:'Boathouse Punch',p:'$14',e:'🍹',c:['#B33E2C','#E8843C'],star:true, gl:'Hurricane',ga:'Orange wheel + cherry',ing:[['2 oz','Aged rum'],['1 oz','Passionfruit'],['0.75 oz','Lime'],['0.5 oz','Grenadine']],pr:'Shake hard with crushed ice. Dirty pour, crown with fresh crushed ice, garnish tall.'},
+    {id:2,g:'sig',n:'Midnight Manhattan',p:'$16',e:'🥃',c:['#3A2E4F','#7C4A6B'],gl:'Coupe',ga:'Luxardo cherry',ing:[['2 oz','Rye whiskey'],['1 oz','Sweet vermouth'],['2 dash','Black walnut bitters']],pr:'Stir 30 rotations over dense ice. Strain up, cherry on a pick.'},
+    {id:3,g:'sig',n:'Smoked Old Fashioned',p:'$15',e:'🔥',c:['#5C3A21','#A66A2E'],gl:'Rocks',ga:'Charred orange peel',ing:[['2 oz','Bourbon'],['0.25 oz','Demerara'],['3 dash','Angostura']],pr:'Smoke the glass under cherrywood. Build over a big cube, express the peel.'},
+    {id:4,g:'sig',n:"Bee's Knees",p:'$12',e:'🍋',c:['#B98A1F','#E6C34A'],gl:'Coupe',ga:'Lemon twist',ing:[['2 oz','Gin'],['0.75 oz','Honey syrup'],['0.75 oz','Lemon']],pr:'Shake with ice, double strain up. Twist over the surface and drop.'},
+    {id:5,g:'mar',n:'Espresso Martini',p:'$15',e:'☕',c:['#2E2320','#6B4A38'],star:true, gl:'Martini',ga:'Three beans',ing:[['1.5 oz','Vodka'],['1 oz','Fresh espresso'],['0.75 oz','Coffee liqueur']],pr:'Shake violently — the crema is the garnish bed. Strain up, float the beans.'},
+    {id:6,g:'mar',n:'Dirty Gibson',p:'$14',e:'🍸',c:['#41504A','#7B8F82'],gl:'Martini',ga:'Pickled pearl onions',ing:[['2.5 oz','Gin'],['0.5 oz','Dry vermouth'],['1 bsp','Onion brine']],pr:'Stir icy-cold, strain up, three onions on a pick.'},
+    {id:7,g:'mar',n:'French Pear Martini',p:'$13',e:'🍐',c:['#4E6B33','#93B457'],gl:'Martini',ga:'Pear fan',ing:[['1.5 oz','Vodka'],['1 oz','Pear purée'],['0.5 oz','St-Germain'],['0.5 oz','Lemon']],pr:'Shake, double strain, fan the pear across the rim.'},
+    {id:8,g:'san',n:'Watermelon Sangria',p:'$13',e:'🍉',c:['#B03A4A','#E0656F'],star:true, gl:'Goblet',ga:'Watermelon cube skewer',ing:[['3 oz','Rosé'],['1 oz','Watermelon purée'],['0.5 oz','Brandy'],['0.5 oz','Lime']],pr:'Build over ice in the goblet, roll once, skewer across the rim.'},
+    {id:9,g:'san',n:'Blood Orange Sangria',p:'$12',e:'🍊',c:['#8E3A22','#D4652F'],gl:'Goblet',ga:'Blood orange half-wheel',ing:[['3 oz','Tempranillo'],['1 oz','Blood orange'],['0.5 oz','Triple sec']],pr:'Build over ice, top with a splash of soda, half-wheel in the glass.'},
+    {id:10,g:'zer',n:'Cucumber Cooler',p:'$8',e:'🥒',c:['#2F6B4F','#5FA582'],gl:'Collins',ga:'Cucumber ribbon',ing:[['4 oz','Cucumber soda'],['1 oz','Lime'],['0.5 oz','Simple']],pr:'Build tall over ice, ribbon the cucumber around the inside wall.'},
+    {id:11,g:'zer',n:'Nojito',p:'$9',e:'🌿',c:['#3D6B3A','#74A667'],gl:'Collins',ga:'Slapped mint crown',ing:[['8','Mint leaves'],['1 oz','Lime'],['0.75 oz','Cane syrup'],['3 oz','Soda']],pr:'Muddle gently — bruise, never shred. Build, swizzle, crown with mint.'}
+  ];
+  function byGroup(gid){
+    return DRINKS.filter(function(d){return d.g===gid})
+      .sort(function(a,b){return (b.star?1:0)-(a.star?1:0)});
+  }
+  function byId(id){return DRINKS.filter(function(d){return d.id===id})[0]}
+  function grad(d){return 'background:linear-gradient(140deg,'+d.c[0]+','+d.c[1]+')'}
+
+  /* ---------- shared tile innards ---------- */
+  function tileInner(d,opts){
+    opts=opts||{};
+    var h='<span class="emoji">'+d.e+'</span><span class="shade"></span>';
+    if(d.star) h+='<span class="starpill tstar'+(opts.shiftStar?' shift':'')+'">'+I('star',9)+'Featured</span>';
+    h+='<div class="tmeta"><span class="tname">'+d.n+'</span><span class="tprice">'+d.p+'</span></div>';
+    if(opts.editor){
+      h+='<span class="cornerpill cl" title="Drag to reorder">'+I('grab',13)+'</span>';
+      h+='<span class="cornerpill cr" data-meatball="'+d.id+'" title="Actions">'+I('dots',13)+'</span>';
+    }
+    return h;
+  }
+
+  /* ---------- A · user grid ---------- */
+  el('au-list').innerHTML=GROUPS.map(function(g){
+    var ds=byGroup(g.id);
+    return '<div class="zlabel">'+g.label+'<span class="ln"></span><span class="n">'+ds.length+'</span></div>'
+      +'<div class="grid2">'+ds.map(function(d){
+        return '<div class="gtile ph" style="'+grad(d)+'" data-det="'+d.id+'">'+tileInner(d)+'</div>';
+      }).join('')+'</div>';
+  }).join('');
+
+  /* ---------- A · editor rails ---------- */
+  el('ae-list').innerHTML=GROUPS.map(function(g){
+    var ds=byGroup(g.id);
+    return '<div class="zlabel">'+g.label+'<span class="ln"></span><span class="n">'+ds.length+'</span></div>'
+      +'<div class="hrail">'+ds.map(function(d){
+        return '<div class="htile ph" style="'+grad(d)+'" data-det="'+d.id+'">'+tileInner(d,{editor:true,shiftStar:true})+'</div>';
+      }).join('')+'</div>';
+  }).join('');
+
+  /* ---------- B · page flip decks ---------- */
+  var flows={bu:{tab:'sig',idx:0},be:{tab:'sig',idx:0}};
+  function renderTabs(key){
+    el(key+'-tabs').innerHTML=GROUPS.map(function(g){
+      var ds=byGroup(g.id);
+      return '<span class="ftab'+(flows[key].tab===g.id?' on':'')+'" data-ftab="'+key+':'+g.id+'">'+g.label+'<span class="n">'+ds.length+'</span></span>';
+    }).join('');
+  }
+  function renderFlow(key){
+    var st=flows[key],ds=byGroup(st.tab);
+    if(st.idx>=ds.length)st.idx=ds.length-1; if(st.idx<0)st.idx=0;
+    var wrap=el(key+'-flow');
+    [].slice.call(wrap.querySelectorAll('.fcard')).forEach(function(c){c.remove()});
+    ds.forEach(function(d,i){
+      var off=i-st.idx, card=document.createElement('div');
+      card.className='fcard ph'; card.style.cssText=grad(d);
+      card.innerHTML=tileInner(d,key==='be'?{editor:false}:{});
+      var x=off*168, sc=off===0?1:0.82, rot=off===0?0:(off<0?9:-9);
+      card.style.transform='translateX(calc(-50% + '+x+'px)) scale('+sc+') rotateZ('+rot+'deg)';
+      card.style.opacity=Math.abs(off)>1?0:(off===0?1:0.55);
+      card.style.filter=off===0?'none':'saturate(.7)';
+      card.style.zIndex=10-Math.abs(off);
+      if(off===0)card.setAttribute('data-det',d.id);
+      if(off!==0)card.addEventListener('click',function(){st.idx=i;renderFlow(key)});
+      wrap.appendChild(card);
+    });
+    if(key==='bu'){
+      el('bu-dots').innerHTML=ds.map(function(_,i){return '<span'+(i===st.idx?' class="on"':'')+'></span>'}).join('');
+      var d=ds[st.idx];
+      el('bu-meta').innerHTML='<div class="nm">'+d.n+'</div><div class="sub"><b>'+d.p+'</b> · '+d.gl+' · '+d.ga+'</div>';
+    }else{
+      var d2=ds[st.idx];
+      el('be-order').innerHTML=
+        '<span class="oarr'+(st.idx===0?' dim':'')+'" data-nudge="-1">'+I('back',14)+'</span>'
+        +'<span class="opill" data-order="'+d2.id+'">Position '+(st.idx+1)+' of '+ds.length+'</span>'
+        +'<span class="oarr'+(st.idx===ds.length-1?' dim':'')+'" data-nudge="1">'+I('fwd',14)+'</span>';
+      all('#be-order [data-nudge]',function(b){b.addEventListener('click',function(){
+        var dir=+b.getAttribute('data-nudge'),ni=st.idx+dir;
+        if(ni<0||ni>=ds.length)return; st.idx=ni; renderFlow(key);
+      })});
+      bindOrder();
+    }
+    bindDetail();
+  }
+  function bindTabs(key){
+    all('#'+key+'-tabs .ftab',function(t){t.onclick=function(){
+      var pair=t.getAttribute('data-ftab').split(':');
+      flows[pair[0]].tab=pair[1]; flows[pair[0]].idx=0;
+      renderTabs(pair[0]); bindTabs(pair[0]); renderFlow(pair[0]);
+    }});
+  }
+  ['bu','be'].forEach(function(key){
+    renderTabs(key); bindTabs(key); renderFlow(key);
+    all('[data-flow="'+key+'"]',function(a){a.addEventListener('click',function(){
+      var st=flows[key],ds=byGroup(st.tab),ni=st.idx+ +a.getAttribute('data-dir');
+      if(ni<0||ni>=ds.length)return; st.idx=ni; renderFlow(key);
+    })});
+  });
+
+  /* ---------- C · shelves ---------- */
+  function shelves(editor){
+    var h='';
+    var feat=DRINKS.filter(function(d){return d.star});
+    if(!editor){
+      var hd=feat[0];
+      h+='<div class="zlabel">Featured<span class="ln"></span><span class="n">'+feat.length+'</span></div>';
+      h+='<div class="hero ph" style="'+grad(hd)+'" data-det="'+hd.id+'">'+tileInner(hd)+'</div>';
+      h+='<div class="fdots" style="margin:8px 0 2px">'+feat.map(function(_,i){return '<span'+(i===0?' class="on"':'')+'></span>'}).join('')+'</div>';
+    }else{
+      h+='<div class="zlabel">Featured · view-only strip<span class="ln"></span><span class="n">'+feat.length+'</span></div>';
+      h+='<div class="shelf">'+feat.map(function(d){
+        return '<div class="stile ph" style="'+grad(d)+'" data-det="'+d.id+'">'+tileInner(d)+'</div>';
+      }).join('')+'</div>';
+    }
+    h+=GROUPS.map(function(g){
+      var ds=byGroup(g.id);
+      return '<div class="zlabel">'+g.label+'<span class="ln"></span><span class="n">'+ds.length+'</span></div>'
+        +'<div class="shelf">'+ds.map(function(d){
+          return '<div class="stile ph" style="'+grad(d)+'" data-det="'+d.id+'">'+tileInner(d,editor?{editor:true,shiftStar:true}:{})+'</div>';
+        }).join('')+'</div>';
+    }).join('');
+    return h;
+  }
+  el('cu-list').innerHTML=shelves(false);
+  el('ce-list').innerHTML=shelves(true);
+
+  /* ---------- D · speed rail ---------- */
+  var duTab='all';
+  function chipRow(){
+    var h='<span class="chip'+(duTab==='all'?' on':'')+'" data-chip="all">All</span>';
+    h+=GROUPS.map(function(g){return '<span class="chip'+(duTab===g.id?' on':'')+'" data-chip="'+g.id+'">'+g.label+'</span>'}).join('');
+    return h;
+  }
+  function rowHTML(d,editor){
+    var h='<div class="rrow" data-det="'+d.id+'">';
+    if(editor) h+='<span class="rgrab">'+I('grab',15)+'</span>';
+    h+='<span class="rthumb ph" style="'+grad(d)+'"><span class="emoji">'+d.e+'</span></span>';
+    h+='<span class="rbd"><span class="rnm">'+d.n+'</span><span class="rhint">'+d.gl+' · '+d.ga+'</span></span>';
+    if(d.star) h+='<svg class="ic rstar"><use href="#i-star"/></svg>';
+    h+='<span class="rpr">'+d.p+'</span>';
+    if(editor) h+='<span class="rmeat" data-meatball="'+d.id+'">'+I('dots',15)+'</span>';
+    return h+'</div>';
+  }
+  function renderDu(){
+    el('du-chips').innerHTML=chipRow();
+    var gs=duTab==='all'?GROUPS:GROUPS.filter(function(g){return g.id===duTab});
+    el('du-list').innerHTML=gs.map(function(g){
+      var ds=byGroup(g.id);
+      return '<div class="zlabel">'+g.label+'<span class="ln"></span><span class="n">'+ds.length+'</span></div>'
+        +ds.map(function(d){return rowHTML(d,false)}).join('');
+    }).join('');
+    all('#du-chips .chip',function(c){c.addEventListener('click',function(){duTab=c.getAttribute('data-chip');renderDu()})});
+    bindDetail();
+  }
+  renderDu();
+  el('de-list').innerHTML=GROUPS.map(function(g){
+    var ds=byGroup(g.id);
+    return '<div class="zlabel">'+g.label+' · drag to reorder<span class="ln"></span><span class="n">'+ds.length+'</span></div>'
+      +ds.map(function(d){return rowHTML(d,true)}).join('');
+  }).join('');
+
+  /* ---------- recipe detail sheet ---------- */
+  function detailHTML(d){
+    var h='<div class="grab"></div>';
+    h+='<div class="shead"><span class="t">'+d.n+(d.star?'<span class="starpill">'+I('star',9)+'Featured</span>':'')+'</span><span class="xbtn scard" data-close="detovl">'+I('x',14)+'</span></div>';
+    h+='<div class="dhero ph" style="'+grad(d)+'"><span class="emoji">'+d.e+'</span><span class="shade"></span></div>';
+    h+='<div class="dsec dgrid"><div><div class="dlabel">Price</div><span class="pricepill">'+d.p+'</span></div>';
+    h+='<div><div class="dlabel">Glassware</div><div class="dval">'+d.gl+'</div></div></div>';
+    h+='<div class="dsec"><div class="dlabel">Garnish</div><div class="dval">'+d.ga+'</div></div>';
+    h+='<div class="dsec"><div class="dlabel">Ingredients</div>'+d.ing.map(function(r){
+      return '<div class="irow"><span class="iamt">'+r[0]+'</span><span class="inm">'+r[1]+'</span></div>';
+    }).join('')+'</div>';
+    h+='<div class="dsec"><div class="dlabel">Procedure</div><div class="proc">'+d.pr+'</div></div>';
+    return h;
+  }
+  function bindDetail(){
+    all('[data-det]',function(x){x.onclick=function(e){
+      if(e.target.closest('[data-meatball]'))return;
+      el('detsheet').innerHTML=detailHTML(byId(+x.getAttribute('data-det')));
+      el('detovl').classList.add('show'); bindClose();
+    }});
+  }
+
+  /* ---------- editor action sheet (meatball) ---------- */
+  function actionHTML(d){
+    var h='<div class="grab"></div>';
+    h+='<div class="shead"><span class="t">'+d.n+'</span><span class="xbtn scard" data-close="actovl">'+I('x',14)+'</span></div>';
+    h+='<div class="arow">'+I('pencil',16)+'Edit Recipe</div>';
+    h+='<div class="arow">'+I('up',16)+'Move Up</div>';
+    h+='<div class="arow">'+I('down',16)+'Move Down</div>';
+    h+='<div class="arow" data-order="'+d.id+'">'+I('order',16)+'Order Position</div>';
+    h+='<div class="arow red">'+I('trash',16)+'Delete Recipe</div>';
+    h+='<div class="tipfoot">GlassActionSheet — replaces today\'s native ActionSheet/Alert menu.</div>';
+    return h;
+  }
+  function bindMeat(){
+    all('[data-meatball]',function(x){x.onclick=function(e){
+      e.stopPropagation();
+      el('actsheet').innerHTML=actionHTML(byId(+x.getAttribute('data-meatball')));
+      el('actovl').classList.add('show'); bindClose(); bindOrder();
+    }});
+    all('[data-meat]',function(x){x.onclick=function(){
+      var st=flows.be,ds=byGroup(st.tab);
+      el('actsheet').innerHTML=actionHTML(ds[st.idx]);
+      el('actovl').classList.add('show'); bindClose(); bindOrder();
+    }});
+  }
+
+  /* ---------- order position sheet ---------- */
+  function orderHTML(d){
+    var sibs=byGroup(d.g), cur=sibs.indexOf(d);
+    var h='<div class="grab"></div>';
+    h+='<div class="shead"><span class="t">Order Position</span><span class="xbtn scard" data-close="ordovl">'+I('x',14)+'</span></div>';
+    h+='<div class="bcap" style="margin-top:0">Where should “'+d.n+'” sit in '+GROUPS.filter(function(g){return g.id===d.g})[0].label+'?</div>';
+    h+='<div class="ogrid">'+sibs.map(function(_,i){
+      return '<span class="onum'+(i===cur?' on':'')+'">'+(i+1)+'</span>';
+    }).join('')+'</div>';
+    h+='<div class="tipfoot">Today\'s OrderPositionModal, reborn as a GlassSheet.</div>';
+    return h;
+  }
+  function bindOrder(){
+    all('[data-order]',function(x){x.onclick=function(e){
+      e.stopPropagation();
+      el('actovl').classList.remove('show');
+      el('ordsheet').innerHTML=orderHTML(byId(+x.getAttribute('data-order')));
+      el('ordovl').classList.add('show'); bindClose();
+      all('#ordsheet .onum',function(n){n.addEventListener('click',function(){
+        all('#ordsheet .onum',function(m){m.classList.remove('on')}); n.classList.add('on');
+      })});
+    }});
+  }
+
+  /* ---------- wiring ---------- */
+  function bindClose(){all('[data-close]',function(b){b.onclick=function(){el(b.getAttribute('data-close')).classList.remove('show')}})}
+  all('.ovl',function(o){o.addEventListener('click',function(e){if(e.target===o)o.classList.remove('show')})});
+  bindDetail(); bindMeat(); bindOrder(); bindClose();
+
+  var state={c:'a',s:'u'};
+  function show(){
+    all('.design',function(d){d.classList.remove('on')});
+    el('d-'+state.c+'-'+state.s).classList.add('on');
+    bindDetail(); bindMeat();
+  }
+  all('[data-c]',function(b){b.addEventListener('click',function(){
+    all('[data-c]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    state.c=b.getAttribute('data-c'); show();
+  })});
+  all('[data-s]',function(b){b.addEventListener('click',function(){
+    all('[data-s]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    state.s=b.getAttribute('data-s'); show();
+  })});
+  all('[data-t]',function(b){b.addEventListener('click',function(){
+    all('[data-t]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    phone.className='phone '+b.getAttribute('data-t');
+  })});
+})();
+</script>
+</body>
+</html>

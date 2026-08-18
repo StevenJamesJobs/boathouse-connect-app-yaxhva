@@ -1,23 +1,17 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
+  TextInput,
   ActivityIndicator,
-  Modal,
-  Platform,
-  Animated,
-  PanResponder,
-  Dimensions,
 } from 'react-native';
-
-const SCREEN_HEIGHT = Dimensions.get('window').height;
-const DISMISS_THRESHOLD = 120;
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { supabase } from '@/app/integrations/supabase/client';
@@ -26,8 +20,15 @@ import FormattedText from '@/components/FormattedText';
 import { StorageImage } from '@/components/StorageImage';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getLocalizedField } from '@/utils/translateContent';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { isManagerOrOwner } from '@/utils/roles';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import HeaderNavMenu from '@/components/HeaderNavMenu';
+import { useManagerPermissions } from '@/hooks/useManagerPermissions';
+import GlassHeroSheet from '@/components/GlassHeroSheet';
+import { RECIPE_TILE_SIZE } from '@/components/RecipeGridCard';
+import { fonts } from '@/constants/fonts';
 
 interface PureeSyrupRecipe {
   id: string;
@@ -43,6 +44,9 @@ interface PureeSyrupRecipe {
 
 type PureeSyrupRow = Database['public']['Functions']['get_puree_syrup_recipes']['Returns'][number];
 
+// The built-in categories keep their canonical EN values in the DB; owners can
+// also mint custom category strings from the editor's picker (s73), so the
+// grouping below appends any non-built-in categories after these.
 const CATEGORIES = ['Purees', 'Simple Syrups'];
 
 // Placeholder image for recipes without thumbnails
@@ -53,13 +57,14 @@ export default function PureeSyrupRecipesScreen() {
   const { t } = useTranslation();
   const { language } = useLanguage();
   const colors = useThemeColors();
-  const { organizationId } = useOrganization();
   const { user } = useAuth();
+  const isManager = isManagerOrOwner(user);
+  const { perms } = useManagerPermissions();
   const [recipes, setRecipes] = useState<PureeSyrupRecipe[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
   const [selectedRecipe, setSelectedRecipe] = useState<PureeSyrupRecipe | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
-  const [scrollY] = useState(new Animated.Value(0));
 
   useEffect(() => {
     loadRecipes();
@@ -69,7 +74,6 @@ export default function PureeSyrupRecipesScreen() {
     if (!user?.id) return;
     try {
       setLoading(true);
-      console.log('Loading puree syrup recipes from table: puree_syrup_recipes');
       const { data, error } = await supabase.rpc('get_puree_syrup_recipes', { p_actor_id: user.id });
 
       if (error) {
@@ -77,7 +81,6 @@ export default function PureeSyrupRecipesScreen() {
         throw error;
       }
       const sorted = (data || []).slice().sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
-      console.log('Loaded puree syrup recipes:', sorted);
       setRecipes(sorted as (PureeSyrupRow & { ingredients: { amount: string; ingredient: string }[] })[]);
     } catch (error) {
       console.error('Error loading puree syrup recipes:', error);
@@ -93,38 +96,9 @@ export default function PureeSyrupRecipesScreen() {
 
   const closeDetailModal = () => {
     setShowDetailModal(false);
-    setTimeout(() => {
-      setSelectedRecipe(null);
-      scrollY.setValue(0);
-    }, 300);
+    setSelectedRecipe(null);
   };
 
-  // Pull-down-to-dismiss
-  const modalTranslateY = useRef(new Animated.Value(0)).current;
-  const dragDismissing = useRef(false);
-  const modalPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gs) => gs.dy > 4 && Math.abs(gs.dy) > Math.abs(gs.dx),
-      onPanResponderMove: (_, gs) => { if (gs.dy > 0) modalTranslateY.setValue(gs.dy); },
-      onPanResponderRelease: (_, gs) => {
-        if (gs.dy > DISMISS_THRESHOLD) {
-          dragDismissing.current = true;
-          Animated.timing(modalTranslateY, { toValue: SCREEN_HEIGHT, duration: 250, useNativeDriver: true }).start(() => {
-            closeDetailModal();
-          });
-        } else {
-          Animated.spring(modalTranslateY, { toValue: 0, useNativeDriver: true, tension: 80, friction: 10 }).start();
-        }
-      },
-    })
-  ).current;
-
-  const handleBackPress = () => {
-    router.back();
-  };
-
-  // Helper function to get image URL with cache busting
   const getImageUrl = (url: string | null) => {
     if (!url) return PLACEHOLDER_IMAGE;
     return url;
@@ -138,43 +112,112 @@ export default function PureeSyrupRecipesScreen() {
     return map[category] ?? category;
   };
 
-  // Group recipes by category
-  const recipesByCategory = CATEGORIES.reduce((acc, category) => {
-    const categoryRecipes = recipes.filter(r => r.category === category);
-    // Only include category if it has recipes
-    if (categoryRecipes.length > 0) {
-      acc[category] = categoryRecipes;
-    }
-    return acc;
-  }, {} as Record<string, PureeSyrupRecipe[]>);
+  // Search across name and ingredients (shelves with no matches disappear).
+  const query = searchQuery.trim().toLowerCase();
+  const visibleRecipes = query
+    ? recipes.filter((r) =>
+        r.name.toLowerCase().includes(query) ||
+        (r.ingredients || []).some((i) => (i.ingredient || '').toLowerCase().includes(query))
+      )
+    : recipes;
 
-  // Animated header opacity for parallax effect
-  const imageOpacity = scrollY.interpolate({
-    inputRange: [0, 200],
-    outputRange: [1, 0.3],
-    extrapolate: 'clamp',
-  });
+  // Group into shelves: built-in categories first (canonical order), then any
+  // custom categories in the order they appear.
+  const shelfOrder: string[] = [...CATEGORIES];
+  for (const r of visibleRecipes) {
+    const cat = r.category || 'Other';
+    if (!shelfOrder.includes(cat)) shelfOrder.push(cat);
+  }
+  const recipesByCategory: Record<string, PureeSyrupRecipe[]> = {};
+  for (const cat of shelfOrder) {
+    const catRecipes = visibleRecipes.filter((r) => (r.category || 'Other') === cat);
+    if (catRecipes.length > 0) recipesByCategory[cat] = catRecipes;
+  }
 
-  const imageTranslateY = scrollY.interpolate({
-    inputRange: [0, 200],
-    outputRange: [0, -50],
-    extrapolate: 'clamp',
-  });
+  const shelfLabel = (label: string, count: number) => (
+    <View style={styles.shelfLabelRow}>
+      <Text style={[styles.shelfLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+        {label.toUpperCase()}
+      </Text>
+      <View style={[styles.shelfLabelLine, { backgroundColor: colors.border + '55' }]} />
+      <Text style={[styles.shelfLabelCount, { color: colors.textSecondary }]}>{count}</Text>
+    </View>
+  );
+
+  const tileScrim = (
+    <LinearGradient
+      colors={['transparent', 'rgba(8,10,14,0.30)', 'rgba(8,10,14,0.84)']}
+      style={styles.tileScrim}
+    />
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card }]}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
+      <AmbientGlow />
+      <ScreenHeader
+        title={t('purees_syrups.title')}
+        rightWide={isManager}
+        right={isManager ? (
+          <HeaderNavMenu
+            label={t('common:to_editor')}
+            iconIos="pencil"
+            iconAndroid="edit"
+            sheetTitle={t('purees_syrups.title')}
+            actions={[
+              {
+                key: 'switch',
+                label: t('common:to_editor'),
+                iosIcon: 'pencil',
+                androidIcon: 'edit',
+                onPress: () => router.replace('/puree-syrup-recipes-editor'),
+              },
+              {
+                key: 'cats',
+                label: t('menu_sheet.edit_categories'),
+                iosIcon: 'square.grid.2x2',
+                androidIcon: 'grid-view',
+                disabled: !(user?.role === 'owner' || perms.editCategories),
+                onPress: () => router.push({ pathname: '/manage-menu-categories', params: { cat: 'cat.libations' } } as any),
+              },
+              {
+                key: 'menu',
+                label: t('menu_sheet.edit_menu'),
+                iosIcon: 'fork.knife',
+                androidIcon: 'restaurant-menu',
+                onPress: () => router.push('/menu-editor' as any),
+              },
+            ]}
           />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('purees_syrups.title')}</Text>
-        <View style={styles.backButton} />
+        ) : undefined}
+      />
+
+      {/* Search — same geometry and position as the editor side. */}
+      <View style={styles.searchRow}>
+        <View style={[styles.searchField, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+          <IconSymbol
+            ios_icon_name="magnifyingglass"
+            android_material_icon_name="search"
+            size={20}
+            color={colors.textSecondary}
+          />
+          <TextInput
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder={t('purees_syrups.search_placeholder')}
+            placeholderTextColor={colors.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={8}>
+              <IconSymbol
+                ios_icon_name="xmark.circle.fill"
+                android_material_icon_name="cancel"
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {loading ? (
@@ -191,186 +234,99 @@ export default function PureeSyrupRecipesScreen() {
                 size={64}
                 color={colors.textSecondary}
               />
-              <Text style={[styles.emptyText, { color: colors.text }]}>{t('purees_syrups.no_recipes')}</Text>
+              <Text style={[styles.emptyText, { color: colors.text }]}>
+                {query ? t('cocktails.no_results') : t('purees_syrups.no_recipes')}
+              </Text>
               <Text style={[styles.emptySubtext, { color: colors.textSecondary }]}>
-                {t('purees_syrups.check_back')}
+                {query ? t('cocktails.no_results_hint') : t('purees_syrups.check_back')}
               </Text>
             </View>
           ) : (
-            Object.entries(recipesByCategory).map(([category, categoryRecipes], categoryIndex) => (
-              <React.Fragment key={categoryIndex}>
-                {/* Category Header */}
-                <Text style={[styles.categoryTitle, { color: colors.text }]}>{getCategoryLabel(category)}</Text>
-
-                {/* Recipe Tiles in 2 columns */}
-                <View style={styles.tilesContainer}>
-                  {categoryRecipes.map((recipe, index) => (
+            Object.entries(recipesByCategory).map(([category, categoryRecipes]) => (
+              <React.Fragment key={category}>
+                {shelfLabel(getCategoryLabel(category), categoryRecipes.length)}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.shelfContent}
+                  style={styles.shelf}
+                >
+                  {categoryRecipes.map((recipe) => (
                     <TouchableOpacity
-                      key={index}
-                      style={styles.recipeTile}
+                      key={recipe.id}
+                      style={[styles.tile, { borderColor: colors.glassBorder }]}
                       onPress={() => openDetailModal(recipe)}
-                      activeOpacity={0.8}
+                      activeOpacity={0.85}
                     >
                       <StorageImage
                         source={{ uri: getImageUrl(recipe.thumbnail_url) }}
                         style={styles.tileImage}
                         resizeMode="cover"
                       />
-                      <View style={styles.tileOverlay}>
-                        <Text style={styles.tileName} numberOfLines={2}>
-                          {recipe.name}
-                        </Text>
+                      {tileScrim}
+                      <View style={styles.tileMeta}>
+                        <Text style={styles.tileName} numberOfLines={2}>{recipe.name}</Text>
                       </View>
                     </TouchableOpacity>
                   ))}
-                </View>
+                </ScrollView>
               </React.Fragment>
             ))
           )}
         </ScrollView>
       )}
 
-      {/* Detail Modal - Beautiful Styled Card */}
-      <Modal
+      {/* Recipe detail sheet — hero photo flush to the top edge (the
+          MenuItemDetailSheet continuity). */}
+      <GlassHeroSheet
         visible={showDetailModal}
-        animationType={dragDismissing.current ? 'none' : 'slide'}
-        transparent={true}
-        onRequestClose={closeDetailModal}
-        onShow={() => {
-          modalTranslateY.setValue(0);
-          dragDismissing.current = false;
-        }}
+        onClose={closeDetailModal}
+        hero={selectedRecipe?.thumbnail_url ? (
+          <>
+            <StorageImage
+              source={{ uri: getImageUrl(selectedRecipe.thumbnail_url) }}
+              style={styles.heroFill}
+              resizeMode="cover"
+            />
+            <LinearGradient
+              colors={['rgba(14,11,9,0)', 'rgba(14,11,9,0.92)']}
+              locations={[0.42, 0.94]}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+          </>
+        ) : undefined}
       >
-        <View style={styles.modalContainer}>
-          <TouchableOpacity
-            style={styles.modalBackdrop}
-            activeOpacity={1}
-            onPress={closeDetailModal}
-          />
-          <Animated.View style={[styles.modalCard, { transform: [{ translateY: modalTranslateY }] }]}>
-            {/* Drag Handle */}
-            <View {...modalPanResponder.panHandlers} style={styles.dragHandleArea}>
-              <View style={styles.dragHandle} />
-            </View>
+        <Text style={[styles.detailTitle, { color: colors.text }]}>{selectedRecipe?.name}</Text>
 
-            {/* Close Button */}
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={closeDetailModal}
-              activeOpacity={0.7}
-            >
-              <View style={styles.closeButtonCircle}>
-                <IconSymbol
-                  ios_icon_name="xmark"
-                  android_material_icon_name="close"
-                  size={20}
-                  color="#FFFFFF"
-                />
+        <View style={styles.detailSection}>
+          <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('purees_syrups.ingredients')}</Text>
+          {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
+            selectedRecipe.ingredients.map((item, index) => (
+              <View
+                key={index}
+                style={[styles.ingredientRow, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
+              >
+                <Text style={[styles.ingredientAmount, { color: colors.primary }]}>{item.amount}</Text>
+                <Text style={[styles.ingredientName, { color: colors.text }]}>{item.ingredient}</Text>
               </View>
-            </TouchableOpacity>
-
-            <Animated.ScrollView
-              style={styles.modalScroll}
-              contentContainerStyle={styles.modalScrollContent}
-              showsVerticalScrollIndicator={false}
-              scrollEventThrottle={16}
-              onScroll={Animated.event(
-                [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-                { useNativeDriver: true }
-              )}
-            >
-              {/* Floating Thumbnail Image with Parallax */}
-              {selectedRecipe?.thumbnail_url && (
-                <Animated.View 
-                  style={[
-                    styles.imageContainer,
-                    {
-                      opacity: imageOpacity,
-                      transform: [{ translateY: imageTranslateY }],
-                    }
-                  ]}
-                >
-                  <StorageImage
-                    source={{ uri: getImageUrl(selectedRecipe.thumbnail_url) }}
-                    style={styles.heroImage}
-                    resizeMode="cover"
-                  />
-                  <View style={styles.imageGradient} />
-                </Animated.View>
-              )}
-
-              {/* Content Card - Floats over image */}
-              <View style={styles.contentCard}>
-                {/* Recipe Name - Blue */}
-                <Text style={styles.recipeTitleLarge}>{selectedRecipe?.name}</Text>
-
-                {/* Information Section */}
-                <View style={styles.infoSection}>
-                  <View style={styles.infoRow}>
-                    {selectedRecipe?.category && (
-                      <View style={styles.infoItem}>
-                        <Text style={styles.infoLabel}>{t('purees_syrups.category')}</Text>
-                        <Text style={styles.infoValue}>{selectedRecipe.category}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-
-                {/* Separator */}
-                <View style={styles.separator} />
-
-                {/* Ingredients Section - Blue */}
-                <View style={styles.section}>
-                  <View style={styles.sectionHeader}>
-                    <IconSymbol
-                      ios_icon_name="list.bullet"
-                      android_material_icon_name="format-list-bulleted"
-                      size={24}
-                      color="#3498DB"
-                    />
-                    <Text style={styles.sectionTitleBlue}>{t('purees_syrups.ingredients')}</Text>
-                  </View>
-                  {selectedRecipe?.ingredients && selectedRecipe.ingredients.length > 0 ? (
-                    <View style={styles.ingredientsList}>
-                      {selectedRecipe.ingredients.map((item, index) => (
-                        <View key={index} style={styles.ingredientRow}>
-                          <View style={styles.ingredientBullet} />
-                          <Text style={styles.ingredientAmount}>{item.amount}</Text>
-                          <Text style={styles.ingredientName}>{item.ingredient}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : (
-                    <Text style={styles.noDataText}>{t('purees_syrups.no_ingredients')}</Text>
-                  )}
-                </View>
-
-                {/* Separator */}
-                <View style={styles.separator} />
-
-                {/* Procedure Section - Red */}
-                {selectedRecipe?.procedure && (
-                  <View style={styles.section}>
-                    <View style={styles.sectionHeader}>
-                      <IconSymbol
-                        ios_icon_name="doc.text"
-                        android_material_icon_name="description"
-                        size={30}
-                        color="#E74C3C"
-                      />
-                      <Text style={styles.sectionTitleRed}>{t('purees_syrups.procedure')}</Text>
-                    </View>
-                    <FormattedText style={styles.procedureText}>{getLocalizedField(selectedRecipe, 'procedure', language)}</FormattedText>
-                  </View>
-                )}
-
-                {/* Bottom Padding for safe scrolling */}
-                <View style={styles.bottomPadding} />
-              </View>
-            </Animated.ScrollView>
-          </Animated.View>
+            ))
+          ) : (
+            <Text style={[styles.noDataText, { color: colors.textSecondary }]}>{t('purees_syrups.no_ingredients')}</Text>
+          )}
         </View>
-      </Modal>
+
+        {!!selectedRecipe?.procedure && (
+          <View style={styles.detailSection}>
+            <Text style={[styles.detailLabel, { color: colors.textSecondary }]}>{t('purees_syrups.procedure')}</Text>
+            <View style={[styles.procedureBox, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+              <FormattedText style={[styles.procedureText, { color: colors.text }]}>
+                {getLocalizedField(selectedRecipe, 'procedure', language)}
+              </FormattedText>
+            </View>
+          </View>
+        )}
+      </GlassHeroSheet>
     </View>
   );
 }
@@ -379,23 +335,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
+  searchRow: {
+    paddingHorizontal: 16,
+    marginBottom: 11,
+  },
+  searchField: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'android' ? 48 : 60,
-    paddingBottom: 12,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+    gap: 8,
+    height: 46,
+    borderRadius: 13,
+    paddingHorizontal: 13,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
-  backButton: {
-    padding: 8,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  searchInput: {
+    flex: 1,
+    fontFamily: fonts.body.regular,
+    fontSize: 15,
+    padding: 0,
   },
   loadingContainer: {
     flex: 1,
@@ -406,7 +363,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingTop: 20,
     paddingHorizontal: 16,
     paddingBottom: 100,
   },
@@ -417,236 +373,138 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
   },
   emptyText: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 16,
+    fontFamily: fonts.display.semibold,
+    fontSize: 16,
+    marginTop: 14,
   },
   emptySubtext: {
-    fontSize: 14,
-    marginTop: 8,
+    fontFamily: fonts.body.regular,
+    fontSize: 13,
+    marginTop: 6,
     textAlign: 'center',
   },
-  categoryTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    marginTop: 8,
-  },
-  tilesContainer: {
+  // Shelf label — the mono zlabel rhythm (label · hairline · count).
+  shelfLabelRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 24,
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    marginBottom: 10,
+    marginHorizontal: 2,
   },
-  recipeTile: {
-    width: '48%',
+  shelfLabel: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10.5,
+    letterSpacing: 1.4,
+    flexShrink: 1,
+  },
+  shelfLabelLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  shelfLabelCount: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10.5,
+  },
+  // Shelves
+  shelf: {
+    marginHorizontal: -2,
+  },
+  shelfContent: {
+    paddingHorizontal: 2,
+    paddingBottom: 4,
+  },
+  tile: {
+    width: RECIPE_TILE_SIZE,
     aspectRatio: 1,
-    borderRadius: 12,
+    borderRadius: 13,
     overflow: 'hidden',
-    marginBottom: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.2)',
-    elevation: 4,
+    marginRight: 10,
+    backgroundColor: '#1C2026',
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
   tileImage: {
     width: '100%',
     height: '100%',
   },
-  tileOverlay: {
+  tileScrim: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: '62%',
+  },
+  tileMeta: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    padding: 12,
+    paddingHorizontal: 9,
+    paddingBottom: 8,
   },
+  // Scrim text = fixed-dark literal (white), the rulebook's ember rule.
   tileName: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontFamily: fonts.display.semibold,
+    fontSize: 13.5,
+    lineHeight: 16.5,
     color: '#FFFFFF',
-    marginBottom: 4,
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-  },
-  modalCard: {
-    backgroundColor: '#F8F9FA',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    height: '92%',
-    overflow: 'hidden',
-    boxShadow: '0px -4px 24px rgba(0, 0, 0, 0.5)',
-    elevation: 12,
-  },
-  dragHandleArea: {
-    alignItems: 'center',
-    paddingTop: 10,
-    paddingBottom: 4,
-    zIndex: 20,
-  },
-  dragHandle: {
-    width: 40,
-    height: 5,
-    borderRadius: 3,
-    backgroundColor: 'rgba(0,0,0,0.2)',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 30,
-    right: 20,
-    zIndex: 100,
-  },
-  closeButtonCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-    elevation: 5,
-  },
-  modalScroll: {
-    flex: 1,
-  },
-  modalScrollContent: {
-    paddingBottom: 60,
-  },
-  imageContainer: {
-    width: '100%',
-    height: 300,
-    position: 'relative',
-  },
-  heroImage: {
+  // Detail sheet — the hero box/radii come from GlassHeroSheet; this just
+  // fills it.
+  heroFill: {
     width: '100%',
     height: '100%',
   },
-  imageGradient: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 100,
+  detailTitle: {
+    fontFamily: fonts.display.bold,
+    fontSize: 22,
+    letterSpacing: -0.3,
+    marginTop: 12,
+    marginBottom: 10,
   },
-  contentCard: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    marginTop: -28,
-    paddingTop: 28,
-    paddingHorizontal: 24,
-    boxShadow: '0px -2px 16px rgba(0, 0, 0, 0.1)',
-    elevation: 8,
-  },
-  recipeTitleLarge: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#3498DB',
-    marginBottom: 24,
-    lineHeight: 38,
-  },
-  infoSection: {
+  detailSection: {
     marginBottom: 8,
   },
-  infoRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16,
-    gap: 16,
-  },
-  infoItem: {
-    flex: 1,
-    minWidth: '45%',
-  },
-  infoLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#7F8C8D',
+  detailLabel: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10,
+    letterSpacing: 1.1,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 6,
-  },
-  infoValue: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: '#2C3E50',
-  },
-  separator: {
-    height: 1,
-    backgroundColor: '#E8EAED',
-    marginVertical: 24,
-  },
-  section: {
-    marginBottom: 8,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-    gap: 10,
-  },
-  sectionTitleBlue: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#3498DB',
-  },
-  sectionTitleRed: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#E74C3C',
-  },
-  ingredientsList: {
-    gap: 12,
+    marginBottom: 7,
   },
   ingredientRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: '#F8F9FA',
-    borderRadius: 10,
-    gap: 12,
-  },
-  ingredientBullet: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#3498DB',
+    gap: 10,
+    paddingVertical: 9,
+    paddingHorizontal: 11,
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    marginBottom: 7,
   },
   ingredientAmount: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#2C3E50',
-    minWidth: 80,
+    fontFamily: fonts.mono.semibold,
+    fontSize: 11.5,
+    minWidth: 64,
   },
   ingredientName: {
-    fontSize: 16,
-    fontWeight: '400',
-    color: '#34495E',
+    fontFamily: fonts.body.regular,
+    fontSize: 13.5,
     flex: 1,
   },
   noDataText: {
-    fontSize: 15,
-    color: '#95A5A6',
+    fontFamily: fonts.body.regular,
+    fontSize: 13,
     fontStyle: 'italic',
   },
-  procedureText: {
-    fontSize: 18,
-    lineHeight: 26,
-    color: '#34495E',
-    backgroundColor: '#F8F9FA',
-    padding: 16,
-    borderRadius: 12,
+  procedureBox: {
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    padding: 13,
   },
-  bottomPadding: {
-    height: 40,
+  procedureText: {
+    fontFamily: fonts.body.regular,
+    fontSize: 13.5,
+    lineHeight: 22,
   },
 });

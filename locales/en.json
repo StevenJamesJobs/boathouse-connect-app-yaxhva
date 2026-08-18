@@ -711,6 +711,12 @@
     "edit_google_maps": "Edit Location"
   },
   "bartender_assistant": {
+    "featured_tonight": "Featured Today",
+    "now_pill": "Now",
+    "done_today": "done today",
+    "categories_count": "{{count}} categories",
+    "recipes_label": "Recipes",
+    "recipes_count": "{{count}} recipes",
     "title": "Bar Assistant",
     "checklists": "Checklists",
     "checklists_desc": "Daily opening and closing checklists",
@@ -722,8 +728,8 @@
     "libation_recipes_suffix": "Libation Recipes",
     "cocktails_az": "Cocktails A-Z",
     "cocktails_az_desc": "Browse all cocktails alphabetically",
-    "purees_syrups": "Purees & Simple Syrups Recipes",
-    "purees_syrups_desc": "Recipe collection for purees and simple syrups"
+    "purees_syrups": "Mixes & Essential Recipes",
+    "purees_syrups_desc": "Purees, syrups, mixes & other essential prep recipes"
   },
   "host_assistant": {
     "title": "Host Assistant",
@@ -840,6 +846,7 @@
     "garnish": "Garnish"
   },
   "summer_libation_recipes": {
+    "search_placeholder": "Search recipes...",
     "title": "Summer Libation Recipes",
     "no_recipes": "No recipes available",
     "check_back": "Check back later for new summer libation recipes!",
@@ -858,6 +865,7 @@
     "no_ingredients": "No ingredients listed"
   },
   "libation_recipes": {
+    "search_placeholder": "Search recipes...",
     "title": "Libation Recipes",
     "no_recipes": "No recipes available",
     "check_back": "Check back later for new libation recipes!",
@@ -876,7 +884,8 @@
     "no_ingredients": "No ingredients listed"
   },
   "purees_syrups": {
-    "title": "Purees & Syrups Recipes",
+    "search_placeholder": "Search recipes...",
+    "title": "Mixes & Essential Recipes",
     "no_recipes": "No recipes available",
     "check_back": "Check back later for new puree and syrup recipes!",
     "purees": "Purees",
@@ -1014,8 +1023,8 @@
     "libation_recipes_editor_suffix": "Libation Recipes Editor",
     "cocktails_az_editor": "Cocktails A-Z Editor",
     "cocktails_az_editor_desc": "Add and manage cocktail recipes alphabetically",
-    "purees_syrups_editor": "Purees & Simple Syrups Recipes Editor",
-    "purees_syrups_editor_desc": "Manage puree and simple syrup recipes"
+    "purees_syrups_editor": "Mixes & Essential Recipes Editor",
+    "purees_syrups_editor_desc": "Manage mixes, purees, syrups & essential prep recipes"
   },
   "bartender_binder_editor": {
     "title": "Bartender Binder Editor",
@@ -1158,6 +1167,7 @@
     "garnish_placeholder": "e.g., Lemon Twist"
   },
   "summer_libation_editor": {
+    "search_placeholder": "Search recipes...",
     "title": "Summer Libation Recipes Editor",
     "move_up": "Move Up",
     "move_down": "Move Down",
@@ -1213,6 +1223,7 @@
     "recipe_deleted": "Recipe deleted successfully"
   },
   "libation_editor": {
+    "search_placeholder": "Search recipes...",
     "title": "Libation Recipes Editor",
     "move_up": "Move Up",
     "move_down": "Move Down",
@@ -1268,7 +1279,9 @@
     "recipe_deleted": "Recipe deleted successfully"
   },
   "puree_editor": {
-    "title": "Purees & Syrups Editor",
+    "search_placeholder": "Search recipes...",
+    "custom_category_placeholder": "Category name...",
+    "title": "Mixes & Essential Recipes Editor",
     "move_up": "Move Up",
     "move_down": "Move Down",
     "order_position": "Order Position",

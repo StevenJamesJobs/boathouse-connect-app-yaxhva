@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,12 +10,16 @@ import {
   Alert,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
+import { isManagerOrOwner } from '@/utils/roles';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import HeaderNavButton from '@/components/HeaderNavButton';
+import { fonts } from '@/constants/fonts';
 
 interface ChecklistItem {
   id: string;
@@ -34,8 +38,8 @@ interface ChecklistCategory {
 export default function BartenderOpeningChecklistScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
   const { t } = useTranslation();
+  const isManager = isManagerOrOwner(user);
   const [categories, setCategories] = useState<ChecklistCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -50,7 +54,6 @@ export default function BartenderOpeningChecklistScreen() {
 
   const loadChecklist = async () => {
     if (!user?.id) return;
-    console.log('Loading Bartender Opening Checklist for user:', user.id);
     try {
       setLoading(true);
 
@@ -107,11 +110,9 @@ export default function BartenderOpeningChecklistScreen() {
       })) || [];
 
       setCategories(categoriesWithItems);
-      
+
       const allCategoryIds = new Set(categoriesWithItems.map(c => c.id));
       setExpandedCategories(allCategoryIds);
-
-      console.log('Loaded bartender checklist with', categoriesWithItems.length, 'categories');
     } catch (error) {
       console.error('Error loading checklist:', error);
       Alert.alert(t('common.error'), t('checklist.error_load'));
@@ -121,7 +122,6 @@ export default function BartenderOpeningChecklistScreen() {
   };
 
   const toggleCategory = (categoryId: string) => {
-    console.log('Toggling category:', categoryId);
     setExpandedCategories(prev => {
       const newSet = new Set(prev);
       if (newSet.has(categoryId)) {
@@ -135,8 +135,7 @@ export default function BartenderOpeningChecklistScreen() {
 
   const toggleItem = async (categoryId: string, itemId: string, currentCompleted: boolean) => {
     if (!user?.id) return;
-    console.log('Toggling item:', itemId, 'from', currentCompleted, 'to', !currentCompleted);
-    
+
     try {
       const today = new Date().toISOString().split('T')[0];
       const newCompleted = !currentCompleted;
@@ -145,7 +144,7 @@ export default function BartenderOpeningChecklistScreen() {
         if (cat.id === categoryId) {
           return {
             ...cat,
-            items: cat.items.map(item => 
+            items: cat.items.map(item =>
               item.id === itemId ? { ...item, completed: newCompleted } : item
             ),
           };
@@ -165,12 +164,10 @@ export default function BartenderOpeningChecklistScreen() {
         console.error('Error updating progress:', error);
         throw error;
       }
-
-      console.log('Item toggled successfully');
     } catch (error) {
       console.error('Error toggling item:', error);
       loadChecklist();
-      Alert.alert('Error', 'Failed to update checklist. Please try again.');
+      Alert.alert(t('common.error'), t('checklist.error_load'));
     }
   };
 
@@ -184,25 +181,32 @@ export default function BartenderOpeningChecklistScreen() {
   };
 
   const stats = getCompletionStats();
-  const completionPercentage = stats.totalItems > 0 
-    ? Math.round((stats.completedItems / stats.totalItems) * 100) 
+  const completionPercentage = stats.totalItems > 0
+    ? Math.round((stats.completedItems / stats.totalItems) * 100)
     : 0;
+
+  const header = (
+    <>
+      <AmbientGlow />
+      <ScreenHeader
+        title={t('checklist.title_bartender_opening')}
+        rightWide={isManager}
+        right={isManager ? (
+          <HeaderNavButton
+            label={t('common:to_editor')}
+            iconIos="pencil"
+            iconAndroid="edit"
+            onPress={() => router.replace('/bartender-opening-checklist-editor')}
+          />
+        ) : undefined}
+      />
+    </>
+  );
 
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol
-              ios_icon_name="chevron.left"
-              android_material_icon_name="arrow-back"
-              size={24}
-              color={colors.text}
-            />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('checklist.title_bartender_opening')}</Text>
-          <View style={styles.placeholder} />
-        </View>
+        {header}
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -212,33 +216,23 @@ export default function BartenderOpeningChecklistScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('checklist.title_bartender_opening')}</Text>
-        <View style={styles.placeholder} />
-      </View>
+      {header}
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        <View style={[styles.progressCard, { backgroundColor: colors.card }]}>
+        {/* Today's progress */}
+        <View style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
           <View style={styles.progressHeader}>
             <Text style={[styles.progressTitle, { color: colors.text }]}>{t('checklist.todays_progress')}</Text>
             <Text style={[styles.progressPercentage, { color: colors.primary }]}>
               {completionPercentage}%
             </Text>
           </View>
-          <View style={[styles.progressBarBackground, { backgroundColor: colors.background }]}>
-            <View 
+          <View style={[styles.progressBarBackground, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+            <View
               style={[
-                styles.progressBarFill, 
-                { backgroundColor: colors.primary, width: `${completionPercentage}%` }
-              ]} 
+                styles.progressBarFill,
+                { backgroundColor: colors.primary, width: `${completionPercentage}%` },
+              ]}
             />
           </View>
           <Text style={[styles.progressText, { color: colors.textSecondary }]}>
@@ -248,11 +242,11 @@ export default function BartenderOpeningChecklistScreen() {
 
         {categories.map((category) => {
           const isExpanded = expandedCategories.has(category.id);
-          const categoryCompleted = category.items.every(item => item.completed);
+          const categoryCompleted = category.items.length > 0 && category.items.every(item => item.completed);
           const categoryProgress = category.items.filter(item => item.completed).length;
 
           return (
-            <View key={category.id} style={[styles.categoryCard, { backgroundColor: colors.card }]}>
+            <View key={category.id} style={[styles.categoryCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
               <TouchableOpacity
                 style={styles.categoryHeader}
                 onPress={() => toggleCategory(category.id)}
@@ -262,7 +256,7 @@ export default function BartenderOpeningChecklistScreen() {
                   <IconSymbol
                     ios_icon_name={categoryCompleted ? 'checkmark.circle.fill' : 'circle'}
                     android_material_icon_name={categoryCompleted ? 'check-circle' : 'radio-button-unchecked'}
-                    size={24}
+                    size={22}
                     color={categoryCompleted ? colors.primary : colors.textSecondary}
                   />
                   <View style={styles.categoryHeaderText}>
@@ -277,7 +271,7 @@ export default function BartenderOpeningChecklistScreen() {
                 <IconSymbol
                   ios_icon_name={isExpanded ? 'chevron.up' : 'chevron.down'}
                   android_material_icon_name={isExpanded ? 'expand-less' : 'expand-more'}
-                  size={24}
+                  size={16}
                   color={colors.textSecondary}
                 />
               </TouchableOpacity>
@@ -287,21 +281,21 @@ export default function BartenderOpeningChecklistScreen() {
                   {category.items.map((item) => (
                     <TouchableOpacity
                       key={item.id}
-                      style={[styles.itemRow, { borderTopColor: colors.border }]}
+                      style={[styles.itemRow, { borderTopColor: colors.border + '55' }]}
                       onPress={() => toggleItem(category.id, item.id, item.completed)}
                       activeOpacity={0.7}
                     >
                       <IconSymbol
                         ios_icon_name={item.completed ? 'checkmark.square.fill' : 'square'}
                         android_material_icon_name={item.completed ? 'check-box' : 'check-box-outline-blank'}
-                        size={24}
+                        size={22}
                         color={item.completed ? colors.primary : colors.textSecondary}
                       />
-                      <Text 
+                      <Text
                         style={[
-                          styles.itemText, 
+                          styles.itemText,
                           { color: colors.text },
-                          item.completed && styles.itemTextCompleted
+                          item.completed && styles.itemTextCompleted,
                         ]}
                       >
                         {item.text}
@@ -322,25 +316,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  placeholder: {
-    width: 40,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -350,16 +325,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingTop: 20,
     paddingHorizontal: 16,
     paddingBottom: 100,
   },
   progressCard: {
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    padding: 16,
+    marginBottom: 14,
   },
   progressHeader: {
     flexDirection: 'row',
@@ -368,55 +341,58 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   progressTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.display.semibold,
+    fontSize: 15,
   },
   progressPercentage: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: fonts.mono.semibold,
+    fontSize: 22,
   },
   progressBarBackground: {
-    height: 8,
-    borderRadius: 4,
+    height: 10,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 9,
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 999,
   },
   progressText: {
-    fontSize: 14,
+    fontFamily: fonts.body.regular,
+    fontSize: 12.5,
   },
   categoryCard: {
-    borderRadius: 12,
-    marginBottom: 12,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    marginBottom: 10,
     overflow: 'hidden',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
   },
   categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
   },
   categoryHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: 12,
+    gap: 11,
   },
   categoryHeaderText: {
     flex: 1,
   },
   categoryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.display.semibold,
+    fontSize: 15,
     marginBottom: 2,
   },
   categoryProgress: {
-    fontSize: 13,
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10.5,
   },
   itemsContainer: {
     paddingBottom: 8,
@@ -424,18 +400,19 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    gap: 12,
-    borderTopWidth: 1,
+    gap: 11,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   itemText: {
     flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
+    fontFamily: fonts.body.regular,
+    fontSize: 14,
+    lineHeight: 21,
   },
   itemTextCompleted: {
     textDecorationLine: 'line-through',
-    opacity: 0.6,
+    opacity: 0.55,
   },
 });

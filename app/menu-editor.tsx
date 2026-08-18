@@ -734,7 +734,10 @@ export default function MenuEditorScreen() {
       isLibations: catOf(item.category)?.system_key === 'cat.libations',
       editAction: {
         label: t('menu_editor:open_recipes_editor'),
-        onPress: () => router.push(recipesEditorPathFor(item) as any),
+        // Recipe-fed rows sync from the recipes by NAME (no id bridge), so the
+        // deep-link hands the editor the name and it opens its own edit modal
+        // for that exact recipe (s69-queued, landed s73).
+        onPress: () => router.push({ pathname: recipesEditorPathFor(item), params: { edit: item.name } } as any),
       },
     };
   })();
