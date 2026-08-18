@@ -24,6 +24,12 @@ export interface MenuSearchRowProps {
   placeholder: string;
   onRightPress: () => void;         // Filter (user) / + (editor)
   filterCount?: number;             // user mode badge
+  /**
+   * Editor mode only (s73, Libations editors): an extra neutral-glass reorder
+   * button between the field and the ＋. Absent → the row renders exactly as
+   * before, so the menu editor is untouched.
+   */
+  onReorderPress?: () => void;
 }
 
 export default function MenuSearchRow({
@@ -34,6 +40,7 @@ export default function MenuSearchRow({
   placeholder,
   onRightPress,
   filterCount,
+  onReorderPress,
 }: MenuSearchRowProps) {
   const { t } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -85,13 +92,29 @@ export default function MenuSearchRow({
           )}
         </TouchableOpacity>
       ) : (
-        <TouchableOpacity
-          style={[styles.rightBtn, styles.rightBtnIconOnly, styles.rightBtnAdd]}
-          onPress={onRightPress}
-          activeOpacity={0.7}
-        >
-          <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={22} color={colors.primary} />
-        </TouchableOpacity>
+        <>
+          {!!onReorderPress && (
+            <TouchableOpacity
+              style={[styles.rightBtn, styles.rightBtnIconOnly]}
+              onPress={onReorderPress}
+              activeOpacity={0.7}
+            >
+              <IconSymbol
+                ios_icon_name="arrow.up.arrow.down"
+                android_material_icon_name="swap-vert"
+                size={20}
+                color={colors.text}
+              />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.rightBtn, styles.rightBtnIconOnly, styles.rightBtnAdd]}
+            onPress={onRightPress}
+            activeOpacity={0.7}
+          >
+            <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={22} color={colors.primary} />
+          </TouchableOpacity>
+        </>
       )}
     </View>
   );

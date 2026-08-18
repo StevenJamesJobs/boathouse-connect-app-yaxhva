@@ -711,6 +711,12 @@
     "edit_google_maps": "Editar ubicación"
   },
   "bartender_assistant": {
+    "featured_tonight": "Destacados de Hoy",
+    "now_pill": "Ahora",
+    "done_today": "hechas hoy",
+    "categories_count": "{{count}} categorías",
+    "recipes_label": "Recetas",
+    "recipes_count": "{{count}} recetas",
     "title": "Asistente de Bar",
     "checklists": "Listas de Verificación",
     "checklists_desc": "Listas de verificación diarias de apertura y cierre",
@@ -722,8 +728,8 @@
     "libation_recipes_suffix": "Recetas de Bebidas",
     "cocktails_az": "Cócteles A-Z",
     "cocktails_az_desc": "Explorar todos los cócteles en orden alfabético",
-    "purees_syrups": "Recetas de Purés y Almíbares",
-    "purees_syrups_desc": "Colección de recetas de purés y almíbares simples"
+    "purees_syrups": "Mezclas y Recetas Esenciales",
+    "purees_syrups_desc": "Purés, almíbares, mezclas y otras recetas esenciales"
   },
   "host_assistant": {
     "title": "Asistente de Anfitrión",
@@ -840,6 +846,7 @@
     "garnish": "Decoración"
   },
   "summer_libation_recipes": {
+    "search_placeholder": "Buscar recetas...",
     "title": "Recetas de Bebidas de Verano",
     "no_recipes": "No hay recetas disponibles",
     "check_back": "¡Vuelve más tarde para nuevas recetas de bebidas de verano!",
@@ -858,6 +865,7 @@
     "no_ingredients": "Sin ingredientes listados"
   },
   "libation_recipes": {
+    "search_placeholder": "Buscar recetas...",
     "title": "Recetas de Bebidas",
     "no_recipes": "No hay recetas disponibles",
     "check_back": "¡Vuelve más tarde para nuevas recetas de bebidas!",
@@ -876,7 +884,8 @@
     "no_ingredients": "Sin ingredientes listados"
   },
   "purees_syrups": {
-    "title": "Recetas de Purés y Almíbares",
+    "search_placeholder": "Buscar recetas...",
+    "title": "Mezclas y Recetas Esenciales",
     "no_recipes": "No hay recetas disponibles",
     "check_back": "¡Vuelve más tarde para nuevas recetas de purés y almíbares!",
     "purees": "Purés",
@@ -1014,8 +1023,8 @@
     "libation_recipes_editor_suffix": "Editor de Recetas de Bebidas",
     "cocktails_az_editor": "Editor de Cócteles A-Z",
     "cocktails_az_editor_desc": "Agregar y gestionar recetas de cócteles en orden alfabético",
-    "purees_syrups_editor": "Editor de Recetas de Purés y Almíbares",
-    "purees_syrups_editor_desc": "Gestionar recetas de purés y almíbares simples"
+    "purees_syrups_editor": "Editor de Mezclas y Recetas Esenciales",
+    "purees_syrups_editor_desc": "Gestionar mezclas, purés, almíbares y recetas esenciales"
   },
   "bartender_binder_editor": {
     "title": "Editor de Carpeta del Barman",
@@ -1158,6 +1167,7 @@
     "garnish_placeholder": "ej. Twist de Limón"
   },
   "summer_libation_editor": {
+    "search_placeholder": "Buscar recetas...",
     "title": "Editor de Recetas de Verano",
     "move_up": "Subir",
     "move_down": "Bajar",
@@ -1213,6 +1223,7 @@
     "recipe_deleted": "Receta eliminada exitosamente"
   },
   "libation_editor": {
+    "search_placeholder": "Buscar recetas...",
     "title": "Editor de Recetas de Bebidas",
     "move_up": "Subir",
     "move_down": "Bajar",
@@ -1268,7 +1279,9 @@
     "recipe_deleted": "Receta eliminada exitosamente"
   },
   "puree_editor": {
-    "title": "Editor de Purés y Almíbares",
+    "search_placeholder": "Buscar recetas...",
+    "custom_category_placeholder": "Nombre de la categoría...",
+    "title": "Editor de Mezclas y Recetas Esenciales",
     "move_up": "Subir",
     "move_down": "Bajar",
     "order_position": "Posición en el Orden",

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -8,12 +8,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Modal,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
@@ -21,6 +17,11 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import HeaderNavButton from '@/components/HeaderNavButton';
+import GlassSheet from '@/components/GlassSheet';
+import { fonts } from '@/constants/fonts';
 
 interface ChecklistItem {
   id: string;
@@ -36,63 +37,19 @@ interface ChecklistCategory {
   items: ChecklistItem[];
 }
 
+const TRASH_RED = '#E53935';
+
 export default function BartenderOpeningChecklistEditorScreen() {
   useRequireManagerRoute();
   const router = useRouter();
   const { t } = useTranslation();
-  const { organizationId } = useOrganization();
   const { user } = useAuth();
   const colors = useThemeColors();
-
-  const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.card, paddingHorizontal: 16, paddingTop: 48, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-    backButton: { padding: 8 },
-    headerTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, flex: 1, textAlign: 'center' },
-    addButton: { padding: 4 },
-    placeholder: { width: 40 },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    scrollView: { flex: 1 },
-    contentContainer: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: 100 },
-    infoCard: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: colors.card, borderRadius: 12, padding: 16, marginBottom: 20, gap: 12 },
-    infoText: { flex: 1, fontSize: 14, color: colors.textSecondary, lineHeight: 20 },
-    categoryCard: { backgroundColor: colors.card, borderRadius: 12, marginBottom: 12, overflow: 'hidden', boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)', elevation: 3 },
-    categoryHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
-    categoryHeaderLeft: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: 12 },
-    categoryHeaderText: { flex: 1 },
-    categoryTitle: { fontSize: 16, fontWeight: '600', color: colors.text, marginBottom: 2 },
-    categoryItemCount: { fontSize: 13, color: colors.textSecondary },
-    categoryActions: { flexDirection: 'row', gap: 8 },
-    actionButton: { padding: 8 },
-    itemsContainer: { paddingBottom: 8 },
-    itemRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.border },
-    itemText: { flex: 1, fontSize: 15, color: colors.text, lineHeight: 22, marginRight: 12 },
-    itemActions: { flexDirection: 'row', gap: 4 },
-    addItemButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, paddingHorizontal: 16, marginTop: 8, marginHorizontal: 16, borderRadius: 8, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderStyle: 'dashed', gap: 8 },
-    addItemText: { fontSize: 15, fontWeight: '600', color: colors.highlight },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-    modalContent: { backgroundColor: colors.card, borderRadius: 16, padding: 24, width: '100%', maxWidth: 500, maxHeight: '80%' },
-    modalTitle: { fontSize: 20, fontWeight: 'bold', color: colors.text, marginBottom: 20 },
-    label: { fontSize: 14, fontWeight: '600', color: colors.text, marginBottom: 8, marginTop: 16 },
-    input: { backgroundColor: colors.background, borderRadius: 8, padding: 12, fontSize: 16, color: colors.text, borderWidth: 1, borderColor: colors.border },
-    textArea: { minHeight: 80, textAlignVertical: 'top' },
-    categoryPicker: { maxHeight: 200, borderRadius: 8, borderWidth: 1, borderColor: colors.border },
-    categoryOption: { padding: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
-    categoryOptionSelected: { backgroundColor: colors.highlight },
-    categoryOptionText: { fontSize: 15, color: colors.text },
-    categoryOptionTextSelected: { fontWeight: '600' },
-    modalButtons: { flexDirection: 'row', gap: 12, marginTop: 24 },
-    modalButton: { flex: 1, paddingVertical: 12, borderRadius: 8, alignItems: 'center' },
-    cancelButton: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
-    cancelButtonText: { fontSize: 16, fontWeight: '600', color: colors.text },
-    saveButton: { backgroundColor: colors.primary },
-    saveButtonText: { fontSize: 16, fontWeight: '600', color: colors.fireText },
-  });
 
   const [categories, setCategories] = useState<ChecklistCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  
+
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [itemModalVisible, setItemModalVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ChecklistCategory | null>(null);
@@ -110,7 +67,6 @@ export default function BartenderOpeningChecklistEditorScreen() {
 
   const loadChecklist = async () => {
     if (!user?.id) return;
-    console.log('Loading Bartender Opening Checklist for editing');
     try {
       setLoading(true);
 
@@ -151,11 +107,9 @@ export default function BartenderOpeningChecklistEditorScreen() {
       })) || [];
 
       setCategories(categoriesWithItems);
-      
+
       const allCategoryIds = new Set(categoriesWithItems.map(c => c.id));
       setExpandedCategories(allCategoryIds);
-
-      console.log('Loaded checklist with', categoriesWithItems.length, 'categories');
     } catch (error) {
       console.error('Error loading checklist:', error);
       Alert.alert(t('common:error'), t('checklist_editor:error_load_checklist'));
@@ -165,7 +119,6 @@ export default function BartenderOpeningChecklistEditorScreen() {
   };
 
   const toggleCategory = (categoryId: string) => {
-    console.log('Toggling category:', categoryId);
     setExpandedCategories(prev => {
       const newSet = new Set(prev);
       if (newSet.has(categoryId)) {
@@ -178,21 +131,18 @@ export default function BartenderOpeningChecklistEditorScreen() {
   };
 
   const openAddCategoryModal = () => {
-    console.log('Opening add category modal');
     setEditingCategory(null);
     setCategoryName('');
     setCategoryModalVisible(true);
   };
 
   const openEditCategoryModal = (category: ChecklistCategory) => {
-    console.log('Opening edit category modal for:', category.name);
     setEditingCategory(category);
     setCategoryName(category.name);
     setCategoryModalVisible(true);
   };
 
   const openAddItemModal = (categoryId: string) => {
-    console.log('Opening add item modal for category:', categoryId);
     setEditingItem(null);
     setItemText('');
     setSelectedCategoryId(categoryId);
@@ -200,7 +150,6 @@ export default function BartenderOpeningChecklistEditorScreen() {
   };
 
   const openEditItemModal = (item: ChecklistItem) => {
-    console.log('Opening edit item modal for:', item.text);
     setEditingItem(item);
     setItemText(item.text);
     setSelectedCategoryId(item.category_id);
@@ -214,7 +163,6 @@ export default function BartenderOpeningChecklistEditorScreen() {
       return;
     }
 
-    console.log('Saving category:', categoryName);
     setSaving(true);
 
     try {
@@ -227,7 +175,6 @@ export default function BartenderOpeningChecklistEditorScreen() {
       });
 
       if (error) throw error;
-      console.log('Category saved successfully');
 
       setCategoryModalVisible(false);
       loadChecklist();
@@ -240,7 +187,6 @@ export default function BartenderOpeningChecklistEditorScreen() {
   };
 
   const handleDeleteCategory = (category: ChecklistCategory) => {
-    console.log('Deleting category:', category.name);
     Alert.alert(
       t('checklist_editor:delete_category_title'),
       t('checklist_editor:delete_category_confirm', { name: category.name }),
@@ -259,7 +205,6 @@ export default function BartenderOpeningChecklistEditorScreen() {
               });
 
               if (error) throw error;
-              console.log('Category deleted successfully');
               loadChecklist();
             } catch (error) {
               console.error('Error deleting category:', error);
@@ -283,7 +228,6 @@ export default function BartenderOpeningChecklistEditorScreen() {
       return;
     }
 
-    console.log('Saving item:', itemText);
     setSaving(true);
 
     try {
@@ -296,7 +240,6 @@ export default function BartenderOpeningChecklistEditorScreen() {
       });
 
       if (error) throw error;
-      console.log('Item saved successfully');
 
       setItemModalVisible(false);
       loadChecklist();
@@ -309,7 +252,6 @@ export default function BartenderOpeningChecklistEditorScreen() {
   };
 
   const handleDeleteItem = (item: ChecklistItem) => {
-    console.log('Deleting item:', item.text);
     Alert.alert(
       t('checklist_editor:delete_item_title'),
       t('checklist_editor:delete_item_confirm'),
@@ -328,7 +270,6 @@ export default function BartenderOpeningChecklistEditorScreen() {
               });
 
               if (error) throw error;
-              console.log('Item deleted successfully');
               loadChecklist();
             } catch (error) {
               console.error('Error deleting item:', error);
@@ -340,21 +281,62 @@ export default function BartenderOpeningChecklistEditorScreen() {
     );
   };
 
+  // Sheet footer: Cancel (glass) / Save (primary) — the house pair.
+  const sheetFooter = (onCancel: () => void, onSave: () => void) => (
+    <View style={styles.footerRow}>
+      <TouchableOpacity
+        style={[styles.footerBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+        onPress={onCancel}
+        disabled={saving}
+        activeOpacity={0.8}
+      >
+        <Text style={[styles.footerBtnLabel, { color: colors.text }]}>{t('common:cancel')}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.footerBtn, { backgroundColor: colors.primary, borderColor: colors.primary }, saving && { opacity: 0.6 }]}
+        onPress={onSave}
+        disabled={saving}
+        activeOpacity={0.8}
+      >
+        {saving ? (
+          <ActivityIndicator color={colors.fireText} />
+        ) : (
+          <Text style={[styles.footerBtnLabel, { color: colors.fireText }]}>{t('common:save')}</Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+
+  const header = (
+    <>
+      <AmbientGlow />
+      <ScreenHeader
+        title={t('checklist_editor:opening_checklist_editor')}
+        rightWide
+        right={
+          <View style={styles.headerRightRow}>
+            <TouchableOpacity
+              onPress={openAddCategoryModal}
+              style={[styles.addChip, { backgroundColor: colors.primary + '2E', borderColor: colors.primary + '6B' }]}
+            >
+              <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={18} color={colors.primary} />
+            </TouchableOpacity>
+            <HeaderNavButton
+              label={t('common:to_user')}
+              iconIos="person.fill"
+              iconAndroid="person"
+              onPress={() => router.replace('/bartender-opening-checklist')}
+            />
+          </View>
+        }
+      />
+    </>
+  );
+
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol
-              ios_icon_name="chevron.left"
-              android_material_icon_name="arrow-back"
-              size={24}
-              color={colors.text}
-            />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('checklist_editor:opening_checklist_editor')}</Text>
-          <View style={styles.placeholder} />
-        </View>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {header}
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -363,36 +345,18 @@ export default function BartenderOpeningChecklistEditorScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Opening Checklist Editor</Text>
-        <TouchableOpacity onPress={openAddCategoryModal} style={styles.addButton}>
-          <IconSymbol
-            ios_icon_name="plus.circle.fill"
-            android_material_icon_name="add-circle"
-            size={28}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {header}
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        <View style={styles.infoCard}>
+        <View style={[styles.infoCard, { backgroundColor: colors.primary + '15' }]}>
           <IconSymbol
             ios_icon_name="info.circle.fill"
             android_material_icon_name="info"
-            size={24}
+            size={20}
             color={colors.primary}
           />
-          <Text style={styles.infoText}>
+          <Text style={[styles.infoText, { color: colors.text }]}>
             {t('checklist_editor:info_bartender_opening')}
           </Text>
         </View>
@@ -401,7 +365,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
           const isExpanded = expandedCategories.has(category.id);
 
           return (
-            <View key={category.id} style={styles.categoryCard}>
+            <View key={category.id} style={[styles.categoryCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
               <View style={styles.categoryHeader}>
                 <TouchableOpacity
                   style={styles.categoryHeaderLeft}
@@ -411,12 +375,12 @@ export default function BartenderOpeningChecklistEditorScreen() {
                   <IconSymbol
                     ios_icon_name={isExpanded ? 'chevron.down' : 'chevron.right'}
                     android_material_icon_name={isExpanded ? 'expand-more' : 'chevron-right'}
-                    size={24}
-                    color={colors.text}
+                    size={16}
+                    color={colors.textSecondary}
                   />
                   <View style={styles.categoryHeaderText}>
-                    <Text style={styles.categoryTitle}>{category.name}</Text>
-                    <Text style={styles.categoryItemCount}>
+                    <Text style={[styles.categoryTitle, { color: colors.text }]}>{category.name}</Text>
+                    <Text style={[styles.categoryItemCount, { color: colors.textSecondary }]}>
                       {t('checklist_editor:items_count', { count: category.items.length })}
                     </Text>
                   </View>
@@ -429,7 +393,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
                     <IconSymbol
                       ios_icon_name="pencil"
                       android_material_icon_name="edit"
-                      size={20}
+                      size={17}
                       color={colors.primary}
                     />
                   </TouchableOpacity>
@@ -440,8 +404,8 @@ export default function BartenderOpeningChecklistEditorScreen() {
                     <IconSymbol
                       ios_icon_name="trash"
                       android_material_icon_name="delete"
-                      size={20}
-                      color="#ff4444"
+                      size={17}
+                      color={TRASH_RED}
                     />
                   </TouchableOpacity>
                 </View>
@@ -450,8 +414,8 @@ export default function BartenderOpeningChecklistEditorScreen() {
               {isExpanded && (
                 <View style={styles.itemsContainer}>
                   {category.items.map((item) => (
-                    <View key={item.id} style={styles.itemRow}>
-                      <Text style={styles.itemText}>{item.text}</Text>
+                    <View key={item.id} style={[styles.itemRow, { borderTopColor: colors.border + '55' }]}>
+                      <Text style={[styles.itemText, { color: colors.text }]}>{item.text}</Text>
                       <View style={styles.itemActions}>
                         <TouchableOpacity
                           onPress={() => openEditItemModal(item)}
@@ -460,7 +424,7 @@ export default function BartenderOpeningChecklistEditorScreen() {
                           <IconSymbol
                             ios_icon_name="pencil"
                             android_material_icon_name="edit"
-                            size={18}
+                            size={16}
                             color={colors.primary}
                           />
                         </TouchableOpacity>
@@ -471,24 +435,24 @@ export default function BartenderOpeningChecklistEditorScreen() {
                           <IconSymbol
                             ios_icon_name="trash"
                             android_material_icon_name="delete"
-                            size={18}
-                            color="#ff4444"
+                            size={16}
+                            color={TRASH_RED}
                           />
                         </TouchableOpacity>
                       </View>
                     </View>
                   ))}
                   <TouchableOpacity
-                    style={styles.addItemButton}
+                    style={[styles.addItemButton, { borderColor: colors.primary + '8C' }]}
                     onPress={() => openAddItemModal(category.id)}
                   >
                     <IconSymbol
-                      ios_icon_name="plus.circle"
-                      android_material_icon_name="add-circle-outline"
-                      size={20}
+                      ios_icon_name="plus"
+                      android_material_icon_name="add"
+                      size={15}
                       color={colors.primary}
                     />
-                    <Text style={styles.addItemText}>{t('checklist_editor:add_item')}</Text>
+                    <Text style={[styles.addItemText, { color: colors.primary }]}>{t('checklist_editor:add_item')}</Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -497,126 +461,249 @@ export default function BartenderOpeningChecklistEditorScreen() {
         })}
       </ScrollView>
 
-      <Modal
+      {/* Add/Edit Category */}
+      <GlassSheet
         visible={categoryModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setCategoryModalVisible(false)}
+        onClose={() => setCategoryModalVisible(false)}
+        title={editingCategory ? t('checklist_editor:edit_category') : t('checklist_editor:add_category')}
+        footer={sheetFooter(() => setCategoryModalVisible(false), handleSaveCategory)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {editingCategory ? t('checklist_editor:edit_category') : t('checklist_editor:add_category')}
-            </Text>
+        <TextInput
+          style={[styles.input, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
+          placeholder={t('checklist_editor:category_name_placeholder')}
+          placeholderTextColor={colors.textSecondary}
+          value={categoryName}
+          onChangeText={setCategoryName}
+          autoFocus
+        />
+      </GlassSheet>
 
-            <TextInput
-              style={styles.input}
-              placeholder={t('checklist_editor:category_name_placeholder')}
-              placeholderTextColor={colors.textSecondary}
-              value={categoryName}
-              onChangeText={setCategoryName}
-              autoFocus
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setCategoryModalVisible(false)}
-                disabled={saving}
-              >
-                <Text style={styles.cancelButtonText}>{t('common:cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleSaveCategory}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color={colors.fireText} />
-                ) : (
-                  <Text style={styles.saveButtonText}>{t('common:save')}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      <Modal
+      {/* Add/Edit Item */}
+      <GlassSheet
         visible={itemModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setItemModalVisible(false)}
+        onClose={() => setItemModalVisible(false)}
+        title={editingItem ? t('checklist_editor:edit_item') : t('checklist_editor:add_item')}
+        footer={sheetFooter(() => setItemModalVisible(false), handleSaveItem)}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {editingItem ? t('checklist_editor:edit_item') : t('checklist_editor:add_item')}
-            </Text>
+        <TextInput
+          style={[styles.input, styles.textArea, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
+          placeholder={t('checklist_editor:item_text_placeholder')}
+          placeholderTextColor={colors.textSecondary}
+          value={itemText}
+          onChangeText={setItemText}
+          multiline
+          numberOfLines={3}
+          autoFocus
+        />
 
-            <TextInput
-              style={[styles.input, styles.textArea]}
-              placeholder={t('checklist_editor:item_text_placeholder')}
-              placeholderTextColor={colors.textSecondary}
-              value={itemText}
-              onChangeText={setItemText}
-              multiline
-              numberOfLines={3}
-              autoFocus
-            />
-
-            <Text style={styles.label}>{t('checklist_editor:category_label')}</Text>
-            <ScrollView style={styles.categoryPicker}>
-              {categories.map((cat) => (
-                <TouchableOpacity
-                  key={cat.id}
-                  style={[
-                    styles.categoryOption,
-                    selectedCategoryId === cat.id && styles.categoryOptionSelected,
-                  ]}
-                  onPress={() => setSelectedCategoryId(cat.id)}
-                >
-                  <Text
-                    style={[
-                      styles.categoryOptionText,
-                      selectedCategoryId === cat.id && styles.categoryOptionTextSelected,
-                    ]}
-                  >
-                    {cat.name}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setItemModalVisible(false)}
-                disabled={saving}
+        <Text style={[styles.sheetLabel, { color: colors.textSecondary }]}>{t('checklist_editor:category_label')}</Text>
+        {categories.map((cat) => {
+          const isCurrent = selectedCategoryId === cat.id;
+          return (
+            <TouchableOpacity
+              key={cat.id}
+              style={[
+                styles.categoryOption,
+                {
+                  backgroundColor: isCurrent ? colors.primary + '2E' : colors.surface,
+                  borderColor: isCurrent ? colors.primary + '6B' : colors.surfaceBorder,
+                },
+              ]}
+              onPress={() => setSelectedCategoryId(cat.id)}
+            >
+              <Text
+                style={[
+                  styles.categoryOptionText,
+                  { color: isCurrent ? colors.primary : colors.text },
+                  isCurrent && { fontFamily: fonts.body.semibold },
+                ]}
+                numberOfLines={1}
               >
-                <Text style={styles.cancelButtonText}>{t('common:cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={handleSaveItem}
-                disabled={saving}
-              >
-                {saving ? (
-                  <ActivityIndicator color={colors.fireText} />
-                ) : (
-                  <Text style={styles.saveButtonText}>{t('common:save')}</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+                {cat.name}
+              </Text>
+              {isCurrent && (
+                <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={16} color={colors.primary} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </GlassSheet>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  headerRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  addChip: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 100,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderRadius: 13,
+    padding: 13,
+    marginBottom: 14,
+    gap: 10,
+  },
+  infoText: {
+    flex: 1,
+    fontFamily: fonts.body.regular,
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  categoryCard: {
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  categoryHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  categoryHeaderText: {
+    flex: 1,
+  },
+  categoryTitle: {
+    fontFamily: fonts.display.semibold,
+    fontSize: 15,
+    marginBottom: 2,
+  },
+  categoryItemCount: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10.5,
+  },
+  categoryActions: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  actionButton: {
+    padding: 8,
+  },
+  itemsContainer: {
+    paddingBottom: 10,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingLeft: 14,
+    paddingRight: 6,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  itemText: {
+    flex: 1,
+    fontFamily: fonts.body.regular,
+    fontSize: 14,
+    lineHeight: 21,
+    marginRight: 8,
+    paddingTop: 6,
+  },
+  itemActions: {
+    flexDirection: 'row',
+  },
+  addItemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    marginTop: 6,
+    marginHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    gap: 7,
+  },
+  addItemText: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 13,
+  },
+  input: {
+    minHeight: 43,
+    borderRadius: 13,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    fontFamily: fonts.body.regular,
+    fontSize: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  sheetLabel: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    marginTop: 12,
+    marginBottom: 7,
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    marginBottom: 8,
+  },
+  categoryOptionText: {
+    flex: 1,
+    fontFamily: fonts.body.regular,
+    fontSize: 14.5,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    gap: 11,
+    paddingTop: 12,
+  },
+  footerBtn: {
+    flex: 1,
+    height: 47,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+  },
+  footerBtnLabel: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 15,
+  },
+});

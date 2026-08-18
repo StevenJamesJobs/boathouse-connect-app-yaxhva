@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bartender Assistant Concepts</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 12px 60px;background:#0C0D11;
+  font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center;max-width:820px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb:focus-visible{outline:2px solid #FF7A2F;outline-offset:2px}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:680px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+
+/* ---------- phone shell + palettes (the ritual set) ---------- */
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --thumbbg:#252A31; --glowA:rgba(230,234,238,0.12); --glowB:rgba(255,122,47,0.10);
+  --danger:#E74C3C; --scrim:rgba(6,10,18,0.55); --blue:#8FA0AC; --bluetext:#CDD8DF;
+  position:relative;width:392px;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--thumbbg:#D8D8DC;--glowA:rgba(58,66,80,0.10);--glowB:rgba(236,106,30,0.12);--danger:#C0392B;--scrim:rgba(6,10,18,0.35);--blue:#7E8A94;--bluetext:#2A313C}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--thumbbg:#2C3E50;--glowA:rgba(74,144,226,0.32);--glowB:rgba(93,173,226,0.16);--blue:#5DADE2;--bluetext:#BFE3F7}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--thumbbg:#CFE4EC;--glowA:rgba(25,118,210,0.18);--glowB:rgba(66,165,245,0.13);--danger:#C0392B;--scrim:rgba(6,10,18,0.35);--blue:#42A5F5;--bluetext:#0D47A1}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--text)}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 96px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.design{display:none;padding:6px 16px 0;animation:fade .35s ease}
+.design.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.concept{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:7px;margin:4px 2px 12px}
+.concept b{color:var(--tint)}
+.concept .ln{flex:1;height:1px;background:var(--hair)}
+
+/* ---------- shared glass pieces ---------- */
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.c38{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.hdr{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
+.hmid{flex:1;text-align:center;min-width:0}
+.eyebrow{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600}
+.htitle{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navpill{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:16px;font-size:12.5px;font-weight:700;color:var(--tint);background:color-mix(in srgb,var(--tint) 11%,transparent);cursor:pointer;white-space:nowrap;flex:0 0 auto}
+.navpill .ic{width:14px;height:14px}
+.navpill .chev{width:11px;height:11px}
+.zlabel{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:14px 2px 10px}
+.zlabel .ln{flex:1;height:1px;background:var(--hair)}
+.zlabel .n{opacity:.8}
+.bcap{font-size:10.5px;color:var(--muted);font-style:italic;margin:2px 2px 10px;line-height:1.45}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+
+/* launcher rows */
+.lrow{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;margin-bottom:10px;cursor:pointer;background:var(--surf);border:1px solid var(--surfbd)}
+.lrow .ichip{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:color-mix(in srgb,var(--tint) 13%,transparent);color:var(--tint)}
+.lrow .bd{flex:1;min-width:0}
+.lrow .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:15px;margin-bottom:2px}
+.lrow .ds{font-size:12px;color:var(--muted);line-height:1.4}
+.lrow .chev{color:var(--muted)}
+.countpill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:700;color:var(--bluetext);background:color-mix(in srgb,var(--blue) 20%,transparent);padding:3px 8px;border-radius:8px;white-space:nowrap;flex:0 0 auto}
+.starnote{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;color:#FFB07A;white-space:nowrap}
+
+/* group card (A checklists) */
+.gcardx{border-radius:14px;background:var(--surf);border:1px solid var(--surfbd);margin-bottom:10px;overflow:hidden}
+.gcardx .ghead{display:flex;align-items:center;gap:12px;padding:13px 14px 6px}
+.subrow{display:flex;align-items:center;gap:11px;margin:8px 12px;padding:11px 12px;border-radius:11px;cursor:pointer;background:var(--glass);border:1px solid var(--glassbd)}
+.subrow:last-child{margin-bottom:12px}
+.subrow .nm{flex:1;font-size:14px;font-weight:600}
+.subrow .ic{color:var(--tint)}
+.subrow .chev{color:var(--muted)}
+
+/* B live tiles */
+.tilerow{display:flex;gap:10px;margin-bottom:10px}
+.ptile{flex:1;border-radius:14px;padding:13px;cursor:pointer;background:var(--surf);border:1px solid var(--surfbd)}
+.ptile .top{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.ptile .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:13.5px;flex:1}
+.ptile .ic{color:var(--tint);width:16px;height:16px}
+.ring{position:relative;width:52px;height:52px;flex:0 0 auto}
+.ring svg{transform:rotate(-90deg)}
+.ring .rlab{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:700}
+.ptile .foot{display:flex;align-items:center;gap:10px}
+.ptile .stat{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted);line-height:1.6}
+.ptile .stat b{color:var(--text);font-size:12px}
+.thumbpeek{display:flex;flex:0 0 auto}
+.thumbpeek span{width:30px;height:30px;border-radius:9px;border:1.5px solid var(--bg);display:inline-flex;align-items:center;justify-content:center;font-size:15px;margin-left:-8px;box-shadow:0 1px 4px rgba(0,0,0,0.25)}
+.thumbpeek span:first-child{margin-left:0}
+
+/* C board */
+.fshelf{display:flex;gap:9px;overflow-x:auto;padding:2px 2px 10px;margin:0 -2px;scrollbar-width:none}
+.fshelf::-webkit-scrollbar{display:none}
+.ftile{width:104px;height:104px;border-radius:13px;flex:0 0 auto;position:relative;overflow:hidden;cursor:pointer;border:1px solid var(--glassbd);display:flex;align-items:center;justify-content:center}
+.ftile .emoji{font-size:34px;text-shadow:0 5px 16px rgba(0,0,0,0.35)}
+.ftile .shade{position:absolute;inset:auto 0 0 0;height:60%;background:linear-gradient(to top,rgba(8,10,14,0.84),transparent)}
+.ftile .meta{position:absolute;left:8px;right:8px;bottom:7px}
+.ftile .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:10.5px;color:#fff;line-height:1.2}
+.ftile .pr{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;color:#FFB07A;font-weight:700}
+.fstar{position:absolute;top:6px;right:6px;background:#FFB07A;color:#1A1E24;border-radius:5px;padding:2px 4px;display:inline-flex}
+.fstar .ic{width:8px;height:8px;stroke-width:2.6}
+.shiftcard{border-radius:14px;background:var(--surf);border:1px solid var(--surfbd);padding:13px;margin-bottom:10px}
+.shiftrow{display:flex;align-items:center;gap:11px;padding:8px 0;cursor:pointer}
+.shiftrow .ic{color:var(--tint);width:17px;height:17px}
+.shiftrow .nm{font-size:13.5px;font-weight:600;width:64px}
+.bar{flex:1;height:9px;border-radius:999px;background:var(--glass);border:1px solid var(--glassbd);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:999px;background:var(--tint)}
+.shiftrow .pct{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:700;width:44px;text-align:right;color:var(--muted)}
+.shiftrow.hot .pct{color:var(--tint)}
+.shiftrow.dim{opacity:.62}
+.nowpill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--fireText);background:var(--tint);padding:2px 6px;border-radius:6px;margin-left:6px}
+.grid2x2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.gtile{border-radius:14px;padding:13px;min-height:96px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;background:var(--surf);border:1px solid var(--surfbd)}
+.gtile .ichip{width:34px;height:34px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb,var(--tint) 13%,transparent);color:var(--tint)}
+.gtile .toprow{display:flex;align-items:center;justify-content:space-between}
+.gtile .thumbpeek span{width:24px;height:24px;border-radius:8px;font-size:12px;margin-left:-7px}
+.gtile .thumbpeek span:first-child{margin-left:0}
+.gtile .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:13.5px;line-height:1.2;margin-top:8px}
+.gtile .ct{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted);margin-top:3px}
+.gtile .ct b{color:var(--tint)}
+
+/* bottom nav dock */
+.dock{position:absolute;left:14px;right:14px;bottom:16px;z-index:5;display:flex;border-radius:22px;padding:9px 6px;background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.dock span{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:8.5px;font-weight:600}
+.dock span.on{color:var(--tint)}
+.dock .ic{width:19px;height:19px}
+
+/* options sheet */
+.ovl{position:absolute;inset:0;z-index:40;display:none;align-items:flex-end;background:var(--scrim)}
+.ovl.show{display:flex}
+.sheet{position:relative;width:100%;max-height:80%;border-radius:26px 26px 0 0;padding:10px 18px 26px;overflow-y:auto;scrollbar-width:none;
+  background:var(--glass);border:1px solid var(--glassbd);border-bottom:0;backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);animation:up .3s ease}
+@keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--glassbd);margin:0 auto 10px}
+.shead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.shead .t{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px}
+.xbtn{width:34px;height:34px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;background:var(--surf);border:1px solid var(--surfbd)}
+.arow{display:flex;align-items:center;gap:11px;padding:13px 12px;border-radius:13px;margin-bottom:8px;cursor:pointer;background:var(--surf);border:1px solid var(--surfbd);font-size:14px;font-weight:600}
+.arow .ic{width:16px;height:16px;color:var(--tint)}
+.arow.dim{opacity:.4}
+.tipfoot{font-size:10.5px;color:var(--muted);font-style:italic;margin-top:8px;line-height:1.5;text-align:center}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+<symbol id="i-fwd" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3l4 4L8 20l-5 1 1-5z"/></symbol>
+<symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12l5 5L20 6"/></symbol>
+<symbol id="i-checklist" viewBox="0 0 24 24"><path d="M4 6l2 2 3-3M4 13l2 2 3-3M4 20l2 2 3-3" stroke-width="1.8"/><path d="M12 6h9M12 13h9M12 20h9"/></symbol>
+<symbol id="i-sunrise" viewBox="0 0 24 24"><path d="M12 3v4M5 10l1.5 1.5M19 10l-1.5 1.5M3 17h18M7 17a5 5 0 0 1 10 0"/></symbol>
+<symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 13A8 8 0 1 1 11 4a7 7 0 0 0 9 9z"/></symbol>
+<symbol id="i-snow" viewBox="0 0 24 24"><path d="M12 2v20M4 6l16 12M20 6L4 18M8 4l4 3 4-3M8 20l4-3 4 3"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.5 4.5l2 2M17.5 17.5l2 2M19.5 4.5l-2 2M6.5 17.5l-2 2"/></symbol>
+<symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="4" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="4" cy="18" r="1" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-drop" viewBox="0 0 24 24"><path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.8 6.3.7-4.7 4.3 1.3 6.2L12 16.9 6.4 20l1.3-6.2L3 9.5l6.3-.7z"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+<symbol id="i-fork" viewBox="0 0 24 24"><path d="M7 3v7a2 2 0 0 0 2 2h0V3M9 12v9M16 3c-1.5 1-2.5 3-2.5 5.5 0 2 1 3.5 2.5 3.5V21M16 3v9"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-cal" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></symbol>
+<symbol id="i-msg" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-8 8H4l2-3a8 8 0 1 1 15-5z"/></symbol>
+<symbol id="i-tools" viewBox="0 0 24 24"><path d="M14 7l3-3 3 3-3 3zM4 20l6-6M10 4L4 10l4 4 6-6z"/></symbol>
+</defs></svg>
+
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Concept</span>
+    <button class="tb" data-c="a">A · Glass Hub</button>
+    <button class="tb" data-c="b">B · Live Tiles</button>
+    <button class="tb" data-c="c">C · Backbar Board</button>
+    <button class="tb on" data-c="d">D · Board Mix</button>
+    <button class="tb" data-c="e">E · Tiles Mix</button>
+  </div>
+  <div class="grp"><span class="gl2">Side</span>
+    <button class="tb on" data-s="u">User</button>
+    <button class="tb" data-s="e">Editor</button>
+  </div>
+  <div class="grp"><span class="gl2">Palette</span>
+    <button class="tb on" data-t="">Mono·D</button>
+    <button class="tb" data-t="t-mono-l">Mono·L</button>
+    <button class="tb" data-t="t-ocean-d">Ocean·D</button>
+    <button class="tb" data-t="t-ocean-l">Ocean·L</button>
+  </div>
+</div>
+<p class="hint">Round 2 — the mix. <b>D · Board Mix</b> = Backbar Board base: Featured shelf → B's progress RINGS → the 2×2 grid with the photo peeks tucked top-right of each tile (icon left, appetite right). <b>E · Tiles Mix</b> = the Featured shelf dropped onto Live Tiles (rings + launcher rows with peeks). The "Now" pill rides the active shift's ring tile in both (client clock). A/B/C stay for reference. Tap the <b>To Editor / To User dropdown</b> — the options sheet is live.</p>
+
+<div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div>
+  <div class="sb"><span>9:41</span><span>𝗠𝗥</span></div>
+  <div class="screen" id="screen"></div>
+
+  <div class="dock">
+    <span><svg class="ic"><use href="#i-home"/></svg>Home</span>
+    <span><svg class="ic"><use href="#i-cal"/></svg>Schedule</span>
+    <span><svg class="ic"><use href="#i-msg"/></svg>Messages</span>
+    <span class="on"><svg class="ic"><use href="#i-tools"/></svg>Tools</span>
+  </div>
+
+  <div class="ovl" id="navovl"><div class="sheet" id="navsheet"></div></div>
+</div>
+
+<script>
+(function(){
+  var phone=document.getElementById('phone');
+  function all(s,fn){[].slice.call(document.querySelectorAll(s)).forEach(fn)}
+  function el(id){return document.getElementById(id)}
+  function I(n,sz,cls){return '<svg class="ic'+(cls?' '+cls:'')+'"'+(sz?' style="width:'+sz+'px;height:'+sz+'px"':'')+'><use href="#i-'+n+'"/></svg>'}
+
+  /* ---------- fixture data (Boathouse-flavoured) ---------- */
+  var FEATURED=[
+    {n:'Boathouse Punch',p:'$14',e:'🍹',c:['#B33E2C','#E8843C']},
+    {n:'Espresso Martini',p:'$15',e:'☕',c:['#2E2320','#6B4A38']},
+    {n:'Watermelon Sangria',p:'$13',e:'🍉',c:['#B03A4A','#E0656F']},
+  ];
+  var D={
+    open:{done:12,total:18}, close:{done:0,total:16},
+    openCats:4, closeCats:3,
+    m1:{name:'Winter', icon:'snow', count:14, feat:2, peek:['🍹','🥃','🍸']},
+    m2:{name:'Summer', icon:'sun',  count:11, feat:1, peek:['🍉','🍹','🍋']},
+    az:{count:26, peek:['🍸','🥃','🍹']},
+    mix:{count:8, cats:3, peek:['🥤','🍯','🫐']},
+  };
+  var pct=function(x){return Math.round(x.done/x.total*100)};
+
+  /* ---------- shared pieces ---------- */
+  function header(side,title){
+    var isU=side==='u';
+    return '<div class="hdr"><span class="c38">'+I('back',18)+'</span>'
+      +'<div class="hmid"><div class="htitle">'+title+'</div><div class="eyebrow">Bar Assistant</div></div>'
+      +'<span class="navpill" data-nav="'+side+'">'+I(isU?'pencil':'person',13)+(isU?'To Editor':'To User')+I('down',11,'chev')+'</span></div>';
+  }
+  function launcher(icon,nm,ds,extra){
+    return '<div class="lrow"><span class="ichip">'+I(icon,19)+'</span>'
+      +'<span class="bd"><div class="nm">'+nm+'</div><div class="ds">'+ds+'</div></span>'
+      +(extra||'')+I('fwd',15,'chev')+'</div>';
+  }
+  function peek(arr){
+    return '<span class="thumbpeek">'+arr.map(function(e,i){
+      var g=['#B33E2C,#E8843C','#3A2E4F,#7C4A6B','#2F6B4F,#5FA582'][i%3];
+      return '<span style="background:linear-gradient(140deg,'+g+')">'+e+'</span>';
+    }).join('')+'</span>';
+  }
+
+  /* ---------- A · Glass Hub ---------- */
+  function conceptA(side){
+    var u=side==='u', sfx=u?'':' Editor';
+    var h='<div class="concept"><b>A · Glass Hub</b> · '+(u?'user':'editor')+' · today\'s layout, glassed<span class="ln"></span></div>';
+    h+=header(side, u?'Bartender Assistant':'Bar Assistant Editor');
+    h+='<div class="gcardx"><div class="ghead"><span style="color:var(--tint)">'+I('checklist',26)+'</span>'
+      +'<span style="flex:1"><div class="lrow-nm" style="font-family:\'Bricolage Grotesque\',\'Avenir Next\',system-ui,sans-serif;font-weight:600;font-size:15px">Checklists'+sfx+'</div>'
+      +'<div style="font-size:12px;color:var(--muted)">'+(u?'Daily opening and closing duties':'Manage the opening and closing lists')+'</div></span></div>'
+      +'<div class="subrow">'+I('sunrise',17)+'<span class="nm">Opening Checklist'+sfx+'</span>'+I('fwd',14,'chev')+'</div>'
+      +'<div class="subrow">'+I('moon',16)+'<span class="nm">Closing Checklist'+sfx+'</span>'+I('fwd',14,'chev')+'</div></div>';
+    h+=launcher('snow','Winter Libation Recipes'+sfx, u?'Winter menu cocktail builds':'Manage the Winter menu builds');
+    h+=launcher('sun','Summer Libation Recipes'+sfx, u?'Summer menu cocktail builds':'Manage the Summer menu builds');
+    h+=launcher('list','Cocktails A-Z'+sfx, u?'The classic cocktail reference':'Manage the A-Z reference');
+    h+=launcher('drop','Mixes & Essential Recipes'+sfx, u?'Purées, syrups & essential prep':'Manage mixes & essential prep');
+    return h;
+  }
+
+  /* ---------- B · Live Tiles ---------- */
+  function ring(p,label){
+    var r=21,c=2*Math.PI*r,off=c*(1-p/100);
+    return '<span class="ring"><svg width="52" height="52"><circle cx="26" cy="26" r="'+r+'" stroke="var(--glassbd)" stroke-width="5" fill="none"/>'
+      +'<circle cx="26" cy="26" r="'+r+'" stroke="var(--tint)" stroke-width="5" fill="none" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'"/></svg>'
+      +'<span class="rlab" style="color:'+(p>0?'var(--tint)':'var(--muted)')+'">'+label+'</span></span>';
+  }
+  function conceptB(side){
+    var u=side==='u', sfx=u?'':' Editor';
+    var h='<div class="concept"><b>B · Live Tiles</b> · '+(u?'user':'editor')+' · same list, live data<span class="ln"></span></div>';
+    h+=header(side, u?'Bartender Assistant':'Bar Assistant Editor');
+    h+='<div class="zlabel">Checklists<span class="ln"></span></div>';
+    if(u){
+      h+='<div class="tilerow">'
+        +'<div class="ptile"><div class="top">'+I('sunrise',16)+'<span class="nm">Opening</span></div>'
+        +'<div class="foot">'+ring(pct(D.open),pct(D.open)+'%')+'<span class="stat"><b>'+D.open.done+' / '+D.open.total+'</b><br>done today</span></div></div>'
+        +'<div class="ptile"><div class="top">'+I('moon',15)+'<span class="nm">Closing</span></div>'
+        +'<div class="foot">'+ring(pct(D.close),pct(D.close)+'%')+'<span class="stat"><b>'+D.close.done+' / '+D.close.total+'</b><br>done today</span></div></div></div>';
+    }else{
+      h+='<div class="tilerow">'
+        +'<div class="ptile"><div class="top">'+I('sunrise',16)+'<span class="nm">Opening'+sfx+'</span></div>'
+        +'<div class="foot">'+ring(100,D.open.total)+'<span class="stat"><b>'+D.open.total+' items</b><br>'+D.openCats+' categories</span></div></div>'
+        +'<div class="ptile"><div class="top">'+I('moon',15)+'<span class="nm">Closing'+sfx+'</span></div>'
+        +'<div class="foot">'+ring(100,D.close.total)+'<span class="stat"><b>'+D.close.total+' items</b><br>'+D.closeCats+' categories</span></div></div></div>';
+    }
+    h+='<div class="zlabel">Recipes<span class="ln"></span></div>';
+    h+=launcher(D.m1.icon, D.m1.name+' Libations'+sfx,
+      '<span class="countpill">'+D.m1.count+'</span> <span class="starnote">'+D.m1.feat+' ✦ featured</span>', peek(D.m1.peek));
+    h+=launcher(D.m2.icon, D.m2.name+' Libations'+sfx,
+      '<span class="countpill">'+D.m2.count+'</span> <span class="starnote">'+D.m2.feat+' ✦ featured</span>', peek(D.m2.peek));
+    h+=launcher('list','Cocktails A-Z'+sfx,'<span class="countpill">'+D.az.count+'</span> classics on file', peek(D.az.peek));
+    h+=launcher('drop','Mixes & Essentials'+sfx,'<span class="countpill">'+D.mix.count+'</span> across '+D.mix.cats+' categories', peek(D.mix.peek));
+    h+='<div class="bcap">Counts, ✦ and progress come from the same RPCs the pages already call — one light fetch on focus. Photo peeks reuse the recipe thumbnails.</div>';
+    return h;
+  }
+
+  /* ---------- C · Backbar Board ---------- */
+  function conceptC(side){
+    var u=side==='u', sfx=u?'':' Editor';
+    var h='<div class="concept"><b>C · Backbar Board</b> · '+(u?'user':'editor')+' · featured shelf + shift card + grid<span class="ln"></span></div>';
+    h+=header(side, u?'Bartender Assistant':'Bar Assistant Editor');
+    h+='<div class="zlabel">Featured tonight<span class="ln"></span><span class="n">'+FEATURED.length+'</span></div>';
+    h+='<div class="fshelf">'+FEATURED.map(function(f){
+      return '<div class="ftile" style="background:linear-gradient(140deg,'+f.c[0]+','+f.c[1]+')"><span class="emoji">'+f.e+'</span><span class="shade"></span>'
+        +'<span class="fstar">'+I('star')+'</span>'
+        +'<span class="meta"><div class="nm">'+f.n+'</div><div class="pr">'+f.p+'</div></span></div>';
+    }).join('')+'</div>';
+    h+='<div class="shiftcard">'
+      +'<div class="shiftrow hot">'+I('sunrise',17)+'<span class="nm">Opening<span class="nowpill">Now</span></span><span class="bar"><i style="width:'+pct(D.open)+'%"></i></span><span class="pct">'+pct(D.open)+'%</span></div>'
+      +'<div class="shiftrow dim">'+I('moon',16)+'<span class="nm">Closing</span><span class="bar"><i style="width:'+pct(D.close)+'%"></i></span><span class="pct">'+pct(D.close)+'%</span></div>'
+      +'</div>';
+    h+='<div class="zlabel">Recipes<span class="ln"></span></div>';
+    h+='<div class="grid2x2">'
+      +'<div class="gtile"><span class="ichip">'+I('snow',18)+'</span><div><div class="nm">'+D.m1.name+' Libations'+sfx+'</div><div class="ct">'+D.m1.count+' recipes · <b>'+D.m1.feat+' ✦</b></div></div></div>'
+      +'<div class="gtile"><span class="ichip">'+I('sun',18)+'</span><div><div class="nm">'+D.m2.name+' Libations'+sfx+'</div><div class="ct">'+D.m2.count+' recipes · <b>'+D.m2.feat+' ✦</b></div></div></div>'
+      +'<div class="gtile"><span class="ichip">'+I('list',18)+'</span><div><div class="nm">Cocktails A-Z'+sfx+'</div><div class="ct">'+D.az.count+' classics</div></div></div>'
+      +'<div class="gtile"><span class="ichip">'+I('drop',18)+'</span><div><div class="nm">Mixes & Essentials'+sfx+'</div><div class="ct">'+D.mix.count+' recipes</div></div></div>'
+      +'</div>';
+    h+='<div class="bcap">Featured shelf taps into its menu\'s Libations '+(u?'page':'editor')+' and HIDES at zero ✦ (the Shelf Flow rule). "Now" = pure client clock: before 4pm Opening leads, after 4pm Closing. Grid keeps everything above the fold.</div>';
+    return h;
+  }
+
+  /* ---------- shared mix pieces ---------- */
+  function featShelf(){
+    var h='<div class="zlabel">Featured tonight<span class="ln"></span><span class="n">'+FEATURED.length+'</span></div>';
+    h+='<div class="fshelf">'+FEATURED.map(function(f){
+      return '<div class="ftile" style="background:linear-gradient(140deg,'+f.c[0]+','+f.c[1]+')"><span class="emoji">'+f.e+'</span><span class="shade"></span>'
+        +'<span class="fstar">'+I('star')+'</span>'
+        +'<span class="meta"><div class="nm">'+f.n+'</div><div class="pr">'+f.p+'</div></span></div>';
+    }).join('')+'</div>';
+    return h;
+  }
+  function ringTiles(side){
+    var u=side==='u', sfx=u?'':' Editor';
+    if(u){
+      return '<div class="tilerow">'
+        +'<div class="ptile"><div class="top">'+I('sunrise',16)+'<span class="nm">Opening<span class="nowpill">Now</span></span></div>'
+        +'<div class="foot">'+ring(pct(D.open),pct(D.open)+'%')+'<span class="stat"><b>'+D.open.done+' / '+D.open.total+'</b><br>done today</span></div></div>'
+        +'<div class="ptile" style="opacity:.78"><div class="top">'+I('moon',15)+'<span class="nm">Closing</span></div>'
+        +'<div class="foot">'+ring(pct(D.close),pct(D.close)+'%')+'<span class="stat"><b>'+D.close.done+' / '+D.close.total+'</b><br>done today</span></div></div></div>';
+    }
+    return '<div class="tilerow">'
+      +'<div class="ptile"><div class="top">'+I('sunrise',16)+'<span class="nm">Opening'+sfx+'</span></div>'
+      +'<div class="foot">'+ring(100,D.open.total)+'<span class="stat"><b>'+D.open.total+' items</b><br>'+D.openCats+' categories</span></div></div>'
+      +'<div class="ptile"><div class="top">'+I('moon',15)+'<span class="nm">Closing'+sfx+'</span></div>'
+      +'<div class="foot">'+ring(100,D.close.total)+'<span class="stat"><b>'+D.close.total+' items</b><br>'+D.closeCats+' categories</span></div></div></div>';
+  }
+  function peekGrid(side){
+    var sfx=side==='u'?'':' Editor';
+    function tile(icon,nm,ct,peekArr){
+      return '<div class="gtile"><div class="toprow"><span class="ichip">'+I(icon,18)+'</span>'+peek(peekArr)+'</div>'
+        +'<div><div class="nm">'+nm+'</div><div class="ct">'+ct+'</div></div></div>';
+    }
+    return '<div class="grid2x2">'
+      +tile('snow',D.m1.name+' Libations'+sfx,D.m1.count+' recipes · <b>'+D.m1.feat+' ✦</b>',D.m1.peek)
+      +tile('sun',D.m2.name+' Libations'+sfx,D.m2.count+' recipes · <b>'+D.m2.feat+' ✦</b>',D.m2.peek)
+      +tile('list','Cocktails A-Z'+sfx,D.az.count+' classics',D.az.peek)
+      +tile('drop','Mixes & Essentials'+sfx,D.mix.count+' recipes',D.mix.peek)
+      +'</div>';
+  }
+
+  /* ---------- D · Board Mix ---------- */
+  function conceptD(side){
+    var u=side==='u';
+    var h='<div class="concept"><b>D · Board Mix</b> · '+(u?'user':'editor')+' · shelf + rings + peek grid<span class="ln"></span></div>';
+    h+=header(side, u?'Bartender Assistant':'Bar Assistant Editor');
+    h+=featShelf();
+    h+='<div class="zlabel">Checklists<span class="ln"></span></div>';
+    h+=ringTiles(side);
+    h+='<div class="zlabel">Recipes<span class="ln"></span></div>';
+    h+=peekGrid(side);
+    h+='<div class="bcap">The peeks ride the tile\'s top-right — icon left, appetite right, name and count keep the floor. "Now" rides the active shift\'s ring (client clock); the off-shift tile rests at 78%.</div>';
+    return h;
+  }
+
+  /* ---------- E · Tiles Mix ---------- */
+  function conceptE(side){
+    var u=side==='u', sfx=u?'':' Editor';
+    var h='<div class="concept"><b>E · Tiles Mix</b> · '+(u?'user':'editor')+' · shelf + rings + live rows<span class="ln"></span></div>';
+    h+=header(side, u?'Bartender Assistant':'Bar Assistant Editor');
+    h+=featShelf();
+    h+='<div class="zlabel">Checklists<span class="ln"></span></div>';
+    h+=ringTiles(side);
+    h+='<div class="zlabel">Recipes<span class="ln"></span></div>';
+    h+=launcher(D.m1.icon, D.m1.name+' Libations'+sfx,
+      '<span class="countpill">'+D.m1.count+'</span> <span class="starnote">'+D.m1.feat+' ✦ featured</span>', peek(D.m1.peek));
+    h+=launcher(D.m2.icon, D.m2.name+' Libations'+sfx,
+      '<span class="countpill">'+D.m2.count+'</span> <span class="starnote">'+D.m2.feat+' ✦ featured</span>', peek(D.m2.peek));
+    h+=launcher('list','Cocktails A-Z'+sfx,'<span class="countpill">'+D.az.count+'</span> classics on file', peek(D.az.peek));
+    h+=launcher('drop','Mixes & Essentials'+sfx,'<span class="countpill">'+D.mix.count+'</span> across '+D.mix.cats+' categories', peek(D.mix.peek));
+    h+='<div class="bcap">The Featured shelf dropped straight onto Live Tiles — rows breathe more than the grid, at the cost of one extra scroll to reach Mixes.</div>';
+    return h;
+  }
+
+  /* ---------- options sheet (the nav dropdown) ---------- */
+  function navSheet(side){
+    var u=side==='u';
+    var h='<div class="grab"></div>';
+    h+='<div class="shead"><span class="t">'+(u?'Bartender Assistant':'Bar Assistant Editor')+'</span><span class="xbtn" data-close="navovl">'+I('x',14)+'</span></div>';
+    h+='<div class="arow">'+I(u?'pencil':'person',16)+(u?'To Editor':'To User')+'</div>';
+    h+='<div class="arow">'+I('grid',16)+'Edit Categories</div>';
+    h+='<div class="arow">'+I('fork',16)+'Edit Menu</div>';
+    h+='<div class="arow dim">'+I('star',16)+'Upload Cocktails · Premium (later)</div>';
+    h+='<div class="tipfoot">The same GlassActionSheet the recipe pages ship with — Edit Categories deep-links to Libations; the premium upload row joins it later.</div>';
+    return h;
+  }
+
+  /* ---------- wiring ---------- */
+  var state={c:'d',s:'u'};
+  var CONCEPTS={a:conceptA,b:conceptB,c:conceptC,d:conceptD,e:conceptE};
+  function show(){
+    el('screen').innerHTML='<div class="design on">'+CONCEPTS[state.c](state.s)+'</div>';
+    all('[data-nav]',function(x){x.onclick=function(){
+      el('navsheet').innerHTML=navSheet(x.getAttribute('data-nav'));
+      el('navovl').classList.add('show');
+      all('[data-close]',function(b){b.onclick=function(){el(b.getAttribute('data-close')).classList.remove('show')}});
+    }});
+  }
+  show();
+  all('.ovl',function(o){o.addEventListener('click',function(e){if(e.target===o)o.classList.remove('show')})});
+  all('[data-c]',function(b){b.addEventListener('click',function(){
+    all('[data-c]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    state.c=b.getAttribute('data-c'); show();
+  })});
+  all('[data-s]',function(b){b.addEventListener('click',function(){
+    all('[data-s]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    state.s=b.getAttribute('data-s'); show();
+  })});
+  all('[data-t]',function(b){b.addEventListener('click',function(){
+    all('[data-t]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    phone.className='phone '+b.getAttribute('data-t');
+  })});
+})();
+</script>
+</body>
+</html>

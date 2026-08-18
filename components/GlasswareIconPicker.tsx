@@ -13,7 +13,9 @@ import {
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import FontAwesome5 from '@expo/vector-icons/FontAwesome5';
 import { IconSymbol } from './IconSymbol';
+import GlassCard from '@/components/GlassCard';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { fonts } from '@/constants/fonts';
 import {
   GLASSWARE_OPTIONS,
   GLASSWARE_ICONS,
@@ -120,7 +122,8 @@ export default function GlasswareIconPicker({
           style={styles.container}
         >
           <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={() => setOpen(false)} />
-          <View style={styles.sheet}>
+          <GlassCard variant="glass" radius={26} intensity={32} style={styles.sheet}>
+            <View style={[styles.grab, { backgroundColor: colors.glassBorder }]} />
             <View style={styles.header}>
               <Text style={styles.title} numberOfLines={1}>{title}</Text>
               <TouchableOpacity onPress={() => setOpen(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
@@ -191,13 +194,16 @@ export default function GlasswareIconPicker({
                 </TouchableOpacity>
               </ScrollView>
             )}
-          </View>
+          </GlassCard>
         </KeyboardAvoidingView>
       </Modal>
     </>
   );
 }
 
+// Glass-kit restyle (s73): trigger matches the sheets' formInput geometry; the
+// modal rides the GlassSheet shell language (glass card, grab pill, display
+// title) with surface-token cells and the primary-wash active state.
 const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
   StyleSheet.create({
     // Trigger (mirrors SimpleSelectPicker's SelectField)
@@ -205,30 +211,32 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      backgroundColor: colors.background,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
+      backgroundColor: colors.glass,
+      borderRadius: 13,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.glassBorder,
+      minHeight: 43,
+      paddingHorizontal: 13,
+      paddingVertical: 11,
     },
-    fieldText: { flex: 1, fontSize: 16, color: colors.text, paddingRight: 8 },
+    fieldText: { flex: 1, fontFamily: fonts.body.regular, fontSize: 14, color: colors.text, paddingRight: 8 },
     fieldPlaceholder: { color: colors.textSecondary },
 
     // Modal sheet
     container: { flex: 1, justifyContent: 'flex-end' },
-    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.5)' },
+    backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(6,10,18,0.55)' },
     sheet: {
-      backgroundColor: colors.card,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      borderBottomLeftRadius: 0,
+      borderBottomRightRadius: 0,
+      borderBottomWidth: 0,
       maxHeight: '70%',
-      paddingHorizontal: 20,
-      paddingTop: 20,
+      paddingHorizontal: 18,
+      paddingTop: 10,
       paddingBottom: 24,
     },
+    grab: { width: 40, height: 4, borderRadius: 2, alignSelf: 'center', marginBottom: 10 },
     header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 },
-    title: { flex: 1, fontSize: 18, fontWeight: '700', color: colors.text, paddingRight: 12 },
+    title: { flex: 1, fontFamily: fonts.display.bold, fontSize: 19, letterSpacing: -0.2, color: colors.text, paddingRight: 12 },
     scroll: { flexGrow: 0 },
 
     // Grid
@@ -240,16 +248,16 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       paddingVertical: 14,
       paddingHorizontal: 6,
       marginHorizontal: 4,
-      borderRadius: 12,
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
+      borderRadius: 13,
+      backgroundColor: colors.surface,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.surfaceBorder,
       minHeight: 86,
     },
-    cellActive: { borderColor: colors.primary, backgroundColor: colors.primary + '1F' },
+    cellActive: { borderColor: colors.primary + '6B', backgroundColor: colors.primary + '2E' },
     cellSpacer: { flex: 1, marginHorizontal: 4 },
-    cellText: { marginTop: 8, fontSize: 12, color: colors.text, textAlign: 'center' },
-    cellTextActive: { color: colors.primary, fontWeight: '600' },
+    cellText: { marginTop: 8, fontFamily: fonts.body.regular, fontSize: 11.5, color: colors.text, textAlign: 'center' },
+    cellTextActive: { color: colors.primary, fontFamily: fonts.body.semibold },
 
     // Custom row + input
     customRow: {
@@ -259,26 +267,33 @@ const createStyles = (colors: ReturnType<typeof useThemeColors>) =>
       gap: 8,
       paddingVertical: 14,
       paddingHorizontal: 16,
-      borderRadius: 12,
+      borderRadius: 13,
       marginTop: 4,
-      backgroundColor: colors.background,
-      borderWidth: 1,
+      backgroundColor: colors.surface,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
       borderStyle: 'dashed',
-      borderColor: colors.primary,
+      borderColor: colors.primary + '8C',
     },
-    customRowText: { fontSize: 15, color: colors.primary, fontWeight: '600' },
+    customRowText: { fontFamily: fonts.body.semibold, fontSize: 14, color: colors.primary },
     customWrap: { paddingTop: 4 },
     customInput: {
-      backgroundColor: colors.background,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      fontSize: 16,
+      backgroundColor: colors.glass,
+      borderRadius: 13,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.glassBorder,
+      paddingHorizontal: 13,
+      paddingVertical: 12,
+      fontFamily: fonts.body.regular,
+      fontSize: 15,
       color: colors.text,
     },
     customActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 12, marginTop: 14 },
-    backBtn: { padding: 10, borderRadius: 10, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
-    confirmBtn: { paddingHorizontal: 22, paddingVertical: 10, borderRadius: 10, backgroundColor: colors.primary, alignItems: 'center' },
+    backBtn: {
+      padding: 10,
+      borderRadius: 11,
+      backgroundColor: colors.glass,
+      borderWidth: StyleSheet.hairlineWidth + 0.5,
+      borderColor: colors.glassBorder,
+    },
+    confirmBtn: { paddingHorizontal: 22, paddingVertical: 10, borderRadius: 11, backgroundColor: colors.primary, alignItems: 'center' },
   });

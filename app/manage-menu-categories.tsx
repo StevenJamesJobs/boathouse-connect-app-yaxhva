@@ -15,7 +15,7 @@ import {
   FlatList,
   useWindowDimensions,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -433,8 +433,12 @@ export default function ManageMenuCategoriesScreen() {
   const { perms, loading: permsLoading } = useManagerPermissions();
   const { organizationId, organization, isLoading: orgLoading } = useOrganization();
   const perMenu = organization?.menu_category_scope === 'per_menu';
+  // Deep-link (s73, the recipe screens' nav menu): ?cat=<system_key> lands the
+  // pager on that category; ?slot=2 opens Menu 2's tree in per-menu scope.
+  const deepLink = useLocalSearchParams<{ cat?: string; slot?: string }>();
+  const deepLinkCatApplied = useRef(false);
   // In per-menu scope the owner edits one menu's tree at a time (slot 1 / 2).
-  const [editSlot, setEditSlot] = useState<1 | 2>(1);
+  const [editSlot, setEditSlot] = useState<1 | 2>(deepLink.slot === '2' ? 2 : 1);
   const { categories: hookCats, loading, refresh } = useMenuCategories({ includeHidden: true, menuSlot: editSlot });
 
   // Local mirror so drag-reorder is snappy; re-synced whenever the hook reloads.
@@ -452,14 +456,23 @@ export default function ManageMenuCategoriesScreen() {
   const [nameInputEs, setNameInputEs] = useState('');
   const [busy, setBusy] = useState(false);
 
-  // The expanded panel always shows one category — default to the first, and
+  // The expanded panel always shows one category — default to the first (or
+  // the deep-linked system_key, applied once on the first loaded tree), and
   // re-point when the tree changes under us (slot switch, delete).
   useEffect(() => {
     if (!cats.length) return;
+    if (!deepLinkCatApplied.current && deepLink.cat) {
+      deepLinkCatApplied.current = true;
+      const target = cats.find((c) => c.system_key === deepLink.cat);
+      if (target) {
+        setSelectedCategoryId(target.id);
+        return;
+      }
+    }
     if (!selectedCategoryId || !cats.some((c) => c.id === selectedCategoryId)) {
       setSelectedCategoryId(cats[0].id);
     }
-  }, [cats, selectedCategoryId]);
+  }, [cats, selectedCategoryId, deepLink.cat]);
 
   // ── Pager ↔ rail sync (s72 round 4) ─────────────────────────────────────────
   // The content below the rail is a REAL pager (horizontal FlatList,
