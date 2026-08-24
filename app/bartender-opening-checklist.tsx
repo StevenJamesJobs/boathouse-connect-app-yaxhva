@@ -16,6 +16,8 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
 import { isManagerOrOwner } from '@/utils/roles';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/translateContent';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavButton from '@/components/HeaderNavButton';
@@ -24,6 +26,7 @@ import { fonts } from '@/constants/fonts';
 interface ChecklistItem {
   id: string;
   text: string;
+  text_es: string | null;
   display_order: number;
   completed: boolean;
 }
@@ -31,6 +34,7 @@ interface ChecklistItem {
 interface ChecklistCategory {
   id: string;
   name: string;
+  name_es: string | null;
   display_order: number;
   items: ChecklistItem[];
 }
@@ -39,6 +43,7 @@ export default function BartenderOpeningChecklistScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const { t } = useTranslation();
+  const { language } = useLanguage();
   const isManager = isManagerOrOwner(user);
   const [categories, setCategories] = useState<ChecklistCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,12 +103,14 @@ export default function BartenderOpeningChecklistScreen() {
       const categoriesWithItems: ChecklistCategory[] = categoriesData?.map(cat => ({
         id: cat.id,
         name: cat.name,
+        name_es: cat.name_es,
         display_order: cat.display_order,
         items: itemsData
           ?.filter(item => item.category_id === cat.id)
           .map(item => ({
             id: item.id,
             text: item.text,
+            text_es: item.text_es,
             display_order: item.display_order,
             completed: progressMap.get(item.id) || false,
           })) || [],
@@ -261,7 +268,7 @@ export default function BartenderOpeningChecklistScreen() {
                   />
                   <View style={styles.categoryHeaderText}>
                     <Text style={[styles.categoryTitle, { color: colors.text }]}>
-                      {category.name}
+                      {getLocalizedField(category, 'name', language)}
                     </Text>
                     <Text style={[styles.categoryProgress, { color: colors.textSecondary }]}>
                       {t('checklist.category_progress', { done: categoryProgress, total: category.items.length })}
@@ -298,7 +305,7 @@ export default function BartenderOpeningChecklistScreen() {
                           item.completed && styles.itemTextCompleted,
                         ]}
                       >
-                        {item.text}
+                        {getLocalizedField(item, 'text', language)}
                       </Text>
                     </TouchableOpacity>
                   ))}

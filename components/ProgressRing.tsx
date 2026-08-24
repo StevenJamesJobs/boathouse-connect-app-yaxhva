@@ -87,11 +87,15 @@ export default function ProgressRing({
           <HalfRing size={size} stroke={stroke} color={color} rotate={rightRot} />
         </View>
       </View>
-      {/* 50–100%: arc continues through the left half */}
+      {/* 50–100%: arc continues through the left half. The −180 basis parks the
+          coloured semicircle in the EAST (hidden) side at φ=0 so the visible
+          west arc grows upward from 6 o'clock: visible = [S .. S+φ]. Without it
+          the west half starts FULLY shown and shrinks as φ grows — the s74
+          smoke bug where 60% looked fuller than 80% and 100% was half a ring. */}
       {leftRot > 0 && (
         <View style={{ position: 'absolute', left: 0, top: 0, width: half, height: size, overflow: 'hidden' }}>
           <View style={{ position: 'absolute', left: 0, width: size, height: size }}>
-            <HalfRing size={size} stroke={stroke} color={color} rotate={leftRot} />
+            <HalfRing size={size} stroke={stroke} color={color} rotate={leftRot - 180} />
           </View>
         </View>
       )}

@@ -31,6 +31,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { RECIPE_TILE_SIZE } from '@/components/RecipeGridCard';
 import { menuIconAndroid } from '@/constants/menuIcons';
 import { fonts } from '@/constants/fonts';
+import { appleGreen } from '@/constants/Colors';
 
 // The s73 Board Mix hub: Featured shelf (✦ across both libation menus) →
 // checklist progress rings → the 2×2 recipe launcher grid with photo peeks.
@@ -157,42 +158,47 @@ export default function BartenderAssistantScreen() {
   const ringTile = (opts: {
     iconIos: string; iconAndroid: string; name: string; now: boolean;
     stat: { done: number; total: number }; route: string;
-  }) => (
-    <TouchableOpacity
-      style={[
-        styles.ringTile,
-        { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
-        !opts.now && styles.ringTileOff,
-      ]}
-      onPress={() => router.push(opts.route as any)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.ringTileTop}>
-        <IconSymbol ios_icon_name={opts.iconIos} android_material_icon_name={opts.iconAndroid} size={16} color={colors.primary} />
-        <Text style={[styles.ringTileName, { color: colors.text }]} numberOfLines={1}>{opts.name}</Text>
-        {opts.now && (
-          <View style={[styles.nowPill, { backgroundColor: colors.primary }]}>
-            <Text style={[styles.nowPillText, { color: colors.fireText }]}>{t('bartender_assistant.now_pill').toUpperCase()}</Text>
-          </View>
-        )}
-      </View>
-      <View style={styles.ringTileFoot}>
-        <ProgressRing
-          pct={pct(opts.stat)}
-          color={colors.primary}
-          trackColor={colors.glassBorder}
-        >
-          <Text style={[styles.ringLabel, { color: pct(opts.stat) > 0 ? colors.primary : colors.textSecondary }]}>
-            {pct(opts.stat)}%
-          </Text>
-        </ProgressRing>
-        <View>
-          <Text style={[styles.statBig, { color: colors.text }]}>{opts.stat.done} / {opts.stat.total}</Text>
-          <Text style={[styles.statSmall, { color: colors.textSecondary }]}>{t('bartender_assistant.done_today')}</Text>
+  }) => {
+    const p = pct(opts.stat);
+    // All done = the rewarding green (Steve, s74 smoke).
+    const ringColor = p >= 100 ? appleGreen : colors.primary;
+    return (
+      <TouchableOpacity
+        style={[
+          styles.ringTile,
+          { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
+          !opts.now && styles.ringTileOff,
+        ]}
+        onPress={() => router.push(opts.route as any)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.ringTileTop}>
+          <IconSymbol ios_icon_name={opts.iconIos} android_material_icon_name={opts.iconAndroid} size={16} color={colors.primary} />
+          <Text style={[styles.ringTileName, { color: colors.text }]} numberOfLines={1}>{opts.name}</Text>
+          {opts.now && (
+            <View style={[styles.nowPill, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.nowPillText, { color: colors.fireText }]}>{t('bartender_assistant.now_pill').toUpperCase()}</Text>
+            </View>
+          )}
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+        <View style={styles.ringTileFoot}>
+          <ProgressRing
+            pct={p}
+            color={ringColor}
+            trackColor={colors.glassBorder}
+          >
+            <Text style={[styles.ringLabel, { color: p >= 100 ? appleGreen : p > 0 ? colors.primary : colors.textSecondary }]}>
+              {p}%
+            </Text>
+          </ProgressRing>
+          <View>
+            <Text style={[styles.statBig, { color: colors.text }]}>{opts.stat.done} / {opts.stat.total}</Text>
+            <Text style={[styles.statSmall, { color: colors.textSecondary }]}>{t('bartender_assistant.done_today')}</Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   const peekRow = (thumbs: string[]) =>
     thumbs.length > 0 ? (

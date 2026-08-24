@@ -33,7 +33,6 @@ interface TitleMapping {
 // resolves them. The labels reuse the employee_tools names the staff-facing
 // Tools screen already uses, so one assistant has one name app-wide.
 const ASSISTANT_INFO: Record<string, { labelKey: string; descKey: string }> = {
-  server: { labelKey: 'employee_tools:server_assistant', descKey: 'org_settings.assistant_server_desc' },
   bartender: { labelKey: 'employee_tools:bartender_assistant', descKey: 'org_settings.assistant_bartender_desc' },
   host: { labelKey: 'employee_tools:host_assistant', descKey: 'org_settings.assistant_host_desc' },
   kitchen: { labelKey: 'employee_tools:kitchen_assistant', descKey: 'org_settings.assistant_kitchen_desc' },

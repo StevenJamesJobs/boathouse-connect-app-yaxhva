@@ -149,6 +149,7 @@ export type Database = {
           is_active: boolean | null
           organization_id: string
           text: string
+          text_es: string | null
           updated_at: string | null
         }
         Insert: {
@@ -159,6 +160,7 @@ export type Database = {
           is_active?: boolean | null
           organization_id: string
           text: string
+          text_es?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -169,6 +171,7 @@ export type Database = {
           is_active?: boolean | null
           organization_id?: string
           text?: string
+          text_es?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -238,6 +241,7 @@ export type Database = {
           is_active: boolean | null
           organization_id: string
           text: string
+          text_es: string | null
           updated_at: string | null
         }
         Insert: {
@@ -248,6 +252,7 @@ export type Database = {
           is_active?: boolean | null
           organization_id: string
           text: string
+          text_es?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -258,6 +263,7 @@ export type Database = {
           is_active?: boolean | null
           organization_id?: string
           text?: string
+          text_es?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -3389,15 +3395,18 @@ export type Database = {
           card_image_shape: string
           card_image_url: string | null
           card_subtitle: string | null
+          card_subtitle_es: string | null
           created_at: string | null
           display_order: number
           icon: string | null
           id: string
           instructions: string | null
+          instructions_es: string | null
           is_active: boolean
           organization_id: string
           system_key: string | null
           title: string
+          title_es: string | null
           updated_at: string | null
         }[]
       }
@@ -3406,15 +3415,18 @@ export type Database = {
         Returns: {
           created_at: string | null
           display_order: number
+          file_url: string | null
           id: string
           image_shape: string
           image_url: string | null
           link_description: string | null
+          link_description_es: string | null
           link_url: string | null
           organization_id: string
           section_id: string
           system_asset_key: string | null
           title: string | null
+          title_es: string | null
           updated_at: string | null
         }[]
       }
@@ -3456,6 +3468,7 @@ export type Database = {
       create_host_section_tile: {
         Args: {
           p_actor_id: string
+          p_file_url?: string | null
           p_image_shape?: string
           p_image_url?: string | null
           p_link_description?: string | null
@@ -3468,6 +3481,8 @@ export type Database = {
       update_host_section_tile: {
         Args: {
           p_actor_id: string
+          p_clear_file?: boolean
+          p_file_url?: string | null
           p_image_shape: string
           p_image_url: string | null
           p_link_description: string | null
@@ -4587,6 +4602,7 @@ export type Database = {
           display_order: number
           id: string
           name: string
+          name_es: string | null
         }[]
       }
       get_checklist_items: {
@@ -4596,6 +4612,7 @@ export type Database = {
           display_order: number
           id: string
           text: string
+          text_es: string | null
         }[]
       }
       get_my_checklist_progress: {
@@ -5635,6 +5652,22 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_bartender_checklist_category_translations_actor: {
+        Args: { p_actor_id: string; p_id: string; p_name_es?: string | null }
+        Returns: undefined
+      }
+      update_bartender_checklist_item_translations_actor: {
+        Args: { p_actor_id: string; p_id: string; p_text_es?: string | null }
+        Returns: undefined
+      }
+      update_checklist_category_translations_actor: {
+        Args: { p_actor_id: string; p_id: string; p_name_es?: string | null }
+        Returns: undefined
+      }
+      update_checklist_item_translations_actor: {
+        Args: { p_actor_id: string; p_id: string; p_text_es?: string | null }
+        Returns: undefined
+      }
       update_cocktail_translations_actor: {
         Args: { p_actor_id: string; p_id: string; p_procedure_es?: string | null }
         Returns: undefined
@@ -5644,6 +5677,25 @@ export type Database = {
           p_actor_id: string
           p_description_es?: string | null
           p_id: string
+          p_title_es?: string | null
+        }
+        Returns: undefined
+      }
+      update_host_section_tile_translations_actor: {
+        Args: {
+          p_actor_id: string
+          p_id: string
+          p_link_description_es?: string | null
+          p_title_es?: string | null
+        }
+        Returns: undefined
+      }
+      update_host_section_translations_actor: {
+        Args: {
+          p_actor_id: string
+          p_card_subtitle_es?: string | null
+          p_id: string
+          p_instructions_es?: string | null
           p_title_es?: string | null
         }
         Returns: undefined
