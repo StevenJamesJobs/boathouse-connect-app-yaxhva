@@ -7,24 +7,37 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
-  ActionSheetIOS,
-  Platform,
 } from 'react-native';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
+import { StorageImage } from '@/components/StorageImage';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import BottomNavBar from '@/components/BottomNavBar';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOrganization } from '@/contexts/OrganizationContext';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/translateContent';
 import { supabase } from '@/app/integrations/supabase/client';
 import HeaderNavButton from '@/components/HeaderNavButton';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import ProgressRing from '@/components/ProgressRing';
+import GlassActionSheet from '@/components/GlassActionSheet';
 import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { fonts } from '@/constants/fonts';
+import { appleGreen } from '@/constants/Colors';
+
+// Mirrors the user hub (Steve, s74): checklist rings on top (routing to the
+// editors), then the sections manager rendered as the same banner-aware cards
+// with editor affordances (eye toggle + meatball).
 
 interface SectionRow {
   id: string;
   title: string;
+  title_es: string | null;
   card_subtitle: string | null;
+  card_subtitle_es: string | null;
   instructions: string | null;
   card_image_url: string | null;
   card_image_shape: string | null;
@@ -33,6 +46,21 @@ interface SectionRow {
   display_order: number;
 }
 
+interface ChecklistStat {
+  done: number;
+  total: number;
+}
+
+const ANDROID_ICON: Record<string, string> = {
+  'graduationcap.fill': 'school',
+  'book.fill': 'menu-book',
+  'calendar': 'event',
+  'star.fill': 'star',
+  'link': 'link',
+};
+
+const EMPTY_STAT: ChecklistStat = { done: 0, total: 0 };
+
 export default function HostAssistantEditorScreen() {
   useRequireManagerRoute();
   const router = useRouter();
@@ -40,17 +68,57 @@ export default function HostAssistantEditorScreen() {
   const colors = useThemeColors();
   const { user } = useAuth();
   const { organizationId } = useOrganization();
+  const { language } = useLanguage();
   const [sections, setSections] = useState<SectionRow[]>([]);
+  const [tileCounts, setTileCounts] = useState<Record<string, number>>({});
+  const [stats, setStats] = useState<{ opening: ChecklistStat; running: ChecklistStat; closing: ChecklistStat }>({
+    opening: EMPTY_STAT, running: EMPTY_STAT, closing: EMPTY_STAT,
+  });
+  const [actionTarget, setActionTarget] = useState<{ section: SectionRow; index: number } | null>(null);
 
-  const loadSections = useCallback(async () => {
+  const load = useCallback(async () => {
     if (!user?.id) return;
-    const { data } = await supabase.rpc('get_host_sections', {
-      p_actor_id: user.id, p_include_inactive: true,
-    });
-    setSections(data || []);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const [sectionsR, openItems, runItems, closeItems, progress] = await Promise.all([
+        supabase.rpc('get_host_sections', { p_actor_id: user.id, p_include_inactive: true }),
+        supabase.rpc('get_checklist_items', { p_actor_id: user.id, p_bartender: false, p_checklist_type: 'opening' }),
+        supabase.rpc('get_checklist_items', { p_actor_id: user.id, p_bartender: false, p_checklist_type: 'running_side_work' }),
+        supabase.rpc('get_checklist_items', { p_actor_id: user.id, p_bartender: false, p_checklist_type: 'closing' }),
+        supabase.rpc('get_my_checklist_progress', { p_actor_id: user.id, p_bartender: false, p_date: today }),
+      ]);
+
+      const rows = (sectionsR.data as SectionRow[]) || [];
+      setSections(rows);
+
+      const doneIds = new Set(
+        (progress.data || []).filter((p: any) => p.completed).map((p: any) => p.checklist_item_id)
+      );
+      const stat = (items: any[] | null | undefined): ChecklistStat => ({
+        done: (items || []).filter((i) => doneIds.has(i.id)).length,
+        total: (items || []).length,
+      });
+      setStats({
+        opening: stat(openItems.data),
+        running: stat(runItems.data),
+        closing: stat(closeItems.data),
+      });
+
+      const counts = await Promise.all(
+        rows.map((s) => supabase.rpc('get_host_section_tiles', { p_actor_id: user.id, p_section_id: s.id }))
+      );
+      const countMap: Record<string, number> = {};
+      rows.forEach((s, i) => { countMap[s.id] = (counts[i].data || []).length; });
+      setTileCounts(countMap);
+    } catch (e) {
+      console.error('Error loading host editor hub:', e);
+    }
   }, [user?.id]);
 
-  useFocusEffect(useCallback(() => { loadSections(); }, [loadSections]));
+  useFocusEffect(useCallback(() => { load(); }, [load]));
+
+  const pct = (x: ChecklistStat) => (x.total > 0 ? Math.round((x.done / x.total) * 100) : 0);
+  const openingIsNow = new Date().getHours() < 16;
 
   const toggleActive = async (section: SectionRow) => {
     if (!user?.id) return;
@@ -86,192 +154,470 @@ export default function HostAssistantEditorScreen() {
           text: t('common:delete'), style: 'destructive', onPress: async () => {
             if (!user?.id) return;
             await supabase.rpc('delete_host_section', { p_actor_id: user.id, p_section_id: section.id });
-            await loadSections();
+            await load();
           },
         },
       ]
     );
   };
 
-  const sectionActions = (section: SectionRow, index: number) => {
-    const opts = [
-      t('common:edit'),
-      index > 0 ? t('host_assistant_editor.move_up') : null,
-      index < sections.length - 1 ? t('host_assistant_editor.move_down') : null,
-      section.is_active ? t('host_assistant_editor.hide') : t('host_assistant_editor.show'),
-      t('common:delete'),
-      t('common:cancel'),
-    ].filter(Boolean) as string[];
-    const handle = (choice: string) => {
-      if (choice === t('common:edit')) router.push(`/host-section-editor?id=${section.id}` as any);
-      else if (choice === t('host_assistant_editor.move_up')) moveSection(index, -1);
-      else if (choice === t('host_assistant_editor.move_down')) moveSection(index, 1);
-      else if (choice === t('host_assistant_editor.hide') || choice === t('host_assistant_editor.show')) toggleActive(section);
-      else if (choice === t('common:delete')) deleteSection(section);
-    };
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: opts, destructiveButtonIndex: opts.indexOf(t('common:delete')), cancelButtonIndex: opts.indexOf(t('common:cancel')) },
-        (i) => handle(opts[i])
+  const zlabel = (label: string) => (
+    <View style={styles.zlabelRow}>
+      <Text style={[styles.zlabel, { color: colors.textSecondary }]} numberOfLines={1}>
+        {label.toUpperCase()}
+      </Text>
+      <View style={[styles.zlabelLine, { backgroundColor: colors.border + '55' }]} />
+    </View>
+  );
+
+  const ringTile = (opts: {
+    iconIos: string; iconAndroid: string; name: string; a11y: string; now: boolean;
+    stat: ChecklistStat; route: string;
+  }) => {
+    const p = pct(opts.stat);
+    // All done = the rewarding green (Steve, s74 smoke).
+    const ringColor = p >= 100 ? appleGreen : colors.primary;
+    return (
+      <TouchableOpacity
+        style={[
+          styles.ringTile,
+          { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
+          !opts.now && styles.ringTileOff,
+        ]}
+        onPress={() => router.push(opts.route as any)}
+        activeOpacity={0.7}
+        accessibilityLabel={opts.a11y}
+      >
+        <View style={styles.ringTileTop}>
+          <IconSymbol ios_icon_name={opts.iconIos} android_material_icon_name={opts.iconAndroid} size={15} color={colors.primary} />
+          <View style={styles.ringTileTopRight}>
+            {opts.now && (
+              <View style={[styles.nowPill, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.nowPillText, { color: colors.fireText }]}>{t('bartender_assistant.now_pill').toUpperCase()}</Text>
+              </View>
+            )}
+            <IconSymbol ios_icon_name="pencil" android_material_icon_name="edit" size={12} color={colors.textSecondary} />
+          </View>
+        </View>
+        <Text style={[styles.ringTileName, { color: colors.text }]} numberOfLines={1}>{opts.name}</Text>
+        <View style={styles.ringTileFoot}>
+          <ProgressRing
+            pct={p}
+            size={44}
+            stroke={4.5}
+            color={ringColor}
+            trackColor={colors.glassBorder}
+          >
+            <Text style={[styles.ringLabel, { color: p >= 100 ? appleGreen : p > 0 ? colors.primary : colors.textSecondary }]}>
+              {p}%
+            </Text>
+          </ProgressRing>
+          <Text style={[styles.statBig, { color: colors.text }]}>{opts.stat.done}/{opts.stat.total}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const editorChips = (section: SectionRow, index: number) => (
+    <View style={styles.editorChips}>
+      <TouchableOpacity onPress={() => toggleActive(section)} style={styles.rowIconBtn} hitSlop={6}>
+        <IconSymbol
+          ios_icon_name={section.is_active ? 'eye.fill' : 'eye.slash.fill'}
+          android_material_icon_name={section.is_active ? 'visibility' : 'visibility-off'}
+          size={19} color={section.is_active ? colors.primary : colors.textSecondary}
+        />
+      </TouchableOpacity>
+      <TouchableOpacity onPress={() => setActionTarget({ section, index })} style={styles.rowIconBtn} hitSlop={6}>
+        <IconSymbol ios_icon_name="ellipsis" android_material_icon_name="more-horiz" size={19} color={colors.text} />
+      </TouchableOpacity>
+    </View>
+  );
+
+  const countText = (id: string) =>
+    tileCounts[id] !== undefined ? (
+      <Text style={[styles.countText, { color: colors.textSecondary }]} numberOfLines={1}>
+        {t('host_assistant.tiles_count', { count: tileCounts[id] })}
+      </Text>
+    ) : null;
+
+  const sectionCard = (section: SectionRow, index: number) => {
+    const title = getLocalizedField(section, 'title', language);
+    const subtitle = getLocalizedField(section, 'card_subtitle', language);
+    const open = () => router.push(`/host-section-editor?id=${section.id}` as any);
+    const dimmed = !section.is_active;
+
+    if (section.card_image_shape === 'banner' && section.card_image_url) {
+      return (
+        <TouchableOpacity
+          key={section.id}
+          style={[
+            styles.bannerCard,
+            { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
+            dimmed && styles.dimmed,
+          ]}
+          onPress={open}
+          activeOpacity={0.85}
+        >
+          <StorageImage source={{ uri: section.card_image_url }} style={styles.bannerImage} resizeMode="cover" />
+          <View style={styles.bannerBar}>
+            <View style={styles.bannerBarText}>
+              <View style={styles.titleLine}>
+                <Text style={[styles.sectionCardTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+                {dimmed && (
+                  <Text style={[styles.hiddenBadge, { color: colors.textSecondary }]}>
+                    {t('host_assistant_editor.hidden')}
+                  </Text>
+                )}
+              </View>
+              {countText(section.id)}
+            </View>
+            {editorChips(section, index)}
+          </View>
+        </TouchableOpacity>
       );
-    } else {
-      Alert.alert(section.title, undefined, [
-        ...opts.filter((o) => o !== t('common:cancel')).map((o) => ({
-          text: o,
-          style: (o === t('common:delete') ? 'destructive' : 'default') as 'destructive' | 'default',
-          onPress: () => handle(o),
-        })),
-        { text: t('common:cancel'), style: 'cancel' as const },
-      ]);
     }
+
+    return (
+      <TouchableOpacity
+        key={section.id}
+        style={[
+          styles.rowCard,
+          { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
+          dimmed && styles.dimmed,
+        ]}
+        onPress={open}
+        activeOpacity={0.7}
+      >
+        {section.card_image_url ? (
+          <StorageImage source={{ uri: section.card_image_url }} style={styles.rowThumb} resizeMode="cover" />
+        ) : (
+          <View style={[styles.rowThumb, styles.rowIconChip, { backgroundColor: colors.primary + '21' }]}>
+            <IconSymbol
+              ios_icon_name={section.icon || 'square.grid.2x2.fill'}
+              android_material_icon_name={(section.icon && ANDROID_ICON[section.icon]) || 'apps'}
+              size={22}
+              color={colors.primary}
+            />
+          </View>
+        )}
+        <View style={styles.rowCardText}>
+          <View style={styles.titleLine}>
+            <Text style={[styles.sectionCardTitle, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+            {dimmed && (
+              <Text style={[styles.hiddenBadge, { color: colors.textSecondary }]}>
+                {t('host_assistant_editor.hidden')}
+              </Text>
+            )}
+          </View>
+          {!!subtitle && (
+            <Text style={[styles.sectionCardDescription, { color: colors.textSecondary }]} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          )}
+          {countText(section.id)}
+        </View>
+        {editorChips(section, index)}
+      </TouchableOpacity>
+    );
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>{t('host_assistant_editor.title')}</Text>
-        <HeaderNavButton
-          label={t('common:to_user')}
-          iconIos="person.fill"
-          iconAndroid="person"
-          onPress={() => router.replace('/host-assistant')}
-        />
-      </View>
+      <AmbientGlow />
+      <ScreenHeader
+        title={t('host_assistant_editor.title')}
+        rightWide
+        right={
+          <HeaderNavButton
+            label={t('common:to_user')}
+            iconIos="person.fill"
+            iconAndroid="person"
+            onPress={() => router.replace('/host-assistant')}
+          />
+        }
+      />
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Sections Manager */}
-        <View style={[styles.card, { backgroundColor: colors.card }]}>
-          <View style={styles.cardHeader}>
-            <IconSymbol ios_icon_name="rectangle.stack.fill" android_material_icon_name="dashboard" size={32} color={colors.primary} />
-            <View style={styles.cardHeaderText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('host_assistant_editor.sections')}</Text>
-              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                {t('host_assistant_editor.sections_desc')}
-              </Text>
-            </View>
-          </View>
+        {/* ── Checklist editors (rings mirror the user hub) ── */}
+        {zlabel(t('host_assistant_editor.checklists_editor'))}
+        <View style={styles.tileRow}>
+          {ringTile({
+            iconIos: 'sunrise.fill', iconAndroid: 'wb-sunny',
+            name: t('host_assistant.opening_short'),
+            a11y: t('host_assistant_editor.opening_checklist_editor'),
+            now: openingIsNow, stat: stats.opening, route: '/opening-checklist-editor',
+          })}
+          {ringTile({
+            iconIos: 'clock.fill', iconAndroid: 'schedule',
+            name: t('host_assistant.running_short'),
+            a11y: t('host_assistant_editor.running_side_work_editor'),
+            now: false, stat: stats.running, route: '/running-side-work-editor',
+          })}
+          {ringTile({
+            iconIos: 'moon.fill', iconAndroid: 'nightlight',
+            name: t('host_assistant.closing_short'),
+            a11y: t('host_assistant_editor.closing_checklist_editor'),
+            now: !openingIsNow, stat: stats.closing, route: '/closing-checklist-editor',
+          })}
+        </View>
 
-          {sections.map((section, index) => (
-            <View key={section.id} style={[styles.sectionRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <TouchableOpacity style={styles.sectionRowMain} onPress={() => router.push(`/host-section-editor?id=${section.id}` as any)}>
-                <Text style={[styles.sectionRowTitle, { color: colors.text }]} numberOfLines={1}>{section.title}</Text>
-                {!section.is_active && (
-                  <Text style={[styles.hiddenBadge, { color: colors.textSecondary }]}>{t('host_assistant_editor.hidden')}</Text>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => toggleActive(section)} style={styles.rowIconBtn}>
-                <IconSymbol
-                  ios_icon_name={section.is_active ? 'eye.fill' : 'eye.slash.fill'}
-                  android_material_icon_name={section.is_active ? 'visibility' : 'visibility-off'}
-                  size={20} color={section.is_active ? colors.primary : colors.textSecondary}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => sectionActions(section, index)} style={styles.rowIconBtn}>
-                <IconSymbol ios_icon_name="ellipsis" android_material_icon_name="more-horiz" size={20} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-          ))}
-
+        {/* ── Sections manager — Add lives up top beside the label (Steve, s74 smoke) ── */}
+        <View style={styles.zlabelRow}>
+          <Text style={[styles.zlabel, { color: colors.textSecondary }]} numberOfLines={1}>
+            {t('host_assistant_editor.sections').toUpperCase()}
+          </Text>
+          <View style={[styles.zlabelLine, { backgroundColor: colors.border + '55' }]} />
           <TouchableOpacity
-            style={[styles.addButton, { borderColor: colors.primary }]}
+            style={[styles.addChip, { backgroundColor: colors.primary + '2E', borderColor: colors.primary + '6B' }]}
             onPress={() => router.push('/host-section-editor?id=new' as any)}
           >
-            <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={18} color={colors.primary} />
-            <Text style={[styles.addButtonText, { color: colors.primary }]}>{t('host_assistant_editor.add_section')}</Text>
+            <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={13} color={colors.primary} />
+            <Text style={[styles.addChipText, { color: colors.primary }]}>{t('host_assistant_editor.add_section')}</Text>
           </TouchableOpacity>
         </View>
+        <Text style={[styles.hint, { color: colors.textSecondary }]}>
+          {t('host_assistant_editor.sections_desc')}
+        </Text>
 
-        {/* Checklists Editor Section */}
-        <View style={[styles.card, { backgroundColor: colors.card }]}>
-          <View style={styles.cardHeader}>
-            <IconSymbol ios_icon_name="checklist" android_material_icon_name="checklist" size={32} color={colors.primary} />
-            <View style={styles.cardHeaderText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('host_assistant_editor.checklists_editor')}</Text>
-              <Text style={[styles.cardDescription, { color: colors.textSecondary }]}>
-                {t('host_assistant_editor.checklists_editor_desc')}
-              </Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-            onPress={() => router.push('/opening-checklist-editor')}
-          >
-            <View style={styles.subCardContent}>
-              <IconSymbol ios_icon_name="sunrise.fill" android_material_icon_name="wb-sunny" size={24} color={colors.primary} />
-              <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant_editor.opening_checklist_editor')}</Text>
-            </View>
-            <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={20} color={colors.text} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-            onPress={() => router.push('/running-side-work-editor')}
-          >
-            <View style={styles.subCardContent}>
-              <IconSymbol ios_icon_name="clock.fill" android_material_icon_name="schedule" size={24} color={colors.primary} />
-              <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant_editor.running_side_work_editor')}</Text>
-            </View>
-            <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={20} color={colors.text} />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.subCardButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-            onPress={() => router.push('/closing-checklist-editor')}
-          >
-            <View style={styles.subCardContent}>
-              <IconSymbol ios_icon_name="moon.fill" android_material_icon_name="nightlight" size={24} color={colors.primary} />
-              <Text style={[styles.subCardText, { color: colors.text }]}>{t('host_assistant_editor.closing_checklist_editor')}</Text>
-            </View>
-            <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={20} color={colors.text} />
-          </TouchableOpacity>
-        </View>
+        {sections.map(sectionCard)}
       </ScrollView>
+
+      {/* Section overflow actions */}
+      <GlassActionSheet
+        visible={!!actionTarget}
+        onClose={() => setActionTarget(null)}
+        title={actionTarget ? getLocalizedField(actionTarget.section, 'title', language) : ''}
+        actions={actionTarget ? [
+          {
+            key: 'edit',
+            label: t('common:edit'),
+            iosIcon: 'pencil',
+            androidIcon: 'edit',
+            onPress: () => router.push(`/host-section-editor?id=${actionTarget.section.id}` as any),
+          },
+          {
+            key: 'up',
+            label: t('host_assistant_editor.move_up'),
+            iosIcon: 'arrow.up',
+            androidIcon: 'arrow-upward',
+            disabled: actionTarget.index === 0,
+            onPress: () => moveSection(actionTarget.index, -1),
+          },
+          {
+            key: 'down',
+            label: t('host_assistant_editor.move_down'),
+            iosIcon: 'arrow.down',
+            androidIcon: 'arrow-downward',
+            disabled: actionTarget.index >= sections.length - 1,
+            onPress: () => moveSection(actionTarget.index, 1),
+          },
+          {
+            key: 'toggle',
+            label: actionTarget.section.is_active ? t('host_assistant_editor.hide') : t('host_assistant_editor.show'),
+            iosIcon: actionTarget.section.is_active ? 'eye.slash.fill' : 'eye.fill',
+            androidIcon: actionTarget.section.is_active ? 'visibility-off' : 'visibility',
+            onPress: () => toggleActive(actionTarget.section),
+          },
+          {
+            key: 'delete',
+            label: t('common:delete'),
+            iosIcon: 'trash',
+            androidIcon: 'delete',
+            destructive: true,
+            onPress: () => deleteSection(actionTarget.section),
+          },
+        ] : []}
+      />
+
       <BottomNavBar activeTab="manage" />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 48, paddingBottom: 12, borderBottomWidth: 1,
+  container: {
+    flex: 1,
   },
-  backButton: { padding: 8 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
-  placeholder: { width: 40 },
-  scrollView: { flex: 1 },
-  contentContainer: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: 100 },
-  card: {
-    borderRadius: 16, padding: 20, marginBottom: 16,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)', elevation: 3,
+  scrollView: {
+    flex: 1,
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  cardHeaderText: { flex: 1, marginLeft: 16 },
-  cardTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
-  cardDescription: { fontSize: 14 },
-  sectionRow: {
-    flexDirection: 'row', alignItems: 'center', borderRadius: 8,
-    paddingVertical: 12, paddingHorizontal: 14, marginTop: 12, borderWidth: 1,
+  contentContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 110,
   },
-  sectionRowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  sectionRowTitle: { fontSize: 15, fontWeight: '600', flexShrink: 1 },
-  hiddenBadge: { fontSize: 11, fontStyle: 'italic' },
-  rowIconBtn: { padding: 8 },
-  addButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
-    borderWidth: 1, borderStyle: 'dashed', borderRadius: 10, paddingVertical: 12, marginTop: 14,
+  zlabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    marginBottom: 10,
+    marginHorizontal: 2,
   },
-  addButtonText: { fontSize: 15, fontWeight: '700' },
-  subCardButton: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderRadius: 8, paddingVertical: 14, paddingHorizontal: 16, marginTop: 12, borderWidth: 1,
+  zlabel: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10.5,
+    letterSpacing: 1.4,
+    flexShrink: 1,
   },
-  subCardContent: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  subCardText: { fontSize: 15, fontWeight: '600' },
+  zlabelLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  hint: {
+    fontFamily: fonts.body.regular,
+    fontSize: 12,
+    lineHeight: 17,
+    marginBottom: 11,
+    marginHorizontal: 2,
+  },
+  tileRow: {
+    flexDirection: 'row',
+    gap: 9,
+  },
+  ringTile: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    paddingHorizontal: 11,
+    paddingVertical: 11,
+  },
+  ringTileOff: {
+    opacity: 0.78,
+  },
+  ringTileTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 7,
+    minHeight: 16,
+  },
+  ringTileTopRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  ringTileName: {
+    fontFamily: fonts.display.semibold,
+    fontSize: 12.5,
+    marginBottom: 9,
+  },
+  nowPill: {
+    borderRadius: 6,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  nowPillText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 7.5,
+    letterSpacing: 0.6,
+  },
+  ringTileFoot: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ringLabel: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10,
+  },
+  statBig: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 12,
+    flexShrink: 1,
+  },
+  // Section cards (banner-aware, mirroring the user hub)
+  bannerCard: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    overflow: 'hidden',
+    marginBottom: 12,
+  },
+  bannerImage: {
+    width: '100%',
+    height: 150,
+  },
+  bannerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingLeft: 14,
+    paddingRight: 6,
+    paddingVertical: 8,
+  },
+  bannerBarText: {
+    flex: 1,
+  },
+  rowCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    paddingVertical: 11,
+    paddingLeft: 13,
+    paddingRight: 4,
+    marginBottom: 10,
+  },
+  dimmed: {
+    opacity: 0.55,
+  },
+  rowThumb: {
+    width: 46,
+    height: 46,
+    borderRadius: 12,
+  },
+  rowIconChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowCardText: {
+    flex: 1,
+  },
+  titleLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  sectionCardTitle: {
+    fontFamily: fonts.display.semibold,
+    fontSize: 15,
+    marginBottom: 2,
+    flexShrink: 1,
+  },
+  hiddenBadge: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 9,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+  },
+  sectionCardDescription: {
+    fontFamily: fonts.body.regular,
+    fontSize: 12.5,
+    lineHeight: 17,
+  },
+  countText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10,
+    marginTop: 3,
+  },
+  editorChips: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rowIconBtn: {
+    padding: 8,
+  },
+  addChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+  },
+  addChipText: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 11.5,
+  },
 });

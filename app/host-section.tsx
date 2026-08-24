@@ -8,13 +8,25 @@ import {
   Linking,
   Modal,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import * as WebBrowser from 'expo-web-browser';
 import { useAuth } from '@/contexts/AuthContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/translateContent';
+import { resolveForOpen } from '@/utils/storageResolver';
 import { supabase } from '@/app/integrations/supabase/client';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import GlassCard from '@/components/GlassCard';
+import { useSheetHandoff } from '@/components/GlassSheet';
+import { fonts } from '@/constants/fonts';
 
 // Built-in images for the seeded OpenTable Academy tiles (keyed by system_asset_key).
 const SYSTEM_ASSETS: Record<string, any> = {
@@ -26,17 +38,22 @@ const SYSTEM_ASSETS: Record<string, any> = {
 interface HostSection {
   id: string;
   title: string;
+  title_es: string | null;
   instructions: string | null;
+  instructions_es: string | null;
 }
 
 interface HostTile {
   id: string;
   title: string | null;
+  title_es: string | null;
   image_url: string | null;
   image_shape: string;
   system_asset_key: string | null;
   link_url: string | null;
+  file_url: string | null;
   link_description: string | null;
+  link_description_es: string | null;
 }
 
 function tileImageSource(tile: HostTile) {
@@ -47,16 +64,27 @@ function tileImageSource(tile: HostTile) {
   return null;
 }
 
+// s74b: link and file are independent slots — a tile may carry both, and the
+// confirmation popup then offers the choice.
+const hasFile = (tile: HostTile) => !!tile.file_url;
+const hasLink = (tile: HostTile) => !!tile.link_url;
+
 export default function HostSectionScreen() {
-  const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useAuth();
+  const { t } = useTranslation();
+  const { language } = useLanguage();
   const colors = useThemeColors();
 
   const [section, setSection] = useState<HostSection | null>(null);
   const [tiles, setTiles] = useState<HostTile[]>([]);
   const [loading, setLoading] = useState(true);
+  // Visibility and data are SEPARATE on purpose: nulling the tile on close made
+  // the popup's content swap to its fallback ("Open Link", two buttons) while
+  // the Modal was still fading out — the s74 round-2 "ghost second prompt".
+  // The tile data simply persists through the fade; the next open overwrites it.
   const [pendingTile, setPendingTile] = useState<HostTile | null>(null);
+  const [promptVisible, setPromptVisible] = useState(false);
 
   const userName = user?.name || 'there';
 
@@ -65,9 +93,9 @@ export default function HostSectionScreen() {
     try {
       setLoading(true);
       const { data: s } = await supabase.rpc('get_host_sections', { p_actor_id: user.id, p_id: id });
-      const { data: t } = await supabase.rpc('get_host_section_tiles', { p_actor_id: user.id, p_section_id: id });
+      const { data: rows } = await supabase.rpc('get_host_section_tiles', { p_actor_id: user.id, p_section_id: id });
       setSection((s?.[0]) as HostSection);
-      setTiles((t as HostTile[]) || []);
+      setTiles((rows as HostTile[]) || []);
     } catch (e) {
       console.error('Error loading host section:', e);
     } finally {
@@ -77,8 +105,22 @@ export default function HostSectionScreen() {
 
   useEffect(() => { load(); }, [load]);
 
-  const openLink = async (url: string | null) => {
-    if (!url) return;
+  // The popup opens an SFSafariViewController (openBrowserAsync) — presenting
+  // one while the Modal is still dismissing gets silently DROPPED by UIKit
+  // (the s74 smoke "Open File does nothing" bug), so every open from the popup
+  // goes through the sheet-handoff defer/onDismiss pair.
+  const { defer, onDismiss } = useSheetHandoff(() => setPromptVisible(false));
+
+  const openFile = async (url: string) => {
+    try {
+      // The guides pattern: sign-read (file tier) → in-app browser.
+      await WebBrowser.openBrowserAsync(await resolveForOpen(url, { tier: 'file' }));
+    } catch (e) {
+      console.error('Error opening tile file:', e);
+    }
+  };
+
+  const openLink = async (url: string) => {
     try {
       // Prepend https:// for legacy tiles saved before the editor's scheme guard (e.g. "kevahomes.com").
       const openUrl = /^https?:\/\//i.test(url) ? url : `https://${url}`;
@@ -86,42 +128,36 @@ export default function HostSectionScreen() {
       if (supported) await Linking.openURL(openUrl);
       else console.error('Cannot open URL:', openUrl);
     } catch (e) {
-      console.error('Error opening URL:', e);
+      console.error('Error opening tile link:', e);
     }
   };
 
   const handleTilePress = (tile: HostTile) => {
-    if (!tile.link_url) return;
-    if (tile.link_description && tile.link_description.trim()) {
+    const file = hasFile(tile);
+    const link = hasLink(tile);
+    if (!file && !link) return;
+    const confirmMsg = getLocalizedField(tile, 'link_description', language);
+    // Both targets → always ask which one; a single target asks only when a
+    // confirmation message is set.
+    if ((file && link) || (confirmMsg && confirmMsg.trim())) {
       setPendingTile(tile);
+      setPromptVisible(true);
+    } else if (file) {
+      openFile(tile.file_url as string);
     } else {
-      openLink(tile.link_url);
+      openLink(tile.link_url as string);
     }
   };
 
-  const confirmOpen = () => {
-    const url = pendingTile?.link_url || null;
-    setPendingTile(null);
-    openLink(url);
-  };
-
-  const instructionLines = (section?.instructions || '')
+  const instructionLines = (section ? getLocalizedField(section, 'instructions', language) : '')
     .split('\n')
     .map((l) => l.trim())
     .filter(Boolean);
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol ios_icon_name="chevron.left" android_material_icon_name="arrow-back" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-          {section?.title || ''}
-        </Text>
-        <View style={styles.placeholder} />
-      </View>
+      <AmbientGlow />
+      <ScreenHeader title={section ? getLocalizedField(section, 'title', language) : ''} />
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -131,8 +167,10 @@ export default function HostSectionScreen() {
         <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
           {/* Welcome blurb + instructions */}
           {(instructionLines.length > 0) && (
-            <View style={[styles.blurbCard, { backgroundColor: colors.card }]}>
-              <Text style={[styles.welcomeText, { color: colors.text }]}>Hello {userName}!</Text>
+            <View style={[styles.blurbCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+              <Text style={[styles.welcomeText, { color: colors.text }]}>
+                {t('host_section.hello', { name: userName })}
+              </Text>
               <View style={styles.bulletContainer}>
                 {instructionLines.map((line, i) => (
                   <View key={i} style={styles.bulletRow}>
@@ -148,28 +186,41 @@ export default function HostSectionScreen() {
           <View style={styles.tilesContainer}>
             {tiles.map((tile) => {
               const src = tileImageSource(tile);
-              const tappable = !!tile.link_url;
+              const tappable = hasFile(tile) || hasLink(tile);
+              const title = getLocalizedField(tile, 'title', language);
+              const trailingIcon = tappable ? (
+                <IconSymbol
+                  ios_icon_name={hasFile(tile) ? 'doc.fill' : 'chevron.right'}
+                  android_material_icon_name={hasFile(tile) ? 'description' : 'chevron-right'}
+                  size={18}
+                  color={colors.textSecondary}
+                />
+              ) : null;
+
               if (tile.image_shape === 'square') {
                 return (
                   <TouchableOpacity
                     key={tile.id}
-                    style={[styles.squareRow, { backgroundColor: colors.card, borderColor: colors.border }]}
+                    style={[styles.squareRow, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
                     onPress={() => handleTilePress(tile)}
                     activeOpacity={tappable ? 0.7 : 1}
                   >
                     {src ? (
                       <StorageImage source={src} style={styles.squareThumb} resizeMode="cover" />
                     ) : (
-                      <View style={[styles.squareThumb, styles.squarePlaceholder, { backgroundColor: colors.primary + '15' }]}>
-                        <IconSymbol ios_icon_name="link" android_material_icon_name="link" size={24} color={colors.primary} />
+                      <View style={[styles.squareThumb, styles.squarePlaceholder, { backgroundColor: colors.primary + '21' }]}>
+                        <IconSymbol
+                          ios_icon_name={hasFile(tile) ? 'doc.fill' : 'link'}
+                          android_material_icon_name={hasFile(tile) ? 'description' : 'link'}
+                          size={22}
+                          color={colors.primary}
+                        />
                       </View>
                     )}
                     <Text style={[styles.squareTitle, { color: colors.text }]} numberOfLines={2}>
-                      {tile.title || ''}
+                      {title}
                     </Text>
-                    {tappable && (
-                      <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={20} color={colors.textSecondary} />
-                    )}
+                    {trailingIcon}
                   </TouchableOpacity>
                 );
               }
@@ -177,23 +228,26 @@ export default function HostSectionScreen() {
               return (
                 <TouchableOpacity
                   key={tile.id}
-                  style={styles.bannerTile}
+                  style={[styles.bannerTile, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}
                   onPress={() => handleTilePress(tile)}
                   activeOpacity={tappable ? 0.85 : 1}
                 >
                   {src ? (
                     <StorageImage source={src} style={styles.bannerImage} resizeMode="cover" />
                   ) : (
-                    <View style={[styles.bannerImage, styles.bannerPlaceholder, { backgroundColor: colors.primary + '15' }]}>
-                      <IconSymbol ios_icon_name="link" android_material_icon_name="link" size={32} color={colors.primary} />
+                    <View style={[styles.bannerImage, styles.bannerPlaceholder, { backgroundColor: colors.primary + '21' }]}>
+                      <IconSymbol
+                        ios_icon_name={hasFile(tile) ? 'doc.fill' : 'link'}
+                        android_material_icon_name={hasFile(tile) ? 'description' : 'link'}
+                        size={30}
+                        color={colors.primary}
+                      />
                     </View>
                   )}
-                  {!!tile.title && (
-                    <View style={[styles.bannerTitleBar, { backgroundColor: colors.card }]}>
-                      <Text style={[styles.bannerTitleText, { color: colors.text }]} numberOfLines={1}>{tile.title}</Text>
-                      {tappable && (
-                        <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={18} color={colors.textSecondary} />
-                      )}
+                  {!!title && (
+                    <View style={styles.bannerTitleBar}>
+                      <Text style={[styles.bannerTitleText, { color: colors.text }]} numberOfLines={1}>{title}</Text>
+                      {trailingIcon}
                     </View>
                   )}
                 </TouchableOpacity>
@@ -203,34 +257,85 @@ export default function HostSectionScreen() {
         </ScrollView>
       )}
 
-      {/* Link confirmation popup */}
-      <Modal visible={!!pendingTile} transparent animationType="fade" onRequestClose={() => setPendingTile(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.modalTitle, { color: colors.text }]}>
-              {pendingTile?.title || 'Open Link'}
+      {/* Link/file confirmation popup. Actions run via defer(): the browser /
+          link presentation must wait until this Modal has finished dismissing. */}
+      <Modal
+        visible={promptVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setPromptVisible(false)}
+        onDismiss={onDismiss}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalOverlay}
+        >
+          <GlassCard variant="glass" radius={20} intensity={32} style={styles.modalCard}>
+            <Text style={[styles.modalTitle, { color: colors.text }]} numberOfLines={2}>
+              {(pendingTile && getLocalizedField(pendingTile, 'title', language)) ||
+                (pendingTile && hasFile(pendingTile)
+                  ? t('host_section.open_file')
+                  : t('host_section.open_link'))}
             </Text>
-            {!!pendingTile?.link_description && (
+            {!!pendingTile && !!getLocalizedField(pendingTile, 'link_description', language).trim() && (
               <Text style={[styles.modalDesc, { color: colors.textSecondary }]}>
-                {pendingTile.link_description}
+                {getLocalizedField(pendingTile, 'link_description', language)}
               </Text>
             )}
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1 }]}
-                onPress={() => setPendingTile(null)}
-              >
-                <Text style={[styles.modalButtonText, { color: colors.text }]}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, { backgroundColor: colors.primary }]}
-                onPress={confirmOpen}
-              >
-                <Text style={[styles.modalButtonText, { color: colors.fireText }]}>Open Link</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+            {pendingTile && hasFile(pendingTile) && hasLink(pendingTile) ? (
+              // Both targets → the choice, stacked. flex:0 overrides the shared
+              // button style's flex:1, which is for the ROW layout — in this
+              // content-sized column it collapsed the stack and the card's
+              // overflow:hidden clipped the Cancel button (s74 round 2).
+              <View style={styles.modalStack}>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonStacked, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                  onPress={() => { const url = pendingTile.link_url as string; defer(() => openLink(url)); }}
+                >
+                  <Text style={[styles.modalButtonText, { color: colors.fireText }]}>{t('host_section.open_link')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonStacked, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                  onPress={() => { const url = pendingTile.file_url as string; defer(() => openFile(url)); }}
+                >
+                  <Text style={[styles.modalButtonText, { color: colors.fireText }]}>{t('host_section.open_file')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, styles.modalButtonStacked, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+                  onPress={() => setPromptVisible(false)}
+                >
+                  <Text style={[styles.modalButtonText, { color: colors.text }]}>{t('common:cancel')}</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+                  onPress={() => setPromptVisible(false)}
+                >
+                  <Text style={[styles.modalButtonText, { color: colors.text }]}>{t('common:cancel')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.modalButton, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                  onPress={() => {
+                    if (!pendingTile) return;
+                    if (hasFile(pendingTile)) {
+                      const url = pendingTile.file_url as string;
+                      defer(() => openFile(url));
+                    } else {
+                      const url = pendingTile.link_url as string;
+                      defer(() => openLink(url));
+                    }
+                  }}
+                >
+                  <Text style={[styles.modalButtonText, { color: colors.fireText }]}>
+                    {pendingTile && hasFile(pendingTile) ? t('host_section.open_file') : t('host_section.open_link')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </GlassCard>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -238,85 +343,107 @@ export default function HostSectionScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: { padding: 8 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold', flex: 1, textAlign: 'center' },
-  placeholder: { width: 40 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   scrollView: { flex: 1 },
-  contentContainer: { paddingTop: 20, paddingHorizontal: 16, paddingBottom: 100 },
+  contentContainer: { paddingHorizontal: 16, paddingBottom: 100 },
   blurbCard: {
     borderRadius: 16,
-    padding: 24,
-    marginBottom: 24,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    padding: 18,
+    marginBottom: 18,
   },
-  welcomeText: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-  bulletContainer: { gap: 16 },
+  welcomeText: {
+    fontFamily: fonts.display.bold,
+    fontSize: 20,
+    letterSpacing: -0.3,
+    marginBottom: 14,
+  },
+  bulletContainer: { gap: 12 },
   bulletRow: { flexDirection: 'row', alignItems: 'flex-start' },
-  bullet: { fontSize: 20, fontWeight: 'bold', marginRight: 12, marginTop: 2 },
-  bulletText: { flex: 1, fontSize: 15, lineHeight: 22 },
-  tilesContainer: { gap: 20 },
+  bullet: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 16,
+    marginRight: 11,
+    marginTop: 1,
+  },
+  bulletText: {
+    flex: 1,
+    fontFamily: fonts.body.regular,
+    fontSize: 13.5,
+    lineHeight: 20,
+  },
+  tilesContainer: { gap: 14 },
   bannerTile: {
     borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
     overflow: 'hidden',
-    boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.15)',
-    elevation: 5,
   },
-  bannerImage: { width: '100%', height: 200 },
+  bannerImage: { width: '100%', height: 180 },
   bannerPlaceholder: { alignItems: 'center', justifyContent: 'center' },
   bannerTitleBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
+    gap: 10,
+    paddingHorizontal: 14,
     paddingVertical: 12,
   },
-  bannerTitleText: { fontSize: 16, fontWeight: '700', flex: 1 },
+  bannerTitleText: {
+    flex: 1,
+    fontFamily: fonts.display.semibold,
+    fontSize: 15,
+  },
   squareRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
     padding: 12,
-    borderWidth: 1,
-    gap: 14,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+    gap: 13,
   },
-  squareThumb: { width: 72, height: 72, borderRadius: 10 },
+  squareThumb: { width: 64, height: 64, borderRadius: 12 },
   squarePlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  squareTitle: { flex: 1, fontSize: 16, fontWeight: '700' },
+  squareTitle: {
+    flex: 1,
+    fontFamily: fonts.display.semibold,
+    fontSize: 15,
+  },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
+    backgroundColor: 'rgba(6,10,18,0.55)',
     justifyContent: 'center',
-    padding: 32,
+    padding: 28,
   },
   modalCard: {
-    width: '100%',
-    borderRadius: 16,
-    padding: 24,
-    boxShadow: '0px 4px 20px rgba(0,0,0,0.3)',
-    elevation: 10,
+    padding: 20,
   },
-  modalTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 10 },
-  modalDesc: { fontSize: 15, lineHeight: 22, marginBottom: 20 },
-  modalButtons: { flexDirection: 'row', gap: 12 },
+  modalTitle: {
+    fontFamily: fonts.display.bold,
+    fontSize: 17,
+    letterSpacing: -0.2,
+    marginBottom: 8,
+  },
+  modalDesc: {
+    fontFamily: fonts.body.regular,
+    fontSize: 14,
+    lineHeight: 21,
+    marginBottom: 18,
+  },
+  modalButtons: { flexDirection: 'row', gap: 10 },
+  modalStack: { gap: 9 },
+  // Overrides modalButton's flex:1 (row-layout sizing) inside the column stack.
+  modalButtonStacked: { flex: 0, alignSelf: 'stretch' },
   modalButton: {
     flex: 1,
+    minHeight: 45,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  modalButtonText: { fontSize: 15, fontWeight: '700' },
+  modalButtonText: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 14.5,
+  },
 });

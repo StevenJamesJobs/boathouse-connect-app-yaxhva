@@ -1,13 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { IconSymbol } from '@/components/IconSymbol';
-import { supabase } from '@/app/integrations/supabase/client';
-import { useOrganization } from '@/contexts/OrganizationContext';
-import { useAuth } from '@/contexts/AuthContext';
-import { useThemeColors } from '@/hooks/useThemeColors';
-import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
-import { useRouter, useFocusEffect } from 'expo-router';
-import { useTranslation } from 'react-i18next';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -16,15 +8,28 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
-  Modal,
   TextInput,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
+import { useAuth } from '@/contexts/AuthContext';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { useRequireManagerRoute } from '@/hooks/useRequireManagerRoute';
+import { IconSymbol } from '@/components/IconSymbol';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { supabase } from '@/app/integrations/supabase/client';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField, saveTranslations } from '@/utils/translateContent';
+import { useTranslationSection } from '@/components/TranslationSection';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import HeaderNavButton from '@/components/HeaderNavButton';
+import GlassSheet from '@/components/GlassSheet';
+import { fonts } from '@/constants/fonts';
 
 interface ChecklistItem {
   id: string;
   text: string;
+  text_es: string | null;
   display_order: number;
   category_id: string;
 }
@@ -32,249 +37,77 @@ interface ChecklistItem {
 interface ChecklistCategory {
   id: string;
   name: string;
+  name_es: string | null;
   display_order: number;
   items: ChecklistItem[];
 }
 
+const TRASH_RED = '#E53935';
+
 export default function ClosingChecklistEditorScreen() {
   useRequireManagerRoute();
   const router = useRouter();
-  const { t } = useTranslation();
-  const { organizationId } = useOrganization();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const { language } = useLanguage();
   const colors = useThemeColors();
+  const isSpanishAuthor = i18n.language === 'es';
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: colors.card,
-      paddingHorizontal: 16,
-      paddingTop: 48,
-      paddingBottom: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    backButton: {
-      padding: 8,
-    },
-    headerTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: colors.text,
-    },
-    placeholder: {
-      width: 40,
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    scrollView: {
-      flex: 1,
-    },
-    contentContainer: {
-      paddingTop: 20,
-      paddingHorizontal: 16,
-      paddingBottom: 100,
-    },
-    addButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.highlight,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 20,
-      gap: 8,
-    },
-    addButtonText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    categoryCard: {
-      backgroundColor: colors.card,
-      borderRadius: 12,
-      marginBottom: 12,
-      overflow: 'hidden',
-      boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.3)',
-      elevation: 3,
-    },
-    categoryHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: 16,
-    },
-    categoryHeaderLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-      gap: 12,
-    },
-    categoryHeaderText: {
-      flex: 1,
-    },
-    categoryTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: 2,
-    },
-    categoryItemCount: {
-      fontSize: 13,
-      color: colors.textSecondary,
-    },
-    categoryActions: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    iconButton: {
-      padding: 8,
-    },
-    itemsContainer: {
-      paddingBottom: 8,
-    },
-    itemRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-    },
-    itemText: {
-      flex: 1,
-      fontSize: 15,
-      color: colors.text,
-      lineHeight: 22,
-    },
-    itemActions: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    addItemButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.background,
-      borderRadius: 8,
-      padding: 12,
-      marginHorizontal: 16,
-      marginBottom: 8,
-      gap: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    addItemButtonText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.text,
-    },
-    modalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 20,
-    },
-    modalContent: {
-      backgroundColor: colors.card,
-      borderRadius: 16,
-      padding: 24,
-      width: '100%',
-      maxWidth: 500,
-      maxHeight: '80%',
-    },
-    modalTitle: {
-      fontSize: 20,
-      fontWeight: 'bold',
-      color: colors.text,
-      marginBottom: 20,
-    },
-    inputLabel: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.text,
-      marginBottom: 8,
-      marginTop: 16,
-    },
-    input: {
-      backgroundColor: colors.background,
-      borderRadius: 8,
-      padding: 12,
-      fontSize: 16,
-      color: colors.text,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    textArea: {
-      minHeight: 80,
-      textAlignVertical: 'top',
-    },
-    categoryPicker: {
-      maxHeight: 200,
-      borderRadius: 8,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    categoryOption: {
-      padding: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    categoryOptionSelected: {
-      backgroundColor: colors.highlight,
-    },
-    categoryOptionText: {
-      fontSize: 15,
-      color: colors.text,
-    },
-    categoryOptionTextSelected: {
-      fontWeight: '600',
-    },
-    modalButtons: {
-      flexDirection: 'row',
-      gap: 12,
-      marginTop: 8,
-    },
-    modalButton: {
-      flex: 1,
-      borderRadius: 8,
-      padding: 14,
-      alignItems: 'center',
-    },
-    cancelButton: {
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    saveButton: {
-      backgroundColor: colors.highlight,
-    },
-    modalButtonText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text,
-    },
-  });
   const [categories, setCategories] = useState<ChecklistCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
-  const [modalVisible, setModalVisible] = useState(false);
-  const [modalType, setModalType] = useState<'category' | 'item'>('category');
-  const [editingId, setEditingId] = useState<string | null>(null);
+
+  const [categoryModalVisible, setCategoryModalVisible] = useState(false);
+  const [itemModalVisible, setItemModalVisible] = useState(false);
+  const [infoVisible, setInfoVisible] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<ChecklistCategory | null>(null);
+  const [editingItem, setEditingItem] = useState<ChecklistItem | null>(null);
   const [categoryName, setCategoryName] = useState('');
+  const [categoryNameEs, setCategoryNameEs] = useState('');
   const [itemText, setItemText] = useState('');
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [itemTextEs, setItemTextEs] = useState('');
+  const [selectedCategoryId, setSelectedCategoryId] = useState('');
+  const [saving, setSaving] = useState(false);
+  const addSessionRef = useRef(0);
+  const addCatSessionRef = useRef(0);
+
+  // ES/EN hybrid authoring for the category name (Steve, s74 smoke round 1).
+  const categoryTranslation = useTranslationSection({
+    fields: [
+      {
+        key: 'name',
+        labelKey: 'translation_section:field_name',
+        enValue: categoryName,
+        esValue: categoryNameEs,
+        setEnValue: setCategoryName,
+        setEsValue: setCategoryNameEs,
+        enStored: editingCategory ? editingCategory.name : undefined,
+        esStored: editingCategory ? editingCategory.name_es : undefined,
+      },
+    ],
+    sessionKey: editingCategory ? `edit:${editingCategory.id}` : `new:${addCatSessionRef.current}`,
+    active: categoryModalVisible,
+  });
+
+  // ES/EN hybrid authoring for the item text (Steve, s74): the input binds the
+  // author's device language; the section fills/refreshes the other side.
+  const itemTranslation = useTranslationSection({
+    fields: [
+      {
+        key: 'text',
+        labelKey: 'checklist_editor:item_text_placeholder',
+        enValue: itemText,
+        esValue: itemTextEs,
+        setEnValue: setItemText,
+        setEsValue: setItemTextEs,
+        multiline: true,
+        enStored: editingItem ? editingItem.text : undefined,
+        esStored: editingItem ? editingItem.text_es : undefined,
+      },
+    ],
+    sessionKey: editingItem ? `edit:${editingItem.id}` : `new:${addSessionRef.current}`,
+    active: itemModalVisible,
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -284,11 +117,9 @@ export default function ClosingChecklistEditorScreen() {
 
   const loadChecklist = async () => {
     if (!user?.id) return;
-    console.log('Loading Closing Checklist for editing');
     try {
       setLoading(true);
 
-      // Fetch categories (member-gated RPC; org derived server-side)
       const { data: categoriesData, error: categoriesError } = await supabase.rpc('get_checklist_categories', {
         p_actor_id: user.id,
         p_bartender: false,
@@ -300,7 +131,6 @@ export default function ClosingChecklistEditorScreen() {
         throw categoriesError;
       }
 
-      // Fetch items
       const { data: itemsData, error: itemsError } = await supabase.rpc('get_checklist_items', {
         p_actor_id: user.id,
         p_bartender: false,
@@ -312,26 +142,26 @@ export default function ClosingChecklistEditorScreen() {
         throw itemsError;
       }
 
-      // Build checklist structure
       const categoriesWithItems: ChecklistCategory[] = categoriesData?.map(cat => ({
         id: cat.id,
         name: cat.name,
+        name_es: cat.name_es,
         display_order: cat.display_order,
         items: itemsData
           ?.filter(item => item.category_id === cat.id)
           .map(item => ({
             id: item.id,
             text: item.text,
+            text_es: item.text_es,
             display_order: item.display_order,
             category_id: item.category_id,
           })) || [],
       })) || [];
 
       setCategories(categoriesWithItems);
+
       const allCategoryIds = new Set(categoriesWithItems.map(c => c.id));
       setExpandedCategories(allCategoryIds);
-
-      console.log('Loaded checklist with', categoriesWithItems.length, 'categories');
     } catch (error) {
       console.error('Error loading checklist:', error);
       Alert.alert(t('common:error'), t('checklist_editor:error_load_checklist'));
@@ -353,65 +183,85 @@ export default function ClosingChecklistEditorScreen() {
   };
 
   const openAddCategoryModal = () => {
-    setModalType('category');
-    setEditingId(null);
+    addCatSessionRef.current += 1;
+    setEditingCategory(null);
     setCategoryName('');
-    setModalVisible(true);
+    setCategoryNameEs('');
+    setCategoryModalVisible(true);
   };
 
   const openEditCategoryModal = (category: ChecklistCategory) => {
-    setModalType('category');
-    setEditingId(category.id);
+    setEditingCategory(category);
     setCategoryName(category.name);
-    setModalVisible(true);
+    setCategoryNameEs(category.name_es || '');
+    setCategoryModalVisible(true);
   };
 
   const openAddItemModal = (categoryId: string) => {
-    setModalType('item');
-    setEditingId(null);
+    addSessionRef.current += 1;
+    setEditingItem(null);
     setItemText('');
+    setItemTextEs('');
     setSelectedCategoryId(categoryId);
-    setModalVisible(true);
+    setItemModalVisible(true);
   };
 
   const openEditItemModal = (item: ChecklistItem) => {
-    setModalType('item');
-    setEditingId(item.id);
+    setEditingItem(item);
     setItemText(item.text);
+    setItemTextEs(item.text_es || '');
     setSelectedCategoryId(item.category_id);
-    setModalVisible(true);
+    setItemModalVisible(true);
   };
 
   const handleSaveCategory = async () => {
     if (!user?.id) return;
-    if (!categoryName.trim()) {
+    const authorName = isSpanishAuthor ? categoryNameEs : categoryName;
+    if (!authorName.trim()) {
       Alert.alert(t('common:error'), t('checklist_editor:error_enter_category_name'));
       return;
     }
 
+    // Fill/refresh the other language per the staleness rules (may ask once).
+    const resolved = await categoryTranslation.resolveOnSave();
+    if (!resolved) return;
+
+    setSaving(true);
+
     try {
-      // One manager-gated upsert (p_category_id present = update name, absent = insert with
-      // server-computed display_order).
-      const { error } = await supabase.rpc('upsert_checklist_category', {
+      const { data: categoryId, error } = await supabase.rpc('upsert_checklist_category', {
         p_actor_id: user.id,
         p_bartender: false,
         p_checklist_type: 'closing',
-        p_name: categoryName.trim(),
-        p_category_id: editingId ?? undefined,
+        p_name: resolved.name.en.trim(),
+        p_category_id: editingCategory?.id ?? undefined,
       });
 
       if (error) throw error;
-      console.log('Category saved successfully');
 
-      setModalVisible(false);
+      // '' (a confirmed clear) must write through — clearBlank marks it; null
+      // would hit the RPC's COALESCE and silently keep the old translation.
+      if (categoryId) {
+        await saveTranslations(
+          'checklist_categories',
+          categoryId,
+          { name_es: resolved.name.es },
+          user.id,
+          { clearBlank: ['name_es'] }
+        );
+      }
+
+      setCategoryModalVisible(false);
       loadChecklist();
     } catch (error) {
       console.error('Error saving category:', error);
       Alert.alert(t('common:error'), t('checklist_editor:error_save_category'));
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeleteCategory = async (category: ChecklistCategory) => {
+  const handleDeleteCategory = (category: ChecklistCategory) => {
     Alert.alert(
       t('checklist_editor:delete_category_title'),
       t('checklist_editor:delete_category_confirm', { name: category.name }),
@@ -430,7 +280,6 @@ export default function ClosingChecklistEditorScreen() {
               });
 
               if (error) throw error;
-              console.log('Category deleted successfully');
               loadChecklist();
             } catch (error) {
               console.error('Error deleting category:', error);
@@ -444,39 +293,57 @@ export default function ClosingChecklistEditorScreen() {
 
   const handleSaveItem = async () => {
     if (!user?.id) return;
-    if (!itemText.trim()) {
+    const authorText = isSpanishAuthor ? itemTextEs : itemText;
+    if (!authorText.trim()) {
       Alert.alert(t('common:error'), t('checklist_editor:error_enter_item_text'));
       return;
     }
 
     if (!selectedCategoryId) {
-      Alert.alert(t('common:error'), t('checklist_editor:error_no_category_selected'));
+      Alert.alert(t('common:error'), t('checklist_editor:error_select_category'));
       return;
     }
 
+    // Fill/refresh the other language per the staleness rules (may ask once).
+    const resolved = await itemTranslation.resolveOnSave();
+    if (!resolved) return;
+
+    setSaving(true);
+
     try {
-      // One manager-gated upsert (p_item_id present = update text/category, absent = insert with
-      // server-computed display_order).
-      const { error } = await supabase.rpc('upsert_checklist_item', {
+      const { data: itemId, error } = await supabase.rpc('upsert_checklist_item', {
         p_actor_id: user.id,
         p_bartender: false,
         p_category_id: selectedCategoryId,
-        p_text: itemText.trim(),
-        p_item_id: editingId ?? undefined,
+        p_text: resolved.text.en.trim(),
+        p_item_id: editingItem?.id ?? undefined,
       });
 
       if (error) throw error;
-      console.log('Item saved successfully');
 
-      setModalVisible(false);
+      // '' (a confirmed clear) must write through — clearBlank marks it; null
+      // would hit the RPC's COALESCE and silently keep the old translation.
+      if (itemId) {
+        await saveTranslations(
+          'checklist_items',
+          itemId,
+          { text_es: resolved.text.es },
+          user.id,
+          { clearBlank: ['text_es'] }
+        );
+      }
+
+      setItemModalVisible(false);
       loadChecklist();
     } catch (error) {
       console.error('Error saving item:', error);
       Alert.alert(t('common:error'), t('checklist_editor:error_save_item'));
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleDeleteItem = async (item: ChecklistItem) => {
+  const handleDeleteItem = (item: ChecklistItem) => {
     Alert.alert(
       t('checklist_editor:delete_item_title'),
       t('checklist_editor:delete_item_confirm'),
@@ -495,7 +362,6 @@ export default function ClosingChecklistEditorScreen() {
               });
 
               if (error) throw error;
-              console.log('Item deleted successfully');
               loadChecklist();
             } catch (error) {
               console.error('Error deleting item:', error);
@@ -507,21 +373,65 @@ export default function ClosingChecklistEditorScreen() {
     );
   };
 
+  // Sheet footer: Cancel (glass) / Save (primary) — the house pair.
+  const sheetFooter = (onCancel: () => void, onSave: () => void) => (
+    <View style={styles.footerRow}>
+      <TouchableOpacity
+        style={[styles.footerBtn, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+        onPress={onCancel}
+        disabled={saving}
+        activeOpacity={0.8}
+      >
+        <Text style={[styles.footerBtnLabel, { color: colors.text }]}>{t('common:cancel')}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.footerBtn, { backgroundColor: colors.primary, borderColor: colors.primary }, saving && { opacity: 0.6 }]}
+        onPress={onSave}
+        disabled={saving}
+        activeOpacity={0.8}
+      >
+        {saving ? (
+          <ActivityIndicator color={colors.fireText} />
+        ) : (
+          <Text style={[styles.footerBtnLabel, { color: colors.fireText }]}>{t('common:save')}</Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+
+  const header = (
+    <>
+      <AmbientGlow />
+      <ScreenHeader
+        title={t('checklist_editor:closing_checklist_editor')}
+        rightWide
+        right={
+          <View style={styles.headerRightRow}>
+            {/* ⓘ replaces the old top-of-page blurb card (Steve, s74). Add
+                Category lives below the header — three chips squished here
+                (s74 smoke round 1). */}
+            <TouchableOpacity
+              onPress={() => setInfoVisible(true)}
+              style={[styles.headerChip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+            >
+              <IconSymbol ios_icon_name="info" android_material_icon_name="info-outline" size={16} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <HeaderNavButton
+              label={t('common:to_user')}
+              iconIos="person.fill"
+              iconAndroid="person"
+              onPress={() => router.replace('/closing-checklist')}
+            />
+          </View>
+        }
+      />
+    </>
+  );
+
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol
-              ios_icon_name="chevron.left"
-              android_material_icon_name="arrow-back"
-              size={24}
-              color={colors.text}
-            />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>{t('checklist_editor:closing_checklist_editor')}</Text>
-          <View style={styles.placeholder} />
-        </View>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        {header}
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -530,36 +440,26 @@ export default function ClosingChecklistEditorScreen() {
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Closing Checklist Editor</Text>
-        <View style={styles.placeholder} />
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {header}
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        <TouchableOpacity style={styles.addButton} onPress={openAddCategoryModal}>
-          <IconSymbol
-            ios_icon_name="plus.circle.fill"
-            android_material_icon_name="add-circle"
-            size={24}
-            color={colors.text}
-          />
-          <Text style={styles.addButtonText}>{t('checklist_editor:add_category')}</Text>
-        </TouchableOpacity>
+        {/* Add Category — its own chip above the list (Steve, s74 smoke round 1) */}
+        <View style={styles.addCatRow}>
+          <TouchableOpacity
+            style={[styles.addCatChip, { backgroundColor: colors.primary + '2E', borderColor: colors.primary + '6B' }]}
+            onPress={openAddCategoryModal}
+          >
+            <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={14} color={colors.primary} />
+            <Text style={[styles.addCatChipText, { color: colors.primary }]}>{t('checklist_editor:add_category')}</Text>
+          </TouchableOpacity>
+        </View>
 
         {categories.map((category) => {
           const isExpanded = expandedCategories.has(category.id);
 
           return (
-            <View key={category.id} style={styles.categoryCard}>
+            <View key={category.id} style={[styles.categoryCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
               <View style={styles.categoryHeader}>
                 <TouchableOpacity
                   style={styles.categoryHeaderLeft}
@@ -569,181 +469,379 @@ export default function ClosingChecklistEditorScreen() {
                   <IconSymbol
                     ios_icon_name={isExpanded ? 'chevron.down' : 'chevron.right'}
                     android_material_icon_name={isExpanded ? 'expand-more' : 'chevron-right'}
-                    size={24}
+                    size={16}
                     color={colors.textSecondary}
                   />
                   <View style={styles.categoryHeaderText}>
-                    <Text style={styles.categoryTitle}>{category.name}</Text>
-                    <Text style={styles.categoryItemCount}>
+                    <Text style={[styles.categoryTitle, { color: colors.text }]}>
+                      {getLocalizedField(category, 'name', language)}
+                    </Text>
+                    <Text style={[styles.categoryItemCount, { color: colors.textSecondary }]}>
                       {t('checklist_editor:items_count', { count: category.items.length })}
                     </Text>
                   </View>
                 </TouchableOpacity>
                 <View style={styles.categoryActions}>
                   <TouchableOpacity
-                    style={styles.iconButton}
                     onPress={() => openEditCategoryModal(category)}
+                    style={styles.actionButton}
                   >
                     <IconSymbol
                       ios_icon_name="pencil"
                       android_material_icon_name="edit"
-                      size={20}
+                      size={17}
                       color={colors.primary}
                     />
                   </TouchableOpacity>
                   <TouchableOpacity
-                    style={styles.iconButton}
                     onPress={() => handleDeleteCategory(category)}
+                    style={styles.actionButton}
                   >
                     <IconSymbol
                       ios_icon_name="trash"
                       android_material_icon_name="delete"
-                      size={20}
-                      color="#ff4444"
+                      size={17}
+                      color={TRASH_RED}
                     />
                   </TouchableOpacity>
                 </View>
               </View>
 
               {isExpanded && (
-                <>
-                  <View style={styles.itemsContainer}>
-                    {category.items.map((item) => (
-                      <View key={item.id} style={styles.itemRow}>
-                        <Text style={styles.itemText}>{item.text}</Text>
-                        <View style={styles.itemActions}>
-                          <TouchableOpacity
-                            style={styles.iconButton}
-                            onPress={() => openEditItemModal(item)}
-                          >
-                            <IconSymbol
-                              ios_icon_name="pencil"
-                              android_material_icon_name="edit"
-                              size={18}
-                              color={colors.primary}
-                            />
-                          </TouchableOpacity>
-                          <TouchableOpacity
-                            style={styles.iconButton}
-                            onPress={() => handleDeleteItem(item)}
-                          >
-                            <IconSymbol
-                              ios_icon_name="trash"
-                              android_material_icon_name="delete"
-                              size={18}
-                              color="#ff4444"
-                            />
-                          </TouchableOpacity>
-                        </View>
+                <View style={styles.itemsContainer}>
+                  {category.items.map((item) => (
+                    <View key={item.id} style={[styles.itemRow, { borderTopColor: colors.border + '55' }]}>
+                      <Text style={[styles.itemText, { color: colors.text }]}>
+                        {getLocalizedField(item, 'text', language)}
+                      </Text>
+                      <View style={styles.itemActions}>
+                        <TouchableOpacity
+                          onPress={() => openEditItemModal(item)}
+                          style={styles.actionButton}
+                        >
+                          <IconSymbol
+                            ios_icon_name="pencil"
+                            android_material_icon_name="edit"
+                            size={16}
+                            color={colors.primary}
+                          />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => handleDeleteItem(item)}
+                          style={styles.actionButton}
+                        >
+                          <IconSymbol
+                            ios_icon_name="trash"
+                            android_material_icon_name="delete"
+                            size={16}
+                            color={TRASH_RED}
+                          />
+                        </TouchableOpacity>
                       </View>
-                    ))}
-                  </View>
+                    </View>
+                  ))}
                   <TouchableOpacity
-                    style={styles.addItemButton}
+                    style={[styles.addItemButton, { borderColor: colors.primary + '8C' }]}
                     onPress={() => openAddItemModal(category.id)}
                   >
                     <IconSymbol
                       ios_icon_name="plus"
                       android_material_icon_name="add"
-                      size={20}
-                      color={colors.text}
+                      size={15}
+                      color={colors.primary}
                     />
-                    <Text style={styles.addItemButtonText}>{t('checklist_editor:add_item')}</Text>
+                    <Text style={[styles.addItemText, { color: colors.primary }]}>{t('checklist_editor:add_item')}</Text>
                   </TouchableOpacity>
-                </>
+                </View>
               )}
             </View>
           );
         })}
       </ScrollView>
 
-      <Modal
-        visible={modalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setModalVisible(false)}
+      {/* About this editor (the old top blurb, now behind the ⓘ chip) */}
+      <GlassSheet
+        visible={infoVisible}
+        onClose={() => setInfoVisible(false)}
+        title={t('checklist_editor:about_title')}
       >
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalOverlay}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>
-              {editingId
-                ? modalType === 'category'
-                  ? t('checklist_editor:edit_category')
-                  : t('checklist_editor:edit_item')
-                : modalType === 'category'
-                ? t('checklist_editor:add_category')
-                : t('checklist_editor:add_item')}
-            </Text>
+        <View style={[styles.infoCard, { backgroundColor: colors.primary + '15' }]}>
+          <IconSymbol
+            ios_icon_name="info.circle.fill"
+            android_material_icon_name="info"
+            size={20}
+            color={colors.primary}
+          />
+          <Text style={[styles.infoText, { color: colors.text }]}>
+            {t('checklist_editor:info_closing_hosts')}
+          </Text>
+        </View>
+      </GlassSheet>
 
-            {modalType === 'category' ? (
-              <>
-                <TextInput
-                  style={styles.input}
-                  value={categoryName}
-                  onChangeText={setCategoryName}
-                  placeholder={t('checklist_editor:category_name_placeholder_closing')}
-                  placeholderTextColor={colors.textSecondary}
-                  autoFocus
-                />
-              </>
-            ) : (
-              <>
-                <TextInput
-                  style={[styles.input, styles.textArea]}
-                  value={itemText}
-                  onChangeText={setItemText}
-                  placeholder={t('checklist_editor:item_text_placeholder')}
-                  placeholderTextColor={colors.textSecondary}
-                  multiline
-                  numberOfLines={3}
-                  autoFocus
-                />
+      {/* Add/Edit Category */}
+      <GlassSheet
+        visible={categoryModalVisible}
+        onClose={() => setCategoryModalVisible(false)}
+        title={editingCategory ? t('checklist_editor:edit_category') : t('checklist_editor:add_category')}
+        footer={sheetFooter(() => setCategoryModalVisible(false), handleSaveCategory)}
+      >
+        <TextInput
+          style={[styles.input, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
+          placeholder={t('checklist_editor:category_name_placeholder_closing')}
+          placeholderTextColor={colors.textSecondary}
+          value={isSpanishAuthor ? categoryNameEs : categoryName}
+          onChangeText={(text) => (isSpanishAuthor ? setCategoryNameEs(text) : setCategoryName(text))}
+          autoFocus
+        />
 
-                <Text style={styles.inputLabel}>{t('checklist_editor:category_label')}</Text>
-                <ScrollView style={styles.categoryPicker}>
-                  {categories.map((cat) => (
-                    <TouchableOpacity
-                      key={cat.id}
-                      style={[
-                        styles.categoryOption,
-                        selectedCategoryId === cat.id && styles.categoryOptionSelected,
-                      ]}
-                      onPress={() => setSelectedCategoryId(cat.id)}
-                    >
-                      <Text
-                        style={[
-                          styles.categoryOptionText,
-                          selectedCategoryId === cat.id && styles.categoryOptionTextSelected,
-                        ]}
-                      >
-                        {cat.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-              </>
-            )}
+        {categoryTranslation.element}
+      </GlassSheet>
 
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setModalVisible(false)}
+      {/* Add/Edit Item */}
+      <GlassSheet
+        visible={itemModalVisible}
+        onClose={() => setItemModalVisible(false)}
+        title={editingItem ? t('checklist_editor:edit_item') : t('checklist_editor:add_item')}
+        footer={sheetFooter(() => setItemModalVisible(false), handleSaveItem)}
+      >
+        <TextInput
+          style={[styles.input, styles.textArea, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
+          placeholder={t('checklist_editor:item_text_placeholder')}
+          placeholderTextColor={colors.textSecondary}
+          value={isSpanishAuthor ? itemTextEs : itemText}
+          onChangeText={(text) => (isSpanishAuthor ? setItemTextEs(text) : setItemText(text))}
+          multiline
+          numberOfLines={3}
+          autoFocus
+        />
+
+        {itemTranslation.element}
+
+        <Text style={[styles.sheetLabel, { color: colors.textSecondary }]}>{t('checklist_editor:category_label')}</Text>
+        {categories.map((cat) => {
+          const isCurrent = selectedCategoryId === cat.id;
+          return (
+            <TouchableOpacity
+              key={cat.id}
+              style={[
+                styles.categoryOption,
+                {
+                  backgroundColor: isCurrent ? colors.primary + '2E' : colors.surface,
+                  borderColor: isCurrent ? colors.primary + '6B' : colors.surfaceBorder,
+                },
+              ]}
+              onPress={() => setSelectedCategoryId(cat.id)}
+            >
+              <Text
+                style={[
+                  styles.categoryOptionText,
+                  { color: isCurrent ? colors.primary : colors.text },
+                  isCurrent && { fontFamily: fonts.body.semibold },
+                ]}
+                numberOfLines={1}
               >
-                <Text style={styles.modalButtonText}>{t('common:cancel')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.saveButton]}
-                onPress={modalType === 'category' ? handleSaveCategory : handleSaveItem}
-              >
-                <Text style={styles.modalButtonText}>{t('common:save')}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+                {getLocalizedField(cat, 'name', language)}
+              </Text>
+              {isCurrent && (
+                <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={16} color={colors.primary} />
+              )}
+            </TouchableOpacity>
+          );
+        })}
+      </GlassSheet>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  headerRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  headerChip: {
+    width: 34,
+    height: 34,
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  addCatRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 10,
+  },
+  addCatChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+  },
+  addCatChipText: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 12.5,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  contentContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 100,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    borderRadius: 13,
+    padding: 13,
+    gap: 10,
+  },
+  infoText: {
+    flex: 1,
+    fontFamily: fonts.body.regular,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  categoryCard: {
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    marginBottom: 10,
+    overflow: 'hidden',
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  categoryHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 10,
+  },
+  categoryHeaderText: {
+    flex: 1,
+  },
+  categoryTitle: {
+    fontFamily: fonts.display.semibold,
+    fontSize: 15,
+    marginBottom: 2,
+  },
+  categoryItemCount: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10.5,
+  },
+  categoryActions: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  actionButton: {
+    padding: 8,
+  },
+  itemsContainer: {
+    paddingBottom: 10,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    paddingLeft: 14,
+    paddingRight: 6,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  itemText: {
+    flex: 1,
+    fontFamily: fonts.body.regular,
+    fontSize: 14,
+    lineHeight: 21,
+    marginRight: 8,
+    paddingTop: 6,
+  },
+  itemActions: {
+    flexDirection: 'row',
+  },
+  addItemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    marginTop: 6,
+    marginHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    gap: 7,
+  },
+  addItemText: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 13,
+  },
+  input: {
+    minHeight: 43,
+    borderRadius: 13,
+    paddingHorizontal: 13,
+    paddingVertical: 11,
+    fontFamily: fonts.body.regular,
+    fontSize: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+  },
+  textArea: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  sheetLabel: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+    marginTop: 12,
+    marginBottom: 7,
+  },
+  categoryOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 13,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    marginBottom: 8,
+  },
+  categoryOptionText: {
+    flex: 1,
+    fontFamily: fonts.body.regular,
+    fontSize: 14.5,
+  },
+  footerRow: {
+    flexDirection: 'row',
+    gap: 11,
+    paddingTop: 12,
+  },
+  footerBtn: {
+    flex: 1,
+    height: 47,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+  },
+  footerBtnLabel: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 15,
+  },
+});

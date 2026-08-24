@@ -95,6 +95,13 @@ const GATES: Record<string, Gate> = {
     bucket: 'host-section-images', roles: 'manager', maxBytes: 10 * MB, mimes: IMAGES,
     path: (c) => `${c.orgId}/${c.ts}-${c.rand}.${c.ext}`,
   },
+  host_section_file: {
+    // s74: host section tiles may attach a file of any type (mirrors guide_file:
+    // picker-declared mimes vary — size-capped instead of allowlisted). Lives in
+    // the host-section bucket under files/, same as guides' layout.
+    bucket: 'host-section-images', roles: 'manager', maxBytes: 50 * MB, mimes: null,
+    path: (c) => `${c.orgId}/files/${c.ts}_${c.safeName}`,
+  },
   menu_item_image: {
     bucket: 'menu-items', roles: 'manager', maxBytes: 10 * MB, mimes: IMAGES,
     path: (c) => `${c.orgId}/${c.ts}-${c.rand}.${c.ext}`,
@@ -204,7 +211,9 @@ const REWRITE_MAP: Record<string, string[]> = {
   content_images: ['image_url'],
   guides_and_training: ['thumbnail_url', 'file_url'],
   host_sections: ['card_image_url'],
-  host_section_tiles: ['image_url'],
+  // file_url: s74b gave tiles a dedicated attached-file column (link_url is
+  // web links only again — the s74 storage URLs parked there were migrated).
+  host_section_tiles: ['image_url', 'file_url'],
   menu_uploads: ['file_url'],
   schedule_uploads: ['file_url'],
   messages: ['image_url', 'file_url'],

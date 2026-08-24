@@ -479,9 +479,7 @@
     "check_out_calculator": "Check Out Calculator",
     "check_out_calculator_desc": "Calculate your tip-outs and declare amount",
     "guides_training": "Guides & Training",
-    "bartender_binder": "Bartender Binder",
     "memory_game": "Menu Memory Game",
-    "server_assistant": "Server Assistant",
     "kitchen_assistant": "Kitchen Assistant",
     "weekly_quizzes": "Weekly Quizzes",
     "game_hub": "Game Hub"
@@ -562,7 +560,6 @@
   "manager_tools": {
     "title": "Tools",
     "employee_management": "Employee Management",
-    "bartender_binder": "Bartender Binder",
     "guides_training": "Guides & Training",
     "notification_center": "Notification Center",
     "rewards_reviews": "Rewards & Reviews"
@@ -573,7 +570,6 @@
     "upcoming_events_editor": "Upcoming Events Editor",
     "guides_training_editor": "Guides and Training Editor",
     "bartender_assistant_editor": "Bar Assistant Editor",
-    "server_assistant_editor": "Server Assistant Editor",
     "host_assistant_editor": "Host Assistant Editor",
     "memory_game_editor": "Menu Memory Game Editor",
     "kitchen_assistant_editor": "Kitchen Assistant Editor",
@@ -588,7 +584,6 @@
     "special_features": "Special Features",
     "menus": "Menus",
     "grid_game_hub": "Game Hub",
-    "grid_server": "Server",
     "grid_bartender": "Bar",
     "grid_host": "Host",
     "grid_kitchen": "Kitchen",
@@ -655,7 +650,7 @@
     "dir_sub_active": "ACTIVE",
     "dir_sub_upcoming": "UPCOMING",
     "dir_sub_broadcast": "BROADCAST",
-    "dir_sub_roles": "4 ROLES",
+    "dir_sub_roles": "3 ROLES",
     "dir_sub_training": "TRAINING",
     "dir_sub_games": "GAMES",
     "dir_sub_items": "ITEMS",
@@ -734,15 +729,15 @@
   "host_assistant": {
     "title": "Host Assistant",
     "checklists": "Checklists",
-    "checklists_desc": "Daily opening, running, and closing checklists",
     "opening_checklist": "Opening Checklist",
     "running_side_work": "Running Side Work Checklist",
-    "closing_checklist": "Closing Checklist"
-  },
-  "server_assistant": {
-    "title": "Server Assistant",
-    "check_out_calculator": "Check Out Calculator",
-    "check_out_calculator_desc": "Calculate your tip-outs and declare amount"
+    "closing_checklist": "Closing Checklist",
+    "opening_short": "Opening",
+    "running_short": "Side Work",
+    "closing_short": "Closing",
+    "sections_label": "Training & Sections",
+    "tiles_count": "{{count}} tiles",
+    "items_count": "{{count}} items"
   },
   "memory_game": {
     "hub_title": "Menu Memory Game",
@@ -820,7 +815,8 @@
     "banquet_recipes": "Banquet Recipes",
     "banquet_recipes_desc": "Browse recipes for banquet events",
     "buffet_recipes": "Buffet Recipes",
-    "buffet_recipes_desc": "Browse recipes for buffet service"
+    "buffet_recipes_desc": "Browse recipes for buffet service",
+    "coming_soon": "Coming Soon"
   },
   "checklist": {
     "title_opening": "Opening Checklist",
@@ -894,16 +890,6 @@
     "ingredients": "Ingredients",
     "procedure": "Procedure",
     "no_ingredients": "No ingredients listed"
-  },
-  "bartender_binder": {
-    "title": "Bartender Binder",
-    "checklists": "Checklists",
-    "checklists_desc": "Daily opening and closing checklists",
-    "opening_checklist": "Opening Checklist",
-    "closing_checklist": "Closing Checklist",
-    "purees_syrups": "Purees & Syrups Recipes",
-    "purees_syrups_desc": "Recipe collection for purees and simple syrups",
-    "view_recipes": "View Recipes"
   },
   "guides_training": {
     "title": "Guides and Training",
@@ -1010,7 +996,10 @@
     "delete_category_title": "Delete Category",
     "delete_category_confirm": "Are you sure you want to delete \"{{name}}\" and all its items?",
     "delete_item_title": "Delete Item",
-    "delete_item_confirm": "Are you sure you want to delete this item?"
+    "delete_item_confirm": "Are you sure you want to delete this item?",
+    "about_title": "About This Editor",
+    "info_closing_hosts": "Manage categories (subheadings) and items for the Closing Checklist. Changes will be visible to all hosts immediately.",
+    "info_running_side_work": "Manage categories (subheadings) and items for the Running Side Work Checklist. Changes will be visible to all hosts immediately."
   },
   "bartender_assistant_editor": {
     "title": "Bar Assistant Editor",
@@ -1026,20 +1015,10 @@
     "purees_syrups_editor": "Mixes & Essential Recipes Editor",
     "purees_syrups_editor_desc": "Manage mixes, purees, syrups & essential prep recipes"
   },
-  "bartender_binder_editor": {
-    "title": "Bartender Binder Editor",
-    "checklists_editor": "Checklists Editor",
-    "checklists_editor_desc": "Manage opening and closing checklists",
-    "opening_checklist_editor": "Opening Checklist Editor",
-    "closing_checklist_editor": "Closing Checklist Editor",
-    "purees_syrups_editor": "Purees & Syrups Recipes Editor",
-    "purees_syrups_editor_desc": "Manage puree and simple syrup recipes",
-    "purees_syrups_button": "Purees & Syrups Editor"
-  },
   "host_assistant_editor": {
     "title": "Host Assistant Editor",
     "sections": "Sections",
-    "sections_desc": "Create custom sections with link tiles (OpenTable, Resy, Toast, and more)",
+    "sections_desc": "Add a new section to the Host Assistant that you can link to outside tutorials, classes, guides, and other helpful information to prepare your host staff for day-to-day operations.",
     "add_section": "Add Section",
     "hidden": "Hidden",
     "hide": "Hide",
@@ -1049,15 +1028,9 @@
     "delete_section_title": "Delete Section",
     "delete_section_confirm": "Delete \"{{title}}\" and all of its tiles?",
     "checklists_editor": "Checklists Editor",
-    "checklists_editor_desc": "Manage opening, running, and closing checklists",
     "opening_checklist_editor": "Opening Checklist Editor",
     "running_side_work_editor": "Running Side Work Editor",
     "closing_checklist_editor": "Closing Checklist Editor"
-  },
-  "server_assistant_editor": {
-    "title": "Server Assistant Editor",
-    "check_out_calculator": "Check Out Calculator",
-    "check_out_calculator_desc": "Server check out calculation tool"
   },
   "kitchen_assistant_editor": {
     "title": "Kitchen Assistant Editor",
@@ -2024,7 +1997,6 @@
     "memory_game": "Memory Game",
     "menus": "Menus",
     "rewards": "Rewards",
-    "server_assistant": "Server Assistant",
     "bartender_assistant": "Bar Assistant",
     "host_assistant": "Host Assistant",
     "kitchen_assistant": "Kitchen Assistant",
@@ -2037,7 +2009,6 @@
     "memory_game_editor": "Game Editor",
     "word_search": "Word Search",
     "word_search_editor": "Word Search Editor",
-    "server_assistant_editor": "Server Asst. Editor",
     "bartender_assistant_editor": "Bartender Asst. Editor",
     "host_assistant_editor": "Host Asst. Editor",
     "kitchen_assistant_editor": "Kitchen Asst. Editor",
@@ -3044,7 +3015,6 @@
     "delete_title_failed": "Failed to delete.",
     "tools_assistants": "Tools & Assistants",
     "tools_assistants_hint": "Toggle tools on/off, then tap a tool to configure which job titles can access it.",
-    "assistant_server_desc": "Server opening/closing checklists, sidework guides",
     "assistant_bartender_desc": "Bar checklists, cocktail recipes, binder",
     "assistant_host_desc": "Seating charts, reservation guides",
     "assistant_kitchen_desc": "Kitchen prep lists, station guides",
@@ -3067,5 +3037,61 @@
     "perm_section_menu": "Menu Access",
     "perm_premium_footnote": "Marked Premium Features will spend your monthly upload credits.",
     "perm_save_failed": "Failed to update permission."
+  },
+  "host_section": {
+    "hello": "Hello {{name}}!",
+    "open_link": "Open Link",
+    "open_file": "Open File"
+  },
+  "host_section_editor": {
+    "title_new": "New Section",
+    "title_edit": "Edit Section",
+    "section_details": "Section Details",
+    "title_label": "Title",
+    "title_placeholder": "e.g. Resy Academy",
+    "subtitle_label": "Card Subtitle",
+    "subtitle_placeholder": "Short description shown on the card",
+    "instructions_label": "Instructions",
+    "instructions_hint": "Shown under the welcome greeting — one line per bullet point.",
+    "instructions_placeholder": "Log in to your account...\nComplete each course...",
+    "add_image": "Add Image",
+    "shape_square": "Square",
+    "shape_banner": "Banner",
+    "save_section": "Save Section",
+    "create_section": "Create Section",
+    "saved_title": "Saved",
+    "saved_msg": "Section updated.",
+    "created_title": "Created",
+    "created_msg": "Section created — you can now add tiles below.",
+    "title_required_title": "Title required",
+    "title_required_msg": "Please enter a section title.",
+    "save_failed": "Failed to save section.",
+    "save_first": "Save the section first to add tiles.",
+    "tiles": "Tiles",
+    "tiles_desc": "Personalize tiles for this section with links to a webpage, training documents, and more for your staff to navigate and access.",
+    "add_tile": "Add Tile",
+    "edit_tile": "Edit Tile",
+    "save_tile": "Save Tile",
+    "tile_save_failed": "Failed to save tile.",
+    "no_tiles": "No tiles yet. Add one that links to a website or a file.",
+    "untitled_tile": "(untitled tile)",
+    "no_link": "no link",
+    "remove_file": "Remove file",
+    "tile_image_label": "Image",
+    "tile_title_placeholder": "e.g. Beginner Course",
+    "link_label": "Link URL (optional)",
+    "upload_file": "Upload File",
+    "from_guides": "From Guides & Training",
+    "pick_guide_title": "Attach from Guides & Training",
+    "no_guides": "No files in Guides & Training yet.",
+    "upload_failed": "File upload failed. Please try again.",
+    "confirm_label": "Confirmation Message (optional)",
+    "confirm_hint": "Shown in a popup before the link or file opens.",
+    "confirm_placeholder": "You're about to leave the app...",
+    "delete_tile_title": "Delete Tile",
+    "delete_tile_confirm": "Remove this tile?",
+    "permission_title": "Permission required",
+    "permission_msg": "Please grant photo library access.",
+    "attach_label": "Attach a File (optional)"
   }
 }

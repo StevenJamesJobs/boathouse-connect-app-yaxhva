@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -10,16 +10,23 @@ import {
   Alert,
 } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganization } from '@/contexts/OrganizationContext';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
+import { isManagerOrOwner } from '@/utils/roles';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField } from '@/utils/translateContent';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import HeaderNavButton from '@/components/HeaderNavButton';
+import { fonts } from '@/constants/fonts';
 
 interface ChecklistItem {
   id: string;
   text: string;
+  text_es: string | null;
   display_order: number;
   completed: boolean;
 }
@@ -27,6 +34,7 @@ interface ChecklistItem {
 interface ChecklistCategory {
   id: string;
   name: string;
+  name_es: string | null;
   display_order: number;
   items: ChecklistItem[];
 }
@@ -34,8 +42,9 @@ interface ChecklistCategory {
 export default function OpeningChecklistScreen() {
   const router = useRouter();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
   const { t } = useTranslation();
+  const { language } = useLanguage();
+  const isManager = isManagerOrOwner(user);
   const [categories, setCategories] = useState<ChecklistCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -50,11 +59,9 @@ export default function OpeningChecklistScreen() {
 
   const loadChecklist = async () => {
     if (!user?.id) return;
-    console.log('Loading Opening Checklist for user:', user?.id);
     try {
       setLoading(true);
 
-      // Fetch categories (member-gated RPC; org derived server-side)
       const { data: categoriesData, error: categoriesError } = await supabase.rpc('get_checklist_categories', {
         p_actor_id: user.id,
         p_bartender: false,
@@ -66,7 +73,6 @@ export default function OpeningChecklistScreen() {
         throw categoriesError;
       }
 
-      // Fetch items
       const { data: itemsData, error: itemsError } = await supabase.rpc('get_checklist_items', {
         p_actor_id: user.id,
         p_bartender: false,
@@ -78,7 +84,6 @@ export default function OpeningChecklistScreen() {
         throw itemsError;
       }
 
-      // Fetch user progress for today
       const today = new Date().toISOString().split('T')[0];
       const { data: progressData, error: progressError } = await supabase.rpc('get_my_checklist_progress', {
         p_actor_id: user.id,
@@ -91,7 +96,6 @@ export default function OpeningChecklistScreen() {
         throw progressError;
       }
 
-      // Build checklist structure
       const progressMap = new Map(
         progressData?.map(p => [p.checklist_item_id, p.completed]) || []
       );
@@ -99,24 +103,23 @@ export default function OpeningChecklistScreen() {
       const categoriesWithItems: ChecklistCategory[] = categoriesData?.map(cat => ({
         id: cat.id,
         name: cat.name,
+        name_es: cat.name_es,
         display_order: cat.display_order,
         items: itemsData
           ?.filter(item => item.category_id === cat.id)
           .map(item => ({
             id: item.id,
             text: item.text,
+            text_es: item.text_es,
             display_order: item.display_order,
             completed: progressMap.get(item.id) || false,
           })) || [],
       })) || [];
 
       setCategories(categoriesWithItems);
-      
-      // Expand all categories by default
+
       const allCategoryIds = new Set(categoriesWithItems.map(c => c.id));
       setExpandedCategories(allCategoryIds);
-
-      console.log('Loaded checklist with', categoriesWithItems.length, 'categories');
     } catch (error) {
       console.error('Error loading checklist:', error);
       Alert.alert(t('common.error'), t('checklist.error_load'));
@@ -126,7 +129,6 @@ export default function OpeningChecklistScreen() {
   };
 
   const toggleCategory = (categoryId: string) => {
-    console.log('Toggling category:', categoryId);
     setExpandedCategories(prev => {
       const newSet = new Set(prev);
       if (newSet.has(categoryId)) {
@@ -140,18 +142,16 @@ export default function OpeningChecklistScreen() {
 
   const toggleItem = async (categoryId: string, itemId: string, currentCompleted: boolean) => {
     if (!user?.id) return;
-    console.log('Toggling item:', itemId, 'from', currentCompleted, 'to', !currentCompleted);
-    
+
     try {
       const today = new Date().toISOString().split('T')[0];
       const newCompleted = !currentCompleted;
 
-      // Update local state immediately for responsiveness
       setCategories(prev => prev.map(cat => {
         if (cat.id === categoryId) {
           return {
             ...cat,
-            items: cat.items.map(item => 
+            items: cat.items.map(item =>
               item.id === itemId ? { ...item, completed: newCompleted } : item
             ),
           };
@@ -159,7 +159,6 @@ export default function OpeningChecklistScreen() {
         return cat;
       }));
 
-      // Update database — one self-gated RPC upserts (check) or deletes (uncheck) own progress.
       const { error } = await supabase.rpc('set_checklist_progress', {
         p_actor_id: user.id,
         p_bartender: false,
@@ -172,13 +171,10 @@ export default function OpeningChecklistScreen() {
         console.error('Error updating progress:', error);
         throw error;
       }
-
-      console.log('Item toggled successfully');
     } catch (error) {
       console.error('Error toggling item:', error);
-      // Revert local state on error
       loadChecklist();
-      Alert.alert('Error', 'Failed to update checklist. Please try again.');
+      Alert.alert(t('common.error'), t('checklist.error_load'));
     }
   };
 
@@ -192,25 +188,32 @@ export default function OpeningChecklistScreen() {
   };
 
   const stats = getCompletionStats();
-  const completionPercentage = stats.totalItems > 0 
-    ? Math.round((stats.completedItems / stats.totalItems) * 100) 
+  const completionPercentage = stats.totalItems > 0
+    ? Math.round((stats.completedItems / stats.totalItems) * 100)
     : 0;
+
+  const header = (
+    <>
+      <AmbientGlow />
+      <ScreenHeader
+        title={t('checklist.title_opening')}
+        rightWide={isManager}
+        right={isManager ? (
+          <HeaderNavButton
+            label={t('common:to_editor')}
+            iconIos="pencil"
+            iconAndroid="edit"
+            onPress={() => router.replace('/opening-checklist-editor')}
+          />
+        ) : undefined}
+      />
+    </>
+  );
 
   if (loading) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <IconSymbol
-              ios_icon_name="chevron.left"
-              android_material_icon_name="arrow-back"
-              size={24}
-              color={colors.text}
-            />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t('checklist.title_opening')}</Text>
-          <View style={styles.placeholder} />
-        </View>
+        {header}
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -220,35 +223,23 @@ export default function OpeningChecklistScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('checklist.title_opening')}</Text>
-        <View style={styles.placeholder} />
-      </View>
+      {header}
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Progress Card */}
-        <View style={[styles.progressCard, { backgroundColor: colors.card }]}>
+        {/* Today's progress */}
+        <View style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
           <View style={styles.progressHeader}>
             <Text style={[styles.progressTitle, { color: colors.text }]}>{t('checklist.todays_progress')}</Text>
             <Text style={[styles.progressPercentage, { color: colors.primary }]}>
               {completionPercentage}%
             </Text>
           </View>
-          <View style={[styles.progressBarBackground, { backgroundColor: colors.background }]}>
-            <View 
+          <View style={[styles.progressBarBackground, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+            <View
               style={[
-                styles.progressBarFill, 
-                { backgroundColor: colors.primary, width: `${completionPercentage}%` }
-              ]} 
+                styles.progressBarFill,
+                { backgroundColor: colors.primary, width: `${completionPercentage}%` },
+              ]}
             />
           </View>
           <Text style={[styles.progressText, { color: colors.textSecondary }]}>
@@ -256,14 +247,13 @@ export default function OpeningChecklistScreen() {
           </Text>
         </View>
 
-        {/* Checklist Categories */}
         {categories.map((category) => {
           const isExpanded = expandedCategories.has(category.id);
-          const categoryCompleted = category.items.every(item => item.completed);
+          const categoryCompleted = category.items.length > 0 && category.items.every(item => item.completed);
           const categoryProgress = category.items.filter(item => item.completed).length;
 
           return (
-            <View key={category.id} style={[styles.categoryCard, { backgroundColor: colors.card }]}>
+            <View key={category.id} style={[styles.categoryCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
               <TouchableOpacity
                 style={styles.categoryHeader}
                 onPress={() => toggleCategory(category.id)}
@@ -273,12 +263,12 @@ export default function OpeningChecklistScreen() {
                   <IconSymbol
                     ios_icon_name={categoryCompleted ? 'checkmark.circle.fill' : 'circle'}
                     android_material_icon_name={categoryCompleted ? 'check-circle' : 'radio-button-unchecked'}
-                    size={24}
+                    size={22}
                     color={categoryCompleted ? colors.primary : colors.textSecondary}
                   />
                   <View style={styles.categoryHeaderText}>
                     <Text style={[styles.categoryTitle, { color: colors.text }]}>
-                      {category.name}
+                      {getLocalizedField(category, 'name', language)}
                     </Text>
                     <Text style={[styles.categoryProgress, { color: colors.textSecondary }]}>
                       {t('checklist.category_progress', { done: categoryProgress, total: category.items.length })}
@@ -288,7 +278,7 @@ export default function OpeningChecklistScreen() {
                 <IconSymbol
                   ios_icon_name={isExpanded ? 'chevron.up' : 'chevron.down'}
                   android_material_icon_name={isExpanded ? 'expand-less' : 'expand-more'}
-                  size={24}
+                  size={16}
                   color={colors.textSecondary}
                 />
               </TouchableOpacity>
@@ -298,24 +288,24 @@ export default function OpeningChecklistScreen() {
                   {category.items.map((item) => (
                     <TouchableOpacity
                       key={item.id}
-                      style={[styles.itemRow, { borderTopColor: colors.border }]}
+                      style={[styles.itemRow, { borderTopColor: colors.border + '55' }]}
                       onPress={() => toggleItem(category.id, item.id, item.completed)}
                       activeOpacity={0.7}
                     >
                       <IconSymbol
                         ios_icon_name={item.completed ? 'checkmark.square.fill' : 'square'}
                         android_material_icon_name={item.completed ? 'check-box' : 'check-box-outline-blank'}
-                        size={24}
+                        size={22}
                         color={item.completed ? colors.primary : colors.textSecondary}
                       />
-                      <Text 
+                      <Text
                         style={[
-                          styles.itemText, 
+                          styles.itemText,
                           { color: colors.text },
-                          item.completed && styles.itemTextCompleted
+                          item.completed && styles.itemTextCompleted,
                         ]}
                       >
-                        {item.text}
+                        {getLocalizedField(item, 'text', language)}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -333,25 +323,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  placeholder: {
-    width: 40,
-  },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -361,16 +332,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    paddingTop: 20,
     paddingHorizontal: 16,
     paddingBottom: 100,
   },
   progressCard: {
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    padding: 16,
+    marginBottom: 14,
   },
   progressHeader: {
     flexDirection: 'row',
@@ -379,55 +348,58 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   progressTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontFamily: fonts.display.semibold,
+    fontSize: 15,
   },
   progressPercentage: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontFamily: fonts.mono.semibold,
+    fontSize: 22,
   },
   progressBarBackground: {
-    height: 8,
-    borderRadius: 4,
+    height: 10,
+    borderRadius: 999,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 9,
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: 999,
   },
   progressText: {
-    fontSize: 14,
+    fontFamily: fonts.body.regular,
+    fontSize: 12.5,
   },
   categoryCard: {
-    borderRadius: 12,
-    marginBottom: 12,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    marginBottom: 10,
     overflow: 'hidden',
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
   },
   categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
   },
   categoryHeaderLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    gap: 12,
+    gap: 11,
   },
   categoryHeaderText: {
     flex: 1,
   },
   categoryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontFamily: fonts.display.semibold,
+    fontSize: 15,
     marginBottom: 2,
   },
   categoryProgress: {
-    fontSize: 13,
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10.5,
   },
   itemsContainer: {
     paddingBottom: 8,
@@ -435,18 +407,19 @@ const styles = StyleSheet.create({
   itemRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    gap: 12,
-    borderTopWidth: 1,
+    gap: 11,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   itemText: {
     flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
+    fontFamily: fonts.body.regular,
+    fontSize: 14,
+    lineHeight: 21,
   },
   itemTextCompleted: {
     textDecorationLine: 'line-through',
-    opacity: 0.6,
+    opacity: 0.55,
   },
 });

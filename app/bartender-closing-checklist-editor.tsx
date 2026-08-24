@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -17,6 +17,9 @@ import { IconSymbol } from '@/components/IconSymbol';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { supabase } from '@/app/integrations/supabase/client';
 import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { getLocalizedField, saveTranslations } from '@/utils/translateContent';
+import { useTranslationSection } from '@/components/TranslationSection';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
 import HeaderNavButton from '@/components/HeaderNavButton';
@@ -26,6 +29,7 @@ import { fonts } from '@/constants/fonts';
 interface ChecklistItem {
   id: string;
   text: string;
+  text_es: string | null;
   display_order: number;
   category_id: string;
 }
@@ -33,6 +37,7 @@ interface ChecklistItem {
 interface ChecklistCategory {
   id: string;
   name: string;
+  name_es: string | null;
   display_order: number;
   items: ChecklistItem[];
 }
@@ -42,9 +47,11 @@ const TRASH_RED = '#E53935';
 export default function BartenderClosingChecklistEditorScreen() {
   useRequireManagerRoute();
   const router = useRouter();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { user } = useAuth();
+  const { language } = useLanguage();
   const colors = useThemeColors();
+  const isSpanishAuthor = i18n.language === 'es';
 
   const [categories, setCategories] = useState<ChecklistCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,12 +59,55 @@ export default function BartenderClosingChecklistEditorScreen() {
 
   const [categoryModalVisible, setCategoryModalVisible] = useState(false);
   const [itemModalVisible, setItemModalVisible] = useState(false);
+  const [infoVisible, setInfoVisible] = useState(false);
   const [editingCategory, setEditingCategory] = useState<ChecklistCategory | null>(null);
   const [editingItem, setEditingItem] = useState<ChecklistItem | null>(null);
   const [categoryName, setCategoryName] = useState('');
+  const [categoryNameEs, setCategoryNameEs] = useState('');
   const [itemText, setItemText] = useState('');
+  const [itemTextEs, setItemTextEs] = useState('');
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [saving, setSaving] = useState(false);
+  const addSessionRef = useRef(0);
+  const addCatSessionRef = useRef(0);
+
+  // ES/EN hybrid authoring for the category name (Steve, s74 smoke round 1).
+  const categoryTranslation = useTranslationSection({
+    fields: [
+      {
+        key: 'name',
+        labelKey: 'translation_section:field_name',
+        enValue: categoryName,
+        esValue: categoryNameEs,
+        setEnValue: setCategoryName,
+        setEsValue: setCategoryNameEs,
+        enStored: editingCategory ? editingCategory.name : undefined,
+        esStored: editingCategory ? editingCategory.name_es : undefined,
+      },
+    ],
+    sessionKey: editingCategory ? `edit:${editingCategory.id}` : `new:${addCatSessionRef.current}`,
+    active: categoryModalVisible,
+  });
+
+  // ES/EN hybrid authoring for the item text (Steve, s74): the input binds the
+  // author's device language; the section fills/refreshes the other side.
+  const itemTranslation = useTranslationSection({
+    fields: [
+      {
+        key: 'text',
+        labelKey: 'checklist_editor:item_text_placeholder',
+        enValue: itemText,
+        esValue: itemTextEs,
+        setEnValue: setItemText,
+        setEsValue: setItemTextEs,
+        multiline: true,
+        enStored: editingItem ? editingItem.text : undefined,
+        esStored: editingItem ? editingItem.text_es : undefined,
+      },
+    ],
+    sessionKey: editingItem ? `edit:${editingItem.id}` : `new:${addSessionRef.current}`,
+    active: itemModalVisible,
+  });
 
   useFocusEffect(
     useCallback(() => {
@@ -95,12 +145,14 @@ export default function BartenderClosingChecklistEditorScreen() {
       const categoriesWithItems: ChecklistCategory[] = categoriesData?.map(cat => ({
         id: cat.id,
         name: cat.name,
+        name_es: cat.name_es,
         display_order: cat.display_order,
         items: itemsData
           ?.filter(item => item.category_id === cat.id)
           .map(item => ({
             id: item.id,
             text: item.text,
+            text_es: item.text_es,
             display_order: item.display_order,
             category_id: item.category_id,
           })) || [],
@@ -131,20 +183,25 @@ export default function BartenderClosingChecklistEditorScreen() {
   };
 
   const openAddCategoryModal = () => {
+    addCatSessionRef.current += 1;
     setEditingCategory(null);
     setCategoryName('');
+    setCategoryNameEs('');
     setCategoryModalVisible(true);
   };
 
   const openEditCategoryModal = (category: ChecklistCategory) => {
     setEditingCategory(category);
     setCategoryName(category.name);
+    setCategoryNameEs(category.name_es || '');
     setCategoryModalVisible(true);
   };
 
   const openAddItemModal = (categoryId: string) => {
+    addSessionRef.current += 1;
     setEditingItem(null);
     setItemText('');
+    setItemTextEs('');
     setSelectedCategoryId(categoryId);
     setItemModalVisible(true);
   };
@@ -152,29 +209,47 @@ export default function BartenderClosingChecklistEditorScreen() {
   const openEditItemModal = (item: ChecklistItem) => {
     setEditingItem(item);
     setItemText(item.text);
+    setItemTextEs(item.text_es || '');
     setSelectedCategoryId(item.category_id);
     setItemModalVisible(true);
   };
 
   const handleSaveCategory = async () => {
     if (!user?.id) return;
-    if (!categoryName.trim()) {
+    const authorName = isSpanishAuthor ? categoryNameEs : categoryName;
+    if (!authorName.trim()) {
       Alert.alert(t('common:error'), t('checklist_editor:error_enter_category_name'));
       return;
     }
 
+    // Fill/refresh the other language per the staleness rules (may ask once).
+    const resolved = await categoryTranslation.resolveOnSave();
+    if (!resolved) return;
+
     setSaving(true);
 
     try {
-      const { error } = await supabase.rpc('upsert_checklist_category', {
+      const { data: categoryId, error } = await supabase.rpc('upsert_checklist_category', {
         p_actor_id: user.id,
         p_bartender: true,
         p_checklist_type: 'closing',
-        p_name: categoryName.trim(),
+        p_name: resolved.name.en.trim(),
         p_category_id: editingCategory?.id ?? undefined,
       });
 
       if (error) throw error;
+
+      // '' (a confirmed clear) must write through — clearBlank marks it; null
+      // would hit the RPC's COALESCE and silently keep the old translation.
+      if (categoryId) {
+        await saveTranslations(
+          'bartender_checklist_categories',
+          categoryId,
+          { name_es: resolved.name.es },
+          user.id,
+          { clearBlank: ['name_es'] }
+        );
+      }
 
       setCategoryModalVisible(false);
       loadChecklist();
@@ -218,7 +293,8 @@ export default function BartenderClosingChecklistEditorScreen() {
 
   const handleSaveItem = async () => {
     if (!user?.id) return;
-    if (!itemText.trim()) {
+    const authorText = isSpanishAuthor ? itemTextEs : itemText;
+    if (!authorText.trim()) {
       Alert.alert(t('common:error'), t('checklist_editor:error_enter_item_text'));
       return;
     }
@@ -228,18 +304,34 @@ export default function BartenderClosingChecklistEditorScreen() {
       return;
     }
 
+    // Fill/refresh the other language per the staleness rules (may ask once).
+    const resolved = await itemTranslation.resolveOnSave();
+    if (!resolved) return;
+
     setSaving(true);
 
     try {
-      const { error } = await supabase.rpc('upsert_checklist_item', {
+      const { data: itemId, error } = await supabase.rpc('upsert_checklist_item', {
         p_actor_id: user.id,
         p_bartender: true,
         p_category_id: selectedCategoryId,
-        p_text: itemText.trim(),
+        p_text: resolved.text.en.trim(),
         p_item_id: editingItem?.id ?? undefined,
       });
 
       if (error) throw error;
+
+      // '' (a confirmed clear) must write through — clearBlank marks it; null
+      // would hit the RPC's COALESCE and silently keep the old translation.
+      if (itemId) {
+        await saveTranslations(
+          'bartender_checklist_items',
+          itemId,
+          { text_es: resolved.text.es },
+          user.id,
+          { clearBlank: ['text_es'] }
+        );
+      }
 
       setItemModalVisible(false);
       loadChecklist();
@@ -315,11 +407,13 @@ export default function BartenderClosingChecklistEditorScreen() {
         rightWide
         right={
           <View style={styles.headerRightRow}>
+            {/* ⓘ + To User, matching the general checklist editors (Steve, s74
+                round 2) — Add Category lives below the header as its own chip. */}
             <TouchableOpacity
-              onPress={openAddCategoryModal}
-              style={[styles.addChip, { backgroundColor: colors.primary + '2E', borderColor: colors.primary + '6B' }]}
+              onPress={() => setInfoVisible(true)}
+              style={[styles.addChip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
             >
-              <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={18} color={colors.primary} />
+              <IconSymbol ios_icon_name="info" android_material_icon_name="info-outline" size={16} color={colors.textSecondary} />
             </TouchableOpacity>
             <HeaderNavButton
               label={t('common:to_user')}
@@ -349,16 +443,15 @@ export default function BartenderClosingChecklistEditorScreen() {
       {header}
 
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        <View style={[styles.infoCard, { backgroundColor: colors.primary + '15' }]}>
-          <IconSymbol
-            ios_icon_name="info.circle.fill"
-            android_material_icon_name="info"
-            size={20}
-            color={colors.primary}
-          />
-          <Text style={[styles.infoText, { color: colors.text }]}>
-            {t('checklist_editor:info_bartender_closing')}
-          </Text>
+        {/* Add Category — its own chip above the list (Steve, s74 round 2) */}
+        <View style={styles.addCatRow}>
+          <TouchableOpacity
+            style={[styles.addCatChip, { backgroundColor: colors.primary + '2E', borderColor: colors.primary + '6B' }]}
+            onPress={openAddCategoryModal}
+          >
+            <IconSymbol ios_icon_name="plus" android_material_icon_name="add" size={14} color={colors.primary} />
+            <Text style={[styles.addCatChipText, { color: colors.primary }]}>{t('checklist_editor:add_category')}</Text>
+          </TouchableOpacity>
         </View>
 
         {categories.map((category) => {
@@ -379,7 +472,9 @@ export default function BartenderClosingChecklistEditorScreen() {
                     color={colors.textSecondary}
                   />
                   <View style={styles.categoryHeaderText}>
-                    <Text style={[styles.categoryTitle, { color: colors.text }]}>{category.name}</Text>
+                    <Text style={[styles.categoryTitle, { color: colors.text }]}>
+                      {getLocalizedField(category, 'name', language)}
+                    </Text>
                     <Text style={[styles.categoryItemCount, { color: colors.textSecondary }]}>
                       {t('checklist_editor:items_count', { count: category.items.length })}
                     </Text>
@@ -415,7 +510,9 @@ export default function BartenderClosingChecklistEditorScreen() {
                 <View style={styles.itemsContainer}>
                   {category.items.map((item) => (
                     <View key={item.id} style={[styles.itemRow, { borderTopColor: colors.border + '55' }]}>
-                      <Text style={[styles.itemText, { color: colors.text }]}>{item.text}</Text>
+                      <Text style={[styles.itemText, { color: colors.text }]}>
+                        {getLocalizedField(item, 'text', language)}
+                      </Text>
                       <View style={styles.itemActions}>
                         <TouchableOpacity
                           onPress={() => openEditItemModal(item)}
@@ -461,6 +558,25 @@ export default function BartenderClosingChecklistEditorScreen() {
         })}
       </ScrollView>
 
+      {/* About this editor (the old top blurb, now behind the ⓘ chip) */}
+      <GlassSheet
+        visible={infoVisible}
+        onClose={() => setInfoVisible(false)}
+        title={t('checklist_editor:about_title')}
+      >
+        <View style={[styles.infoCard, { backgroundColor: colors.primary + '15' }]}>
+          <IconSymbol
+            ios_icon_name="info.circle.fill"
+            android_material_icon_name="info"
+            size={20}
+            color={colors.primary}
+          />
+          <Text style={[styles.infoText, { color: colors.text }]}>
+            {t('checklist_editor:info_bartender_closing')}
+          </Text>
+        </View>
+      </GlassSheet>
+
       {/* Add/Edit Category */}
       <GlassSheet
         visible={categoryModalVisible}
@@ -472,10 +588,12 @@ export default function BartenderClosingChecklistEditorScreen() {
           style={[styles.input, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
           placeholder={t('checklist_editor:category_name_placeholder')}
           placeholderTextColor={colors.textSecondary}
-          value={categoryName}
-          onChangeText={setCategoryName}
+          value={isSpanishAuthor ? categoryNameEs : categoryName}
+          onChangeText={(text) => (isSpanishAuthor ? setCategoryNameEs(text) : setCategoryName(text))}
           autoFocus
         />
+
+        {categoryTranslation.element}
       </GlassSheet>
 
       {/* Add/Edit Item */}
@@ -489,12 +607,14 @@ export default function BartenderClosingChecklistEditorScreen() {
           style={[styles.input, styles.textArea, { backgroundColor: colors.glass, color: colors.text, borderColor: colors.glassBorder }]}
           placeholder={t('checklist_editor:item_text_placeholder')}
           placeholderTextColor={colors.textSecondary}
-          value={itemText}
-          onChangeText={setItemText}
+          value={isSpanishAuthor ? itemTextEs : itemText}
+          onChangeText={(text) => (isSpanishAuthor ? setItemTextEs(text) : setItemText(text))}
           multiline
           numberOfLines={3}
           autoFocus
         />
+
+        {itemTranslation.element}
 
         <Text style={[styles.sheetLabel, { color: colors.textSecondary }]}>{t('checklist_editor:category_label')}</Text>
         {categories.map((cat) => {
@@ -519,7 +639,7 @@ export default function BartenderClosingChecklistEditorScreen() {
                 ]}
                 numberOfLines={1}
               >
-                {cat.name}
+                {getLocalizedField(cat, 'name', language)}
               </Text>
               {isCurrent && (
                 <IconSymbol ios_icon_name="checkmark" android_material_icon_name="check" size={16} color={colors.primary} />
@@ -548,6 +668,24 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth + 0.5,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  addCatRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    marginBottom: 10,
+  },
+  addCatChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 11,
+    paddingVertical: 7,
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+  },
+  addCatChipText: {
+    fontFamily: fonts.body.semibold,
+    fontSize: 12.5,
   },
   loadingContainer: {
     flex: 1,

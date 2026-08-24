@@ -147,6 +147,30 @@ const TRANSLATION_RPC_MAP: Record<string, { rpc: TranslationRpcName; paramMap: R
     rpc: 'update_puree_syrup_recipe_translations_actor',
     paramMap: { procedure_es: 'p_procedure_es' },
   },
+  checklist_items: {
+    rpc: 'update_checklist_item_translations_actor',
+    paramMap: { text_es: 'p_text_es' },
+  },
+  bartender_checklist_items: {
+    rpc: 'update_bartender_checklist_item_translations_actor',
+    paramMap: { text_es: 'p_text_es' },
+  },
+  checklist_categories: {
+    rpc: 'update_checklist_category_translations_actor',
+    paramMap: { name_es: 'p_name_es' },
+  },
+  bartender_checklist_categories: {
+    rpc: 'update_bartender_checklist_category_translations_actor',
+    paramMap: { name_es: 'p_name_es' },
+  },
+  host_sections: {
+    rpc: 'update_host_section_translations_actor',
+    paramMap: { title_es: 'p_title_es', card_subtitle_es: 'p_card_subtitle_es', instructions_es: 'p_instructions_es' },
+  },
+  host_section_tiles: {
+    rpc: 'update_host_section_tile_translations_actor',
+    paramMap: { title_es: 'p_title_es', link_description_es: 'p_link_description_es' },
+  },
 };
 
 export interface SaveTranslationsOptions {

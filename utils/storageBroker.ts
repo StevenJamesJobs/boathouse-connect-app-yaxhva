@@ -16,6 +16,7 @@ export type UploadPurpose =
   | 'special_feature_image'
   | 'upcoming_event_image'
   | 'host_section_image'
+  | 'host_section_file'
   | 'menu_item_image'
   | 'quiz_question_image'
   | 'guide_thumbnail'

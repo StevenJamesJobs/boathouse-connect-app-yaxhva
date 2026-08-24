@@ -113,16 +113,6 @@ export const QUICK_TOOLS_CATALOG: QuickToolConfig[] = [
   },
   // === ASSISTANTS (Role-Based) ===
   {
-    id: 'server-assistant',
-    labelKey: 'quick_tools.server_assistant',
-    iosIcon: 'tray.full.fill',
-    androidIcon: 'room-service',
-    route: '/server-assistant',
-    category: 'assistants',
-    availableTo: 'all',
-    requiredJobTitles: ['Server', 'Lead Server'],
-  },
-  {
     id: 'bartender-assistant',
     labelKey: 'quick_tools.bartender_assistant',
     iosIcon: 'wineglass.fill',
@@ -240,15 +230,6 @@ export const QUICK_TOOLS_CATALOG: QuickToolConfig[] = [
     iosIcon: 'questionmark.circle.fill',
     androidIcon: 'quiz',
     route: '/quiz-hub-editor',
-    category: 'editors',
-    availableTo: 'manager',
-  },
-  {
-    id: 'server-assistant-editor',
-    labelKey: 'quick_tools.server_assistant_editor',
-    iosIcon: 'tray.full.fill',
-    androidIcon: 'room-service',
-    route: '/server-assistant-editor',
     category: 'editors',
     availableTo: 'manager',
   },
