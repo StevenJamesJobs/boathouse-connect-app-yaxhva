@@ -1,27 +1,37 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-} from 'react-native';
-import { useThemeColors } from '@/hooks/useThemeColors';
-import { IconSymbol } from '@/components/IconSymbol';
+/**
+ * Menu Memory Game — s75 Arcade Shelf category page.
+ * Mode tiles expand into that mode's top-3 board + your best + Play; Play
+ * opens the Lives/Timed GlassSheet, then gameplay continues from the highest
+ * completed difficulty. Mode visibility honors the org's category switches
+ * (Game Hub Editor → Game Setup) and the menu's Wine visibility.
+ */
+
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
-import BottomNavBar from '@/components/BottomNavBar';
-import { GameMode, PlayMode, GAME_MODE_INFO } from '@/types/game';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { isManagerOrOwner } from '@/utils/roles';
+import { supabase } from '@/app/integrations/supabase/client';
+import { fetchOwnWineVisible } from '@/utils/game/wineVisibility';
+import { GameMode, PlayMode, GAME_MODE_INFO } from '@/types/game';
 import PremiumGate from '@/components/PremiumGate';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
-import { fetchOwnWineVisible } from '@/utils/game/wineVisibility';
-import { supabase } from '@/app/integrations/supabase/client';
-import { useOrganization } from '@/contexts/OrganizationContext';
+import BottomNavBar from '@/components/BottomNavBar';
+import JoltOverlay from '@/components/JoltOverlay';
+import GameSquareTile from '@/components/game/GameSquareTile';
+import GameBoardCard, { GameBoardRow } from '@/components/game/GameBoardCard';
+import GamePickerSheet from '@/components/game/GamePickerSheet';
+import { CATEGORY_VISUALS } from '@/components/game/gameVisuals';
+import { fetchCategoryBoard } from '@/utils/game/boards';
+import { formatPlayedLine } from '@/utils/game/scoreLine';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
+import { fonts } from '@/constants/fonts';
 
 interface ModeStats {
   best_score: number;
@@ -29,130 +39,137 @@ interface ModeStats {
   highest_difficulty: number;
 }
 
+// Modes mapped onto the shared cross-game color language (gameVisuals.ts).
+const MODE_VISUALS: Record<GameMode, { accent: string; gradient: readonly [string, string] }> = {
+  wine_pairings: CATEGORY_VISUALS.wine,
+  ingredients_dishes: CATEGORY_VISUALS.food,
+  cocktail_ingredients: CATEGORY_VISUALS.libations,
+};
+
 export default function MenuMemoryGameScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const { user } = useAuth();
   const { hasPremium } = useSubscription();
-  const { organizationId, organization } = useOrganization();
-  const [modeStats, setModeStats] = useState<Record<GameMode, ModeStats | null>>({
-    wine_pairings: null,
-    ingredients_dishes: null,
-    cocktail_ingredients: null,
-  });
-  const [selectedMode, setSelectedMode] = useState<GameMode | null>(null);
-  // Wine & Entree Pairings only shows when the org's Wine category is visible.
-  // null = still checking: render NOTHING yet so wine-hidden orgs never see
-  // the card flash-then-vanish (visible orgs get a normal content pop-in).
+  const { organization, isLoading: orgLoading } = useOrganization();
+  const { open: openMiniProfile } = useMiniProfile();
+
+  const [modeStats, setModeStats] = useState<Record<string, ModeStats | null>>({});
+  const [myLines, setMyLines] = useState<Record<string, { score: number; games_played: number }>>({});
+  const [expanded, setExpanded] = useState<GameMode | null>(null);
+  const [boards, setBoards] = useState<Partial<Record<GameMode, GameBoardRow[]>>>({});
+  const [pickerMode, setPickerMode] = useState<GameMode | null>(null);
+
+  // Wine & Entree Pairings shows only when the org's Wine category is visible
+  // AND the editor's category switch is on. null = still checking: render
+  // NOTHING yet so wine-hidden orgs never see the tile flash-then-vanish.
   const perMenu = organization?.menu_category_scope === 'per_menu';
   const [wineVisible, setWineVisible] = useState<boolean | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetchOwnWineVisible(user?.id, perMenu).then((v) => { if (!cancelled) setWineVisible(v); });
-    return () => { cancelled = true; };
+    fetchOwnWineVisible(user?.id, perMenu).then((v) => {
+      if (!cancelled) setWineVisible(v);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id, perMenu]);
 
+  // Conditional modes wait for the real org row (no flash of a switched-off
+  // tile on cold start); on fetch error the context fails open, matching the
+  // wine-visibility precedent.
+  const modes: GameMode[] = [
+    ...(!orgLoading && organization.games_show_wine_pairings && wineVisible === true
+      ? (['wine_pairings'] as GameMode[])
+      : []),
+    'ingredients_dishes' as GameMode,
+    ...(!orgLoading && organization.games_show_cocktails
+      ? (['cocktail_ingredients'] as GameMode[])
+      : []),
+  ];
+
+  // If a category switch (or wine visibility) hides the expanded mode, close
+  // the orphaned board card too.
+  const modesKey = modes.join(',');
   useEffect(() => {
-    if (user?.id) loadStats();
-  }, [user?.id]);
+    if (expanded && !modes.includes(expanded)) setExpanded(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modesKey, expanded]);
 
-  const loadStats = async () => {
-    if (!user?.id) return;
-
-    const modes: GameMode[] = ['wine_pairings', 'ingredients_dishes', 'cocktail_ingredients'];
-    const stats: Record<string, ModeStats | null> = {};
-
-    // One self-only RPC returns per-mode aggregates (replaces 3 table reads).
-    const { data } = await supabase.rpc('get_my_game_stats', { p_actor_id: user.id });
-    const byMode = new Map<string, any>((data || []).map((row: any) => [row.game_mode, row]));
-
-    for (const mode of modes) {
-      const row = byMode.get(mode);
-      stats[mode] = row
-        ? {
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.id) return;
+      let cancelled = false;
+      (async () => {
+        // Two self-only RPCs: get_my_game_stats drives the difficulty
+        // continuation (its aggregates include incomplete plays), while the
+        // DISPLAYED best/count comes from get_my_game_category_stats so it
+        // matches the completed-only board right above it.
+        const [statsRes, lineRes] = await Promise.all([
+          supabase.rpc('get_my_game_stats', { p_actor_id: user.id }),
+          supabase.rpc('get_my_game_category_stats', { p_actor_id: user.id, p_game: 'memory' }),
+        ]);
+        if (cancelled) return;
+        const stats: Record<string, ModeStats | null> = {};
+        for (const row of statsRes.data || []) {
+          stats[row.game_mode] = {
             best_score: row.best_score,
             games_played: Number(row.games_played),
             highest_difficulty: row.highest_completed_difficulty,
+          };
+        }
+        setModeStats(stats);
+        if (!lineRes.error) {
+          const lines: Record<string, { score: number; games_played: number }> = {};
+          for (const row of lineRes.data || []) {
+            lines[row.category] = { score: Number(row.score), games_played: Number(row.games_played) };
           }
-        : null;
-    }
+          setMyLines(lines);
+        }
+        setBoards({});
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [user?.id])
+  );
 
-    setModeStats(stats as Record<GameMode, ModeStats | null>);
-  };
+  // Lazy top-3 for the expanded mode — best single score across play modes.
+  useEffect(() => {
+    if (!expanded || !user?.id || boards[expanded]) return;
+    let cancelled = false;
+    (async () => {
+      // null = fetch failed: keep the cache (spinner if nothing) rather than
+      // rendering a false empty board.
+      const rows = await fetchCategoryBoard(user.id, 'memory', expanded);
+      if (cancelled || !rows) return;
+      setBoards((prev) => ({ ...prev, [expanded]: rows }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, user?.id, boards]);
 
   const startGame = (mode: GameMode, playMode: PlayMode) => {
-    setSelectedMode(null);
     const stats = modeStats[mode];
     // Start at difficulty 1, or continue from highest completed + 1
-    const startDifficulty = stats && stats.highest_difficulty > 0
-      ? Math.min(stats.highest_difficulty + 1, 5)
-      : 1;
-    router.push(`/memory-game-play?mode=${mode}&difficulty=${startDifficulty}&play_mode=${playMode}`);
+    const startDifficulty =
+      stats && stats.highest_difficulty > 0 ? Math.min(stats.highest_difficulty + 1, 5) : 1;
+    router.push({
+      pathname: '/memory-game-play',
+      params: { mode, difficulty: String(startDifficulty), play_mode: playMode },
+    });
   };
 
-  const renderModeCard = (mode: GameMode) => {
-    const info = GAME_MODE_INFO[mode];
-    const stats = modeStats[mode];
-
-    return (
-      <TouchableOpacity
-        key={mode}
-        style={[styles.modeCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-        onPress={() => setSelectedMode(mode)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.modeCardContent}>
-          <View style={[styles.iconCircle, { backgroundColor: colors.primary + '20' }]}>
-            <IconSymbol
-              ios_icon_name={info.icon.ios as any}
-              android_material_icon_name={info.icon.android as any}
-              size={28}
-              color={colors.primary}
-            />
-          </View>
-          <View style={styles.modeInfo}>
-            <Text style={[styles.modeTitle, { color: colors.text }]}>
-              {t(info.titleKey)}
-            </Text>
-            <Text style={[styles.modeDesc, { color: colors.textSecondary }]} numberOfLines={2}>
-              {t(info.descKey)}
-            </Text>
-            {stats ? (
-              <View style={styles.statsRow}>
-                <View style={[styles.statChip, { backgroundColor: colors.primary + '15' }]}>
-                  <Text style={[styles.statText, { color: colors.primary }]}>
-                    {t('memory_game.best')}: {stats.best_score.toLocaleString()}
-                  </Text>
-                </View>
-                <View style={[styles.statChip, { backgroundColor: colors.primary + '15' }]}>
-                  <Text style={[styles.statText, { color: colors.primary }]}>
-                    {t('memory_game.level')} {stats.highest_difficulty}/5
-                  </Text>
-                </View>
-              </View>
-            ) : (
-              <Text style={[styles.newLabel, { color: colors.primary }]}>
-                {t('memory_game.tap_to_start')}
-              </Text>
-            )}
-          </View>
-          <IconSymbol
-            ios_icon_name="chevron.right"
-            android_material_icon_name="chevron-right"
-            size={20}
-            color={colors.textSecondary}
-          />
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const youLine = (mode: GameMode): string =>
+    formatPlayedLine(t, myLines[mode]?.score, myLines[mode]?.games_played);
 
   if (!hasPremium) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <AmbientGlow />
-        <ScreenHeader title={t('memory_game.hub_title')} />
+        <ScreenHeader title={t('memory_game.hub_title')} eyebrow={t('game_hub_ui:title')} />
         {isManagerOrOwner(user) ? (
           <PremiumGate
             desc={t('game_hub_ui.premium_intro')}
@@ -172,287 +189,137 @@ export default function MenuMemoryGameScreen() {
     );
   }
 
+  const expandedInfo = expanded ? GAME_MODE_INFO[expanded] : null;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AmbientGlow />
-      {/* Header */}
-      <ScreenHeader title={t('memory_game.hub_title')} />
+      <ScreenHeader title={t('memory_game.hub_title')} eyebrow={t('game_hub_ui:title')} />
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.contentContainer}>
-        {/* Intro Card */}
-        <View style={[styles.introCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
-          <Text style={[styles.introTitle, { color: colors.text }]}>
-            {t('memory_game.intro_title')}
-          </Text>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Intro */}
+        <View style={[styles.introCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+          <Text style={[styles.introTitle, { color: colors.text }]}>{t('memory_game.intro_title')}</Text>
           <Text style={[styles.introText, { color: colors.textSecondary }]}>
             {t('memory_game.intro_desc')}
           </Text>
         </View>
 
-        {/* Game Mode Cards */}
         <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
           {t('memory_game.choose_mode')}
         </Text>
 
-        {wineVisible === true && renderModeCard('wine_pairings')}
-        {renderModeCard('ingredients_dishes')}
-        {renderModeCard('cocktail_ingredients')}
+        <View style={styles.grid}>
+          {modes.map((mode) => {
+            const info = GAME_MODE_INFO[mode];
+            const visuals = MODE_VISUALS[mode];
+            return (
+              <View key={mode} style={styles.gridCell}>
+                <GameSquareTile
+                  label={t(info.titleKey)}
+                  iosIcon={info.icon.ios}
+                  androidIcon={info.icon.android}
+                  gradient={visuals.gradient}
+                  aspectRatio={1.45}
+                  selected={expanded === mode}
+                  onPress={() => setExpanded((prev) => (prev === mode ? null : mode))}
+                />
+              </View>
+            );
+          })}
+        </View>
 
-        {/* Leaderboard Button */}
-        <TouchableOpacity
-          style={[styles.leaderboardBtn, { backgroundColor: colors.primary }]}
-          onPress={() => router.push('/memory-game-leaderboard')}
-          activeOpacity={0.8}
-        >
-          <IconSymbol
-            ios_icon_name="trophy.fill"
-            android_material_icon_name="emoji-events"
-            size={22}
-            color={colors.fireText}
+        {expanded && expandedInfo && (
+          <GameBoardCard
+            accent={MODE_VISUALS[expanded].accent}
+            iosIcon={expandedInfo.icon.ios}
+            androidIcon={expandedInfo.icon.android}
+            title={t(expandedInfo.titleKey)}
+            desc={t(expandedInfo.descKey)}
+            rows={boards[expanded] ?? null}
+            emptyText={t('memory_game.no_scores_yet')}
+            youLabel={t('game_hub_ui:your_best')}
+            youValue={youLine(expanded)}
+            playLabel={t('game_hub_ui:play')}
+            onPlay={() => setPickerMode(expanded)}
+            onRowPress={openMiniProfile}
           />
-          <Text style={[styles.leaderboardBtnText, { color: colors.fireText }]}>
-            {t('memory_game.leaderboard')}
-          </Text>
-        </TouchableOpacity>
+        )}
       </ScrollView>
 
       <BottomNavBar activeTab="tools" />
+      <JoltOverlay role={isManagerOrOwner(user) ? 'manager' : 'employee'} />
 
-      {/* Play Mode Selection Modal */}
-      <Modal
-        visible={selectedMode !== null}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setSelectedMode(null)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setSelectedMode(null)}
-        >
-          <View style={[styles.playModeCard, { backgroundColor: colors.card }]}>
-            <Text style={[styles.playModeTitle, { color: colors.text }]}>
-              {t('memory_game.choose_play_mode')}
-            </Text>
-
-            {/* Lives Mode Option */}
-            <TouchableOpacity
-              style={[styles.playModeOption, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
-              onPress={() => selectedMode && startGame(selectedMode, 'lives')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.playModeEmoji}>❤️</Text>
-              <View style={styles.playModeInfo}>
-                <Text style={[styles.playModeOptionTitle, { color: colors.text }]}>
-                  {t('memory_game.lives_mode')}
-                </Text>
-                <Text style={[styles.playModeOptionDesc, { color: colors.textSecondary }]}>
-                  {t('memory_game.lives_mode_desc')}
-                </Text>
-              </View>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={18}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-
-            {/* Timed Mode Option */}
-            <TouchableOpacity
-              style={[styles.playModeOption, { backgroundColor: '#F5A623' + '10', borderColor: '#F5A623' + '30' }]}
-              onPress={() => selectedMode && startGame(selectedMode, 'timed')}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.playModeEmoji}>⏱</Text>
-              <View style={styles.playModeInfo}>
-                <Text style={[styles.playModeOptionTitle, { color: colors.text }]}>
-                  {t('memory_game.timed_mode')}
-                </Text>
-                <Text style={[styles.playModeOptionDesc, { color: colors.textSecondary }]}>
-                  {t('memory_game.timed_mode_desc')}
-                </Text>
-              </View>
-              <IconSymbol
-                ios_icon_name="chevron.right"
-                android_material_icon_name="chevron-right"
-                size={18}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-
-            {/* Cancel */}
-            <TouchableOpacity
-              style={[styles.cancelButton, { borderColor: colors.border }]}
-              onPress={() => setSelectedMode(null)}
-            >
-              <Text style={[styles.cancelButtonText, { color: colors.textSecondary }]}>
-                {t('common.cancel')}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </TouchableOpacity>
-      </Modal>
+      {/* Lives / Timed */}
+      <GamePickerSheet
+        visible={pickerMode !== null}
+        onClose={() => setPickerMode(null)}
+        title={t('memory_game.choose_play_mode')}
+        subtitle={pickerMode ? t(GAME_MODE_INFO[pickerMode].titleKey) : undefined}
+        dismissOnPick
+        options={[
+          {
+            key: 'lives',
+            label: `❤️ ${t('memory_game.lives_mode')}`,
+            desc: t('memory_game.lives_mode_desc'),
+            color: pickerMode ? MODE_VISUALS[pickerMode].accent : undefined,
+          },
+          {
+            key: 'timed',
+            label: `⏱ ${t('memory_game.timed_mode')}`,
+            desc: t('memory_game.timed_mode_desc'),
+            color: '#F5A623',
+          },
+        ]}
+        onPick={(key) => {
+          const mode = pickerMode;
+          setPickerMode(null);
+          if (mode) startGame(mode, key as PlayMode);
+        }}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: 100,
+  container: { flex: 1 },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 140,
   },
   introCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
+    borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    padding: 14,
+    marginBottom: 14,
   },
   introTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 6,
+    fontFamily: fonts.display.semibold,
+    fontSize: 14.5,
+    marginBottom: 4,
   },
   introText: {
-    fontSize: 13,
+    fontFamily: fonts.body.regular,
+    fontSize: 12.5,
     lineHeight: 18,
   },
   sectionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10.5,
+    letterSpacing: 1.4,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 12,
+    marginBottom: 10,
+    paddingHorizontal: 2,
   },
-  modeCard: {
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  modeCardContent: {
+  grid: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 9,
   },
-  iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
-  modeInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  modeTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    marginBottom: 3,
-  },
-  modeDesc: {
-    fontSize: 12,
-    lineHeight: 16,
-    marginBottom: 6,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  statChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  statText: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  newLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    fontStyle: 'italic',
-  },
-  // Leaderboard Button
-  leaderboardBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    marginTop: 8,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  leaderboardBtnText: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  // Play Mode Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  playModeCard: {
-    width: '100%',
-    maxWidth: 340,
-    borderRadius: 16,
-    padding: 24,
-  },
-  playModeTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  playModeOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    marginBottom: 12,
-  },
-  playModeEmoji: {
-    fontSize: 28,
-    marginRight: 14,
-  },
-  playModeInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  playModeOptionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  playModeOptionDesc: {
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  cancelButton: {
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginTop: 4,
-  },
-  cancelButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
+  gridCell: {
+    flexBasis: '48%',
+    flexGrow: 1,
+    maxWidth: '49%',
   },
 });

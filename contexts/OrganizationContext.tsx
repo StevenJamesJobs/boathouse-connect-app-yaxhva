@@ -27,6 +27,14 @@ export interface Organization {
   owner_id: string | null;
   games_use_sample_data: boolean;
   staff_can_view_roster: boolean;
+  // Per-category game visibility switches (Game Hub Editor → Game Setup).
+  // Display preferences for the game surfaces only — content RPCs stay open
+  // (exams read wine pairings, the bartender assistant reads Cocktails A-Z).
+  games_show_wine_pairings: boolean;
+  games_show_cocktails: boolean;
+  games_show_ws_libations: boolean;
+  games_show_pt_libations: boolean;
+  games_show_pt_wine: boolean;
 }
 
 interface OrganizationContextType {
@@ -63,6 +71,11 @@ const DEFAULT_ORG: Organization = {
   owner_id: null,
   games_use_sample_data: true,
   staff_can_view_roster: true,
+  games_show_wine_pairings: true,
+  games_show_cocktails: true,
+  games_show_ws_libations: true,
+  games_show_pt_libations: true,
+  games_show_pt_wine: true,
 };
 
 const OrganizationContext = createContext<OrganizationContextType>({
@@ -112,6 +125,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         owner_id: orgData.owner_id || null,
         games_use_sample_data: orgData.games_use_sample_data ?? true,
         staff_can_view_roster: orgData.staff_can_view_roster ?? true,
+        games_show_wine_pairings: orgData.games_show_wine_pairings ?? true,
+        games_show_cocktails: orgData.games_show_cocktails ?? true,
+        games_show_ws_libations: orgData.games_show_ws_libations ?? true,
+        games_show_pt_libations: orgData.games_show_pt_libations ?? true,
+        games_show_pt_wine: orgData.games_show_pt_wine ?? true,
       });
     }
   }, [user?.id]);
