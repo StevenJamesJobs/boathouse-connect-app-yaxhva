@@ -1,7 +1,7 @@
 /**
- * Master Leaderboard
- * 3 tabs: Overall (both games), Menu Memory, Word Search.
- * Shows total accumulated scores per user.
+ * Master Leaderboard — s75 glass reskin.
+ * 4 tabs: Overall, Menu Memory, Word Search, Picture This! — total accumulated
+ * scores per player (top 20), with the viewer's own row highlighted.
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -13,18 +13,23 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOrganization } from '../contexts/OrganizationContext';
+import { isManagerOrOwner } from '@/utils/roles';
 import { supabase } from '@/app/integrations/supabase/client';
 import type { Database } from '@/app/integrations/supabase/types';
 import { refreshAllUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import BottomNavBar from '@/components/BottomNavBar';
+import JoltOverlay from '@/components/JoltOverlay';
+import { fonts } from '@/constants/fonts';
 
 type LeaderboardTab = 'overall' | 'memory' | 'word_search' | 'picture_this';
 
@@ -57,33 +62,42 @@ export default function MasterLeaderboardScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const { user } = useAuth();
-  const { organizationId } = useOrganization();
   const { open: openMiniProfile } = useMiniProfile();
+  // Deep links (e.g. the Picture This! end screen) can open straight onto
+  // their game's tab.
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const initialTab: LeaderboardTab = TABS.some((tabDef) => tabDef.key === params.tab)
+    ? (params.tab as LeaderboardTab)
+    : 'overall';
 
-  const [activeTab, setActiveTab] = useState<LeaderboardTab>('overall');
-  const [entries, setEntries] = useState<MasterLeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<LeaderboardTab>(initialTab);
+  // Per-tab cache: flipping tabs within a visit reuses fetched boards; focus
+  // clears the cache so returning to the screen refetches fresh.
+  const [tabBoards, setTabBoards] = useState<Partial<Record<LeaderboardTab, MasterLeaderboardEntry[]>>>({});
+  const entries = tabBoards[activeTab];
 
   const loadData = useCallback(async (tab: LeaderboardTab) => {
     if (!user?.id) return;
-    setLoading(true);
     try {
       const { data, error } = await supabase.rpc(RPC_MAP[tab], { p_limit: 20, p_actor_id: user.id });
+      // On error keep whatever the cache holds — never paint a false empty board.
       if (!error && data) {
-        setEntries(data);
-      } else {
-        setEntries([]);
+        setTabBoards((prev) => ({ ...prev, [tab]: data }));
       }
-    } catch {
-      setEntries([]);
-    } finally {
-      setLoading(false);
+    } catch (err) {
+      console.error('[MasterLeaderboard] load error:', err);
     }
   }, [user?.id]);
 
   useEffect(() => {
-    loadData(activeTab);
-  }, [activeTab]);
+    if (!tabBoards[activeTab]) loadData(activeTab);
+  }, [activeTab, loadData, tabBoards]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setTabBoards({});
+    }, [])
+  );
 
   // Mark leaderboard as viewed every time the screen gains focus — clears
   // the unread-pass badge across all surfaces (app icon, nav, tile, button).
@@ -99,20 +113,20 @@ export default function MasterLeaderboardScreen() {
     }, [user?.id])
   );
 
-  const handleTabPress = (tab: LeaderboardTab) => {
-    if (tab !== activeTab) setActiveTab(tab);
-  };
-
   const renderEntry = ({ item, index }: { item: MasterLeaderboardEntry; index: number }) => {
     const rank = index + 1;
     const isMe = item.user_id === user?.id;
+    const gamesLabel =
+      item.games_played === 1
+        ? t('master_leaderboard:games_completed_one')
+        : t('master_leaderboard:games_completed_n', { n: item.games_played });
 
     return (
       <TouchableOpacity
         style={[
           styles.entry,
-          { backgroundColor: isMe ? colors.primary + '12' : colors.card },
-          isMe && { borderColor: colors.primary, borderWidth: 1.5 },
+          { backgroundColor: colors.surface, borderColor: colors.surfaceBorder },
+          isMe && { backgroundColor: colors.tint + '14', borderColor: colors.tint + '59' },
         ]}
         onPress={() => openMiniProfile(item.user_id)}
         activeOpacity={0.7}
@@ -130,8 +144,8 @@ export default function MasterLeaderboardScreen() {
         {item.profile_picture_url ? (
           <StorageImage source={{ uri: item.profile_picture_url }} style={styles.avatar} />
         ) : (
-          <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
-            <Text style={[styles.avatarInitial, { color: colors.primary }]}>
+          <View style={[styles.avatarPlaceholder, { backgroundColor: colors.tint + '2E' }]}>
+            <Text style={[styles.avatarInitial, { color: colors.tint }]}>
               {(item.name || '?')[0].toUpperCase()}
             </Text>
           </View>
@@ -139,16 +153,15 @@ export default function MasterLeaderboardScreen() {
 
         {/* Name + Games */}
         <View style={styles.nameBox}>
-          <Text style={[styles.name, { color: isMe ? colors.primary : colors.text }]} numberOfLines={1}>
-            {item.name}{isMe ? ' (You)' : ''}
+          <Text style={[styles.name, { color: isMe ? colors.tint : colors.text }]} numberOfLines={1}>
+            {item.name}
+            {isMe ? ` (${t('master_leaderboard:you')})` : ''}
           </Text>
-          <Text style={[styles.gamesPlayed, { color: colors.textSecondary }]}>
-            {item.games_played} game{item.games_played !== 1 ? 's' : ''} completed
-          </Text>
+          <Text style={[styles.gamesPlayed, { color: colors.textSecondary }]}>{gamesLabel}</Text>
         </View>
 
         {/* Total Score */}
-        <Text style={[styles.score, { color: colors.primary }]}>
+        <Text style={[styles.score, { color: colors.tint }]}>
           {item.total_score.toLocaleString()}
         </Text>
       </TouchableOpacity>
@@ -157,22 +170,11 @@ export default function MasterLeaderboardScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="chevron-left"
-            size={22}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>{t('master_leaderboard:title')}</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <AmbientGlow />
+      <ScreenHeader title={t('master_leaderboard:title')} eyebrow={t('game_hub_ui:eyebrow')} />
 
-      {/* Tab Bar */}
-      <View style={[styles.tabBar, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
+      {/* Tab chips */}
+      <View style={styles.tabBar}>
         {TABS.map((tab) => {
           const isActive = tab.key === activeTab;
           return (
@@ -180,22 +182,25 @@ export default function MasterLeaderboardScreen() {
               key={tab.key}
               style={[
                 styles.tab,
-                isActive && { backgroundColor: colors.primary, borderRadius: 10 },
+                isActive
+                  ? { backgroundColor: colors.tint, borderColor: colors.tint }
+                  : { backgroundColor: colors.glass, borderColor: colors.glassBorder },
               ]}
-              onPress={() => handleTabPress(tab.key)}
+              onPress={() => setActiveTab(tab.key)}
             >
               <IconSymbol
                 ios_icon_name={tab.icon.ios as any}
                 android_material_icon_name={tab.icon.android as any}
-                size={14}
+                size={13}
                 color={isActive ? colors.fireText : colors.textSecondary}
               />
               <Text
                 style={[
                   styles.tabLabel,
                   { color: isActive ? colors.fireText : colors.textSecondary },
-                  isActive && { fontWeight: '700' },
+                  isActive && { fontFamily: fonts.body.semibold },
                 ]}
+                numberOfLines={1}
               >
                 {t(tab.labelKey)}
               </Text>
@@ -205,32 +210,30 @@ export default function MasterLeaderboardScreen() {
       </View>
 
       {/* Subtitle */}
-      <View style={styles.subtitleRow}>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {activeTab === 'overall'
-            ? t('master_leaderboard:subtitle_overall')
-            : activeTab === 'memory'
-            ? t('master_leaderboard:subtitle_memory')
-            : activeTab === 'word_search'
-            ? t('master_leaderboard:subtitle_word')
-            : t('master_leaderboard:subtitle_picture')}
-        </Text>
-      </View>
+      <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+        {activeTab === 'overall'
+          ? t('master_leaderboard:subtitle_overall')
+          : activeTab === 'memory'
+          ? t('master_leaderboard:subtitle_memory')
+          : activeTab === 'word_search'
+          ? t('master_leaderboard:subtitle_word')
+          : t('master_leaderboard:subtitle_picture')}
+      </Text>
 
       {/* List */}
-      {loading ? (
+      {!entries ? (
         <View style={styles.loadingBox}>
-          <ActivityIndicator size="large" color={colors.primary} />
+          <ActivityIndicator size="large" color={colors.tint} />
         </View>
       ) : entries.length === 0 ? (
         <View style={styles.emptyBox}>
           <Text style={styles.emptyEmoji}>🏆</Text>
           <Text style={[styles.emptyTitle, { color: colors.text }]}>{t('master_leaderboard:no_scores')}</Text>
           <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
-            Play some games to climb the leaderboard.
+            {t('master_leaderboard:empty_desc')}
           </Text>
           <TouchableOpacity
-            style={[styles.playBtn, { backgroundColor: colors.primary }]}
+            style={[styles.playBtn, { backgroundColor: colors.tint }]}
             onPress={() => router.push('/game-hub')}
           >
             <Text style={[styles.playBtnText, { color: colors.fireText }]}>{t('master_leaderboard:play_now')}</Text>
@@ -245,93 +248,77 @@ export default function MasterLeaderboardScreen() {
           showsVerticalScrollIndicator={false}
         />
       )}
+
+      <BottomNavBar activeTab="tools" />
+      <JoltOverlay role={isManagerOrOwner(user) ? 'manager' : 'employee'} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-  },
-  backBtn: { width: 40 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  // Tabs
   tabBar: {
     flexDirection: 'row',
-    padding: 8,
+    paddingHorizontal: 16,
     gap: 6,
-    borderBottomWidth: 1,
+    marginBottom: 10,
   },
   tab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 10,
-    paddingHorizontal: 6,
-    borderRadius: 10,
+    gap: 4,
+    paddingVertical: 9,
+    paddingHorizontal: 4,
+    borderRadius: 11,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
   },
   tabLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  subtitleRow: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
+    fontFamily: fonts.body.medium,
+    fontSize: 11,
   },
   subtitle: {
-    fontSize: 13,
+    fontFamily: fonts.body.regular,
+    fontSize: 12,
     fontStyle: 'italic',
+    paddingHorizontal: 18,
+    marginBottom: 8,
   },
-  // List
   listContent: {
-    padding: 16,
-    paddingBottom: 40,
-    gap: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 130,
+    gap: 9,
   },
   entry: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
     padding: 12,
     gap: 10,
-    boxShadow: '0px 1px 4px rgba(0,0,0,0.1)',
-    elevation: 2,
   },
-  rankBox: {
-    width: 30,
-    alignItems: 'center',
-  },
-  rankEmoji: { fontSize: 20 },
-  rankNumber: { fontSize: 16, fontWeight: '700' },
-  avatar: { width: 40, height: 40, borderRadius: 20 },
+  rankBox: { width: 30, alignItems: 'center' },
+  rankEmoji: { fontSize: 19 },
+  rankNumber: { fontFamily: fonts.mono.semibold, fontSize: 14 },
+  avatar: { width: 38, height: 38, borderRadius: 19 },
   avatarPlaceholder: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarInitial: { fontSize: 16, fontWeight: '700' },
+  avatarInitial: { fontSize: 15, fontFamily: fonts.display.bold },
   nameBox: { flex: 1 },
-  name: { fontSize: 14, fontWeight: '700' },
-  gamesPlayed: { fontSize: 11, marginTop: 2 },
-  score: { fontSize: 18, fontWeight: '800' },
-  // States
+  name: { fontFamily: fonts.body.semibold, fontSize: 13.5 },
+  gamesPlayed: { fontFamily: fonts.body.regular, fontSize: 11, marginTop: 2 },
+  score: { fontFamily: fonts.mono.semibold, fontSize: 16 },
   loadingBox: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   emptyBox: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24, gap: 10 },
   emptyEmoji: { fontSize: 48 },
-  emptyTitle: { fontSize: 18, fontWeight: '700' },
-  emptyDesc: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
+  emptyTitle: { fontFamily: fonts.display.semibold, fontSize: 17 },
+  emptyDesc: { fontFamily: fonts.body.regular, fontSize: 13, textAlign: 'center', lineHeight: 19 },
   playBtn: { marginTop: 8, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 24 },
-  playBtnText: { fontWeight: '700', fontSize: 14 },
+  playBtnText: { fontFamily: fonts.body.semibold, fontSize: 14 },
 });

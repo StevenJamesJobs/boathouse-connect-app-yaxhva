@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Game Hub Concepts</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 12px 60px;background:#0C0D11;
+  font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center;max-width:860px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb:focus-visible{outline:2px solid #FF7A2F;outline-offset:2px}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:720px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+
+/* ---------- phone shell + palettes (the ritual set) ---------- */
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --thumbbg:#252A31; --glowA:rgba(230,234,238,0.12); --glowB:rgba(255,122,47,0.10);
+  --danger:#E74C3C; --scrim:rgba(6,10,18,0.55); --blue:#8FA0AC; --bluetext:#CDD8DF;
+  position:relative;width:392px;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--thumbbg:#D8D8DC;--glowA:rgba(58,66,80,0.10);--glowB:rgba(236,106,30,0.12);--danger:#C0392B;--scrim:rgba(6,10,18,0.35);--blue:#7E8A94;--bluetext:#2A313C}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--thumbbg:#2C3E50;--glowA:rgba(74,144,226,0.32);--glowB:rgba(93,173,226,0.16);--blue:#5DADE2;--bluetext:#BFE3F7}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--thumbbg:#CFE4EC;--glowA:rgba(25,118,210,0.18);--glowB:rgba(66,165,245,0.13);--danger:#C0392B;--scrim:rgba(6,10,18,0.35);--blue:#42A5F5;--bluetext:#0D47A1}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--text)}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 108px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.design{display:none;padding:6px 16px 0;animation:fade .35s ease}
+.design.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.concept{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:7px;margin:4px 2px 12px}
+.concept b{color:var(--tint)}
+.concept .ln{flex:1;height:1px;background:var(--hair)}
+
+/* ---------- shared glass pieces ---------- */
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.c38{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.hdr{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
+.hmid{flex:1;text-align:center;min-width:0}
+.eyebrow{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600}
+.htitle{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.navpill{display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border-radius:16px;font-size:12.5px;font-weight:700;color:var(--tint);background:color-mix(in srgb,var(--tint) 11%,transparent);cursor:pointer;white-space:nowrap;flex:0 0 auto}
+.navpill .ic{width:14px;height:14px}
+.navpill .chev{width:11px;height:11px}
+.zlabel{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px;margin:14px 2px 10px}
+.zlabel .ln{flex:1;height:1px;background:var(--hair)}
+.zlabel .n{opacity:.8}
+.bcap{font-size:10.5px;color:var(--muted);font-style:italic;margin:6px 2px 10px;line-height:1.45}
+.mono{font-family:'JetBrains Mono',ui-monospace,monospace}
+.sub{font-size:13px;color:var(--muted);line-height:1.45;margin:0 2px 12px}
+
+/* launcher rows */
+.lrow{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:14px;margin-bottom:10px;cursor:pointer;background:var(--surf);border:1px solid var(--surfbd)}
+.lrow .ichip{width:40px;height:40px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+.lrow .bd{flex:1;min-width:0}
+.lrow .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:15px;margin-bottom:2px}
+.lrow .ds{font-size:11.5px;color:var(--muted);line-height:1.4}
+.lrow .chev{color:var(--muted)}
+.lrow .statline{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;margin-top:3px}
+.badge{min-width:16px;height:16px;border-radius:8px;background:#E74C3C;color:#fff;font-size:10px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 4px;font-family:'JetBrains Mono',ui-monospace,monospace}
+
+/* intro / info cards */
+.intro{border-radius:14px;padding:13px 14px;margin-bottom:14px;background:var(--surf);border:1px solid var(--surfbd)}
+.intro .t{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:14.5px;margin-bottom:4px}
+.intro .d{font-size:12px;color:var(--muted);line-height:1.5}
+.intro .tip{font-size:11px;color:var(--muted);font-style:italic;margin-top:6px;line-height:1.45}
+
+/* square game tiles */
+.shelf{display:flex;gap:9px;margin-bottom:2px}
+.sqtile{flex:1;aspect-ratio:1;border-radius:15px;position:relative;overflow:hidden;cursor:pointer;border:1px solid var(--glassbd);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;transition:border-color .2s}
+.sqtile.sel{border:1.5px solid var(--tint)}
+.sqtile .gi{width:26px;height:26px;stroke-width:1.8;color:#fff;filter:drop-shadow(0 3px 8px rgba(0,0,0,0.35))}
+.sqtile .shade{position:absolute;inset:auto 0 0 0;height:56%;background:linear-gradient(to top,rgba(8,10,14,0.72),transparent)}
+.sqtile .nm{position:absolute;left:8px;right:8px;bottom:7px;font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:10.5px;color:#fff;line-height:1.2;text-align:left;z-index:2}
+.sqtile .caret{position:absolute;top:7px;right:7px;width:20px;height:20px;border-radius:7px;background:rgba(8,10,14,0.45);border:1px solid rgba(255,255,255,0.25);display:flex;align-items:center;justify-content:center;color:#fff;z-index:2}
+.sqtile .caret .ic{width:11px;height:11px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:2px}
+.grid2 .sqtile{aspect-ratio:1.45}
+
+/* expansion card */
+.expcard{border-radius:16px;background:var(--surf);border:1px solid var(--surfbd);padding:14px;margin:10px 0 12px;animation:fade .25s ease}
+.expcard .toprow{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.expcard .ichip{width:36px;height:36px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto}
+.expcard .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:15.5px;flex:1}
+.expcard .ds{font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:10px}
+.minirow{display:flex;align-items:center;gap:9px;padding:7px 2px;border-top:1px solid var(--hair)}
+.minirow .medal{width:22px;text-align:center;font-size:14px}
+.minirow .nm2{flex:1;font-size:12.5px;font-weight:600}
+.minirow .sc{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;font-weight:700}
+.youline{display:flex;align-items:center;gap:8px;margin:8px 0 10px;padding:8px 10px;border-radius:11px;background:var(--glass);border:1px solid var(--glassbd)}
+.youline .lab{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.youline .v{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;font-weight:700;flex:1;text-align:right}
+.playbtn{display:flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:12px;color:#fff;font-weight:700;font-size:14.5px;cursor:pointer}
+.playbtn .ic{width:15px;height:15px}
+
+/* leaderboard card */
+.lbcard{border-radius:16px;background:var(--surf);border:1px solid var(--surfbd);padding:14px;margin-bottom:12px}
+.lbcard .toprow{display:flex;align-items:center;gap:11px;margin-bottom:4px}
+.lbcard .tchip{width:40px;height:40px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:rgba(245,158,11,0.14);color:#F59E0B}
+.lbcard .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:15px}
+.lbcard .ds{font-size:11.5px;color:var(--muted)}
+.lbrow{display:flex;align-items:center;gap:9px;padding:8px 2px;border-top:1px solid var(--hair)}
+.lbrow:first-of-type{border-top:0}
+.lbrow .medal{width:24px;text-align:center;font-size:16px}
+.lbrow .av{width:30px;height:30px;border-radius:15px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex:0 0 auto}
+.lbrow .nm2{flex:1;font-size:13px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lbrow .sc{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13.5px;font-weight:700}
+.lbrow.me{margin:6px -6px 0;padding:8px 6px;border-radius:11px;background:color-mix(in srgb,var(--tint) 9%,transparent);border:1px solid color-mix(in srgb,var(--tint) 35%,transparent)}
+.lbrow.me .rk{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--tint);width:24px;text-align:center}
+.viewall{display:flex;align-items:center;justify-content:center;gap:7px;border-radius:11px;padding:10px;margin-top:10px;background:rgba(245,158,11,0.12);color:#F59E0B;font-size:13px;font-weight:700;cursor:pointer}
+.viewall .ic{width:13px;height:13px}
+
+/* podium (C) */
+.podwrap{display:flex;align-items:flex-end;gap:8px;margin:4px 6px 10px;justify-content:center}
+.podcol{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;max-width:110px}
+.podcol .av{width:44px;height:44px;border-radius:22px;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;border:2px solid var(--glassbd);box-shadow:0 4px 14px rgba(0,0,0,0.25)}
+.podcol .pn{font-size:11.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.podcol .ps{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;font-weight:700;color:var(--tint)}
+.podblock{width:100%;border-radius:12px 12px 6px 6px;background:var(--glass);border:1px solid var(--glassbd);display:flex;align-items:flex-start;justify-content:center;padding-top:6px;font-size:15px}
+.youpill{display:flex;align-items:center;gap:10px;padding:11px 13px;border-radius:13px;margin-bottom:4px;cursor:pointer;background:color-mix(in srgb,var(--tint) 9%,transparent);border:1px solid color-mix(in srgb,var(--tint) 35%,transparent)}
+.youpill .rk{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;font-weight:700;color:var(--tint)}
+.youpill .t2{flex:1;font-size:12.5px;font-weight:600}
+.youpill .sc{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13.5px;font-weight:700}
+
+/* player card (D) */
+.pcard{border-radius:18px;background:var(--surf);border:1px solid var(--surfbd);padding:15px 14px 13px;margin-bottom:4px}
+.pcard .row1{display:flex;align-items:center;gap:12px;margin-bottom:11px}
+.pcard .av{width:52px;height:52px;border-radius:26px;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex:0 0 auto}
+.pcard .who{flex:1;min-width:0}
+.pcard .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:16.5px}
+.pcard .rank{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--muted);margin-top:2px}
+.pcard .rank b{color:var(--tint)}
+.pcard .tot{text-align:right}
+.pcard .tv{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:21px;font-weight:700;color:var(--tint)}
+.pcard .tl{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.gstats{display:flex;gap:7px}
+.gstat{flex:1;border-radius:11px;padding:8px 9px;background:var(--glass);border:1px solid var(--glassbd)}
+.gstat .gl{display:flex;align-items:center;gap:5px;font-size:9.5px;font-weight:600;color:var(--muted);margin-bottom:3px}
+.gstat .dot{width:7px;height:7px;border-radius:4px}
+.gstat .gv{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;font-weight:700}
+.top3strip{display:flex;gap:7px;margin-bottom:2px}
+.t3chip{flex:1;border-radius:12px;padding:9px 8px;background:var(--surf);border:1px solid var(--surfbd);text-align:center;cursor:pointer}
+.t3chip .m{font-size:15px}
+.t3chip .n{font-size:10.5px;font-weight:600;margin:3px 0 1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t3chip .s{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:700;color:var(--tint)}
+
+/* editor pieces */
+.segwrap{display:flex;border-radius:13px;padding:4px;gap:4px;background:var(--surf);border:1px solid var(--surfbd);margin-bottom:14px}
+.seg{flex:1;text-align:center;padding:9px 6px;border-radius:10px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer}
+.seg.on{background:var(--glass);border:1px solid var(--glassbd);color:var(--text);font-weight:700}
+.togcard{display:flex;align-items:center;gap:12px;border-radius:14px;padding:13px 14px;margin-bottom:10px;background:var(--surf);border:1px solid var(--surfbd)}
+.togcard .bd{flex:1;min-width:0}
+.togcard .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:14.5px;margin-bottom:3px}
+.togcard .ds{font-size:11.5px;color:var(--muted);line-height:1.45}
+.sw{width:46px;height:27px;border-radius:14px;background:var(--tint);position:relative;flex:0 0 auto;cursor:pointer}
+.sw i{position:absolute;top:2.5px;right:2.5px;width:22px;height:22px;border-radius:11px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.3)}
+.sw.off{background:var(--glassbd)}
+.sw.off i{right:auto;left:2.5px}
+.togrow{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:11px;margin-top:8px;background:var(--glass);border:1px solid var(--glassbd)}
+.togrow .dot{width:8px;height:8px;border-radius:4px;flex:0 0 auto}
+.togrow .bd{flex:1;min-width:0}
+.togrow .nm{font-size:13px;font-weight:600}
+.togrow .sd{font-size:10px;color:var(--muted);margin-top:1px}
+.togrow.off .nm{color:var(--muted)}
+.togrow.off .dot{opacity:.35}
+.sbar{display:flex;align-items:center;gap:10px;border-radius:13px;padding:11px 13px;margin-bottom:10px;background:var(--surf);border:1px solid var(--surfbd);color:var(--muted);font-size:13.5px}
+.sbar .ic{width:16px;height:16px}
+.rescard{border-radius:14px;padding:13px 14px;margin-bottom:10px;background:var(--surf);border:1px solid var(--surfbd)}
+.rescard .row1{display:flex;align-items:center;gap:11px;margin-bottom:10px}
+.rescard .av{width:40px;height:40px;border-radius:20px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff}
+.rescard .nm{font-size:14.5px;font-weight:700}
+.rescard .tt{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;color:var(--tint);font-weight:700;margin-top:2px}
+.schips{display:flex;gap:6px;margin-bottom:10px}
+.schip{flex:1;border-radius:10px;padding:6px 4px;text-align:center}
+.schip .l{font-size:8.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;margin-bottom:2px}
+.schip .v{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:600}
+.rbtns{display:flex;gap:8px}
+.rbtn{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;border-radius:10px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;border:1.5px solid var(--glassbd);color:var(--muted)}
+.rbtn.warn{border-color:rgba(245,158,11,0.55);color:#F59E0B}
+.rbtn.dang{border-color:color-mix(in srgb,var(--danger) 60%,transparent);color:var(--danger)}
+.rbtn .ic{width:13px;height:13px}
+.resetrow{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:11px;margin-top:8px;background:var(--glass);border:1px solid var(--glassbd)}
+.resetrow .nm{flex:1;font-size:13px;font-weight:600}
+.resetrow .go{border-radius:8px;border:1px solid color-mix(in srgb,var(--danger) 55%,transparent);background:color-mix(in srgb,var(--danger) 8%,transparent);color:var(--danger);font-size:11.5px;font-weight:700;padding:5px 12px;cursor:pointer}
+.filterchips{display:flex;gap:6px;margin-top:8px}
+.fchip{flex:1;text-align:center;border-radius:9px;padding:6px;font-size:11px;font-weight:600;color:var(--muted);background:var(--glass);border:1px solid var(--glassbd);cursor:pointer}
+.fchip.on{color:var(--fireText);background:var(--tint);border-color:var(--tint);font-weight:700}
+.dangerbtn{display:flex;align-items:center;justify-content:center;gap:8px;border-radius:13px;border:2px solid var(--danger);color:var(--danger);padding:13px;font-size:14px;font-weight:700;margin-top:12px;cursor:pointer}
+.dangerbtn .ic{width:15px;height:15px}
+.winecard{border-radius:14px;padding:13px 14px;margin-bottom:10px;background:var(--surf);border:1px solid var(--surfbd)}
+.winecard .row1{display:flex;align-items:center;gap:11px;margin-bottom:7px}
+.winecard .ichip{width:40px;height:40px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;background:rgba(139,0,0,0.16);color:#C05C6A}
+.winecard .nm{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:600;font-size:14.5px}
+.winecard .ds{font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:9px}
+.winecard .manage{display:flex;align-items:center;gap:9px;padding:10px 11px;border-radius:11px;background:var(--glass);border:1px solid var(--glassbd);cursor:pointer;font-size:13px;font-weight:600}
+.winecard .manage .chev{margin-left:auto;color:var(--muted)}
+.countpill{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;font-weight:700;color:var(--bluetext);background:color-mix(in srgb,var(--blue) 20%,transparent);padding:3px 8px;border-radius:8px;white-space:nowrap;flex:0 0 auto}
+
+/* bottom dock + jolt */
+.dock{position:absolute;left:14px;right:14px;bottom:16px;z-index:5;display:flex;border-radius:22px;padding:9px 6px;background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.dock span{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;color:var(--muted);font-size:8.5px;font-weight:600}
+.dock span.on{color:var(--tint)}
+.dock .ic{width:19px;height:19px}
+.fab{position:absolute;right:18px;bottom:92px;width:46px;height:46px;border-radius:16px;z-index:6;display:flex;align-items:center;justify-content:center;background:var(--glass);border:1px solid var(--glassbd);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);color:var(--tint);box-shadow:0 8px 22px rgba(0,0,0,0.28)}
+.fab .ic{width:21px;height:21px}
+
+/* options sheet */
+.ovl{position:absolute;inset:0;z-index:40;display:none;align-items:flex-end;background:var(--scrim)}
+.ovl.show{display:flex}
+.sheet{position:relative;width:100%;max-height:82%;border-radius:26px 26px 0 0;padding:10px 18px 26px;overflow-y:auto;scrollbar-width:none;
+  background:var(--glass);border:1px solid var(--glassbd);border-bottom:0;backdrop-filter:blur(26px);-webkit-backdrop-filter:blur(26px);animation:up .3s ease}
+@keyframes up{from{transform:translateY(40px);opacity:.4}to{transform:none;opacity:1}}
+.grab{width:40px;height:4px;border-radius:2px;background:var(--glassbd);margin:0 auto 10px}
+.shead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.shead .t{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px}
+.xbtn{width:34px;height:34px;border-radius:11px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;background:var(--surf);border:1px solid var(--surfbd)}
+.arow{display:flex;align-items:center;gap:11px;padding:13px 12px;border-radius:13px;margin-bottom:8px;cursor:pointer;background:var(--surf);border:1px solid var(--surfbd);font-size:14px;font-weight:600}
+.arow .ic{width:16px;height:16px;color:var(--tint)}
+.arow .sd{font-size:11px;color:var(--muted);font-weight:500;margin-top:2px}
+.arow .bd2{flex:1}
+.arow.dang{color:var(--danger)}
+.arow.dang .ic{color:var(--danger)}
+.tipfoot{font-size:10.5px;color:var(--muted);font-style:italic;margin-top:8px;line-height:1.5;text-align:center}
+.optbtn{border-radius:12px;border:1.5px solid var(--glassbd);padding:13px;margin-bottom:9px;cursor:pointer}
+.optbtn .ol{font-size:15px;font-weight:700;margin-bottom:2px;display:flex;align-items:center;gap:8px}
+.optbtn .od{font-size:11.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+<symbol id="i-fwd" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+<symbol id="i-pencil" viewBox="0 0 24 24"><path d="M17 3l4 4L8 20l-5 1 1-5z"/></symbol>
+<symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></symbol>
+<symbol id="i-gear" viewBox="0 0 24 24"><path d="M10.4 3.5h3.2l.5 2.1a6.6 6.6 0 0 1 1.8 1l2-.6 1.6 2.7-1.5 1.4a6.6 6.6 0 0 1 0 2.1l1.5 1.4-1.6 2.7-2-.6a6.6 6.6 0 0 1-1.8 1l-.5 2.1h-3.2l-.5-2.1a6.6 6.6 0 0 1-1.8-1l-2 .6-1.6-2.7 1.5-1.4a6.6 6.6 0 0 1 0-2.1L4.5 8.7l1.6-2.7 2 .6a6.6 6.6 0 0 1 1.8-1z"/><circle cx="12" cy="12" r="2.5"/></symbol>
+<symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0zM8 5H5a3 3 0 0 0 3.2 4M16 5h3a3 3 0 0 1-3.2 4M12 13v4M9 20.5h6M10.5 17h3"/></symbol>
+<symbol id="i-game" viewBox="0 0 24 24"><path d="M7 6h10c3 0 4.5 2.6 4.5 5.3S20 17.5 17.8 17.5c-1.6 0-2.1-1.3-3.2-1.3H9.4c-1.1 0-1.6 1.3-3.2 1.3C4 17.5 2.5 14 2.5 11.3S4 6 7 6z"/><path d="M7.5 9.5v4M5.5 11.5h4"/><circle cx="16" cy="10.3" r=".8" fill="currentColor" stroke="none"/><circle cx="18.3" cy="12.6" r=".8" fill="currentColor" stroke="none"/></symbol>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></symbol>
+<symbol id="i-photo" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4.5 17l4.5-3.7 3 2.4 4-3.5 3.5 3"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.8 6.3.7-4.7 4.3 1.3 6.2L12 16.9 6.4 20l1.3-6.2L3 9.5l6.3-.7z"/></symbol>
+<symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 5v5h5"/><path d="M4.6 10A8 8 0 1 0 7 5.2"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/></symbol>
+<symbol id="i-flask" viewBox="0 0 24 24"><path d="M10 3h4M11 3v5l-5.5 9.5A2 2 0 0 0 7.2 21h9.6a2 2 0 0 0 1.7-3.5L13 8V3"/></symbol>
+<symbol id="i-wine" viewBox="0 0 24 24"><path d="M8 3h8c0 5-2 8-4 8s-4-3-4-8zM12 11v8M8 21h8"/></symbol>
+<symbol id="i-fork" viewBox="0 0 24 24"><path d="M7 3v7a2 2 0 0 0 2 2h0V3M9 12v9M16 3c-1.5 1-2.5 3-2.5 5.5 0 2 1 3.5 2.5 3.5V21M16 3v9"/></symbol>
+<symbol id="i-cup" viewBox="0 0 24 24"><path d="M4.5 5h15l-7.5 8zM12 13v6M8.5 21h7"/></symbol>
+<symbol id="i-dollar" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.2v9.6M14.4 9.2c-.5-.9-1.4-1.4-2.4-1.4-1.3 0-2.4.8-2.4 1.9s.9 1.6 2.4 1.9c1.5.3 2.6.8 2.6 2s-1.2 1.9-2.6 1.9c-1.1 0-2-.5-2.5-1.4"/></symbol>
+<symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11l8-7 8 7v9a1 1 0 0 1-1 1h-5v-6h-4v6H5a1 1 0 0 1-1-1z"/></symbol>
+<symbol id="i-tools" viewBox="0 0 24 24"><path d="M14 7l3-3 3 3-3 3zM4 20l6-6M10 4L4 10l4 4 6-6z"/></symbol>
+<symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 8h8.5M17.5 8H20M4 16h5.5M12.5 16H20"/><circle cx="15" cy="8" r="2.2"/><circle cx="10" cy="16" r="2.2"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11L9.5 22 18 10.5h-6.5z"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5.5" y="10.5" width="13" height="9" rx="2"/><path d="M8.5 10.5V7.5a3.5 3.5 0 0 1 7 0v3"/></symbol>
+<symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l11-6.5z"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 7.5v.3"/></symbol>
+<symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7-4.5-9-9c-1.3-3 .8-6.5 4-6.5 2 0 3.5 1 5 3 1.5-2 3-3 5-3 3.2 0 5.3 3.5 4 6.5-2 4.5-9 9-9 9z"/></symbol>
+<symbol id="i-timer" viewBox="0 0 24 24"><circle cx="12" cy="13" r="7.5"/><path d="M12 13V9M9 2.5h6"/></symbol>
+<symbol id="i-unlock" viewBox="0 0 24 24"><rect x="5.5" y="10.5" width="13" height="9" rx="2"/><path d="M8.5 10.5V7a3.5 3.5 0 0 1 6.9-.7"/></symbol>
+</defs></svg>
+
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Concept</span>
+    <button class="tb on" data-c="m1">M1 · Stacked Mix</button>
+    <button class="tb" data-c="m2">M2 · Combined Card</button>
+    <button class="tb" data-c="a">A</button>
+    <button class="tb" data-c="b">B</button>
+    <button class="tb" data-c="c">C</button>
+    <button class="tb" data-c="d">D</button>
+  </div>
+  <div class="grp"><span class="gl2">Screen</span>
+    <button class="tb on" data-s="hub">Game Hub</button>
+    <button class="tb" data-s="game">Game Page</button>
+    <button class="tb" data-s="ed">Editor</button>
+  </div>
+  <div class="grp"><span class="gl2">Tiles</span>
+    <button class="tb on" data-p="arcade">Arcade</button>
+    <button class="tb" data-p="blues">Blues</button>
+  </div>
+  <div class="grp"><span class="gl2">Palette</span>
+    <button class="tb on" data-t="">Mono·D</button>
+    <button class="tb" data-t="t-mono-l">Mono·L</button>
+    <button class="tb" data-t="t-ocean-d">Ocean·D</button>
+    <button class="tb" data-t="t-ocean-l">Ocean·L</button>
+  </div>
+</div>
+<p class="hint">Round 2 — the two hub mixes. <b>M1 · Stacked</b>: your player card (photo · name · rank · total, no per-game stats) → the expanding Arcade tiles → the podium closing the page with View&nbsp;Full underneath. <b>M2 · Combined Card</b>: one hero card — you on top, the podium right beneath, View&nbsp;Full riding inside the card floor — then the tiles. <b>Game Page and Editor are LOCKED</b> (Arcade Shelf tiles / D's two tabs with inline resets — the Setup tab now carries the live <b>Game Category switches</b>, tap them) and render under both mixes; A–D stay for reference. NEW: the <b>Tiles</b> toggle flips the game/category color set — <b>Arcade</b> (per-game identity colors) vs <b>Blues</b> (one blue scale, light→dark). Everything still live: <b>⚙ pill</b>, <b>tiles</b>, <b>Play</b> sheet, editor <b>tabs</b>, <b>Reset</b> confirms.</p>
+
+<div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div>
+  <div class="sb"><span>9:41</span><span>𝗠𝗥</span></div>
+  <div class="screen" id="screen"></div>
+  <div id="chrome"></div>
+  <div class="ovl" id="navovl"><div class="sheet" id="navsheet"></div></div>
+  <div class="ovl" id="modeovl"><div class="sheet" id="modesheet"></div></div>
+  <div class="ovl" id="confovl"><div class="sheet" id="confsheet"></div></div>
+</div>
+
+<script>
+(function(){
+  var phone=document.getElementById('phone');
+  function all(s,fn){[].slice.call(document.querySelectorAll(s)).forEach(fn)}
+  function el(id){return document.getElementById(id)}
+  function I(n,sz,cls){return '<svg class="ic'+(cls?' '+cls:'')+'"'+(sz?' style="width:'+sz+'px;height:'+sz+'px"':'')+'><use href="#i-'+n+'"/></svg>'}
+
+  /* ---------- fixture data (MyResto Test-flavoured) ---------- */
+  var AV=['#B33E2C,#E8843C','#2F6B4F,#5FA582','#3A2E4F,#7C4A6B','#345B7A,#5E93B8'];
+  var LB={
+    top:[{n:'Maria Santos',a:'MS',s:4120,g:12,c:AV[0]},{n:'Danny Kim',a:'DK',s:3870,g:9,c:AV[1]},{n:'Alyssa Reyes',a:'AR',s:3140,g:11,c:AV[2]}],
+    you:{rank:6,of:24,s:1980}
+  };
+  var GAMES=[
+    {k:'ws', n:'Word Search',      icon:'grid', col:'#10B981', grad:'#0E7A5A,#2FBE8F', bcol:'#38BDF8', bgrad:'#0B5E86,#41B4E8',
+     desc:'Find hidden menu items, ingredients, and specials in word search puzzles',
+     best:640, played:4, top:[['Maria S.',1180],['Danny K.',960],['Priya N.',830]]},
+    {k:'mem',n:'Menu Memory Game', icon:'game', col:'#6366F1', grad:'#3B3F9E,#7A7DF0', bcol:'#3B82F6', bgrad:'#1D3E8F,#5C8DF0',
+     desc:'Match wine pairings, ingredients & dishes, and cocktails across multiple difficulty levels',
+     best:1240, played:6, top:[['Danny K.',1420],['Maria S.',1310],['Alyssa R.',1150]]},
+    {k:'pt', n:'Picture This!',    icon:'photo',col:'#EC4899', grad:'#9C2B66,#F06AAE', bcol:'#5B5BD6', bgrad:'#28246E,#6663E0',
+     desc:'Choose the correct ingredients, prices, and more from menu pictures',
+     best:780, played:3, top:[['Alyssa R.',1310],['Maria S.',1240],['Sam T.',990]]}
+  ];
+  var PTCATS=[
+    {n:'Menu Dishes',icon:'fork',  col:'#EF4444', grad:'#8E2A22,#E2604F', bcol:'#38BDF8', bgrad:'#0B5E86,#41B4E8', desc:'Identify ingredients in dishes from across the menu',
+     top:[['Maria S.',620],['Danny K.',585],['Sam T.',540]], best:540},
+    {n:'Libations',  icon:'cup',   col:'#8B5CF6', grad:'#4E3390,#9B72EE', bcol:'#3B82F6', bgrad:'#1D3E8F,#5C8DF0', desc:'Spot what goes into the cocktails and libations on your menus',
+     top:[['Danny K.',580],['Alyssa R.',510],['Maria S.',495]], best:460},
+    {n:'Wine',       icon:'wine',  col:'#A21CAF', grad:'#5E1266,#C04ECB', bcol:'#5B5BD6', bgrad:'#28246E,#6663E0', desc:'Know the wines on your list — Medium and Hard only',
+     top:[['Alyssa R.',505],['Maria S.',470],['Priya N.',430]], best:null},
+    {n:'Menu Prices',icon:'dollar',col:'#0891B2', grad:'#0A5D74,#2FA9C6', bcol:'#6C7FD8', bgrad:'#101A45,#3D4E9E', desc:'Pick the right menu price for the picture — expert level',
+     top:[['Maria S.',690],['Steve E.',610],['Danny K.',575]], best:610}
+  ];
+  var RESETS=[
+    {k:'ws', n:'Word Search', icon:'grid', col:'#10B981', bcol:'#38BDF8', rows:['Dishes & Ingredients','Libations & Ingredients']},
+    {k:'mem',n:'Menu Memory', icon:'game', col:'#6366F1', bcol:'#3B82F6', rows:['Wine & Entree Pairings','Ingredients & Dishes','Cocktails & Ingredients'], filters:true},
+    {k:'pt', n:'Picture This!',icon:'photo',col:'#EC4899', bcol:'#5B5BD6', rows:['Menu Dishes','Libations','Wine','Menu Prices']}
+  ];
+
+  var state={c:'m1', s:'hub', p:'arcade', exg:null, exc:null, tab:'setup', exr:null, mstep:1,
+             wineShow:true, cats:{mc:true,wsl:true,ptl:true,ptw:false}};
+
+  /* ---------- tile palette (Arcade vs Blues) ---------- */
+  function tcol(x){return state.p==='blues'&&x.bcol?x.bcol:x.col}
+  function tgrad(x){return state.p==='blues'&&x.bgrad?x.bgrad:x.grad}
+  var RK={mem:RESETS[1], ws:RESETS[0], pt:RESETS[2]};
+
+  /* ---------- shared pieces ---------- */
+  function avat(txt,c,sz){return '<span class="av" style="width:'+sz+'px;height:'+sz+'px;border-radius:'+(sz/2)+'px;background:linear-gradient(140deg,'+c+')">'+txt+'</span>'}
+  function header(title,eyebrow,pill){
+    return '<div class="hdr"><span class="c38">'+I('back',18)+'</span>'
+      +'<div class="hmid"><div class="htitle">'+title+'</div><div class="eyebrow">'+eyebrow+'</div></div>'
+      +(pill||'<span style="width:38px;flex:0 0 auto"></span>')+'</div>';
+  }
+  function hubPill(side){
+    return '<span class="navpill" data-nav="'+side+'">'+I('gear',13)+'Game Hub'+I('down',11,'chev')+'</span>';
+  }
+  function gchip(g,sz){
+    return '<span class="ichip" style="width:'+sz+'px;height:'+sz+'px;background:color-mix(in srgb,'+tcol(g)+' 15%,transparent);color:'+tcol(g)+'">'+I(g.icon,Math.round(sz*0.5))+'</span>';
+  }
+  function medals(i){return ['🥇','🥈','🥉'][i]}
+  function miniLB(top,col){
+    return top.map(function(r,i){
+      return '<div class="minirow"><span class="medal">'+medals(i)+'</span><span class="nm2">'+r[0]+'</span><span class="sc" style="color:'+col+'">'+r[1].toLocaleString()+'</span></div>';
+    }).join('');
+  }
+  function youBest(g){
+    return '<div class="youline"><span class="lab">Your best</span><span class="v">'
+      +(g.best?g.best.toLocaleString()+' · '+g.played+' games':'—  not played yet')+'</span></div>';
+  }
+  function playBtn(g,label){
+    return '<div class="playbtn" style="background:'+tcol(g)+'" data-play="1">'+I('play',14)+(label||'Play')+'</div>';
+  }
+  function lbCard(withYou){
+    var h='<div class="lbcard"><div class="toprow"><span class="tchip">'+I('trophy',21)+'</span>'
+      +'<span style="flex:1"><div class="nm">Leaderboard</div><div class="ds">Top players across all games</div></span></div>';
+    h+=LB.top.map(function(r,i){
+      return '<div class="lbrow"><span class="medal">'+medals(i)+'</span>'+avat(r.a,r.c,30)
+        +'<span class="nm2">'+r.n+'</span><span class="sc" style="color:var(--tint)">'+r.s.toLocaleString()+'</span></div>';
+    }).join('');
+    if(withYou){
+      h+='<div class="lbrow me"><span class="rk">#'+LB.you.rank+'</span>'+avat('SE',AV[3],30)
+        +'<span class="nm2">You</span><span class="sc" style="color:var(--tint)">'+LB.you.s.toLocaleString()+'</span></div>';
+    }
+    h+='<div class="viewall">View Full Leaderboard <span class="badge">2</span>'+I('fwd',13)+'</div></div>';
+    return h;
+  }
+  function dockFab(){
+    return '<div class="fab">'+I('bolt')+'</div>'
+      +'<div class="dock">'
+      +'<span>'+I('home')+'Home</span>'
+      +'<span>'+I('fork')+'Menus</span>'
+      +'<span class="on">'+I('tools')+'Tools</span>'
+      +'<span>'+I('sliders')+'Manage</span>'
+      +'<span>'+I('person')+'Profile</span>'
+      +'</div>';
+  }
+
+  /* ================= shared hub pieces (round 2) ================= */
+  function pcardRow(noMargin){
+    return '<div class="row1"'+(noMargin?' style="margin-bottom:0"':'')+'>'+avat('SE',AV[3],52)
+      +'<span class="who"><div class="nm">Steve Eccles</div><div class="rank">RANK <b>#'+LB.you.rank+'</b> OF '+LB.you.of+' PLAYERS</div></span>'
+      +'<span class="tot"><div class="tv">'+LB.you.s.toLocaleString()+'</div><div class="tl">Total score</div></span></div>';
+  }
+  function podium(){
+    var t=LB.top;
+    return '<div class="podwrap">'
+      +'<div class="podcol">'+avat(t[1].a,t[1].c,44)+'<span class="pn">'+t[1].n.split(' ')[0]+'</span><span class="ps">'+t[1].s.toLocaleString()+'</span><div class="podblock" style="height:60px">🥈</div></div>'
+      +'<div class="podcol">'+avat(t[0].a,t[0].c,44)+'<span class="pn">'+t[0].n.split(' ')[0]+'</span><span class="ps">'+t[0].s.toLocaleString()+'</span><div class="podblock" style="height:84px">🥇</div></div>'
+      +'<div class="podcol">'+avat(t[2].a,t[2].c,44)+'<span class="pn">'+t[2].n.split(' ')[0]+'</span><span class="ps">'+t[2].s.toLocaleString()+'</span><div class="podblock" style="height:46px">🥉</div></div>'
+      +'</div>';
+  }
+  function gamesShelf(){
+    var h='<div class="zlabel">Games<span class="ln"></span><span class="n">3</span></div>';
+    h+='<div class="shelf">'+GAMES.map(function(g,i){
+      var sel=state.exg===i;
+      return '<div class="sqtile'+(sel?' sel':'')+'" data-exg="'+i+'" style="background:linear-gradient(150deg,'+tgrad(g)+')">'
+        +'<svg class="ic gi"><use href="#i-'+g.icon+'"/></svg><span class="shade"></span>'
+        +'<span class="caret">'+I(sel?'up':'down',11)+'</span>'
+        +'<span class="nm">'+g.n+'</span></div>';
+    }).join('')+'</div>';
+    if(state.exg!==null){
+      var g=GAMES[state.exg];
+      h+='<div class="expcard"><div class="toprow">'+gchip(g,36)+'<span class="nm">'+g.n+'</span></div>'
+        +'<div class="ds">'+g.desc+'</div>'
+        +miniLB(g.top,tcol(g))
+        +youBest(g)
+        +playBtn(g)+'</div>';
+    } else { h+='<div style="height:10px"></div>'; }
+    return h;
+  }
+
+  /* ================= HUB — round 2 mixes ================= */
+  function hubM1(){
+    var h='<div class="concept"><b>M1 · Stacked Mix</b> · card → tiles → podium<span class="ln"></span></div>';
+    h+=header('Game Hub','Staff Games',hubPill('u'));
+    h+='<div class="pcard" style="margin-bottom:2px">'+pcardRow(true)+'</div>';
+    h+=gamesShelf();
+    h+='<div class="zlabel" style="margin-top:16px">Leaderboard<span class="ln"></span></div>';
+    h+=podium();
+    h+='<div class="viewall" style="margin:0 0 4px">View Full Leaderboard <span class="badge">2</span>'+I('fwd',13)+'</div>';
+    h+='<div class="bcap">Your card leads — photo · name · rank · total only (per-game bests live inside the tiles now). The Arcade tiles hold the middle, and the podium closes the page with View Full right under it. No duplicate rank pill anywhere.</div>';
+    return h;
+  }
+  function hubM2(){
+    var h='<div class="concept"><b>M2 · Combined Card</b> · one hero card, then tiles<span class="ln"></span></div>';
+    h+=header('Game Hub','Staff Games',hubPill('u'));
+    h+='<div class="pcard">'+pcardRow()
+      +'<div style="height:1px;background:var(--hair);margin:1px 0 12px"></div>'
+      +podium()
+      +'<div class="viewall" style="margin-top:4px">View Full Leaderboard <span class="badge">2</span>'+I('fwd',13)+'</div>'
+      +'</div>';
+    h+=gamesShelf();
+    h+='<div class="bcap">The whole competition in one hero card — you on top, the podium right beneath, View Full riding the card floor — then it’s pure play: the Arcade tiles with their expansions. Tallest hero of the pair, cleanest page below.</div>';
+    return h;
+  }
+
+  /* ================= HUB — user side (round 1 reference) ================= */
+  function hubA(){
+    var h='<div class="concept"><b>A · Glass Hub</b> · today’s layout, glassed<span class="ln"></span></div>';
+    h+=header('Game Hub','Staff Games',hubPill('u'));
+    h+='<div class="sub">Test your knowledge of the menu with fun, interactive games.</div>';
+    h+=GAMES.map(function(g){
+      return '<div class="lrow">'+gchip(g,40)
+        +'<span class="bd"><div class="nm">'+g.n+'</div><div class="ds">'+g.desc+'</div></span>'+I('fwd',15,'chev')+'</div>';
+    }).join('');
+    h+=lbCard(false);
+    h+='<div class="bcap">Straight conversion: launcher rows + the trophy card, on glass. The old To&nbsp;Editor pill becomes the ⚙ Game Hub menu (tap it). Locked premium rows keep the lock glyph in the chevron slot exactly as today. Your own score still is not on this screen — the other concepts fix that.</div>';
+    return h;
+  }
+  function hubB(){
+    var h='<div class="concept"><b>B · Arcade Shelf</b> · square tiles that open up<span class="ln"></span></div>';
+    h+=header('Game Hub','Staff Games',hubPill('u'));
+    h+=gamesShelf();
+    h+=lbCard(true);
+    h+='<div class="bcap">Tap a tile: description, that game’s top 3, <b>your best</b>, and Play — the per-game leaderboard pages fold in here and could retire. The overall board keeps its own card below (with a pinned You row) and simply slides down while a tile is open.</div>';
+    return h;
+  }
+  function hubC(){
+    var h='<div class="concept"><b>C · Podium Rise</b> · leaderboard leads, games follow<span class="ln"></span></div>';
+    h+=header('Game Hub','Staff Games',hubPill('u'));
+    h+=podium();
+    h+='<div class="youpill"><span class="rk">#'+LB.you.rank+'</span><span class="t2">You — of '+LB.you.of+' players</span><span class="sc">'+LB.you.s.toLocaleString()+'</span>'+I('fwd',13)+'</div>';
+    h+='<div class="viewall" style="margin:0 0 4px">View Full Leaderboard <span class="badge">2</span>'+I('fwd',13)+'</div>';
+    h+='<div class="zlabel">Games<span class="ln"></span></div>';
+    h+=GAMES.map(function(g){
+      return '<div class="lrow">'+gchip(g,40)
+        +'<span class="bd"><div class="nm">'+g.n+'</div>'
+        +'<div class="statline"><span style="color:'+tcol(g)+'">You '+(g.best?g.best.toLocaleString():'—')+'</span><span style="color:var(--muted)"> · Top '+g.top[0][1].toLocaleString()+' ('+g.top[0][0]+')</span></div>'
+        +'</span>'+I('fwd',15,'chev')+'</div>';
+    }).join('');
+    h+='<div class="bcap">The board IS the hero — podium up top, your rank pinned right under it (tap → mini profile). Every game row trades its blurb for a live stat line: <b>your best vs the team’s top</b>. One fetch on focus, no expansion needed.</div>';
+    return h;
+  }
+  function hubD(){
+    var h='<div class="concept"><b>D · Player Card</b> · your stats lead<span class="ln"></span></div>';
+    h+=header('Game Hub','Staff Games',hubPill('u'));
+    h+='<div class="pcard"><div class="row1">'+avat('SE',AV[3],52)
+      +'<span class="who"><div class="nm">Steve Eccles</div><div class="rank">RANK <b>#'+LB.you.rank+'</b> OF '+LB.you.of+' PLAYERS</div></span>'
+      +'<span class="tot"><div class="tv">'+LB.you.s.toLocaleString()+'</div><div class="tl">Total score</div></span></div>'
+      +'<div class="gstats">'+GAMES.map(function(g){
+        return '<span class="gstat"><span class="gl"><span class="dot" style="background:'+tcol(g)+'"></span>'+(g.k==='ws'?'Word Search':g.k==='mem'?'Memory':'Picture This')+'</span><span class="gv">'+(g.best?g.best.toLocaleString():'—')+'</span></span>';
+      }).join('')+'</div></div>';
+    h+='<div class="zlabel">Games<span class="ln"></span></div>';
+    h+='<div class="shelf">'+GAMES.map(function(g){
+      return '<div class="sqtile" style="background:linear-gradient(150deg,'+tgrad(g)+')">'
+        +'<svg class="ic gi"><use href="#i-'+g.icon+'"/></svg><span class="shade"></span>'
+        +'<span class="nm">'+g.n+'</span></div>';
+    }).join('')+'</div>';
+    h+='<div class="zlabel" style="margin-top:16px">Top players<span class="ln"></span></div>';
+    h+='<div class="top3strip">'+LB.top.map(function(r,i){
+      return '<div class="t3chip"><div class="m">'+medals(i)+'</div><div class="n">'+r.n.split(' ')[0]+'</div><div class="s">'+r.s.toLocaleString()+'</div></div>';
+    }).join('')+'</div>';
+    h+='<div class="viewall" style="margin-top:10px">View Full Leaderboard <span class="badge">2</span>'+I('fwd',13)+'</div>';
+    h+='<div class="bcap">Answers "where do I stand?" before anything else — the player card is yours (total, rank, best per game), tiles go straight to their game, and the podium shrinks to a strip. Cleanest scroll of the four; game detail lives on the game pages.</div>';
+    return h;
+  }
+
+  /* ================= GAME PAGE — Picture This! ================= */
+  function gameIntro(short){
+    return '<div class="intro"><div class="t">📸 Picture This!</div>'
+      +'<div class="d">Spot the correct ingredients, prices, and more from menu pictures. Choose a category, pick your difficulty, and play with Lives or Beat the Clock!</div>'
+      +(short?'':'<div class="tip">💡 The Wine category only appears when your menu’s Wine section is visible — same rule as today.</div>')
+      +'</div>';
+  }
+  function gameA(){
+    var h='<div class="concept"><b>A · Glass Hub</b> · game page, straight conversion<span class="ln"></span></div>';
+    h+=header('Picture This!','Game Hub');
+    h+=gameIntro();
+    h+='<div class="zlabel">Choose a category<span class="ln"></span></div>';
+    h+=PTCATS.map(function(c){
+      return '<div class="lrow" data-play="1"><span class="ichip" style="width:40px;height:40px;background:color-mix(in srgb,'+tcol(c)+' 15%,transparent);color:'+tcol(c)+'">'+I(c.icon,20)+'</span>'
+        +'<span class="bd"><div class="nm">'+c.n+'</div><div class="ds">'+c.desc+'</div></span>'+I('fwd',15,'chev')+'</div>';
+    }).join('');
+    h+='<div class="viewall" style="background:color-mix(in srgb,var(--tint) 10%,transparent);color:var(--tint)">'+I('trophy',14)+'View Leaderboard'+I('fwd',13)+'</div>';
+    h+='<div class="bcap">Blurb + category rows + leaderboard button, glassed. Tapping a category opens the difficulty→mode sheet (tap one). The old centre modal becomes a bottom GlassSheet — same two steps.</div>';
+    return h;
+  }
+  function gameB(){
+    var h='<div class="concept"><b>B · Arcade Shelf</b> · category tiles open up<span class="ln"></span></div>';
+    h+=header('Picture This!','Game Hub');
+    h+=gameIntro(true);
+    h+='<div class="zlabel">Choose a category<span class="ln"></span><span class="n">4</span></div>';
+    h+='<div class="grid2">'+PTCATS.map(function(c,i){
+      var sel=state.exc===i;
+      return '<div class="sqtile'+(sel?' sel':'')+'" data-exc="'+i+'" style="background:linear-gradient(150deg,'+tgrad(c)+')">'
+        +'<svg class="ic gi"><use href="#i-'+c.icon+'"/></svg><span class="shade"></span>'
+        +'<span class="caret">'+I(sel?'up':'down',11)+'</span>'
+        +'<span class="nm">'+c.n+'</span></div>';
+    }).join('')+'</div>';
+    if(state.exc!==null){
+      var c=PTCATS[state.exc];
+      h+='<div class="expcard"><div class="toprow"><span class="ichip" style="background:color-mix(in srgb,'+tcol(c)+' 15%,transparent);color:'+tcol(c)+'">'+I(c.icon,18)+'</span><span class="nm">'+c.n+'</span></div>'
+        +'<div class="ds">'+c.desc+'</div>'
+        +miniLB(c.top,tcol(c))
+        +'<div class="youline"><span class="lab">Your best</span><span class="v">'+(c.best?c.best.toLocaleString():'—  not played yet')+'</span></div>'
+        +'<div class="playbtn" style="background:'+tcol(c)+'" data-play="1">'+I('play',14)+'Play</div></div>';
+    }
+    h+='<div class="bcap">Same expanding grammar as the hub, one level down: each category shows its own top 3 + your best, then Play → the difficulty→mode sheet. The <b>View Leaderboard button and the per-game leaderboard page retire</b> — the board lives in the tiles (full rankings stay on the Master Leaderboard’s game tabs).</div>';
+    return h;
+  }
+  function gameC(){
+    var h='<div class="concept"><b>C · Podium Rise</b> · stat lines, no expansion<span class="ln"></span></div>';
+    h+=header('Picture This!','Game Hub');
+    h+=gameIntro(true);
+    h+='<div class="zlabel">Choose a category<span class="ln"></span></div>';
+    h+=PTCATS.map(function(c){
+      return '<div class="lrow" data-play="1"><span class="ichip" style="width:40px;height:40px;background:color-mix(in srgb,'+tcol(c)+' 15%,transparent);color:'+tcol(c)+'">'+I(c.icon,20)+'</span>'
+        +'<span class="bd"><div class="nm">'+c.n+'</div>'
+        +'<div class="statline"><span style="color:'+tcol(c)+'">You '+(c.best?c.best.toLocaleString():'—')+'</span><span style="color:var(--muted)"> · Top '+c.top[0][1].toLocaleString()+' ('+c.top[0][0]+')</span></div>'
+        +'</span>'+I('fwd',15,'chev')+'</div>';
+    }).join('');
+    h+='<div class="viewall" style="background:color-mix(in srgb,var(--tint) 10%,transparent);color:var(--tint)">'+I('trophy',14)+'View Leaderboard'+I('fwd',13)+'</div>';
+    h+='<div class="bcap">Rows keep C’s stat-line trade: your best vs the category’s top, always visible, zero taps. Keeps the leaderboard button (page stays), so it’s the lightest change of the three.</div>';
+    return h;
+  }
+  function gameD(){
+    var h='<div class="concept"><b>D · Player Card</b> · light expansion<span class="ln"></span></div>';
+    h+=header('Picture This!','Game Hub');
+    h+=gameIntro(true);
+    h+='<div class="zlabel">Choose a category<span class="ln"></span><span class="n">4</span></div>';
+    h+='<div class="grid2">'+PTCATS.map(function(c,i){
+      var sel=state.exc===i;
+      return '<div class="sqtile'+(sel?' sel':'')+'" data-exc="'+i+'" style="background:linear-gradient(150deg,'+tgrad(c)+')">'
+        +'<svg class="ic gi"><use href="#i-'+c.icon+'"/></svg><span class="shade"></span>'
+        +'<span class="caret">'+I(sel?'up':'down',11)+'</span>'
+        +'<span class="nm">'+c.n+'</span></div>';
+    }).join('')+'</div>';
+    if(state.exc!==null){
+      var c=PTCATS[state.exc];
+      h+='<div class="expcard"><div class="ds" style="margin-bottom:9px">'+c.desc+'</div>'
+        +'<div class="youline" style="margin-top:0"><span class="lab">You</span><span class="v">'+(c.best?c.best.toLocaleString():'—')+'</span></div>'
+        +'<div class="youline" style="margin-top:-4px"><span class="lab">Team best</span><span class="v">'+c.top[0][1].toLocaleString()+' · '+c.top[0][0]+'</span></div>'
+        +'<div class="playbtn" style="background:'+tcol(c)+'" data-play="1">'+I('play',14)+'Play</div></div>';
+    }
+    h+='<div class="bcap">B’s tiles with a lighter card — just you vs the team best, then Play. Faster to scan than the full top-3; the per-game leaderboard page can retire or stay, your call.</div>';
+    return h;
+  }
+
+  /* ================= EDITOR ================= */
+  function sampleTog(){
+    return '<div class="togcard"><span class="bd"><div class="nm">Sample Game Data</div>'
+      +'<div class="ds">When toggled on the games will use a built in MyResto Sample Menu so new staff can play right away! Turn off to use only your menu items once they are added.</div></span>'
+      +'<span class="sw"><i></i></span></div>';
+  }
+  function wineSection(){
+    return '<div class="winecard"><div class="row1"><span class="ichip">'+I('wine',20)+'</span>'
+      +'<span style="flex:1"><div class="nm">Wine &amp; Entree Pairings</div></span><span class="countpill">12 pairings</span></div>'
+      +'<div class="ds">Pairings power the Memory Game’s Wine &amp; Entree mode — add each wine with the entree it pairs with, plus an optional hint. Moved out of the Memory editor so it’s one tap from here.</div>'
+      +'<div class="manage">'+I('pencil',15)+'Manage Wine Pairings<span class="chev">'+I('fwd',14)+'</span></div></div>';
+  }
+  function swEl(on,key){return '<span class="sw'+(on?'':' off')+'" data-tog="'+key+'"><i></i></span>'}
+  function catToggles(){
+    var c=state.cats;
+    function row(key,on,dot,nm,sd){
+      return '<div class="togrow'+(on?'':' off')+'"><span class="dot" style="background:'+dot+'"></span>'
+        +'<span class="bd"><div class="nm">'+nm+'</div><div class="sd">'+sd+'</div></span>'+swEl(on,key)+'</div>';
+    }
+    return '<div class="winecard"><div class="row1" style="margin-bottom:2px"><span class="ichip" style="background:color-mix(in srgb,var(--tint) 13%,transparent);color:var(--tint)">'+I('sliders',19)+'</span>'
+      +'<span style="flex:1"><div class="nm">Game Categories</div></span></div>'
+      +'<div class="ds">Turn a category off and it disappears from that game on the user side — for menus without wine or a bar program. Wine surfaces also keep following your menu’s Wine visibility, same as today.</div>'
+      +row('mc', c.mc, tcol(RK.mem),'Cocktails &amp; Ingredients','Menu Memory · fed by Cocktails A–Z')
+      +row('wsl',c.wsl,tcol(RK.ws),'Libations &amp; Ingredients','Word Search · libation recipes + Cocktails A–Z')
+      +row('ptl',c.ptl,tcol(RK.pt),'Libations','Picture This! · cocktail &amp; libation pictures')
+      +row('ptw',c.ptw,tcol(RK.pt),'Wine','Picture This! · also follows menu Wine visibility')
+      +'</div>';
+  }
+  function wineSectionD(){
+    return '<div class="winecard"><div class="row1"><span class="ichip">'+I('wine',20)+'</span>'
+      +'<span style="flex:1"><div class="nm">Wine &amp; Entree Pairings</div></span><span class="countpill">12 pairings</span></div>'
+      +'<div class="ds">Pairings power the Memory Game’s Wine &amp; Entree mode — add each wine with the entree it pairs with, plus an optional hint. Moved out of the Memory editor so it’s one tap from here.</div>'
+      +'<div class="manage">'+I('pencil',15)+'Manage Wine Pairings<span class="chev">'+I('fwd',14)+'</span></div>'
+      +'<div class="togrow'+(state.wineShow?'':' off')+'" style="margin-top:9px"><span class="dot" style="background:'+tcol(RK.mem)+'"></span>'
+      +'<span class="bd"><div class="nm">Show in Menu Memory Game</div><div class="sd">Hides the Wine &amp; Entree Pairings mode when off — pairings stay saved</div></span>'+swEl(state.wineShow,'wine')+'</div>'
+      +'</div>';
+  }
+  function lookupBlock(withResult){
+    var h='<div class="zlabel">Employee score lookup<span class="ln"></span></div>';
+    h+='<div class="sbar">'+I('search',16)+'Search by name…</div>';
+    if(withResult){
+      h+='<div class="rescard"><div class="row1">'+avat('DD',AV[2],40)
+        +'<span style="flex:1"><div class="nm">Daisy Dukes</div><div class="tt">TOTAL 1,560</div></span></div>'
+        +'<div class="schips">'
+        +'<span class="schip" style="background:rgba(99,102,241,0.13)"><div class="l" style="color:#6366F1">Memory</div><div class="v" style="color:#6366F1">1,240 (6)</div></span>'
+        +'<span class="schip" style="background:rgba(16,185,129,0.13)"><div class="l" style="color:#10B981">Word Search</div><div class="v" style="color:#10B981">320 (2)</div></span>'
+        +'<span class="schip" style="background:rgba(236,72,153,0.13)"><div class="l" style="color:#EC4899">Picture This</div><div class="v" style="color:#EC4899">0 (0)</div></span>'
+        +'</div>'
+        +'<div class="rbtns"><span class="rbtn warn">'+I('flask',13)+'Mark Test User</span>'
+        +'<span class="rbtn dang" data-reset="Daisy’s scores across all three games">'+I('reset',13)+'Reset Scores</span></div></div>';
+    }
+    return h;
+  }
+  function resetTiles(expandable){
+    var h='';
+    RESETS.forEach(function(r,i){
+      var sel=state.exr===i;
+      h+='<div class="lrow" style="margin-bottom:'+(sel?'0':'10')+'px'+(sel?';border-bottom-left-radius:0;border-bottom-right-radius:0':'')+'" '+(expandable?('data-exr="'+i+'"'):'')+'>'
+        +'<span class="ichip" style="width:40px;height:40px;background:color-mix(in srgb,'+tcol(r)+' 15%,transparent);color:'+tcol(r)+'">'+I(r.icon,20)+'</span>'
+        +'<span class="bd"><div class="nm">'+r.n+'</div><div class="ds">'+(expandable?'Reset scores by '+(r.k==='mem'?'mode':'category')+' or all at once':'Open the '+r.n+' editor to reset scores')+'</div></span>'
+        +I(expandable?(sel?'up':'down'):'fwd',15,'chev')+'</div>';
+      if(expandable&&sel){
+        h+='<div class="expcard" style="margin-top:0;border-top-left-radius:0;border-top-right-radius:0">';
+        if(r.filters){
+          h+='<div class="filterchips"><span class="fchip on">All</span><span class="fchip">❤️ Lives</span><span class="fchip">⏱ Timed</span></div>';
+        }
+        r.rows.forEach(function(row){
+          h+='<div class="resetrow"><span class="nm">'+row+'</span><span class="go" data-reset="'+row+'">Reset</span></div>';
+        });
+        h+='<div class="resetrow" style="border-color:color-mix(in srgb,var(--danger) 40%,transparent)"><span class="nm" style="color:var(--danger)">All '+r.n+' scores</span><span class="go" data-reset="all '+r.n+'">Reset</span></div>';
+        h+='</div>';
+      }
+    });
+    return h;
+  }
+  function edA(){
+    var h='<div class="concept"><b>A · Glass Hub</b> · today’s editor, glassed + sectioned<span class="ln"></span></div>';
+    h+=header('Game Hub Editor','Staff Games',hubPill('e'));
+    h+='<div class="sub">Manage game content and leaderboards for all staff games.</div>';
+    h+=sampleTog();
+    h+=lookupBlock(true);
+    h+='<div class="zlabel">Game editors<span class="ln"></span></div>';
+    h+=resetTiles(false);
+    h+='<div class="zlabel" style="color:var(--danger)">Danger zone<span class="ln"></span></div>';
+    h+='<div class="dangerbtn" data-reset="EVERY score in EVERY game for EVERY player">'+I('reset',15)+'Reset All Game Scores</div>';
+    h+='<div class="bcap">The straight conversion: same pile, glassed, with zone labels doing the separating. Wine Pairings still lives inside the Memory editor. Everything on one long scroll — honest, but still a lot of page.</div>';
+    return h;
+  }
+  function edTabs(){
+    return '<div class="segwrap"><span class="seg'+(state.tab==='setup'?' on':'')+'" data-tab="setup">Game Setup</span>'
+      +'<span class="seg'+(state.tab==='boards'?' on':'')+'" data-tab="boards">Leaderboards</span></div>';
+  }
+  function edB(){
+    var h='<div class="concept"><b>B · Arcade Shelf</b> · two tabs: setup / leaderboards<span class="ln"></span></div>';
+    h+=header('Game Hub Editor','Staff Games',hubPill('e'));
+    h+=edTabs();
+    if(state.tab==='setup'){
+      h+=sampleTog();
+      h+=wineSection();
+      h+='<div class="bcap">Setup = what feeds the games: the sample-menu switch and Wine Pairings, pulled out of the Memory editor into its own page (the blurb rides along). Everything else is auto-fed from your menu — nothing more to configure.</div>';
+    }else{
+      h+=lookupBlock(true);
+      h+='<div class="zlabel">Reset by game<span class="ln"></span></div>';
+      h+=resetTiles(false);
+      h+='<div class="dangerbtn" data-reset="EVERY score in EVERY game for EVERY player">'+I('reset',15)+'Reset All Game Scores</div>';
+      h+='<div class="bcap">Leaderboards = people: score lookup with per-player reset + test-user flag, then the per-game reset screens, then the big red button. The ⚙ Reset Scores shortcut on the user side lands on THIS tab.</div>';
+    }
+    return h;
+  }
+  function edC(){
+    var h='<div class="concept"><b>C · Podium Rise</b> · one page, resets expand inline<span class="ln"></span></div>';
+    h+=header('Game Hub Editor','Staff Games',hubPill('e'));
+    h+=sampleTog();
+    h+=wineSection();
+    h+=lookupBlock(false);
+    h+='<div class="zlabel">Game score resets<span class="ln"></span></div>';
+    h+=resetTiles(true);
+    h+='<div class="dangerbtn" data-reset="EVERY score in EVERY game for EVERY player">'+I('reset',15)+'Reset All Game Scores</div>';
+    h+='<div class="bcap">One page, no tabs: each game expands right here with its category resets (Memory keeps its All/Lives/Timed filter) — tap a Reset to see the confirm. <b>The three separate editor screens retire completely.</b> Longest single scroll, fewest screens in the app.</div>';
+    return h;
+  }
+  function edD(){
+    var h='<div class="concept"><b>Editor · Locked D</b> · tabs + inline resets + category switches<span class="ln"></span></div>';
+    h+=header('Game Hub Editor','Staff Games',hubPill('e'));
+    h+=edTabs();
+    if(state.tab==='setup'){
+      h+=sampleTog();
+      h+=catToggles();
+      h+=wineSectionD();
+      h+='<div class="bcap">Setup = what feeds the games. The Game Categories switches hide a category from its game on the user side (tap them — Wine ships off here to show the state). Wine Pairings keeps its own card: the pairings editor plus its Show switch, pulled out of the Memory editor.</div>';
+    }else{
+      h+=lookupBlock(true);
+      h+='<div class="zlabel">Reset by game<span class="ln"></span></div>';
+      h+=resetTiles(true);
+      h+='<div class="dangerbtn" data-reset="EVERY score in EVERY game for EVERY player">'+I('reset',15)+'Reset All Game Scores</div>';
+      h+='<div class="bcap">The control room: B’s two tabs, but the game tiles expand INLINE instead of navigating — <b>no separate editor screens at all</b>, and the lookup stays above so a "who’s cheating" check and the fix live on one tab.</div>';
+    }
+    return h;
+  }
+
+  /* ================= sheets ================= */
+  function navSheet(side){
+    var u=side==='u';
+    var h='<div class="grab"></div>';
+    h+='<div class="shead"><span class="t">'+(u?'Game Hub':'Game Hub Editor')+'</span><span class="xbtn" data-close="navovl">'+I('x',14)+'</span></div>';
+    if(u){
+      h+='<div class="arow">'+I('pencil',16)+'<span class="bd2">Game Hub Editor<div class="sd">Sample data, wine pairings &amp; leaderboards</div></span>'+I('fwd',13)+'</div>';
+    }else{
+      h+='<div class="arow">'+I('game',16)+'<span class="bd2">Return to Game Hub<div class="sd">See what your staff sees</div></span>'+I('fwd',13)+'</div>';
+    }
+    h+='<div class="arow">'+I('star',16)+'<span class="bd2">Rewards<div class="sd">Send Bucks for a high score</div></span>'+I('fwd',13)+'</div>';
+    h+='<div class="arow">'+I('reset',16)+'<span class="bd2">Reset Scores<div class="sd">Jump to Leaderboard Management</div></span>'+I('fwd',13)+'</div>';
+    h+='<div class="tipfoot">The recipes-family HeaderNavMenu, re-badged ⚙ Game Hub. Employees never see the pill — manager/owner only. Navigation rides the GlassActionSheet defer handoff as always.</div>';
+    return h;
+  }
+  function modeSheet(){
+    var h='<div class="grab"></div>';
+    if(state.mstep===1){
+      h+='<div class="shead"><span class="t">Choose Difficulty</span><span class="xbtn" data-close="modeovl">'+I('x',14)+'</span></div>';
+      h+='<div class="optbtn" data-mstep="2" style="border-color:rgba(16,185,129,0.5)"><div class="ol" style="color:#10B981">🟢 Easy</div><div class="od">4 choices, generous timer</div></div>';
+      h+='<div class="optbtn" data-mstep="2" style="border-color:rgba(245,158,11,0.5)"><div class="ol" style="color:#F59E0B">🟡 Medium</div><div class="od">6 choices, tighter timer</div></div>';
+      h+='<div class="optbtn" data-mstep="2" style="border-color:rgba(239,68,68,0.5)"><div class="ol" style="color:#EF4444">🔴 Hard</div><div class="od">8 close choices, expert pace</div></div>';
+    }else{
+      h+='<div class="shead"><span class="t">Choose Play Mode</span><span class="xbtn" data-close="modeovl">'+I('x',14)+'</span></div>';
+      h+='<div class="optbtn" data-go="1"><div class="ol">'+I('heart',16)+'Lives Mode</div><div class="od">Careful picks — limited lives per round.</div></div>';
+      h+='<div class="optbtn" data-go="1"><div class="ol">'+I('timer',16)+'Timed Mode</div><div class="od">Beat the clock before time runs out!</div></div>';
+      h+='<div class="tipfoot" data-mstep="1" style="cursor:pointer">← Back to difficulty</div>';
+    }
+    return h;
+  }
+  function confSheet(label){
+    var h='<div class="grab"></div>';
+    h+='<div class="shead"><span class="t">Reset scores?</span><span class="xbtn" data-close="confovl">'+I('x',14)+'</span></div>';
+    h+='<div class="sub" style="margin-bottom:14px">This clears <b style="color:var(--text)">'+label+'</b> for every player. It cannot be undone.</div>';
+    h+='<div class="arow dang" data-close="confovl">'+I('reset',16)+'<span class="bd2">Reset</span></div>';
+    h+='<div class="arow" data-close="confovl">'+I('x',16)+'<span class="bd2">Cancel</span></div>';
+    return h;
+  }
+
+  /* ---------- wiring ---------- */
+  var HUB={m1:hubM1,m2:hubM2,a:hubA,b:hubB,c:hubC,d:hubD};
+  var GAME={m1:gameB,m2:gameB,a:gameA,b:gameB,c:gameC,d:gameD};
+  var ED={m1:edD,m2:edD,a:edA,b:edB,c:edC,d:edD};
+
+  function show(){
+    var fn = state.s==='hub'?HUB[state.c] : state.s==='game'?GAME[state.c] : ED[state.c];
+    el('screen').innerHTML='<div class="design on">'+fn()+'</div>';
+    el('chrome').innerHTML = state.s==='ed' ? '' : dockFab();
+    wire();
+  }
+  function wire(){
+    all('[data-nav]',function(x){x.onclick=function(){
+      el('navsheet').innerHTML=navSheet(x.getAttribute('data-nav'));
+      el('navovl').classList.add('show'); wireClose();
+    }});
+    all('[data-exg]',function(x){x.onclick=function(){
+      var i=+x.getAttribute('data-exg'); state.exg=(state.exg===i?null:i); show();
+    }});
+    all('[data-exc]',function(x){x.onclick=function(){
+      var i=+x.getAttribute('data-exc'); state.exc=(state.exc===i?null:i); show();
+    }});
+    all('[data-exr]',function(x){x.onclick=function(){
+      var i=+x.getAttribute('data-exr'); state.exr=(state.exr===i?null:i); show();
+    }});
+    all('[data-tab]',function(x){x.onclick=function(){
+      state.tab=x.getAttribute('data-tab'); show();
+    }});
+    all('[data-tog]',function(x){x.onclick=function(e){
+      e.stopPropagation();
+      var k=x.getAttribute('data-tog');
+      if(k==='wine') state.wineShow=!state.wineShow; else state.cats[k]=!state.cats[k];
+      show();
+    }});
+    all('[data-play]',function(x){x.onclick=function(e){
+      e.stopPropagation(); state.mstep=1;
+      el('modesheet').innerHTML=modeSheet();
+      el('modeovl').classList.add('show'); wireMode();
+    }});
+    all('[data-reset]',function(x){x.onclick=function(e){
+      e.stopPropagation();
+      el('confsheet').innerHTML=confSheet(x.getAttribute('data-reset'));
+      el('confovl').classList.add('show'); wireClose();
+    }});
+  }
+  function wireMode(){
+    wireClose();
+    all('[data-mstep]',function(b){b.onclick=function(){
+      state.mstep=+b.getAttribute('data-mstep');
+      el('modesheet').innerHTML=modeSheet(); wireMode();
+    }});
+    all('[data-go]',function(b){b.onclick=function(){el('modeovl').classList.remove('show')}});
+  }
+  function wireClose(){
+    all('[data-close]',function(b){b.onclick=function(e){e.stopPropagation();el(b.getAttribute('data-close')).classList.remove('show')}});
+  }
+
+  show();
+  all('.ovl',function(o){o.addEventListener('click',function(e){if(e.target===o)o.classList.remove('show')})});
+  all('[data-c]',function(b){b.addEventListener('click',function(){
+    all('[data-c]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    state.c=b.getAttribute('data-c'); state.exg=null; state.exc=null; state.exr=null; show();
+  })});
+  all('[data-s]',function(b){b.addEventListener('click',function(){
+    all('[data-s]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    state.s=b.getAttribute('data-s'); state.exg=null; state.exc=null; state.exr=null; show();
+  })});
+  all('[data-p]',function(b){b.addEventListener('click',function(){
+    all('[data-p]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    state.p=b.getAttribute('data-p'); show();
+  })});
+  all('[data-t]',function(b){b.addEventListener('click',function(){
+    all('[data-t]',function(x){x.classList.remove('on')}); b.classList.add('on');
+    phone.className='phone '+b.getAttribute('data-t');
+  })});
+})();
+</script>
+</body>
+</html>

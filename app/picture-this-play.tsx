@@ -720,7 +720,9 @@ export default function PictureThisPlayScreen() {
 
               <TouchableOpacity
                 style={[styles.actionBtn, { backgroundColor: '#F59E0B' }]}
-                onPress={() => router.replace('/picture-this-leaderboard')}
+                // The per-game leaderboard page retired in s75 — full rankings
+                // live on the Master Leaderboard's Picture This! tab.
+                onPress={() => router.replace('/master-leaderboard?tab=picture_this')}
               >
                 <IconSymbol ios_icon_name="trophy.fill" android_material_icon_name="emoji-events" size={18} color="#fff" />
                 <Text style={styles.actionBtnText}>{t('picture_this:view_leaderboard')}</Text>

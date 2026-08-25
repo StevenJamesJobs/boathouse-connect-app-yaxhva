@@ -1,50 +1,101 @@
 /**
- * Game Hub
- * Player-facing hub screen with cards for Memory Game, Word Search,
- * and a Leaderboard preview showing the top 3 overall leaders.
+ * Game Hub — the s75 "M1 Stacked" layout.
+ * Player card (you: rank + total) → Arcade tiles that expand into each game's
+ * top-3 board card → the podium + View Full Leaderboard at the floor.
+ * Manager/owner get the ⚙ Game Hub menu (Editor / Rewards / Reset Scores).
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  ActivityIndicator,
-  Platform,
   Alert,
 } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
-import { useAppTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { isManagerOrOwner } from '@/utils/roles';
-import HeaderNavButton from '@/components/HeaderNavButton';
+import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { useUnreadLeaderboardPasses } from '@/hooks/useUnreadLeaderboardPasses';
-import { MessageBadge } from '@/components/MessageBadge';
-import { hexToRgba } from '@/styles/commonStyles';
+import { isManagerOrOwner } from '@/utils/roles';
+import { supabase } from '@/app/integrations/supabase/client';
+import type { Database } from '@/app/integrations/supabase/types';
 import { IconSymbol } from '@/components/IconSymbol';
 import { StorageImage } from '@/components/StorageImage';
-import { supabase } from '@/app/integrations/supabase/client';
-import { useMiniProfile } from '@/contexts/MiniProfileContext';
-import { useOrganization } from '../contexts/OrganizationContext';
-import { useFocusEffect } from '@react-navigation/native';
-import { BlurView } from 'expo-blur';
-import { useTranslation } from 'react-i18next';
-import { useSubscription } from '@/contexts/SubscriptionContext';
+import { MessageBadge } from '@/components/MessageBadge';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import HeaderNavMenu from '@/components/HeaderNavMenu';
+import BottomNavBar from '@/components/BottomNavBar';
+import JoltOverlay from '@/components/JoltOverlay';
+import GameSquareTile from '@/components/game/GameSquareTile';
+import GameBoardCard, { GameBoardRow } from '@/components/game/GameBoardCard';
+import { GAME_VISUALS } from '@/components/game/gameVisuals';
+import { fetchMasterTop } from '@/utils/game/boards';
+import { formatPlayedLine } from '@/utils/game/scoreLine';
+import { fonts } from '@/constants/fonts';
 
-interface GameCard {
+type GameKey = 'word_search' | 'memory' | 'picture_this';
+
+interface GameDef {
+  key: GameKey;
   titleKey: string;
   descKey: string;
   iosIcon: string;
   androidIcon: string;
+  accent: string;
+  gradient: readonly [string, string];
   route: string;
-  color: string;
+  boardRpc: keyof Database['public']['Functions'];
   isPremium?: boolean;
 }
 
-interface LeaderboardEntry {
+const GAMES: GameDef[] = [
+  // Free game first — base users get a playable game up top; the two premium
+  // tiles sit beside it with their locks visible.
+  {
+    key: 'word_search',
+    titleKey: 'game_hub_cards:word_search_title',
+    descKey: 'game_hub_cards:word_search_desc',
+    iosIcon: 'textformat.abc',
+    androidIcon: 'spellcheck',
+    accent: GAME_VISUALS.word_search.accent,
+    gradient: GAME_VISUALS.word_search.gradient,
+    route: '/word-search-game',
+    boardRpc: 'get_master_leaderboard_word_search_actor',
+  },
+  {
+    key: 'memory',
+    titleKey: 'game_hub_cards:memory_title',
+    descKey: 'game_hub_cards:memory_desc',
+    iosIcon: 'gamecontroller.fill',
+    androidIcon: 'sports-esports',
+    accent: GAME_VISUALS.memory.accent,
+    gradient: GAME_VISUALS.memory.gradient,
+    route: '/menu-memory-game',
+    boardRpc: 'get_master_leaderboard_memory_actor',
+    isPremium: true,
+  },
+  {
+    key: 'picture_this',
+    titleKey: 'game_hub_cards:picture_this_title',
+    descKey: 'game_hub_cards:picture_this_desc',
+    iosIcon: 'photo.fill',
+    androidIcon: 'photo-camera',
+    accent: GAME_VISUALS.picture_this.accent,
+    gradient: GAME_VISUALS.picture_this.gradient,
+    route: '/picture-this-game',
+    boardRpc: 'get_master_leaderboard_picture_this_actor',
+    isPremium: true,
+  },
+];
+
+interface LeaderEntry {
   user_id: string;
   name: string;
   profile_picture_url: string | null;
@@ -52,416 +103,449 @@ interface LeaderboardEntry {
   games_played: number;
 }
 
-const GAME_CARDS: GameCard[] = [
-  // Free game first — base users get a playable game up top; the two premium
-  // cards sit right below with their locks visible.
-  {
-    titleKey: 'game_hub_cards:word_search_title',
-    descKey: 'game_hub_cards:word_search_desc',
-    iosIcon: 'textformat.abc',
-    androidIcon: 'spellcheck',
-    route: '/word-search-game',
-    color: '#10B981',
-  },
-  {
-    titleKey: 'game_hub_cards:memory_title',
-    descKey: 'game_hub_cards:memory_desc',
-    iosIcon: 'gamecontroller.fill',
-    androidIcon: 'sports-esports',
-    route: '/menu-memory-game',
-    color: '#6366F1',
-    isPremium: true,
-  },
-  {
-    titleKey: 'game_hub_cards:picture_this_title',
-    descKey: 'game_hub_cards:picture_this_desc',
-    iosIcon: 'photo.fill',
-    androidIcon: 'photo-camera',
-    route: '/picture-this-game',
-    color: '#EC4899',
-    isPremium: true,
-  },
-];
+interface MySummary {
+  total_score: number;
+  overall_rank: number | null;
+  players_total: number;
+  memory_score: number;
+  memory_games: number;
+  word_search_score: number;
+  word_search_games: number;
+  picture_this_score: number;
+  picture_this_games: number;
+}
 
 const RANK_MEDALS = ['🥇', '🥈', '🥉'];
 
-interface NavTab {
-  route: string;
-  labelKey: string;
-  iosIcon: string;
-  androidIcon: string;
-}
-
-const EMPLOYEE_NAV_TABS: NavTab[] = [
-  { route: '/(portal)/employee', labelKey: 'tabs.welcome', iosIcon: 'house.fill', androidIcon: 'home' },
-  { route: '/(portal)/employee/menus', labelKey: 'tabs.menus', iosIcon: 'fork.knife', androidIcon: 'restaurant' },
-  { route: '/(portal)/employee/tools', labelKey: 'tabs.tools', iosIcon: 'wrench.and.screwdriver.fill', androidIcon: 'build' },
-  { route: '/(portal)/employee/rewards', labelKey: 'tabs.rewards', iosIcon: 'star.fill', androidIcon: 'star' },
-  { route: '/(portal)/employee/profile', labelKey: 'tabs.profile', iosIcon: 'person.fill', androidIcon: 'person' },
-];
-
-const MANAGER_NAV_TABS: NavTab[] = [
-  { route: '/(portal)/manager', labelKey: 'tabs.welcome', iosIcon: 'house.fill', androidIcon: 'home' },
-  { route: '/(portal)/manager/menus', labelKey: 'tabs.menus', iosIcon: 'fork.knife', androidIcon: 'restaurant' },
-  { route: '/(portal)/manager/tools', labelKey: 'tabs.tools', iosIcon: 'wrench.and.screwdriver.fill', androidIcon: 'build' },
-  { route: '/(portal)/manager/manage', labelKey: 'tabs.manage', iosIcon: 'slider.horizontal.3', androidIcon: 'tune' },
-  { route: '/(portal)/manager/profile', labelKey: 'tabs.profile', iosIcon: 'person.fill', androidIcon: 'person' },
-];
-
-function GameHubBottomNav() {
-  const router = useRouter();
-  const { t } = useTranslation();
-  const { user } = useAuth();
+function SectionLabel({ label, count }: { label: string; count?: number }) {
   const colors = useThemeColors();
-  const { mode } = useAppTheme();
-
-  const tabs = (user?.role === 'manager' || user?.role === 'owner') ? MANAGER_NAV_TABS : EMPLOYEE_NAV_TABS;
-
-  const blurBgColor = Platform.select({
-    ios: hexToRgba(colors.tabBarBackground, 0.6),
-    android: hexToRgba(colors.tabBarBackground, 0.9),
-    web: hexToRgba(colors.tabBarBackground, 0.85),
-  });
-
   return (
-    <View style={navStyles.container}>
-      <BlurView
-        intensity={80}
-        tint={mode === 'dark' ? 'dark' : 'light'}
-        style={[navStyles.blur, { backgroundColor: blurBgColor }]}
-      >
-        <View style={navStyles.row}>
-          {tabs.map((tab) => (
-            <TouchableOpacity
-              key={tab.route}
-              style={navStyles.tabBtn}
-              onPress={() => router.replace(tab.route as any)}
-            >
-              <IconSymbol
-                ios_icon_name={tab.iosIcon as any}
-                android_material_icon_name={tab.androidIcon as any}
-                size={24}
-                color={colors.tabBarInactive}
-              />
-              <Text style={[navStyles.label, { color: colors.tabBarInactive }]} numberOfLines={1}>
-                {t(tab.labelKey)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </BlurView>
+    <View style={styles.zlabel}>
+      <Text style={[styles.zlabelText, { color: colors.textSecondary }]}>{label}</Text>
+      <View style={[styles.zlabelLine, { backgroundColor: colors.hairline }]} />
+      {count !== undefined && (
+        <Text style={[styles.zlabelText, { color: colors.textSecondary }]}>{count}</Text>
+      )}
     </View>
   );
 }
-
-const navStyles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    bottom: 20,
-    left: 10,
-    right: 10,
-    alignItems: 'center',
-  },
-  blur: {
-    width: '100%',
-    maxWidth: 500,
-    borderRadius: 30,
-    overflow: 'hidden',
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.6)',
-    boxShadow: '0px 8px 32px rgba(0, 0, 0, 0.2), 0px 4px 16px rgba(0, 0, 0, 0.15)',
-    elevation: 20,
-  },
-  row: {
-    flexDirection: 'row',
-    paddingHorizontal: 6,
-    paddingVertical: 10,
-    alignItems: 'center',
-    justifyContent: 'space-around',
-  },
-  tabBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
-    paddingHorizontal: 2,
-  },
-  label: {
-    fontSize: 11,
-    fontWeight: '700',
-    marginTop: 3,
-    textAlign: 'center',
-  },
-});
 
 export default function GameHubScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
-  const { organizationId } = useOrganization();
-  const { open: openMiniProfile } = useMiniProfile();
   const { hasPremium } = useSubscription();
-  const [topLeaders, setTopLeaders] = useState<LeaderboardEntry[]>([]);
-  const [loadingLeaders, setLoadingLeaders] = useState(true);
+  const { open: openMiniProfile } = useMiniProfile();
+  const { unreadCount: unreadLeaderboardCount } = useUnreadLeaderboardPasses();
+
+  const [topLeaders, setTopLeaders] = useState<LeaderEntry[] | null>(null);
+  const [summary, setSummary] = useState<MySummary | null>(null);
+  const [expanded, setExpanded] = useState<GameKey | null>(null);
+  const [boards, setBoards] = useState<Partial<Record<GameKey, GameBoardRow[]>>>({});
 
   useFocusEffect(
     useCallback(() => {
-      const fetchTopLeaders = async () => {
-        if (!user?.id) { setLoadingLeaders(false); return; }
-        setLoadingLeaders(true);
-        try {
-          const { data, error } = await supabase.rpc('get_master_leaderboard_overall_actor', {
-            p_limit: 3,
-            p_actor_id: user.id,
-          });
-          if (!error && data) {
-            setTopLeaders(data);
-          }
-        } catch (err) {
-          console.error('Error fetching top leaders:', err);
-        }
-        setLoadingLeaders(false);
+      if (!user?.id) return;
+      let cancelled = false;
+      (async () => {
+        const [leadersRes, summaryRes] = await Promise.all([
+          supabase.rpc('get_master_leaderboard_overall_actor', { p_actor_id: user.id, p_limit: 3 }),
+          supabase.rpc('get_my_game_summary', { p_actor_id: user.id }),
+        ]);
+        if (cancelled) return;
+        // On error KEEP the previous values — a transient failure must not
+        // paint an authoritative "no scores yet" over a board that has scores.
+        if (!leadersRes.error && leadersRes.data) setTopLeaders(leadersRes.data);
+        const row = Array.isArray(summaryRes.data) ? summaryRes.data[0] : summaryRes.data;
+        if (!summaryRes.error && row) setSummary(row as MySummary);
+        // Scores change while we're away — drop cached boards so an open tile refetches.
+        setBoards({});
+      })();
+      return () => {
+        cancelled = true;
       };
-      fetchTopLeaders();
     }, [user?.id])
   );
 
+  // Lazy board fetch for the expanded tile (top-3 of that game's master board).
+  useEffect(() => {
+    if (!expanded || !user?.id || boards[expanded]) return;
+    const game = GAMES.find((g) => g.key === expanded)!;
+    let cancelled = false;
+    (async () => {
+      // null = fetch failed: keep whatever the cache holds (spinner if nothing)
+      // rather than rendering a false empty board.
+      const rows = await fetchMasterTop(user.id, game.boardRpc);
+      if (cancelled || !rows) return;
+      setBoards((prev) => ({ ...prev, [expanded]: rows }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, user?.id, boards]);
+
+  const handleTilePress = (game: GameDef) => {
+    const isLocked = game.isPremium && !hasPremium;
+    if (isLocked) {
+      if (!isManagerOrOwner(user)) {
+        // Employees can't purchase — no upsell, just a friendly nudge.
+        Alert.alert(
+          t('common:feature_locked_title'),
+          `${t('common:feature_locked_desc')}\n\n${t('game_hub_ui:locked_joke')}`,
+          [{ text: t('common:ok') }]
+        );
+        return;
+      }
+      // Locked + manager/owner falls through: the game screen itself shows
+      // the sales-copy gate — a better pitch than an alert.
+      router.push(game.route as any);
+      return;
+    }
+    setExpanded((prev) => (prev === game.key ? null : game.key));
+  };
+
+  const myGameLine = (game: GameDef): string => {
+    if (!summary) return '…';
+    // MySummary field names are exactly `${game.key}_score` / `${game.key}_games`.
+    const score = summary[`${game.key}_score` as keyof MySummary] as number;
+    const games = summary[`${game.key}_games` as keyof MySummary] as number;
+    return formatPlayedLine(t, score, games);
+  };
+
+  const expandedGame = expanded ? GAMES.find((g) => g.key === expanded) : null;
+
+  // Podium column order: 2nd · 1st · 3rd (missing places just don't render).
+  const podium = topLeaders
+    ? [
+        { leader: topLeaders[1], place: 1 },
+        { leader: topLeaders[0], place: 0 },
+        { leader: topLeaders[2], place: 2 },
+      ].filter((p): p is { leader: LeaderEntry; place: number } => !!p.leader)
+    : [];
+
+  const navMenu = isManagerOrOwner(user) ? (
+    <HeaderNavMenu
+      label={t('game_hub_ui:menu_pill')}
+      iconIos="gearshape.fill"
+      iconAndroid="settings"
+      sheetTitle={t('game_hub_ui:title')}
+      actions={[
+        {
+          key: 'editor',
+          label: t('game_hub_ui:menu_editor'),
+          iosIcon: 'pencil',
+          androidIcon: 'edit',
+          onPress: () => router.replace('/game-hub-editor'),
+        },
+        {
+          key: 'rewards',
+          label: t('game_hub_ui:menu_rewards'),
+          iosIcon: 'star.fill',
+          androidIcon: 'star',
+          onPress: () => router.push('/rewards-and-reviews-editor'),
+        },
+        {
+          key: 'reset',
+          label: t('game_hub_ui:menu_reset'),
+          iosIcon: 'arrow.counterclockwise',
+          androidIcon: 'refresh',
+          onPress: () => router.replace('/game-hub-editor?tab=boards'),
+        },
+      ]}
+    />
+  ) : undefined;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="chevron-left"
-            size={22}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text, flexShrink: 1 }]} numberOfLines={1}>{t('game_hub_ui:title')}</Text>
-        {isManagerOrOwner(user) ? (
-          <HeaderNavButton label={t('common:to_editor')} iconIos="pencil" iconAndroid="edit" onPress={() => router.replace('/game-hub-editor')} />
-        ) : (
-          <View style={{ width: 40 }} />
-        )}
-      </View>
+      <AmbientGlow />
+      <ScreenHeader
+        title={t('game_hub_ui:title')}
+        eyebrow={t('game_hub_ui:eyebrow')}
+        right={navMenu}
+        rightWide={!!navMenu}
+      />
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: 120 }]}>
-        <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-          {t('game_hub_ui:subtitle')}
-        </Text>
-
-        {GAME_CARDS.map((card) => {
-          const isLocked = card.isPremium && !hasPremium;
-          return (
-            <TouchableOpacity
-              key={card.route}
-              style={[styles.card, { backgroundColor: colors.card }, isLocked && { opacity: 0.7 }]}
-              onPress={() => {
-                if (isLocked && !isManagerOrOwner(user)) {
-                  // Employees can't purchase — no upsell, just a friendly nudge.
-                  Alert.alert(
-                    t('common:feature_locked_title'),
-                    `${t('common:feature_locked_desc')}\n\n${t('game_hub_ui:locked_joke')}`,
-                    [{ text: t('common:ok') }]
-                  );
-                  return;
-                }
-                // Locked + manager/owner falls through: the game screen itself
-                // shows the sales-copy gate — a better pitch than an alert.
-                router.push(card.route as any);
-              }}
-              activeOpacity={0.75}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: card.color + '18' }]}>
-                <IconSymbol
-                  ios_icon_name={card.iosIcon as any}
-                  android_material_icon_name={card.androidIcon as any}
-                  size={30}
-                  color={card.color}
-                />
-              </View>
-              <View style={styles.cardText}>
-                <Text style={[styles.cardTitle, { color: colors.text }]}>{t(card.titleKey)}</Text>
-                <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{t(card.descKey)}</Text>
-              </View>
-              {isLocked ? (
-                <IconSymbol
-                  ios_icon_name="lock.fill"
-                  android_material_icon_name="lock"
-                  size={16}
-                  color={colors.textSecondary}
-                />
-              ) : (
-                <IconSymbol
-                  ios_icon_name="chevron.right"
-                  android_material_icon_name="chevron-right"
-                  size={18}
-                  color={colors.textSecondary}
-                />
-              )}
-            </TouchableOpacity>
-          );
-        })}
-
-        {/* Leaderboard Card with Top 3 Preview */}
-        <View style={[styles.leaderboardCard, { backgroundColor: colors.card }]}>
-          <View style={styles.leaderboardHeader}>
-            <View style={[styles.iconContainer, { backgroundColor: '#F59E0B18' }]}>
-              <Text style={styles.trophyIcon}>🏆</Text>
-            </View>
-            <View style={styles.cardText}>
-              <Text style={[styles.cardTitle, { color: colors.text }]}>{t('game_hub_ui:leaderboard_title')}</Text>
-              <Text style={[styles.cardDesc, { color: colors.textSecondary }]}>{t('game_hub_ui:leaderboard_subtitle')}</Text>
-            </View>
-          </View>
-
-          {/* Top 3 Preview */}
-          {loadingLeaders ? (
-            <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
-          ) : topLeaders.length > 0 ? (
-            <View style={styles.top3Container}>
-              {topLeaders.map((leader, index) => (
-                <TouchableOpacity
-                  key={leader.user_id}
-                  style={[styles.leaderRow, { borderTopColor: colors.border }]}
-                  onPress={() => openMiniProfile(leader.user_id)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.rankMedal}>{RANK_MEDALS[index]}</Text>
-                  {leader.profile_picture_url ? (
-                    <StorageImage source={{ uri: leader.profile_picture_url }} style={styles.leaderAvatar} />
-                  ) : (
-                    <View style={[styles.leaderAvatarPlaceholder, { backgroundColor: colors.primary + '20' }]}>
-                      <Text style={[styles.leaderInitial, { color: colors.primary }]}>
-                        {leader.name.charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-                  )}
-                  <Text style={[styles.leaderName, { color: colors.text }]} numberOfLines={1}>
-                    {leader.name}
-                  </Text>
-                  <Text style={[styles.leaderScore, { color: colors.primary }]}>
-                    {leader.total_score.toLocaleString()}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Player card — you: photo · name · rank · total */}
+        <View style={[styles.playerCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+          {user?.profilePictureUrl ? (
+            <StorageImage source={{ uri: user.profilePictureUrl }} style={styles.playerAvatar} />
           ) : (
-            <Text style={[styles.noScoresText, { color: colors.textSecondary }]}>
+            <View style={[styles.playerAvatarPlaceholder, { backgroundColor: colors.tint + '2E' }]}>
+              <Text style={[styles.playerInitial, { color: colors.tint }]}>
+                {(user?.name || '?').charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <View style={styles.playerWho}>
+            <Text style={[styles.playerName, { color: colors.text }]} numberOfLines={1}>
+              {user?.name}
+            </Text>
+            <Text style={[styles.playerRank, { color: colors.textSecondary }]} numberOfLines={1}>
+              {summary
+                ? summary.overall_rank
+                  ? t('game_hub_ui:rank_line', {
+                      rank: summary.overall_rank,
+                      total: summary.players_total,
+                    })
+                  : t('game_hub_ui:rank_none')
+                : '…'}
+            </Text>
+          </View>
+          <View style={styles.playerTotals}>
+            <Text style={[styles.playerTotal, { color: colors.tint }]}>
+              {summary ? Number(summary.total_score).toLocaleString() : '—'}
+            </Text>
+            <Text style={[styles.playerTotalLabel, { color: colors.textSecondary }]}>
+              {t('game_hub_ui:total_label')}
+            </Text>
+          </View>
+        </View>
+
+        {/* Games shelf */}
+        <SectionLabel label={t('game_hub_ui:games_label')} count={GAMES.length} />
+        <View style={styles.shelf}>
+          {GAMES.map((game) => (
+            <GameSquareTile
+              key={game.key}
+              label={t(game.titleKey)}
+              iosIcon={game.iosIcon}
+              androidIcon={game.androidIcon}
+              gradient={game.gradient}
+              selected={expanded === game.key}
+              locked={game.isPremium && !hasPremium}
+              onPress={() => handleTilePress(game)}
+            />
+          ))}
+        </View>
+
+        {expandedGame && (
+          <GameBoardCard
+            accent={expandedGame.accent}
+            iosIcon={expandedGame.iosIcon}
+            androidIcon={expandedGame.androidIcon}
+            title={t(expandedGame.titleKey)}
+            desc={t(expandedGame.descKey)}
+            rows={boards[expandedGame.key] ?? null}
+            emptyText={t('game_hub_ui:no_scores')}
+            youLabel={t('game_hub_ui:your_score')}
+            youValue={myGameLine(expandedGame)}
+            playLabel={t('game_hub_ui:play')}
+            onPlay={() => router.push(expandedGame.route as any)}
+            onRowPress={openMiniProfile}
+          />
+        )}
+
+        {/* Podium — the overall board closes the page */}
+        <SectionLabel label={t('game_hub_ui:leaderboard_title')} />
+        {topLeaders && topLeaders.length === 0 ? (
+          <View style={[styles.emptyBoard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+            <Text style={styles.emptyBoardEmoji}>🏆</Text>
+            <Text style={[styles.emptyBoardText, { color: colors.textSecondary }]}>
               {t('game_hub_ui:no_scores')}
             </Text>
-          )}
+          </View>
+        ) : (
+          <View style={styles.podium}>
+            {podium.map(({ leader, place }) => (
+              <TouchableOpacity
+                key={leader.user_id}
+                style={styles.podiumCol}
+                onPress={() => openMiniProfile(leader.user_id)}
+                activeOpacity={0.75}
+              >
+                {leader.profile_picture_url ? (
+                  <StorageImage
+                    source={{ uri: leader.profile_picture_url }}
+                    style={[styles.podiumAvatar, { borderColor: colors.glassBorder }]}
+                  />
+                ) : (
+                  <View
+                    style={[
+                      styles.podiumAvatar,
+                      styles.podiumAvatarPlaceholder,
+                      { backgroundColor: colors.tint + '2E', borderColor: colors.glassBorder },
+                    ]}
+                  >
+                    <Text style={[styles.podiumInitial, { color: colors.tint }]}>
+                      {(leader.name || '?').charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <Text style={[styles.podiumName, { color: colors.text }]} numberOfLines={1}>
+                  {(leader.name || '').split(' ')[0]}
+                </Text>
+                <Text style={[styles.podiumScore, { color: colors.tint }]}>
+                  {leader.total_score.toLocaleString()}
+                </Text>
+                <View
+                  style={[
+                    styles.podiumBlock,
+                    { backgroundColor: colors.glass, borderColor: colors.glassBorder },
+                    place === 0 ? styles.blockFirst : place === 1 ? styles.blockSecond : styles.blockThird,
+                  ]}
+                >
+                  <Text style={styles.podiumMedal}>{RANK_MEDALS[place]}</Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
 
-          {/* View Full Leaderboard Button */}
-          <TouchableOpacity
-            style={[styles.viewAllBtn, { backgroundColor: '#F59E0B15' }]}
-            onPress={() => router.push('/master-leaderboard')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.viewAllText, { color: '#F59E0B' }]}>{t('game_hub_ui:view_full_leaderboard')}</Text>
-            {unreadLeaderboardCount > 0 && (
-              <View style={{ marginLeft: 4 }}>
-                <MessageBadge count={unreadLeaderboardCount} size="small" />
-              </View>
-            )}
-            <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color="#F59E0B" />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity
+          style={styles.viewAllBtn}
+          onPress={() => router.push('/master-leaderboard')}
+          activeOpacity={0.75}
+        >
+          <Text style={styles.viewAllText}>{t('game_hub_ui:view_full_leaderboard')}</Text>
+          {unreadLeaderboardCount > 0 && (
+            <View style={{ marginLeft: 2 }}>
+              <MessageBadge count={unreadLeaderboardCount} size="small" />
+            </View>
+          )}
+          <IconSymbol
+            ios_icon_name="chevron.right"
+            android_material_icon_name="chevron-right"
+            size={15}
+            color="#F59E0B"
+          />
+        </TouchableOpacity>
       </ScrollView>
 
-      <GameHubBottomNav />
+      <BottomNavBar activeTab="tools" />
+      <JoltOverlay role={isManagerOrOwner(user) ? 'manager' : 'employee'} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  content: {
     paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 14,
-    borderBottomWidth: 1,
+    paddingTop: 4,
+    paddingBottom: 140,
   },
-  backBtn: { width: 40 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
-  content: { padding: 16, gap: 14, paddingBottom: 40 },
-  subtitle: { fontSize: 14, lineHeight: 20 },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    padding: 16,
-    gap: 14,
-    boxShadow: '0px 2px 10px rgba(0,0,0,0.12)',
-    elevation: 3,
-  },
-  iconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardText: { flex: 1 },
-  cardTitle: { fontSize: 15, fontWeight: '700', marginBottom: 4 },
-  cardDesc: { fontSize: 12, lineHeight: 17 },
-  trophyIcon: { fontSize: 28 },
 
-  // Leaderboard card
-  leaderboardCard: {
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 6,
-    boxShadow: '0px 2px 10px rgba(0,0,0,0.12)',
-    elevation: 3,
-  },
-  leaderboardHeader: {
+  // Player card
+  playerCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 14,
-  },
-  top3Container: {
-    marginTop: 12,
-  },
-  leaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    gap: 10,
-  },
-  rankMedal: { fontSize: 20, width: 28, textAlign: 'center' },
-  leaderAvatar: { width: 36, height: 36, borderRadius: 18 },
-  leaderAvatarPlaceholder: {
-    width: 36,
-    height: 36,
+    gap: 12,
     borderRadius: 18,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+  },
+  playerAvatar: { width: 52, height: 52, borderRadius: 26 },
+  playerAvatarPlaceholder: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  leaderInitial: { fontSize: 16, fontWeight: 'bold' },
-  leaderName: { flex: 1, fontSize: 14, fontWeight: '600' },
-  leaderScore: { fontSize: 15, fontWeight: '800' },
-  noScoresText: {
-    textAlign: 'center',
-    fontSize: 13,
-    fontStyle: 'italic',
-    marginVertical: 12,
+  playerInitial: { fontSize: 20, fontFamily: fonts.display.bold },
+  playerWho: { flex: 1, minWidth: 0 },
+  playerName: { fontFamily: fonts.display.bold, fontSize: 17 },
+  playerRank: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 9.5,
+    letterSpacing: 0.8,
+    textTransform: 'uppercase',
+    marginTop: 3,
   },
+  playerTotals: { alignItems: 'flex-end' },
+  playerTotal: { fontFamily: fonts.mono.semibold, fontSize: 21 },
+  playerTotalLabel: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 8.5,
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    marginTop: 2,
+  },
+
+  // Section labels
+  zlabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 16,
+    marginBottom: 10,
+    paddingHorizontal: 2,
+  },
+  zlabelText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10.5,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
+  },
+  zlabelLine: { flex: 1, height: StyleSheet.hairlineWidth },
+
+  // Shelf
+  shelf: { flexDirection: 'row', gap: 9 },
+
+  // Podium
+  podium: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 6,
+    marginBottom: 10,
+  },
+  podiumCol: { flex: 1, maxWidth: 112, alignItems: 'center', gap: 5 },
+  podiumAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+  },
+  podiumAvatarPlaceholder: { alignItems: 'center', justifyContent: 'center' },
+  podiumInitial: { fontSize: 16, fontFamily: fonts.display.bold },
+  podiumName: { fontFamily: fonts.body.semibold, fontSize: 11.5, maxWidth: '100%' },
+  podiumScore: { fontFamily: fonts.mono.semibold, fontSize: 12 },
+  podiumBlock: {
+    width: '100%',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+    borderBottomLeftRadius: 6,
+    borderBottomRightRadius: 6,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    alignItems: 'center',
+    paddingTop: 6,
+  },
+  blockFirst: { height: 84 },
+  blockSecond: { height: 60 },
+  blockThird: { height: 46 },
+  podiumMedal: { fontSize: 15 },
+
+  // Empty board
+  emptyBoard: {
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    alignItems: 'center',
+    paddingVertical: 22,
+    gap: 6,
+    marginBottom: 10,
+  },
+  emptyBoardEmoji: { fontSize: 32 },
+  emptyBoardText: { fontSize: 13, fontStyle: 'italic' },
+
+  // View full leaderboard — the trophy amber reads on both themes (same
+  // literal the old hub used).
   viewAllBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 10,
-    paddingVertical: 10,
-    marginTop: 10,
     gap: 6,
+    borderRadius: 12,
+    paddingVertical: 11,
+    backgroundColor: 'rgba(245,158,11,0.14)',
   },
-  viewAllText: { fontSize: 14, fontWeight: '700' },
+  viewAllText: {
+    color: '#F59E0B',
+    fontFamily: fonts.body.semibold,
+    fontSize: 13.5,
+  },
 });

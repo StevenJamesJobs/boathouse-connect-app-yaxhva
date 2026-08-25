@@ -1,56 +1,61 @@
 /**
- * Picture This! Hub
- * Category cards → difficulty picker → play mode picker → gameplay.
- * Pattern source: word-search-game.tsx.
+ * Picture This! — s75 Arcade Shelf category page.
+ * Category tiles expand into that category's top-3 board (accumulated score,
+ * matching the game's board semantics) + your score + Play; Play runs the
+ * difficulty → play-mode GlassSheet steps. Libations/Wine honor the org's
+ * category switches, and Wine additionally follows the menu's Wine visibility.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
+import { useThemeColors } from '@/hooks/useThemeColors';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { isManagerOrOwner } from '@/utils/roles';
-import PremiumGate from '@/components/PremiumGate';
-import AmbientGlow from '@/components/AmbientGlow';
-import ScreenHeader from '@/components/ScreenHeader';
-import { useOrganization } from '@/contexts/OrganizationContext';
+import { supabase } from '@/app/integrations/supabase/client';
 import { fetchOwnWineVisible } from '@/utils/game/wineVisibility';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  Pressable,
-} from 'react-native';
-import { useThemeColors } from '@/hooks/useThemeColors';
-import { IconSymbol } from '@/components/IconSymbol';
-import { useRouter } from 'expo-router';
-import { useTranslation } from 'react-i18next';
-import BottomNavBar from '@/components/BottomNavBar';
 import {
   PictureThisCategory,
   PictureThisDifficulty,
   PictureThisPlayMode,
 } from '@/utils/game/pictureThisGenerator';
-
-type PickerStep = 'difficulty' | 'playmode';
+import PremiumGate from '@/components/PremiumGate';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import BottomNavBar from '@/components/BottomNavBar';
+import JoltOverlay from '@/components/JoltOverlay';
+import GameSquareTile from '@/components/game/GameSquareTile';
+import GameBoardCard, { GameBoardRow } from '@/components/game/GameBoardCard';
+import GamePickerSheet from '@/components/game/GamePickerSheet';
+import { CATEGORY_VISUALS } from '@/components/game/gameVisuals';
+import { fetchCategoryBoard } from '@/utils/game/boards';
+import { formatPlayedLine } from '@/utils/game/scoreLine';
+import { useMiniProfile } from '@/contexts/MiniProfileContext';
+import { fonts } from '@/constants/fonts';
 
 interface CategoryInfo {
   key: PictureThisCategory;
   labelKey: string;
   descKey: string;
   icon: { ios: string; android: string };
-  color: string;
+  accent: string;
+  gradient: readonly [string, string];
   difficulties: PictureThisDifficulty[];
 }
 
+// Categories carry the shared cross-game color language (gameVisuals.ts).
 const CATEGORIES: CategoryInfo[] = [
   {
     key: 'food',
     labelKey: 'picture_this:cat_food',
     descKey: 'picture_this:cat_food_desc',
     icon: { ios: 'fork.knife', android: 'restaurant' },
-    color: '#EF4444',
+    accent: CATEGORY_VISUALS.food.accent,
+    gradient: CATEGORY_VISUALS.food.gradient,
     difficulties: ['easy', 'medium', 'hard'],
   },
   {
@@ -58,7 +63,8 @@ const CATEGORIES: CategoryInfo[] = [
     labelKey: 'picture_this:cat_libations',
     descKey: 'picture_this:cat_libations_desc',
     icon: { ios: 'wineglass.fill', android: 'local-bar' },
-    color: '#8B5CF6',
+    accent: CATEGORY_VISUALS.libations.accent,
+    gradient: CATEGORY_VISUALS.libations.gradient,
     difficulties: ['easy', 'medium', 'hard'],
   },
   {
@@ -66,7 +72,8 @@ const CATEGORIES: CategoryInfo[] = [
     labelKey: 'picture_this:cat_wine',
     descKey: 'picture_this:cat_wine_desc',
     icon: { ios: 'wineglass', android: 'wine-bar' },
-    color: '#A21CAF',
+    accent: CATEGORY_VISUALS.wine.accent,
+    gradient: CATEGORY_VISUALS.wine.gradient,
     difficulties: ['medium', 'hard'],
   },
   {
@@ -74,7 +81,8 @@ const CATEGORIES: CategoryInfo[] = [
     labelKey: 'picture_this:cat_menu_prices',
     descKey: 'picture_this:cat_menu_prices_desc',
     icon: { ios: 'dollarsign.circle.fill', android: 'attach-money' },
-    color: '#0891B2',
+    accent: CATEGORY_VISUALS.menu_prices.accent,
+    gradient: CATEGORY_VISUALS.menu_prices.gradient,
     difficulties: ['only'],
   },
 ];
@@ -98,69 +106,131 @@ const PLAY_MODES: { value: PictureThisPlayMode; labelKey: string; descKey: strin
   { value: 'timed', labelKey: 'picture_this:mode_timed', descKey: 'picture_this:mode_timed_desc' },
 ];
 
+interface MyCategoryLine {
+  score: number;
+  games_played: number;
+}
+
 export default function PictureThisGameScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { t } = useTranslation();
   const { user } = useAuth();
   const { hasPremium } = useSubscription();
-  const { organization } = useOrganization();
+  const { organization, isLoading: orgLoading } = useOrganization();
+  const { open: openMiniProfile } = useMiniProfile();
   const perMenu = organization?.menu_category_scope === 'per_menu';
 
-  // Wine tile only shows when the org's Wine category is visible on the menu.
-  // null = still checking: keep the tile hidden until resolved (no
-  // flash-then-vanish on wine-hidden orgs).
+  // Wine tile shows only when the org's Wine category is visible on the menu
+  // AND the editor's category switch is on. null = still checking: keep the
+  // tile hidden until resolved (no flash-then-vanish on wine-hidden orgs).
   const [wineVisible, setWineVisible] = useState<boolean | null>(null);
   useEffect(() => {
     let cancelled = false;
-    fetchOwnWineVisible(user?.id, perMenu).then((v) => { if (!cancelled) setWineVisible(v); });
-    return () => { cancelled = true; };
+    fetchOwnWineVisible(user?.id, perMenu).then((v) => {
+      if (!cancelled) setWineVisible(v);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [user?.id, perMenu]);
-  const visibleCategories = wineVisible === true ? CATEGORIES : CATEGORIES.filter((c) => c.key !== 'wine');
 
-  const [selectedCategory, setSelectedCategory] = useState<CategoryInfo | null>(null);
-  const [pickerStep, setPickerStep] = useState<PickerStep>('difficulty');
+  // Conditional categories wait for the real org row (no flash of a
+  // switched-off tile on cold start); errors fail open via the context default.
+  const visibleCategories = CATEGORIES.filter((c) => {
+    if (c.key === 'wine')
+      return !orgLoading && organization.games_show_pt_wine && wineVisible === true;
+    if (c.key === 'libations') return !orgLoading && organization.games_show_pt_libations;
+    return true;
+  });
+
+  const [expanded, setExpanded] = useState<PictureThisCategory | null>(null);
+  const [boards, setBoards] = useState<Partial<Record<PictureThisCategory, GameBoardRow[]>>>({});
+  const [myStats, setMyStats] = useState<Record<string, MyCategoryLine>>({});
+
+  const [pickerCategory, setPickerCategory] = useState<CategoryInfo | null>(null);
+  const [pickerStep, setPickerStep] = useState<'difficulty' | 'playmode'>('difficulty');
   const [selectedDifficulty, setSelectedDifficulty] = useState<PictureThisDifficulty>('easy');
-  const [showPicker, setShowPicker] = useState(false);
+
+  // If a switch (or wine visibility) hides the expanded category, close the
+  // orphaned board card too.
+  const visibleKey = visibleCategories.map((c) => c.key).join(',');
+  useEffect(() => {
+    if (expanded && !visibleCategories.some((c) => c.key === expanded)) setExpanded(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleKey, expanded]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!user?.id) return;
+      let cancelled = false;
+      (async () => {
+        const { data } = await supabase.rpc('get_my_game_category_stats', {
+          p_actor_id: user.id,
+          p_game: 'picture_this',
+        });
+        if (cancelled) return;
+        const byCat: Record<string, MyCategoryLine> = {};
+        for (const row of data || []) {
+          byCat[row.category] = { score: Number(row.score), games_played: Number(row.games_played) };
+        }
+        setMyStats(byCat);
+        setBoards({});
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [user?.id])
+  );
+
+  // Lazy top-3 for the expanded category — accumulated score per player.
+  useEffect(() => {
+    if (!expanded || !user?.id || boards[expanded]) return;
+    let cancelled = false;
+    (async () => {
+      // null = fetch failed: keep the cache (spinner if nothing) rather than
+      // rendering a false empty board.
+      const rows = await fetchCategoryBoard(user.id, 'picture_this', expanded);
+      if (cancelled || !rows) return;
+      setBoards((prev) => ({ ...prev, [expanded]: rows }));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [expanded, user?.id, boards]);
 
   const openPicker = (cat: CategoryInfo) => {
-    setSelectedCategory(cat);
+    setPickerCategory(cat);
     setPickerStep('difficulty');
     setSelectedDifficulty(cat.difficulties[0]);
-    setShowPicker(true);
   };
 
-  const handleDifficultySelect = (difficulty: PictureThisDifficulty) => {
-    setSelectedDifficulty(difficulty);
-    setPickerStep('playmode');
-  };
-
-  const handlePlayModeSelect = (playMode: PictureThisPlayMode) => {
-    setShowPicker(false);
-    if (!selectedCategory) return;
+  const handleFinalPick = (playMode: string) => {
+    const cat = pickerCategory;
+    setPickerCategory(null);
+    if (!cat) return;
     router.push({
       pathname: '/picture-this-play',
-      params: {
-        category: selectedCategory.key,
-        difficulty: selectedDifficulty,
-        playMode,
-      },
+      params: { category: cat.key, difficulty: selectedDifficulty, playMode },
     });
   };
 
   const renderDifficultyDesc = (difficulty: PictureThisDifficulty): string => {
-    if (selectedCategory) {
-      const overrideKey = DIFFICULTY_DESC_OVERRIDE[selectedCategory.key]?.[difficulty];
+    if (pickerCategory) {
+      const overrideKey = DIFFICULTY_DESC_OVERRIDE[pickerCategory.key]?.[difficulty];
       if (overrideKey) return t(overrideKey);
     }
     return t(DIFFICULTY_INFO[difficulty].descKey);
   };
 
+  const youLine = (catKey: PictureThisCategory): string =>
+    formatPlayedLine(t, myStats[catKey]?.score, myStats[catKey]?.games_played);
+
   if (!hasPremium) {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <AmbientGlow />
-        <ScreenHeader title={t('picture_this:hub_title')} />
+        <ScreenHeader title={t('picture_this:hub_title')} eyebrow={t('game_hub_ui:title')} />
         {isManagerOrOwner(user) ? (
           <PremiumGate
             desc={t('game_hub_ui:premium_intro')}
@@ -180,15 +250,18 @@ export default function PictureThisGameScreen() {
     );
   }
 
+  const expandedInfo = expanded ? CATEGORIES.find((c) => c.key === expanded) : null;
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AmbientGlow />
-      <ScreenHeader title={t('picture_this:hub_title')} />
+      <ScreenHeader title={t('picture_this:hub_title')} eyebrow={t('game_hub_ui:title')} />
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={[styles.introCard, { backgroundColor: '#EC489915', borderColor: '#EC489940' }]}>
-          <Text style={[styles.introTitle, { color: '#EC4899' }]}>{t('picture_this:intro_title')}</Text>
-          <Text style={[styles.introDesc, { color: colors.textSecondary }]}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Intro */}
+        <View style={[styles.introCard, { backgroundColor: colors.surface, borderColor: colors.surfaceBorder }]}>
+          <Text style={[styles.introTitle, { color: colors.text }]}>{t('picture_this:intro_title')}</Text>
+          <Text style={[styles.introText, { color: colors.textSecondary }]}>
             {t('picture_this:intro_desc')}
           </Text>
           <Text style={[styles.introTip, { color: colors.textSecondary }]}>
@@ -196,178 +269,140 @@ export default function PictureThisGameScreen() {
           </Text>
         </View>
 
-        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>{t('picture_this:choose_category')}</Text>
-        {visibleCategories.map((cat) => (
-          <TouchableOpacity
-            key={cat.key}
-            style={[styles.categoryCard, { backgroundColor: colors.card }]}
-            onPress={() => openPicker(cat)}
-            activeOpacity={0.75}
-          >
-            <View style={[styles.categoryIcon, { backgroundColor: cat.color + '20' }]}>
-              <IconSymbol
-                ios_icon_name={cat.icon.ios as any}
-                android_material_icon_name={cat.icon.android as any}
-                size={28}
-                color={cat.color}
+        <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
+          {t('picture_this:choose_category')}
+        </Text>
+
+        <View style={styles.grid}>
+          {visibleCategories.map((cat) => (
+            <View key={cat.key} style={styles.gridCell}>
+              <GameSquareTile
+                label={t(cat.labelKey)}
+                iosIcon={cat.icon.ios}
+                androidIcon={cat.icon.android}
+                gradient={cat.gradient}
+                aspectRatio={1.45}
+                selected={expanded === cat.key}
+                onPress={() => setExpanded((prev) => (prev === cat.key ? null : cat.key))}
               />
             </View>
-            <View style={styles.categoryText}>
-              <Text style={[styles.categoryTitle, { color: colors.text }]}>{t(cat.labelKey)}</Text>
-              <Text style={[styles.categoryDesc, { color: colors.textSecondary }]}>{t(cat.descKey)}</Text>
-            </View>
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
-              size={18}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-        ))}
+          ))}
+        </View>
 
-        <TouchableOpacity
-          style={[styles.leaderboardBtn, { backgroundColor: colors.card, borderColor: colors.primary + '40' }]}
-          onPress={() => router.push('/picture-this-leaderboard')}
-          activeOpacity={0.75}
-        >
-          <IconSymbol ios_icon_name="trophy.fill" android_material_icon_name="emoji-events" size={22} color={colors.primary} />
-          <Text style={[styles.leaderboardBtnText, { color: colors.primary }]}>{t('picture_this:view_leaderboard')}</Text>
-          <IconSymbol ios_icon_name="chevron.right" android_material_icon_name="chevron-right" size={16} color={colors.primary} />
-        </TouchableOpacity>
+        {expandedInfo && (
+          <GameBoardCard
+            accent={expandedInfo.accent}
+            iosIcon={expandedInfo.icon.ios}
+            androidIcon={expandedInfo.icon.android}
+            title={t(expandedInfo.labelKey)}
+            desc={t(expandedInfo.descKey)}
+            rows={boards[expandedInfo.key] ?? null}
+            emptyText={t('picture_this:no_scores_yet')}
+            youLabel={t('game_hub_ui:your_score')}
+            youValue={youLine(expandedInfo.key)}
+            playLabel={t('game_hub_ui:play')}
+            onPlay={() => openPicker(expandedInfo)}
+            onRowPress={openMiniProfile}
+          />
+        )}
       </ScrollView>
 
-      <Modal visible={showPicker} transparent animationType="fade" onRequestClose={() => setShowPicker(false)}>
-        <Pressable style={styles.modalOverlay} onPress={() => setShowPicker(false)}>
-          <Pressable style={[styles.modalCard, { backgroundColor: colors.card }]} onPress={() => {}}>
-            {pickerStep === 'difficulty' ? (
-              <>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>{t('picture_this:choose_difficulty')}</Text>
-                <Text style={[styles.modalSub, { color: colors.textSecondary }]}>{selectedCategory ? t(selectedCategory.labelKey) : ''}</Text>
-                {selectedCategory?.difficulties.map((d) => {
-                  const info = DIFFICULTY_INFO[d];
-                  return (
-                    <TouchableOpacity
-                      key={d}
-                      style={[styles.optionBtn, { borderColor: info.color + '50', backgroundColor: info.color + '10' }]}
-                      onPress={() => handleDifficultySelect(d)}
-                      activeOpacity={0.75}
-                    >
-                      <Text style={[styles.optionLabel, { color: info.color }]}>{t(info.labelKey)}</Text>
-                      <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>
-                        {renderDifficultyDesc(d)}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </>
-            ) : (
-              <>
-                <Text style={[styles.modalTitle, { color: colors.text }]}>{t('picture_this:choose_play_mode')}</Text>
-                <Text style={[styles.modalSub, { color: colors.textSecondary }]}>
-                  {t(DIFFICULTY_INFO[selectedDifficulty].labelKey).replace(/^[^A-Za-zÀ-ÿ¿¡]+/, '')}
-                </Text>
-                {PLAY_MODES.map((pm) => (
-                  <TouchableOpacity
-                    key={pm.value}
-                    style={[styles.optionBtn, { borderColor: colors.primary + '50', backgroundColor: colors.primary + '10' }]}
-                    onPress={() => handlePlayModeSelect(pm.value)}
-                    activeOpacity={0.75}
-                  >
-                    <Text style={[styles.optionLabel, { color: colors.primary }]}>{t(pm.labelKey)}</Text>
-                    <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>{t(pm.descKey)}</Text>
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity onPress={() => setPickerStep('difficulty')} style={styles.backOption}>
-                  <Text style={[styles.backOptionText, { color: colors.textSecondary }]}>{t('picture_this:back_to_difficulty')}</Text>
-                </TouchableOpacity>
-              </>
-            )}
-            <TouchableOpacity onPress={() => setShowPicker(false)} style={styles.cancelBtn}>
-              <Text style={[styles.cancelText, { color: colors.textSecondary }]}>{t('picture_this:cancel')}</Text>
-            </TouchableOpacity>
-          </Pressable>
-        </Pressable>
-      </Modal>
-
       <BottomNavBar activeTab="tools" />
+      <JoltOverlay role={isManagerOrOwner(user) ? 'manager' : 'employee'} />
+
+      {/* Difficulty → play mode */}
+      <GamePickerSheet
+        visible={pickerCategory !== null}
+        onClose={() => setPickerCategory(null)}
+        title={
+          pickerStep === 'difficulty'
+            ? t('picture_this:choose_difficulty')
+            : t('picture_this:choose_play_mode')
+        }
+        subtitle={
+          pickerStep === 'difficulty'
+            ? pickerCategory
+              ? t(pickerCategory.labelKey)
+              : undefined
+            : // Difficulty labels carry a leading emoji — strip it for the quiet subtitle.
+              t(DIFFICULTY_INFO[selectedDifficulty].labelKey).replace(/^[^A-Za-zÀ-ÿ¿¡]+/, '')
+        }
+        dismissOnPick={pickerStep === 'playmode'}
+        options={
+          pickerStep === 'difficulty'
+            ? (pickerCategory?.difficulties ?? []).map((d) => ({
+                key: d,
+                label: t(DIFFICULTY_INFO[d].labelKey),
+                desc: renderDifficultyDesc(d),
+                color: DIFFICULTY_INFO[d].color,
+              }))
+            : PLAY_MODES.map((pm) => ({
+                key: pm.value,
+                label: t(pm.labelKey),
+                desc: t(pm.descKey),
+              }))
+        }
+        onPick={(key) => {
+          if (pickerStep === 'difficulty') {
+            setSelectedDifficulty(key as PictureThisDifficulty);
+            setPickerStep('playmode');
+          } else {
+            handleFinalPick(key);
+          }
+        }}
+        backLabel={pickerStep === 'playmode' ? t('picture_this:back_to_difficulty') : undefined}
+        onBack={pickerStep === 'playmode' ? () => setPickerStep('difficulty') : undefined}
+      />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { padding: 16, paddingBottom: 120 },
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 4,
+    paddingBottom: 140,
+  },
   introCard: {
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    marginBottom: 20,
-  },
-  introTitle: { fontSize: 16, fontWeight: '700', marginBottom: 6 },
-  introDesc: { fontSize: 13, lineHeight: 19 },
-  introTip: { fontSize: 12, lineHeight: 17, fontStyle: 'italic', marginTop: 6 },
-  sectionLabel: { fontSize: 12, fontWeight: '700', letterSpacing: 1, marginBottom: 10 },
-  categoryCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
     borderRadius: 14,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
     padding: 14,
+    marginBottom: 14,
+  },
+  introTitle: {
+    fontFamily: fonts.display.semibold,
+    fontSize: 14.5,
+    marginBottom: 4,
+  },
+  introText: {
+    fontFamily: fonts.body.regular,
+    fontSize: 12.5,
+    lineHeight: 18,
+  },
+  introTip: {
+    fontFamily: fonts.body.regular,
+    fontSize: 11.5,
+    lineHeight: 16,
+    fontStyle: 'italic',
+    marginTop: 6,
+  },
+  sectionLabel: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10.5,
+    letterSpacing: 1.4,
+    textTransform: 'uppercase',
     marginBottom: 10,
-    gap: 12,
-    boxShadow: '0px 2px 8px rgba(0,0,0,0.12)',
-    elevation: 3,
+    paddingHorizontal: 2,
   },
-  categoryIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  categoryText: { flex: 1 },
-  categoryTitle: { fontSize: 15, fontWeight: '700', marginBottom: 3 },
-  categoryDesc: { fontSize: 12, lineHeight: 16 },
-  leaderboardBtn: {
+  grid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    marginTop: 8,
-    borderWidth: 1.5,
-    gap: 8,
-    boxShadow: '0px 2px 8px rgba(0,0,0,0.08)',
-    elevation: 2,
+    flexWrap: 'wrap',
+    gap: 9,
   },
-  leaderboardBtnText: { fontSize: 15, fontWeight: '700', flex: 1, textAlign: 'center' },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
+  gridCell: {
+    flexBasis: '48%',
+    flexGrow: 1,
+    maxWidth: '49%',
   },
-  modalCard: {
-    width: '100%',
-    borderRadius: 20,
-    padding: 24,
-    gap: 12,
-    boxShadow: '0px 8px 24px rgba(0,0,0,0.2)',
-    elevation: 10,
-  },
-  modalTitle: { fontSize: 20, fontWeight: '700', textAlign: 'center' },
-  modalSub: { fontSize: 13, textAlign: 'center', marginBottom: 4 },
-  optionBtn: {
-    borderRadius: 12,
-    borderWidth: 1.5,
-    padding: 14,
-    gap: 4,
-  },
-  optionLabel: { fontSize: 16, fontWeight: '700' },
-  optionDesc: { fontSize: 12 },
-  backOption: { alignItems: 'center', paddingVertical: 4 },
-  backOptionText: { fontSize: 13 },
-  cancelBtn: { alignItems: 'center', paddingVertical: 6 },
-  cancelText: { fontSize: 14 },
 });

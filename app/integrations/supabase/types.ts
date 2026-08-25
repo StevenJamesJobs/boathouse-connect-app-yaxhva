@@ -3586,6 +3586,11 @@ export type Database = {
           allow_self_signup: boolean
           city: string
           default_password: string
+          games_show_cocktails: boolean
+          games_show_pt_libations: boolean
+          games_show_pt_wine: boolean
+          games_show_wine_pairings: boolean
+          games_show_ws_libations: boolean
           games_use_sample_data: boolean
           google_maps_query: string
           header_icon: string
@@ -4386,21 +4391,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      get_game_leaderboard: {
-        Args: {
-          p_game_mode: string
-          p_limit?: number
-          p_organization_id?: string
-          p_play_mode?: string
-        }
-        Returns: {
-          best_score: number
-          games_played: number
-          name: string
-          profile_picture_url: string
-          user_id: string
-        }[]
-      }
       get_master_leaderboard_memory: {
         Args: { p_limit?: number; p_organization_id?: string }
         Returns: {
@@ -4441,20 +4431,46 @@ export type Database = {
           user_id: string
         }[]
       }
-      get_game_leaderboard_actor: {
+      get_game_category_board: {
         Args: {
           p_actor_id: string
-          p_game_mode: string
+          p_game: string
+          p_category: string
           p_limit?: number
-          p_play_mode?: string
         }
         Returns: {
-          best_score: number
           games_played: number
           name: string
           profile_picture_url: string | null
+          score: number
           user_id: string
         }[]
+      }
+      get_my_game_category_stats: {
+        Args: { p_actor_id: string; p_game: string }
+        Returns: {
+          category: string
+          games_played: number
+          score: number
+        }[]
+      }
+      get_my_game_summary: {
+        Args: { p_actor_id: string }
+        Returns: {
+          memory_games: number
+          memory_score: number
+          overall_rank: number | null
+          picture_this_games: number
+          picture_this_score: number
+          players_total: number
+          total_score: number
+          word_search_games: number
+          word_search_score: number
+        }[]
+      }
+      set_org_game_category_flag: {
+        Args: { p_actor_id: string; p_flag: string; p_value: boolean }
+        Returns: Json
       }
       get_master_leaderboard_memory_actor: {
         Args: { p_actor_id: string; p_limit?: number }
@@ -4493,31 +4509,6 @@ export type Database = {
           name: string
           profile_picture_url: string | null
           total_score: number
-          user_id: string
-        }[]
-      }
-      get_picture_this_leaderboard_filtered_actor: {
-        Args: {
-          p_actor_id: string
-          p_category?: string
-          p_limit?: number
-          p_play_mode?: string
-        }
-        Returns: {
-          games_played: number
-          name: string
-          profile_picture_url: string | null
-          total_score: number
-          user_id: string
-        }[]
-      }
-      get_word_search_leaderboard_actor: {
-        Args: { p_actor_id: string; p_category: string; p_limit?: number }
-        Returns: {
-          best_score: number
-          games_played: number
-          name: string
-          profile_picture_url: string | null
           user_id: string
         }[]
       }
@@ -4565,21 +4556,6 @@ export type Database = {
         }
         Returns: {
           name: string
-          user_id: string
-        }[]
-      }
-      get_picture_this_leaderboard_filtered: {
-        Args: {
-          p_category?: string
-          p_limit?: number
-          p_organization_id?: string
-          p_play_mode?: string
-        }
-        Returns: {
-          games_played: number
-          name: string
-          profile_picture_url: string
-          total_score: number
           user_id: string
         }[]
       }
@@ -5385,20 +5361,6 @@ export type Database = {
       get_user_total_game_score: {
         Args: { p_organization_id?: string; p_user_id: string }
         Returns: number
-      }
-      get_word_search_leaderboard: {
-        Args: {
-          p_category: string
-          p_limit?: number
-          p_organization_id?: string
-        }
-        Returns: {
-          best_score: number
-          games_played: number
-          name: string
-          profile_picture_url: string
-          user_id: string
-        }[]
       }
       initialize_org_trial: {
         Args: { p_organization_id: string }
