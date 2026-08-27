@@ -7,8 +7,14 @@ import { fonts } from '@/constants/fonts';
 
 /**
  * The board card that expands under a selected GameSquareTile (s75 Arcade
- * Shelf): description → that category's top 3 → the viewer's own line → Play.
+ * Shelf, s76 H2 bottom row): description → that category's top 3 → then one
+ * split row: the viewer's own line as a stat block with Play beside it.
  * Purely presentational; the screen owns fetching and expansion state.
+ *
+ * Quick play (s76 Hub·A): pass `playSetupLine` to render the remembered setup
+ * as a mono sub-line under Play (the button then launches straight in) and
+ * `onChangeSetup` for the ⚙ chip that reopens the picker. Omit both for the
+ * first-run / plain state where Play itself opens the picker.
  */
 export interface GameBoardRow {
   user_id: string;
@@ -32,6 +38,10 @@ interface GameBoardCardProps {
   youValue: string;
   playLabel: string;
   onPlay: () => void;
+  /** Remembered setup, pre-formatted ("HARD · TIMED") — enables quick play. */
+  playSetupLine?: string;
+  /** Renders the ⚙ chip that reopens the picker sheet. */
+  onChangeSetup?: () => void;
   onRowPress?: (userId: string) => void;
 }
 
@@ -49,6 +59,8 @@ export default function GameBoardCard({
   youValue,
   playLabel,
   onPlay,
+  playSetupLine,
+  onChangeSetup,
   onRowPress,
 }: GameBoardCardProps) {
   const colors = useThemeColors();
@@ -105,19 +117,47 @@ export default function GameBoardCard({
         ))
       )}
 
-      <View style={[styles.youLine, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
-        <Text style={[styles.youLabel, { color: colors.textSecondary }]}>{youLabel}</Text>
-        <Text style={[styles.youValue, { color: colors.text }]}>{youValue}</Text>
-      </View>
+      {/* s76 H2 split row: stat block left, Play right (+ optional ⚙). */}
+      <View style={styles.splitRow}>
+        <View style={[styles.youMini, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+          <Text style={[styles.youLabel, { color: colors.textSecondary }]}>{youLabel}</Text>
+          <Text style={[styles.youValue, { color: colors.text }]} numberOfLines={1}>
+            {youValue}
+          </Text>
+        </View>
 
-      <TouchableOpacity
-        style={[styles.playBtn, { backgroundColor: accent }]}
-        onPress={onPlay}
-        activeOpacity={0.85}
-      >
-        <IconSymbol ios_icon_name="play.fill" android_material_icon_name="play-arrow" size={15} color="#FFFFFF" />
-        <Text style={styles.playText}>{playLabel}</Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.playBtn, { backgroundColor: accent }]}
+          onPress={onPlay}
+          activeOpacity={0.85}
+        >
+          <View style={styles.playMain}>
+            <IconSymbol ios_icon_name="play.fill" android_material_icon_name="play-arrow" size={14} color="#FFFFFF" />
+            <Text style={styles.playText}>{playLabel}</Text>
+          </View>
+          {!!playSetupLine && (
+            <Text style={styles.playSetup} numberOfLines={1}>
+              {playSetupLine}
+            </Text>
+          )}
+        </TouchableOpacity>
+
+        {!!onChangeSetup && (
+          <TouchableOpacity
+            style={[styles.gearChip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}
+            onPress={onChangeSetup}
+            activeOpacity={0.8}
+            hitSlop={6}
+          >
+            <IconSymbol
+              ios_icon_name="gearshape.fill"
+              android_material_icon_name="settings"
+              size={15}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }
@@ -178,40 +218,65 @@ const styles = StyleSheet.create({
   avatarInitial: { fontSize: 12, fontFamily: fonts.body.semibold },
   rowName: { flex: 1, fontSize: 13, fontFamily: fonts.body.semibold },
   rowScore: { fontFamily: fonts.mono.semibold, fontSize: 13.5 },
-  youLine: {
+  splitRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'stretch',
     gap: 8,
-    borderRadius: 11,
+    marginTop: 8,
+  },
+  youMini: {
+    flex: 1.15,
+    minWidth: 0,
+    borderRadius: 12,
     borderWidth: StyleSheet.hairlineWidth + 0.5,
     paddingHorizontal: 11,
-    paddingVertical: 9,
-    marginTop: 8,
-    marginBottom: 10,
+    paddingVertical: 8,
+    justifyContent: 'center',
+    gap: 2,
   },
   youLabel: {
     fontFamily: fonts.mono.semibold,
-    fontSize: 9,
-    letterSpacing: 1.2,
+    fontSize: 8.5,
+    letterSpacing: 1.1,
     textTransform: 'uppercase',
   },
   youValue: {
-    flex: 1,
-    textAlign: 'right',
     fontFamily: fonts.mono.semibold,
     fontSize: 13,
   },
   playBtn: {
-    flexDirection: 'row',
+    flex: 1.35,
+    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 2,
     borderRadius: 12,
-    paddingVertical: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 8,
+  },
+  playMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
   },
   playText: {
     color: '#FFFFFF',
     fontFamily: fonts.body.semibold,
-    fontSize: 14.5,
+    fontSize: 14,
+  },
+  playSetup: {
+    color: '#FFFFFF',
+    opacity: 0.85,
+    fontFamily: fonts.mono.semibold,
+    fontSize: 9.5,
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+  },
+  gearChip: {
+    width: 42,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -28,10 +28,12 @@ import BottomNavBar from '@/components/BottomNavBar';
 import JoltOverlay from '@/components/JoltOverlay';
 import GameSquareTile from '@/components/game/GameSquareTile';
 import GameBoardCard, { GameBoardRow } from '@/components/game/GameBoardCard';
+import GameHubHeaderAction from '@/components/game/GameHubHeaderAction';
 import GamePickerSheet from '@/components/game/GamePickerSheet';
 import { CATEGORY_VISUALS as SHARED_VISUALS } from '@/components/game/gameVisuals';
 import { fetchCategoryBoard } from '@/utils/game/boards';
 import { formatPlayedLine } from '@/utils/game/scoreLine';
+import { QuickSetup, loadQuickSetup, saveQuickSetup } from '@/utils/game/quickSetup';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { fonts } from '@/constants/fonts';
 
@@ -82,6 +84,8 @@ export default function WordSearchGameScreen() {
   const [pickerCategory, setPickerCategory] = useState<WordSearchCategory | null>(null);
   const [pickerStep, setPickerStep] = useState<'difficulty' | 'playmode'>('difficulty');
   const [selectedDifficulty, setSelectedDifficulty] = useState<WordSearchDifficulty>('easy');
+  // Remembered quick-play setup per category (device-local; Hub·A lockdown).
+  const [setups, setSetups] = useState<Record<string, QuickSetup>>({});
 
   // The Libations category waits for the real org row (no flash of a
   // switched-off tile on cold start); errors fail open via the context default.
@@ -114,6 +118,15 @@ export default function WordSearchGameScreen() {
         setMyStats(byCat);
         setBoards({});
       })();
+      // Remembered setups load in parallel (device-local, never blocks the boards).
+      (async () => {
+        const loaded: Record<string, QuickSetup> = {};
+        for (const cat of WORD_SEARCH_CATEGORIES) {
+          const s = await loadQuickSetup('word_search', cat);
+          if (s) loaded[cat] = s;
+        }
+        if (!cancelled) setSetups(loaded);
+      })();
       return () => {
         cancelled = true;
       };
@@ -139,17 +152,41 @@ export default function WordSearchGameScreen() {
   const openPicker = (category: WordSearchCategory) => {
     setPickerCategory(category);
     setPickerStep('difficulty');
-    setSelectedDifficulty('easy');
+    // The ⚙ path starts from the remembered difficulty, not a hard 'easy'.
+    setSelectedDifficulty((setups[category]?.difficulty as WordSearchDifficulty) ?? 'easy');
+  };
+
+  const launch = (category: WordSearchCategory, difficulty: WordSearchDifficulty, playMode: string) => {
+    router.push({
+      pathname: '/word-search-play',
+      params: { category, difficulty, playMode },
+    });
+  };
+
+  // Quick play: a remembered setup launches straight in; first run opens the sheet.
+  const handlePlay = (category: WordSearchCategory) => {
+    const s = setups[category];
+    if (s?.difficulty) {
+      launch(category, s.difficulty as WordSearchDifficulty, s.playMode);
+    } else {
+      openPicker(category);
+    }
   };
 
   const handleFinalPick = (playMode: string) => {
     const category = pickerCategory;
     setPickerCategory(null);
     if (!category) return;
-    router.push({
-      pathname: '/word-search-play',
-      params: { category, difficulty: selectedDifficulty, playMode },
-    });
+    const setup: QuickSetup = { difficulty: selectedDifficulty, playMode };
+    setSetups((prev) => ({ ...prev, [category]: setup }));
+    saveQuickSetup('word_search', category, setup);
+    launch(category, selectedDifficulty, playMode);
+  };
+
+  const setupLine = (category: WordSearchCategory): string | undefined => {
+    const s = setups[category];
+    if (!s?.difficulty) return undefined;
+    return `${t(`word_search:difficulty_${s.difficulty}`)} · ${t(`word_search:play_mode_${s.playMode}`)}`;
   };
 
   const youLine = (cat: WordSearchCategory): string =>
@@ -160,7 +197,12 @@ export default function WordSearchGameScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AmbientGlow />
-      <ScreenHeader title={t('word_search:hub_title')} eyebrow={t('game_hub_ui:title')} />
+      <ScreenHeader
+        title={t('word_search:hub_title')}
+        eyebrow={t('game_hub_ui:title')}
+        right={<GameHubHeaderAction context="gamePage" />}
+        rightWide
+      />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Intro */}
@@ -209,7 +251,9 @@ export default function WordSearchGameScreen() {
             youLabel={t('game_hub_ui:your_best')}
             youValue={youLine(expanded)}
             playLabel={t('game_hub_ui:play')}
-            onPlay={() => openPicker(expanded)}
+            onPlay={() => handlePlay(expanded)}
+            playSetupLine={setupLine(expanded)}
+            onChangeSetup={setupLine(expanded) ? () => openPicker(expanded) : undefined}
             onRowPress={openMiniProfile}
           />
         )}

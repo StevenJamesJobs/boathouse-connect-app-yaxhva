@@ -55,8 +55,10 @@ export function extractIngredientWords(
 ): Array<{ searchWord: string; displayLabel: string; itemName: string }> {
   if (!description?.trim()) return [];
 
+  // Periods double as separators in AI-scanned descriptions; the lookahead
+  // keeps decimals ("1.5 oz") intact while splitting sentence-style lists.
   const phrases = description
-    .split(/[,\n]+/)
+    .split(/[,\n]+|\.(?=\s|$)/)
     .map((s) => s.trim())
     .filter(Boolean);
 

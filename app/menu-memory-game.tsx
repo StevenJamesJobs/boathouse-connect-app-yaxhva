@@ -26,10 +26,12 @@ import BottomNavBar from '@/components/BottomNavBar';
 import JoltOverlay from '@/components/JoltOverlay';
 import GameSquareTile from '@/components/game/GameSquareTile';
 import GameBoardCard, { GameBoardRow } from '@/components/game/GameBoardCard';
+import GameHubHeaderAction from '@/components/game/GameHubHeaderAction';
 import GamePickerSheet from '@/components/game/GamePickerSheet';
 import { CATEGORY_VISUALS } from '@/components/game/gameVisuals';
 import { fetchCategoryBoard } from '@/utils/game/boards';
 import { formatPlayedLine } from '@/utils/game/scoreLine';
+import { QuickSetup, loadQuickSetup, saveQuickSetup } from '@/utils/game/quickSetup';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { fonts } from '@/constants/fonts';
 
@@ -60,6 +62,9 @@ export default function MenuMemoryGameScreen() {
   const [expanded, setExpanded] = useState<GameMode | null>(null);
   const [boards, setBoards] = useState<Partial<Record<GameMode, GameBoardRow[]>>>({});
   const [pickerMode, setPickerMode] = useState<GameMode | null>(null);
+  // Remembered quick-play setup per mode — play mode only; the difficulty
+  // continues from get_my_game_stats regardless (the s75 continuation rule).
+  const [setups, setSetups] = useState<Record<string, QuickSetup>>({});
 
   // Wine & Entree Pairings shows only when the org's Wine category is visible
   // AND the editor's category switch is on. null = still checking: render
@@ -129,6 +134,15 @@ export default function MenuMemoryGameScreen() {
         }
         setBoards({});
       })();
+      // Remembered setups load in parallel (device-local, never blocks the boards).
+      (async () => {
+        const loaded: Record<string, QuickSetup> = {};
+        for (const mode of ['wine_pairings', 'ingredients_dishes', 'cocktail_ingredients']) {
+          const s = await loadQuickSetup('memory', mode);
+          if (s) loaded[mode] = s;
+        }
+        if (!cancelled) setSetups(loaded);
+      })();
       return () => {
         cancelled = true;
       };
@@ -151,15 +165,34 @@ export default function MenuMemoryGameScreen() {
     };
   }, [expanded, user?.id, boards]);
 
-  const startGame = (mode: GameMode, playMode: PlayMode) => {
+  const nextDifficulty = (mode: GameMode): number => {
     const stats = modeStats[mode];
     // Start at difficulty 1, or continue from highest completed + 1
-    const startDifficulty =
-      stats && stats.highest_difficulty > 0 ? Math.min(stats.highest_difficulty + 1, 5) : 1;
+    return stats && stats.highest_difficulty > 0 ? Math.min(stats.highest_difficulty + 1, 5) : 1;
+  };
+
+  const startGame = (mode: GameMode, playMode: PlayMode) => {
     router.push({
       pathname: '/memory-game-play',
-      params: { mode, difficulty: String(startDifficulty), play_mode: playMode },
+      params: { mode, difficulty: String(nextDifficulty(mode)), play_mode: playMode },
     });
+  };
+
+  // Quick play: a remembered play mode launches straight in; first run opens the sheet.
+  const handlePlay = (mode: GameMode) => {
+    const s = setups[mode];
+    if (s) {
+      startGame(mode, s.playMode as PlayMode);
+    } else {
+      setPickerMode(mode);
+    }
+  };
+
+  const setupLine = (mode: GameMode): string | undefined => {
+    const s = setups[mode];
+    if (!s) return undefined;
+    const modeLabel = s.playMode === 'timed' ? t('memory_game.timed_mode') : t('memory_game.lives_mode');
+    return `${modeLabel} · ${t('memory_game.level_short', { level: nextDifficulty(mode) })}`;
   };
 
   const youLine = (mode: GameMode): string =>
@@ -169,7 +202,12 @@ export default function MenuMemoryGameScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <AmbientGlow />
-        <ScreenHeader title={t('memory_game.hub_title')} eyebrow={t('game_hub_ui:title')} />
+        <ScreenHeader
+          title={t('memory_game.hub_title')}
+          eyebrow={t('game_hub_ui:title')}
+          right={<GameHubHeaderAction context="gamePage" />}
+          rightWide
+        />
         {isManagerOrOwner(user) ? (
           <PremiumGate
             desc={t('game_hub_ui.premium_intro')}
@@ -194,7 +232,12 @@ export default function MenuMemoryGameScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AmbientGlow />
-      <ScreenHeader title={t('memory_game.hub_title')} eyebrow={t('game_hub_ui:title')} />
+      <ScreenHeader
+          title={t('memory_game.hub_title')}
+          eyebrow={t('game_hub_ui:title')}
+          right={<GameHubHeaderAction context="gamePage" />}
+          rightWide
+        />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Intro */}
@@ -241,7 +284,9 @@ export default function MenuMemoryGameScreen() {
             youLabel={t('game_hub_ui:your_best')}
             youValue={youLine(expanded)}
             playLabel={t('game_hub_ui:play')}
-            onPlay={() => setPickerMode(expanded)}
+            onPlay={() => handlePlay(expanded)}
+            playSetupLine={setupLine(expanded)}
+            onChangeSetup={setups[expanded] ? () => setPickerMode(expanded) : undefined}
             onRowPress={openMiniProfile}
           />
         )}
@@ -274,7 +319,12 @@ export default function MenuMemoryGameScreen() {
         onPick={(key) => {
           const mode = pickerMode;
           setPickerMode(null);
-          if (mode) startGame(mode, key as PlayMode);
+          if (mode) {
+            const setup: QuickSetup = { playMode: key };
+            setSetups((prev) => ({ ...prev, [mode]: setup }));
+            saveQuickSetup('memory', mode, setup);
+            startGame(mode, key as PlayMode);
+          }
         }}
       />
     </View>
