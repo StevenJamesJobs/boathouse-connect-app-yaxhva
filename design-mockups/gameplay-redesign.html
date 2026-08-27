@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Gameplay Concepts</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{min-height:100vh;display:flex;flex-direction:column;align-items:center;gap:14px;padding:24px 12px 60px;background:#0C0D11;
+  font-family:'Inter','SF Pro Text',system-ui,sans-serif}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+
+/* ---------- toolbar ---------- */
+.toolbar{display:flex;flex-wrap:wrap;gap:14px;align-items:center;justify-content:center;max-width:900px}
+.grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);padding:6px;border-radius:16px}
+.gl2{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9px;letter-spacing:1.4px;text-transform:uppercase;color:#6E7681;margin:0 4px 0 6px}
+.tb{background:rgba(255,255,255,0.06);color:#D6D9DE;border:1px solid rgba(255,255,255,0.10);border-radius:11px;padding:7px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.18s}
+.tb:hover{background:rgba(255,255,255,0.12)}
+.tb.on{background:#F4F6F8;color:#15171C;border-color:#F4F6F8}
+.tb:focus-visible{outline:2px solid #5C8DF0;outline-offset:2px}
+.hint{color:#6E7681;font-size:11.5px;font-family:'JetBrains Mono',ui-monospace,monospace;text-align:center;max-width:780px;line-height:1.7}
+.hint b{color:#AEB4BD;font-weight:600}
+
+/* ---------- phone shell + palettes ---------- */
+.phone{
+  --bg:#181B21; --text:#F4F6F8; --muted:#9AA1A8; --fireText:#1A1E24; --tint:#FF7A2F;
+  --glass:rgba(255,255,255,0.07); --glassbd:rgba(255,255,255,0.12); --surf:rgba(255,255,255,0.045); --surfbd:rgba(255,255,255,0.09); --hair:rgba(255,255,255,0.07);
+  --glowA:rgba(230,234,238,0.12); --glowB:rgba(92,141,240,0.12);
+  --boardGrad:linear-gradient(150deg,#052A3E,#083D5A 55%,#0B5E86); --boardGradBd:rgba(255,255,255,0.16); --boardGradLetter:#EAF6FF;
+  position:relative;width:392px;height:840px;background:var(--bg);border-radius:46px;border:1px solid #2A2E36;overflow:hidden;
+  box-shadow:0 40px 90px -30px rgba(0,0,0,0.8);transition:background .3s;display:flex;flex-direction:column;color:var(--text)}
+.phone.t-mono-l{--bg:#ECECEE;--text:#22262C;--muted:#6E747C;--fireText:#FFFFFF;--tint:#EC6A1E;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.66);--surfbd:rgba(0,0,0,0.07);--hair:rgba(0,0,0,0.07);--glowA:rgba(58,66,80,0.10);--glowB:rgba(59,130,246,0.12);
+  --boardGrad:linear-gradient(150deg,#E9F4FC,#D6EAF9 55%,#C2E1F7);--boardGradBd:rgba(11,94,134,0.18);--boardGradLetter:#0B3550}
+.phone.t-ocean-d{--bg:#1A2332;--text:#FFFFFF;--muted:#A8B8D8;--fireText:#0A1422;--tint:#5DA0E5;--glass:rgba(255,255,255,0.07);--glassbd:rgba(255,255,255,0.13);--surf:rgba(255,255,255,0.05);--surfbd:rgba(255,255,255,0.10);--hair:rgba(255,255,255,0.08);--glowA:rgba(74,144,226,0.32);--glowB:rgba(93,173,226,0.16)}
+.phone.t-ocean-l{--bg:#E8F4F8;--text:#1A3A52;--muted:#4A6B7C;--fireText:#FFFFFF;--tint:#1976D2;--glass:rgba(255,255,255,0.62);--glassbd:rgba(255,255,255,0.9);--surf:rgba(255,255,255,0.7);--surfbd:rgba(13,71,161,0.10);--hair:rgba(13,71,161,0.08);--glowA:rgba(25,118,210,0.18);--glowB:rgba(66,165,245,0.13);
+  --boardGrad:linear-gradient(150deg,#E9F4FC,#D6EAF9 55%,#C2E1F7);--boardGradBd:rgba(25,118,210,0.2);--boardGradLetter:#0B3550}
+.phone{--ws:#0EA5E9;--wsA:#0B5E86;--wsB:#41B4E8;--pt:#5B5BD6;--gold:#F59E0B;--ok:#10B981;--bad:#EF4444;--rose:#FF7A93}
+
+.glow{position:absolute;top:-120px;right:-80px;width:360px;height:320px;border-radius:50%;background:radial-gradient(circle,var(--glowA),transparent 66%);z-index:0;pointer-events:none}
+.glow2{position:absolute;top:-70px;left:-90px;width:300px;height:280px;border-radius:50%;background:radial-gradient(circle,var(--glowB),transparent 68%);z-index:0;pointer-events:none}
+.sb{position:relative;z-index:3;display:flex;justify-content:space-between;align-items:center;padding:16px 30px 4px;font-size:13px;font-weight:600;font-family:'JetBrains Mono',ui-monospace,monospace;color:var(--text)}
+.screen{position:relative;z-index:2;flex:1;overflow-y:auto;overflow-x:hidden;padding:0 0 24px;scrollbar-width:none}
+.screen::-webkit-scrollbar{display:none}
+.design{display:none;padding:6px 16px 0;animation:fade .35s ease}
+.design.on{display:block}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.concept{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:7px;margin:4px 2px 12px}
+.concept b{color:var(--tint)}
+.concept .ln{flex:1;height:1px;background:var(--hair)}
+.bcap{font-size:10.5px;color:var(--muted);font-style:italic;margin:10px 2px 14px;line-height:1.5}
+.bcap b{font-style:normal;color:var(--text);font-weight:600}
+
+/* ---------- shared ---------- */
+.ic{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:0 0 auto}
+.c38{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd);color:var(--text);cursor:pointer;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.hdr{display:flex;align-items:center;gap:8px;margin:2px 0 12px}
+.hmid{flex:1;text-align:center;min-width:0}
+.eyebrow{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.6px;text-transform:uppercase;color:var(--tint);font-weight:600}
+.htitle{font-family:'Bricolage Grotesque','Avenir Next',system-ui,sans-serif;font-weight:700;font-size:19px;letter-spacing:-0.3px;line-height:1.1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.modechip{width:38px;height:38px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;background:var(--glass);border:1px solid var(--glassbd)}
+.console{border-radius:16px;padding:10px 13px;margin-bottom:10px;position:relative;overflow:hidden;border:1px solid rgba(255,255,255,0.14);color:#fff;box-shadow:0 10px 26px -14px rgba(0,0,0,0.55);background:linear-gradient(135deg,#06354D,#0B5E86 55%,#1180B4)}
+.console .row1{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ctimer{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:19px;font-weight:700;letter-spacing:.5px;display:flex;align-items:center;gap:6px}
+.ctimer .ic{width:15px;height:15px;opacity:.75}
+
+/* ---------- WS board ---------- */
+.wsboard{border-radius:16px;padding:12px 9px;margin-bottom:10px;border:1px solid var(--boardGradBd);background:var(--boardGrad);box-shadow:0 12px 30px -16px rgba(0,0,0,0.45)}
+.wsgrid{position:relative;display:grid;gap:2px}
+.wcell{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;background:transparent;position:relative;z-index:1;color:var(--boardGradLetter)}
+.wcap{position:absolute;border-radius:999px;z-index:0;opacity:.34;box-shadow:0 0 14px 1px currentColor}
+/* light themes, treatment A: alpha via color-mix + a hue ring for definition */
+.t-mono-l .wcap,.t-ocean-l .wcap{opacity:1;background:color-mix(in srgb,currentColor 30%,transparent)!important;border:1.5px solid color-mix(in srgb,currentColor 75%,transparent);box-shadow:none}
+/* light themes, treatment B: NO ring — deeper fill + a soft blur glow like dark mode */
+.t-mono-l .capglow .wcap,.t-ocean-l .capglow .wcap{border:0;background:color-mix(in srgb,currentColor 36%,transparent)!important;box-shadow:0 0 10px 2px color-mix(in srgb,currentColor 45%,transparent)}
+.wcap.sel{opacity:1;background:transparent!important;box-shadow:none;border:2px solid currentColor}
+.t-mono-l .capglow .wcap.sel,.t-ocean-l .capglow .wcap.sel{background:transparent!important;border:2px solid currentColor;box-shadow:none}
+
+/* trays — now with the glass gradient wash (round 4) */
+.trayrail{display:flex;gap:9px;overflow-x:auto;padding:2px 2px 6px;scrollbar-width:none;margin:0 -2px}
+.trayrail::-webkit-scrollbar{display:none}
+.tray{flex:0 0 78%;border-radius:14px;border:1px solid var(--surfbd);padding:10px 12px;
+  background:linear-gradient(150deg,color-mix(in srgb,var(--wsA) 15%,transparent),color-mix(in srgb,var(--wsB) 7%,transparent)),var(--surf)}
+.tray.done{border-color:color-mix(in srgb,var(--ws) 60%,transparent)}
+.tray .th{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+.tray .th .t{flex:1;font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:600;font-size:13px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tray .th .prog{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:700;color:var(--ws)}
+.tray .wchips{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.wchip{border-radius:8px;border:1px solid var(--glassbd);background:var(--glass);padding:4px 9px;font-size:11px;font-weight:600;color:var(--muted);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wchip b{font-weight:700;color:var(--text)}
+.wchip.found{border-color:color-mix(in srgb,var(--ws) 55%,transparent);background:color-mix(in srgb,var(--ws) 13%,transparent);color:var(--ws);text-decoration:line-through}
+.traydots{display:flex;gap:4px;justify-content:center;margin-top:6px}
+.traydots i{width:5px;height:5px;border-radius:3px;background:var(--glassbd)}
+.traydots i.on{background:var(--ws)}
+
+/* ---------- results (design B locked geometry) ---------- */
+.rwrap{border-radius:20px;border:1px solid var(--surfbd);background:var(--surf);padding:18px 16px 14px;position:relative;overflow:hidden}
+.rsplit{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.rsplit .rav{width:50px;height:50px;border-radius:25px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:#fff;border:2px solid rgba(255,255,255,0.35)}
+.rsplit .lcol{flex:1.15;min-width:0}
+.rsplit .lcol .t{font-family:'Bricolage Grotesque',system-ui,sans-serif;font-weight:700;font-size:16.5px;line-height:1.15}
+.rsplit .lcol .s{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:24px;font-weight:700;margin-top:3px}
+.rsplit .lcol .delta2{display:inline-block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:9.5px;font-weight:700;color:var(--ok);background:color-mix(in srgb,var(--ok) 12%,transparent);border:1px solid color-mix(in srgb,var(--ok) 40%,transparent);border-radius:7px;padding:2px 7px;margin-top:4px}
+.rsplit .rcol{flex:1;min-width:0;text-align:right;display:flex;flex-direction:column;gap:5px;align-items:flex-end}
+.rsplit .rcol .meta{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8.5px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.rsplit .rcol .rankline{display:flex;align-items:center;gap:6px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;font-weight:700}
+.rsplit .rcol .rankline .old{color:var(--muted);text-decoration:line-through}
+.rsplit .rcol .rankline .ic{width:12px;height:12px;color:var(--ok)}
+.rsplit .rcol .rankline .new{color:var(--gold);font-size:13px}
+.rsplit .rcol .rankline .you{color:var(--text)}
+/* the chase line — permanent header resident (Steve, round 4) */
+.rsplit .rcol .chase{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;font-weight:700;color:var(--muted)}
+.rsplit .rcol .chase b{color:var(--tint)}
+.rbox{border-radius:13px;background:var(--glass);border:1px solid var(--glassbd);padding:10px 13px;margin-bottom:12px}
+.rrow{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:12.5px}
+.rrow .l{color:var(--muted)}
+.rrow .v{font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:700}
+.fold{border-radius:12px;border:1px solid var(--surfbd);background:var(--glass);margin-bottom:8px;overflow:hidden}
+.fold .fh{display:flex;align-items:center;gap:8px;padding:9px 12px;font-size:12.5px;font-weight:700}
+.fold .fh .n{margin-left:auto;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10.5px;color:var(--muted)}
+.fold .fh .ic{width:13px;height:13px;color:var(--muted)}
+.revitem{display:flex;gap:9px;padding:7px 12px;border-top:1px solid var(--hair);align-items:center}
+.revitem .thumb{width:34px;height:34px;border-radius:8px;flex:0 0 auto;background:radial-gradient(80% 80% at 35% 30%,rgba(232,168,124,0.9),rgba(140,58,58,0.8) 70%),#241A14}
+.revitem .bd{flex:1;min-width:0}
+.revitem .n{font-size:11.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.revitem .a{font-size:10.5px;color:var(--ok);font-weight:600;margin-top:1px}
+.revitem .a.miss{color:var(--bad)}
+.pairrev{display:flex;align-items:center;gap:7px;padding:6px 12px;border-top:1px solid var(--hair);font-size:11.5px}
+.pairrev .ic{width:13px;height:13px;flex:0 0 auto}
+.pairrev .w{font-weight:700;color:var(--ws);flex:1;text-align:right}
+.pairrev .arr{color:var(--muted)}
+.pairrev .e{font-weight:600;flex:1}
+.ractions{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.rbtn2{display:flex;align-items:center;justify-content:center;gap:8px;border-radius:12px;padding:12px;font-weight:700;font-size:14px;cursor:pointer;color:#fff}
+.rbtn2 .ic{width:15px;height:15px}
+.rbtn2.gold{background:color-mix(in srgb,var(--gold) 16%,transparent);color:var(--gold)}
+.rbtn2.quiet{background:transparent;border:1px solid var(--glassbd);color:var(--text);font-weight:600;padding:10px}
+.confetti{position:absolute;inset:0;pointer-events:none;z-index:0}
+.confetti i{position:absolute;width:6px;height:10px;border-radius:2px;opacity:.85;animation:cfall 3.2s linear infinite}
+@keyframes cfall{0%{transform:translateY(-30px) rotate(0)}100%{transform:translateY(700px) rotate(540deg)}}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+<symbol id="i-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+<symbol id="i-up" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5.5 5.5L20 6.5"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+<symbol id="i-star" viewBox="0 0 24 24"><path d="M12 3l2.7 5.8 6.3.7-4.7 4.3 1.3 6.2L12 16.9 6.4 20l1.3-6.2L3 9.5l6.3-.7z"/></symbol>
+<symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 4h8v5a4 4 0 0 1-8 0zM8 5H5a3 3 0 0 0 3.2 4M16 5h3a3 3 0 0 1-3.2 4M12 13v4M9 20.5h6M10.5 17h3"/></symbol>
+<symbol id="i-abc" viewBox="0 0 24 24"><path d="M4 17l3-9 3 9M5 14h4M13 8h3a2 2 0 0 1 0 4h-3zM13 12h3.4a2 2 0 0 1 0 4H13zM13 8v8"/></symbol>
+<symbol id="i-reset" viewBox="0 0 24 24"><path d="M4 5v5h5"/><path d="M4.6 10A8 8 0 1 0 7 5.2"/></symbol>
+<symbol id="i-bolt" viewBox="0 0 24 24"><path d="M13 2L4.5 13.5H11L9.5 22 19 10h-6.5z"/></symbol>
+</defs></svg>
+
+<div class="toolbar">
+  <div class="grp"><span class="gl2">Screen</span>
+    <button class="tb scr on" data-s="ws">Word Search</button>
+    <button class="tb scr" data-s="r">Results</button>
+  </div>
+  <div class="grp"><span class="gl2">Design</span>
+    <button class="tb des on" data-d="1">A</button>
+    <button class="tb des" data-d="2">B</button>
+  </div>
+  <div class="grp"><span class="gl2">Theme</span>
+    <button class="tb th on" data-t="">Mono·D</button>
+    <button class="tb th" data-t="t-mono-l">Mono·L</button>
+    <button class="tb th" data-t="t-ocean-d">Ocean·D</button>
+    <button class="tb th" data-t="t-ocean-l">Ocean·L</button>
+  </div>
+</div>
+<div class="hint"><b>ROUND 4 — the lockdown round.</b> Memory ✅ and Picture This! ✅ are done (not shown). Word Search: trays now wear the glass
+gradient in both frames; <b>flip to a light theme and judge A (hue ring) vs B (borderless glow)</b> — dark mode is identical in both.
+Results: design B geometry in its two states — the chase line now lives in the header permanently.</div>
+
+<div class="phone" id="phone">
+  <div class="glow"></div><div class="glow2"></div>
+  <div class="sb"><span>9:41</span><span>●●●</span></div>
+  <div class="screen">
+
+  <!-- ═══ WS A — glass trays + RING capsules in light ═══ -->
+  <div class="design on" id="ws1">
+    <div class="concept"><b>WS·A</b> glass trays · light capsules WITH ring<span class="ln"></span></div>
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="htitle">Word Search</div><div class="eyebrow">Dishes & Ingredients · Medium</div></div>
+      <span class="modechip"><svg class="ic" style="width:16px;height:16px;color:#0EA5E9"><use href="#i-clock"/></svg></span></div>
+    <div class="console">
+      <div class="row1">
+        <span class="ctimer"><svg class="ic"><use href="#i-clock"/></svg>2:14</span>
+        <span class="ctimer" style="font-size:14px;opacity:.85"><svg class="ic" style="width:13px;height:13px"><use href="#i-star"/></svg>1,350</span>
+        <span class="ctimer" style="font-size:14px"><svg class="ic" style="width:13px;height:13px"><use href="#i-abc"/></svg>6<small style="font-size:10px;opacity:.6">/9</small></span>
+      </div>
+    </div>
+    <div class="wsboard"><div class="wsgrid" id="grid-wsA"></div></div>
+    <div class="trayrail">
+      <div class="tray done">
+        <div class="th"><svg class="ic" style="width:13px;height:13px;color:#0EA5E9"><use href="#i-check"/></svg><span class="t">Lobster Roll</span><span class="prog">3/3</span></div>
+        <div class="wchips"><span class="wchip found">Lobster</span><span class="wchip found">Brioche</span><span class="wchip found">Aioli</span><span class="wchip found" style="opacity:.5">＋150</span></div>
+      </div>
+      <div class="tray">
+        <div class="th"><span class="t">Summer Berry Salad</span><span class="prog">1/3</span></div>
+        <div class="wchips"><span class="wchip found">Pecans</span><span class="wchip">Goat <b>CHEESE</b></span><span class="wchip"><b>STRAWBERRY</b></span><span class="wchip">Arugula</span></div>
+      </div>
+    </div>
+    <div class="traydots"><i class="on"></i><i></i><i></i></div>
+    <div class="bcap"><b>WS·A:</b> the trays now carry a soft WS-gradient <b>glass wash</b> (matching the PT answer tiles), in both themes. Light-mode found words = the ring treatment from round 3. Dark mode is your locked look, identical in A and B.</div>
+  </div>
+
+  <!-- ═══ WS B — glass trays + BORDERLESS glow capsules in light ═══ -->
+  <div class="design" id="ws2">
+    <div class="concept"><b>WS·B</b> glass trays · light capsules NO ring, glow only<span class="ln"></span></div>
+    <div class="hdr"><span class="c38"><svg class="ic"><use href="#i-back"/></svg></span>
+      <div class="hmid"><div class="htitle">Word Search</div><div class="eyebrow">Dishes & Ingredients · Medium</div></div>
+      <span class="modechip"><svg class="ic" style="width:16px;height:16px;color:#0EA5E9"><use href="#i-clock"/></svg></span></div>
+    <div class="console">
+      <div class="row1">
+        <span class="ctimer"><svg class="ic"><use href="#i-clock"/></svg>2:14</span>
+        <span class="ctimer" style="font-size:14px;opacity:.85"><svg class="ic" style="width:13px;height:13px"><use href="#i-star"/></svg>1,350</span>
+        <span class="ctimer" style="font-size:14px"><svg class="ic" style="width:13px;height:13px"><use href="#i-abc"/></svg>6<small style="font-size:10px;opacity:.6">/9</small></span>
+      </div>
+    </div>
+    <div class="wsboard capglow"><div class="wsgrid" id="grid-wsB"></div></div>
+    <div class="trayrail">
+      <div class="tray done">
+        <div class="th"><svg class="ic" style="width:13px;height:13px;color:#0EA5E9"><use href="#i-check"/></svg><span class="t">Lobster Roll</span><span class="prog">3/3</span></div>
+        <div class="wchips"><span class="wchip found">Lobster</span><span class="wchip found">Brioche</span><span class="wchip found">Aioli</span><span class="wchip found" style="opacity:.5">＋150</span></div>
+      </div>
+      <div class="tray">
+        <div class="th"><span class="t">Summer Berry Salad</span><span class="prog">1/3</span></div>
+        <div class="wchips"><span class="wchip found">Pecans</span><span class="wchip">Goat <b>CHEESE</b></span><span class="wchip"><b>STRAWBERRY</b></span><span class="wchip">Arugula</span></div>
+      </div>
+    </div>
+    <div class="traydots"><i class="on"></i><i></i><i></i></div>
+    <div class="bcap"><b>WS·B:</b> same frame, but light-mode capsules drop the ring — a slightly deeper fill with a <b>soft blur glow</b>, mirroring dark mode's feel. My honest read: A stays crisper at small word sizes, B is moodier and more matching. Judge in Mono·L / Ocean·L — whichever you call becomes the build.</div>
+  </div>
+
+  <!-- ═══ R A — split header · personal best (+ chase to #1) ═══ -->
+  <div class="design" id="r1">
+    <div class="concept"><b>R·A</b> split header · personal-best state<span class="ln"></span></div>
+    <div class="rwrap">
+      <div class="confetti" id="cf1"></div>
+      <div style="position:relative;z-index:1">
+        <div class="rsplit">
+          <div class="rav" style="background:linear-gradient(135deg,#28246E,#6663E0);box-shadow:0 6px 18px -6px rgba(91,91,214,0.55)">N</div>
+          <div class="lcol">
+            <div class="t">New Personal Best!</div>
+            <div class="s" style="color:#6663E0">4,890</div>
+            <span class="delta2">+340 vs best</span>
+          </div>
+          <div class="rcol">
+            <span class="meta">Food · Hard · Lives</span>
+            <span class="rankline"><span class="old">#4</span><svg class="ic"><use href="#i-up"/></svg><span class="new">#2</span></span>
+            <span class="chase"><b>310 PTS</b> TO <b>#1</b></span>
+          </div>
+        </div>
+        <div class="rbox">
+          <div class="rrow"><span class="l">Correct</span><span class="v">23 · 87% clean</span></div>
+          <div class="rrow"><span class="l">Best streak</span><span class="v">11</span></div>
+          <div class="rrow"><span class="l">Bonuses</span><span class="v" style="color:#F59E0B">+425</span></div>
+        </div>
+        <div class="fold">
+          <div class="fh"><svg class="ic" style="color:#EF4444"><use href="#i-x"/></svg>Review these<span class="n">4</span><svg class="ic"><use href="#i-up"/></svg></div>
+          <div class="revitem"><span class="thumb"></span><div class="bd"><div class="n">Harissa Chicken Skewers</div><div class="a miss">You said truffle honey → pickled red onion</div></div></div>
+          <div class="revitem"><span class="thumb"></span><div class="bd"><div class="n">Summer Berry Salad</div><div class="a miss">You said feta → goat cheese</div></div></div>
+        </div>
+        <div class="fold">
+          <div class="fh"><svg class="ic" style="color:#10B981"><use href="#i-check"/></svg>Correct<span class="n">19</span><svg class="ic"><use href="#i-down"/></svg></div>
+        </div>
+        <div class="ractions">
+          <div class="rbtn2" style="background:#5B5BD6"><svg class="ic"><use href="#i-reset"/></svg>Play Again</div>
+          <div class="rbtn2 gold"><svg class="ic"><use href="#i-trophy"/></svg>See Yourself on the Board</div>
+          <div class="rbtn2 quiet">Back to Categories</div>
+        </div>
+      </div>
+    </div>
+    <div class="bcap"><b>R·A:</b> design B locked, and per your note the <b>chase line is now a permanent header resident</b> — on a personal best it keeps pulling upward: rank move + "310 PTS TO #1" beneath it. At #1 it reads "TOP OF THE BOARD". Confetti: wins + personal bests only.</div>
+  </div>
+
+  <!-- ═══ R B — split header · regular completion ═══ -->
+  <div class="design" id="r2">
+    <div class="concept"><b>R·B</b> split header · regular completion<span class="ln"></span></div>
+    <div class="rwrap">
+      <div class="confetti" id="cf2"></div>
+      <div style="position:relative;z-index:1">
+        <div class="rsplit">
+          <div class="rav" style="background:linear-gradient(135deg,#0B5E86,#41B4E8);box-shadow:0 6px 18px -6px rgba(14,165,233,0.55)">N</div>
+          <div class="lcol">
+            <div class="t">Puzzle Complete!</div>
+            <div class="s" style="color:#0EA5E9">1,950</div>
+          </div>
+          <div class="rcol">
+            <span class="meta">Dishes & Ingr · Med · Timed</span>
+            <span class="rankline"><span class="you">YOU'RE</span><span class="new">#5</span></span>
+            <span class="chase"><b>240 PTS</b> TO <b>#4</b></span>
+          </div>
+        </div>
+        <div class="rbox">
+          <div class="rrow"><span class="l">Words found</span><span class="v">9 × 150</span></div>
+          <div class="rrow"><span class="l">Time bonus</span><span class="v" style="color:#10B981">+600</span></div>
+          <div class="rrow"><span class="l">Your best</span><span class="v">3,980</span></div>
+        </div>
+        <div class="fold">
+          <div class="fh"><svg class="ic" style="color:#10B981"><use href="#i-check"/></svg>Word review<span class="n">9/9</span><svg class="ic"><use href="#i-up"/></svg></div>
+          <div class="pairrev"><svg class="ic" style="color:#10B981"><use href="#i-check"/></svg><span class="e">Lobster Roll</span><span class="arr">·</span><span class="w">AIOLI</span></div>
+          <div class="pairrev"><svg class="ic" style="color:#10B981"><use href="#i-check"/></svg><span class="e">Berry Salad</span><span class="arr">·</span><span class="w">PECANS</span></div>
+        </div>
+        <div class="ractions">
+          <div class="rbtn2" style="background:#0EA5E9"><svg class="ic"><use href="#i-reset"/></svg>Play Again</div>
+          <div class="rbtn2 gold"><svg class="ic"><use href="#i-trophy"/></svg>See Yourself on the Board</div>
+          <div class="rbtn2 quiet">Back to Categories</div>
+        </div>
+      </div>
+    </div>
+    <div class="bcap"><b>R·B:</b> the regular-completion state — "Puzzle Complete!" (per-game wording), no delta, and the header's right column carries <b>YOU'RE #5 + 240 PTS TO #4</b>. A completed win still gets confetti; losses use this same layout with a softer title and none.</div>
+  </div>
+
+  </div><!-- /screen -->
+</div><!-- /phone -->
+
+<script>
+/* ---------- WS boards (identical content; B wears .capglow) ---------- */
+const ROWS = ['BRIOCHEQZL','AVLKPDMTAO','ANYAIOLIVB','MSPECANSES','ATCJWQBRPT','CRUDNFGHKE','HAOEMLPQXR','EWNBASILWQ','ELDZHYKMNO','SIVCHEESET'];
+const MARKS = [
+  {r:0,c:0,len:7,dir:'h',dark:'#7DE3FF',light:'#0284C7',kind:'cap'},
+  {r:2,c:3,len:5,dir:'h',dark:'#5EEAD4',light:'#0D9488',kind:'cap'},
+  {r:3,c:1,len:6,dir:'h',dark:'#A5B4FC',light:'#6366F1',kind:'cap'},
+  {r:7,c:3,len:5,dir:'h',dark:'#93C5FD',light:'#2563EB',kind:'cap'},
+  {r:9,c:3,len:6,dir:'h',dark:'#FFFFFF',light:'#0B5E86',kind:'selcap'}
+];
+const GRIDS = {'grid-wsA':{rows:ROWS,marks:MARKS},'grid-wsB':{rows:ROWS,marks:MARKS}};
+for (const [id,cfg] of Object.entries(GRIDS)) {
+  const el = document.getElementById(id);
+  if (!el) continue;
+  el.style.gridTemplateColumns = `repeat(${cfg.rows[0].length},1fr)`;
+  cfg.rows.forEach((row)=>{ [...row].forEach((ch)=>{
+    const d = document.createElement('span'); d.className='wcell'; d.textContent=ch; el.appendChild(d);
+  });});
+}
+function isLightTheme(){ return /t-mono-l|t-ocean-l/.test(document.getElementById('phone').className); }
+function layoutCaps(){
+  for (const [id,cfg] of Object.entries(GRIDS)) {
+    const el = document.getElementById(id);
+    if (!el || el.dataset.capsDone || el.offsetWidth===0) continue;
+    const cell = el.children[0].getBoundingClientRect();
+    if (cell.width < 2) continue;
+    el.dataset.capsDone = '1';
+    const gap = 2, s = cell.width + gap;
+    for (const m of cfg.marks){
+      const cap = document.createElement('i');
+      cap.className = 'wcap' + (m.kind==='selcap' ? ' sel' : '');
+      cap.dataset.dark = m.dark; cap.dataset.light = m.light;
+      const len = (m.len-1)*s + cell.width;
+      cap.style.height = cell.width+'px';
+      cap.style.left = (m.c*s)+'px';
+      cap.style.top = (m.r*s)+'px';
+      cap.style.width = len+'px';
+      el.appendChild(cap);
+    }
+  }
+  recolorCaps();
+}
+function recolorCaps(){
+  const light = isLightTheme();
+  document.querySelectorAll('.wcap').forEach(cap=>{
+    const col = light ? cap.dataset.light : cap.dataset.dark;
+    cap.style.color = col;
+    cap.style.background = col;
+  });
+}
+
+/* ---------- confetti ---------- */
+for (const [cid,cols] of [['cf1',['#28246E','#6663E0','#8B88F0','#F59E0B','#FDE68A']],['cf2',['#0B5E86','#41B4E8','#7DE3FF','#F59E0B','#FDE68A']]]){
+  const cf = document.getElementById(cid);
+  if (!cf) continue;
+  for(let i=0;i<26;i++){const p=document.createElement('i');p.style.left=(Math.random()*100)+'%';p.style.top=(-Math.random()*140)+'px';p.style.background=cols[i%cols.length];p.style.animationDelay=(Math.random()*3)+'s';p.style.animationDuration=(2.6+Math.random()*1.6)+'s';cf.appendChild(p);}
+}
+
+/* ---------- toggles ---------- */
+const phone=document.getElementById('phone');
+let S='ws', D='1';
+function show(){
+  document.querySelectorAll('.design').forEach(d=>d.classList.remove('on'));
+  const el=document.getElementById(S+D)||document.getElementById(S+'1');
+  if(el)el.classList.add('on');
+  phone.querySelector('.screen').scrollTop=0;
+  requestAnimationFrame(layoutCaps);
+}
+document.querySelectorAll('.scr').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.scr').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  S=b.dataset.s;D='1';
+  document.querySelectorAll('.des').forEach((x,i)=>x.classList.toggle('on',i===0));
+  show();
+}));
+document.querySelectorAll('.des').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.des').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  D=b.dataset.d;show();
+}));
+document.querySelectorAll('.th').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('.th').forEach(x=>x.classList.remove('on'));b.classList.add('on');
+  phone.className='phone'+(b.dataset.t?' '+b.dataset.t:'');
+  requestAnimationFrame(()=>{layoutCaps();recolorCaps();});
+}));
+requestAnimationFrame(layoutCaps);
+</script>
+</body>
+</html>

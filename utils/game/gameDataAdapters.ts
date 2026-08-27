@@ -1,5 +1,6 @@
 import { CardData, GameMode } from '@/types/game';
 import { createCardPair, selectRandom } from './gameEngine';
+import { parseIngredients } from './ingredientParser';
 import { WINE_PAIRINGS } from './winePairings';
 import { supabase } from '@/app/integrations/supabase/client';
 import { parseCocktailIngredients, pickMainCocktailIngredient } from './cocktailIngredients';
@@ -165,22 +166,19 @@ async function generateCocktailCards(pairCount: number, organizationId: string, 
   return cards;
 }
 
-// Extract a key ingredient phrase from a menu item description
-// Descriptions look like: "Asparagus, roasted red bliss potatoes, housemade tartar sauce"
-// We pick the first distinctive item
+// Extract a key ingredient phrase from a menu item description.
+// parseIngredients handles the separator zoo (commas, periods-as-separators,
+// "with"/"and", newlines, formatting tags) and caps parts at 40 chars, so a
+// period-separated AI-scanned description can no longer land whole on a card.
 function extractKeyIngredient(description: string): string {
-  // Clean HTML formatting tags
-  const clean = description
-    .replace(/<[^>]+>/g, '')
-    .replace(/\r?\n/g, ', ')
-    .trim();
-
-  // Split by comma and pick the most distinctive ingredient
-  const parts = clean.split(',').map(s => s.trim()).filter(s => s.length > 2);
+  const parts = parseIngredients(description);
   if (parts.length === 0) return '';
 
-  // Try to find a protein or standout ingredient (skip generic sides)
-  const genericWords = ['french fries', 'side salad', 'bread', 'butter', 'salt', 'pepper'];
+  // Try to find a protein or standout ingredient (skip generic sides and the
+  // menu-prose lead-ins real descriptions open with: "All platters served",
+  // "Choice of:", "Comes", "Flat Panini Bread Sandwiches Served")
+  const genericWords = ['french fries', 'side salad', 'bread', 'butter', 'salt', 'pepper',
+    'platters', 'choice', 'comes', 'sandwiches'];
   const distinctive = parts.find(
     p => !genericWords.some(g => p.toLowerCase().includes(g))
   );

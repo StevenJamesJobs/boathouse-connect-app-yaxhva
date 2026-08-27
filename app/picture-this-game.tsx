@@ -30,10 +30,12 @@ import BottomNavBar from '@/components/BottomNavBar';
 import JoltOverlay from '@/components/JoltOverlay';
 import GameSquareTile from '@/components/game/GameSquareTile';
 import GameBoardCard, { GameBoardRow } from '@/components/game/GameBoardCard';
+import GameHubHeaderAction from '@/components/game/GameHubHeaderAction';
 import GamePickerSheet from '@/components/game/GamePickerSheet';
 import { CATEGORY_VISUALS } from '@/components/game/gameVisuals';
 import { fetchCategoryBoard } from '@/utils/game/boards';
 import { formatPlayedLine } from '@/utils/game/scoreLine';
+import { QuickSetup, loadQuickSetup, saveQuickSetup } from '@/utils/game/quickSetup';
 import { useMiniProfile } from '@/contexts/MiniProfileContext';
 import { fonts } from '@/constants/fonts';
 
@@ -151,6 +153,8 @@ export default function PictureThisGameScreen() {
   const [pickerCategory, setPickerCategory] = useState<CategoryInfo | null>(null);
   const [pickerStep, setPickerStep] = useState<'difficulty' | 'playmode'>('difficulty');
   const [selectedDifficulty, setSelectedDifficulty] = useState<PictureThisDifficulty>('easy');
+  // Remembered quick-play setup per category (device-local; Hub·A lockdown).
+  const [setups, setSetups] = useState<Record<string, QuickSetup>>({});
 
   // If a switch (or wine visibility) hides the expanded category, close the
   // orphaned board card too.
@@ -177,6 +181,15 @@ export default function PictureThisGameScreen() {
         setMyStats(byCat);
         setBoards({});
       })();
+      // Remembered setups load in parallel (device-local, never blocks the boards).
+      (async () => {
+        const loaded: Record<string, QuickSetup> = {};
+        for (const cat of CATEGORIES) {
+          const s = await loadQuickSetup('picture_this', cat.key);
+          if (s) loaded[cat.key] = s;
+        }
+        if (!cancelled) setSetups(loaded);
+      })();
       return () => {
         cancelled = true;
       };
@@ -202,17 +215,48 @@ export default function PictureThisGameScreen() {
   const openPicker = (cat: CategoryInfo) => {
     setPickerCategory(cat);
     setPickerStep('difficulty');
-    setSelectedDifficulty(cat.difficulties[0]);
+    // The ⚙ path starts from the remembered difficulty when it's still offered.
+    const stored = setups[cat.key]?.difficulty as PictureThisDifficulty | undefined;
+    setSelectedDifficulty(stored && cat.difficulties.includes(stored) ? stored : cat.difficulties[0]);
+  };
+
+  const launch = (catKey: PictureThisCategory, difficulty: PictureThisDifficulty, playMode: string) => {
+    router.push({
+      pathname: '/picture-this-play',
+      params: { category: catKey, difficulty, playMode },
+    });
+  };
+
+  // Quick play: a remembered setup launches straight in; first run opens the sheet.
+  const handlePlay = (cat: CategoryInfo) => {
+    const s = setups[cat.key];
+    const stored = s?.difficulty as PictureThisDifficulty | undefined;
+    if (s && stored && cat.difficulties.includes(stored)) {
+      launch(cat.key, stored, s.playMode);
+    } else {
+      openPicker(cat);
+    }
   };
 
   const handleFinalPick = (playMode: string) => {
     const cat = pickerCategory;
     setPickerCategory(null);
     if (!cat) return;
-    router.push({
-      pathname: '/picture-this-play',
-      params: { category: cat.key, difficulty: selectedDifficulty, playMode },
-    });
+    const setup: QuickSetup = { difficulty: selectedDifficulty, playMode };
+    setSetups((prev) => ({ ...prev, [cat.key]: setup }));
+    saveQuickSetup('picture_this', cat.key, setup);
+    launch(cat.key, selectedDifficulty, playMode);
+  };
+
+  // Difficulty labels carry a leading emoji — strip it for the compact sub-line.
+  const stripEmoji = (s: string) => s.replace(/^[^A-Za-zÀ-ÿ¿¡]+/, '');
+
+  const setupLine = (cat: CategoryInfo): string | undefined => {
+    const s = setups[cat.key];
+    const stored = s?.difficulty as PictureThisDifficulty | undefined;
+    if (!s || !stored || !cat.difficulties.includes(stored)) return undefined;
+    const modeKey = s.playMode === 'timed' ? 'picture_this:mode_timed' : 'picture_this:mode_lives';
+    return `${stripEmoji(t(DIFFICULTY_INFO[stored].labelKey))} · ${t(modeKey)}`;
   };
 
   const renderDifficultyDesc = (difficulty: PictureThisDifficulty): string => {
@@ -230,7 +274,12 @@ export default function PictureThisGameScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <AmbientGlow />
-        <ScreenHeader title={t('picture_this:hub_title')} eyebrow={t('game_hub_ui:title')} />
+        <ScreenHeader
+          title={t('picture_this:hub_title')}
+          eyebrow={t('game_hub_ui:title')}
+          right={<GameHubHeaderAction context="gamePage" />}
+          rightWide
+        />
         {isManagerOrOwner(user) ? (
           <PremiumGate
             desc={t('game_hub_ui:premium_intro')}
@@ -255,7 +304,12 @@ export default function PictureThisGameScreen() {
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <AmbientGlow />
-      <ScreenHeader title={t('picture_this:hub_title')} eyebrow={t('game_hub_ui:title')} />
+      <ScreenHeader
+          title={t('picture_this:hub_title')}
+          eyebrow={t('game_hub_ui:title')}
+          right={<GameHubHeaderAction context="gamePage" />}
+          rightWide
+        />
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Intro */}
@@ -301,7 +355,9 @@ export default function PictureThisGameScreen() {
             youLabel={t('game_hub_ui:your_score')}
             youValue={youLine(expandedInfo.key)}
             playLabel={t('game_hub_ui:play')}
-            onPlay={() => openPicker(expandedInfo)}
+            onPlay={() => handlePlay(expandedInfo)}
+            playSetupLine={setupLine(expandedInfo)}
+            onChangeSetup={setupLine(expandedInfo) ? () => openPicker(expandedInfo) : undefined}
             onRowPress={openMiniProfile}
           />
         )}

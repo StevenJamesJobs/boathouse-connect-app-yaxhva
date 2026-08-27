@@ -1,39 +1,53 @@
+/**
+ * Menu Memory Play — the s76 lockdown screen.
+ * ScreenHeader + slim memory console (LEVEL · timer · score / hearts · pair
+ * rail) + the persistent FlipDock (fixed height, never unmounts — the board
+ * never shifts) over the theme-aware gradient board with org-branded card
+ * backs. A match merges the dock into a chip that flies into the next rail
+ * slot; a lit slot taps to PEEK its pair back into the dock. Results ride the
+ * shared GameResults sheet (split header, standing + chase, confetti on
+ * wins).
+ */
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-  Modal,
-  ScrollView,
-  Animated as RNAnimated,
-} from 'react-native';
-import { useThemeColors } from '@/hooks/useThemeColors';
-import { IconSymbol } from '@/components/IconSymbol';
+import { Animated as RNAnimated, Easing as RNEasing, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import * as Haptics from 'expo-haptics';
-import { GameMode, GameState, CardData, PlayMode } from '@/types/game';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useThemeColors } from '@/hooks/useThemeColors';
+import { useAppTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
+import { supabase } from '@/app/integrations/supabase/client';
+import { notifyLeaderboardPassed } from '@/utils/notificationHelpers';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import { IconSymbol } from '@/components/IconSymbol';
+import { GameMode, GameState, CardData, PlayMode, GAME_MODE_INFO } from '@/types/game';
 import {
   getDifficultyConfig,
   getMaxDifficulty,
   getElapsedSeconds,
-  getModeName,
-  processTimeout,
 } from '@/utils/game/gameEngine';
+import { processTimeout } from '@/utils/game/gameEngine';
 import { generateCards } from '@/utils/game/gameDataAdapters';
+import { fetchStanding, BoardStanding } from '@/utils/game/standing';
 import MemoryGameBoard from '@/components/game/MemoryGameBoard';
-import GameHUD from '@/components/game/GameHUD';
-import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/app/integrations/supabase/client';
-import { notifyLeaderboardPassed } from '@/utils/notificationHelpers';
-import { useOrganization } from '@/contexts/OrganizationContext';
+import FlipDock, { DockCard, FlipDockState } from '@/components/game/FlipDock';
+import PlayConsole, { ConsoleTimer, ConsoleStat, ConsoleTag, HeartsRow, PairRail, railSlotCenter } from '@/components/game/PlayConsole';
+import GameResults, { ResultsFold } from '@/components/game/GameResults';
+import { PLAY_VISUALS, HEART_FULL } from '@/components/game/gameVisuals';
+import { fonts } from '@/constants/fonts';
+
+const FLY_DURATION = 420;
 
 export default function MemoryGamePlayScreen() {
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const { resolvedMode } = useAppTheme();
+  const scheme = resolvedMode === 'dark' ? 'dark' : 'light';
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
   const params = useLocalSearchParams<{ mode: string; difficulty: string; play_mode: string }>();
@@ -42,94 +56,86 @@ export default function MemoryGamePlayScreen() {
   const playMode = (params.play_mode || 'lives') as PlayMode;
   const difficultyLevel = parseInt(params.difficulty || '1', 10);
   const difficultyConfig = getDifficultyConfig(difficultyLevel);
+  const isTimed = playMode === 'timed';
 
   const [cards, setCards] = useState<CardData[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [showResults, setShowResults] = useState(false);
-  const [scoreSaved, setScoreSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [gameKey, setGameKey] = useState(0); // for restarting
 
-  // Timed mode countdown
+  const [elapsed, setElapsed] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState<number>(difficultyConfig.timeLimitSeconds);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const gameStateRef = useRef<GameState | null>(null);
-
-  // Keep ref in sync
   useEffect(() => {
     gameStateRef.current = gameState;
   }, [gameState]);
 
-  // ─── Preview pills state ─────────────────────────────────────────────────
-  const previewCards = gameState?.flippedIndices
-    .map(i => gameState.cards[i])
-    .filter(Boolean) ?? [];
-  const prevPreviewRef = useRef<CardData[]>([]);
-  const previewAnim1 = useRef(new RNAnimated.Value(0)).current;
-  const previewAnim2 = useRef(new RNAnimated.Value(0)).current;
+  // ─── Standing / personal best (mode = the board category) ────────────────
+  const [prevBest, setPrevBest] = useState(0);
+  const [rankBefore, setRankBefore] = useState<number | null>(null);
+  const [standingAfter, setStandingAfter] = useState<BoardStanding | null>(null);
 
   useEffect(() => {
-    const prev = prevPreviewRef.current;
-    if (previewCards.length === 1 && prev.length === 0) {
-      previewAnim1.setValue(0);
-      RNAnimated.spring(previewAnim1, { toValue: 1, useNativeDriver: true, tension: 120, friction: 8 }).start();
-    }
-    if (previewCards.length === 2 && prev.length < 2) {
-      previewAnim2.setValue(0);
-      RNAnimated.spring(previewAnim2, { toValue: 1, useNativeDriver: true, tension: 120, friction: 8 }).start();
-    }
-    if (previewCards.length === 0 && prev.length > 0) {
-      previewAnim1.setValue(0);
-      previewAnim2.setValue(0);
-    }
-    prevPreviewRef.current = previewCards;
-  }, [previewCards.length]);
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const [standing, statsRes] = await Promise.all([
+        fetchStanding(user.id, 'memory', mode),
+        supabase.rpc('get_my_game_category_stats', { p_actor_id: user.id, p_game: 'memory' }),
+      ]);
+      if (cancelled) return;
+      if (standing) setRankBefore(standing.rank);
+      const row = (statsRes.data || []).find((r: any) => r.category === mode);
+      if (row) setPrevBest(Number(row.score));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, mode]);
 
-  const renderPreviewCard = (card: CardData, index: number) => {
-    const anim = index === 0 ? previewAnim1 : previewAnim2;
-    const isMatch = previewCards.length === 2 && gameState
-      ? previewCards[0].pairId === previewCards[1].pairId
-      : false;
-    const isMismatch = previewCards.length === 2 && !isMatch;
-
-    const borderColor = isMatch ? '#10B981' : isMismatch ? '#EF4444' : colors.border;
-    const scale = anim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] });
-    const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] });
-
-    return (
-      <RNAnimated.View
-        key={card.id}
-        style={[
-          styles.previewCard,
-          { backgroundColor: colors.card, borderColor, transform: [{ scale }], opacity },
-        ]}
-      >
-        <Text style={[styles.previewSubtext, { color: colors.textSecondary }]} numberOfLines={1}>
-          {card.displaySubtext}
-        </Text>
-        <Text style={[styles.previewText, { color: colors.text }]} numberOfLines={2}>
-          {card.displayText}
-        </Text>
-      </RNAnimated.View>
-    );
-  };
-
-  // Load cards on mount or restart
+  // ─── Load cards on mount or restart ──────────────────────────────────────
   useEffect(() => {
     loadCards();
   }, [gameKey]);
 
-  // Timed mode countdown timer
-  useEffect(() => {
-    if (playMode !== 'timed' || !gameState || gameState.isComplete || loading) return;
+  const loadCards = async () => {
+    if (!user?.id) return;
+    setLoading(true);
+    setShowResults(false);
+    setStandingAfter(null);
+    scoreSavedRef.current = false;
+    setElapsed(0);
+    setTimeRemaining(difficultyConfig.timeLimitSeconds);
+    setPeekIndex(null);
+    try {
+      const generatedCards = await generateCards(mode, difficultyConfig.totalPairs, organizationId ?? '', organization.games_use_sample_data, user.id);
+      setCards(generatedCards);
+    } catch (e) {
+      console.error('Error generating cards:', e);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // ─── Clocks ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!gameState || gameState.isComplete || loading) return;
+    const interval = setInterval(() => {
+      setElapsed(getElapsedSeconds(gameState.startTime));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [gameState?.startTime, gameState?.isComplete, loading]);
+
+  useEffect(() => {
+    if (!isTimed || !gameState || gameState.isComplete || loading) return;
     timerRef.current = setInterval(() => {
-      setTimeRemaining(prev => {
+      setTimeRemaining((prev) => {
         const next = prev - 1;
         if (next <= 0) {
-          // Time's up!
           if (timerRef.current) clearInterval(timerRef.current);
-          // Trigger game over
           const currentState = gameStateRef.current;
           if (currentState && !currentState.isComplete) {
             const timeoutState = processTimeout(currentState);
@@ -141,61 +147,146 @@ export default function MemoryGamePlayScreen() {
         return next;
       });
     }, 1000);
-
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [playMode, gameState?.startTime, gameState?.isComplete, loading]);
+  }, [isTimed, gameState?.startTime, gameState?.isComplete, loading]);
 
-  const loadCards = async () => {
-    if (!user?.id) return;
-    setLoading(true);
-    setShowResults(false);
-    setScoreSaved(false);
-    setTimeRemaining(difficultyConfig.timeLimitSeconds);
-    try {
-      const generatedCards = await generateCards(mode, difficultyConfig.totalPairs, organizationId ?? '', organization.games_use_sample_data, user.id);
-      setCards(generatedCards);
-    } catch (e) {
-      console.error('Error generating cards:', e);
-    } finally {
-      setLoading(false);
+  // ─── The dock (persistent) + fly-to-rail choreography ────────────────────
+  const [peekIndex, setPeekIndex] = useState<number | null>(null);
+  const peekTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [flying, setFlying] = useState<{ label: string; targetIndex: number } | null>(null);
+  const flyPos = useRef(new RNAnimated.ValueXY({ x: 0, y: 0 })).current;
+  const flyScale = useRef(new RNAnimated.Value(1)).current;
+  const dockWrapRef = useRef<View>(null);
+  const railWrapRef = useRef<View>(null);
+  const rootRef = useRef<View>(null);
+  const prevMatchedCount = useRef(0);
+
+  const flippedCards: CardData[] =
+    gameState?.flippedIndices.map((i) => gameState.cards[i]).filter(Boolean) ?? [];
+
+  const toDockCard = (card: CardData): DockCard => ({
+    sub: card.displaySubtext,
+    text: card.displayText,
+    side: card.cardType === 'primary' ? 'primary' : 'match',
+  });
+
+  // Live flips override a peek instantly.
+  useEffect(() => {
+    if (flippedCards.length > 0 && peekIndex !== null) dismissPeek();
+  }, [flippedCards.length]);
+
+  const isPairMatch =
+    flippedCards.length === 2 && flippedCards[0].pairId === flippedCards[1].pairId;
+
+  let dockState: FlipDockState = 'idle';
+  let dockLeft: DockCard | null = null;
+  let dockRight: DockCard | null = null;
+
+  if (peekIndex !== null && gameState && flippedCards.length === 0) {
+    const pairId = gameState.matchedPairIds[peekIndex];
+    const primary = gameState.cards.find((c) => c.pairId === pairId && c.cardType === 'primary');
+    const match = gameState.cards.find((c) => c.pairId === pairId && c.cardType === 'match');
+    dockState = 'peek';
+    dockLeft = primary ? toDockCard(primary) : null;
+    dockRight = match ? toDockCard(match) : null;
+  } else if (flippedCards.length === 1) {
+    dockState = 'pending';
+    dockLeft = toDockCard(flippedCards[0]);
+  } else if (flippedCards.length === 2) {
+    dockState = isPairMatch ? 'match' : 'miss';
+    dockLeft = toDockCard(flippedCards[0]);
+    dockRight = toDockCard(flippedCards[1]);
+  }
+
+  // A new matched pair → the merged chip flies from the dock into its slot.
+  useEffect(() => {
+    const count = gameState?.matchedPairIds.length ?? 0;
+    if (count > prevMatchedCount.current && gameState && !gameState.isComplete) {
+      const pairId = gameState.matchedPairIds[count - 1];
+      const primary = gameState.cards.find((c) => c.pairId === pairId && c.cardType === 'primary');
+      launchFly(primary?.displayText ?? '', count - 1);
     }
+    prevMatchedCount.current = count;
+  }, [gameState?.matchedPairIds.length]);
+
+  const launchFly = (label: string, targetIndex: number) => {
+    const dock = dockWrapRef.current;
+    const rail = railWrapRef.current;
+    const root = rootRef.current;
+    if (!dock || !rail || !root) return;
+    dock.measureLayout(
+      root as any,
+      (dx, dy, dw, dh) => {
+        rail.measureLayout(
+          root as any,
+          (rx, ry, _rw, rh) => {
+            const { offsetX, slotSize } = railSlotCenter(difficultyConfig.totalPairs, targetIndex);
+            flyPos.setValue({ x: dx + dw / 2, y: dy + dh / 2 });
+            flyScale.setValue(1);
+            setFlying({ label, targetIndex });
+            RNAnimated.parallel([
+              RNAnimated.timing(flyPos, {
+                toValue: { x: rx + offsetX, y: ry + rh / 2 },
+                duration: FLY_DURATION,
+                easing: RNEasing.inOut(RNEasing.quad),
+                useNativeDriver: false,
+              }),
+              RNAnimated.timing(flyScale, {
+                toValue: slotSize / 40,
+                duration: FLY_DURATION,
+                easing: RNEasing.in(RNEasing.quad),
+                useNativeDriver: false,
+              }),
+            ]).start(() => {
+              setFlying(null);
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            });
+          },
+          () => setFlying(null),
+        );
+      },
+      () => setFlying(null),
+    );
   };
 
+  const handleSlotPeek = (index: number) => {
+    if (peekTimer.current) clearTimeout(peekTimer.current);
+    setPeekIndex(index);
+    peekTimer.current = setTimeout(() => setPeekIndex(null), 2500);
+  };
+
+  const dismissPeek = () => {
+    if (peekTimer.current) clearTimeout(peekTimer.current);
+    setPeekIndex(null);
+  };
+
+  useEffect(() => () => {
+    if (peekTimer.current) clearTimeout(peekTimer.current);
+  }, []);
+
+  // ─── Game lifecycle ──────────────────────────────────────────────────────
   const handleGameStateChange = useCallback((state: GameState) => {
     setGameState(state);
   }, []);
 
-  const handleMatch = useCallback(() => {
-    // Additional match feedback can go here
-  }, []);
-
-  const handleMismatch = useCallback(() => {
-    // Additional mismatch feedback can go here
-  }, []);
-
-  const handleGraceMismatch = useCallback(() => {
-    // Grace mismatch — no life lost, lighter feedback
-  }, []);
+  const scoreSavedRef = useRef(false);
 
   const handleGameComplete = useCallback(async (finalState: GameState) => {
-    // Stop timer
     if (timerRef.current) clearInterval(timerRef.current);
-
-    // Haptic for game end
     if (finalState.isWin) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } else {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     }
-
     setShowResults(true);
 
-    // Save score to database
-    if (user?.id) {
+    if (user?.id && !scoreSavedRef.current) {
+      scoreSavedRef.current = true;
+      setSaving(true);
       try {
-        const elapsed = getElapsedSeconds(finalState.startTime);
+        const elapsedFinal = getElapsedSeconds(finalState.startTime);
         // Self-submit RPC: the player is the actor, org derived server-side.
         await supabase.rpc('submit_memory_game_score', {
           p_actor_id: user.id,
@@ -203,29 +294,27 @@ export default function MemoryGamePlayScreen() {
           p_play_mode: playMode,
           p_difficulty: difficultyLevel,
           p_score: finalState.score,
-          p_time_seconds: elapsed,
+          p_time_seconds: elapsedFinal,
           p_pairs_matched: finalState.matchedPairIds.length,
           p_total_pairs: difficultyConfig.totalPairs,
           p_lives_remaining: playMode === 'lives' ? finalState.lives : 0,
           p_completed: finalState.isWin,
         });
-        setScoreSaved(true);
         if (finalState.isWin && finalState.score > 0) {
-          notifyLeaderboardPassed(
-            user.id,
-            finalState.score,
-            user.name,
-            organizationId ?? undefined
-          );
+          notifyLeaderboardPassed(user.id, finalState.score, user.name, organizationId ?? undefined);
         }
+        const after = await fetchStanding(user.id, 'memory', mode);
+        setStandingAfter(after);
       } catch (e) {
         console.error('Error saving score:', e);
+      } finally {
+        setSaving(false);
       }
     }
   }, [user?.id, mode, playMode, difficultyLevel, difficultyConfig.totalPairs]);
 
   const handlePlayAgain = () => {
-    setGameKey(prev => prev + 1);
+    setGameKey((prev) => prev + 1);
   };
 
   const handleNextDifficulty = () => {
@@ -233,21 +322,16 @@ export default function MemoryGamePlayScreen() {
     router.replace(`/memory-game-play?mode=${mode}&difficulty=${next}&play_mode=${playMode}`);
   };
 
-  const handleBackToHub = () => {
-    router.back();
-  };
-
-  // Get ALL pairs with matched/unmatched status for the results review
+  // ─── Pairs for the review folds ──────────────────────────────────────────
   const getAllPairs = () => {
     if (!gameState) return [];
     const pairs: { primary: string; match: string; isMatched: boolean }[] = [];
     const seenPairIds = new Set<string>();
-
     for (const card of gameState.cards) {
       if (seenPairIds.has(card.pairId)) continue;
       seenPairIds.add(card.pairId);
-      const primary = gameState.cards.find(c => c.pairId === card.pairId && c.cardType === 'primary');
-      const match = gameState.cards.find(c => c.pairId === card.pairId && c.cardType === 'match');
+      const primary = gameState.cards.find((c) => c.pairId === card.pairId && c.cardType === 'primary');
+      const match = gameState.cards.find((c) => c.pairId === card.pairId && c.cardType === 'match');
       if (primary && match) {
         pairs.push({
           primary: primary.displayText,
@@ -256,474 +340,338 @@ export default function MemoryGamePlayScreen() {
         });
       }
     }
-    // Sort: matched first, then unmatched
-    return pairs.sort((a, b) => (a.isMatched === b.isMatched ? 0 : a.isMatched ? -1 : 1));
+    return pairs;
   };
 
-  // Extract matched pairs only (for win screen)
-  const getMatchedPairs = () => {
-    return getAllPairs().filter(p => p.isMatched);
-  };
+  const modeTitle = t(GAME_MODE_INFO[mode].titleKey);
+  const isWin = !!gameState?.isWin;
+  const finalScore = gameState?.score ?? 0;
+  const isPB = isWin && prevBest > 0 && finalScore > prevBest;
+  const isFirstScore = isWin && prevBest === 0;
+  const resultTitle = isWin
+    ? isPB
+      ? t('game_results:new_personal_best')
+      : t('memory_game.you_won')
+    : isTimed
+      ? t('word_search:times_up')
+      : t('memory_game.game_over');
+
+  const chase = standingAfter?.isTop
+    ? ('top' as const)
+    : standingAfter?.rank != null && standingAfter.gapToAbove != null
+      ? { gapPts: standingAfter.gapToAbove, toRank: standingAfter.rank - 1 }
+      : null;
+
+  const matchedPairs = getAllPairs().filter((p) => p.isMatched);
+  const missedPairs = getAllPairs().filter((p) => !p.isMatched);
+
+  const boardVisual = PLAY_VISUALS.memory.board[scheme];
+  const lives = gameState?.lives ?? difficultyConfig.startingLives;
+  const matchedCount = gameState?.matchedPairIds.length ?? 0;
+  const railLit = matchedCount - (flying ? 1 : 0);
 
   if (loading || !cards) {
     return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-          {t('memory_game.loading')}
-        </Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AmbientGlow />
+        <ScreenHeader title={t('memory_game.hub_title')} eyebrow={modeTitle} />
+        <View style={styles.loadingBody}>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            {t('memory_game.loading')}
+          </Text>
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={handleBackToHub} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.text}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {getModeName(mode)}
-        </Text>
-        <View style={[styles.playModeBadge, { backgroundColor: playMode === 'timed' ? '#F5A623' + '30' : colors.primary + '20' }]}>
-          <Text style={[styles.playModeBadgeText, { color: playMode === 'timed' ? '#F5A623' : colors.primary }]}>
-            {playMode === 'timed' ? '⏱' : '❤️'}
-          </Text>
-        </View>
-      </View>
-
-      {/* HUD */}
-      <GameHUD
-        lives={gameState?.lives ?? difficultyConfig.startingLives}
-        maxLives={difficultyConfig.startingLives}
-        score={gameState?.score ?? 0}
-        difficulty={difficultyLevel}
-        startTime={gameState?.startTime ?? Date.now()}
-        isComplete={gameState?.isComplete ?? false}
-        matchedCount={gameState?.matchedPairIds.length ?? 0}
-        totalPairs={difficultyConfig.totalPairs}
-        playMode={playMode}
-        timeRemaining={playMode === 'timed' ? timeRemaining : undefined}
-        timeLimit={playMode === 'timed' ? difficultyConfig.timeLimitSeconds : undefined}
+    <View ref={rootRef} style={[styles.container, { backgroundColor: colors.background }]}>
+      <AmbientGlow />
+      <ScreenHeader
+        title={t('memory_game.hub_title')}
+        eyebrow={modeTitle}
+        onBack={() => router.back()}
+        right={
+          <View style={[styles.modeChip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+            <IconSymbol
+              ios_icon_name={isTimed ? 'clock.fill' : 'heart.fill'}
+              android_material_icon_name={isTimed ? 'schedule' : 'favorite'}
+              size={16}
+              color={isTimed ? PLAY_VISUALS.memory.console[2] : HEART_FULL}
+            />
+          </View>
+        }
       />
 
-      {/* Preview Pills */}
-      <View style={styles.previewBar}>
-        {previewCards.map((card, i) => renderPreviewCard(card, i))}
-      </View>
-
-      {/* Game Board */}
-      <MemoryGameBoard
-        key={gameKey}
-        cards={cards}
-        difficulty={difficultyConfig}
-        playMode={playMode}
-        timeRemaining={playMode === 'timed' ? timeRemaining : undefined}
-        onGameStateChange={handleGameStateChange}
-        onMatch={handleMatch}
-        onMismatch={handleMismatch}
-        onGraceMismatch={handleGraceMismatch}
-        onGameComplete={handleGameComplete}
-      />
-
-      {/* Results Modal */}
-      <Modal
-        visible={showResults}
-        transparent
-        animationType="fade"
-        onRequestClose={handleBackToHub}
-      >
-        <View style={styles.modalOverlay}>
-          <ScrollView
-            contentContainerStyle={styles.modalScrollContent}
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={[styles.resultsCard, { backgroundColor: colors.card }]}>
-              {/* Result Header */}
-              <Text style={styles.resultEmoji}>
-                {gameState?.isWin ? '🎉' : '💔'}
-              </Text>
-              <Text style={[styles.resultTitle, { color: colors.text }]}>
-                {gameState?.isWin ? t('memory_game.you_won') : t('memory_game.game_over')}
-              </Text>
-
-              {/* Score Breakdown */}
-              <View style={[styles.scoreBreakdown, { backgroundColor: colors.background }]}>
-                <View style={styles.scoreRow}>
-                  <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>
-                    {t('memory_game.pairs_matched')}
-                  </Text>
-                  <Text style={[styles.scoreValue, { color: colors.text }]}>
-                    {gameState?.matchedPairIds.length ?? 0}/{difficultyConfig.totalPairs}
-                  </Text>
-                </View>
-                {playMode === 'lives' ? (
-                  <View style={styles.scoreRow}>
-                    <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>
-                      {t('memory_game.lives_remaining')}
-                    </Text>
-                    <Text style={[styles.scoreValue, { color: colors.text }]}>
-                      {gameState?.lives ?? 0}
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.scoreRow}>
-                    <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>
-                      {t('memory_game.time_remaining')}
-                    </Text>
-                    <Text style={[styles.scoreValue, { color: colors.text }]}>
-                      {timeRemaining}s
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.scoreRow}>
-                  <Text style={[styles.scoreLabel, { color: colors.textSecondary }]}>
-                    {t('memory_game.time_elapsed')}
-                  </Text>
-                  <Text style={[styles.scoreValue, { color: colors.text }]}>
-                    {gameState ? `${getElapsedSeconds(gameState.startTime)}s` : '0s'}
-                  </Text>
-                </View>
-                <View style={[styles.scoreRow, styles.totalRow]}>
-                  <Text style={[styles.totalLabel, { color: colors.primary }]}>
-                    {t('memory_game.total_score')}
-                  </Text>
-                  <Text style={[styles.totalValue, { color: colors.primary }]}>
-                    {(gameState?.score ?? 0).toLocaleString()}
-                  </Text>
-                </View>
-              </View>
-
-              {/* Pairs Review — shown on win (matched only) and loss (all pairs with status) */}
-              {gameState?.isWin ? (
-                <View style={[styles.pairsReview, { backgroundColor: colors.background }]}>
-                  <Text style={[styles.pairsReviewTitle, { color: colors.text }]}>
-                    {t('memory_game.your_matches')}
-                  </Text>
-                  {getMatchedPairs().map((pair, i) => (
-                    <View
-                      key={i}
-                      style={[styles.pairRow, { borderBottomColor: colors.border }]}
-                    >
-                      <Text style={[styles.pairPrimary, { color: colors.primary }]} numberOfLines={2}>
-                        {pair.primary}
-                      </Text>
-                      <Text style={[styles.pairArrow, { color: colors.textSecondary }]}>→</Text>
-                      <Text style={[styles.pairMatch, { color: colors.text }]} numberOfLines={2}>
-                        {pair.match}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              ) : (
-                <View style={[styles.pairsReview, { backgroundColor: colors.background }]}>
-                  <Text style={[styles.pairsReviewTitle, { color: colors.text }]}>
-                    {t('memory_game.all_pairs')}
-                  </Text>
-                  {getAllPairs().map((pair, i) => (
-                    <View
-                      key={i}
-                      style={[styles.pairRow, { borderBottomColor: colors.border }]}
-                    >
-                      <Text style={styles.pairStatusIcon}>
-                        {pair.isMatched ? '✅' : '❌'}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.pairPrimaryCompact,
-                          { color: pair.isMatched ? colors.primary : colors.textSecondary },
-                        ]}
-                        numberOfLines={2}
-                      >
-                        {pair.primary}
-                      </Text>
-                      <Text style={[styles.pairArrow, { color: colors.textSecondary }]}>→</Text>
-                      <Text
-                        style={[
-                          styles.pairMatchCompact,
-                          { color: pair.isMatched ? colors.text : colors.textSecondary },
-                        ]}
-                        numberOfLines={2}
-                      >
-                        {pair.match}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {/* Action Buttons */}
-              <View style={styles.actionButtons}>
-                <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                  onPress={handlePlayAgain}
-                >
-                  <IconSymbol
-                    ios_icon_name="arrow.counterclockwise"
-                    android_material_icon_name="replay"
-                    size={18}
-                    color={colors.fireText}
-                  />
-                  <Text style={[styles.actionButtonText, { color: colors.fireText }]}>
-                    {t('memory_game.play_again')}
-                  </Text>
-                </TouchableOpacity>
-
-                {gameState?.isWin && difficultyLevel < getMaxDifficulty() && (
-                  <TouchableOpacity
-                    style={[styles.actionButton, { backgroundColor: colors.primary }]}
-                    onPress={handleNextDifficulty}
-                  >
-                    <IconSymbol
-                      ios_icon_name="arrow.right"
-                      android_material_icon_name="arrow-forward"
-                      size={18}
-                      color={colors.fireText}
-                    />
-                    <Text style={[styles.actionButtonText, { color: colors.fireText }]}>
-                      {t('memory_game.next_level')}
-                    </Text>
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  style={[styles.secondaryButton, { borderColor: colors.border }]}
-                  onPress={handleBackToHub}
-                >
-                  <Text style={[styles.secondaryButtonText, { color: colors.text }]}>
-                    {t('memory_game.back_to_hub')}
-                  </Text>
-                </TouchableOpacity>
-              </View>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <PlayConsole game="memory">
+          <View style={styles.consoleRow}>
+            <ConsoleTag text={t('memory_game.level_tag', { level: difficultyLevel })} />
+            <ConsoleTimer seconds={isTimed ? timeRemaining : elapsed} warn={isTimed && timeRemaining <= 15} size={22} />
+            <ConsoleStat iosIcon="star" androidIcon="star" value={(gameState?.score ?? 0).toLocaleString()} />
+          </View>
+          <View style={styles.consoleRow2}>
+            {playMode === 'lives' ? (
+              <HeartsRow lives={lives} max={difficultyConfig.startingLives} />
+            ) : (
+              <ConsoleTag text={t('memory_game.timed_mode')} />
+            )}
+            <View ref={railWrapRef} collapsable={false}>
+              <PairRail
+                total={difficultyConfig.totalPairs}
+                lit={railLit}
+                landingIndex={flying?.targetIndex ?? null}
+                peekIndex={peekIndex}
+                onSlotPress={handleSlotPeek}
+              />
             </View>
-          </ScrollView>
+          </View>
+        </PlayConsole>
+
+        <View ref={dockWrapRef} collapsable={false}>
+          <FlipDock
+            left={dockLeft}
+            right={dockRight}
+            state={dockState}
+            peekLabel={
+              peekIndex !== null
+                ? t('memory_game.dock_peek_tag', { number: peekIndex + 1 })
+                : undefined
+            }
+            onDismissPeek={dismissPeek}
+          />
         </View>
-      </Modal>
+
+        {/* The theme-aware gradient board with org-branded backs. */}
+        <View style={styles.boardShell}>
+          <LinearGradient
+            colors={[boardVisual[0], boardVisual[1], boardVisual[2]]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0.7, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <MemoryGameBoard
+            key={gameKey}
+            cards={cards}
+            difficulty={difficultyConfig}
+            playMode={playMode}
+            timeRemaining={isTimed ? timeRemaining : undefined}
+            orgName={organization?.name ?? ''}
+            orgLogoUrl={organization?.logo_url ?? null}
+            onGameStateChange={handleGameStateChange}
+            onMatch={() => {}}
+            onMismatch={() => {}}
+            onGraceMismatch={() => {}}
+            onGameComplete={handleGameComplete}
+          />
+        </View>
+      </ScrollView>
+
+      {/* The merged pair chip mid-flight to its rail slot. */}
+      {flying && (
+        <RNAnimated.View
+          pointerEvents="none"
+          style={[
+            styles.flyChip,
+            {
+              transform: [
+                { translateX: RNAnimated.subtract(flyPos.x, 70) },
+                { translateY: RNAnimated.subtract(flyPos.y, 14) },
+                { scale: flyScale },
+              ],
+            },
+          ]}
+        >
+          <Text style={styles.flyText} numberOfLines={1}>
+            {flying.label} ✓
+          </Text>
+        </RNAnimated.View>
+      )}
+
+      <GameResults
+        visible={showResults}
+        game="memory"
+        title={resultTitle}
+        score={finalScore}
+        meta={`${modeTitle} · ${t('memory_game.level_short', { level: difficultyLevel })} · ${isTimed ? t('memory_game.timed_mode') : t('memory_game.lives_mode')}`}
+        deltaChip={
+          isPB
+            ? t('game_results:vs_best_delta', { delta: (finalScore - prevBest).toLocaleString() })
+            : isFirstScore
+              ? t('game_results:first_score')
+              : undefined
+        }
+        rankBefore={rankBefore}
+        rankAfter={standingAfter?.rank ?? null}
+        chase={chase}
+        boardLabel={t('game_results:board_label', { name: modeTitle })}
+        celebrate={isWin}
+        saving={saving}
+        statRows={[
+          {
+            label: t('memory_game.pairs_matched'),
+            value: `${matchedCount}/${difficultyConfig.totalPairs}`,
+          },
+          playMode === 'lives'
+            ? { label: t('memory_game.lives_remaining'), value: String(gameState?.lives ?? 0) }
+            : { label: t('memory_game.time_remaining'), value: `${timeRemaining}s` },
+          {
+            label: t('memory_game.time_elapsed'),
+            value: gameState ? `${getElapsedSeconds(gameState.startTime)}s` : '0s',
+          },
+          ...(!isPB && prevBest > 0
+            ? [{ label: t('game_results:your_best'), value: prevBest.toLocaleString() }]
+            : []),
+        ]}
+        playAgainLabel={t('memory_game.play_again')}
+        onPlayAgain={handlePlayAgain}
+        extraAction={
+          isWin && difficultyLevel < getMaxDifficulty()
+            ? { label: t('memory_game.next_level'), onPress: handleNextDifficulty }
+            : undefined
+        }
+        viewBoardLabel={t('game_results:view_board')}
+        onViewBoard={() => router.replace('/master-leaderboard?tab=memory')}
+        backLabel={t('game_results:back_to_game', { name: t('memory_game.hub_title') })}
+        onBack={() => router.replace('/menu-memory-game')}
+        onGameHub={() => router.replace('/game-hub')}
+      >
+        {missedPairs.length > 0 && (
+          <ResultsFold
+            iconIos="xmark"
+            iconAndroid="close"
+            iconColor="#EF4444"
+            title={t('game_results:review_these')}
+            count={missedPairs.length}
+            initiallyOpen
+          >
+            {missedPairs.map((pair, i) => (
+              <PairReviewRow key={i} primary={pair.primary} match={pair.match} matched={false} />
+            ))}
+          </ResultsFold>
+        )}
+        <ResultsFold
+          iconIos="checkmark"
+          iconAndroid="check"
+          iconColor="#10B981"
+          title={t('memory_game.your_matches')}
+          count={`${matchedPairs.length}/${difficultyConfig.totalPairs}`}
+          initiallyOpen={missedPairs.length === 0}
+        >
+          {matchedPairs.map((pair, i) => (
+            <PairReviewRow key={i} primary={pair.primary} match={pair.match} matched />
+          ))}
+        </ResultsFold>
+      </GameResults>
+    </View>
+  );
+}
+
+function PairReviewRow({ primary, match, matched }: { primary: string; match: string; matched: boolean }) {
+  const colors = useThemeColors();
+  return (
+    <View style={[styles.reviewRow, { borderTopColor: colors.hairline }]}>
+      <IconSymbol
+        ios_icon_name={matched ? 'checkmark' : 'xmark'}
+        android_material_icon_name={matched ? 'check' : 'close'}
+        size={13}
+        color={matched ? '#10B981' : '#EF4444'}
+      />
+      <Text style={[styles.reviewPrimary, { color: matched ? colors.text : colors.textSecondary }]} numberOfLines={1}>
+        {primary}
+      </Text>
+      <IconSymbol ios_icon_name="arrow.right" android_material_icon_name="arrow-forward" size={11} color={colors.textSecondary} />
+      <Text style={[styles.reviewMatch, { color: matched ? colors.text : colors.textSecondary }]} numberOfLines={1}>
+        {match}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1 },
+  loadingBody: {
     flex: 1,
-  },
-  loadingContainer: {
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 14,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 60,
-    paddingBottom: 12,
+  loadingText: { fontSize: 15 },
+  content: {
     paddingHorizontal: 16,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    padding: 4,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    flex: 1,
-    textAlign: 'center',
-  },
-  playModeBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  playModeBadgeText: {
-    fontSize: 16,
-  },
-  // Preview Pills
-  previewBar: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: 90,
-    paddingHorizontal: 12,
+    paddingTop: 4,
+    paddingBottom: 28,
     gap: 10,
   },
-  previewCard: {
-    flex: 1,
-    maxWidth: 180,
-    height: 78,
-    borderRadius: 14,
-    borderWidth: 2,
+  modeChip: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingTop: 7,
-    paddingBottom: 5,
-  },
-  previewSubtext: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 2,
-  },
-  previewText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '700',
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  // Results Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-  },
-  modalScrollContent: {
-    flexGrow: 1,
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
   },
-  resultsCard: {
-    width: '100%',
-    maxWidth: 340,
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-  },
-  resultEmoji: {
-    fontSize: 48,
-    marginBottom: 8,
-  },
-  resultTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    marginBottom: 16,
-  },
-  scoreBreakdown: {
-    width: '100%',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 20,
-  },
-  scoreRow: {
+  consoleRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 6,
-  },
-  scoreLabel: {
-    fontSize: 13,
-  },
-  scoreValue: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  totalRow: {
-    borderTopWidth: 1,
-    borderTopColor: '#ddd',
-    marginTop: 4,
-    paddingTop: 10,
-  },
-  totalLabel: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: '800',
-  },
-  actionButtons: {
-    width: '100%',
     gap: 10,
   },
-  actionButton: {
+  consoleRow2: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 13,
-    borderRadius: 10,
+    justifyContent: 'space-between',
+    gap: 10,
+    marginTop: 9,
   },
-  actionButtonText: {
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: '700',
+  boardShell: {
+    borderRadius: 22,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    borderColor: 'rgba(120,140,190,0.28)',
+    boxShadow: '0 12px 30px -16px rgba(0,0,0,0.45)',
   },
-  secondaryButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    borderRadius: 10,
+  flyChip: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: 140,
+    height: 28,
+    borderRadius: 9,
+    backgroundColor: 'rgba(16,185,129,0.22)',
     borderWidth: 1,
+    borderColor: 'rgba(16,185,129,0.7)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+    zIndex: 40,
+    boxShadow: '0 4px 14px -4px rgba(16,185,129,0.6)',
   },
-  secondaryButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
+  flyText: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 10,
+    color: '#10B981',
   },
-  // Pairs Review
-  pairsReview: {
-    width: '100%',
-    borderRadius: 10,
-    padding: 14,
-    marginBottom: 20,
-  },
-  pairsReviewTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  pairRow: {
+  reviewRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 7,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  pairPrimary: {
+  reviewPrimary: {
     flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'right',
-    paddingRight: 6,
-  },
-  pairArrow: {
-    fontSize: 16,
-    paddingHorizontal: 4,
-  },
-  pairMatch: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
-    paddingLeft: 6,
-  },
-  pairStatusIcon: {
-    fontSize: 14,
-    marginRight: 6,
-    width: 20,
-    textAlign: 'center',
-  },
-  pairPrimaryCompact: {
-    flex: 1,
+    minWidth: 0,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: fonts.body.semibold,
     textAlign: 'right',
-    paddingRight: 4,
   },
-  pairMatchCompact: {
+  reviewMatch: {
     flex: 1,
+    minWidth: 0,
     fontSize: 12,
-    fontWeight: '600',
-    paddingLeft: 4,
+    fontFamily: fonts.body.semibold,
   },
 });

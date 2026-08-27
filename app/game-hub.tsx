@@ -30,7 +30,7 @@ import { StorageImage } from '@/components/StorageImage';
 import { MessageBadge } from '@/components/MessageBadge';
 import AmbientGlow from '@/components/AmbientGlow';
 import ScreenHeader from '@/components/ScreenHeader';
-import HeaderNavMenu from '@/components/HeaderNavMenu';
+import GameHubHeaderAction from '@/components/game/GameHubHeaderAction';
 import BottomNavBar from '@/components/BottomNavBar';
 import JoltOverlay from '@/components/JoltOverlay';
 import GameSquareTile from '@/components/game/GameSquareTile';
@@ -224,37 +224,10 @@ export default function GameHubScreen() {
       ].filter((p): p is { leader: LeaderEntry; place: number } => !!p.leader)
     : [];
 
-  const navMenu = isManagerOrOwner(user) ? (
-    <HeaderNavMenu
-      label={t('game_hub_ui:menu_pill')}
-      iconIos="gearshape.fill"
-      iconAndroid="settings"
-      sheetTitle={t('game_hub_ui:title')}
-      actions={[
-        {
-          key: 'editor',
-          label: t('game_hub_ui:menu_editor'),
-          iosIcon: 'pencil',
-          androidIcon: 'edit',
-          onPress: () => router.replace('/game-hub-editor'),
-        },
-        {
-          key: 'rewards',
-          label: t('game_hub_ui:menu_rewards'),
-          iosIcon: 'star.fill',
-          androidIcon: 'star',
-          onPress: () => router.push('/rewards-and-reviews-editor'),
-        },
-        {
-          key: 'reset',
-          label: t('game_hub_ui:menu_reset'),
-          iosIcon: 'arrow.counterclockwise',
-          androidIcon: 'refresh',
-          onPress: () => router.replace('/game-hub-editor?tab=boards'),
-        },
-      ]}
-    />
-  ) : undefined;
+  // Managers get the settings menu; employees on the hub get nothing (the
+  // shared component also serves the game pages, where employees get a
+  // jump-home pill instead).
+  const navMenu = isManagerOrOwner(user) ? <GameHubHeaderAction context="hub" /> : undefined;
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

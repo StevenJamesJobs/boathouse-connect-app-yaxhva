@@ -8,9 +8,10 @@ import { fonts } from '@/constants/fonts';
 /**
  * Square arcade tile for the Game Hub and the per-game category grids (s75
  * Arcade Shelf). A game-colored gradient IS the card: big white glyph in the
- * middle, name on a dark scrim at the foot, and a caret chip top-right that
- * flips while the tile's board card is expanded below the shelf. Premium-locked
- * tiles swap the caret for a lock chip.
+ * middle, name on a dark scrim at the foot, and a caret chip bottom-right —
+ * beside where the expanded board card emerges (Steve, s76) — that flips while
+ * the tile's board card is open. Premium-locked tiles swap the caret for a
+ * lock chip in the same corner.
  *
  * Scrim text/pill colors are LITERALS on purpose — the gradient is a fixed-dark
  * photo-class surface in both themes (the rulebook's ember lesson), so white +
@@ -109,7 +110,7 @@ const styles = StyleSheet.create({
   },
   cornerChip: {
     position: 'absolute',
-    top: 7,
+    bottom: 7,
     right: 7,
     width: 21,
     height: 21,
@@ -123,7 +124,8 @@ const styles = StyleSheet.create({
   name: {
     position: 'absolute',
     left: 8,
-    right: 8,
+    // Clears the bottom-right caret/lock chip (7 + 21 + 6).
+    right: 34,
     bottom: 7,
     fontFamily: fonts.display.semibold,
     fontSize: 11.5,

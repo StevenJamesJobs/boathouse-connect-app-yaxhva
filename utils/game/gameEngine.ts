@@ -218,11 +218,5 @@ export function formatTime(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Get display name for a game mode
-export function getModeName(mode: GameMode): string {
-  switch (mode) {
-    case 'wine_pairings': return 'Wine & Entree Pairings';
-    case 'ingredients_dishes': return 'Ingredients & Dishes';
-    case 'cocktail_ingredients': return 'Cocktails & Ingredients';
-  }
-}
+// (Mode display names come from GAME_MODE_INFO's titleKeys via t() — the old
+// EN-literal getModeName retired with the s76 screen rebuild.)

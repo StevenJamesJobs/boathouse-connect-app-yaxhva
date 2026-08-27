@@ -1,54 +1,58 @@
 /**
- * Word Search Play Screen
- * The main game screen: HUD + interactive grid + scrollable word list.
- * Shows win/loss modals with full word review.
+ * Word Search Play — the s76 lockdown screen.
+ * ScreenHeader + WS console (timer · score · found) over the theme-aware
+ * gradient board with capsule highlights, per-dish word trays below, and the
+ * shared GameResults sheet (split header, board standing + chase line,
+ * confetti on wins/personal bests).
  */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  Modal,
-  ActivityIndicator,
-  Platform,
-} from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useTranslation } from 'react-i18next';
 import { useThemeColors } from '@/hooks/useThemeColors';
+import { useAppTheme } from '@/contexts/ThemeContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOrganization } from '@/contexts/OrganizationContext';
 import { supabase } from '@/app/integrations/supabase/client';
 import { notifyLeaderboardPassed } from '@/utils/notificationHelpers';
-import { useTranslation } from 'react-i18next';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import { IconSymbol } from '@/components/IconSymbol';
 import {
   GridCell,
   WordSearchCategory,
   WordSearchDifficulty,
   WordSearchPlayMode,
   WordSearchPuzzle,
-  WordSearchWord,
 } from '@/types/game';
 import {
   generateWordSearchPuzzle,
   getTimeLimitSeconds,
   calculateWordSearchScore,
-  getDifficultyConfig,
   POINTS_PER_WORD,
   TIMED_BONUS_PER_SECOND,
   DIFFICULTY_MULTIPLIER,
 } from '@/utils/game/wordSearchEngine';
 import { getWordsForCategory } from '@/utils/game/wordSearchDataAdapters';
+import { fetchStanding, BoardStanding } from '@/utils/game/standing';
 import WordSearchGrid from '@/components/game/WordSearchGrid';
-import WordSearchWordList from '@/components/game/WordSearchWordList';
-import WordSearchHUD from '@/components/game/WordSearchHUD';
-import { useOrganization } from '@/contexts/OrganizationContext';
+import WordTrays from '@/components/game/WordTrays';
+import PlayConsole, { ConsoleTimer, ConsoleStat } from '@/components/game/PlayConsole';
+import GameResults, { ResultsFold } from '@/components/game/GameResults';
+import { PLAY_VISUALS } from '@/components/game/gameVisuals';
+import { fonts } from '@/constants/fonts';
 
 type GamePhase = 'loading' | 'playing' | 'won' | 'lost';
 
+const BOARD_PAD = 10; // matches WordSearchGrid's sizing constant
+
 export default function WordSearchPlayScreen() {
   const colors = useThemeColors();
+  const { resolvedMode } = useAppTheme();
+  const scheme = resolvedMode === 'dark' ? 'dark' : 'light';
   const router = useRouter();
   const { user } = useAuth();
   const { organizationId, organization } = useOrganization();
@@ -62,6 +66,8 @@ export default function WordSearchPlayScreen() {
   const category = params.category ?? 'dishes_ingredients';
   const difficulty = params.difficulty ?? 'easy';
   const playMode = params.playMode ?? 'free';
+  const isTimed = playMode === 'timed';
+  const timeLimitSeconds = isTimed ? getTimeLimitSeconds(difficulty) : 0;
 
   const [phase, setPhase] = useState<GamePhase>('loading');
   const [puzzle, setPuzzle] = useState<WordSearchPuzzle | null>(null);
@@ -69,63 +75,88 @@ export default function WordSearchPlayScreen() {
   const [foundWordIds, setFoundWordIds] = useState<string[]>([]);
   const [score, setScore] = useState(0);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [saving, setSaving] = useState(false);
   const scoreSavedRef = useRef(false);
 
-  const timeLimitSeconds = playMode === 'timed' ? getTimeLimitSeconds(difficulty) : 0;
+  // Board standing for the results header — captured before play, refreshed
+  // after the score lands (the run is what moves the board).
+  const [prevBest, setPrevBest] = useState(0);
+  const [rankBefore, setRankBefore] = useState<number | null>(null);
+  const [standingAfter, setStandingAfter] = useState<BoardStanding | null>(null);
 
-  // ─── Load puzzle ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user?.id) return;
+    let cancelled = false;
+    (async () => {
+      const [standing, statsRes] = await Promise.all([
+        fetchStanding(user.id, 'word_search', category),
+        supabase.rpc('get_my_game_category_stats', { p_actor_id: user.id, p_game: 'word_search' }),
+      ]);
+      if (cancelled) return;
+      if (standing) setRankBefore(standing.rank);
+      const row = (statsRes.data || []).find((r: any) => r.category === category);
+      if (row) setPrevBest(Number(row.score));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id, category]);
+
+  // ─── Load puzzle ─────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     async function load() {
       if (!user?.id) return;
       const rawWords = await getWordsForCategory(category, difficulty, organizationId ?? '', organization.games_use_sample_data, user.id);
       if (cancelled) return;
-      const generated = generateWordSearchPuzzle(rawWords, difficulty);
-      setPuzzle(generated);
+      setPuzzle(generateWordSearchPuzzle(rawWords, difficulty));
       setPhase('playing');
     }
     load();
     return () => { cancelled = true; };
   }, [category, difficulty, user?.id]);
 
-  // ─── Word found ───────────────────────────────────────────────────────────────
+  // ─── Clock (single source — the console just renders it) ─────────────────
+  useEffect(() => {
+    if (phase !== 'playing') return;
+    const interval = setInterval(() => {
+      setElapsedSeconds((prev) => {
+        const next = prev + 1;
+        if (isTimed && next >= timeLimitSeconds) {
+          clearInterval(interval);
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+          setPhase('lost');
+          return timeLimitSeconds;
+        }
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [phase, isTimed, timeLimitSeconds]);
+
+  // ─── Word found ──────────────────────────────────────────────────────────
   const handleWordFound = useCallback((wordId: string) => {
-    if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     setFoundWordIds((prev) => {
       const next = [...prev, wordId];
-      // Check if all words found
       if (puzzle && next.length === puzzle.words.length) {
         setPhase('won');
       }
       return next;
     });
     setScore((prev) => prev + Math.round(POINTS_PER_WORD * DIFFICULTY_MULTIPLIER[difficulty]));
-  }, [puzzle]);
+  }, [puzzle, difficulty]);
 
-  // ─── Timer callbacks ──────────────────────────────────────────────────────────
-  const handleTick = useCallback((secs: number) => {
-    setElapsedSeconds(secs);
-  }, []);
+  // ─── Save score + refresh standing ───────────────────────────────────────
+  const timeRemaining = isTimed ? Math.max(0, timeLimitSeconds - elapsedSeconds) : 0;
+  const finalScore = phase === 'won'
+    ? calculateWordSearchScore(foundWordIds.length, timeRemaining, playMode, difficulty)
+    : score;
 
-  const handleTimeExpired = useCallback(() => {
-    if (phase !== 'playing') return;
-    if (Platform.OS !== 'web') {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    }
-    setPhase('lost');
-  }, [phase]);
-
-  // ─── Save score ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if ((phase === 'won' || phase === 'lost') && puzzle && user && !scoreSavedRef.current) {
       scoreSavedRef.current = true;
-      const timeRemaining = timeLimitSeconds > 0 ? Math.max(0, timeLimitSeconds - elapsedSeconds) : 0;
-      const finalScore = phase === 'won'
-        ? calculateWordSearchScore(foundWordIds.length, timeRemaining, playMode, difficulty)
-        : score;
-
+      setSaving(true);
       // Self-submit RPC: the player is the actor, org derived server-side.
       supabase.rpc('submit_word_search_score', {
         p_actor_id: user.id,
@@ -137,20 +168,18 @@ export default function WordSearchPlayScreen() {
         p_total_words: puzzle.words.length,
         p_time_seconds: elapsedSeconds,
         p_completed: phase === 'won',
-      }).then(() => {
+      }).then(async () => {
         if (phase === 'won' && finalScore > 0) {
-          notifyLeaderboardPassed(
-            user.id,
-            finalScore,
-            user.name,
-            organizationId ?? undefined
-          );
+          notifyLeaderboardPassed(user.id, finalScore, user.name, organizationId ?? undefined);
         }
+        const after = await fetchStanding(user.id, 'word_search', category);
+        setStandingAfter(after);
+        setSaving(false);
       });
     }
   }, [phase]);
 
-  // ─── Restart ──────────────────────────────────────────────────────────────────
+  // ─── Restart ─────────────────────────────────────────────────────────────
   const handleRestart = async () => {
     if (!user?.id) return;
     scoreSavedRef.current = false;
@@ -159,283 +188,306 @@ export default function WordSearchPlayScreen() {
     setScore(0);
     setElapsedSeconds(0);
     setSelectedCells([]);
+    setStandingAfter(null);
     const rawWords = await getWordsForCategory(category, difficulty, organizationId ?? '', organization.games_use_sample_data, user.id);
-    const generated = generateWordSearchPuzzle(rawWords, difficulty);
-    setPuzzle(generated);
+    setPuzzle(generateWordSearchPuzzle(rawWords, difficulty));
     setPhase('playing');
   };
 
-  // ─── Result modal content ─────────────────────────────────────────────────────
-  const renderResultModal = () => {
-    if (!puzzle || (phase !== 'won' && phase !== 'lost')) return null;
+  // ─── Results derivation ──────────────────────────────────────────────────
+  const isWin = phase === 'won';
+  const isPB = isWin && prevBest > 0 && finalScore > prevBest;
+  const isFirstScore = isWin && prevBest === 0;
+  const celebrate = isWin; // win = full completion; PB implies win here
+  const resultTitle = !isWin
+    ? t('word_search:times_up')
+    : isPB
+      ? t('game_results:new_personal_best')
+      : t('word_search:puzzle_complete');
 
-    const isWin = phase === 'won';
-    const timeRemaining = timeLimitSeconds > 0 ? Math.max(0, timeLimitSeconds - elapsedSeconds) : 0;
-    const finalScore = isWin
-      ? calculateWordSearchScore(foundWordIds.length, timeRemaining, playMode, difficulty)
-      : score;
-    const multiplier = DIFFICULTY_MULTIPLIER[difficulty];
-    const pointsPerWord = Math.round(POINTS_PER_WORD * multiplier);
-    const timeBonus = isWin && playMode === 'timed' ? Math.round(timeRemaining * TIMED_BONUS_PER_SECOND * multiplier) : 0;
+  const multiplier = DIFFICULTY_MULTIPLIER[difficulty];
+  const pointsPerWord = Math.round(POINTS_PER_WORD * multiplier);
+  const timeBonus = isWin && isTimed ? Math.round(timeRemaining * TIMED_BONUS_PER_SECOND * multiplier) : 0;
 
-    // Group words by dish/cocktail for review
-    const grouped = new Map<string, WordSearchWord[]>();
-    for (const word of puzzle.words) {
-      if (!grouped.has(word.itemName)) grouped.set(word.itemName, []);
-      grouped.get(word.itemName)!.push(word);
+  const missedWords = puzzle ? puzzle.words.filter((w) => !foundWordIds.includes(w.id)) : [];
+  const foundWords = puzzle ? puzzle.words.filter((w) => foundWordIds.includes(w.id)) : [];
+
+  // Review stays organized by DISH (Steve's study note) — each fold groups
+  // its words under the menu item they belong to.
+  const groupByItem = (words: typeof missedWords) => {
+    const map = new Map<string, typeof missedWords>();
+    for (const w of words) {
+      if (!map.has(w.itemName)) map.set(w.itemName, []);
+      map.get(w.itemName)!.push(w);
     }
-
-    return (
-      <Modal visible transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.resultCard, { backgroundColor: colors.card }]}>
-            <Text style={styles.resultEmoji}>{isWin ? '🎉' : '⏰'}</Text>
-            <Text style={[styles.resultTitle, { color: colors.text }]}>
-              {isWin ? t('word_search:puzzle_complete') : t('word_search:times_up')}
-            </Text>
-            <Text style={[styles.resultSub, { color: colors.textSecondary }]}>
-              {isWin
-                ? t('word_search:great_work')
-                : t('word_search:you_found_count', { found: foundWordIds.length, total: puzzle.words.length })}
-            </Text>
-
-            {/* Score breakdown */}
-            <View style={[styles.scoreBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-              <ScoreRow label={t('word_search:words_found')} value={`${foundWordIds.length} × ${pointsPerWord}`} color={colors.primary} />
-              {playMode === 'timed' && isWin && (
-                <ScoreRow label={t('word_search:time_bonus')} value={`+${timeBonus}`} color="#10B981" />
-              )}
-              <View style={[styles.scoreDivider, { backgroundColor: colors.border }]} />
-              <ScoreRow label={t('word_search:total_score')} value={String(finalScore)} color={colors.primary} bold />
-            </View>
-
-            {/* Word review grouped by dish/cocktail */}
-            <View style={[styles.reviewBox, { borderColor: colors.border }]}>
-              <Text style={[styles.reviewTitle, { color: colors.text }]}>{t('word_search:word_review')}</Text>
-              <ScrollView style={styles.reviewScroll} showsVerticalScrollIndicator={false}>
-                {Array.from(grouped.entries()).map(([itemName, words]) => (
-                  <View key={itemName}>
-                    <View style={styles.reviewGroupHeader}>
-                      <Text style={[styles.reviewGroupTitle, { color: colors.text }]}>
-                        🍽 {itemName}
-                      </Text>
-                    </View>
-                    {words.map((word) => {
-                      const wasFound = foundWordIds.includes(word.id);
-                      return (
-                        <View key={word.id} style={styles.reviewRow}>
-                          <Text style={[styles.reviewCheck, { color: wasFound ? '#10B981' : '#EF4444' }]}>
-                            {wasFound ? '✓' : '✗'}
-                          </Text>
-                          <Text style={[styles.reviewWordLabel, { color: colors.textSecondary }]} numberOfLines={1}>
-                            {word.displayLabel}
-                          </Text>
-                          <Text style={[styles.reviewSearchWord, { color: wasFound ? colors.primary : colors.textSecondary }]}>
-                            {word.searchWord}
-                          </Text>
-                        </View>
-                      );
-                    })}
-                  </View>
-                ))}
-              </ScrollView>
-            </View>
-
-            {/* Action buttons */}
-            <TouchableOpacity
-              style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-              onPress={handleRestart}
-            >
-              <Text style={[styles.actionBtnText, { color: colors.fireText }]}>{t('word_search:play_again')}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.secondaryBtn, { borderColor: colors.border }]}
-              onPress={() => {
-                setPhase('loading');
-                router.replace('/word-search-game');
-              }}
-            >
-              <Text style={[styles.secondaryBtnText, { color: colors.textSecondary }]}>{t('word_search:back_to_categories')}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    );
+    return Array.from(map.entries());
   };
 
-  // ─── Loading state ────────────────────────────────────────────────────────────
+  const chase = standingAfter?.isTop
+    ? ('top' as const)
+    : standingAfter?.rank != null && standingAfter.gapToAbove != null
+      ? { gapPts: standingAfter.gapToAbove, toRank: standingAfter.rank - 1 }
+      : null;
+
+  const categoryLabel = t(`word_search:cat_${category}`);
+  const meta = `${categoryLabel} · ${t(`word_search:difficulty_${difficulty}`)} · ${t(`word_search:play_mode_${playMode}`)}`;
+
+  const boardVisual = PLAY_VISUALS.word_search.board[scheme];
+
+  // ─── Loading ─────────────────────────────────────────────────────────────
   if (phase === 'loading' || !puzzle) {
     return (
-      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>{t('word_search:building_puzzle')}</Text>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AmbientGlow />
+        <ScreenHeader title={t('word_search:hub_title')} eyebrow={categoryLabel} />
+        <View style={styles.loadingBody}>
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+            {t('word_search:building_puzzle')}
+          </Text>
+        </View>
       </View>
     );
   }
 
-  // ─── Game screen ──────────────────────────────────────────────────────────────
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* HUD */}
-      <WordSearchHUD
-        category={category}
-        difficulty={difficulty}
-        playMode={playMode}
-        score={score}
-        wordsFound={foundWordIds.length}
-        totalWords={puzzle.words.length}
-        timeLimitSeconds={timeLimitSeconds}
-        isComplete={phase !== 'playing'}
-        onTimeExpired={handleTimeExpired}
-        onTick={handleTick}
+      <AmbientGlow />
+      <ScreenHeader
+        title={t('word_search:hub_title')}
+        eyebrow={`${categoryLabel} · ${t(`word_search:difficulty_${difficulty}`)}`}
         onBack={() => router.replace('/word-search-game')}
+        right={
+          <View style={[styles.modeChip, { backgroundColor: colors.glass, borderColor: colors.glassBorder }]}>
+            <IconSymbol
+              ios_icon_name={isTimed ? 'clock.fill' : 'infinity'}
+              android_material_icon_name={isTimed ? 'schedule' : 'all-inclusive'}
+              size={16}
+              color={PLAY_VISUALS.word_search.console[2]}
+            />
+          </View>
+        }
       />
 
-      {/* Grid — does not scroll, sized to content */}
-      <View style={styles.gridContainer}>
-        <WordSearchGrid
-          puzzle={puzzle}
-          selectedCells={selectedCells}
-          foundWordIds={foundWordIds}
-          onSelectionChange={setSelectedCells}
-          onWordFound={handleWordFound}
-          disabled={phase !== 'playing'}
-        />
+      {/* FROZEN column — no page scroll: a board drag must never move the
+          page under the finger (the s76 smoke bug). Only the tray pager
+          scrolls, horizontally, in its own region below. */}
+      <View style={styles.content}>
+        <PlayConsole game="word_search">
+          <View style={styles.consoleRow}>
+            <ConsoleTimer
+              seconds={isTimed ? timeRemaining : elapsedSeconds}
+              warn={isTimed && timeRemaining <= 30}
+            />
+            <ConsoleStat iosIcon="star" androidIcon="star" value={score.toLocaleString()} />
+            <ConsoleStat
+              iosIcon="textformat.abc"
+              androidIcon="spellcheck"
+              value={String(foundWordIds.length)}
+              suffix={`/${puzzle.words.length}`}
+            />
+          </View>
+        </PlayConsole>
+
+        {/* The theme-aware gradient board — capsules + floating letters inside. */}
+        <View style={styles.boardShell}>
+          <LinearGradient
+            colors={[boardVisual[0], boardVisual[1], boardVisual[2]]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+          <WordSearchGrid
+            puzzle={puzzle}
+            selectedCells={selectedCells}
+            foundWordIds={foundWordIds}
+            onSelectionChange={setSelectedCells}
+            onWordFound={handleWordFound}
+            disabled={phase !== 'playing'}
+          />
+        </View>
+
+        <View style={styles.trayRegion}>
+          <WordTrays words={puzzle.words} foundWordIds={foundWordIds} />
+        </View>
       </View>
 
-      {/* Word List — takes remaining space and scrolls */}
-      <View style={[styles.wordListContainer, { borderTopColor: colors.border }]}>
-        <WordSearchWordList
-          words={puzzle.words}
-          foundWordIds={foundWordIds}
-          scrollable
-        />
-      </View>
-
-      {/* Result modal */}
-      {renderResultModal()}
+      <GameResults
+        visible={phase === 'won' || phase === 'lost'}
+        game="word_search"
+        title={resultTitle}
+        score={finalScore}
+        meta={meta}
+        deltaChip={
+          isPB
+            ? t('game_results:vs_best_delta', { delta: (finalScore - prevBest).toLocaleString() })
+            : isFirstScore
+              ? t('game_results:first_score')
+              : undefined
+        }
+        rankBefore={rankBefore}
+        rankAfter={standingAfter?.rank ?? null}
+        chase={chase}
+        boardLabel={t('game_results:board_label', { name: categoryLabel })}
+        celebrate={celebrate}
+        saving={saving}
+        statRows={[
+          {
+            label: t('word_search:words_found'),
+            value: `${foundWordIds.length} × ${pointsPerWord}`,
+          },
+          ...(timeBonus > 0
+            ? [{ label: t('word_search:time_bonus'), value: `+${timeBonus.toLocaleString()}`, color: '#10B981' }]
+            : []),
+          ...(!isPB && prevBest > 0
+            ? [{ label: t('game_results:your_best'), value: prevBest.toLocaleString() }]
+            : []),
+        ]}
+        playAgainLabel={t('word_search:play_again')}
+        onPlayAgain={handleRestart}
+        viewBoardLabel={t('game_results:view_board')}
+        onViewBoard={() => router.replace('/master-leaderboard?tab=word_search')}
+        backLabel={t('game_results:back_to_game', { name: t('word_search:hub_title') })}
+        onBack={() => router.replace('/word-search-game')}
+        onGameHub={() => router.replace('/game-hub')}
+      >
+        {missedWords.length > 0 && (
+          <ResultsFold
+            iconIos="xmark"
+            iconAndroid="close"
+            iconColor="#EF4444"
+            title={t('game_results:review_these')}
+            count={missedWords.length}
+            initiallyOpen
+          >
+            {groupByItem(missedWords).map(([itemName, words]) => (
+              <React.Fragment key={itemName}>
+                <DishHeaderRow name={itemName} />
+                {words.map((word) => (
+                  <WordReviewRow key={word.id} label={word.displayLabel} word={word.searchWord} found={false} />
+                ))}
+              </React.Fragment>
+            ))}
+          </ResultsFold>
+        )}
+        <ResultsFold
+          iconIos="checkmark"
+          iconAndroid="check"
+          iconColor="#10B981"
+          title={t('word_search:words_found')}
+          count={`${foundWords.length}/${puzzle.words.length}`}
+          initiallyOpen={missedWords.length === 0}
+        >
+          {groupByItem(foundWords).map(([itemName, words]) => (
+            <React.Fragment key={itemName}>
+              <DishHeaderRow name={itemName} />
+              {words.map((word) => (
+                <WordReviewRow key={word.id} label={word.displayLabel} word={word.searchWord} found />
+              ))}
+            </React.Fragment>
+          ))}
+        </ResultsFold>
+      </GameResults>
     </View>
   );
 }
 
-function ScoreRow({
-  label,
-  value,
-  color,
-  bold,
-}: {
-  label: string;
-  value: string;
-  color: string;
-  bold?: boolean;
-}) {
+function DishHeaderRow({ name }: { name: string }) {
+  const colors = useThemeColors();
   return (
-    <View style={styles.scoreRow}>
-      <Text style={[styles.scoreLabel, bold && styles.scoreLabelBold]}>{label}</Text>
-      <Text style={[styles.scoreValue, { color }, bold && styles.scoreValueBold]}>{value}</Text>
+    <View style={[styles.dishHeader, { borderTopColor: colors.hairline }]}>
+      <Text style={[styles.dishHeaderText, { color: colors.text }]} numberOfLines={1}>
+        {name}
+      </Text>
+    </View>
+  );
+}
+
+function WordReviewRow({ label, word, found }: { label: string; word: string; found: boolean }) {
+  const colors = useThemeColors();
+  return (
+    <View style={[styles.reviewRow, { borderTopColor: colors.hairline }]}>
+      <IconSymbol
+        ios_icon_name={found ? 'checkmark' : 'xmark'}
+        android_material_icon_name={found ? 'check' : 'close'}
+        size={13}
+        color={found ? '#10B981' : '#EF4444'}
+      />
+      <Text style={[styles.reviewLabel, { color: colors.textSecondary }]} numberOfLines={1}>
+        {label}
+      </Text>
+      <Text style={[styles.reviewWord, { color: found ? PLAY_VISUALS.word_search.console[2] : colors.textSecondary }]}>
+        {word}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  loadingContainer: {
+  loadingBody: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
   },
   loadingText: { fontSize: 15 },
-  gridContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-  },
-  wordListContainer: {
+  content: {
     flex: 1,
-    borderTopWidth: 1,
     paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 16,
-    minHeight: 120,
+    paddingTop: 4,
+    paddingBottom: 18,
+    gap: 10,
   },
-  // Modal
-  modalOverlay: {
+  trayRegion: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    minHeight: 110,
+  },
+  modeChip: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
   },
-  resultCard: {
-    width: '100%',
-    maxHeight: '90%',
-    borderRadius: 20,
-    padding: 24,
-    gap: 12,
-    boxShadow: '0px 8px 24px rgba(0,0,0,0.25)',
-    elevation: 12,
-  },
-  resultEmoji: { fontSize: 42, textAlign: 'center' },
-  resultTitle: { fontSize: 22, fontWeight: '800', textAlign: 'center' },
-  resultSub: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
-  scoreBox: {
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 14,
-    gap: 8,
-  },
-  scoreRow: {
+  consoleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 10,
   },
-  scoreLabel: { fontSize: 13, color: '#888' },
-  scoreLabelBold: { fontWeight: '700', fontSize: 14, color: '#555' },
-  scoreValue: { fontSize: 14, fontWeight: '600' },
-  scoreValueBold: { fontSize: 16, fontWeight: '800' },
-  scoreDivider: { height: 1, marginVertical: 2 },
-  reviewBox: {
-    borderRadius: 12,
-    borderWidth: 1,
+  boardShell: {
+    borderRadius: 16,
+    padding: BOARD_PAD,
     overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth + 0.5,
+    borderColor: 'rgba(120,150,180,0.25)',
+    boxShadow: '0 12px 30px -16px rgba(0,0,0,0.45)',
   },
-  reviewTitle: {
-    fontSize: 13,
-    fontWeight: '700',
+  dishHeader: {
     paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 6,
-  },
-  reviewScroll: { maxHeight: 220, paddingHorizontal: 12, paddingBottom: 8 },
-  reviewGroupHeader: {
     paddingTop: 8,
-    paddingBottom: 2,
+    paddingBottom: 3,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  reviewGroupTitle: {
-    fontSize: 13,
-    fontWeight: '700',
+  dishHeaderText: {
+    fontFamily: fonts.display.semibold,
+    fontSize: 12.5,
   },
   reviewRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
-    paddingLeft: 4,
     gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  reviewCheck: { fontSize: 14, fontWeight: '700', width: 18 },
-  reviewWordLabel: { flex: 1, fontSize: 12 },
-  reviewSearchWord: { fontSize: 12, fontWeight: '700' },
-  actionBtn: {
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
+  reviewLabel: {
+    flex: 1,
+    minWidth: 0,
+    fontSize: 12,
   },
-  actionBtnText: { color: '#fff', fontSize: 15, fontWeight: '700' },
-  secondaryBtn: {
-    borderRadius: 12,
-    borderWidth: 1,
-    paddingVertical: 12,
-    alignItems: 'center',
+  reviewWord: {
+    fontFamily: fonts.mono.semibold,
+    fontSize: 11.5,
   },
-  secondaryBtnText: { fontSize: 14, fontWeight: '600' },
 });
