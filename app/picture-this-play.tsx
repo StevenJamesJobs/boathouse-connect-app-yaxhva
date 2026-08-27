@@ -735,18 +735,18 @@ function QuestionReviewRow({ entry, t }: { entry: AnsweredQuestion; t: (k: strin
           {entry.question.itemName}
         </Text>
         {clean ? (
-          <Text style={[styles.reviewAnswer, { color: '#10B981' }]} numberOfLines={2}>
-            {correctText}
-          </Text>
+          <Text style={[styles.reviewAnswer, { color: '#10B981' }]}>{correctText}</Text>
         ) : (
-          // The correct answer stands out bold-green after the muted miss.
-          <Text style={[styles.reviewAnswer, { color: colors.textSecondary }]} numberOfLines={2}>
-            {t('game_results:you_said_wrong', {
-              wrong: entry.wrongAttempts.map((idx) => entry.question.choices[idx].text).join(', '),
-            })}
-            {' → '}
-            <Text style={styles.reviewCorrect}>{correctText}</Text>
-          </Text>
+          <>
+            {/* The miss list may truncate; the bold-green correct answer gets
+                its own fully-wrapping line so it can never be cut off. */}
+            <Text style={[styles.reviewAnswer, { color: colors.textSecondary }]} numberOfLines={2}>
+              {t('game_results:you_said_wrong', {
+                wrong: entry.wrongAttempts.map((idx) => entry.question.choices[idx].text).join(', '),
+              })}
+            </Text>
+            <Text style={[styles.reviewAnswer, styles.reviewCorrect]}>→ {correctText}</Text>
+          </>
         )}
       </View>
     </View>
