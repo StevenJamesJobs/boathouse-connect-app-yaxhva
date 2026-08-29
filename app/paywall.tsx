@@ -30,7 +30,7 @@ const BASE_FEATURES = [
 
 const PREMIUM_EXTRAS = [
   'AI Schedule Upload',
-  'Weekly Quizzes',
+  'Quizzes & Exams',
   'Menu Memory Tiles',
   'Picture This! Game',
   'Auto Google Reviews',

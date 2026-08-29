@@ -14,6 +14,7 @@ export interface ExamQuestion {
   bucks_value: number | null;
   category_label: string | null;
   source_type: 'auto' | 'custom' | 'bonus';
+  source_table?: string | null;
   question_image_url?: string | null;
   // Spanish translations
   question_text_es?: string | null;
@@ -119,19 +120,28 @@ export function handleTimeout(state: ExamState): ExamState {
 
 // Calculate scoring results.
 //
-// rewardPerCorrect is the fallback used for any standard question whose
-// per-question bucks_value is NULL. When a user is eligible for multiple
-// weekly quizzes we pass $1/N here so the weekly maximum earnings from
-// fallback questions stays constant regardless of how many quizzes a user
-// takes. Per-question bucks_value (when set) is paid in full and is NOT
-// scaled by N — managers explicitly chose those values.
+// rewardPerCorrect is the LEGACY fallback used for any standard question
+// whose per-question bucks_value is NULL when the quiz has no default of its
+// own. When a user is eligible for multiple quizzes we pass $1/N here so the
+// maximum earnings from fallback questions stays constant regardless of how
+// many quizzes a user takes.
+//
+// defaultBucksValue (s77) is the quiz-level default the manager set in the
+// composer (exams.default_bucks_value). It replaces the $1 BASE — and, like
+// that base, it is SPLIT across a multi-quiz member's quizzes (Steve's smoke
+// ruling: the per-correct number reads plain everywhere, and the split is
+// described once, on the Rewards line — so it must actually apply). $0 is an
+// explicit no-reward quiz. NULL keeps the $1 base.
+//
+// Per-question bucks_value (when set) always wins and always pays in full.
 //
 // rewardsEnabled gates the entire quiz: when false (the manager flipped the
-// "No Rewards" toggle on the exam), totalBucksAwarded is forced to 0.
+// "Award Bucks" toggle off), totalBucksAwarded is forced to 0.
 export function calculateResults(
   state: ExamState,
   rewardPerCorrect: number = 1,
-  rewardsEnabled: boolean = true
+  rewardsEnabled: boolean = true,
+  defaultBucksValue: number | null = null
 ): {
   correctCount: number;
   totalQuestions: number;
@@ -159,9 +169,13 @@ export function calculateResults(
       if (answer.is_correct) {
         standardCorrect++;
         // Per-question bucks_value (full value) when set; otherwise the
-        // shared rewardPerCorrect fallback (already $1/N when relevant).
+        // quiz-level default (or the $1 base) scaled by the multi-quiz split
+        // that rewardPerCorrect already carries ($1/N → the factor is 1/N).
         const perQ = question.bucks_value;
-        standardBucks += typeof perQ === 'number' ? perQ : rewardPerCorrect;
+        standardBucks +=
+          typeof perQ === 'number'
+            ? perQ
+            : (typeof defaultBucksValue === 'number' ? defaultBucksValue : 1) * rewardPerCorrect;
       }
     }
   });

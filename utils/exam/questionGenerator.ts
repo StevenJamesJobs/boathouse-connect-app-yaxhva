@@ -1082,12 +1082,43 @@ export async function generatePhotoQuestion(
 // MAIN GENERATOR
 // =============================================
 
+// ─── s77 composer dials ──────────────────────────────────────────────────
+// The generator's knobs, surfaced in the editor's composer. Every dial maps
+// onto structure that already existed: sources gate the template pools,
+// photoRatio scales the reserved picture slots (the old hardcoded 1-in-5),
+// and difficulty tiers the ingredient templates (easy = prices/sections/
+// dietary/pairings, medium/hard = the ingredient digs).
+
+export type QuizSource = 'menu' | 'wine' | 'libations' | 'cocktails' | 'checklists';
+export type QuizDifficulty = 'standard' | 'mixed' | 'advanced';
+
+export interface GenerateOptions {
+  /** Template pools to draw from. Default: every pool the exam type can use. */
+  sources?: QuizSource[];
+  /**
+   * Exact number of picture-question slots to reserve (the composer's slider,
+   * s77 smoke round). Clamped to the question count; gracefully downgrades
+   * when the image pool runs dry. Default: the classic 1-in-5 reservation.
+   */
+  photoCount?: number;
+  /** 'standard' skips the hard tier; 'advanced' leads with medium/hard. */
+  difficulty?: QuizDifficulty;
+}
+
+type Tier = 'easy' | 'medium' | 'hard';
+interface TaggedGenerator {
+  source: QuizSource;
+  tier: Tier;
+  make: () => QuestionCandidate | null;
+}
+
 export async function generateQuizQuestions(
   examType: ExamType,
   cycleKey: string,
   questionCount: number = 5,
   organizationId: string,
   actorId: string = '',
+  options: GenerateOptions = {},
 ): Promise<GeneratedQuestion[]> {
   // Org scoping is mandatory: never generate a quiz from another tenant's data.
   if (!organizationId) {
@@ -1096,17 +1127,25 @@ export async function generateQuizQuestions(
   const seedStr = `${cycleKey}-${examType}`;
   const rng = seededRandom(hashString(seedStr));
 
+  const wantSource = (s: QuizSource) => !options.sources || options.sources.includes(s);
+  const difficulty: QuizDifficulty = options.difficulty ?? 'mixed';
+  const reservedPhotoSlots = Math.max(
+    0,
+    Math.min(
+      questionCount,
+      options.photoCount ?? Math.max(1, Math.round(questionCount / 5)),
+    ),
+  );
+
   // Fetch all data sources
   const menuItems = await fetchMenuItems(actorId);
-  const photoPool = await fetchMenuItemsWithImages(actorId);
+  const photoPool = reservedPhotoSlots === 0 ? [] : await fetchMenuItemsWithImages(actorId);
 
   // Build candidate pool based on exam type
   const candidates: QuestionCandidate[] = [];
 
-  // ─── Picture question slots (1-in-5 ratio) ──────────────────────────
-  // Reserve Math.max(1, round(count/5)) slots for picture questions.
-  // Gracefully downgrades to 0 if the image pool is too small.
-  const reservedPhotoSlots = Math.max(1, Math.round(questionCount / 5));
+  // ─── Picture question slots ─────────────────────────────────────────
+  // Gracefully downgrades when the image pool runs dry.
   const usedPhotoItemIds = new Set<string>();
   let photoSlotsFilled = 0;
   for (let i = 0; i < reservedPhotoSlots; i++) {
@@ -1128,46 +1167,70 @@ export async function generateQuizQuestions(
   }
 
   // Menu questions — available for all exam types
-  const menuGenerators = [
-    () => menuPriceQuestion(menuItems, rng),
-    () => menuCategoryQuestion(menuItems, rng),
-    () => menuGlutenFreeQuestion(menuItems, rng),
-    () => menuVegetarianQuestion(menuItems, rng),
-    () => menuIngredientMediumQuestion(menuItems, rng),
-    () => menuIngredientHardQuestion(menuItems, rng),
-  ];
-
-  // Libation/cocktail questions — Server and Bartender only
-  if (examType === 'server' || examType === 'bartender') {
-    const cocktails = await fetchCocktails(actorId);
-    const libations = await fetchLibationRecipes(actorId);
-    const winePairings = await fetchWinePairings(actorId);
-    const wineItems = await fetchWineItems(actorId);
-
-    menuGenerators.push(
-      () => cocktailSpiritQuestion(cocktails, rng),
-      () => libationGlasswareQuestion(libations, rng),
-      () => libationGarnishQuestion(libations, rng),
-      () => winePairingQuestion(winePairings, rng),
-      () => libationIngredientQuestion(libations, rng),
-      () => libationIngredientMediumQuestion(libations, rng),
-      () => libationIngredientHardQuestion(libations, rng),
-      () => wineNameLocationQuestion(wineItems, rng),
-      () => winePriceQuestion(wineItems, rng),
+  const generators: TaggedGenerator[] = [];
+  if (wantSource('menu')) {
+    generators.push(
+      { source: 'menu', tier: 'easy', make: () => menuPriceQuestion(menuItems, rng) },
+      { source: 'menu', tier: 'easy', make: () => menuCategoryQuestion(menuItems, rng) },
+      { source: 'menu', tier: 'easy', make: () => menuGlutenFreeQuestion(menuItems, rng) },
+      { source: 'menu', tier: 'easy', make: () => menuVegetarianQuestion(menuItems, rng) },
+      { source: 'menu', tier: 'medium', make: () => menuIngredientMediumQuestion(menuItems, rng) },
+      { source: 'menu', tier: 'hard', make: () => menuIngredientHardQuestion(menuItems, rng) },
     );
   }
 
-  // Checklist questions — Bartender and Host
-  if (examType === 'bartender') {
-    const checklistItems = await fetchBartenderChecklistItems(actorId);
-    menuGenerators.push(() => checklistQuestion(checklistItems, 'Bartender', rng));
-  } else if (examType === 'host') {
-    const checklistItems = await fetchHostChecklistItems(actorId);
-    menuGenerators.push(() => checklistQuestion(checklistItems, 'Host', rng));
+  // Libation/cocktail/wine questions — Server and Bartender only
+  if (examType === 'server' || examType === 'bartender') {
+    const cocktails = wantSource('cocktails') ? await fetchCocktails(actorId) : [];
+    const libations = wantSource('libations') ? await fetchLibationRecipes(actorId) : [];
+    const winePairings = wantSource('wine') ? await fetchWinePairings(actorId) : [];
+    const wineItems = wantSource('wine') ? await fetchWineItems(actorId) : [];
+
+    if (wantSource('cocktails')) {
+      generators.push({ source: 'cocktails', tier: 'easy', make: () => cocktailSpiritQuestion(cocktails, rng) });
+    }
+    if (wantSource('libations')) {
+      generators.push(
+        { source: 'libations', tier: 'easy', make: () => libationGlasswareQuestion(libations, rng) },
+        { source: 'libations', tier: 'easy', make: () => libationGarnishQuestion(libations, rng) },
+        { source: 'libations', tier: 'easy', make: () => libationIngredientQuestion(libations, rng) },
+        { source: 'libations', tier: 'medium', make: () => libationIngredientMediumQuestion(libations, rng) },
+        { source: 'libations', tier: 'hard', make: () => libationIngredientHardQuestion(libations, rng) },
+      );
+    }
+    if (wantSource('wine')) {
+      generators.push(
+        { source: 'wine', tier: 'easy', make: () => winePairingQuestion(winePairings, rng) },
+        { source: 'wine', tier: 'easy', make: () => wineNameLocationQuestion(wineItems, rng) },
+        { source: 'wine', tier: 'easy', make: () => winePriceQuestion(wineItems, rng) },
+      );
+    }
   }
 
-  // Shuffle generators for variety
-  const shuffledGenerators = seededShuffle(menuGenerators, rng);
+  // Checklist questions — Bartender and Host
+  if (wantSource('checklists')) {
+    if (examType === 'bartender') {
+      const checklistItems = await fetchBartenderChecklistItems(actorId);
+      generators.push({ source: 'checklists', tier: 'easy', make: () => checklistQuestion(checklistItems, 'Bartender', rng) });
+    } else if (examType === 'host') {
+      const checklistItems = await fetchHostChecklistItems(actorId);
+      generators.push({ source: 'checklists', tier: 'easy', make: () => checklistQuestion(checklistItems, 'Host', rng) });
+    }
+  }
+
+  // Difficulty shapes the draw order: 'standard' drops the hard tier
+  // entirely, 'advanced' deals medium/hard first (easy only fills the tail),
+  // 'mixed' keeps the classic full shuffle.
+  const pool =
+    difficulty === 'standard' ? generators.filter(g => g.tier !== 'hard') : generators;
+  let shuffledGenerators: Array<() => QuestionCandidate | null>;
+  if (difficulty === 'advanced') {
+    const deep = seededShuffle(pool.filter(g => g.tier !== 'easy'), rng);
+    const easy = seededShuffle(pool.filter(g => g.tier === 'easy'), rng);
+    shuffledGenerators = [...deep, ...easy].map(g => g.make);
+  } else {
+    shuffledGenerators = seededShuffle(pool, rng).map(g => g.make);
+  }
 
   // Generate candidates, ensuring no duplicate templates
   const usedTemplates = new Set<string>();

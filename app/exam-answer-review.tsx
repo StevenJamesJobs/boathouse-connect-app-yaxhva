@@ -19,6 +19,10 @@ import { formatTime } from '@/utils/exam/examEngine';
 import QuestionReviewList, { QuestionReviewEntry } from '@/components/QuestionReviewList';
 import { useOrganization } from '@/contexts/OrganizationContext';
 import { getOrgDirectory } from '@/utils/orgDirectory';
+import AmbientGlow from '@/components/AmbientGlow';
+import ScreenHeader from '@/components/ScreenHeader';
+import GlassCard from '@/components/GlassCard';
+import { fonts } from '@/constants/fonts';
 
 type AnswerRecord = {
   question_id: string;
@@ -31,7 +35,7 @@ export default function ExamAnswerReviewScreen() {
   const colors = useThemeColors();
   const { user } = useAuth();
   const { organizationId } = useOrganization();
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const isSpanish = i18n.language === 'es';
   const params = useLocalSearchParams<{ examId: string; userId: string }>();
 
@@ -179,25 +183,13 @@ export default function ExamAnswerReviewScreen() {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <IconSymbol
-            ios_icon_name="chevron.left"
-            android_material_icon_name="arrow-back"
-            size={24}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          {isSpanish ? 'Revisión de Respuestas' : 'Answer Review'}
-        </Text>
-        <View style={styles.placeholder} />
-      </View>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AmbientGlow />
+      <ScreenHeader title={t('exam_review.title')} eyebrow={t('weekly_quizzes.title')} />
 
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* User + score header */}
-        <View style={[styles.userCard, { backgroundColor: colors.card }]}>
+        <GlassCard style={styles.userCard}>
           {targetUser?.profile_picture_url ? (
             <StorageImage source={{ uri: targetUser.profile_picture_url }} style={styles.avatar} />
           ) : (
@@ -221,18 +213,18 @@ export default function ExamAnswerReviewScreen() {
                   <Text style={{ color: '#10B981' }}>· ${summary.bucks_awarded}</Text>
                 </Text>
                 <Text style={[styles.metaLine, { color: colors.textSecondary }]}>
-                  {isSpanish ? 'Tiempo' : 'Time'}: {formatTime(summary.time_seconds)}
-                  {summary.is_timed_out ? (isSpanish ? ' · Tiempo agotado' : ' · Timed out') : ''}
+                  {t('exam_review.time_line', { time: formatTime(summary.time_seconds) })}
+                  {summary.is_timed_out ? ` · ${t('exam_review.timed_out')}` : ''}
                 </Text>
               </>
             )}
           </View>
-        </View>
+        </GlassCard>
 
         {loadError ? (
           <View style={[styles.emptyCard, { backgroundColor: '#EF444415', borderColor: '#EF4444', borderWidth: 1 }]}>
             <Text style={[styles.emptyText, { color: '#EF4444' }]}>
-              {isSpanish ? 'Error al cargar las respuestas:' : 'Failed to load answers:'}
+              {t('exam_review.load_failed')}
             </Text>
             <Text style={[styles.emptyText, { color: '#EF4444', marginTop: 4 }]}>
               {loadError}
@@ -241,48 +233,33 @@ export default function ExamAnswerReviewScreen() {
         ) : summary ? (
           <QuestionReviewList questions={questions} />
         ) : (
-          <View style={[styles.emptyCard, { backgroundColor: colors.card }]}>
+          <GlassCard style={styles.emptyCard}>
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              {isSpanish ? 'Este usuario no ha completado el cuestionario.' : 'This user has not completed the quiz.'}
+              {t('exam_review.not_completed')}
             </Text>
-          </View>
+          </GlassCard>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  backButton: { padding: 8 },
-  headerTitle: { fontSize: 20, fontWeight: 'bold' },
-  placeholder: { width: 40 },
-  scrollContent: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40 },
+  scrollContent: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 40 },
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 16,
     padding: 16,
-    marginBottom: 20,
+    marginBottom: 16,
     gap: 14,
-    boxShadow: '0px 2px 8px rgba(0, 0, 0, 0.1)',
-    elevation: 3,
   },
-  avatar: { width: 60, height: 60, borderRadius: 30 },
+  avatar: { width: 56, height: 56, borderRadius: 28 },
   userInfo: { flex: 1 },
-  userName: { fontSize: 18, fontWeight: 'bold', marginBottom: 4 },
-  scoreLine: { fontSize: 15, fontWeight: '700' },
-  metaLine: { fontSize: 12, marginTop: 2 },
+  userName: { fontFamily: fonts.display.semibold, fontSize: 17.5, marginBottom: 4 },
+  scoreLine: { fontFamily: fonts.mono.semibold, fontSize: 14.5 },
+  metaLine: { fontFamily: fonts.body.regular, fontSize: 11.5, marginTop: 2 },
   emptyCard: {
     borderRadius: 14,
     padding: 24,

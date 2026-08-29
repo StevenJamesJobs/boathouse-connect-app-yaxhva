@@ -81,6 +81,8 @@ const EXACT_MAP: Record<string, string> = {
   'Guest name and review text are required': 'server_errors.guest_review_required',
   'Rating must be between 1 and 5': 'server_errors.rating_range',
   'Invalid bucks amount': 'server_errors.invalid_bucks_amount',
+  // s77: set_exam_default_bucks_value rejects negatives (UI clamps first).
+  'Invalid value': 'server_errors.invalid_value',
   // manage_menu_* json 'error' values (surfaced via callRpc data.error)
   'Category name is required': 'server_errors.category_name_required',
   'Subcategory name is required': 'server_errors.subcategory_name_required',
